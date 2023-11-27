@@ -42,13 +42,16 @@ iree_cc_library(
   NAME
     VMVX
   HDRS
+    "KernelDispatch.h"
     "Passes.h"
   SRCS
+    "KernelDispatch.cpp"
     "LowerLinalgMicrokernels.cpp"
     "Passes.cpp"
     "VMVXAssignConstantOrdinals.cpp"
     "VMVXLinkExecutables.cpp"
     "VMVXLowerExecutableTargetPass.cpp"
+    "VMVXSelectLoweringStrategy.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
@@ -71,7 +74,6 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

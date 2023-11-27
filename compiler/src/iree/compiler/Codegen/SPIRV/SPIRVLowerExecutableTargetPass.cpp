@@ -59,71 +59,52 @@ public:
 
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
 
-  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
-
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline. This should have been verified
-  // when setting the strategy, however we still need to retrieve the
-  // translation info due to this restriction.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitError(
-              "unhandled compilation of entry point function with different "
-              "translation info within a module");
-          return signalPassFailure();
-        }
-        continue;
-      }
-      translationInfo = currTranslationInfo;
-    }
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    variantOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
+    return signalPassFailure();
   }
 
-  if (translationInfo.has_value()) {
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case CodeGenPipeline::SPIRVBaseLowering:
-      addSPIRVBaseLoweringPassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseDistribute:
-      addSPIRVBaseDistributePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseVectorize:
-      addSPIRVBaseVectorizePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVSubgroupReduce:
-      addSPIRVSubgroupReducePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-      addSPIRVCooperativeMatrixVectorizePassPipeline(
-          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-          translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-      addSPIRVMatmulPromoteVectorizePassPipeline(
-          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-          translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVWinogradVectorize:
-      addSPIRVWinogradVectorizePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::TransformDialectCodegen:
-      addSPIRVTransformDialectPassPipeline(pipeline);
-      break;
-    // No pipeline specified, nothing to do.
-    case CodeGenPipeline::None:
-      return;
-    default:
-      variantOp.emitOpError("Unsupported pipeline on GPU target.");
-      return signalPassFailure();
-    }
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
+  switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+  case CodeGenPipeline::SPIRVBaseLowering:
+    addSPIRVBaseLoweringPassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVBaseDistribute:
+    addSPIRVBaseDistributePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVBaseVectorize:
+    addSPIRVBaseVectorizePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVSubgroupReduce:
+    addSPIRVSubgroupReducePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+    addSPIRVCooperativeMatrixVectorizePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+        translationInfo.value().getSoftwarePipelineStoreStage());
+    break;
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+    addSPIRVMatmulPromoteVectorizePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+        translationInfo.value().getSoftwarePipelineStoreStage());
+    break;
+  case CodeGenPipeline::SPIRVWinogradVectorize:
+    addSPIRVWinogradVectorizePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::TransformDialectCodegen:
+    addSPIRVTransformDialectPassPipeline(pipeline);
+    break;
+  // No pipeline specified, nothing to do.
+  case CodeGenPipeline::None:
+    return;
+  default:
+    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    return signalPassFailure();
   }
 
   LLVM_DEBUG({

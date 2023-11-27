@@ -333,6 +333,32 @@ getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp) {
       kTranslationInfoAttrName);
 }
 
+std::optional<IREE::Codegen::TranslationInfoAttr>
+getIdenticalTranslationInfo(IREE::HAL::ExecutableVariantOp variantOp) {
+  ModuleOp moduleOp = variantOp.getInnerModule();
+  if (!moduleOp) {
+    return std::nullopt;
+  }
+
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
+  for (auto exportOp : variantOp.getExportOps()) {
+    IREE::Codegen::TranslationInfoAttr currTranslationInfo =
+        getTranslationInfo(exportOp);
+    if (!currTranslationInfo) {
+      continue;
+    }
+    if (!translationInfo) {
+      translationInfo = currTranslationInfo;
+      continue;
+    }
+    if (currTranslationInfo != translationInfo.value()) {
+      return std::nullopt;
+    }
+  }
+
+  return translationInfo;
+}
+
 SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   if (std::optional<ArrayAttr> workgroupSizeAttrList =
           exportOp.getWorkgroupSize()) {

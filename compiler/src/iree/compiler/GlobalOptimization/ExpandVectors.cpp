@@ -12,6 +12,7 @@
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -106,11 +107,12 @@ struct ExpandVectors
           rewriter
               .create<tensor::ExpandShapeOp>(loc, newVectorCastInTy, castIn, ri)
               .getResult();
-      expandedIn =
-          rewriter
-              .create(loc, castOp.value()->getName().getIdentifier(),
-                      expandedIn, newVectorInTy, castOp.value()->getAttrs())
-              ->getResult(0);
+      auto genericOp = castOp.value()->getParentOfType<linalg::GenericOp>();
+      NamedAttrList castAttrs = genericOp
+                                    ? linalg::getPrunedAttributeList(genericOp)
+                                    : castOp.value()->getAttrs();
+      expandedIn = createGenericElementwiseCastOp(rewriter, loc, expandedIn,
+                                                  castOp.value(), castAttrs);
     } else {
       expandedIn =
           rewriter

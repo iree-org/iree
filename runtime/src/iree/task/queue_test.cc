@@ -6,7 +6,24 @@
 
 #include "iree/task/queue.h"
 
+#include "iree/base/internal/threading.h"
 #include "iree/testing/gtest.h"
+
+// Like iree_task_queue_try_steal but retries until success.
+// This is used in this test as iree_task_queue_try_steal may (rarely) fail even
+// in simple single-threaded tests, see #15488.
+static iree_task_t* iree_task_queue_try_steal_until_success(
+    iree_task_queue_t* source_queue, iree_task_queue_t* target_queue,
+    iree_host_size_t max_tasks) {
+  while (true) {
+    iree_task_t* task =
+        iree_task_queue_try_steal(source_queue, target_queue, max_tasks);
+    if (task) {
+      return task;
+    }
+    iree_thread_yield();
+  }
+}
 
 namespace {
 
@@ -186,8 +203,8 @@ TEST(QueueTest, TryStealEmpty) {
   iree_task_t task_c = {0};
   iree_task_queue_push_front(&source_queue, &task_c);
 
-  EXPECT_EQ(&task_a,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 1));
+  EXPECT_EQ(&task_a, iree_task_queue_try_steal_until_success(&source_queue,
+                                                             &target_queue, 1));
 
   iree_task_queue_deinitialize(&source_queue);
   iree_task_queue_deinitialize(&target_queue);
@@ -202,8 +219,8 @@ TEST(QueueTest, TryStealLast) {
   iree_task_t task_a = {0};
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  EXPECT_EQ(&task_a,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 100));
+  EXPECT_EQ(&task_a, iree_task_queue_try_steal_until_success(
+                         &source_queue, &target_queue, 100));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
 
@@ -224,8 +241,8 @@ TEST(QueueTest, TrySteal1) {
   iree_task_queue_push_front(&source_queue, &task_b);
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  EXPECT_EQ(&task_c,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 1));
+  EXPECT_EQ(&task_c, iree_task_queue_try_steal_until_success(&source_queue,
+                                                             &target_queue, 1));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
   EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
@@ -250,8 +267,8 @@ TEST(QueueTest, TryStealIntoExisting) {
   iree_task_t task_existing = {0};
   iree_task_queue_push_front(&target_queue, &task_existing);
 
-  EXPECT_EQ(&task_existing,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 1));
+  EXPECT_EQ(&task_existing, iree_task_queue_try_steal_until_success(
+                                &source_queue, &target_queue, 1));
 
   EXPECT_EQ(&task_a, iree_task_queue_pop_front(&source_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&source_queue));
@@ -278,8 +295,8 @@ TEST(QueueTest, TryStealMany) {
   iree_task_queue_push_front(&source_queue, &task_b);
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  EXPECT_EQ(&task_c,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 2));
+  EXPECT_EQ(&task_c, iree_task_queue_try_steal_until_success(&source_queue,
+                                                             &target_queue, 2));
   EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 
@@ -306,8 +323,8 @@ TEST(QueueTest, TryStealAll) {
   iree_task_queue_push_front(&source_queue, &task_b);
   iree_task_queue_push_front(&source_queue, &task_a);
 
-  EXPECT_EQ(&task_c,
-            iree_task_queue_try_steal(&source_queue, &target_queue, 1000));
+  EXPECT_EQ(&task_c, iree_task_queue_try_steal_until_success(
+                         &source_queue, &target_queue, 1000));
   EXPECT_EQ(&task_d, iree_task_queue_pop_front(&target_queue));
   EXPECT_TRUE(iree_task_queue_is_empty(&target_queue));
 

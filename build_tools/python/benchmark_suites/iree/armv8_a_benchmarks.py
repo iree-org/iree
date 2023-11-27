@@ -45,7 +45,7 @@ class Android_ARMv8_A_Benchmarks(object):
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-llvmcpu-enable-microkernels",
+            "--iree-llvmcpu-enable-ukernels=all",
         ],
     )
     DATA_TILING_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -54,7 +54,7 @@ class Android_ARMv8_A_Benchmarks(object):
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-llvmcpu-enable-microkernels",
+            "--iree-llvmcpu-enable-ukernels=all",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )

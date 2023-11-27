@@ -41,5 +41,6 @@ Dialect                             | Description
 ------------------------------------| -----------
 [IREEInput](./IREEInput.md)         | Structural ops legal as input to IREE's compiler
 [IREELinalgExt](./IREELinalgExt.md) | Extensions to the Linalg dialect for specific operations
+[IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 
 [^1]: Hardware Abstraction Layer

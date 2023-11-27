@@ -40,19 +40,31 @@ jobs:
         include:
           # Ubuntu packages.
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+            build-family: linux-aarch64
+            build-package: main-dist-linux
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+            build-family: linux-aarch64
+            build-package: py-compiler-pkg
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
+          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+            build-family: linux-aarch64
+            build-package: py-runtime-pkg
+            experimental: true
           - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
-            build-family: linux
+            build-family: linux-x86_64
             build-package: py-tf-compiler-tools-pkg
             experimental: false
 
@@ -84,7 +96,9 @@ jobs:
             experimental: true
 
     env:
+      # These are also set in: build_tools/python_deploy/build_linux_packages.sh
       MANYLINUX_X86_64_IMAGE: ghcr.io/nod-ai/manylinux_x86_64:main
+      MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
       - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -149,13 +163,22 @@ jobs:
       # is not enough to just invoke it directly because then pip managed
       # console scripts (like cmake, ninja) will not be on the path.
       ##########################################################################
-      - name: Main distribution (Linux)
-        if: "matrix.build-package == 'main-dist-linux'"
+      - name: Main distribution (Linux for x86_64)
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-x86_64'"
         shell: bash
         run: |
           docker run --rm -w=/work \
             -v $PWD:/work \
             "${MANYLINUX_X86_64_IMAGE}" \
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
+
+      - name: Main distribution (Linux for Arm64)
+        if: "matrix.build-package == 'main-dist-linux' && matrix.build-family == 'linux-aarch64'"
+        shell: bash
+        run: |
+          docker run --rm -w=/work \
+            -v $PWD:/work \
+            "${MANYLINUX_AARCH64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py main-dist'
 
       ##########################################################################
@@ -164,8 +187,8 @@ jobs:
       # One step per OS.
       ##########################################################################
 
-      - name: Build runtime wheels (Linux)
-        if: "matrix.build-package == 'py-runtime-pkg' && matrix.build-family == 'linux'"
+      - name: Build runtime wheels (Linux, x86_64 and Arm64)
+        if: "matrix.build-package == 'py-runtime-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}
@@ -206,8 +229,8 @@ jobs:
       # Builds the iree-compiler wheel.
       # One step per OS.
       ##########################################################################
-      - name: Build compiler wheels (Linux)
-        if: "matrix.build-package == 'py-compiler-pkg' && matrix.build-family == 'linux'"
+      - name: Build compiler wheels (Linux, x86_64 and Arm64)
+        if: "matrix.build-package == 'py-compiler-pkg' && contains(matrix.build-family, 'linux')"
         shell: bash
         env:
           package_suffix: ${{ github.event.inputs.package_suffix }}

@@ -476,7 +476,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
     // struct. As we declare all variables at the start of the function, the
     // macro call cannot be inlined into the function.
-    if (!isa<mlir::func::FuncOp, emitc::CallOp>(op))
+    if (!isa<mlir::func::FuncOp, emitc::CallOpaqueOp>(op))
       continue;
     if (op.hasAttr("vm.emit_at_end"))
       continue;

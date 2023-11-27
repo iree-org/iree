@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
     "pipeline.mlir"
+    "select_lowering_strategy.mlir"
   TOOLS
     FileCheck
     iree-opt

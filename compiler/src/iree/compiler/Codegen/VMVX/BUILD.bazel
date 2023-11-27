@@ -47,13 +47,16 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "VMVX",
     srcs = [
+        "KernelDispatch.cpp",
         "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
         "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
         "VMVXLowerExecutableTargetPass.cpp",
+        "VMVXSelectLoweringStrategy.cpp",
     ],
     hdrs = [
+        "KernelDispatch.h",
         "Passes.h",
     ],
     deps = [
@@ -62,7 +65,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
-        "//compiler/src/iree/compiler/Codegen/LLVMCPU",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",

@@ -31,11 +31,16 @@ iree_cc_library(
     LLVMSupport
     LLVMTarget
     LLVMipo
+    MLIRAMDGPUDialect
+    MLIRAMDGPUToROCDL
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
     MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPass
     MLIRROCDLDialect
+    MLIRROCDLTarget
     MLIRROCDLToLLVMIRTranslation
     MLIRSupport
     MLIRTargetLLVMIRExport

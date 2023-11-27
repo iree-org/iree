@@ -95,8 +95,9 @@ struct MatmulNarrowSizes {
 // Returns the minimum of static sizes of the M-dimension in the types of the
 // LHS and/or the Output operand of a matmul, whichever is static.
 static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
-  int64_t M = outType.getDimSize(0);
-  int64_t N = outType.getDimSize(1);
+  int64_t M = outType.getDimSize(outType.getRank() - 2);
+  int64_t N = outType.getDimSize(outType.getRank() - 1);
+
   MatmulNarrowSizes narrow;
   // Threshold below which a M/N size is considered "narrow", making it
   // eligible for a narrow tile size during materialization. This value should
@@ -146,38 +147,12 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
 static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
                                CastOpInterface castOp,
                                IREE::LinalgExt::EncodingAttr encodingAttr) {
-  auto encodedType = cast<RankedTensorType>(encoded.getType());
-  auto castResultElemType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
-  auto castedType = RankedTensorType::get(encodedType.getShape(),
-                                          castResultElemType, encodingAttr);
-  assert(encodedType.getElementType() ==
-             getElementTypeOrSelf(castOp->getOperandTypes()[0]) &&
-         "Expected encoded element type to be the same as the cast input "
-         "element type");
-  SmallVector<OpFoldResult> inputMixedSizes =
-      tensor::getMixedSizes(builder, loc, encoded);
-  Value init = builder.create<tensor::EmptyOp>(
-      loc, inputMixedSizes, castResultElemType, encodingAttr);
-  SmallVector<AffineMap> maps(
-      2, AffineMap::getMultiDimIdentityMap(castedType.getRank(),
-                                           builder.getContext()));
-  SmallVector<utils::IteratorType> iteratorTypes(castedType.getRank(),
-                                                 utils::IteratorType::parallel);
   auto genericOp = castOp->getParentOfType<linalg::GenericOp>();
-  NamedAttrList castAttrs =
-      genericOp ? genericOp->getAttrs() : castOp->getAttrs();
-  return builder
-      .create<linalg::GenericOp>(
-          loc, castedType, encoded, init, maps, iteratorTypes,
-          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
-            Value castRes =
-                b.create(nestedLoc, castOp->getName().getIdentifier(), args[0],
-                         castResultElemType)
-                    ->getResult(0);
-            b.create<linalg::YieldOp>(nestedLoc, castRes);
-          },
-          castAttrs)
-      ->getResult(0);
+  NamedAttrList castAttrs = genericOp
+                                ? linalg::getPrunedAttributeList(genericOp)
+                                : castOp->getAttrs();
+  return createGenericElementwiseCastOp(builder, loc, encoded, castOp,
+                                        castAttrs, encodingAttr);
 }
 
 static Value
@@ -268,8 +243,12 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       }
       return {};
     };
-    Type lhsElemType = getElemType(origLhs);
-    Type rhsElemType = getElemType(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
+                                      : getElemType(origLhs);
+    Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
+                                      : getElemType(origRhs);
     Type outElemType = getElemType(origOut);
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
@@ -280,13 +259,17 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     MatmulNarrowSizes narrowSizes =
         getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
     Location loc = matmulOp.getLoc();
-    TypeRange operandTypes = matmulOp->getOperandTypes();
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, origLhs, user,
-                                         IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, origRhs, user,
-                                         IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes);
+    SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
+    operandTypes[0] =
+        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
+    operandTypes[1] =
+        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
+    Value encodedLhs = padAndSetEncoding(
+        rewriter, loc, origLhs, user, IREE::LinalgExt::EncodingRole::LHS,
+        operandTypes, narrowSizes, maybeLhsCastOp);
+    Value encodedRhs = padAndSetEncoding(
+        rewriter, loc, origRhs, user, IREE::LinalgExt::EncodingRole::RHS,
+        operandTypes, narrowSizes, maybeRhsCastOp);
     Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
                                          IREE::LinalgExt::EncodingRole::RESULT,
                                          operandTypes, narrowSizes);

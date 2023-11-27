@@ -90,30 +90,6 @@ static void permute(SmallVectorImpl<T> &vector) {
     break;
   }
 }
-/// Container of information needed to materialize the pack operation.
-struct MaterializeEncodingInfo {
-  SmallVector<int64_t> innerDimsPos;
-  SmallVector<int64_t> innerTileSizes;
-  SmallVector<int64_t> outerDimsPerm;
-  unsigned srcRank = 0;
-};
-
-using MaterializeEncodingFn =
-    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
-
-struct MaterializeEncodingValueInfo {
-  SmallVector<Value> innerTileSizes;
-};
-
-using MaterializeEncodingValueFn =
-    std::function<FailureOr<MaterializeEncodingValueInfo>(
-        RankedTensorType, OpBuilder &, Location)>;
-
-FailureOr<SmallVector<OpFoldResult>>
-getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
-                     RankedTensorType tensorType,
-                     const MaterializeEncodingInfo &materializeEncodingInfo,
-                     MaterializeEncodingValueFn materializeEncodingValueFn);
 
 } // namespace LinalgExt
 } // namespace IREE

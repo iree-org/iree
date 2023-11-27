@@ -42,13 +42,13 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "CPULowerToUKernels.cpp"
     "CPUMaterializeEncodingPass.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
-    IREELinalgExtEncodingUtils
     IREELinalgExtTransforms
     IREELinalgExtUtils
     LLVMSupport
@@ -71,12 +71,15 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

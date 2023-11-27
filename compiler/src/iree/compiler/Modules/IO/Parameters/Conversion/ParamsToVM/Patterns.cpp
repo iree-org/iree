@@ -72,76 +72,6 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
-struct ReadOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::ReadOp> {
-  ReadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
-                   TypeConverter &typeConverter, StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-  LogicalResult
-  matchAndRewrite(IREE::IO::Parameters::ReadOp readOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        readOp, importOp.getSymNameAttr(), TypeRange{},
-        ValueRange{
-            adaptor.getDevice(),
-            adaptor.getQueueAffinity(),
-            adaptor.getWaitFence(),
-            adaptor.getSignalFence(),
-            getStringRodata(readOp.getLoc(), adaptor.getSourceScopeAttr(),
-                            rewriter),
-            getStringRodata(readOp.getLoc(), adaptor.getSourceKeyAttr(),
-                            rewriter),
-            adaptor.getSourceOffset(),
-            adaptor.getTargetBuffer(),
-            adaptor.getTargetOffset(),
-            adaptor.getLength(),
-        });
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
-struct WriteOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::WriteOp> {
-  WriteOpConversion(MLIRContext *context, SymbolTable &importSymbols,
-                    TypeConverter &typeConverter, StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-  LogicalResult
-  matchAndRewrite(IREE::IO::Parameters::WriteOp writeOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        writeOp, importOp.getSymNameAttr(), TypeRange{},
-        ValueRange{
-            adaptor.getDevice(),
-            adaptor.getQueueAffinity(),
-            adaptor.getWaitFence(),
-            adaptor.getSignalFence(),
-            getStringRodata(writeOp.getLoc(), adaptor.getTargetScopeAttr(),
-                            rewriter),
-            getStringRodata(writeOp.getLoc(), adaptor.getTargetKeyAttr(),
-                            rewriter),
-            adaptor.getTargetOffset(),
-            adaptor.getSourceBuffer(),
-            adaptor.getSourceOffset(),
-            adaptor.getLength(),
-        });
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
 // TODO(benvanik): make a vm.rodata.table or something that returns the
 // offset/length and data buffers. We could then do a whole-program analysis to
 // build a single data table with multiple views into it.
@@ -300,10 +230,6 @@ void populateIOParametersToVMPatterns(MLIRContext *context,
                                       RewritePatternSet &patterns) {
   patterns.insert<LoadOpConversion>(context, importSymbols, typeConverter,
                                     "io_parameters.load");
-  patterns.insert<ReadOpConversion>(context, importSymbols, typeConverter,
-                                    "io_parameters.read");
-  patterns.insert<WriteOpConversion>(context, importSymbols, typeConverter,
-                                     "io_parameters.write");
   patterns.insert<GatherOpConversion>(context, importSymbols, typeConverter,
                                       "io_parameters.gather");
   patterns.insert<ScatterOpConversion>(context, importSymbols, typeConverter,

@@ -20,5 +20,7 @@ rules:
     # Formatters may do this (e.g. Prettier does) and it seems like the most
     # trivial thing to get a failing check for.
     min-spaces-from-content: 1
+  # This is not a useful check, especially when disabling entire blocks.
+  comments-indentation: disable
 
 ignore: /third_party/*

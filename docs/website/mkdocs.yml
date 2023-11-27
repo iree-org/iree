@@ -163,6 +163,7 @@ nav:
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
               - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
+              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
@@ -206,6 +207,11 @@ nav:
       - "Blog":
           - "community/blog/index.md"
       - "community/tags.md"
+
+# https://www.mkdocs.org/user-guide/configuration/#hooks
+hooks:
+  - custom_edit_url.py
+
 plugins:
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
   - blog:

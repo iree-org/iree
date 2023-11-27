@@ -20,6 +20,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
+#define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 namespace mlir {
 namespace iree_compiler {
@@ -342,9 +343,9 @@ QuantizedMatmulRewriter::QuantizedMatmulRewriter(RewriterBase &rewriter,
 
 LogicalResult QuantizedMatmulRewriter::precondition() {
   if (ins.size() != 5) {
-    llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                 << "expected `ins` to have 5 inputs\n";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        matmul,
+        "expected `ins` to have 5 inputs for quantized matmul reassociation");
   }
   OpOperand *unquantizedInputOperand = ins[1];
   Value unquantizedInput = ins[1]->get();
@@ -356,17 +357,15 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   SmallVector<utils::IteratorType> matmulIteratorTypes =
       matmul.getIteratorTypesArray();
   if (unquantizedInputShape.size() < 2) {
-    llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                 << "input expected to have a rank of at least 2\n";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        matmul, "input expected to have a rank of at least 2");
   }
   if (matmulIteratorTypes[indexingMap.getNumDims() - 1] ==
           utils::IteratorType::parallel ||
       matmulIteratorTypes[indexingMap.getNumDims() - 2] ==
           utils::IteratorType::parallel) {
-    llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                 << "inner 2 dimensions of matmul expected to be reduction\n";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        matmul, "inner 2 dimensions of matmul expected to be reduction");
   }
   auto affineExprs = indexingMap.getResults();
   auto innerDim0 = dyn_cast<AffineDimExpr>(affineExprs.back());
@@ -374,14 +373,11 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   if (!innerDim0 || !innerDim1 ||
       innerDim0.getPosition() != indexingMap.getNumDims() - 1 ||
       innerDim1.getPosition() != indexingMap.getNumDims() - 2) {
-    llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                 << "inner shape of input expected to be reduced in matmul\n";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        matmul, "inner shape of input expected to be reduced in matmul");
   }
   if (!unquantizedInputType.getElementType().isa<FloatType>()) {
-    llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                 << "expected float type\n";
-    return failure();
+    return rewriter.notifyMatchFailure(matmul, "expected float type");
   }
   Value scales = ins[2]->get();
   Value zps = ins[3]->get();
@@ -391,25 +387,20 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   auto scalesType = llvm::dyn_cast<RankedTensorType>(scales.getType());
   auto zpsType = llvm::dyn_cast<RankedTensorType>(zps.getType());
   if (!scalesType || !zpsType) {
-    llvm::dbgs()
-        << "[" DEBUG_TYPE "]: "
-        << "expected scales and zero points to have RankedTensorType\n";
-    return failure();
+    return rewriter.notifyMatchFailure(
+        dequant, "expected scales and zero points to have RankedTensorType");
   }
   if (scalesType.getShape().size() != matmulDequantizedInputExprs.size() - 1) {
     if (scalesType.getShape().size() != matmulDequantizedInputExprs.size() ||
         scalesType.getShape().back() != 1) {
-      llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                   << "unexpected rank for scales\n";
-      return failure();
+      return rewriter.notifyMatchFailure(dequant, "unexpected rank for scales");
     }
   }
   if (zpsType.getShape().size() != matmulDequantizedInputExprs.size() - 1) {
     if (zpsType.getShape().size() != matmulDequantizedInputExprs.size() ||
         zpsType.getShape().back() != 1) {
-      llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                   << "unexpected rank for zero points\n";
-      return failure();
+      return rewriter.notifyMatchFailure(dequant,
+                                         "unexpected rank for zero points");
     }
   }
   return success();
@@ -483,8 +474,7 @@ Value QuantizedMatmulRewriter::generateGroupMaxGeneric() {
         Value max = b.create<arith::MaximumFOp>(nestedLoc, abs, args[1]);
         b.create<linalg::YieldOp>(nestedLoc, max);
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "groupMaxOp:   " << groupMaxOp << "\n";
+  LLVM_DEBUG(DBGS() << "groupMaxOp:   " << groupMaxOp << "\n");
   return groupMaxOp.getResult(0);
 }
 
@@ -508,8 +498,7 @@ Value QuantizedMatmulRewriter::generateScalesGeneric(Value groupMax) {
         Value scale = b.create<arith::DivFOp>(nestedLoc, args[0], cst);
         b.create<linalg::YieldOp>(nestedLoc, scale);
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "scalesOp:   " << scalesOp << "\n";
+  LLVM_DEBUG(DBGS() << "scalesOp:   " << scalesOp << "\n");
   return scalesOp.getResult(0);
 }
 
@@ -529,8 +518,7 @@ Value QuantizedMatmulRewriter::generateGroupSumsGeneric() {
         Value sum = b.create<arith::AddFOp>(nestedLoc, args[0], args[1]);
         b.create<linalg::YieldOp>(nestedLoc, sum);
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "groupSumsOp:   " << groupSumsOp << "\n";
+  LLVM_DEBUG(DBGS() << "groupSumsOp:   " << groupSumsOp << "\n");
   return groupSumsOp.getResult(0);
 }
 
@@ -567,8 +555,7 @@ SmallVector<Value> QuantizedMatmulRewriter::generateQuantizationGenerics() {
             b.create<arith::FPToSIOp>(nestedLoc, quantizedElementType, scaled);
         b.create<linalg::YieldOp>(nestedLoc, quant);
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "quantizeOp:   " << quantizeOp << "\n";
+  LLVM_DEBUG(DBGS() << "quantizeOp:   " << quantizeOp << "\n");
   Value newQuantizedInput = quantizeOp.getResult(0);
   SmallVector<Value> results{groupMax, scales, groupSums, newQuantizedInput};
   return results;
@@ -635,13 +622,8 @@ linalg::GenericOp QuantizedMatmulRewriter::generateQuantizedMatmulGeneric(
           sum = b.create<arith::AddIOp>(nestedLoc, extMul, args[2]);
         }
         b.create<linalg::YieldOp>(nestedLoc, sum);
-        llvm::dbgs() << "[" DEBUG_TYPE "]: "
-                     << "15\n";
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "16\n";
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "integerMatmulOp:   " << integerMatmulOp << "\n";
+  LLVM_DEBUG(DBGS() << "integerMatmulOp:   " << integerMatmulOp << "\n");
   return integerMatmulOp;
 }
 
@@ -727,9 +709,8 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
         Value sum = b.create<arith::AddFOp>(loc, groupRes, args[5]);
         b.create<linalg::YieldOp>(loc, sum);
       });
-  llvm::dbgs() << "[" DEBUG_TYPE "]: "
-               << "reassociatedDequantizationOp:   "
-               << reassociatedDequantizationOp << "\n";
+  LLVM_DEBUG(DBGS() << "reassociatedDequantizationOp:   "
+                    << reassociatedDequantizationOp << "\n");
   return reassociatedDequantizationOp;
 }
 
@@ -832,16 +813,13 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
 //             } -> tensor<8xf32>
 //         ```
 //
-// The rewrite also forms a `flow.dispatch.region` op around ops 5 and 6, and
-// sets a specific tiling on ops 5 and 6 to target a VectorContractCustomKernel.
-//
 // ** Note that this rewrite introduces precision loss in the matmul, and is a
 //    tradeoff between precision and performance. This rewrite should most
 //    likely be opt-in only. **
-static LogicalResult reassociateAndFuseDequantMatmul(RewriterBase &rewriter,
-                                                     linalg::GenericOp dequant,
-                                                     linalg::GenericOp matmul,
-                                                     int quantizeBitWidth) {
+static LogicalResult reassociateDequantMatmul(RewriterBase &rewriter,
+                                              linalg::GenericOp dequant,
+                                              linalg::GenericOp matmul,
+                                              int quantizeBitWidth) {
   QuantizedMatmulRewriter qmr(rewriter, dequant, matmul, quantizeBitWidth);
   if (failed(qmr.precondition())) {
     return success();
@@ -855,14 +833,6 @@ static LogicalResult reassociateAndFuseDequantMatmul(RewriterBase &rewriter,
 
   rewriter.replaceOp(matmul, reassociatedDequantization.getResult(0));
 
-  // Fuse dequantization + matmul ops into a single dispatch region
-  SmallVector<Operation *> dequantMatmulOps{quantizedIntegerMatmul,
-                                            reassociatedDequantization};
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeDequantMatmulDispatch =
-      wrapConsecutiveOpsInDispatchRegion(rewriter, dequantMatmulOps);
-  if (failed(maybeDequantMatmulDispatch)) {
-    return failure();
-  }
   return success();
 }
 
@@ -980,7 +950,7 @@ void FuseDequantizationMatmulPass::runOnOperation() {
     IRRewriter rewriter(context);
     for (auto candidate : candidates) {
       rewriter.setInsertionPointAfter(candidate.second);
-      if (failed(reassociateAndFuseDequantMatmul(
+      if (failed(reassociateDequantMatmul(
               rewriter, candidate.first, candidate.second, quantizeBitWidth))) {
         return signalPassFailure();
       }

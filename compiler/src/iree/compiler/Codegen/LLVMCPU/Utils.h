@@ -45,26 +45,12 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
-/// Find the root operation for the dispatch region. The priority is:
-///   1. A Linalg operation that has reduction loops.
-///   2. Any other Linalg op or LinalgExt op.
-///   3. An operation that implements TilingInterface.
-/// If there are multiple operations meeting the same priority, the one closer
-/// to the end of the function is the root op.
-FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
-
 /// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
 /// provided the corresponding tile size will be multiplied by a vector.vscale
 /// op.
 void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
                      SmallVector<int64_t> tileSizes,
                      SmallVector<bool> tileScalableFlags);
-
-// If the `genericOp` is element-wise with identity maps, and has only a
-// CastOpInterface op, return the CastOpInterface op of the body. Otherwise,
-// return std::nullopt.
-std::optional<CastOpInterface>
-getCastOpOfElementWiseCast(linalg::GenericOp genericOp);
 
 } // namespace iree_compiler
 } // namespace mlir

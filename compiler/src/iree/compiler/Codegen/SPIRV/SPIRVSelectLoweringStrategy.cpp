@@ -122,40 +122,23 @@ void SPIRVSelectLoweringStrategyPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
 
-  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
-
   if (failed(initSPIRVLaunchConfig(moduleOp))) {
     return signalPassFailure();
   }
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. For now this restriction
-  // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitError(
-              "unhandled compilation of entry point function with different "
-              "translation info within a module");
-          return signalPassFailure();
-        }
-        continue;
-      }
 
-      // Verify the properties of each entry point based on the target
-      // pipeline.
-      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
-        return signalPassFailure();
-      }
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    moduleOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
+    return signalPassFailure();
+  }
 
-      translationInfo = currTranslationInfo;
+  // Verify the properties of each entry point based on the target pipeline.
+  for (auto exportOp : variantOp.getExportOps()) {
+    if (failed(verifyEntryPoint(moduleOp, translationInfo.value(), exportOp))) {
+      return signalPassFailure();
     }
   }
 }

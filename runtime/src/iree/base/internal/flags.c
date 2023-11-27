@@ -160,24 +160,33 @@ iree_status_t iree_flag_string_list_parse(iree_string_view_t flag_name,
     // Switching from inline storage to external storage.
     iree_host_size_t new_capacity = 4;
     iree_string_view_t* values = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        iree_flags_leaky_allocator(), sizeof(iree_string_view_t) * new_capacity,
-        (void**)&values));
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_outline,
+                                "iree_flag_string_list_parse_outline");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z_outline,
+        iree_allocator_malloc(iree_flags_leaky_allocator(),
+                              sizeof(iree_string_view_t) * new_capacity,
+                              (void**)&values));
     values[0] = flag->inline_value;
     flag->capacity = new_capacity;
     flag->values = values;
     flag->values[flag->count++] = value;
+    IREE_TRACE_ZONE_END(z_outline);
   } else if (flag->count < flag->capacity) {  // external storage available
     // Stash in external storage list.
     flag->values[flag->count++] = value;
   } else {  // external storage full
     // Growing external storage list.
+    IREE_TRACE_ZONE_BEGIN_NAMED(z_grow, "iree_flag_string_list_parse_grow");
     iree_host_size_t new_capacity = iree_max(4, flag->capacity * 2);
-    IREE_RETURN_IF_ERROR(iree_allocator_realloc(
-        iree_flags_leaky_allocator(), sizeof(iree_string_view_t) * new_capacity,
-        (void**)&flag->values));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z_grow,
+        iree_allocator_realloc(iree_flags_leaky_allocator(),
+                               sizeof(iree_string_view_t) * new_capacity,
+                               (void**)&flag->values));
     flag->capacity = new_capacity;
     flag->values[flag->count++] = value;
+    IREE_TRACE_ZONE_END(z_grow);
   }
   return iree_ok_status();
 }

@@ -14,7 +14,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-sync"
   COMPILER_FLAGS
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   RUNNER_ARGS
     "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
   LABELS

@@ -59,7 +59,6 @@ ALL_DEVICE_SPECS = [
     # Moto Edge X30
     moto_edge_x30_specs.GPU,
     # GCP machines
-    gcp_specs.GCP_C2_STANDARD_16,
     gcp_specs.GCP_C2_STANDARD_60,
     gcp_specs.GCP_A2_HIGHGPU_1G,
     # RISCV emulators
