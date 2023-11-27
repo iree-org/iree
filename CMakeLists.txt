@@ -616,6 +616,8 @@ iree_register_external_hal_driver(
     webgpu
   SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
+  BINARY_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu"
   DRIVER_TARGET
     iree::experimental::webgpu::registration
   REGISTER_FN
