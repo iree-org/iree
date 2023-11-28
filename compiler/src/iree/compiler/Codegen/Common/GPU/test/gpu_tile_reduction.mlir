@@ -44,6 +44,44 @@ func.func @warp_reduction_dispatch() {
 
 // -----
 
+func.func @warp_reduction_batch_matmul() {
+  %cst = arith.constant 1.000000e+00 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<11x512x512xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<11x512x512xf32>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<11x512x512xf32>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %3 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_z, %workgroup_id_y, 0], sizes = [1, 1, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<11x512x512xf32>> -> tensor<1x1x512xf32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_z, 0, %workgroup_id_x], sizes = [1, 512, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<11x512x512xf32>> -> tensor<1x512x1xf32>
+  %5 = flow.dispatch.tensor.load %2, offsets = [%workgroup_id_z, %workgroup_id_y, %workgroup_id_x], sizes = [1, 1, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<11x512x512xf32>> -> tensor<1x1x1xf32>
+  %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1], [0, 0, 0, 64]]>} ins(%cst : f32) outs(%5 : tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+  %7 = linalg.batch_matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1], [0, 0, 0, 64]]>}
+           ins(%3, %4: tensor<1x1x512xf32>, tensor<1x512x1xf32>) outs(%6: tensor<1x1x1xf32>) -> tensor<1x1x1xf32>
+  flow.dispatch.tensor.store %7, %2, offsets = [%workgroup_id_z, %workgroup_id_y, %workgroup_id_x], sizes = [1, 1, 1], strides = [1, 1, 1] : tensor<1x1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<11x512x512xf32>>
+  return
+}
+
+// CHECK-LABEL: warp_reduction_batch_matmul()
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//       CHECK:   linalg.fill {{.*}} -> tensor<1x1x1xf32>
+//       CHECK:   linalg.fill {{.*}} -> tensor<1x1x1x64xf32>
+//       CHECK:   scf.for {{.*}} = %[[C0]] to %[[C512]] step %[[C64]] {{.*}} -> (tensor<1x1x1x64xf32>)
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins({{.*}} : tensor<1x1x64xf32>, tensor<1x64x1xf32>)
+//  CHECK-SAME:         outs({{.*}} : tensor<1x1x1x64xf32>)
+//       CHECK:       arith.mulf
+//       CHECK:       arith.addf
+//       CHECK:   %[[FINAL:.+]] = linalg.generic
+//  CHECK-SAME:                   ins({{.*}} : tensor<1x1x1x64xf32>)
+//  CHECK-SAME:                   outs({{.*}} : tensor<1x1x1xf32>)
+//       CHECK:     arith.addf
+//       CHECK:   flow.dispatch.tensor.store %[[FINAL]]
+
+// -----
+
 func.func @warp_reduction_broadcast_dispatch() {
   %cst = arith.constant 1.000000e+00 : f32
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
