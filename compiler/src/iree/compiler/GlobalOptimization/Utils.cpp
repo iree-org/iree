@@ -14,10 +14,20 @@ namespace mlir {
 namespace iree_compiler {
 namespace GlobalOptimization {
 
-std::optional<CastOpInterface> getDefiningCastOp(Value input) {
+std::optional<CastOpInterface> getDefiningNonI1CastOp(Value input) {
+  // Returns true if the source of cast op has i1 element type.
+  auto isI1Src = [](CastOpInterface castOp) -> bool {
+    auto elemType = getElementTypeOrSelf(castOp->getOperandTypes()[0]);
+    return elemType.getIntOrFloatBitWidth() == 1;
+  };
+
+  std::optional<CastOpInterface> result = std::nullopt;
   auto castOp = input.getDefiningOp<CastOpInterface>();
   if (castOp) {
-    return castOp;
+    if (!isI1Src(castOp)) {
+      result = castOp;
+    }
+    return result;
   }
   auto genericOp = input.getDefiningOp<linalg::GenericOp>();
   if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
@@ -36,11 +46,14 @@ std::optional<CastOpInterface> getDefiningCastOp(Value input) {
       castIn.cast<BlockArgument>().getArgNumber() != 0) {
     return std::nullopt;
   }
-  return castOp;
+  if (!isI1Src(castOp)) {
+    result = castOp;
+  }
+  return result;
 }
 
 std::optional<Type> getCastElemType(Value input) {
-  std::optional<CastOpInterface> castOp = getDefiningCastOp(input);
+  std::optional<CastOpInterface> castOp = getDefiningNonI1CastOp(input);
   if (!castOp) {
     return std::nullopt;
   }

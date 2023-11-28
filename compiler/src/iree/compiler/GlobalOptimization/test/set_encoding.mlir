@@ -781,6 +781,47 @@ func.func @matmul_casted_ui8i8i32(%arg0 : tensor<100x250xi8>, %arg1 : tensor<250
 
 // -----
 
+func.func @matmul_casted_from_i1_f32f32f32(%arg0 : tensor<64x256xi1>,
+    %arg1 : tensor<256x128xf32>) -> tensor<64x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %casted = arith.uitofp %arg0 : tensor<64x256xi1> to tensor<64x256xf32>
+  %0 = tensor.empty() : tensor<64x128xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64x128xf32>) -> tensor<64x128xf32>
+  %2 = linalg.matmul ins(%casted, %arg1 : tensor<64x256xf32>, tensor<256x128xf32>) outs(%1 : tensor<64x128xf32>) -> tensor<64x128xf32>
+  return %2 : tensor<64x128xf32>
+}
+// CHECK-LABEL: func.func @matmul_casted_from_i1_f32f32f32
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<64x256xf32>>>
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>>>
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<64x128xf32>>>
+
+// -----
+
+func.func @matmul_generic_casted_from_i1_f32f32f32(%arg0 : tensor<64x256xi1>,
+    %arg1 : tensor<256x128xf32>) -> tensor<64x128xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %init = tensor.empty() : tensor<64x256xf32>
+  %casted = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                              affine_map<(d0, d1) -> (d0, d1)>],
+                              iterator_types = ["parallel", "parallel"]}
+                              ins(%arg0 : tensor<64x256xi1>)
+                              outs(%init : tensor<64x256xf32>) {
+  ^bb0(%in: i1, %out: f32):
+      %1 = arith.uitofp %in : i1 to f32
+      linalg.yield %1 : f32
+  } -> tensor<64x256xf32>
+  %0 = tensor.empty() : tensor<64x128xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<64x128xf32>) -> tensor<64x128xf32>
+  %2 = linalg.matmul ins(%casted, %arg1 : tensor<64x256xf32>, tensor<256x128xf32>) outs(%1 : tensor<64x128xf32>) -> tensor<64x128xf32>
+  return %2 : tensor<64x128xf32>
+}
+// CHECK-LABEL: func.func @matmul_generic_casted_from_i1_f32f32f32
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<64x256xf32>>>
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>>>
+// CHECK:         set_encoding {{.+}} tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<64x128xf32>>>
+
+// -----
+
 func.func @matmul_f32f32f32_narrow_M(%arg0 : tensor<2x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<2x500xf32>) -> tensor<2x500xf32> {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x250xf32>, tensor<250x500xf32>)

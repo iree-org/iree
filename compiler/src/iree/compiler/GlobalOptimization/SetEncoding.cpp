@@ -243,8 +243,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       }
       return {};
     };
-    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
-    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp =
+        getDefiningNonI1CastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp =
+        getDefiningNonI1CastOp(origRhs);
     Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
                                       : getElemType(origLhs);
     Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
@@ -331,8 +333,10 @@ struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
       }
       return {};
     };
-    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
-    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp =
+        getDefiningNonI1CastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp =
+        getDefiningNonI1CastOp(origRhs);
     Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
                                       : getElemType(origLhs);
     Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
