@@ -41,8 +41,11 @@ It's important to reduce the potential surface area to make the problem more
 tractable.
 
 Once we have a more isolated case, the general methodology to pinpoint the
-exact culprit is to **1) collect and inspect the symptoms, 2) form hypothesis
-and run experiments to prove/refute the hypothesis, and 3) iterate**.
+exact culprit is to
+
+1. **collect and inspect the symptoms,**
+2. **form hypothesis and run experiments to prove/refute the hypothesis, and**
+3. **iterate**.
 
 ### .. with shortcuts
 
@@ -66,15 +69,15 @@ If we are facing a large problem without a clear clue, we need to isolate the
 problematic compiler or runtime layer first, typically by comparing with a
 working solution:
 
-* `[correctness/performance]` Sanitize the environment first--did you recently
-  updated the GPU SDK or driver?
-  Are others able to reproduce the issue?
-  If not what SDK / driver versions they are using?
-  Is your machine drawing enough power when benchmarking?
-  Is your machine connected with a mointor (for Vulkan)?
-  How long since you last rebooted your machine? 👻
+* `[correctness/performance]` Sanitize the environment first.
   Asking these questions and making sure the environment is proper can save
-  you hours of debugging sometimes.
+  you hours of debugging sometimes:
+    * Did you recently updated the GPU SDK or driver?
+    * Are others able to reproduce the issue?
+    * If not what SDK / driver versions they are using?
+    * Is your machine drawing enough power when benchmarking?
+    * Is your machine connected with a mointor (e.g., for Vulkan)?
+    * How long since you last rebooted your machine? 👻
 * `[correctness/performance]` We have multiple GPU targets/drivers in
   IREE--LLVMGPU/CUDA, LLVMGPU/HIP, SPIR-V/Vulkan, SPIR-V/Metal.
   For the _same_ GPU, we typically have two paths to target, e.g., CUDA/HIP
@@ -91,12 +94,14 @@ working solution:
   Or there are driver issues from a particular vendor.
 * `[correctness]` If the CPU is working properly, we can use the same dispatch
   region formation and diff against the CPU dispatches one by one to isolate
-  the problem.
+  the problem. See [this issue](https://github.com/openxla/iree/issues/14739)
+  as an example.
 * `[correctness]` `--iree-flow-trace-dispatch-tensors` and/or
    `--iree-flow-break-dispatch=` to `iree-compile` is quite helpful to inspect
    the output after all/each dispatch(es).
 * `[correctness]` `iree-reduce` is a great tool to reduce and isolate issues
   programmatically.
+  See more details [here](https://github.com/openxla/iree/blob/main/samples/reducer/README.md).
 
 ## Pinpointing compiler issues
 
@@ -107,7 +112,8 @@ investigate by comparing with different paths and inputs:
   e.g., for matmul we can have simple SIMT pipeline or using tensor/matrix cores.
   We can try to switch between different pipelines to isolate the problem.
 * `[correctness]` Assuming we have a small repro, we can also try to see if there
-  are "patterns" in the wrong result.
+  are "patterns" in the wrong result
+  (e.g., [this issue](https://github.com/openxla/iree/issues/14739#issuecomment-1685149869)).
   Or mutate the input to see if the failure has some "consistency".
 * `[correctness/performance]` `--mlir-print-ir-*` and `--debug*` to `iree-opt` is
   our best friend.
