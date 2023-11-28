@@ -362,6 +362,11 @@ struct FusionOfTensorOpsPass
               return false;
             }
 
+            // Do not fuse by expand if consumer is dequant.
+            if (isGroupedDequantizationOp(consumer)) {
+              return false;
+            }
+
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
@@ -428,6 +433,12 @@ struct FusionOfTensorOpsPass
             Operation *consumer = fusedOperand->getOwner();
             if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
+            }
+
+            // Do not fuse if consumer is a contraction/matmul like op.
+            if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+              if (linalg::isaContractionOpInterface(linalgConsumerOp))
+                return false;
             }
 
             auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
