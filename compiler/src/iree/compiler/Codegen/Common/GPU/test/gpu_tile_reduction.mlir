@@ -63,13 +63,20 @@ func.func @warp_reduction_batch_matmul() {
 }
 
 // CHECK-LABEL: warp_reduction_batch_matmul()
+//   CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
+//   CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //       CHECK:   linalg.fill {{.*}} -> tensor<1x1x1xf32>
 //       CHECK:   linalg.fill {{.*}} -> tensor<1x1x1x64xf32>
-//       CHECK:   linalg.generic
-//       CHECK:     arith.mulf
-//       CHECK:     arith.addf
+//       CHECK:   scf.for {{.*}} = %[[C0]] to %[[C512]] step %[[C64]] {{.*}} -> (tensor<1x1x1x64xf32>)
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins({{.*}} : tensor<1x1x64xf32>, tensor<1x64x1xf32>)
+//  CHECK-SAME:         outs({{.*}} : tensor<1x1x1x64xf32>)
+//       CHECK:       arith.mulf
+//       CHECK:       arith.addf
 //       CHECK:   %[[FINAL:.+]] = linalg.generic
 //  CHECK-SAME:                   ins({{.*}} : tensor<1x1x1x64xf32>)
+//  CHECK-SAME:                   outs({{.*}} : tensor<1x1x1xf32>)
 //       CHECK:     arith.addf
 //       CHECK:   flow.dispatch.tensor.store %[[FINAL]]
 
