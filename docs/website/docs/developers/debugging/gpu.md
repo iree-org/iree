@@ -7,7 +7,7 @@ tags:
   - Metal
   - ROCm
   - Vulkan
-icon: material/chip
+icon: octicons/bug-16
 ---
 
 # GPU debugging playbook
@@ -19,8 +19,20 @@ GPUs fundamentally have similar architectures and software stacks.
 We target GPUs from various vendors using different GPU APIs, but they share
 quite a lot common infrastructure in IREE.
 So the approaches and tips here should be widely applicable.
+
 For the ones that are specific to a particular kind of problem/component/GPU,
-they are prefixed with proper tags to be clear.
+they are prefixed with proper icons to be clear.
+Here are what those icons represents--
+
+Icon | Category
+:--: | :------:
+:material-check-bold: | Correctness
+:material-trending-up: | Performance
+:simple-amd: | AMD HIP/ROCm
+:simple-apple: | Apple Metal
+:simple-microsoft: | Microsoft DirectX
+:simple-nvidia: | NVIDIA CUDA
+:simple-vulkan: | Vulkan
 
 ## General methodology
 
@@ -29,7 +41,7 @@ problematic component and pinpointing the culprit**.
 Once done, the solution typically derives naturally.
 
 There are many components in the IREE stack; hierarchically we can categorize
-them into either the compiler or runtime bucket.
+them into either the compiler or runtime bucket:
 
 * For compilers, there are multiple layers from the top to the bottom--frontend
   input importers, IREE flow/stream compilation, IREE host/device compilation,
@@ -69,56 +81,86 @@ If we are facing a large problem without a clear clue, we need to isolate the
 problematic compiler or runtime layer first, typically by comparing with a
 working solution:
 
-* `[correctness/performance]` Sanitize the environment first.
-  Asking these questions and making sure the environment is proper can save
-  you hours of debugging sometimes:
+!!! tip "[:material-check-bold:/:material-trending-up:]"
+
+    Sanitize the environment first.
+    Asking these questions and making sure the environment is proper can save
+    you hours of debugging sometimes:
+
     * Did you recently updated the GPU SDK or driver?
     * Are others able to reproduce the issue?
     * If not what SDK / driver versions they are using?
     * Is your machine drawing enough power when benchmarking?
     * Is your machine connected with a mointor (e.g., for Vulkan)?
     * How long since you last rebooted your machine? 👻
-* `[correctness/performance]` We have multiple GPU targets/drivers in
-  IREE--LLVMGPU/CUDA, LLVMGPU/HIP, SPIR-V/Vulkan, SPIR-V/Metal.
-  For the _same_ GPU, we typically have two paths to target, e.g., CUDA/HIP
-  or Vulkan for NVIDIA/AMD GPUs, Metal or Vulkan for Apple GPUs.
-  If one path is correct/performant, we can diff against it to try isolate
-  the problem--the common/shared compiler/runtime code is likely okay; what
-  differs between paths is likely problematic.
-* `[correctness/performance][vulkan]` Vulkan supports different GPUs.
-  Similarly, if one GPU gives correct/performant result, we diff against it
-  to find clues.
-  Even more code in compiler/runtime are shared here; what's problematic is
-  likely different capabilities triggering different CodeGen pipelines so
-  revealing bugs in a particular CodeGen pipeline.
-  Or there are driver issues from a particular vendor.
-* `[correctness]` If the CPU is working properly, we can use the same dispatch
-  region formation and diff against the CPU dispatches one by one to isolate
-  the problem. See [this issue](https://github.com/openxla/iree/issues/14739)
-  as an example.
-* `[correctness]` `--iree-flow-trace-dispatch-tensors` and/or
-   `--iree-flow-break-dispatch=` to `iree-compile` is quite helpful to inspect
-   the output after all/each dispatch(es).
-* `[correctness]` `iree-reduce` is a great tool to reduce and isolate issues
-  programmatically.
-  See more details [here](https://github.com/openxla/iree/blob/main/samples/reducer/README.md).
+
+!!! tip "[:material-check-bold:/:material-trending-up:]"
+
+    We have multiple GPU targets/drivers in IREE--LLVMGPU/CUDA, LLVMGPU/HIP,
+    SPIR-V/Vulkan, SPIR-V/Metal.
+
+    For the _same_ GPU, we typically have two paths to target, e.g., CUDA/HIP
+    or Vulkan for NVIDIA/AMD GPUs, Metal or Vulkan for Apple GPUs.
+
+    If one path is correct/performant, we can diff against it to try isolate
+    the problem--the common/shared compiler/runtime code is likely okay; what
+    differs between paths is likely problematic.
+
+!!! tip "[:material-check-bold:/:material-trending-up:] [:simple-vulkan:]"
+
+    Vulkan supports different GPUs.
+    Similarly, if one GPU gives correct/performant result, we diff against it
+    to find clues.
+
+    Even more code in compiler/runtime are shared here; what's problematic is
+    likely different capabilities triggering different CodeGen pipelines so
+    revealing bugs in a particular CodeGen pipeline.
+    Or there are driver issues from a particular vendor.
+
+!!! tip "[:material-check-bold:]"
+
+    If the CPU is working properly, we can use the same dispatch region formation
+    and diff against the CPU dispatches one by one to isolate the problem. See
+    [this issue](https://github.com/openxla/iree/issues/14739) as an example.
+
+!!! tip "[:material-check-bold:]"
+
+    `--iree-flow-trace-dispatch-tensors` and/or `--iree-flow-break-dispatch=` to
+    `iree-compile` is quite helpful to inspect the output after all/each
+    dispatch(es).
+
+!!! tip "[:material-check-bold:]"
+
+    `iree-reduce` is a great tool to reduce and isolate issues programmatically.
+    See more details [here](https://github.com/openxla/iree/blob/main/samples/reducer/README.md).
 
 ## Pinpointing compiler issues
 
 Once we identified that the problem is due to some compiler issue, we can
 investigate by comparing with different paths and inputs:
 
-* `[correctness]` For the same dispatch, we may have different CodeGen pipelines,
-  e.g., for matmul we can have simple SIMT pipeline or using tensor/matrix cores.
-  We can try to switch between different pipelines to isolate the problem.
-* `[correctness]` Assuming we have a small repro, we can also try to see if there
-  are "patterns" in the wrong result
-  (e.g., [this issue](https://github.com/openxla/iree/issues/14739#issuecomment-1685149869)).
-  Or mutate the input to see if the failure has some "consistency".
-* `[correctness/performance]` `--mlir-print-ir-*` and `--debug*` to `iree-opt` is
-  our best friend.
-  Sometimes it just takes eyeballing the IRs between stages to find clues.
-* `[performance]` For identifying performance issues, we typically need to use:
+!!! tip "[:material-check-bold:]"
+
+    For the same dispatch, we may have different CodeGen pipelines, e.g.,
+    for matmul we can have simple SIMT pipeline or using tensor/matrix cores.
+    We can try to switch between different pipelines to isolate the problem.
+
+!!! tip "[:material-check-bold:]"
+
+    Assuming we have a small repro, we can also try to see if there are
+    "patterns" in the wrong result (e.g.,
+    [this issue](https://github.com/openxla/iree/issues/14739#issuecomment-1685149869)).
+    Or mutate the input to see if the failure has some "consistency".
+
+!!! tip "[:material-check-bold:/:material-trending-up:]"
+
+    `--mlir-print-ir-*` and `--debug*` to `iree-opt` is our best friend.
+    Sometimes it just takes eyeballing the IRs between stages to find clues.
+
+!!! tip "[:material-trending-up:]"
+
+    For identifying performance issues, we typically need to use:
+
     * [Tracy profiling](../performance/profiling-with-tracy.md) to get a
       course-grained command-buffer timing to understand what's the most
       time-consuming kernels.
@@ -126,7 +168,7 @@ investigate by comparing with different paths and inputs:
       incorrect CodeGen pipeline, missing tiling/vectorization, having an
       improper tiling/vectorization configuration, and so on.
       If the course-grained information is not enough, then we need to
-    * Use [vendor-specific tools](../performance/profiling-gpu-vulkan.md) to
+    * [vendor-specific tools](../performance/profiling-gpu-vulkan.md) to
       understand kernel internal counters to identify the bottleneck.
 
 ## Pinpointing runtime issues
@@ -134,44 +176,59 @@ investigate by comparing with different paths and inputs:
 On the other side, if we suspect that it's a runtime issue, here are some
 useful approachs and tips:
 
-* `[correctness/performance]` [Tracy profiling](../performance/profiling-with-tracy.md)
-  is a great way to view how the application runs dynamically.
-  It can help to show problematic GPU API call sequences and performance
-  bottlenecks.
+!!! tip "[:material-check-bold:/:material-trending-up:]"
+
+    [Tracy profiling](../performance/profiling-with-tracy.md) is a great way to
+    view how the application runs dynamically.
+    It can help to show problematic GPU API call sequences and performance
+    bottlenecks.
+
     * It requires adding `-DIREE_ENABLE_RUNTIME_TRACING=ON` during CMake
       configuration, or use the `IREE_PY_RUNTIME=tracy` environment variable
       when invoking IREE runtime installed via Python packages.
-* `[correctness]` GPU validation can sometimes give us hints:
-    * `[metal]` Enable validation via `export METAL_DEVICE_WRAPPER_TYPE=1`.
-    * `[vulkan]` Use `--vulkan_validation_layers=true` to `iree-run-module`, or
-    * `[vulkan]` Force enable via environment variables to the Vulkan loader:
+
+!!! tip "[:material-check-bold:]"
+
+    GPU validation can sometimes give us hints:
+
+    * [:simple-apple:] Enable validation via `export METAL_DEVICE_WRAPPER_TYPE=1`.
+    * [:simple-vulkan:] Use `--vulkan_validation_layers=true` to `iree-run-module`, or
+    * [:simple-vulkan:] Force enable via environment variables to the Vulkan loader:
       `export VK_INSTANCE_LAYERS=VK_LAYER_LUNARG_standard_validation`
       (may additionally need
       `export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d` and
       `export LD_LIBRARY_PATH=$VULKAN_SDK/lib` if Vulkan SDK is not installed
       to a system path).
-* `[correctness]` Turning on verbose output can give us more information:
+
+!!! tip "[:material-check-bold:]"
+
+    Turning on verbose output can give us more information:
+
     * When compiling IREE runtime, add
       `-DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1` in CMake
       configuration to enable VM op tracing.
-    * `[vulkan]` Use `--vulkan_debug_verbosity=4` to `iree-run-module`.
-    * `[vulkan]` Print all Vulkan APIs calls with detailed arguments:
+    * [:simple-vulkan:] Use `--vulkan_debug_verbosity=4` to `iree-run-module`.
+    * [:simple-vulkan:] Print all Vulkan APIs calls with detailed arguments:
       `export VK_INSTANCE_LAYERS=VK_LAYER_LUNARG_api_dump`
       (may additionally need
       `export VK_LAYER_PATH=$VULKAN_SDK/etc/vulkan/explicit_layer.d` and
       `export LD_LIBRARY_PATH=$VULKAN_SDK/lib` if Vulkan SDK is not installed
       to a system path).
-* `[correctness]` Try different "debugging modes" provided by HAL drivers:
-    * `[cuda]` Switch `--cuda_use_streams=` between `true` and `false` to
+
+!!! tip "[:material-check-bold:]"
+
+    Try different "debugging modes" provided by HAL drivers:
+
+    * [:simple-nvidia:] Switch `--cuda_use_streams=` between `true` and `false` to
       `iree-run-module` to see whether the issue comes from the stream/graph
       command buffer implementation.
-    * `[cuda]` Switch `--cuda_async_allocations=false` to `iree-run-module` to
+    * [:simple-nvidia:] Switch `--cuda_async_allocations=false` to `iree-run-module` to
       see if the issue comes from async allocation.
-    * `[metal]` Use `--metal_serial_command_dispatch=true`,
+    * [:simple-apple:] Use `--metal_serial_command_dispatch=true`,
       `--metal_command_buffer_retain_resources=true`, or
       `--metal_resource_hazard_tracking=true` to `iree-run-module` to see
       if any of the above "fixes" the issue.
       It can help to isolate the pontential problem.
-    * `[vulkan]` Use `--vulkan_robust_buffer_access=true` to `iree-run-module`
+    * [:simple-vulkan:] Use `--vulkan_robust_buffer_access=true` to `iree-run-module`
       especially when seeing undeterministic/corrupted contents in buffers and
       suspecting there are buffer allocation/indexing issues.
