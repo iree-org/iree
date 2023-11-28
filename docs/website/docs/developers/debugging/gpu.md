@@ -1,8 +1,16 @@
 ---
+hide:
+  - tags
+tags:
+  - GPU
+  - CUDA
+  - Metal
+  - ROCm
+  - Vulkan
 icon: material/chip
 ---
 
-# GPU debugging approaches and tips
+# GPU debugging playbook
 
 This page aims to provide general approaches and practical tips for debugging
 GPU compiler/runtime correctness/performance issues in IREE.
