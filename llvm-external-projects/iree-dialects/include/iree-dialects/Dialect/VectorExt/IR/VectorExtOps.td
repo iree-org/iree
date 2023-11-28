@@ -8,6 +8,7 @@
 #define IREE_DIALECT_VECTOREXT_OPS
 
 include "iree-dialects/Dialect/VectorExt/IR/VectorExtBase.td"
+include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -30,15 +31,13 @@ def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conf
   }];
   let arguments = (ins
     AnyVector:$input,
-    LayoutAttr:$sourceLayout,
-    LayoutAttr:$desiredLayout
+    VectorLayoutInterface:$sourceLayout,
+    VectorLayoutInterface:$desiredLayout
   );
   let results = (outs
     AnyVector:$output
   );
-  let extraClassDeclaration = [{
-
-  }];
+  let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
   let hasVerifier = 1;
 }
