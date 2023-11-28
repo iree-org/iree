@@ -81,7 +81,7 @@ If we are facing a large problem without a clear clue, we need to isolate the
 problematic compiler or runtime layer first, typically by comparing with a
 working solution:
 
-!!! tip "[:material-check-bold:/:material-trending-up:]"
+!!! tip "[correctness/performance]"
 
     Sanitize the environment first.
     Asking these questions and making sure the environment is proper can save
@@ -94,7 +94,7 @@ working solution:
     * Is your machine connected with a mointor (e.g., for Vulkan)?
     * How long since you last rebooted your machine? 👻
 
-!!! tip "[:material-check-bold:/:material-trending-up:]"
+!!! tip "[correctness/performance]"
 
     We have multiple GPU targets/drivers in IREE--LLVMGPU/CUDA, LLVMGPU/HIP,
     SPIR-V/Vulkan, SPIR-V/Metal.
@@ -106,7 +106,7 @@ working solution:
     the problem--the common/shared compiler/runtime code is likely okay; what
     differs between paths is likely problematic.
 
-!!! tip "[:material-check-bold:/:material-trending-up:] [:simple-vulkan:]"
+!!! tip "[correctness/performance] [vulkan]"
 
     Vulkan supports different GPUs.
     Similarly, if one GPU gives correct/performant result, we diff against it
@@ -117,19 +117,19 @@ working solution:
     revealing bugs in a particular CodeGen pipeline.
     Or there are driver issues from a particular vendor.
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     If the CPU is working properly, we can use the same dispatch region formation
     and diff against the CPU dispatches one by one to isolate the problem. See
     [this issue](https://github.com/openxla/iree/issues/14739) as an example.
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     `--iree-flow-trace-dispatch-tensors` and/or `--iree-flow-break-dispatch=` to
     `iree-compile` is quite helpful to inspect the output after all/each
     dispatch(es).
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     `iree-reduce` is a great tool to reduce and isolate issues programmatically.
     See more details [here](https://github.com/openxla/iree/blob/main/samples/reducer/README.md).
@@ -139,25 +139,25 @@ working solution:
 Once we identified that the problem is due to some compiler issue, we can
 investigate by comparing with different paths and inputs:
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     For the same dispatch, we may have different CodeGen pipelines, e.g.,
     for matmul we can have simple SIMT pipeline or using tensor/matrix cores.
     We can try to switch between different pipelines to isolate the problem.
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     Assuming we have a small repro, we can also try to see if there are
     "patterns" in the wrong result (e.g.,
     [this issue](https://github.com/openxla/iree/issues/14739#issuecomment-1685149869)).
     Or mutate the input to see if the failure has some "consistency".
 
-!!! tip "[:material-check-bold:/:material-trending-up:]"
+!!! tip "[correctness/performance]"
 
     `--mlir-print-ir-*` and `--debug*` to `iree-opt` is our best friend.
     Sometimes it just takes eyeballing the IRs between stages to find clues.
 
-!!! tip "[:material-trending-up:]"
+!!! tip "[performance]"
 
     For identifying performance issues, we typically need to use:
 
@@ -176,7 +176,7 @@ investigate by comparing with different paths and inputs:
 On the other side, if we suspect that it's a runtime issue, here are some
 useful approachs and tips:
 
-!!! tip "[:material-check-bold:/:material-trending-up:]"
+!!! tip "[correctness/performance]"
 
     [Tracy profiling](../performance/profiling-with-tracy.md) is a great way to
     view how the application runs dynamically.
@@ -187,7 +187,7 @@ useful approachs and tips:
       configuration, or use the `IREE_PY_RUNTIME=tracy` environment variable
       when invoking IREE runtime installed via Python packages.
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     GPU validation can sometimes give us hints:
 
@@ -200,7 +200,7 @@ useful approachs and tips:
       `export LD_LIBRARY_PATH=$VULKAN_SDK/lib` if Vulkan SDK is not installed
       to a system path).
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     Turning on verbose output can give us more information:
 
@@ -215,7 +215,7 @@ useful approachs and tips:
       `export LD_LIBRARY_PATH=$VULKAN_SDK/lib` if Vulkan SDK is not installed
       to a system path).
 
-!!! tip "[:material-check-bold:]"
+!!! tip "[correctness]"
 
     Try different "debugging modes" provided by HAL drivers:
 
