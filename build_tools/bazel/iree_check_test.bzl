@@ -122,11 +122,11 @@ def iree_check_single_backend_test_suite(
     if target_cpu_features:
         fail("target_cpu_features must currently be empty")
 
-    if backend == "cuda" or driver == "cuda":
+    if target_backend == "cuda" or driver == "cuda":
         # TODO(#15233): add filtering based on @iree_cuda//:enabled for cuda
         pass
 
-    if backend == "webgpu" or backend == "metal-spirv":
+    if target_backend == "webgpu" or target_backend == "metal-spirv":
         # These are only supported in the CMake build for now.
         return
 

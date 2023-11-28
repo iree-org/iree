@@ -303,7 +303,6 @@ iree_check_single_backend_test_suite(
     srcs = CUDA_SRCS,
     driver = "cuda",
     input_type = "tosa",
-    target_backend = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
@@ -312,6 +311,7 @@ iree_check_single_backend_test_suite(
         "noubsan",
         "requires-gpu-nvidia",
     ],
+    target_backend = "cuda",
 )
 
 WEBGPU_SRCS = enforce_glob(
@@ -334,6 +334,7 @@ WEBGPU_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
+        "logical_right_shift_16.mlir",
         "matmul.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -490,11 +491,12 @@ test_suite(
     tests = [
         ":check_cuda-cuda",
         ":check_llvm-cpu_local-task",
-        ":check_metal-spirv_metal",
-        ":check_rocm-rocm",
         ":check_vmvx_local-sync_microkernels",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
-        ":check_webgpu-webgpu",
+        # These are unused in Bazel.
+        # ":check_metal-spirv_metal",
+        # ":check_rocm-rocm",
+        # ":check_webgpu-webgpu",
     ],
 )
