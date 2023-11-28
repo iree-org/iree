@@ -278,13 +278,16 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
   // They should go down different pipelines.
   int nonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  SmallVector<utils::IteratorType, 4> kinds = op.getIteratorTypesArray();
-  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
-    if (kind == utils::IteratorType::parallel)
-      nonUnitParallelDimCount += bound != 1;
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(op);
+  assert(succeeded(contractionDims) && "Could not infer contraction dims");
+  for (auto mDim : contractionDims->m) {
+    nonUnitParallelDimCount += bounds[mDim] != 1;
   }
-  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op) &&
-      nonUnitParallelDimCount == 1)
+  for (auto nDim : contractionDims->n) {
+    nonUnitParallelDimCount += bounds[nDim] != 1;
+  }
+  if (nonUnitParallelDimCount <= 1)
     return failure();
 
   // Don't consider operations that don't have a broadcast, those should go
@@ -734,8 +737,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op,
                                             const TargetInfo &targetInfo) {
   if (!targetInfo.hasWarpShuffle)
-    return failure();
-  if (!isa<linalg::GenericOp>(op))
     return failure();
 
   SmallVector<unsigned> parallelDims;

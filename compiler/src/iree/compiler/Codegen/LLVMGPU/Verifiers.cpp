@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -11,6 +12,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constants used in the matmul lowering verifiers.
@@ -22,7 +25,7 @@ constexpr int kDimX = 0;
 constexpr int kDimY = 1;
 constexpr int kDimZ = 2;
 
-// Dimenstions identifiers for: matmul problem shapes (m, n, k), thread block
+// Dimensions identifiers for: matmul problem shapes (m, n, k), thread block
 // shape (m, n, k), warp shape, and instruction shape (m, n, k).
 constexpr int kM = 0;
 constexpr int kN = 1;
@@ -31,15 +34,16 @@ constexpr int kK = 2;
 
 /// Returns the shape of the math instruction for the given pipeline and input
 /// element type.
-static LogicalResult getInstructionShape(
-    Operation *op, IREE::Codegen::DispatchLoweringPassPipelineAttr pipeline,
-    Type inputElementType, SmallVector<int64_t> &instructionShape) {
-  switch (pipeline.getValue()) {
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+static LogicalResult
+getInstructionShape(Operation *op, CodeGenPipeline pipeline,
+                    Type inputElementType,
+                    SmallVector<int64_t> &instructionShape) {
+  switch (pipeline) {
+  case CodeGenPipeline::LLVMGPUMatmulSimt:
     // SIMT Pipeline / CUDA Cores
     instructionShape = {1, 1, 1};
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+  case CodeGenPipeline::LLVMGPUMatmulTensorCore:
     // Tensor Core Pipeline / WMMA API
     if (inputElementType.isF16() || inputElementType.isBF16()) {
       instructionShape = {16, 16, 16};
@@ -50,8 +54,7 @@ static LogicalResult getInstructionShape(
           "Expected f16, bf16 or f32 for Tensor Core (WMMA) pipeline");
     }
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::
-      LLVMGPUMatmulTensorCoreMmaSync:
+  case CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync:
     // Tensor Core Pipeline / MMA.SYNC
     if (inputElementType.isF16() || inputElementType.isBF16()) {
       instructionShape = {16, 8, 16};
@@ -77,6 +80,13 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize) {
+  // This verifier only applies to matmul.
+  CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
+  if (pipeline != CodeGenPipeline::LLVMGPUMatmulSimt &&
+      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCore &&
+      pipeline != CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync) {
+    return success();
+  }
   // Only verify batched and unbatched matmul.
   if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
     return success();
@@ -92,8 +102,7 @@ verifyGPUMatmulPipeline(Operation *op,
          "software pipeline.");
 
   // Get compilation pipeline.
-  auto pipeline = translationInfo.getPassPipeline();
-  StringRef pipelineName = stringifyEnum(pipeline.getValue());
+  StringRef pipelineName = stringifyEnum(pipeline);
 
   assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
          "Store to workgroup memory currently expected to happen in stage 1 of "
@@ -166,8 +175,7 @@ verifyGPUMatmulPipeline(Operation *op,
   }
 
   // Return success for SIMT/CUDA cores.
-  if (pipeline.getValue() ==
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt)
+  if (pipeline == CodeGenPipeline::LLVMGPUMatmulSimt)
     return success();
 
   //
