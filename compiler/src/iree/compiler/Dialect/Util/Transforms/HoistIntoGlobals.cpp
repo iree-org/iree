@@ -184,9 +184,16 @@ public:
     // down and materialize producers.
     GlobalOp existingGlobal = hoistedMap.lookup(producerInfo->constValue);
     if (existingGlobal) {
-      cloneMapping.map(producerInfo->constValue,
-                       builder.create<GlobalLoadOp>(existingGlobal.getLoc(),
-                                                    existingGlobal));
+      Value newGlobal =
+          builder.create<GlobalLoadOp>(existingGlobal.getLoc(), existingGlobal);
+      // Call user hook to cast back to the original type.
+      if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+              producerInfo->constValue.getType())) {
+        newGlobal = hoistableType.decodeStorageType(
+            builder, newGlobal.getLoc(), producerInfo->constValue.getType(),
+            newGlobal);
+      }
+      cloneMapping.map(producerInfo->constValue, newGlobal);
       return;
     }
 
