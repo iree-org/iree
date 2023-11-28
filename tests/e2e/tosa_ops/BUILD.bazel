@@ -301,7 +301,7 @@ iree_check_single_backend_test_suite(
     srcs = CUDA_SRCS,
     driver = "cuda",
     input_type = "tosa",
-    target_backend = "cuda-spirv",
+    target_backend = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",

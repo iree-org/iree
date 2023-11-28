@@ -269,7 +269,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "cuda-spirv"
+    "cuda"
   DRIVER
     "cuda"
   INPUT_TYPE
