@@ -39,6 +39,7 @@ iree_lit_test_suite(
     "emulate_i64.mlir"
     "erase_storage_buffer_static_shape.mlir"
     "illegal_configuration.mlir"
+    "lower_masks.mlir"
     "lowering_matmul_fusion.mlir"
     "lowering_matmul_promotion.mlir"
     "lowering_matvec.mlir"

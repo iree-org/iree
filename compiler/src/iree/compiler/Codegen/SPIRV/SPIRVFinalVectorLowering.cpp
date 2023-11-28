@@ -79,6 +79,8 @@ public:
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
       vector::populateVectorGatherLoweringPatterns(patterns);
+      vector::populateVectorMaskOpLoweringPatterns(patterns);
+      vector::CreateMaskOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
