@@ -460,11 +460,9 @@ iree_check_single_backend_test_suite(
     "requires-gpu-nvidia"
 )
 
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
 iree_check_single_backend_test_suite(
   NAME
-    check_webgpu
+    check_webgpu-webgpu
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -473,12 +471,8 @@ iree_check_single_backend_test_suite(
     "broadcast.mlir"
     "broadcast_add.mlir"
     "broadcast_in_dim.mlir"
-    # "clamp.mlir"  # TODO(#10906): fix (i8/i16?)
-    # "compare.mlir"  # TODO(#10906): fix (i8/i16?)
-    # "complex.mlir" # TODO(#11054)
     "concatenate.mlir"
     "constant.mlir"
-    # "convert.mlir"  # TODO(#10906): fix (i8/i16?)
     "convolution.mlir"
     "cosine.mlir"
     "divide.mlir"
@@ -489,19 +483,14 @@ iree_check_single_backend_test_suite(
     "exponential.mlir"
     "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
-    # "fft.mlir"  # TODO(#9583): fix (fft codegen via spirv)
-    # "finite.mlir"  # TODO(#11321): error: value cannot be represented as 'f32': inf
     "floor.mlir"
     "gather.mlir"
     "iota.mlir"
     "log.mlir"
     "log_plus_one.mlir"
-    # "maximum.mlir"  # TODO(#10906): fix (i8/i16?)
-    # "minimum.mlir"  # TODO(#10906): fix (i8/i16?)
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
-    # "philox.mlir"  # TODO(#12509): WebGPU SPIR-V broken
     "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
@@ -521,18 +510,14 @@ iree_check_single_backend_test_suite(
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"
-    # "three_fry.mlir"  # TODO(#12509): WebGPU SPIR-V broken
     "torch_index_select.mlir"
     "transpose.mlir"
-    # "while.mlir"  # TODO(#12509): WebGPU SPIR-V broken
   TARGET_BACKEND
     "webgpu"
-  # Only test compilation for now, the WebGPU driver is not stable/tested yet.
-  # DRIVER
-  #   "webgpu"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
-    "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
+    "--iree-codegen-gpu-native-math-precision=true"
+  INPUT_TYPE
+    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -578,7 +563,6 @@ iree_check_single_backend_test_suite(
     "philox.mlir"
     "pow.mlir"
     "reduce.mlir"
-    # "reduce_window.mlir"  # TODO(15012): fix test crash
     "remainder.mlir"
     "reshape.mlir"
     "reverse.mlir"
@@ -603,10 +587,9 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
-
 
 iree_check_single_backend_test_suite(
   NAME
@@ -674,9 +657,8 @@ iree_check_single_backend_test_suite(
     "while.mlir"
   TARGET_BACKEND
     "rocm"
-  # Only test compilation for now, the ROCm driver is experimental.
-  # DRIVER
-  #   "rocm"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
+
+### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
