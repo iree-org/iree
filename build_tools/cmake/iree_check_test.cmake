@@ -103,7 +103,7 @@ function(iree_check_test)
   if (_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
-  
+
   iree_bytecode_module(
     NAME
       "${_MODULE_NAME}"
@@ -378,11 +378,6 @@ function(iree_check_test_suite)
     set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
   else()
     set(_TARGET_CPU_FEATURES_VARIANTS "default")
-  endif()
-
-  if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
-    set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
-    set(_RULE_DRIVERS "local-task" "vulkan" "local-task")
   endif()
 
   list(LENGTH _RULE_TARGET_BACKENDS _TARGET_BACKEND_COUNT)

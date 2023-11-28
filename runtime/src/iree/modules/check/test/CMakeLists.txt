@@ -31,6 +31,14 @@ iree_check_test_suite(
     check
   SRCS
     "success.mlir"
+  TARGET_BACKENDS
+    "vmvx"
+    "vulkan-spirv"
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+    "vulkan"
+    "local-task"
 )
 
 iree_check_test_suite(
@@ -38,6 +46,14 @@ iree_check_test_suite(
     check_failure
   SRCS
     "failure.mlir"
+  TARGET_BACKENDS
+    "vmvx"
+    "vulkan-spirv"
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+    "vulkan"
+    "local-task"
   RUNNER_ARGS
     "--expect_failure"
 )

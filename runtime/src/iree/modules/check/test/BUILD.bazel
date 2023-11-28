@@ -36,10 +36,20 @@ iree_lit_test_suite(
 iree_check_test_suite(
     name = "check",
     srcs = ["success.mlir"],
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+        ("vulkan-spirv", "vulkan"),
+        ("llvm-cpu", "local-task"),
+    ],
 )
 
 iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
     runner_args = ["--expect_failure"],
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+        ("vulkan-spirv", "vulkan"),
+        ("llvm-cpu", "local-task"),
+    ],
 )

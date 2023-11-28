@@ -9,12 +9,6 @@
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
-ALL_TARGET_BACKENDS_AND_DRIVERS = [
-    ("vmvx", "local-task"),
-    ("vulkan-spirv", "vulkan"),
-    ("llvm-cpu", "local-task"),
-]
-
 def iree_check_test(
         name,
         src,
@@ -163,7 +157,7 @@ def iree_check_single_backend_test_suite(
 def iree_check_test_suite(
         name,
         srcs,
-        target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
+        target_backends_and_drivers = [],
         compiler_flags = [],
         runner_args = [],
         tags = [],
@@ -176,8 +170,9 @@ def iree_check_test_suite(
     Args:
       name: name of the generated test suite.
       srcs: source mlir files containing the module.
-      target_backends_and_drivers: backend/driver pairs to compile and run the
-          module, respectively.
+      target_backends_and_drivers: list of ("backend", "driver") tuples to
+          compile and run the module, respectively. If "driver" is omitted then
+          only compilation will be tested.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
       runner_args: additional runner_args to pass to the underlying
