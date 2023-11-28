@@ -7,7 +7,6 @@
 
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.device_specs import device_parameters
 
 
 EMULATOR_RISCV_64 = common_definitions.DeviceSpec.build(
@@ -15,7 +14,6 @@ EMULATOR_RISCV_64 = common_definitions.DeviceSpec.build(
     device_name="emulator-riscv_64",
     host_environment=common_definitions.HostEnvironment.LINUX_RISCV_64,
     architecture=common_definitions.DeviceArchitecture.RV64_GENERIC,
-    device_parameters=[device_parameters.ALL_CORES],
     tags=["cpu"],
 )
 
@@ -24,6 +22,5 @@ EMULATOR_RISCV_32 = common_definitions.DeviceSpec.build(
     device_name="emulator-riscv_32",
     host_environment=common_definitions.HostEnvironment.LINUX_RISCV_32,
     architecture=common_definitions.DeviceArchitecture.RV32_GENERIC,
-    device_parameters=[device_parameters.ALL_CORES],
     tags=["cpu"],
 )

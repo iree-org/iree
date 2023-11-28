@@ -58,7 +58,6 @@ iree_cc_library(
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
-    "LLVMCPULowerToUKernels.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
     "LLVMCPUPeel.cpp"
     "LLVMCPUSelectLoweringStrategy.cpp"
@@ -133,17 +132,14 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
-    iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::TransformStrategies::CPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
-    iree::compiler::Codegen::VMVX
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect

@@ -7,7 +7,6 @@
 
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
-from e2e_test_framework.device_specs import device_parameters
 
 DEVICE_NAME = "pixel-6-pro"
 
@@ -16,23 +15,17 @@ BIG_CORES = common_definitions.DeviceSpec.build(
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-    device_parameters=[device_parameters.ARM_BIG_CORES],
-    tags=["big-core"],
-)
-LITTLE_CORES = common_definitions.DeviceSpec.build(
-    id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-little-core",
-    device_name=DEVICE_NAME,
-    architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-    host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-    device_parameters=[device_parameters.ARM_LITTLE_CORES],
-    tags=["little-core"],
+    device_parameters=common_definitions.DeviceParameters(
+        # Cortex-X1
+        cpu_params=common_definitions.CPUParameters(pinned_cores=[6, 7])
+    ),
+    tags=["big-cores"],
 )
 ALL_CORES = common_definitions.DeviceSpec.build(
     id=unique_ids.DEVICE_SPEC_MOBILE_PIXEL_6_PRO + "-all-core",
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-    device_parameters=[device_parameters.ALL_CORES],
     tags=["all-cores"],
 )
 GPU = common_definitions.DeviceSpec.build(
@@ -40,5 +33,9 @@ GPU = common_definitions.DeviceSpec.build(
     device_name=DEVICE_NAME,
     architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
+    device_parameters=common_definitions.DeviceParameters(
+        # Pin on the fastest CPU core.
+        cpu_params=common_definitions.CPUParameters(pinned_cores=[7])
+    ),
     tags=["gpu"],
 )

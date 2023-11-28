@@ -333,7 +333,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -348,7 +348,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileNetV3Small_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -363,7 +363,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -378,7 +378,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -393,7 +393,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -408,7 +408,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -423,7 +423,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileSSD_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -438,7 +438,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "PoseNet_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -453,7 +453,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -468,7 +468,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -483,7 +483,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "EfficientNetV2STF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -498,7 +498,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MiniLML12H384Uncased(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -513,7 +513,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -528,7 +528,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -543,7 +543,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -558,7 +558,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "Falcon7bGptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -573,7 +573,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "Vit_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -1150,7 +1150,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -1164,7 +1164,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -1178,7 +1178,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -1192,7 +1192,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel]"
   PUBLIC
 )
@@ -1206,7 +1206,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,dotprod]"
   PUBLIC
@@ -1221,7 +1221,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,data-tiling,ukernel,dotprod]"
   PUBLIC
@@ -1733,7 +1733,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1752,7 +1752,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1771,7 +1771,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1790,7 +1790,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1809,7 +1809,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1828,7 +1828,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1847,7 +1847,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1866,7 +1866,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1885,7 +1885,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1904,7 +1904,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1923,7 +1923,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1942,7 +1942,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1961,7 +1961,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1980,7 +1980,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -1999,7 +1999,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2018,7 +2018,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2037,7 +2037,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2782,7 +2782,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2800,7 +2800,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2818,7 +2818,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2836,7 +2836,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2854,7 +2854,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
@@ -2873,7 +2873,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-microkernels"
+    "--iree-llvmcpu-enable-ukernels=all"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"

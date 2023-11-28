@@ -156,7 +156,7 @@ static LogicalResult printOperation(CppEmitter &emitter, mlir::func::CallOp call
   return success();
 }
 
-static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOp callOp) {
+static LogicalResult printOperation(CppEmitter &emitter, emitc::CallOpaqueOp callOp) {
   raw_ostream &os = emitter.ostream();
   Operation &op = *callOp.getOperation();
 
@@ -752,7 +752,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
   LogicalResult status =
       llvm::TypeSwitch<Operation *, LogicalResult>(&op)
           // EmitC ops.
-          .Case<emitc::ApplyOp, emitc::CallOp, emitc::CastOp, emitc::ConstantOp,
+          .Case<emitc::ApplyOp, emitc::CallOpaqueOp, emitc::CastOp, emitc::ConstantOp,
                 emitc::IncludeOp, emitc::VariableOp>(
               [&](auto op) { return printOperation(*this, op); })
           // SCF ops.

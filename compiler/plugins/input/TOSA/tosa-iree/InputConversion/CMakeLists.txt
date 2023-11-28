@@ -52,6 +52,7 @@ iree_cc_library(
   SRCS
     "Converti48Toi64.cpp"
     "Passes.cpp"
+    "StripSignedness.cpp"
     "TosaToLinalgExt.cpp"
     "VerifyCompilerTOSAInputLegality.cpp"
   DEPS
@@ -60,6 +61,7 @@ iree_cc_library(
     IREELinalgExtDialect
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRPass
@@ -71,7 +73,6 @@ iree_cc_library(
     MLIRTosaToSCF
     MLIRTosaToTensor
     MLIRTransforms
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::InputConversion::Common
   PUBLIC
 )

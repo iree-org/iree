@@ -77,7 +77,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
     }
     for (int r = 0; r < 2; ++r) {
       int actualMapResult =
-          map.getResults()[r].cast<AffineDimExpr>().getPosition();
+          cast<AffineDimExpr>(map.getResults()[r]).getPosition();
       if (actualMapResult != expectedMapResults[m][r]) {
         return false;
       }

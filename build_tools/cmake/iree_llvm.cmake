@@ -34,7 +34,10 @@ macro(iree_llvm_configure_bundled)
   set(LLVM_LIBRARY_OUTPUT_INTDIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/lib")
   set(LLVM_RUNTIME_OUTPUT_INTDIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/bin")
 
+  message(STATUS "Configuring third_party/llvm-project")
+  list(APPEND CMAKE_MESSAGE_INDENT "  ")
   add_subdirectory("third_party/llvm-project/llvm" "llvm-project" EXCLUDE_FROM_ALL)
+  list(POP_BACK CMAKE_MESSAGE_INDENT)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" )
@@ -150,7 +153,6 @@ macro(iree_llvm_set_bundled_cmake_options)
 
   # Unconditionally enable some other cheap LLVM tooling.
   set(IREE_LLVM_LINK_TARGET llvm-link)
-  set(IREE_LLD_TARGET lld)
 
   # Unconditionally enable mlir.
   list(APPEND LLVM_ENABLE_PROJECTS mlir)

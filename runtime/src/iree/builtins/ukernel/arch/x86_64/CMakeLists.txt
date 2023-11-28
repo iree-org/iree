@@ -18,6 +18,14 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_entry_points
   ARCH
     wasm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_entry_point.c"
     "pack_x86_64_entry_point.c"
@@ -30,6 +38,14 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx2_fma
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
     "pack_x86_64_avx2_fma.c"
@@ -46,6 +62,14 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_base
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
@@ -67,6 +91,14 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_vnni
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -87,6 +119,14 @@ iree_bitcode_library(
     ukernel_bitcode_x86_64_avx512_bf16
   ARCH
     x86_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
+    "pack_x86_64_internal.h"
+    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_bf16.c"
   COPTS
@@ -188,19 +228,57 @@ set(IREE_UK_COPTS_X86_64_AVX512_BF16
   "${IREE_UK_COPTS_X86_64_AVX512_BF16_RELATIVE}"
 )
 
+# CPU features that we will try checking compiler support for, unless
+# we set them to OFF below.
+set(IREE_UK_TRY_X86_64_AVX2_FMA ON)
+set(IREE_UK_TRY_X86_64_AVX512_BASE ON)
+set(IREE_UK_TRY_X86_64_AVX512_VNNI ON)
+set(IREE_UK_TRY_X86_64_AVX512_BF16 ON)
+
+# On some compilers, we don't even want to try checking compiler support for
+# features that we know are not working. Often, a compiler supports a flag but
+# there is a bug in its support for that feature. In the case of MSVC, the
+# /arch: flag is often too coarse-grained to be meaningful.
+
+# GCC version check
 if ((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
     (CMAKE_C_COMPILER_VERSION VERSION_LESS 12))
-# Old GCC versions have incompatible x86 intrinsics. Supporting them
-# is not considered worth it. By not defining these tokens, we leave these
-# code paths out. At least GCC 9 is known to be problematic, while GCC 12 is
-# known working, so the current test is based on that.
-else()
-check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
-check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
-check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
-check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BF16}" IREE_UK_BUILD_X86_64_AVX512_BF16)
+  # Old GCC versions have incompatible x86 intrinsics. Supporting them
+  # is not considered worth it. By not defining these tokens, we leave these
+  # code paths out. At least GCC 9 is known to be problematic, while GCC 12 is
+  # known working, so the current test is based on that.
+  set(IREE_UK_TRY_X86_64_AVX2_FMA OFF)
+  set(IREE_UK_TRY_X86_64_AVX512_BASE OFF)
+  set(IREE_UK_TRY_X86_64_AVX512_VNNI OFF)
+  set(IREE_UK_TRY_X86_64_AVX512_BF16 OFF)
+endif()  # GCC version check
+
+# MSVC version check for AVX-512-BF16
+if (MSVC_VERSION AND ("${MSVC_VERSION}" VERSION_LESS 1937))
+  # Missing _mm512_cvtpbh_ps intrinsic at _MSC_VER=1930.
+  set(IREE_UK_TRY_X86_64_AVX512_BF16 OFF)
+endif()  # MSVC version check for AVX-512-BF16
+
+# Now check compiler support for what we've decided to try.
+
+if (IREE_UK_TRY_X86_64_AVX2_FMA)
+  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
 endif()
 
+if (IREE_UK_TRY_X86_64_AVX512_BASE)
+  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
+endif()
+
+if (IREE_UK_TRY_X86_64_AVX512_VNNI)
+  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
+endif()
+
+if (IREE_UK_TRY_X86_64_AVX512_BF16)
+  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BF16}" IREE_UK_BUILD_X86_64_AVX512_BF16)
+endif()
+
+# Now generate the configured header. This needs to happen after all
+# IREE_UK_BUILD_X86_64_* variables have been set.
 configure_file("config_x86_64.h.in" "config_x86_64.h")
 
 iree_cc_library(

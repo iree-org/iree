@@ -69,7 +69,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-vmvx-enable-microkernels"
-    "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false"
+    "--iree-vmvx-enable-ukernels-decompose-linalg-generic=false"
 )
 
 iree_check_single_backend_test_suite(

@@ -87,7 +87,7 @@ iree_check_single_backend_test_suite(
         # results in the creation of temporary buffers between these split
         # linalg.generic ops, causing:
         # > error: failed to legalize operation 'memref.alloca' that was explicitly marked illegal
-        "--iree-vmvx-enable-microkernels-decompose-linalg-generic=false",
+        "--iree-vmvx-enable-ukernels-decompose-linalg-generic=false",
     ],
     driver = "local-task",
     target_backend = "vmvx",

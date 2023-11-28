@@ -409,10 +409,6 @@ typedef struct iree_io_gguf_parser_t {
   uint64_t tensor_data_size;
 } iree_io_gguf_parser_t;
 
-static inline uint64_t iree_align_uint64(uint64_t value, uint64_t alignment) {
-  return (value + (alignment - 1)) & ~(alignment - 1);
-}
-
 static iree_status_t iree_io_gguf_calculate_storage_size(
     const gguf_tensor_info_t* tensor_info, uint64_t* out_storage_size) {
   *out_storage_size = 0;

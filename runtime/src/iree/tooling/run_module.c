@@ -232,6 +232,7 @@ static iree_status_t iree_tooling_run_function(
         iree_hal_fence_wait(finish_fence, iree_infinite_timeout()),
         "waiting on finish fence");
   }
+  iree_hal_fence_release(finish_fence);
 
   // End profiling after waiting for the invocation to finish.
   if (iree_status_is_ok(status)) {

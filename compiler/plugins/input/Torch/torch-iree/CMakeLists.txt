@@ -27,7 +27,7 @@ iree_cc_library(
 
 iree_compiler_register_plugin(
   PLUGIN_ID
-    torch_iree
+    input_torch
   TARGET
     ::registration
 )

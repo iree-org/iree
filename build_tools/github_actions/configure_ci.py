@@ -362,9 +362,9 @@ def parse_jobs_trailer(
     jobs = set(jobs)
     unknown_jobs = jobs - all_jobs
     if unknown_jobs:
-        raise ValueError(
-            f"Received unknown jobs '{','.join(unknown_jobs)}' in trailer '{key}'"
-        )
+        # Unknown jobs may be for a different workflow. Warn then continue.
+        print(f"::warning::Unknown jobs '{','.join(unknown_jobs)}' in trailer '{key}'")
+        jobs = jobs - unknown_jobs
     return jobs
 
 

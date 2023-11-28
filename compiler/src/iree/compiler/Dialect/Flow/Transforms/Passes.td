@@ -277,12 +277,6 @@ def SplitReduction :
   let constructor = "mlir::iree_compiler::IREE::Flow::createSplitReductionPass()";
 }
 
-def StripSignedness :
-    InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
-  let summary = "Legalizes ui tensors constants to uis";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
-}
-
 def TensorPadToTensorInsertSlice :
     Pass<"iree-flow-tensor-pad-to-tensor-insert-slice", ""> {
   let summary = "Convert tensor.pad into linalg.fill + tensor.insert_slice";

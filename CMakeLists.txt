@@ -147,10 +147,10 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 #
 #   iree_compiler_plugin.cmake : Included in the context of the compiler/
 #     directory before sources and bindings. Will execute with source and
-#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other 
+#     binary dir ${IREE_BUILD_DIR}/compiler/plugins (shared with all other
 #     dirs).
 #   iree_runtime_plugin.cmake : Included in the context of the runtime/
-#     directory before sources. Will execute with source and binary dir 
+#     directory before sources. Will execute with source and binary dir
 #     ${IREE_BUILD_DIR}/runtime/plugins (shared with all other dirs).
 #
 # Typically, these plugins will perform additional project setup, and
@@ -169,7 +169,7 @@ set(IREE_EXTERNAL_TOOLING_MODULES "" CACHE STRING "")
 # External HAL Driver Plugins
 # ---------------------------
 # HAL driver implementations are advertised to the build system via
-# iree_register_external_hal_driver(), which specifies the name, target, 
+# iree_register_external_hal_driver(), which specifies the name, target,
 # registration function and optional source/binary directory.
 #-------------------------------------------------------------------------------
 
@@ -183,7 +183,7 @@ endif()
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
-option(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS "Build experimental plugins making builtin ukernels available to llvm-cpu modules compiled with --iree-llvmcpu-enable-microkernels" OFF)
+option(IREE_BUILD_EXPERIMENTAL_CPU_UKERNEL_PLUGINS "Build experimental plugins making builtin ukernels available to llvm-cpu modules compiled with --iree-llvmcpu-enable-ukernels" OFF)
 option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 
 #-------------------------------------------------------------------------------
@@ -446,12 +446,14 @@ if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
       "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
 endif()
 
-if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
-  if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-    message(SEND_ERROR
-        "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
-        "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-        "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
+if(IREE_BUILD_COMPILER)
+  if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
+    if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
+      message(SEND_ERROR
+          "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+          "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
+          "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
+    endif()
   endif()
 endif()
 
@@ -580,7 +582,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 iree_register_external_hal_driver(
   NAME
     cuda2
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
   DRIVER_TARGET
     iree::experimental::cuda2::registration
@@ -596,7 +598,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     rocm
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/rocm"
   DRIVER_TARGET
     iree::experimental::rocm::registration
@@ -612,8 +614,10 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     webgpu
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
+  BINARY_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu"
   DRIVER_TARGET
     iree::experimental::webgpu::registration
   REGISTER_FN
@@ -847,10 +851,18 @@ else()
   iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
   iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
-  # Add default external projects.
+  # Add external projects.
+
+  message(STATUS "Configuring llvm-external-projects/mlir-iree-dialects")
+  list(APPEND CMAKE_MESSAGE_INDENT "  ")
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  list(POP_BACK CMAKE_MESSAGE_INDENT)
+
   if(IREE_INPUT_STABLEHLO)
+    message(STATUS "Configuring third_party/stablehlo")
+    list(APPEND CMAKE_MESSAGE_INDENT "  ")
     iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.
@@ -923,24 +935,6 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   iree_set_spirv_cross_cmake_options()
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
-endif()
-
-if(IREE_TARGET_BACKEND_WEBGPU)
-  # Tint is needed to compile SPIR-V into WGSL source code.
-  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
-
-  # NOTE: these can be synced by referencing one of these repositories:
-  #   * https://dawn.googlesource.com/dawn/
-  #   * https://dawn.googlesource.com/tint/
-  #   * https://chromium.googlesource.com/vulkan-deps/+/refs/heads/main/DEPS
-  # or they can be updated independently
-  set(IREE_TINT_TAG         "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
-  set(IREE_SPIRV_TOOLS_TAG  "43b8886490eb6af81fc61e0ff071c51a922af864")  # 2023-08-11
-
-  iree_set_spirv_headers_cmake_options()
-  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
-  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------

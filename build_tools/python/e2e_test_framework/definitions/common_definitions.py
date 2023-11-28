@@ -109,6 +109,23 @@ class ModelSourceType(Enum):
     EXPORTED_TFLITE = "exported_tflite"
 
 
+@serialization.serializable
+@dataclass(frozen=True)
+class CPUParameters:
+    """Describes CPU related parameters."""
+
+    # CPU cores to pin at, ordered from the slowest to the fastest.
+    pinned_cores: List[int]
+
+
+@serialization.serializable
+@dataclass(frozen=True)
+class DeviceParameters:
+    """Describes device parameters."""
+
+    cpu_params: Optional[CPUParameters] = None
+
+
 @serialization.serializable(type_key="device_specs")
 @dataclass(frozen=True)
 class DeviceSpec(object):
@@ -138,7 +155,7 @@ class DeviceSpec(object):
     # This is for modeling the spec of a heterogeneous processor. Depending on
     # which cores you run, the device has a different spec. Benchmark machines use
     # these parameters to set up the devices. E.g. set CPU mask.
-    device_parameters: List[str] = dataclasses.field(default_factory=list)
+    device_parameters: DeviceParameters
 
     def __str__(self):
         return self.name
@@ -150,7 +167,7 @@ class DeviceSpec(object):
         device_name: str,
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
-        device_parameters: Sequence[str] = (),
+        device_parameters: DeviceParameters = DeviceParameters(),
         tags: Sequence[str] = (),
     ):
         tag_part = ",".join(tags)
@@ -163,7 +180,7 @@ class DeviceSpec(object):
             device_name=device_name,
             host_environment=host_environment,
             architecture=architecture,
-            device_parameters=list(device_parameters),
+            device_parameters=device_parameters,
         )
 
 

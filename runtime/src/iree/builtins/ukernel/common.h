@@ -26,11 +26,12 @@
 //       themselves, other ukernels, or any other code, on any thread.
 //    c. Stateless: ukernels can't access any nonconstant global variable.
 
+#ifdef __cplusplus
+#error This file should only be included in ukernel/ code, which should be C, not C++.
+#endif  // __cplusplus
+
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_bits.h"
-
-// Include IREE_UK_STATIC_ASSERT.
-#include "iree/builtins/ukernel/static_assert.h"
 
 // Clang on Windows has __builtin_clzll; otherwise we need to use the
 // windows intrinsic functions.
@@ -39,10 +40,6 @@
 #pragma intrinsic(_BitScanReverse)
 #pragma intrinsic(_BitScanForward)
 #endif  // defined(_MSC_VER)
-
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // Compiler/version checks
@@ -109,8 +106,6 @@ extern "C" {
 #define IREE_UK_RESTRICT __restrict
 #elif defined(IREE_UK_COMPILER_MSVC)
 #define IREE_UK_RESTRICT
-#elif defined(__cplusplus)
-#define IREE_UK_RESTRICT __restrict__
 #else
 #define IREE_UK_RESTRICT restrict
 #endif  // IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1900)
@@ -207,7 +202,6 @@ extern "C" {
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//
 
-#ifndef __cplusplus
 // Exactly as in stdbool.h.
 // As stdbool.h is only macros, not typedefs, and it is standardized how these
 // macros expand, we can simply do them here. We still avoid #including it
@@ -215,7 +209,14 @@ extern "C" {
 #define bool _Bool
 #define true 1
 #define false 0
-#endif
+
+//===----------------------------------------------------------------------===//
+// IREE_UK_STATIC_ASSERT, a wrapper around the static-assertion keyword.
+//===----------------------------------------------------------------------===//
+
+// Currently unconditionally _Static_assert since C11, but will have to evaluate
+// to static_assert on C23.
+#define IREE_UK_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
@@ -851,9 +852,5 @@ static inline float iree_uk_bf16_to_f32(iree_uk_uint16_t bf16_value) {
 static inline iree_uk_uint16_t iree_uk_f32_to_bf16(float value) {
   return iree_uk_f32_to_generic_fp16(value, 8);
 }
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_BUILTINS_UKERNEL_COMMON_H_

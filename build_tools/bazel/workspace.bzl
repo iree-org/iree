@@ -116,12 +116,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.local_repository,
-        name = "spirv_headers",
-        path = paths.join(iree_path, "third_party/spirv_headers"),
-    )
-
-    maybe(
-        native.local_repository,
         name = "stablehlo",
         path = paths.join(iree_path, "third_party/stablehlo"),
     )

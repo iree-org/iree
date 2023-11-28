@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 
-#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"

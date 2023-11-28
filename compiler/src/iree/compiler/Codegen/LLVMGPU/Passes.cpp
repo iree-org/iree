@@ -394,6 +394,8 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   // Linalg -> vector
   {
     GenericVectorizationPassOptions options;
+    options.enableVectorMasking = true;
+    options.useConfiguredVectorSizes = false;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
@@ -428,7 +430,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
 
   // vector -> simt gpu + vector
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertVectorReductionToGPUPass());
+      createConvertVectorReductionToGPUPass(/*expandSubgroupReduction=*/true));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -596,6 +598,8 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 

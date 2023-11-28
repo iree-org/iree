@@ -30,8 +30,8 @@ static inline iree_uk_random_engine_t iree_uk_random_engine_init(void) {
 iree_uk_uint32_t iree_uk_random_engine_get_uint32(iree_uk_random_engine_t* e);
 iree_uk_uint64_t iree_uk_random_engine_get_uint64(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_65535(iree_uk_random_engine_t* e);
+int iree_uk_random_engine_get_0_255(iree_uk_random_engine_t* e);
 int iree_uk_random_engine_get_0_1(iree_uk_random_engine_t* e);
-int iree_uk_random_engine_get_minus16_plus15(iree_uk_random_engine_t* e);
 void iree_uk_write_random_buffer(void* buffer, iree_uk_index_t size_in_bytes,
                                  iree_uk_type_t type,
                                  iree_uk_random_engine_t* engine);

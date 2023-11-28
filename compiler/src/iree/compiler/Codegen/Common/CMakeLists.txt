@@ -52,7 +52,7 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
-    "EncodingInfo.h"
+    "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "Passes.h"
     "TileSizeSelection.h"
@@ -74,6 +74,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "EmulateNarrowType.cpp"
+    "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
@@ -160,7 +161,6 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
@@ -171,8 +171,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::VMVX::IR
-    iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Utils
   PUBLIC
 )

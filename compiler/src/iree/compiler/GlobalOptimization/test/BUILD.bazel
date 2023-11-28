@@ -19,6 +19,7 @@ iree_lit_test_suite(
             "conv1x1_to_matmul.mlir",
             "detach_elementwise_from_named_ops.mlir",
             "expand_vectors.mlir",
+            "flow_hoist_into_globals.mlir",
             "fuse_dequantization_matmul.mlir",
             "lift_generic_to_transpose_batch_matmul.mlir",
             "materialize_homogeneous_encodings.mlir",

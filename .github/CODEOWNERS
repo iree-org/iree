@@ -73,7 +73,7 @@
 /compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst
 /compiler/src/iree/compiler/GlobalOptimization/ @hanhanW
 /compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
-/compiler/src/iree/compiler/InputConversion/StableHLO/ @hanhanW @MaheshRavishankar @rsuderman
+/compiler/plugins/input/StableHLO/ @hanhanW @MaheshRavishankar @rsuderman
 /compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
 
 # Runtime

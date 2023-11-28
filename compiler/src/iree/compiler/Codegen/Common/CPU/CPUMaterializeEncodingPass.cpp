@@ -6,12 +6,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/EncodingUtils.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
-#include "iree/compiler/Codegen/Common/EncodingInfo.h"
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -19,7 +16,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -37,7 +36,7 @@ using IREE::HAL::ExecutableTargetAttr;
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
-  if (hasMicrokernels(target)) {
+  if (hasUkernel(target)) {
     // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
     // does not support batch_matmul atm.
     if (user == EncodingUser::BATCH_MATMUL) {
@@ -340,7 +339,8 @@ struct CPUMaterializeEncodingPass
   explicit CPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr attr)
       : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, IREE::LinalgExt::IREELinalgExtDialect,
+    registry.insert<arith::ArithDialect, tensor::TensorDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
@@ -403,7 +403,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
     return a == IntegerAttr() ? 0 : a.getInt();
   };
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = hasMicrokernels(targetAttr)
+  int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
                               ? 0
                               : getIntOrZero(encoding.getMatmulNarrow_N());
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
@@ -413,7 +413,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
   auto role = encoding.getRole().getValue();
-  return IREE::LinalgExt::getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
+  return getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
 }
 
 static MaterializeEncodingFn

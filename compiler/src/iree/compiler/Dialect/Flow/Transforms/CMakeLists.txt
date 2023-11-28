@@ -62,7 +62,6 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
     "SplitReduction.cpp"
-    "StripSignedness.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TopLevelSCFToCFG.cpp"
     "VerifyInputLegality.cpp"

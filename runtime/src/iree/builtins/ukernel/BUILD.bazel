@@ -15,14 +15,8 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "static_assert",
-    hdrs = ["static_assert.h"],
-)
-
-iree_runtime_cc_library(
     name = "exported_bits",
     hdrs = ["exported_bits.h"],
-    deps = [":static_assert"],
 )
 
 internal_headers = [
@@ -34,7 +28,6 @@ internal_headers = [
     "pack_internal.h",
     "query_tile_sizes.h",
     "query_tile_sizes_internal.h",
-    "static_assert.h",
     "unpack.h",
     "unpack_internal.h",
 ]
@@ -70,7 +63,6 @@ iree_runtime_cc_library(
     visibility = ["//visibility:private"],
     deps = [
         ":exported_bits",
-        ":static_assert",
         "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/builtins/ukernel/arch:ukernel_arch",
     ],

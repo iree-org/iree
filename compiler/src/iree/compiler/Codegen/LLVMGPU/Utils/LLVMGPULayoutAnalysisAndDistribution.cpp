@@ -301,8 +301,7 @@ static void propagateLayoutToReduceBroadcastTranspose(
   auto reductionDims =
       llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   // Get the transpose permutation
-  SmallVector<int64_t> perm;
-  transposeOp.getTransp(perm);
+  ArrayRef<int64_t> perm = transposeOp.getPermutation();
   // Don't support dim-1 broadcasted dims
   llvm::SetVector<int64_t> dimOneBroadcastedDims =
       broadcastOp.computeBroadcastedUnitDims();
@@ -444,7 +443,7 @@ getDistributedIndices(OpBuilder &rewriter, Location loc, Layout &layout,
   SmallVector<Value> newIndices{indices.begin(), indices.end()};
   int64_t laneDim = 0;
   for (AffineExpr expr : permutationMap.getResults()) {
-    auto dimExpr = expr.dyn_cast<AffineDimExpr>();
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
     if (!dimExpr)
       continue;
     unsigned pos = dimExpr.getPosition();
@@ -478,8 +477,8 @@ static bool isTransposedLdMatrix(AffineMap map) {
   if (map.getNumResults() != 2) {
     return false;
   }
-  auto exprX = map.getResult(0).dyn_cast<AffineDimExpr>();
-  auto exprY = map.getResult(1).dyn_cast<AffineDimExpr>();
+  auto exprX = dyn_cast<AffineDimExpr>(map.getResult(0));
+  auto exprY = dyn_cast<AffineDimExpr>(map.getResult(1));
   if (!exprX || !exprY)
     return false;
   return exprX.getPosition() > exprY.getPosition();
@@ -533,7 +532,7 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
     std::swap(laneOffsets[0], laneOffsets[1]);
   }
   for (AffineExpr expr : permutationMap.getResults()) {
-    auto dimExpr = expr.dyn_cast<AffineDimExpr>();
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
     if (!dimExpr)
       continue;
     unsigned pos = dimExpr.getPosition();

@@ -425,11 +425,8 @@ static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m, iree_hal_dim_t n) {
   float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
-    acc = iree_math_round_to_nearest_f16(
-        iree_math_round_to_nearest_f16(
-            (iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
-             iree_math_f16_to_f32(rhs_data[n + k * n_size]))) +
-        acc);
+    acc += iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
+           iree_math_f16_to_f32(rhs_data[n + k * n_size]);
   }
   result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
 }
@@ -460,11 +457,8 @@ static void reference_matmul_bf16_bf16_bf16_bf16(
     iree_hal_dim_t m, iree_hal_dim_t n) {
   float acc = acc_data ? iree_math_bf16_to_f32(acc_data[n + m * n_size]) : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
-    acc = iree_math_round_to_nearest_bf16(
-        iree_math_round_to_nearest_bf16(
-            (iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
-             iree_math_bf16_to_f32(rhs_data[n + k * n_size]))) +
-        acc);
+    acc += iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
+           iree_math_bf16_to_f32(rhs_data[n + k * n_size]);
   }
   result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
 }
@@ -672,9 +666,6 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
              FLAG_acceptable_fp_delta;
     case IREE_E2E_TEST_VALUE_TYPE_BF16:
       if (actual.bf16_u16 == expected.bf16_u16) return true;
-      fprintf(stderr, "actual (%x) %g ; expected (%x) %g\n", actual.bf16_u16,
-              iree_math_bf16_to_f32(actual.bf16_u16), expected.bf16_u16,
-              iree_math_bf16_to_f32(expected.bf16_u16));
       if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
                    iree_math_bf16_to_f32(expected.bf16_u16)) <

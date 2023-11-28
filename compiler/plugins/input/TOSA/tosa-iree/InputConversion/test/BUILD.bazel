@@ -16,7 +16,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "auto_input_conversion.mlir",
             "convert_i48_to_i64.mlir",
+            "strip_signedness.mlir",
             "tosa_to_linalg_ext.mlir",
             "verify_compiler_tosa_input_legality.mlir",
         ],
@@ -24,6 +26,7 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],

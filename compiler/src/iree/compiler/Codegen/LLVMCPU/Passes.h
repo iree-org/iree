@@ -49,11 +49,6 @@ createLLVMCPULowerExecutableTargetPass();
 /// Can handel more operations if required in future.
 std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
-/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
-/// operation.
-std::unique_ptr<OperationPass<>>
-createLLVMCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
-
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUMmt4dVectorLoweringPass();
 
@@ -161,10 +156,6 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 /// Transform dialect-based common.
 void addTransformDialectPasses(OpPassManager &passManager);
 
-/// Populates the passes to lower to tiled/distributed/bufferized ops,
-/// suitable for library call dispatch and lowering to loops.
-void addVMVXDefaultPassPipeline(OpPassManager &passManager,
-                                bool enableMicrokernels);
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(

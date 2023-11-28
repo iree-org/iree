@@ -72,7 +72,12 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 
 /// Methods to get target information.
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
-bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+// Returns true if the ukernel with given `ukernelName` is enabled.
+// If `ukernelName` is empty (the default), returns true if any ukernel
+// is enabled at all.
+bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
+                StringRef ukernelName = "");
 
 /// Returns the CPU target features associated with the `targetAttr`, if set.
 std::optional<StringRef>

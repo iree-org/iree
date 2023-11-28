@@ -525,7 +525,7 @@ hal.executable private @mmt4d_ukernel {
       {cpu = "generic", cpu_features = "",
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
-       ukernels = true}>) {
+       ukernels = "mmt4d"}>) {
     hal.executable.export public @ukernel_dispatch ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5, %arg6
@@ -562,7 +562,7 @@ hal.executable private @ukernel_pass_through {
       cpu = "generic", cpu_features = "",
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 16 : index, target_triple = "x86_64-none-elf",
-      ukernels = false}>) {
+      ukernels = "all"}>) {
     hal.executable.export public @dispatch ordinal(0) layout(#hal.pipeline.layout<
       push_constants = 2, sets = [
         <0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>,

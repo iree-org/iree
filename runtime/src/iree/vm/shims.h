@@ -151,15 +151,6 @@ typedef iree_status_t(IREE_API_PTR* iree_vm_native_function_target2_t)(
         (args)->vla_field[i].r0, &(*(out_ptrs))[i]));                         \
   }
 
-#define IREE_VM_ABI_VLA_HEAP_DEREF(args, vla_count, vla_field, ref_type,         \
-                                   host_allocator, out_count, out_ptrs)          \
-  *(out_count) = (args)->vla_count;                                              \
-  IREE_RETURN_IF_ERROR(iree_alloca((args)->vla_count * sizeof(ref_type##_t*));  \
-  for (iree_host_size_t i = 0; i < (args)->vla_count; ++i) {                   \
-    IREE_RETURN_IF_ERROR(                                                      \
-        ref_type##_check_deref((args)->vla_field[i].r0, &(*(out_ptrs))[i]));  \
-  }
-
 //===----------------------------------------------------------------------===//
 // Structures used for arguments and results.
 //===----------------------------------------------------------------------===//
@@ -458,19 +449,6 @@ IREE_VM_ABI_FIXED_STRUCT(rIrrrrrrr, {
   iree_vm_ref_t r8;
 });
 
-IREE_VM_ABI_FIXED_STRUCT(rIrrrrIrII, {
-  iree_vm_ref_t r0;
-  int64_t i1;
-  iree_vm_ref_t r2;
-  iree_vm_ref_t r3;
-  iree_vm_ref_t r4;
-  iree_vm_ref_t r5;
-  int64_t i6;
-  iree_vm_ref_t r7;
-  int64_t i8;
-  int64_t i9;
-});
-
 IREE_VM_ABI_FIXED_STRUCT(rIrrrrIIiiI, {
   iree_vm_ref_t r0;
   int64_t i1;
@@ -696,7 +674,6 @@ IREE_VM_ABI_DECLARE_SHIM(rrrIii, v);
 IREE_VM_ABI_DECLARE_SHIM(rIrriiiI, r);
 IREE_VM_ABI_DECLARE_SHIM(rIrrrIrIIi, v);
 IREE_VM_ABI_DECLARE_SHIM(rIrrrrrrr, v);
-IREE_VM_ABI_DECLARE_SHIM(rIrrrrIrII, v)
 IREE_VM_ABI_DECLARE_SHIM(rIrrrrIIiiI, r);
 IREE_VM_ABI_DECLARE_SHIM(rIrrr, v);
 IREE_VM_ABI_DECLARE_SHIM(rIrrCrD, v);

@@ -7,34 +7,19 @@
 #ifndef IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_
 #define IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_
 
-#include "iree/builtins/ukernel/static_assert.h"
-
 // This header is shared across:
 //
 // * C++ code under compiler/
 // * C code   under runtime/.../ukernel/
-// * asm code under runtime/.../ukernel/
 //
 // Being shared with compiler/ means that we should treat these flags as set
 // in stone. Don't count on being able to remove or change the numerical value
 // of an existing flag.
 //
-// Being shared with asm code means that the only thing that we can do here is
-// #define literal integers. The C/C++ code only cares about the flags values
-// but asm code also cares about the bit-position values (i.e. the log2's).
-// Consistency between the two is guarded by static_assert's but only when
-// the language is C/C++ (not assembly).
-//
 // Ukernel flags are typically of type uint32. For now, we treat all flags as
 // specific to one op, sometimes duplicating identical flags for multiple ops.
 // In the future we might let multiple ops share common flags, but it is too
-// early to tell which yet.
-
-// Static assertions ensuring consistency of flag values, for those flags for
-// which we define _BIT_POS (typically, flags that are used in asm code, where
-// having _BIT_POS allows using bit-test instructions.)
-#define IREE_UK_ENSURE_CONSISTENT_FLAG(F) \
-  IREE_UK_STATIC_ASSERT((F) == (1u << (F##_BIT_POS)))
+// early to tell which yet. We also might widen flags to uint64 as needed.
 
 //===----------------------------------------------------------------------===//
 // mmt4d
@@ -55,8 +40,6 @@
 
 // bit flags
 #define IREE_UK_FLAG_MMT4D_ACCUMULATE 0x100
-#define IREE_UK_FLAG_MMT4D_ACCUMULATE_BIT_POS 8
-IREE_UK_ENSURE_CONSISTENT_FLAG(IREE_UK_FLAG_MMT4D_ACCUMULATE);
 #define IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS 0x400
 
 //===----------------------------------------------------------------------===//

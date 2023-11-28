@@ -40,7 +40,9 @@ getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
                         StringRef format) {
   SmallVector<NamedAttribute> config;
   config.emplace_back(StringAttr::get(context, "ukernels"),
-                      BoolAttr::get(context, clEnableMicrokernels));
+                      StringAttr::get(context, clEnableMicrokernels.getValue()
+                                                   ? "all"
+                                                   : "none"));
   return IREE::HAL::ExecutableTargetAttr::get(
       context, StringAttr::get(context, backend),
       StringAttr::get(context, format), DictionaryAttr::get(context, config));

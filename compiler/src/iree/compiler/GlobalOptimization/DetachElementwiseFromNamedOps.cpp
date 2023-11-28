@@ -95,7 +95,7 @@ struct DetachElementwisePattern
     SmallVector<utils::IteratorType> iterators;
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
+      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
       auto attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr))
         return failure();
