@@ -122,11 +122,3 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   }
   return LayoutAttr::get(getContext(), newLayouts);
 }
-  }
-  }
-      break;
-  }
-  }
-}
-
-}

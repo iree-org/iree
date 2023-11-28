@@ -88,7 +88,7 @@ def PerDimLayoutAttr : IREEVectorExt_Attr<"PerDimLayout"> {
      ArrayRefParameter<"LayoutDimensionAttr", "labels for the high dimensional layout dims">:$labels,
      ArrayRefParameter<"int64_t", "shapes for the high dimensional layout dims">:$shapes
    );
-   let assemblyFormat = "`<` `[` $labels `]` `,` `[` $shapes `]` `>`";
+   let assemblyFormat = "`<``[` $labels `]``,` `[` $shapes `]``>`";
    let genVerifyDecl = 0;
    let extraClassDeclaration = [{
       std::optional<int64_t> getShape(const LayoutDimension &dim);
@@ -112,8 +112,6 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   let extraClassDeclaration = [{
     SmallVector<int64_t> getSIMTVectorShape(ArrayRef<LayoutDimension> dims);
   }];
-}
-  let genVerifyDecl = 0;
 }
 
 #endif // IREE_DIALECT_VECTOREXT_BASE
