@@ -122,6 +122,14 @@ def iree_check_single_backend_test_suite(
     if target_cpu_features:
         fail("target_cpu_features must currently be empty")
 
+    if backend == "cuda" or driver == "cuda":
+        # TODO(#15233): add filtering based on @iree_cuda//:enabled for cuda
+        pass
+
+    if backend == "webgpu" or backend == "metal-spirv":
+        # These are only supported in the CMake build for now.
+        return
+
     tests = []
     for src in srcs:
         test_name = "_".join([name, src])
@@ -201,9 +209,6 @@ def iree_check_test_suite(
     # could just create a test suite. The latter seems simpler and more readable.
     tests = []
     for backend, driver in target_backends_and_drivers:
-        # CUDA backend/driver not supported by Bazel build.
-        if backend == "cuda" or driver == "cuda":
-            continue
         suite_name = "_".join([name, backend, driver])
         iree_check_single_backend_test_suite(
             name = suite_name,
