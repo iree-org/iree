@@ -1,10 +1,10 @@
-// Copyright 2023 The IREE Authors
-//
+// Copyright 2023 The IREE Authors //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -24,6 +24,17 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+
+void buildGlobalOptExprHoistingPassPipeline(
+    OpPassManager &passManager, const TransformOptions &transformOptions) {
+  IREE::Util::ExprHoistingOptions options;
+  options.maxSizeIncreaseThreshold =
+      transformOptions.options.constExprMaxSizeIncreaseThreshold;
+  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+}
 
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
@@ -107,8 +118,7 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
-    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
-        transformOptions.options.constExprMaxSizeIncreaseThreshold));
+    buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {
@@ -152,6 +162,16 @@ void registerGlobalOptimizationPipeline() {
           [](OpPassManager &passManager,
              const TransformOptions &transformOptions) {
             buildGlobalOptimizationPassPipeline(passManager, transformOptions);
+          });
+  PassPipelineRegistration<TransformOptions>
+      globalOptimizationConstantHoistingPassPipeline(
+          "iree-global-optimization-hoist-constant-expressions",
+          "Hoists constant expressions with the preferred storage types for "
+          "global optimization",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildGlobalOptExprHoistingPassPipeline(passManager,
+                                                   transformOptions);
           });
 }
 
