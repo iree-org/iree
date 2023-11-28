@@ -1277,8 +1277,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const Type elementType =
-      llvm::cast<ShapedType>(op.getDpsInitsMutable()[0].get().getType())
-          .getElementType();
+      llvm::cast<ShapedType>(op.getDpsInits()[0].getType()).getElementType();
   if (!elementType.isIntOrFloat())
     return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
