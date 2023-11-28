@@ -334,7 +334,6 @@ WEBGPU_SRCS = enforce_glob(
         "log.mlir",
         "logical_left_shift.mlir",
         "logical_right_shift.mlir",
-        "logical_right_shift_16.mlir",
         "matmul.mlir",
         "maximum.mlir",
         "minimum.mlir",
@@ -360,6 +359,7 @@ WEBGPU_SRCS = enforce_glob(
         "max_pool.mlir",  # TODO(#10906): fix (i8/i16?)
         "table.mlir",  # TODO(#10906): fix (i8/i16?)
         "while.mlir",  # TODO(#12509): WebGPU SPIR-V broken
+        "logical_right_shift_16.mlir",  # TODO(#10906): fix (i8/i16?)
     ],
 )
 
