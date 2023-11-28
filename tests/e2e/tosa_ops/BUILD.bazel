@@ -249,6 +249,69 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+CUDA_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "arithmetic_right_shift.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "clz.mlir",
+        "const.mlir",
+        "equal.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "fully_connected.mlir",
+        "gather.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "logical_right_shift_16.mlir",
+        "matmul.mlir",
+        "max_pool.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul_shift.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reciprocal.mlir",
+        "reduce.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sigmoid.mlir",
+        "sub.mlir",
+        "table.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    include = ["*.mlir"],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_cuda-cuda",
+    srcs = CUDA_SRCS,
+    driver = "cuda",
+    input_type = "tosa",
+    target_backend = "cuda-spirv",
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+)
+
 WEBGPU_SRCS = enforce_glob(
     [
         "abs.mlir",
@@ -423,6 +486,7 @@ iree_check_single_backend_test_suite(
 test_suite(
     name = "check",
     tests = [
+        ":check_cuda-cuda",
         ":check_llvm-cpu_local-task",
         ":check_metal-spirv_metal",
         ":check_rocm-rocm",
