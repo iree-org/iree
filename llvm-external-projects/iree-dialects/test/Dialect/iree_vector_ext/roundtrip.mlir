@@ -12,11 +12,11 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   return %2 : vector<32x32xf16>
 }
 
+// CHECK-DAG: #[[LAYOUT0:.+]] = #iree_vector_ext.layout<<[ BATCHY,  LANEY,  VECTORX], [4, 2, 4]>, <[ BATCHX,  LANEX,  VECTORY], [2, 4, 4]>>
+// CHECK-DAG: #[[LAYOUT1:.+]] = #iree_vector_ext.layout<<[ BATCHX,  LANEX,  VECTORY], [2, 4, 4]>, <[ BATCHY,  LANEY,  VECTORX], [4, 2, 4]>>
 // CHECK-LABEL: func.func @specify_layout
 // CHECK:      iree_vector_ext.layout_conflict_resolution
-// CHECK:         desiredLayout = #iree_vector_ext.layout<<[ BATCHY, LANEY, VECTORX], [4, 2, 4]>,
-// CHECK-SAME:                                            <[ BATCHX, LANEX, VECTORY], [2, 4, 4]>>
-// CHECK:         sourceLayout = #iree_vector_ext.layout<<[ BATCHX, LANEX, VECTORY], [2, 4, 4]>,
-// CHECK-SAME:                                           <[ BATCHY, LANEY, VECTORX], [4, 2, 4]>>
+// CHECK-SAME:         desiredLayout = #[[LAYOUT0]]
+// CHECK-SAME:         sourceLayout = #[[LAYOUT1]]
 
 // -----
