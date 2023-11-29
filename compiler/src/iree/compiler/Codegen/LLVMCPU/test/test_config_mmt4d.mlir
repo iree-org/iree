@@ -28,7 +28,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
             : !flow.dispatch.tensor<readonly:tensor<128x384x4x1xf32>> -> tensor<128x384x4x1xf32>
         %11 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [96, 384, 4, 4], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readwrite:tensor<96x128x4x4xf32>> -> tensor<96x128x4x4xf32>
-        %12 = linalg.mmt4d {__internal_linalg_transform__ = "workgroup"}
+        %12 = linalg.mmt4d
             ins(%8, %10 : tensor<96x384x4x1xf32>, tensor<128x384x4x1xf32>)
             outs(%11 : tensor<96x128x4x4xf32>) -> tensor<96x128x4x4xf32>
         flow.dispatch.tensor.store %12, %2, offsets = [0, 0, 0, 0], sizes = [96, 128, 4, 4], strides = [1, 1, 1, 1]
