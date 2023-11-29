@@ -26,6 +26,8 @@ namespace GlobalOptimization {
 /// casting from i1 types, a std::nullopt is returned. It is dangerous to mix
 /// boalean concept and i1 subtypes concept at graph optimizatoin level. We
 /// ignore this type of casting ops intentionally.
+/// TODO(hanchung): Remove the restriction about i1 after we can handle i1
+/// sub-type emulation and deprecate TypePropagation pass.
 ///
 /// If it is not from a casting op, it returns a std::nullopt.
 ///
