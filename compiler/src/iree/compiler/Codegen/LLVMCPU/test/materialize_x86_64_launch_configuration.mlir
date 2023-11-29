@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy)))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -326,9 +326,8 @@ hal.executable private @add_static {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -342,7 +341,7 @@ hal.executable private @preset_config_matmul_tensors  {
     target_triple = "x86_64-unknown-linux-gnu",
     native_vector_size = 16 : index
   }>) {
-    hal.executable.export @preset_config layout(#pipeline_layout)
+    hal.executable.export @preset_config layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -358,7 +357,7 @@ hal.executable private @preset_config_matmul_tensors  {
             : !flow.dispatch.tensor<readonly:tensor<256x512xf32>> -> tensor<256x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<128x256xf32>, tensor<256x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
@@ -368,7 +367,6 @@ hal.executable private @preset_config_matmul_tensors  {
     }
   }
 }
-
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export

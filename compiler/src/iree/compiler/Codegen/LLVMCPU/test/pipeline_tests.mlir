@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' --split-input-file %s | FileCheck %s
 
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
@@ -68,9 +68,8 @@ hal.executable private @check_no_cse {
 // Checks that the ops are padded and vectorized. The test sets tiling sizes to
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[65, 65], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -80,7 +79,7 @@ hal.executable private @check_no_cse {
 ]>
 hal.executable private @preset_pad_config_matmul  {
   hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
-    hal.executable.export @preset_pad_config_matmul layout(#pipeline_layout) {
+    hal.executable.export @preset_pad_config_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -96,7 +95,7 @@ hal.executable private @preset_pad_config_matmul  {
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [49, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x512xf32>
         %5 = tensor.empty() : tensor<128x512xf32>
         %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %7 = linalg.matmul {compilation_info = #compilation}
+        %7 = linalg.matmul {lowering_config = #config}
           ins(%3, %4 : tensor<128x49xf32>, tensor<49x512xf32>)
           outs(%6 : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
@@ -113,9 +112,8 @@ hal.executable private @preset_pad_config_matmul  {
 // Checks that the ops are padded and vectorized. The test sets tiling sizes to
 // be non-divisible by problem sizes. If padding and vectorizing are kicked in,
 // vector ops will be generated.
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[192, 128, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -125,7 +123,7 @@ hal.executable private @preset_pad_config_matmul  {
 ]>
 hal.executable private @preset_pad_config_dynamic_matmul  {
   hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
-    hal.executable.export @preset_pad_config_dynamic_matmul layout(#pipeline_layout) {
+    hal.executable.export @preset_pad_config_dynamic_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
       hal.return %x, %y, %z : index, index, index
@@ -153,7 +151,7 @@ hal.executable private @preset_pad_config_dynamic_matmul  {
         %16 = flow.dispatch.tensor.load %13, offsets = [0, 0], sizes = [%9, %11], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%9, %11} -> tensor<?x?xf32>
         %17 = tensor.empty(%10, %11) : tensor<?x?xf32>
         %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %19 = linalg.matmul {compilation_info = #compilation} ins(%15, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%18 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %19 = linalg.matmul {lowering_config = #config} ins(%15, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%18 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %19, %14, offsets = [0, 0], sizes = [%10, %11], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%10, %11}
         return
       }
