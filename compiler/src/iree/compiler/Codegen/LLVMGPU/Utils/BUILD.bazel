@@ -19,11 +19,9 @@ iree_compiler_cc_library(
     srcs = [
         "LLVMGPULayoutAnalysisAndDistribution.cpp",
         "LLVMGPUUtils.cpp",
-        "SIMTLayoutAnalysis.cpp",
     ],
     hdrs = [
         "LLVMGPUUtils.h",
-        "SIMTLayoutAnalysis.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen/Transforms",

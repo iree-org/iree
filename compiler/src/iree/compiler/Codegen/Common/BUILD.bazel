@@ -120,6 +120,7 @@ iree_compiler_cc_library(
         "TypePropagationPass.cpp",
         "UserConfig.cpp",
         "VectorizePad.cpp",
+        "VectorLayoutAnalysis.cpp"
     ],
     hdrs = [
         "BufferizationAnalysis.h",
@@ -129,6 +130,7 @@ iree_compiler_cc_library(
         "TileSizeSelection.h",
         "Transforms.h",
         "UserConfig.h",
+        "VectorLayoutAnalysis.h",
     ],
     deps = [
         ":PassHeaders",

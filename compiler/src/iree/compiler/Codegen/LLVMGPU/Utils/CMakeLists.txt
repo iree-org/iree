@@ -15,11 +15,9 @@ iree_cc_library(
     Utils
   HDRS
     "LLVMGPUUtils.h"
-    "SIMTLayoutAnalysis.h"
   SRCS
     "LLVMGPULayoutAnalysisAndDistribution.cpp"
     "LLVMGPUUtils.cpp"
-    "SIMTLayoutAnalysis.cpp"
   DEPS
     LLVMSupport
     MLIRAffineDialect

@@ -4,15 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_SIMTLAYOUTANALYSIS_H_
-#define IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_SIMTLAYOUTANALYSIS_H_
+#ifndef IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
+#define IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "llvm/Support/Debug.h"
-#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
-#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/AffineMap.h"
+#include "mlir/Analysis/DataFlowFramework.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -55,4 +51,4 @@ private:
 }; // namespace iree_compiler
 }; // namespace mlir
 
-#endif // IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_SIMTLAYOUTANALYSIS_H_
+#endif // IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H

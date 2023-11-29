@@ -4,15 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/LLVMGPU/Utils/SIMTLayoutAnalysis.h"
-#include "SIMTLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
-#include "mlir/Analysis/DataFlow/SparseAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/AffineMap.h"
 
-#define DEBUG_TYPE "iree-simt-layout-analysis"
+#define DEBUG_TYPE "iree-vector-layout-analysis"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
