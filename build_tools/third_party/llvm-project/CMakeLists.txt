@@ -12,3 +12,7 @@ add_library(MLIRLinalgStructuredOpsIncGenLib INTERFACE)
 add_dependencies(MLIRLinalgStructuredOpsIncGenLib
   MLIRLinalgStructuredOpsIncGen
 )
+add_library(MLIRLinalgOpsIncGenLib INTERFACE)
+add_dependencies(MLIRLinalgOpsIncGenLib
+  MLIRLinalgOpsIncGen
+)

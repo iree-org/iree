@@ -78,3 +78,16 @@ module @hoist_sub_byte_tensor_transitive {
 }
 // We do not need to cast for transitive sub-byte values.
 // CHECK-NOT: flow.tensor.bitcast
+
+// -----
+
+// We should not hoist metadata ops alone.
+// CHECK-LABEL: @do_not_hoist_metadata_leaf
+// CHECK-NOT: util.global
+module @do_not_hoist_metadata_leaf {
+  func.func @main() -> (tensor<1xi32>) {
+    %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi8>
+    %1 = flow.tensor.bitcast %0 : tensor<4xi8> -> tensor<1xi32>
+    return %1 : tensor<1xi32>
+  }
+}

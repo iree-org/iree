@@ -1113,8 +1113,71 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::Util::HoistableTypeInterface
+// IREE::Util::Hoistable*Interface
 //===----------------------------------------------------------------------===//
+
+def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to control hoisting of ops into globals.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this op is valid to hoist as a transient value in the
+        global initializer.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isHoistableOp",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this op is valid to hoist as a leaf value in the
+        global initializer.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isHoistableLeafOp",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this op is should be treated as atomic from the
+        perspective of the hoisting analysis. This causes all nested ops to
+        share hoistability with this op.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isAtomicallyHoistableOp",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the operand for this op is hoistable.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isOperandHoistable",
+      /*args=*/(ins "OpOperand *":$operand),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+  ];
+}
 
 def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
