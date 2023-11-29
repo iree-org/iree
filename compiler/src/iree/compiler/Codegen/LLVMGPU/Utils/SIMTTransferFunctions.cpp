@@ -151,6 +151,7 @@ static void propagateLayoutToMultiReductionOp(
     return;
   }
 
+  // Otherwise, try resolving with init.
   ChangeResult changed = result->resolve(init);
   update(result, changed);
 }
