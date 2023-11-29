@@ -948,17 +948,9 @@ static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
 static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
                               func::FuncOp funcOp) {
   funcOp.walk([&](Operation *op) {
-    for (OpOperand &operand : op->getOpOperands()) {
-      if (auto layout = analysis.getLayout<Attribute>(operand.get())) {
-        // Print layout attr to a string.
-        std::string layoutStr;
-        llvm::raw_string_ostream s(layoutStr);
-        s << layout;
-        // Emit remark.
-        op->emitRemark("layout of operand #" +
-                       std::to_string(operand.getOperandNumber()) + " is " +
-                       s.str());
-      }
+    // Do not emit remarks for conflict operations.
+    if (isa<VectorExt::LayoutConflictResolutionOp>(op)) {
+      return;
     }
 
     for (OpResult result : op->getOpResults()) {
