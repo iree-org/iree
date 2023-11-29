@@ -41,8 +41,8 @@ def iree_check_test(
       input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to iree-check-module. The
           driver and input file are passed automatically.
-      tags: additional tags to apply to the generated test. A tag
-          "driver=DRIVER" is added automatically.
+      tags: additional tags to apply to the generated test. Tag
+          "driver=DRIVER" and "target=TARGET" are added automatically.
       target_cpu_features: currently unimplemented (must be empty), will
           eventually allow specifying target CPU features.
       timeout: timeout for the generated tests.
