@@ -8,7 +8,7 @@
 #define IREE_DIALECT_VECTOREXT_OPS
 
 include "iree-dialects/Dialect/VectorExt/IR/VectorExtBase.td"
-include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.td"
+include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.

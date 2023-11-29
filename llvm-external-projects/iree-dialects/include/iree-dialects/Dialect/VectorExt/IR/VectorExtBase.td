@@ -12,7 +12,7 @@ include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
-include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.td"
+include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Dialect definition

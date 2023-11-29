@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_VECTOREXT_ATTR_INTERFACES
-#define IREE_DIALECT_VECTOREXT_ATTR_INTERFACES
+#ifndef IREE_DIALECT_VECTOREXT_INTERFACES
+#define IREE_DIALECT_VECTOREXT_INTERFACES
 
 include "mlir/IR/OpBase.td"
 
@@ -38,4 +38,4 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
   ];
 }
 
-#endif  // IREE_DIALECT_VECTOREXT_ATTR_INTERFACES
+#endif  // IREE_DIALECT_VECTOREXT_INTERFACES
