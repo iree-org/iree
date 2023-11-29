@@ -68,8 +68,8 @@ SmallVector<int64_t>
 LayoutAttr::getSIMTVectorShape(ArrayRef<LayoutDimension> dims) {
   SmallVector<int64_t> simtVectorShape;
   for (LayoutDimension dim : dims) {
-    auto layouts = getLayouts();
-    for (auto layout : getLayouts()) {
+    ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
+    for (PerDimLayoutAttr layout : layouts) {
       if (!layout.contains(dim))
         continue;
       simtVectorShape.push_back(layout.getShape(dim).value());
