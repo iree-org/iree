@@ -28,9 +28,6 @@ createConvertToLLVMPass(bool reassociateFpReordering = false);
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUCheckIRBeforeLLVMConversionPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUEmitVectorizationRemarksPass();
-
 /// Pass to select a lowering strategy for a hal.executable.variant operation.
 /// The variant is annotated with the selected strategies, which are
 /// subsequently ingested by LLVMCPULowerExecutableTargetPass.

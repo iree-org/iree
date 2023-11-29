@@ -37,12 +37,6 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
                    "before conversion to LLVM IR"),
     llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clCheckLinalgVectorization(
-    "iree-llvmcpu-check-linalg-vectorization",
-    llvm::cl::desc(
-        "Runs the pass to check if all the Linalg ops are vectorized"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clUseFastMinMaxOps(
     "iree-llvmcpu-use-fast-min-max-ops",
     llvm::cl::desc(
@@ -611,10 +605,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg -> SCF
   passManager.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  if (clCheckLinalgVectorization) {
-    passManager.addNestedPass<func::FuncOp>(
-        createLLVMCPUEmitVectorizationRemarksPass());
-  }
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addPass(createConvertBf16ArithToF32Pass());
   passManager.addPass(createConvertBf16ToUInt16BuffersPass());
