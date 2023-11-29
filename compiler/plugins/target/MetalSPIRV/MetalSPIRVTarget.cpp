@@ -34,13 +34,13 @@ namespace IREE {
 namespace HAL {
 
 struct MetalSPIRVOptions {
-  MetalTargetPlatform targetPlatform;
-  bool compileToMetalLib;
+  MetalTargetPlatform clTargetPlatform;
+  bool clCompileToMetalLib;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("MetalSPIRV HAL Target");
     binder.opt<MetalTargetPlatform>(
-        "iree-metal-target-platform", targetPlatform, llvm::cl::cat(category),
+        "iree-metal-target-platform", clTargetPlatform, llvm::cl::cat(category),
         llvm::cl::desc("Apple platform to target"),
         llvm::cl::values(
             clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
@@ -49,7 +49,7 @@ struct MetalSPIRVOptions {
                        "iOS simulator platform")),
         llvm::cl::init(MetalTargetPlatform::macOS));
     binder.opt<bool>(
-        "iree-metal-compile-to-metallib", compileToMetalLib,
+        "iree-metal-compile-to-metallib", clCompileToMetalLib,
         llvm::cl::cat(category),
         llvm::cl::desc("Compile to .metallib and embed in IREE deployable "
                        "flatbuffer if true; "
@@ -200,7 +200,8 @@ public:
       // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
       ArrayRef spvData(spvBinary.data(), spvBinary.size());
       std::optional<std::pair<MetalShader, std::string>> msl =
-          crossCompileSPIRVToMSL(options_.targetPlatform, spvData, entryPoint);
+          crossCompileSPIRVToMSL(options_.clTargetPlatform, spvData,
+                                 entryPoint);
       if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
@@ -220,7 +221,7 @@ public:
 
     // 3. Compile MSL to MTLLibrary.
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metalLibs;
-    if (options_.compileToMetalLib) {
+    if (options_.clCompileToMetalLib) {
       // We need to use offline Metal shader compilers.
       // TODO(#14048): The toolchain can also exist on other platforms. Probe
       // the PATH instead.
@@ -229,7 +230,7 @@ public:
         for (auto [shader, entryPoint] :
              llvm::zip(mslShaders, mslEntryPointNames)) {
           std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
-              options_.targetPlatform, shader.source, entryPoint);
+              options_.clTargetPlatform, shader.source, entryPoint);
           if (!lib) {
             return variantOp.emitError()
                    << "failed to compile to MTLLibrary from MSL:\n\n"
