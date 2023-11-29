@@ -119,8 +119,8 @@ iree_compiler_cc_library(
         "TileSizeSelection.cpp",
         "TypePropagationPass.cpp",
         "UserConfig.cpp",
+        "VectorLayoutAnalysis.cpp",
         "VectorizePad.cpp",
-        "VectorLayoutAnalysis.cpp"
     ],
     hdrs = [
         "BufferizationAnalysis.h",
