@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy)))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -326,9 +326,8 @@ hal.executable private @add_static {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPadExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -342,7 +341,7 @@ hal.executable private @preset_config_matmul_tensors  {
     target_triple = "x86_64-unknown-linux-gnu",
     native_vector_size = 16 : index
   }>) {
-    hal.executable.export @preset_config layout(#pipeline_layout)
+    hal.executable.export @preset_config layout(#pipeline_layout) attributes {translation_info = #translation}
     builtin.module {
       func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -358,7 +357,7 @@ hal.executable private @preset_config_matmul_tensors  {
             : !flow.dispatch.tensor<readonly:tensor<256x512xf32>> -> tensor<256x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<128x256xf32>, tensor<256x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
@@ -368,7 +367,6 @@ hal.executable private @preset_config_matmul_tensors  {
     }
   }
 }
-
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPadExpert>
 //      CHECK: hal.executable.export
@@ -497,7 +495,7 @@ hal.executable private @static_1d_fft_stage2  {
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:tensor<32xf32>>
         %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
-        %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
+        %4:2 = iree_linalg_ext.fft ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
         flow.dispatch.tensor.store %4#0, %0, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:tensor<32xf32>>
         flow.dispatch.tensor.store %4#1, %1, offsets = [0], sizes = [32], strides = [1] : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:tensor<32xf32>>
         return
@@ -2087,3 +2085,54 @@ module {
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
 //       CHECK: linalg.generic {{.*}} iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:     lowering_config = #[[CONFIG1]]
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu = "cascadelake", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 32 : index, target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = true}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 28, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer, ReadOnly>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @batch_mmt4d {
+  hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
+    hal.executable.export public @batch_mmt4d ordinal(0) layout(#pipeline_layout)
+    builtin.module {
+      func.func @batch_mmt4d() {
+        %c32_i64 = arith.constant 32 : i64
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = arith.extui %0 : i32 to i64
+        %5 = arith.extui %1 : i32 to i64
+        %6 = arith.shli %5, %c32_i64 : i64
+        %7 = arith.ori %4, %6 : i64
+        %8 = arith.index_castui %7 {stream.alignment = 64 : index} : i64 to index
+        %9 = arith.extui %2 : i32 to i64
+        %10 = arith.extui %3 : i32 to i64
+        %11 = arith.shli %10, %c32_i64 : i64
+        %12 = arith.ori %9, %11 : i64
+        %13 = arith.index_castui %12 : i64 to index
+        %14 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x10x32x8x1xf32>>
+        %15 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%8) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x80x32x4x1xf32>>
+        %16 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%13) : !flow.dispatch.tensor<writeonly:tensor<128x10x80x8x4xf32>>
+        %17 = flow.dispatch.tensor.load %14, offsets = [0, 0, 0, 0, 0], sizes = [128, 10, 32, 8, 1], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x10x32x8x1xf32>> -> tensor<128x10x32x8x1xf32>
+        %18 = flow.dispatch.tensor.load %15, offsets = [0, 0, 0, 0, 0], sizes = [128, 80, 32, 4, 1], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x80x32x4x1xf32>> -> tensor<128x80x32x4x1xf32>
+        %19 = tensor.empty() : tensor<128x10x80x8x4xf32>
+        %20 = linalg.fill ins(%cst : f32) outs(%19 : tensor<128x10x80x8x4xf32>) -> tensor<128x10x80x8x4xf32>
+        %21 = linalg.batch_mmt4d ins(%17, %18 : tensor<128x10x32x8x1xf32>, tensor<128x80x32x4x1xf32>) outs(%20 : tensor<128x10x80x8x4xf32>) -> tensor<128x10x80x8x4xf32>
+        flow.dispatch.tensor.store %21, %16, offsets = [0, 0, 0, 0, 0], sizes = [128, 10, 80, 8, 4], strides = [1, 1, 1, 1, 1] : tensor<128x10x80x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x10x80x8x4xf32>>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 10, 80, 0, 0, 0, 0], [1, 1, 1, 0, 8, 4, 0], [0, 0, 0, 1, 0, 0, 1]{{\]}}>
+//      CHECK: func.func @batch_mmt4d()
+//      CHECK:   linalg.batch_mmt4d
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

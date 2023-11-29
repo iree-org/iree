@@ -27,10 +27,10 @@ graph LR
 
 See end-to-end examples of how to use each framework with IREE:
 
-* [:simple-tensorflow: TensorFlow](./tensorflow.md) and
-  [:simple-tensorflow: TensorFlow Lite](./tflite.md)
 * [:simple-python: JAX](./jax.md)
 * [:simple-pytorch: PyTorch](./pytorch.md)
+* [:simple-tensorflow: TensorFlow](./tensorflow.md) and
+  [:simple-tensorflow: TensorFlow Lite](./tflite.md)
 
 Importing from other frameworks is planned - stay tuned!
 

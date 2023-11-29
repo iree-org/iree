@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-expand-tensor-shapes %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-global-opt-expand-tensor-shapes %s | FileCheck %s
 
 // Tests that global tensor loads also load their dynamic dimensions.
 

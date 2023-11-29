@@ -127,10 +127,10 @@ nav:
       - "guides/index.md"
       - "ML frameworks":
           - "guides/ml-frameworks/index.md"
-          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
-          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
           - JAX: "guides/ml-frameworks/jax.md"
           - PyTorch: "guides/ml-frameworks/pytorch.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
       - "Deployment configurations":
           - "guides/deployment-configurations/index.md"
           - CPU: "guides/deployment-configurations/cpu.md"
