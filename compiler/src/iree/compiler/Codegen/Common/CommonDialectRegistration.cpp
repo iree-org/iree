@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
@@ -60,6 +61,7 @@ void registerTransformDialectTranslationDependentDialects(
 
   // clang-format off
   registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+                  mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
                   mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::Codegen::IREECodegenDialect,
                   arith::ArithDialect,
