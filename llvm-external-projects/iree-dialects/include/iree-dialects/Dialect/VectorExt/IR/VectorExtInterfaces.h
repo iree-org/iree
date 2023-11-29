@@ -9,7 +9,6 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/Support/LLVM.h"
 
 /// Include the generated interface declarations.
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc"
