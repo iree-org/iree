@@ -44,13 +44,18 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "GlobalOptimization",
     srcs = [
+        "CleanupNumericNarrowing.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",
         "DetachElementwiseFromNamedOps.cpp",
         "EraseUnusedLinalgOperands.cpp",
+        "ExpandTensorShapes.cpp",
         "ExpandVectors.cpp",
         "FuseDequantizationMatmul.cpp",
+        "GeneralizeLinalgNamedOps.cpp",
+        "InferNumericNarrowing.cpp",
         "LiftGenericToTransposeBatchMatmul.cpp",
         "MaterializeHomogeneousEncodings.cpp",
+        "OptimizeNumerics.cpp",
         "Passes.cpp",
         "RemoveZeroExtentTensors.cpp",
         "SetEncoding.cpp",

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-cleanup-numeric-narrowing %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-cleanup-numeric-narrowing %s | FileCheck %s
 
 // CHECK-LABEL: @remove_inferences
 func.func @remove_inferences(%arg0 : tensor<5x3xf32>) -> tensor<5x3xf32> {
