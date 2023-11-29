@@ -110,4 +110,14 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    parameter_archive
+  HDRS
+    "parameter_archive.h"
+  DEPS
+
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -9,8 +9,9 @@
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/internal/path.h"
-#include "iree/io/formats/gguf/gguf_format.h"
-#include "iree/io/formats/safetensors/safetensors_format.h"
+#include "iree/io/formats/gguf/gguf_parser.h"
+#include "iree/io/formats/irpa/irpa_parser.h"
+#include "iree/io/formats/safetensors/safetensors_parser.h"
 #include "iree/io/parameter_index.h"
 #include "iree/io/parameter_index_provider.h"
 #include "iree/io/scope_map.h"
@@ -110,7 +111,9 @@ static iree_status_t iree_io_append_parameter_file_to_index(
   // Index the file based on its (inferred) format.
   iree_status_t status = iree_ok_status();
   iree_string_view_t path_ext = iree_file_path_extension(path);
-  if (iree_string_view_equal_case(path_ext, IREE_SV("gguf"))) {
+  if (iree_string_view_equal_case(path_ext, IREE_SV("irpa"))) {
+    status = iree_io_parse_irpa_index(file_handle, index);
+  } else if (iree_string_view_equal_case(path_ext, IREE_SV("gguf"))) {
     status = iree_io_parse_gguf_index(file_handle, index);
   } else if (iree_string_view_equal_case(path_ext, IREE_SV("safetensors"))) {
     status = iree_io_parse_safetensors_index(file_handle, index);

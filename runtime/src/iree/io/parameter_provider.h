@@ -76,8 +76,7 @@ IREE_API_EXPORT bool iree_io_parameter_provider_query_support(
 
 // Loads a parameter from |provider| for use on |device|.
 // |source_scope| and |source_key| define the parameter and |target_params|
-// defines how the buffer is to be allocated. If the parameter is smaller than
-// |length| any remaining space must be zero-filled.
+// defines how the buffer is to be allocated.
 //
 // If the implementation is able to meet the expected |target_params| with an
 // existing buffer it may be returned without a new allocation. If access allows
@@ -100,8 +99,7 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_provider_load(
 
 // Reads a parameter from |provider| for use on |device|.
 // |source_scope| and |source_key| define the parameter to be read into
-// |target_buffer| at |target_offset|. If the parameter is smaller than
-// |length| any remaining space must be zero-filled.
+// |target_buffer| at |target_offset|.
 //
 // Returns IREE_STATUS_NOT_FOUND if the parameter is not found.
 IREE_API_EXPORT iree_status_t iree_io_parameter_provider_read(
@@ -140,10 +138,9 @@ typedef struct iree_io_parameter_enumerator_t {
 
 // Gathers zero or more spans from |provider| into the given |target_buffer|.
 // The |enumerator| defines the source keys in |source_scope| and the offset and
-// length in the |target_buffer| of each span. For any parameter is smaller than
-// the length specified by the span any remaining space must be zero-filled.
-// Multiple spans may reference the same source parameter but behavior is
-// undefined if multiple span target ranges overlap.
+// length in the |target_buffer| of each span. Multiple spans may reference the
+// same source parameter but behavior is undefined if multiple span target
+// ranges overlap.
 //
 // Returns IREE_STATUS_NOT_FOUND if any parameter is not found.
 IREE_API_EXPORT iree_status_t iree_io_parameter_provider_gather(

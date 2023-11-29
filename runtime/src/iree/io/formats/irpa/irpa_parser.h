@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_IO_FORMATS_GGUF_GGUF_FORMAT_H_
-#define IREE_IO_FORMATS_GGUF_GGUF_FORMAT_H_
+#ifndef IREE_IO_FORMATS_IRPA_irpa_parser_H_
+#define IREE_IO_FORMATS_IRPA_irpa_parser_H_
 
 #include "iree/base/api.h"
 #include "iree/io/file_handle.h"
@@ -15,15 +15,12 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Parses a .gguf file and merges its contained resources into |index|.
-//
-// Specification:
-// https://github.com/ggerganov/ggml/blob/master/docs/gguf.md
-IREE_API_EXPORT iree_status_t iree_io_parse_gguf_index(
+// Parses an IREE archive file and merges its contained resources into |index|.
+IREE_API_EXPORT iree_status_t iree_io_parse_irpa_index(
     iree_io_file_handle_t* file_handle, iree_io_parameter_index_t* index);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_IO_FORMATS_GGUF_GGUF_FORMAT_H_
+#endif  // IREE_IO_FORMATS_IRPA_irpa_parser_H_

@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "file_handle.c"
   DEPS
+    ::stream
     iree::base
     iree::base::internal
   PUBLIC

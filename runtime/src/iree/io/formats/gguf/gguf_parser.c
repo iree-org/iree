@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/io/formats/gguf/gguf_format.h"
+#include "iree/io/formats/gguf/gguf_parser.h"
 
 #include <ctype.h>
 
@@ -652,7 +652,7 @@ static iree_status_t iree_io_gguf_append_tensor_info(
   return iree_io_parameter_index_add(parser->index, &entry);
 }
 
-IREE_API_EXPORT iree_status_t iree_io_parse_gguf_index_from_memory(
+static iree_status_t iree_io_parse_gguf_index_from_memory(
     iree_io_file_handle_t* file_handle, iree_const_byte_span_t file_contents,
     iree_io_parameter_index_t* index) {
   // Read the header enough to check for file validity and version.

@@ -21,6 +21,7 @@ iree_runtime_cc_library(
         "file_handle.h",
     ],
     deps = [
+        ":stream",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
     ],
