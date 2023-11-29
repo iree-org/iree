@@ -65,7 +65,7 @@ using VectorLayoutInterface = IREE::VectorExt::VectorLayoutInterface;
 ///
 /// If at any point, a value has a layout, but the user of that value requires
 /// a different layout, the analysis inserts a resolution operation. This
-/// resolution operation is `iree_vector_ext.layout_conflict_resolution`. 
+/// resolution operation is `iree_vector_ext.layout_conflict_resolution`.
 /// For Example:
 ///
 /// %0 = vector.transfer_read
