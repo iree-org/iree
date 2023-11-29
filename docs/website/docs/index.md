@@ -25,11 +25,11 @@ considerations of mobile and edge deployments.
 
 IREE supports importing from a variety of ML frameworks:
 
-- [x] TensorFlow
-- [x] TensorFlow Lite
 - [x] JAX
 - [x] PyTorch
-- [ ] ONNX (hoped for)
+- [x] TensorFlow
+- [x] TensorFlow Lite
+- [ ] ONNX (experimental)
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
@@ -37,11 +37,11 @@ and can generate efficient code for a variety of runtime platforms:
 
 - [x] Linux
 - [x] Windows
-- [x] Android
 - [x] macOS
+- [x] Android
 - [x] iOS
 - [x] Bare metal
-- [ ] WebAssembly (planned)
+- [ ] WebAssembly (experimental)
 
 and architectures:
 
@@ -54,7 +54,9 @@ Support for hardware accelerators and APIs is also included:
 - [x] Vulkan
 - [x] CUDA
 - [x] Metal (for Apple silicon devices)
-- [ ] WebGPU (planned)
+- [ ] ROCm (experimental)
+- [ ] AMD AIE (experimental)
+- [ ] WebGPU (experimental)
 
 ## Project architecture
 
@@ -96,10 +98,10 @@ Using IREE involves the following general steps:
 IREE supports importing models from a growing list of ML frameworks and model
 formats:
 
-* [TensorFlow](./guides/ml-frameworks/tensorflow.md) and
-  [TensorFlow Lite](./guides/ml-frameworks/tflite.md)
 * [JAX](./guides/ml-frameworks/jax.md)
 * [PyTorch](./guides/ml-frameworks/pytorch.md)
+* [TensorFlow](./guides/ml-frameworks/tensorflow.md) and
+  [TensorFlow Lite](./guides/ml-frameworks/tflite.md)
 
 ### Selecting deployment configurations
 
