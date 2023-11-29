@@ -51,6 +51,13 @@ def LLVMCPUCheckIRBeforeLLVMConversion :
   let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
 }
 
+def LLVMCPUEmitVectorizationRemarks :
+    Pass<"iree-llvmcpu-emit-vectorization-remarks", "func::FuncOp"> {
+  let summary = "Emit vectorization remarks on Linalg ops";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUEmitVectorizationRemarksPass()";
+}
+
 def LLVMCPULinkExecutables :
     Pass<"iree-llvmcpu-link-executables", "mlir::ModuleOp"> {
   let summary = "Links LLVMCPU HAL executables within the top-level program module.";
