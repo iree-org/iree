@@ -227,8 +227,32 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need rocm implementation");
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+
+  uint8_t* src = (uint8_t*)source_buffer + source_offset;
+  if (command_buffer->block_pool) {
+    uint8_t* storage = NULL;
+
+    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+        command_buffer->context->host_allocator, length, (void**)&storage));
+    memcpy(storage, src, length);
+    src = storage;
+  }
+
+  hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
+      iree_hal_buffer_allocated_buffer(target_buffer));
+  target_offset += iree_hal_buffer_byte_offset(target_buffer);
+
+  hipDeviceptr_t dst =
+      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
+
+  ROCM_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      hipMemcpyAsync(dst, src, length, hipMemcpyHostToDevice, 0),
+      "hipMemcpyAsync");
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
