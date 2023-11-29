@@ -12,6 +12,8 @@ include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
+include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.td"
+
 //===----------------------------------------------------------------------===//
 // Dialect definition
 //===----------------------------------------------------------------------===//
@@ -36,6 +38,42 @@ def IREEVectorExt_Dialect : Dialect {
 class IREEVectorExt_Attr<string name, list<Trait> traits = []>
   : AttrDef<IREEVectorExt_Dialect, name, traits>;
 
+class IREEVectorExt_I32EnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
+    : I32EnumAttr<name, summary, cases> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::VectorExt";
+  let genSpecializedAttr = 0;
+}
+
+class IREEVectorExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
+  : EnumAttr<IREEVectorExt_Dialect, enumInfo, name>;
+
+// Defines the batch dimensions for the original SIMD tensor.
+// By convention, X is along rows and Y along columns.
+def BATCHX : I32EnumAttrCase<"BATCHX", 0>;
+def BATCHY : I32EnumAttrCase<"BATCHY", 1>;
+// Defines the vector dimension.
+def VECTORX : I32EnumAttrCase<"VECTORX", 2>;
+def VECTORY : I32EnumAttrCase<"VECTORY", 3>;
+def VECTORZ : I32EnumAttrCase<"VECTORZ", 4>;
+// Defines the lane dimensions.
+def LANEX : I32EnumAttrCase<"LANEX", 5>;
+def LANEY : I32EnumAttrCase<"LANEY", 6>;
+def LANEZ : I32EnumAttrCase<"LANEZ", 7>;
+
+def LayoutDimension : IREEVectorExt_I32EnumAttr<"LayoutDimension",
+    "Describes the dimension of the high-dimensional layout", [
+      BATCHX,
+      BATCHY,
+      VECTORX,
+      VECTORY,
+      VECTORZ,
+      LANEX,
+      LANEY,
+      LANEZ,
+    ]>;
+
+def LayoutDimensionAttr : IREEVectorExt_EnumAttr<LayoutDimension, "dimension">;
+
 def PerDimLayoutAttr : IREEVectorExt_Attr<"PerDimLayout"> {
    let mnemonic = "per_dim_layout";
    let summary = [{high-dimensional vector register layout for a given vector dimension}];
@@ -47,14 +85,19 @@ def PerDimLayoutAttr : IREEVectorExt_Attr<"PerDimLayout"> {
     we can reason about layouts, propagating layouts and layout conflicts.
    }];
    let parameters = (ins
-     ArrayRefParameter<"std::string", "labels for the high dimensional layout dims">:$labels,
+     ArrayRefParameter<"LayoutDimensionAttr", "labels for the high dimensional layout dims">:$labels,
      ArrayRefParameter<"int64_t", "shapes for the high dimensional layout dims">:$shapes
    );
-   let hasCustomAssemblyFormat = 1;
+   let assemblyFormat = "`<``[` $labels `]``,` `[` $shapes `]``>`";
    let genVerifyDecl = 0;
+   let extraClassDeclaration = [{
+      std::optional<int64_t> getShape(const LayoutDimension &dim);
+      bool contains(const LayoutDimension &dim);
+   }];
 }
 
-def LayoutAttr : IREEVectorExt_Attr<"Layout"> {
+def LayoutAttr : IREEVectorExt_Attr<"Layout",
+      [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
   let mnemonic = "layout";
   let summary = [{high-dimensional vector register layout for a given vector}];
   let description = [{
@@ -64,8 +107,11 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout"> {
   let parameters = (ins
     ArrayRefParameter<"PerDimLayoutAttr", "layout for each dimension of the vector">:$layouts
   );
-  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = "`<`$layouts`>`";
   let genVerifyDecl = 0;
+  let extraClassDeclaration = [{
+    SmallVector<int64_t> getSIMTVectorShape(ArrayRef<LayoutDimension> dims);
+  }];
 }
 
 #endif // IREE_DIALECT_VECTOREXT_BASE
