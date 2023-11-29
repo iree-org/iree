@@ -32,7 +32,7 @@ ctest_args=(
 )
 
 declare -a label_exclude_args=(
-  "^nokokoro$"
+  "^nodocker$"
   "^driver=vulkan$"
   "^driver=cuda$"
   "^vulkan_uses_vk_khr_shader_float16_int8$"
