@@ -66,6 +66,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -76,6 +77,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
