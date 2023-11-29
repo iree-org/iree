@@ -192,6 +192,8 @@ hal.executable @exe {
 // CHECK:     scf.yield %[[EXE]] : !hal.executable
 // CHECK:   }
 // CHECK:   default {
+// CHECK:     %[[C14:.+]] = arith.constant 14 : i32
+// CHECK:     util.status.check_ok %[[C14]], "none of the executable binaries in the module are supported by the runtime"
 // CHECK:     %[[NULL:.+]] = util.null : !hal.executable
 // CHECK:     scf.yield %[[NULL]] : !hal.executable
 // CHECK:   }
