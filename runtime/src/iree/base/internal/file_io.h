@@ -88,6 +88,25 @@ iree_status_t iree_file_map_contents_readonly(
     const char* path, iree_allocator_t allocator,
     iree_file_contents_t** out_contents);
 
+// EXPERIMENTAL: will be moved to iree_io_file_handle_t (along with the rest of
+// this file) in future changes.
+//
+// Creates a new file on disk and maps its contents for read/write access.
+// The file will be zero-extended up to |file_size| bytes and the returned
+// contents will start at |offset| and run for |length| bytes.
+// As pages may be read or written on demand care should be used when
+// profiling/benchmarking as warm-up costs will be higher and variance during
+// execution will go up. It's possible for dozens of GiB of outstanding writes
+// to complete at memcpy speed only to flush after the process has exited.
+//
+// Returns the contents of the file in |out_contents|.
+// |allocator| is used to allocate the memory and the caller must use
+// iree_file_contents_free to release the memory.
+iree_status_t iree_file_create_mapped(const char* path, uint64_t file_size,
+                                      uint64_t offset, iree_host_size_t length,
+                                      iree_allocator_t allocator,
+                                      iree_file_contents_t** out_contents);
+
 // Synchronously writes a byte buffer into a file.
 // Existing contents are overwritten.
 iree_status_t iree_file_write_contents(const char* path,

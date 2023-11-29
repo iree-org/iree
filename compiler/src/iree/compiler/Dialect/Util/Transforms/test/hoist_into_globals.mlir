@@ -91,20 +91,6 @@ module @hoist_sub_byte_aligned_scalar_transitive {
 }
 
 // -----
-// CHECK-LABEL: @do_not_hoist_sub_byte_tensor_transitive
-// CHECK-NOT: util.global
-// We do not yet support constexpr of sub-byte types that are 
-// Can hoist a const-expr tree that transitively includes sub-byte aligned
-// values.
-module @do_not_hoist_sub_byte_tensor_transitive {
-  func.func @main() -> (i32) {
-    %0 = arith.constant dense<3> : tensor<i4>
-    %2 = "iree_unregistered.const_expr"(%0) : (tensor<i4>) -> i32
-    return %2 : i32
-  }
-}
-
-// -----
 // CHECK-LABEL: @hoist_i1_tensor_transitive
 // CHECK: util.global private {{.*}} : i32
 // We presently expand i1 -> i8 for legacy reasons. As such, we support
@@ -311,5 +297,24 @@ module @do_not_hoist_significant_size_increase_const_expr {
     %2 = "iree_unregistered.const_expr"(%0, %1) 
     : (tensor<32xi8>, tensor<32xi8>) -> tensor<129xi8>
     return %2 : tensor<129xi8>
+  }
+}
+
+// -----
+
+// The hoisting in this case is nested on the outer module, and the inner
+// module is a different logical program, so we shouldn't hoist to the outer
+// module.
+// CHECK-LABEL: @nested_program_const_expr
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @nested_program_const_expr {
+  module {
+    func.func @main() -> (i32) {
+      %0 = arith.constant 0 : i32
+      %1 = arith.constant 1 : i32
+      %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
+      return %2 : i32
+    }
   }
 }

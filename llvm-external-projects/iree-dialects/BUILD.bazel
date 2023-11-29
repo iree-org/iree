@@ -682,6 +682,26 @@ gentbl_cc_library(
     ],
 )
 
+gentbl_cc_library(
+    name = "IREEVectorExtInterfacesIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.td",
+    deps = [
+        ":TdFiles",
+    ],
+)
+
 cc_library(
     name = "IREEVectorExtDialect",
     srcs = glob([
@@ -693,6 +713,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEVectorExtIncGen",
+        ":IREEVectorExtInterfacesIncGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
     ],

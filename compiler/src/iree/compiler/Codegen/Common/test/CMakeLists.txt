@@ -45,6 +45,7 @@ iree_lit_test_suite(
     "iree_expand_strided_metadata.mlir"
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
+    "materialize_user_configs.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
     "reductions.mlir"

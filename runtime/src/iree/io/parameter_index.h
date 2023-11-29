@@ -25,6 +25,11 @@ typedef enum iree_io_parameter_index_entry_storage_type_e {
   IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE,
 } iree_io_parameter_index_entry_storage_type_t;
 
+// Power of two; enough bytes to fit complex128 (complex<f64>).
+// Prefer 1, 2, and 4 byte patterns as they can often hit hardware accelerated
+// fast paths while 8 and 16 may require emulation.
+#define IREE_IO_PARAMETER_MAX_SPLAT_PATTERN_LENGTH 16
+
 // An entry in an in-memory file index.
 typedef struct iree_io_parameter_index_entry_t {
   // Key used to reference this file.
@@ -38,7 +43,7 @@ typedef struct iree_io_parameter_index_entry_t {
   // Defines the backing storage of a parameter based on its type.
   union {
     // Describes a synthetic parameter comprised of some repeated sequence of
-    // bytes. Sized to allow for up to complex128 (2xf64) values.
+    // bytes. Sized to allow for up to complex128 (complex<f64>) values.
     // Valid when type is IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT.
     struct {
       // Length of the pattern in bytes defining how many bytes of the pattern
@@ -49,7 +54,7 @@ typedef struct iree_io_parameter_index_entry_t {
       //         0xAA: pattern_length=1 pattern=[0xAA ...]
       //       0xBBAA: pattern_length=2 pattern=[0xAA 0xBB ...]
       //   0xDDCCBBAA: pattern_length=4 pattern=[0xAA 0xBB 0xCC 0xDD ...]
-      uint8_t pattern[16];
+      uint8_t pattern[IREE_IO_PARAMETER_MAX_SPLAT_PATTERN_LENGTH];
     } splat;
     // Describes a file-backed parameter.
     // Valid when type is IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE.
@@ -114,6 +119,17 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_index_get(
 IREE_API_EXPORT iree_status_t iree_io_parameter_index_lookup(
     iree_io_parameter_index_t* index, iree_string_view_t key,
     const iree_io_parameter_index_entry_t** out_entry);
+
+// Formats a textual dump of the parameter |index| to |builder|.
+// An optional |scope| name can be provided to include in the dump.
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_dump(
+    iree_string_view_t scope, iree_io_parameter_index_t* index,
+    iree_string_builder_t* builder);
+
+// Writes a textual dump of the parameter |index| to |file|.
+// An optional |scope| name can be provided to include in the dump.
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_fprint(
+    FILE* file, iree_string_view_t scope, iree_io_parameter_index_t* index);
 
 #ifdef __cplusplus
 }  // extern "C"

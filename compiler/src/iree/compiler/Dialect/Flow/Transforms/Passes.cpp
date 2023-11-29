@@ -70,6 +70,11 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clCollapseReductionDims(
+    "iree-flow-collapse-reduction-dims",
+    llvm::cl::desc("Enable collapsing of reduction dims"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool>
     clEnableFuseMultiUse("iree-flow-fuse-multi-use",
                          llvm::cl::desc("Fuse multi-use ops."),
@@ -129,7 +134,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Preprocess the input to a form more amenable for fusion
       .addPass(createRaiseSpecialOps)
       .addPass(createInterchangeGenericOpsPass)
-      .addPass(createCollapseDimsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
@@ -139,6 +143,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
+      .addPredicatedPass(clCollapseReductionDims, createCollapseDimsPass)
       // Split reduction operations into parallel and reduction.
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last

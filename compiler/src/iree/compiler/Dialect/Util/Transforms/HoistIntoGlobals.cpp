@@ -45,10 +45,14 @@ class HoistIntoGlobalsPass : public HoistIntoGlobalsBase<HoistIntoGlobalsPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registerConstExprDependentDialects(registry);
+    if (this->registerDependentDialectsFn) {
+      (*registerDependentDialectsFn)(registry);
+    }
   }
 
-  HoistIntoGlobalsPass(int64_t threshold) {
-    this->maxSizeIncreaseThreshold.setValue(threshold);
+  HoistIntoGlobalsPass(const ExprHoistingOptions &options)
+      : registerDependentDialectsFn(options.registerDependentDialectsFn) {
+    this->maxSizeIncreaseThreshold.setValue(options.maxSizeIncreaseThreshold);
   }
 
   void runOnOperation() override {
@@ -80,27 +84,35 @@ public:
     // in topological order so that corresponding initializers will be created
     // in order without depending on globals that have not been initialized
     // yet.
-    getOperation().walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
-      // We only want to look at const-expr ops (non roots) since they may
-      // have interesting escapes. Early exit here for efficiency.
-      auto *iterInfo = constExprs.lookup(iterOp);
-      if (!iterInfo) {
-        return WalkResult::advance();
-      }
+    auto walkRes =
+        getOperation().walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
+          // We only want to look at const-expr ops (non roots) since they may
+          // have interesting escapes. Early exit here for efficiency.
+          auto *iterInfo = constExprs.lookup(iterOp);
+          if (!iterInfo) {
+            return WalkResult::advance();
+          }
 
-      for (Value constExprResult : iterOp->getResults()) {
-        auto *resultInfo = constExprs.lookup(constExprResult);
-        assert(resultInfo && "must have const-expr info");
+          for (Value constExprResult : iterOp->getResults()) {
+            auto *resultInfo = constExprs.lookup(constExprResult);
+            assert(resultInfo && "must have const-expr info");
 
-        if (policy.getDecision(resultInfo)->getOutcome() !=
-            ConstExprHoistingPolicy::ENABLE_HOIST) {
-          continue;
-        }
+            if (policy.getDecision(resultInfo)->getOutcome() !=
+                ConstExprHoistingPolicy::ENABLE_HOIST) {
+              continue;
+            }
 
-        hoistConstExpr(constExprResult, hoistedMap, moduleSymbols, constExprs);
-      }
-      return WalkResult::advance();
-    });
+            if (failed(hoistConstExpr(constExprResult, hoistedMap,
+                                      moduleSymbols, constExprs))) {
+              return WalkResult::interrupt();
+            }
+          }
+          return WalkResult::advance();
+        });
+
+    if (walkRes.wasInterrupted()) {
+      return signalPassFailure();
+    }
 
     // Apply any remaining RAUW cleanups. We have to do these at the cleanup
     // phase since modifying the source program can invalidate the analysis.
@@ -110,15 +122,29 @@ public:
       Value originalValue = it.first;
       GlobalOp globalOp = it.second;
       builder.setInsertionPointAfterValue(originalValue);
-      auto load = builder.create<GlobalLoadOp>(globalOp->getLoc(), globalOp);
+      Value load = builder.create<GlobalLoadOp>(globalOp->getLoc(), globalOp);
+      // Call user hook to cast back to the original type.
+      if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+              originalValue.getType())) {
+        load = hoistableType.decodeStorageType(builder, load.getLoc(),
+                                               originalValue.getType(), load);
+      }
+      if (load.getType() != originalValue.getType()) {
+        getOperation().emitError()
+            << "Unresolved conflict between casted global of type "
+            << load.getType() << " and original type "
+            << originalValue.getType();
+        return signalPassFailure();
+      }
       originalValue.replaceAllUsesWith(load);
     }
     cleanupDeadOps(constExprs);
   }
 
-  GlobalOp hoistConstExpr(Value originalValue, HoistedValueMap &hoistedMap,
-                          SymbolTable &moduleSymbols,
-                          const ConstExprAnalysis &constExprs) {
+  FailureOr<GlobalOp> hoistConstExpr(Value originalValue,
+                                     HoistedValueMap &hoistedMap,
+                                     SymbolTable &moduleSymbols,
+                                     const ConstExprAnalysis &constExprs) {
     GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
 
     if (!existingGlobal) {
@@ -132,8 +158,11 @@ public:
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
       IRMapping valueMapping;
-      cloneConstExprInto(initializerOp.getLoc(), initBuilder, originalValue,
-                         hoistedMap, moduleSymbols, valueMapping, constExprs);
+      if (failed(cloneConstExprInto(initializerOp.getLoc(), initBuilder,
+                                    originalValue, hoistedMap, moduleSymbols,
+                                    valueMapping, constExprs))) {
+        return failure();
+      }
 
       existingGlobal = hoistedMap.lookup(originalValue);
     }
@@ -155,9 +184,16 @@ public:
     // down and materialize producers.
     GlobalOp existingGlobal = hoistedMap.lookup(producerInfo->constValue);
     if (existingGlobal) {
-      cloneMapping.map(producerInfo->constValue,
-                       builder.create<GlobalLoadOp>(existingGlobal.getLoc(),
-                                                    existingGlobal));
+      Value newGlobal =
+          builder.create<GlobalLoadOp>(existingGlobal.getLoc(), existingGlobal);
+      // Call user hook to cast back to the original type.
+      if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+              producerInfo->constValue.getType())) {
+        newGlobal = hoistableType.decodeStorageType(
+            builder, newGlobal.getLoc(), producerInfo->constValue.getType(),
+            newGlobal);
+      }
+      cloneMapping.map(producerInfo->constValue, newGlobal);
       return;
     }
 
@@ -178,10 +214,12 @@ public:
   // Clones the const expr tree rooted at `constExprValue` into the given
   // initializer, noting any new hoisted value mappings that result. At
   // a minimum, a mapping will be created for the requested value.
-  void cloneConstExprInto(Location loc, OpBuilder &builder,
-                          Value constExprValue, HoistedValueMap &hoistedMap,
-                          SymbolTable &moduleSymbols, IRMapping &cloneMapping,
-                          const ConstExprAnalysis &constExprs) {
+  LogicalResult cloneConstExprInto(Location loc, OpBuilder &builder,
+                                   Value constExprValue,
+                                   HoistedValueMap &hoistedMap,
+                                   SymbolTable &moduleSymbols,
+                                   IRMapping &cloneMapping,
+                                   const ConstExprAnalysis &constExprs) {
     // Do a depth first traversal of the producers, emitting them in a valid
     // def-use order.
     Operation *rootOp = constExprValue.getDefiningOp();
@@ -197,8 +235,17 @@ public:
     OpBuilder globalBuilder = getModuleBeginBuilder();
     for (Value origResult : rootOp->getResults()) {
       Value clonedResult = cloneMapping.lookup(origResult);
-      GlobalOp globalOp = globalBuilder.create<GlobalOp>(loc, "hoisted", false,
-                                                         origResult.getType());
+      Type globalType = origResult.getType();
+      // If the original type is registered as hoistable, invoke the interface
+      // functions for setting the preferred storage type.
+      auto hoistableType =
+          dyn_cast<IREE::Util::HoistableTypeInterface>(globalType);
+      // Get the preferred global storage type.
+      if (hoistableType) {
+        globalType = hoistableType.getPreferredStorageType();
+      }
+      GlobalOp globalOp =
+          globalBuilder.create<GlobalOp>(loc, "hoisted", false, globalType);
       StringAttr globalSymbol = moduleSymbols.insert(globalOp);
       SymbolTable::setSymbolVisibility(globalOp,
                                        SymbolTable::Visibility::Private);
@@ -209,10 +256,22 @@ public:
       // And store into it.
       LLVM_DEBUG(dbgs() << "    CREATE GLOBAL " << globalSymbol << " = "
                         << clonedResult << "\n");
+      // Cast to the preferred global storage type.
+      if (hoistableType) {
+        clonedResult = hoistableType.encodeStorageType(
+            builder, clonedResult.getLoc(), globalType, clonedResult);
+      }
+      if (clonedResult.getType() != globalType) {
+        globalOp.emitError()
+            << "Unresolved conflict between global of type " << globalType
+            << " and stored type " << clonedResult.getType();
+        return failure();
+      }
       builder.create<GlobalStoreOp>(loc, clonedResult, globalSymbol);
     }
 
     builder.create<InitializerReturnOp>(loc);
+    return success();
   }
 
   void cleanupDeadOps(const ConstExprAnalysis &constExprs) {
@@ -252,13 +311,22 @@ public:
     Block *block = getOperation().getBody();
     return OpBuilder::atBlockEnd(block);
   }
+
+private:
+  const std::optional<ExprHoistingOptions::RegisterDialectsFn>
+      registerDependentDialectsFn;
 };
 
 } // namespace
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createHoistIntoGlobalsPass(int64_t maxSizeIncreaseThreshold) {
-  return std::make_unique<HoistIntoGlobalsPass>(maxSizeIncreaseThreshold);
+createHoistIntoGlobalsPass(const ExprHoistingOptions &options) {
+  return std::make_unique<HoistIntoGlobalsPass>(options);
+}
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
+  IREE::Util::ExprHoistingOptions options;
+  return std::make_unique<HoistIntoGlobalsPass>(options);
 }
 
 } // namespace Util

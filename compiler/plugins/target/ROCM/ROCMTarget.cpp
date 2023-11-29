@@ -12,14 +12,19 @@
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/MC/TargetRegistry.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/PassManager.h"
@@ -111,6 +116,42 @@ public:
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::DeviceTargetAttr::get(
         context, b.getStringAttr(deviceID()), configAttr);
+  }
+  // Performs optimizations on |module| (including LTO-style whole-program
+  // ones). Inspired by code section in
+  // https://github.com/openxla/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
+  static void optimizeModule(llvm::Module &module,
+                             llvm::TargetMachine &targetMachine) {
+    llvm::LoopAnalysisManager lam;
+    llvm::FunctionAnalysisManager fam;
+    llvm::CGSCCAnalysisManager cgam;
+    llvm::ModuleAnalysisManager mam;
+
+    fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
+
+    llvm::PipelineTuningOptions pto;
+    pto.SLPVectorization = false;
+
+    llvm::PassInstrumentationCallbacks pic;
+
+    llvm::StandardInstrumentations si(module.getContext(), false);
+    si.registerCallbacks(pic, &mam);
+
+    llvm::PassBuilder pb(&targetMachine, pto, std::nullopt, &pic);
+    llvm::ModulePassManager mpm;
+    pb.registerModuleAnalyses(mam);
+    pb.registerCGSCCAnalyses(cgam);
+    pb.registerFunctionAnalyses(fam);
+    pb.registerLoopAnalyses(lam);
+    pb.crossRegisterProxies(lam, fam, cgam, mam);
+
+    llvm::OptimizationLevel ol = llvm::OptimizationLevel::O2;
+
+    mpm.addPass(llvm::VerifierPass());
+    mpm.addPass(pb.buildPerModuleDefaultPipeline(ol));
+    mpm.addPass(llvm::VerifierPass());
+
+    mpm.run(module, mam);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -205,21 +246,38 @@ public:
 
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
-      llvm::Triple triple("amdgcn--amdhsa-amdgiz");
+      llvm::Triple triple("amdgcn-amd-amdhsa");
+      const std::string GFX9("gfx9");
       std::string error;
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
       if (target == nullptr) {
         return variantOp.emitError() << "cannot initialize target triple";
       }
+      llvm::TargetOptions opt;
+      opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+      opt.UnsafeFPMath = false;
+      opt.NoInfsFPMath = false;
+      opt.NoNaNsFPMath = true;
+      std::string features{""};
+      std::string subTarget = options_.targetChip.substr(0, 4);
+      if (GFX9 == subTarget) {
+        features = "+sramecc,-xnack";
+      }
       targetMachine.reset(target->createTargetMachine(
-          triple.str(), options_.targetChip, {}, {}, {}));
+          triple.str(), options_.targetChip, features, opt,
+          llvm::Reloc::Model::PIC_, std::nullopt,
+          llvm::CodeGenOptLevel::Aggressive));
+
       if (targetMachine == nullptr) {
         return variantOp.emitError() << "cannot initialize target machine";
       }
     }
 
     llvmModule->setDataLayout(targetMachine->createDataLayout());
+
+    for (llvm::Function &f : llvmModule->functions())
+      f.addFnAttr(llvm::Attribute::AlwaysInline);
 
     iree_compiler::FlatbufferBuilder builder;
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
@@ -235,9 +293,19 @@ public:
       linkROCDLIfNecessary(llvmModule.get(), options_.targetChip,
                            options_.bitcodeDirectory);
     }
+    // Add Optimize module
+    optimizeModule(*llvmModule, *targetMachine);
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final FlatBuffer.
+    std::unique_ptr<llvm::Module> moduleCopy;
+    if (!options.dumpIntermediatesPath.empty()) {
+      moduleCopy = llvm::CloneModule(*llvmModule);
+      if (!moduleCopy) {
+        llvm::errs() << "Error: cloning LLIR failed"
+                     << "\n";
+      }
+    }
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
     std::string targetHSACO =
         createHsaco(variantOp.getLoc(), targetObj, libraryName);
@@ -270,7 +338,6 @@ public:
     auto workgroupLocalMemoriesRef =
         builder.createInt32Vec(workgroupLocalMemories);
     auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
-
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
     iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
@@ -285,7 +352,8 @@ public:
         builder.getBufferAttr(executableBuilder.getContext()));
 
     if (!options.dumpIntermediatesPath.empty()) {
-      std::string targetISA = translateModuleToISA(*llvmModule, *targetMachine);
+      std::string targetISA =
+          translateModuleToISA(*moduleCopy.get(), *targetMachine);
       dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
                      variantOp.getName(), ".rocmasm", targetISA);
     }

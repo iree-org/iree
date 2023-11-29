@@ -30,73 +30,6 @@
 #include "iree/tooling/parameter_util.h"
 
 //===----------------------------------------------------------------------===//
-// Parameter index information
-//===----------------------------------------------------------------------===//
-
-static iree_status_t iree_tooling_dump_parameter_index(
-    iree_string_view_t scope, iree_io_parameter_index_t* index) {
-  iree_host_size_t entry_count = iree_io_parameter_index_count(index);
-  uint64_t total_bytes = 0;
-  for (iree_host_size_t i = 0; i < entry_count; ++i) {
-    const iree_io_parameter_index_entry_t* entry = NULL;
-    IREE_RETURN_IF_ERROR(iree_io_parameter_index_get(index, i, &entry));
-    total_bytes += entry->length;
-  }
-  fprintf(stdout,
-          "//"
-          "===-----------------------------------------------------------------"
-          "---------------------------------------------===//\n");
-  fprintf(stdout,
-          "// Parameter scope `%.*s` (%" PRIhsz " entries, %" PRIu64
-          " total bytes)\n",
-          (int)scope.size, scope.data, entry_count, total_bytes);
-  fprintf(stdout,
-          "//===------------+------------------+------------------+------------"
-          "-----------------------------------------------===//\n");
-  fprintf(stdout,
-          "//         Start |              End |           Length | Key\n");
-  fprintf(stdout,
-          "//---------------+------------------+------------------+------------"
-          "--------------------------------------------------//\n");
-  for (iree_host_size_t i = 0; i < entry_count; ++i) {
-    const iree_io_parameter_index_entry_t* entry = NULL;
-    IREE_RETURN_IF_ERROR(iree_io_parameter_index_get(index, i, &entry));
-    switch (entry->type) {
-      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
-        fprintf(stdout,
-                "               - |                - | %16" PRIu64
-                " | `%.*s`\n",
-                entry->length, (int)entry->key.size, entry->key.data);
-        break;
-      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE:
-        fprintf(stdout,
-                "%16" PRIu64 " | %16" PRIu64 " | %16" PRIu64 " | `%.*s`\n",
-                entry->storage.file.offset,
-                entry->storage.file.offset + entry->length, entry->length,
-                (int)entry->key.size, entry->key.data);
-        break;
-      default:
-        fprintf(stdout,
-                "               ? |               ? | %16" PRIu64 " | `%.*s`\n",
-                entry->length, (int)entry->key.size, entry->key.data);
-        break;
-    }
-  }
-  fprintf(stdout, "\n");
-  return iree_ok_status();
-}
-
-static iree_status_t iree_tooling_dump_scope_map(
-    iree_io_scope_map_t* scope_map) {
-  for (iree_host_size_t i = 0; i < scope_map->count; ++i) {
-    iree_string_view_t scope = scope_map->entries[i]->scope;
-    iree_io_parameter_index_t* index = scope_map->entries[i]->index;
-    IREE_RETURN_IF_ERROR(iree_tooling_dump_parameter_index(scope, index));
-  }
-  return iree_ok_status();
-}
-
-//===----------------------------------------------------------------------===//
 // Parameter extraction
 //===----------------------------------------------------------------------===//
 
@@ -196,7 +129,14 @@ int main(int argc, char** argv) {
 
   // Dump parameter information.
   if (iree_status_is_ok(status)) {
-    status = iree_tooling_dump_scope_map(&scope_map);
+    iree_string_builder_t sb;
+    iree_string_builder_initialize(host_allocator, &sb);
+    status = iree_io_scope_map_dump(&scope_map, &sb);
+    if (iree_status_is_ok(status)) {
+      fprintf(stdout, "%.*s", (int)iree_string_builder_size(&sb),
+              iree_string_builder_buffer(&sb));
+    }
+    iree_string_builder_deinitialize(&sb);
   }
 
   // Extract parameters as requested, if any.

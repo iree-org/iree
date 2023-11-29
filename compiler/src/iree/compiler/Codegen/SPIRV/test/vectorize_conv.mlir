@@ -49,12 +49,12 @@ func.func @nwc_conv_1d_dot_prod(%input: tensor<1x7x3xi8>, %filter: tensor<1x3x4x
 
 //          CHECK:   %[[LHS:.+]] = spirv.CompositeConstruct %{{.+}}, %[[ZERO]] : (vector<3xi8>, i8) -> vector<4xi8>
 //          CHECK:   %[[RHS:.+]] = spirv.CompositeConstruct %{{.+}}, %[[ZERO]] : (vector<3xi8>, i8) -> vector<4xi8>
-//          CHECK:   spirv.SDotAccSat %[[LHS]], %[[RHS]], %{{.+}} : (vector<4xi8>, vector<4xi8>, i32) -> i32
+//          CHECK:   spirv.SDotAccSat %[[LHS]], %[[RHS]], %{{.+}} : vector<4xi8> -> i32
 //  CHECK-COUNT-2:   spirv.CompositeConstruct %{{.+}}, %[[ZERO]] : (vector<3xi8>, i8) -> vector<4xi8>
-//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : (vector<4xi8>, vector<4xi8>, i32) -> i32
+//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : vector<4xi8> -> i32
 //  CHECK-COUNT-2:   spirv.CompositeConstruct %{{.+}}, %[[ZERO]] : (vector<3xi8>, i8) -> vector<4xi8>
-//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : (vector<4xi8>, vector<4xi8>, i32) -> i32
+//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : vector<4xi8> -> i32
 //  CHECK-COUNT-2:   spirv.CompositeConstruct %{{.+}}, %[[ZERO]] : (vector<3xi8>, i8) -> vector<4xi8>
-//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : (vector<4xi8>, vector<4xi8>, i32) -> i32
+//          CHECK:   spirv.SDotAccSat %{{.+}}, %{{.+}}, %{{.+}} : vector<4xi8> -> i32
 
-// CHECK-COUNT-12:   spirv.SDotAccSat {{.+}} : (vector<4xi8>, vector<4xi8>, i32) -> i32
+// CHECK-COUNT-12:   spirv.SDotAccSat {{.+}} : vector<4xi8> -> i32

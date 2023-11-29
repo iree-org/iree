@@ -27,12 +27,15 @@ iree_cc_library(
     "ROCMTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
+    LLVMAnalysis
     LLVMCore
     LLVMIRReader
     LLVMLinker
     LLVMMC
+    LLVMPasses
     LLVMSupport
     LLVMTarget
+    LLVMTransformUtils
     LLVMipo
     MLIRAMDGPUDialect
     MLIRAMDGPUToROCDL

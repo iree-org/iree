@@ -43,18 +43,6 @@
 #define DEBUG_TYPE "iree-llvm-cpu-target"
 using llvm::dbgs;
 
-// Deprecated: use iree-llvmcpu-enable-ukernels instead.
-//
-// If set to `true`, has the same effect as --iree-llvmcpu-enable-ukernels=all.
-//
-// TODO(ravishankarm): This is redundant w.r.t `iree-vmvx-enable-microkernels`
-// flag. Fold these into either a single flag, or not have the flag at all.
-static llvm::cl::opt<bool> clEnableCPUMicrokernels(
-    "iree-llvmcpu-enable-microkernels",
-    llvm::cl::desc(
-        "Enables microkernel lowering for llvmcpu backend (experimental)"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<std::string> clEnableCPUUkernels(
     "iree-llvmcpu-enable-ukernels",
     llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
@@ -942,9 +930,7 @@ private:
     configAttrs.emplace_back(b.getStringAttr("native_vector_size"),
                              b.getIndexAttr(addlConfig.vectorSize));
 
-    std::string enableUkernels = clEnableCPUMicrokernels.getValue()
-                                     ? "all"
-                                     : clEnableCPUUkernels.getValue();
+    std::string enableUkernels = clEnableCPUUkernels.getValue();
     // Check if microkernels are to be enabled.
     configAttrs.emplace_back(b.getStringAttr("ukernels"),
                              b.getStringAttr(enableUkernels));

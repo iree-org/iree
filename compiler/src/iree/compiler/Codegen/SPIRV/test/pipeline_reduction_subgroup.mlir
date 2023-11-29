@@ -52,18 +52,11 @@ hal.executable private @subgroup_reduce {
 // CHECK-DAG:   %[[C8:.+]] = spirv.Constant 8 : i32
 // CHECK-DAG:   %[[F0:.+]] = spirv.Constant 0.000000e+00 : f32
 // CHECK-DAG:   %[[FV0:.+]] = spirv.Constant dense<0.000000e+00> : vector<4xf32>
+// CHECK-DAG:   %[[FV1:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf32>
 
 // CHECK:   %[[LD:.+]] = spirv.Load "StorageBuffer" %{{.+}} : vector<4xf32>
 // CHECK:   %[[ADDV0:.+]] = spirv.FAdd %[[LD]], %[[FV0]] : vector<4xf32>
-
-// CHECK:   %[[E0:.+]] = spirv.CompositeExtract %[[ADDV0]][0 : i32] : vector<4xf32>
-// CHECK:   %[[E1:.+]] = spirv.CompositeExtract %[[ADDV0]][1 : i32] : vector<4xf32>
-// CHECK:   %[[E2:.+]] = spirv.CompositeExtract %[[ADDV0]][2 : i32] : vector<4xf32>
-// CHECK:   %[[E3:.+]] = spirv.CompositeExtract %[[ADDV0]][3 : i32] : vector<4xf32>
-
-// CHECK:   %[[ADD0:.+]] = spirv.FAdd %[[E0]], %[[E1]] : f32
-// CHECK:   %[[ADD1:.+]] = spirv.FAdd %[[ADD0]], %[[E2]] : f32
-// CHECK:   %[[ADD2:.+]] = spirv.FAdd %[[ADD1]], %[[E3]] : f32
+// CHECK:   %[[ADD2:.+]] = spirv.Dot %[[ADDV0]], %[[FV1]] : vector<4xf32> -> f32
 
 // CHECK:   %[[S0:.+]] = spirv.GroupNonUniformShuffleXor <Subgroup> %[[ADD2]], %[[C1]] : f32, i32
 // CHECK:   %[[ADD3:.+]] = spirv.FAdd %[[ADD2]], %[[S0]] : f32

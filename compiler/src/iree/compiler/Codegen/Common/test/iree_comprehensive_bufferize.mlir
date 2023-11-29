@@ -581,7 +581,7 @@ module {
         %17 = affine.min #map1(%arg0)[%workgroup_size_y, %4]
         %18 = affine.min #map1(%arg1)[%workgroup_size_x, %5]
         %19 = flow.dispatch.tensor.load %8, offsets = [%arg0, %arg1], sizes = [%17, %18], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%4, %5} -> tensor<?x?xf32>
-        %20 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%14, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%19 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %20 = linalg.matmul ins(%14, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%19 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %20, %8, offsets = [%arg0, %arg1], sizes = [%17, %18], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%4, %5}
       }
     }
@@ -751,7 +751,7 @@ module {
         %12 = tensor.extract_slice %4[%arg0, 0] [%9, 2] [1, 1] : tensor<1x2xf32> to tensor<?x2xf32>
         %13 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [2, %10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32>> -> tensor<2x?xf32>
         %14 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%12, %13 : tensor<?x2xf32>, tensor<2x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %15 = linalg.matmul ins(%12, %13 : tensor<?x2xf32>, tensor<2x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%9, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x3xf32>>
       }
     }
@@ -997,7 +997,7 @@ module {
         %11 = tensor.extract_slice %3[%arg0, 0] [%8, 3] [1, 1] : tensor<5x3xf32> to tensor<?x3xf32>
         %12 = tensor.extract_slice %cst[0, %arg1] [3, %9] [1, 1] : tensor<3x5xf32> to tensor<3x?xf32>
         %13 = linalg.fill ins(%cst_0 : f32) outs(%10 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %12 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %14 = linalg.matmul ins(%11, %12 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %9], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<5x5xf32>>
       }
     }
@@ -1126,7 +1126,7 @@ module {
         %17 = flow.dispatch.tensor.load %6, offsets = [%arg0, %arg1], sizes = [%15, %16], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
         %18 = tensor.extract_slice %8[%arg0, %arg1] [%15, %16] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
         %19 = tensor.extract_slice %10[%arg0, %arg1] [%15, %16] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-        %20 = linalg.generic {indexing_maps = [#map2, #map2, #map2, #map2, #map2], iterator_types = ["parallel", "parallel"]} ins(%18, %18, %19, %19 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %20 = linalg.generic {indexing_maps = [#map2, #map2, #map2, #map2, #map2], iterator_types = ["parallel", "parallel"]} ins(%18, %18, %19, %19 : tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) {
         ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32):
           %21 = arith.mulf %arg4, %arg5 : f32
           %22 = arith.mulf %arg2, %arg3 : f32
@@ -1334,8 +1334,8 @@ module {
           %7 = flow.dispatch.tensor.load %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, 32, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>> -> tensor<1x32x32xf32>
           %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [1, 32, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x32x1024xf32>> -> tensor<1x32x1024xf32>
           %9 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1024, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1024x64xf32>> -> tensor<1x1024x32xf32>
-          %10 = linalg.fill {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%7 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
-          %11 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%8, %9 : tensor<1x32x1024xf32>, tensor<1x1024x32xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
+          %10 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
+          %11 = linalg.batch_matmul ins(%8, %9 : tensor<1x32x1024xf32>, tensor<1x1024x32xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
           flow.dispatch.tensor.store %11, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %c32, %c32], strides = [1, 1, 1] : tensor<1x32x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>>
         }
       }
@@ -1354,7 +1354,7 @@ module {
 //        CHECK: linalg.fill
 //   CHECK-SAME:     ins(%[[ZERO]] :
 //   CHECK-SAME:     outs(%[[RESULTV]] :
-//        CHECK: linalg.batch_matmul {{.*}} ins(%[[LHSV]], %[[RHSV]] : {{.*}}) outs(%[[RESULTV]]
+//        CHECK: linalg.batch_matmul ins(%[[LHSV]], %[[RHSV]] : {{.*}}) outs(%[[RESULTV]]
 
 // -----
 
@@ -1526,9 +1526,9 @@ module {
       %11 = flow.dispatch.tensor.load %5, offsets = [%arg0], sizes = [%9], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%2} -> tensor<?xi32>
       %12 = flow.dispatch.tensor.load %3, offsets = [0, %arg0], sizes = [%0, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%0, %1} -> tensor<?x?xi32>
       %13 = flow.dispatch.tensor.load %4, offsets = [0, %arg0], sizes = [%0, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xi32>>{%0, %1} -> tensor<?x?xi32>
-      %14 = linalg.fill {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} ins(%c-2147483648_i32 : i32) outs(%11 : tensor<?xi32>) -> tensor<?xi32>
-      %15 = linalg.fill {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} ins(%c0_i32 : i32) outs(%10 : tensor<?xi32>) -> tensor<?xi32>
-      %16:2 = linalg.generic {indexing_maps = [#map2, #map2, #map3, #map3], iterator_types = ["parallel", "reduction"]} ins(%12, %13 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %15 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} {
+      %14 = linalg.fill ins(%c-2147483648_i32 : i32) outs(%11 : tensor<?xi32>) -> tensor<?xi32>
+      %15 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32>) -> tensor<?xi32>
+      %16:2 = linalg.generic {indexing_maps = [#map2, #map2, #map3, #map3], iterator_types = ["parallel", "reduction"]} ins(%12, %13 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %15 : tensor<?xi32>, tensor<?xi32>) {
       ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):
         %17 = arith.cmpi sge, %arg1, %arg3 : i32
         %18 = arith.select %17, %arg1, %arg3 : i32
@@ -1612,7 +1612,7 @@ module {
               %22 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
               %23 = affine.min #map6(%22, %arg4)
               %24 = tensor.extract_slice %arg7[%arg2, %arg4] [%21, %23] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-              %25 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering_config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 24], [4, 4, 4]]}} ins(%17, %19 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%24 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              %25 = linalg.matmul ins(%17, %19 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%24 : tensor<?x?xf32>) -> tensor<?x?xf32>
               %26 = tensor.insert_slice %25 into %arg7[%arg2, %arg4] [%21, %23] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
               scf.yield %26 : tensor<?x?xf32>
             }
@@ -1691,7 +1691,7 @@ module {
         %9 = flow.dispatch.tensor.load %2, offsets = [%arg0, %arg1], sizes = [%7, %8], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<250x370xf32>> -> tensor<?x?xf32>
         %10 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<250x144xf32>> -> tensor<?x144xf32>
         %11 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [144, %8], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<144x370xf32>> -> tensor<144x?xf32>
-        %12 = linalg.fill {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[64, 64]]}} ins(%cst : f32) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %12 = linalg.fill ins(%cst : f32) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
         %13 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %12) -> (tensor<?x?xf32>) {
           %14 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
             %15 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
@@ -1705,7 +1705,7 @@ module {
               %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
               %24 = affine.min #map6(%23, %arg4)
               %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-              %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering_config = {nativeVectorSize = [4, 4, 4], tileSizes = [[64, 64], [32, 32, 24], [4, 4, 4]]}} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              %26 = linalg.matmul ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
               %27 = tensor.insert_slice %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
               scf.yield %27 : tensor<?x?xf32>
             }
@@ -1882,7 +1882,7 @@ module {
         %14 = flow.dispatch.tensor.load %6, offsets = [%arg0, %arg1], sizes = [%12, %13], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
         %15 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [%12, %2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2} -> tensor<?x?xf32>
         %16 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [%2, %13], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1} -> tensor<?x?xf32>
-        %17 = linalg.fill {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %17 = linalg.fill ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
         %18 = scf.for %arg2 = %c0 to %12 step %c4 iter_args(%arg3 = %17) -> (tensor<?x?xf32>) {
           %20 = scf.for %arg4 = %c0 to %13 step %c4 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
             %21 = affine.min #map2(%12, %arg2)
@@ -1897,7 +1897,7 @@ module {
                 %31 = affine.apply #map3(%arg8, %arg4)
                 %32 = tensor.extract_slice %16[0, %31] [%2, %30] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
                 %33 = tensor.extract_slice %arg9[%arg6, %arg8] [%27, %30] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-                %34 = linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering_config = {nativeVectorSize = [4, 4, 4], tileSizes = [[], [4, 4, 4], [4, 4, 4]]}} ins(%29, %32 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%33 : tensor<?x?xf32>) -> tensor<?x?xf32>
+                %34 = linalg.matmul ins(%29, %32 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%33 : tensor<?x?xf32>) -> tensor<?x?xf32>
                 %35 = tensor.insert_slice %34 into %arg9[%arg6, %arg8] [%27, %30] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
                 scf.yield %35 : tensor<?x?xf32>
               }
@@ -1908,7 +1908,7 @@ module {
           }
           scf.yield %20 : tensor<?x?xf32>
         }
-        %19 = linalg.generic {indexing_maps = [#map4, #map5], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<f32>) outs(%18 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %19 = linalg.generic {indexing_maps = [#map4, #map5], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<f32>) outs(%18 : tensor<?x?xf32>) {
         ^bb0(%arg2: f32, %arg3: f32):
           %20 = arith.addf %arg2, %arg3 : f32
           linalg.yield %20 : f32
@@ -1985,9 +1985,9 @@ module {
         %14 = flow.dispatch.tensor.load %6, offsets = [%arg0, %arg1], sizes = [%12, %13], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
         %15 = flow.dispatch.tensor.load %3, offsets = [%arg0, 0], sizes = [%12, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %2} -> tensor<?x?xf32>
         %16 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, %13], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1} -> tensor<?x?xf32>
-        %17 = linalg.fill {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %18 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%15, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %19 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<f32>) outs(%18 : tensor<?x?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %17 = linalg.fill ins(%cst : f32) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %18 = linalg.matmul ins(%15, %16 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        %19 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<f32>) outs(%18 : tensor<?x?xf32>) {
         ^bb0(%arg2: f32, %arg3: f32):
           %20 = arith.addf %arg2, %arg3 : f32
           linalg.yield %20 : f32

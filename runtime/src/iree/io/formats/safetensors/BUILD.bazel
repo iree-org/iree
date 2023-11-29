@@ -15,10 +15,10 @@ package(
 iree_runtime_cc_library(
     name = "safetensors",
     srcs = [
-        "safetensors_format.c",
+        "safetensors_parser.c",
     ],
     hdrs = [
-        "safetensors_format.h",
+        "safetensors_parser.h",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -28,12 +28,10 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
-    name = "safetensors_format_test",
-    srcs = ["safetensors_format_test.cc"],
-    tags = ["requires-filesystem"],
+    name = "safetensors_parser_test",
+    srcs = ["safetensors_parser_test.cc"],
     deps = [
         ":safetensors",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/io/formats/safetensors/testdata:safetensors_files",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

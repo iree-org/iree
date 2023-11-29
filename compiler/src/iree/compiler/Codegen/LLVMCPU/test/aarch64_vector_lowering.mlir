@@ -142,7 +142,7 @@ module {
             %21 = vector.transfer_write %20, %12[%c0, %c0] {in_bounds = [true, true]} : vector<32x32xf32>, tensor<32x32xf32>
             %22 = tensor.extract_slice %15[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
             %23 = tensor.extract_slice %arg5[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
-            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = ["parallel", "parallel"]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) attrs =  {__internal_linalg_transform__ = "vectorize"} {
+            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = ["parallel", "parallel"]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) {
             ^bb0(%arg6: f32, %arg7: i32, %arg8: f32, %arg9: f32):
               %26 = linalg.index 1 : index
               %27 = affine.apply #map6(%arg1, %26, %arg4)
