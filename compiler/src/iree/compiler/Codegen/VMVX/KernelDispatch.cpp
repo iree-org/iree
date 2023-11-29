@@ -85,9 +85,10 @@ static LogicalResult setVMVXRootConfigImpl(func::FuncOp entryPointFn,
   return setRootConfigFn(op);
 }
 
-static LogicalResult lowerUsingNonePipeline(func::FuncOp op) {
+static LogicalResult lowerUsingVMVXDefaultPipeline(func::FuncOp op) {
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      op.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+      op.getContext(),
+      IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault);
   return setTranslationInfo(op, translationInfo);
 }
 
@@ -95,7 +96,7 @@ static LogicalResult lowerUsingNonePipeline(func::FuncOp op) {
 static LogicalResult setConfigForKernel(func::FuncOp entryPointFn) {
   SmallVector<Operation *> computeOps = getComputeOps(entryPointFn);
   if (computeOps.empty()) {
-    return lowerUsingNonePipeline(entryPointFn);
+    return lowerUsingVMVXDefaultPipeline(entryPointFn);
   }
 
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
@@ -106,7 +107,7 @@ static LogicalResult setConfigForKernel(func::FuncOp entryPointFn) {
   // Handle the case with no known root operation.
   Operation *rootOperation = rootOp.value();
   if (!rootOperation) {
-    return lowerUsingNonePipeline(entryPointFn);
+    return lowerUsingVMVXDefaultPipeline(entryPointFn);
   }
 
   if (failed(setVMVXRootConfigImpl(entryPointFn, rootOperation))) {

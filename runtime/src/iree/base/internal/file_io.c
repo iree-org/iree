@@ -275,6 +275,41 @@ static iree_status_t iree_file_map_contents_readonly_platform(
   return iree_ok_status();
 }
 
+static iree_status_t iree_file_create_mapped_platform(
+    const char* path, uint64_t file_size, uint64_t offset,
+    iree_host_size_t length, iree_file_contents_t* contents) {
+  // Create file on disk.
+  FILE* file = fopen(path, "w+b");
+  if (file == NULL) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND, "failed to open file '%s'",
+                            path);
+  }
+  contents->mapping = file;
+
+  // Zero-extend the file ('truncate' can extend, because... unix).
+  if (ftruncate(fileno(file), (off_t)file_size) == -1) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to extend file '%s' to %" PRIu64
+                            " bytes (out of disk space or permission denied)",
+                            path, file_size);
+  }
+
+  // Map the memory.
+  void* ptr = mmap(NULL, (size_t)length, PROT_READ | PROT_WRITE, MAP_SHARED,
+                   fileno(file), (off_t)offset);
+  if (ptr == MAP_FAILED) {
+    return iree_make_status(iree_status_code_from_errno(errno),
+                            "failed to map '%s' range %" PRIu64 "-%" PRIu64
+                            " (%" PRIhsz " bytes) from file of %" PRIu64
+                            " total bytes",
+                            path, offset, offset + length, length, file_size);
+  }
+
+  contents->const_buffer =
+      iree_make_const_byte_span(ptr, (iree_host_size_t)length);
+  return iree_ok_status();
+}
+
 static void iree_file_contents_free_platform(iree_file_contents_t* contents) {
   if (contents->mapping) {
     munmap(contents->buffer.data, (size_t)contents->buffer.data_length);
@@ -334,6 +369,67 @@ static iree_status_t iree_file_map_contents_readonly_platform(
   return iree_ok_status();
 }
 
+static iree_status_t iree_file_create_mapped_platform(
+    const char* path, uint64_t file_size, uint64_t offset,
+    iree_host_size_t length, iree_file_contents_t* contents) {
+  // TODO(benvanik): investigate FILE_FLAG_SEQUENTIAL_SCAN +
+  // FILE_FLAG_WRITE_THROUGH flags once we have some benchmarks.
+  HANDLE file = CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+  if (file == INVALID_HANDLE_VALUE) {
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to open file '%s'", path);
+  }
+
+  // Zero-extend the file up to the total file size specified by the caller.
+  // This may be larger than the virtual address space can handle but so long as
+  // the length requested for mapping is under the size_t limit this will
+  // succeed.
+  LARGE_INTEGER file_size_li;
+  file_size_li.QuadPart = file_size;
+  if (!SetFilePointerEx(file, file_size_li, NULL, FILE_BEGIN) ||
+      !SetEndOfFile(file)) {
+    CloseHandle(file);
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to extend file '%s' to %" PRIu64
+                            " bytes (out of disk space or permission denied)",
+                            path, file_size);
+  }
+
+  // Create a file mapping object which will retain the file handle for the
+  // lifetime of the mapping.
+  HANDLE mapping =
+      CreateFileMappingA(file, NULL, PAGE_READWRITE, /*dwMaximumSizeHigh=*/0,
+                         /*dwMaximumSizeLow=*/0, /*lpName=*/NULL);
+  if (!mapping) {
+    CloseHandle(file);
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to create file mapping for '%s'", path);
+  }
+
+  // Retained by the mapping so safe to release now.
+  CloseHandle(file);
+
+  // Map the requested range into the virtual address space of the process.
+  LARGE_INTEGER offset_li;
+  offset_li.QuadPart = offset;
+  void* ptr = MapViewOfFileEx(mapping, FILE_MAP_ALL_ACCESS, offset_li.HighPart,
+                              offset_li.LowPart, (SIZE_T)length,
+                              /*lpBaseAddress=*/NULL);
+  if (!ptr) {
+    CloseHandle(mapping);
+    return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
+                            "failed to map '%s' range %" PRIu64 "-%" PRIu64
+                            " (%" PRIhsz " bytes) from file of %" PRIu64
+                            " total bytes",
+                            path, offset, offset + length, length, file_size);
+  }
+
+  contents->mapping = mapping;
+  contents->buffer = iree_make_byte_span(ptr, length);
+  return iree_ok_status();
+}
+
 static void iree_file_contents_free_platform(iree_file_contents_t* contents) {
   if (contents->mapping) {
     UnmapViewOfFile(contents->buffer.data);
@@ -349,9 +445,41 @@ static iree_status_t iree_file_map_contents_readonly_platform(
                           "file mapping not supported on this platform");
 }
 
+static iree_status_t iree_file_create_mapped_platform(
+    const char* path, uint64_t file_size, uint64_t offset,
+    iree_host_size_t length, iree_file_contents_t* contents) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "file mapping not supported on this platform");
+}
+
 static void iree_file_contents_free_platform(iree_file_contents_t* contents) {}
 
 #endif  // IREE_PLATFORM_*
+
+iree_status_t iree_file_create_mapped(const char* path, uint64_t file_size,
+                                      uint64_t offset, iree_host_size_t length,
+                                      iree_allocator_t allocator,
+                                      iree_file_contents_t** out_contents) {
+  IREE_ASSERT_ARGUMENT(path);
+  IREE_ASSERT_ARGUMENT(out_contents);
+  *out_contents = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_file_contents_t* contents = NULL;
+  iree_allocator_malloc(allocator, sizeof(*contents), (void**)&contents);
+  contents->allocator = allocator;
+
+  iree_status_t status = iree_file_create_mapped_platform(
+      path, file_size, offset, length, contents);
+
+  if (iree_status_is_ok(status)) {
+    *out_contents = contents;
+  } else {
+    iree_file_contents_free(contents);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
 
 iree_status_t iree_file_write_contents(const char* path,
                                        iree_const_byte_span_t content) {

@@ -4,9 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/io/formats/gguf/gguf_format.h"
+#include "iree/io/formats/gguf/gguf_parser.h"
 
-#include "iree/base/internal/file_io.h"
 #include "iree/io/formats/gguf/testdata/gguf_files.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"

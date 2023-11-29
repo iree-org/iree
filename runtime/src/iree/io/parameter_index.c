@@ -243,3 +243,86 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_index_lookup(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_dump(
+    iree_string_view_t scope, iree_io_parameter_index_t* index,
+    iree_string_builder_t* builder) {
+  iree_host_size_t entry_count = iree_io_parameter_index_count(index);
+  uint64_t total_bytes = 0;
+  for (iree_host_size_t i = 0; i < entry_count; ++i) {
+    const iree_io_parameter_index_entry_t* entry = NULL;
+    IREE_RETURN_IF_ERROR(iree_io_parameter_index_get(index, i, &entry));
+    total_bytes += entry->length;
+  }
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+      builder,
+      "//"
+      "===-----------------------------------------------------------------"
+      "---------------------------------------------===//\n"));
+  IREE_RETURN_IF_ERROR(
+      iree_string_builder_append_cstring(builder, "// Parameter scope "));
+  if (iree_string_view_is_empty(scope)) {
+    IREE_RETURN_IF_ERROR(
+        iree_string_builder_append_cstring(builder, "<global>"));
+  } else {
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+        builder, "`%.*s`", (int)scope.size, scope.data));
+  }
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+      builder, " (%" PRIhsz " entries, %" PRIu64 " total bytes)\n", entry_count,
+      total_bytes));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+      builder,
+      "//===------------+------------------+------------------+------------"
+      "-----------------------------------------------===//\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+      builder,
+      "//         Start |              End |           Length | Key\n"));
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+      builder,
+      "//---------------+------------------+------------------+------------"
+      "--------------------------------------------------//\n"));
+  for (iree_host_size_t i = 0; i < entry_count; ++i) {
+    const iree_io_parameter_index_entry_t* entry = NULL;
+    IREE_RETURN_IF_ERROR(iree_io_parameter_index_get(index, i, &entry));
+    switch (entry->type) {
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder,
+            "               - |                - | %16" PRIu64 " | `%.*s`\n",
+            entry->length, (int)entry->key.size, entry->key.data));
+        break;
+      }
+      case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder, "%16" PRIu64 " | %16" PRIu64 " | %16" PRIu64 " | `%.*s`\n",
+            entry->storage.file.offset,
+            entry->storage.file.offset + entry->length, entry->length,
+            (int)entry->key.size, entry->key.data));
+        break;
+      }
+      default: {
+        IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+            builder,
+            "               ? |               ? | %16" PRIu64 " | `%.*s`\n",
+            entry->length, (int)entry->key.size, entry->key.data));
+        break;
+      }
+    }
+  }
+  IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(builder, "\n"));
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_io_parameter_index_fprint(
+    FILE* file, iree_string_view_t scope, iree_io_parameter_index_t* index) {
+  iree_string_builder_t builder;
+  iree_string_builder_initialize(index->host_allocator, &builder);
+  iree_status_t status = iree_io_parameter_index_dump(scope, index, &builder);
+  if (iree_status_is_ok(status)) {
+    fprintf(file, "%.*s", (int)iree_string_builder_size(&builder),
+            iree_string_builder_buffer(&builder));
+  }
+  iree_string_builder_deinitialize(&builder);
+  return status;
+}

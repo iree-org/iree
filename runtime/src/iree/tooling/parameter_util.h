@@ -14,6 +14,7 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_io_parameter_index_t iree_io_parameter_index_t;
 typedef struct iree_io_scope_map_t iree_io_scope_map_t;
 
 // Populates |scope_map| with parameter indices as specified by flags.

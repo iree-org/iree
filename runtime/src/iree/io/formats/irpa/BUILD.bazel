@@ -13,26 +13,32 @@ package(
 )
 
 iree_runtime_cc_library(
-    name = "safetensors",
+    name = "irpa",
     srcs = [
-        "safetensors_parser.c",
+        "irpa_builder.c",
+        "irpa_parser.c",
     ],
     hdrs = [
-        "safetensors_parser.h",
+        "irpa_builder.h",
+        "irpa_parser.h",
     ],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/io:file_handle",
         "//runtime/src/iree/io:parameter_index",
+        "//runtime/src/iree/io:stream",
+        "//runtime/src/iree/schemas:parameter_archive",
     ],
 )
 
 iree_runtime_cc_test(
-    name = "safetensors_parser_test",
-    srcs = ["safetensors_parser_test.cc"],
+    name = "irpa_parser_test",
+    srcs = ["irpa_parser_test.cc"],
+    tags = ["requires-filesystem"],
     deps = [
-        ":safetensors",
-        "//runtime/src/iree/io/formats/safetensors/testdata:safetensors_files",
+        ":irpa",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/io/formats/irpa/testdata:irpa_files",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
     ],

@@ -8,7 +8,7 @@
 
 // This is arbitrary - we should allow dynamic block sizes and such but keeping
 // this small only requires a reasonable fixed size stack alloc.
-#define IREE_IO_STREAM_COPY_BLOCK_SIZE (16 * 1024)
+#define IREE_IO_STREAM_COPY_BLOCK_SIZE (32 * 1024)
 
 //===----------------------------------------------------------------------===//
 // Stream utilities

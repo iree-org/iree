@@ -184,6 +184,7 @@ nav:
       - "Debugging":
           - "developers/debugging/android-with-lldb.md"
           - "developers/debugging/compile-time-regressions.md"
+          - "developers/debugging/gpu.md"
           - "developers/debugging/integration-tests.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"
