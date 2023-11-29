@@ -20,12 +20,10 @@ iree_compiler_cc_library(
         "LLVMGPULayoutAnalysisAndDistribution.cpp",
         "LLVMGPUUtils.cpp",
         "SIMTLayoutAnalysis.cpp",
-        "SIMTTransferFunctions.cpp",
     ],
     hdrs = [
         "LLVMGPUUtils.h",
         "SIMTLayoutAnalysis.h",
-        "SIMTTransferFunctions.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen/Transforms",
