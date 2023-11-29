@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-infer-numeric-narrowing %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-infer-numeric-narrowing %s | FileCheck %s
 // This does not test all of the analysis logic, just that the annotations
 // are inserted at proper points in the right way. Probe points checked:
 //   - Every operand of a LinalgOp

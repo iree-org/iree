@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-optimize-numerics %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-optimize-numerics %s | FileCheck %s
 
 // CHECK-LABEL: @matmul_i8_i8_i32_unsigned
 func.func @matmul_i8_i8_i32_unsigned(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {

@@ -9,6 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CleanupNumericNarrowing :
+    Pass<"iree-global-opt-cleanup-numeric-narrowing", ""> {
+  let summary = "Cleans up any numeric narrowing ops inserted by iree-global-opt-infer-numeric-narrowing";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createCleanupNumericNarrowingPass()";
+}
+
 def Convert1X1FilterConv2DToMatmul:
     Pass<"iree-global-opt-convert-1x1-filter-conv2d-to-matmul", ""> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
@@ -27,6 +33,12 @@ def EraseUnusedLinalgOperands :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createEraseUnusedLinalgOperands()";
 }
 
+def ExpandTensorShapes :
+    Pass<"iree-global-opt-expand-tensor-shapes", "mlir::ModuleOp"> {
+  let summary = "Expands tensor shape dimensions into SSA values across the program.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandTensorShapesPass()";
+}
+
 def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
   let summary = "Expand vector in vector/matrix operations";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
@@ -42,11 +54,29 @@ def FuseDequantizationMatmul:
   ];
 }
 
+def GeneralizeLinalgNamedOps :
+    InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Convert some Linalg named ops into linalg.generics";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createGeneralizeLinalgNamedOpsPass()";
+}
+
+def InferNumericNarrowing :
+    Pass<"iree-global-opt-infer-numeric-narrowing", ""> {
+  let summary = "Infers and inserts util.numeric.optional_narrow ops at points that may be beneficial";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createInferNumericNarrowingPass()";
+}
+
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
   let constructor =
   "mlir::iree_compiler::GlobalOptimization::createMaterializeHomogeneousEncodingsPass()";
+}
+
+def OptimizeNumerics :
+    Pass<"iree-global-opt-optimize-numerics", ""> {
+  let summary = "Optimizes numerics given annotations added via iree-global-opt-infer-numeric-narrowing";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
 def RemoveZeroExtentTensors :

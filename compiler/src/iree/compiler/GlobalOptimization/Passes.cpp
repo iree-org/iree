@@ -71,14 +71,14 @@ void buildGlobalOptimizationPassPipeline(
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
   // better our fusions will be.
-  mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+  mainPassManager.addPass(createExpandTensorShapesPass());
 
   FunctionLikeNest(mainPassManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
@@ -126,9 +126,9 @@ void buildGlobalOptimizationPassPipeline(
   }
 
   if (transformOptions.options.numericPrecisionReduction) {
-    pipeline.addPass(IREE::Flow::createInferNumericNarrowingPass());
-    pipeline.addPass(IREE::Flow::createOptimizeNumericsPass());
-    pipeline.addPass(IREE::Flow::createCleanupNumericNarrowingPass());
+    pipeline.addPass(createInferNumericNarrowingPass());
+    pipeline.addPass(createOptimizeNumericsPass());
+    pipeline.addPass(createCleanupNumericNarrowingPass());
   }
 
   FunctionLikeNest(pipeline)
