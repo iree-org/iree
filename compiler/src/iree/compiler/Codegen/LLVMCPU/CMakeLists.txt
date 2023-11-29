@@ -55,7 +55,6 @@ iree_cc_library(
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
-    "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUMmt4dVectorLowering.cpp"
