@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/LLVMGPU/Utils/SIMTLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -1278,8 +1279,75 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
   return maps == infer({{m, k}, {n, k}, {m, n}});
 }
 
+static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
+                                       func::FuncOp funcOp) {
+  // Find operation with "__vector_layout_test_anchor_operand_x" or
+  // "__vector_layout_test_anchor_result_x"attribute, where x is the
+  // operand/result number.
+  for (auto &block : funcOp) {
+    for (auto &op : block) {
+      for (auto attr : op.getAttrs()) {
+        std::string name = attr.getName().str();
+        if (name.find("__vector_layout_test_anchor_operand_") !=
+            std::string::npos) {
+          int operandNum = std::stoi(name.substr(name.find_last_of("_") + 1));
+          analysis.setAnchor(op.getOperand(operandNum), attr.getValue());
+        }
+        if (name.find("__vector_layout_test_anchor_result_") !=
+            std::string::npos) {
+          int resultNum = std::stoi(name.substr(name.find_last_of("_") + 1));
+          analysis.setAnchor(op.getResult(resultNum), attr.getValue());
+        }
+      }
+    }
+  }
+}
+
+static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
+                              func::FuncOp funcOp) {
+  funcOp.walk([&](Operation *op) {
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (auto layout = analysis.getLayout<Attribute>(operand.get())) {
+        // Print layout attr to a string.
+        std::string layoutStr;
+        llvm::raw_string_ostream s(layoutStr);
+        s << layout;
+        // Emit remark.
+        op->emitRemark("layout of operand #" +
+                       std::to_string(operand.getOperandNumber()) + " is " +
+                       s.str());
+      }
+    }
+
+    for (OpResult result : op->getOpResults()) {
+      if (auto layout = analysis.getLayout<Attribute>(result)) {
+        // Print layout attr to a string.
+        std::string layoutStr;
+        llvm::raw_string_ostream s(layoutStr);
+        s << layout;
+        // Emit remark.
+        op->emitRemark("layout of result #" +
+                       std::to_string(result.getResultNumber()) + " is " +
+                       s.str());
+      }
+    }
+  });
+}
+
 void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
                                      func::FuncOp funcOp) {
+
+  VectorLayoutAnalysis analysis(funcOp);
+  setAnchorOpsFromAttributes(analysis, funcOp);
+  LogicalResult result = analysis.run();
+  if (failed(result)) {
+    funcOp.emitError("layout analysis failed");
+    return;
+  }
+  emitLayoutRemarks(analysis, funcOp);
+
+  return;
+
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {
