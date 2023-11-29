@@ -130,12 +130,24 @@ static void propagateLayoutToMultiReductionOp(
     std::function<void(DistributionLayout *, ChangeResult)> update) {
   // Multi reduce has only one vector result.
   DistributionLayout *result = resultLattices[0];
+  // Multi reduce has first vector operands as the value being reduced.
+  const DistributionLayout *vector = operandLattices[0];
   // Multi reduce has second operand as init.
   const DistributionLayout *init = operandLattices[1];
 
   // If result lattice already has a layout, we cannot do anything. We do not
   // impose layout conflicts on results.
   if (result->hasLayout()) {
+    return;
+  }
+
+  // If the vector begin reduced has a layout, then propagate it to the result.
+  // by projecting
+  if (vector->hasLayout()) {
+    SmallVector<bool> reductionMask = multiReduce.getReductionMask();
+    ChangeResult changed =
+        result->resolve(vector->getInnerLayout().project(reductionMask));
+    update(result, changed);
     return;
   }
 
