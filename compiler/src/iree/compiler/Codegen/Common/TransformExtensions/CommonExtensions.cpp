@@ -923,9 +923,6 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 
 static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
                                        func::FuncOp funcOp) {
-  // Find operation with "__vector_layout_test_anchor_operand_x" or
-  // "__vector_layout_test_anchor_result_x"attribute, where x is the
-  // operand/result number.
   for (auto &block : funcOp) {
     for (auto &op : block) {
       for (auto attr : op.getAttrs()) {

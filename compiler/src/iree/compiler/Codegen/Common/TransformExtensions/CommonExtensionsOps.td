@@ -532,6 +532,19 @@ def TestVectorLayoutAnalysisOp :
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
+    Run VectorLayoutAnalysis on the target as the root.
+
+    The anchor points are set by using the attribute
+    "__vector_layout_test_anchor_operand_x" and
+    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
+    number.
+
+    The analysis emits remarks for the layout for each SSA value infered
+    on it's owning operation.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
