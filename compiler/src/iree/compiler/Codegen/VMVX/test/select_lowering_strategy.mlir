@@ -271,3 +271,34 @@ hal.executable private @elem_pack_ukernels  {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @copy_cst {
+  hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = "none"}>) {
+    hal.executable.export public @copy_cst ordinal(0) layout(#hal.pipeline.layout<push_constants = 10, sets = [<0, bindings = [<0, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2, %arg3, %arg4
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @copy_cst() {
+        %cst = arith.constant dense<4.200000e-01> : tensor<5x19x8x4xf32>
+        %c32_i64 = arith.constant 32 : i64
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = arith.extui %0 : i32 to i64
+        %3 = arith.extui %1 : i32 to i64
+        %4 = arith.shli %3, %c32_i64 : i64
+        %5 = arith.ori %2, %4 : i64
+        %6 = arith.index_castui %5 : i64 to index
+        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%6) : !flow.dispatch.tensor<writeonly:tensor<5x19x8x4xf32>>
+        flow.dispatch.tensor.store %cst, %7, offsets = [0, 0, 0, 0], sizes = [5, 19, 8, 4], strides = [1, 1, 1, 1] : tensor<5x19x8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<5x19x8x4xf32>>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<VMVXDefault>
+//      CHECK: hal.executable.export public @copy_cst
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
