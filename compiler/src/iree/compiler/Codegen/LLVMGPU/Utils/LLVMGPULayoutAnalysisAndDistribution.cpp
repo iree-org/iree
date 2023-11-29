@@ -1280,7 +1280,6 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
 
 void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
                                      func::FuncOp funcOp) {
-
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {
