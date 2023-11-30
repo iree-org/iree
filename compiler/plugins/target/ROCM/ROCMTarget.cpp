@@ -39,9 +39,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+namespace {
 struct ROCMOptions {
-  std::string targetChip;
-  bool linkBitcode;
+  std::string targetChip = "gfx908";
+  bool linkBitcode = false;
   std::string bitcodeDirectory;
 
   void bindOptions(OptionsBinder &binder) {
@@ -50,14 +51,13 @@ struct ROCMOptions {
         "iree-rocm-target-chip", targetChip, llvm::cl::cat(category),
         llvm::cl::desc("ROCm target Chip"), llvm::cl::init("gfx908"));
     binder.opt<bool>("iree-rocm-link-bc", linkBitcode, llvm::cl::cat(category),
-                     llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-                     llvm::cl::init(false));
-    binder.opt<std::string>(
-        "iree-rocm-bc-dir", bitcodeDirectory, llvm::cl::cat(category),
-        llvm::cl::desc("Directory of ROCM Bitcode"),
-        llvm::cl::init(mlir::iree_compiler::findPlatformLibDirectory("rocm")));
+                     llvm::cl::desc("Whether to try Linking to AMD Bitcodes"));
+    binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
+                            llvm::cl::cat(category),
+                            llvm::cl::desc("Directory of ROCM Bitcode"));
   }
 };
+} // namespace
 
 static std::string translateModuleToObj(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
@@ -89,7 +89,7 @@ static std::string translateModuleToISA(llvm::Module &module,
 
 class ROCMTargetBackend final : public TargetBackend {
 public:
-  ROCMTargetBackend(ROCMOptions options) : options_(std::move(options)) {}
+  ROCMTargetBackend(const ROCMOptions &options) : options(options) {}
 
   std::string name() const override { return "rocm"; }
 
@@ -175,7 +175,7 @@ public:
     buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
-  LogicalResult serializeExecutable(const SerializationOptions &options,
+  LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Perform the translation in a separate context to avoid any
@@ -260,12 +260,12 @@ public:
       opt.NoInfsFPMath = false;
       opt.NoNaNsFPMath = true;
       std::string features{""};
-      std::string subTarget = options_.targetChip.substr(0, 4);
+      std::string subTarget = options.targetChip.substr(0, 4);
       if (GFX9 == subTarget) {
         features = "+sramecc,-xnack";
       }
       targetMachine.reset(target->createTargetMachine(
-          triple.str(), options_.targetChip, features, opt,
+          triple.str(), options.targetChip, features, opt,
           llvm::Reloc::Model::PIC_, std::nullopt,
           llvm::CodeGenOptLevel::Aggressive));
 
@@ -283,15 +283,15 @@ public:
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
-    if (options_.linkBitcode) {
-      if (options_.bitcodeDirectory.empty()) {
+    if (options.linkBitcode) {
+      if (options.bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set --iree-rocm-bc-dir= "
                   "to an explicit location on your system.";
       }
-      linkROCDLIfNecessary(llvmModule.get(), options_.targetChip,
-                           options_.bitcodeDirectory);
+      linkROCDLIfNecessary(llvmModule.get(), options.targetChip,
+                           options.bitcodeDirectory);
     }
     // Add Optimize module
     optimizeModule(*llvmModule, *targetMachine);
@@ -299,7 +299,7 @@ public:
     // Serialize hsaco kernel into the binary that we will embed in the
     // final FlatBuffer.
     std::unique_ptr<llvm::Module> moduleCopy;
-    if (!options.dumpIntermediatesPath.empty()) {
+    if (!serOptions.dumpIntermediatesPath.empty()) {
       moduleCopy = llvm::CloneModule(*llvmModule);
       if (!moduleCopy) {
         llvm::errs() << "Error: cloning LLIR failed"
@@ -313,8 +313,8 @@ public:
       return failure();
     }
 
-    if (!options.dumpBinariesPath.empty()) {
-      dumpDataToPath(options.dumpBinariesPath, options.dumpBaseName,
+    if (!serOptions.dumpBinariesPath.empty()) {
+      dumpDataToPath(serOptions.dumpBinariesPath, serOptions.dumpBaseName,
                      variantOp.getName(), ".hsaco", targetHSACO);
     }
 
@@ -351,10 +351,10 @@ public:
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
 
-    if (!options.dumpIntermediatesPath.empty()) {
+    if (!serOptions.dumpIntermediatesPath.empty()) {
       std::string targetISA =
           translateModuleToISA(*moduleCopy.get(), *targetMachine);
-      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+      dumpDataToPath(serOptions.dumpIntermediatesPath, serOptions.dumpBaseName,
                      variantOp.getName(), ".rocmasm", targetISA);
     }
 
@@ -379,7 +379,7 @@ private:
       configItems.emplace_back(StringAttr::get(context, name), value);
     };
     // Set target arch
-    addConfig("target_arch", StringAttr::get(context, options_.targetChip));
+    addConfig("target_arch", StringAttr::get(context, options.targetChip));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(
@@ -387,13 +387,18 @@ private:
         configAttr);
   }
 
-  ROCMOptions options_;
+  const ROCMOptions &options;
 };
 
+namespace {
 struct ROCMSession
     : public PluginSession<ROCMSession, ROCMOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    if (options.bitcodeDirectory.empty()) {
+      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
+    }
+
     // #hal.device.target<"rocm", ...
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
@@ -406,6 +411,7 @@ struct ROCMSession
     });
   }
 };
+} // namespace
 
 } // namespace HAL
 } // namespace IREE
