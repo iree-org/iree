@@ -162,15 +162,31 @@ static std::string getOpNameWithoutDialectName(Operation *op) {
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   // Check if the body only contains a yield.
   bool hasOnlyYield = true;
-  op.walk([&](Operation *op) {
-    if (isa<linalg::YieldOp>(op))
+  op.walk([&](Operation *child) {
+    if (op == child || isa<linalg::YieldOp>(child))
       return WalkResult::advance();
     hasOnlyYield = false;
     return WalkResult::interrupt();
   });
 
-  if (hasOnlyYield) {
+  // Check if the indexing maps are only projected permutations.
+  bool hasOnlyPermutation = true;
+  bool hasOnlyIdentity = true;
+  for (AffineMap map : op.getIndexingMapsArray()) {
+    if (!map.isIdentity()) {
+      hasOnlyIdentity = false;
+    }
+    if (!map.isPermutation()) {
+      hasOnlyPermutation = false;
+    }
+  }
+
+  if (hasOnlyYield && hasOnlyIdentity) {
     return "slow_memcpy";
+  }
+
+  if (hasOnlyYield && hasOnlyPermutation) {
+    return "transpose";
   }
 
   auto opName = op->getName().getStringRef();
