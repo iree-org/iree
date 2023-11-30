@@ -24,10 +24,10 @@ made over time for specific vendors and architectures.
 
 GPU Vendor | Category | Performance | Focus Architecture
 :--------: | :------: | :---------: | :----------------:
-ARM Mali GPU | Mobile |  Good | Valhall
+ARM Mali GPU | Mobile |  Good | Valhall+
 Qualcomm Adreno GPU | Mobile | Reasonable | 640+
-AMD GPU | Desktop/server | Reasonable | -
-NVIDIA GPU | Desktop/server | Good | -
+AMD GPU | Desktop/server | Good | RDNA+
+NVIDIA GPU | Desktop/server | Good | Turing+
 
 ## :octicons-download-16: Prerequisites
 
@@ -191,19 +191,22 @@ iree-compile \
 ```
 
 !!! note
-    A target triple of the form `<vendor/arch>-<product>-<os>` is needed
-    to compile towards each GPU architecture. If no triple is specified then a safe
-    but more limited default will be used. We don't support the full spectrum
-    here[^1]; the following table summarizes the
-    currently recognized ones:
+    Currently a target triple of the form `<vendor/arch>-<product>-<os>` is needed
+    to compile towards a specific GPU architecture.
+    We don't support the full spectrum here[^1]; the following table summarizes the
+    currently recognized ones.
+    If no triple is specified, then a safe but more limited default will be used.
+    This is more of a mechanism to help us develop IREE itself--in the long term
+    we want to perform multiple targetting to generate to multiple architectures
+    if no target triple is given.
 
-| GPU Vendor          | Target Triple                    |
-| ------------------- | -------------------------------- |
-| ARM Mali GPU        | e.g., `valhall-g78-android30`    |
-| Qualcomm Adreno GPU | e.g., `adreno-unknown-android30` |
-| AMD GPU             | e.g., `rdna1-5700xt-linux`       |
-| NVIDIA GPU          | e..g, `ampere-rtx3080-windows`   |
-| SwiftShader CPU     | `cpu-swiftshader-unknown`        |
+| GPU Vendor          | Target Triple                                 |
+| ------------------- | --------------------------------------------- |
+| ARM Mali GPU        | e.g., `valhall-unknown-{android30|android31}` |
+| Qualcomm Adreno GPU | e.g., `adreno-unknown-{android30|android31}`  |
+| AMD GPU             | e.g., `{rdna1|rdna2|rdna3}-unknown-unknown`   |
+| NVIDIA GPU          | e..g, `{turing|ampere}-unknown-unknown`       |
+| SwiftShader CPU     | `cpu-swiftshader-unknown`                     |
 
 ### :octicons-terminal-16: Run a compiled program
 
