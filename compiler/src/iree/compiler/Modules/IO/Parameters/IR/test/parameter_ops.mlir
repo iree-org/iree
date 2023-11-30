@@ -13,17 +13,16 @@ func.func @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.
   // CHECK-SAME: affinity(%[[AFFINITY]])
   // CHECK-SAME: wait(%[[WAIT]])
   // CHECK-SAME: signal(%[[SIGNAL]])
-  // CHECK-SAME: source("scope"::"w0")[%[[OFFSET]]]
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable")
-  // CHECK-SAME: : !hal.buffer{%[[LENGTH]]}
+  // CHECK-NEXT: "scope"::"w0"[%[[OFFSET]]] : !hal.buffer{%[[LENGTH]]}
   %0 = io_parameters.load<%device : !hal.device>
       affinity(%affinity)
       wait(%wait)
       signal(%signal)
-      source("scope"::"w0")[%offset]
       type("DeviceVisible|DeviceLocal")
-      usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable")
-      : !hal.buffer{%length}
+      usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable") {
+        "scope"::"w0"[%offset] : !hal.buffer{%length}
+      }
   return
 }
