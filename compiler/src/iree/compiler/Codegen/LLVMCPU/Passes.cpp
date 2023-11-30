@@ -10,8 +10,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -36,6 +34,12 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
     llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU "
                    "before conversion to LLVM IR"),
     llvm::cl::init(true));
+
+static llvm::cl::opt<bool> clCheckLinalgVectorization(
+    "iree-llvmcpu-check-linalg-vectorization",
+    llvm::cl::desc(
+        "Runs the pass to check if all the Linalg ops are vectorized"),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool> clUseFastMinMaxOps(
     "iree-llvmcpu-use-fast-min-max-ops",
@@ -507,7 +511,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
-                                      bool enableMicrokernels) {
+                                      bool enableMicrokernels,
+                                      bool lowerToAVX2) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -534,8 +539,20 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   addCPUBufferizePasses(nestedModulePM);
 
   if (!enableMicrokernels) {
+    // Vector lowering of Mmt4d.
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
+
+    // Fold unit dims before vector lowering.
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeVectorTransferPass(/*flatten=*/false));
+
+    // Generic vector lowering.
+    LLVMCPUVectorLoweringPassOptions options;
+    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
+    options.splitVectorTransfersTo = "linalg-copy";
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
@@ -605,6 +622,10 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // Linalg -> SCF
   passManager.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  if (clCheckLinalgVectorization) {
+    passManager.addNestedPass<func::FuncOp>(
+        createLLVMCPUEmitVectorizationRemarksPass());
+  }
   passManager.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addPass(createConvertBf16ArithToF32Pass());
   passManager.addPass(createConvertBf16ToUInt16BuffersPass());

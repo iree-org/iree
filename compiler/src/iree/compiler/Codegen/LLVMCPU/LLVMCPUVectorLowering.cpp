@@ -110,6 +110,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   // TODO (dcaballe): We should run full canonicalization here.
   {
     RewritePatternSet patterns(ctx);
+    vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
+    vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
     vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }

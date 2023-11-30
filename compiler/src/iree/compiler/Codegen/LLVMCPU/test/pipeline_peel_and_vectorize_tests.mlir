@@ -1,6 +1,8 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' -split-input-file %s | FileCheck %s
 
-// Test peeling + vectorization using CPUDoubleTilingPeelingExpert.
+// Test peeling + vectorization using CPUDoubleTilingPeelingExpert. The tests in
+// this file are expected to preset lowering_config and translation_info on
+// dispatches.
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>

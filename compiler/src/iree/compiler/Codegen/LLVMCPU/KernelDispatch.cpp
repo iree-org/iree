@@ -875,19 +875,6 @@ static LogicalResult setMatmulNoPadRootConfig(
     VectorPreProcStrategy vecPreProcStrategy) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  // Iterate over the inner tile size tuples to check that their sizes divides
-  // the sizes of the iteration space.
-  for (auto tileSizeTuple :
-       llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
-    for (const auto &[idx, tileSize] : llvm::enumerate(tileSizeTuple)) {
-      // Quantized cases are not fully evaluated yet, so it might go with NoPad
-      // approach.
-      if (tileSize == 0 || shape[idx] == ShapedType::kDynamic)
-        continue;
-      assert(shape[idx] % tileSize == 0);
-      shape[idx] = tileSize;
-    }
-  }
 
   // The tiling for parallel dims and reduction dims are separated.
   const SmallVectorImpl<int64_t> &vecTileSizes = inputTileSizes.back();
@@ -1168,17 +1155,15 @@ setRootConfig(func::FuncOp entryPointFn,
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
-    SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
-    if (isBM) {
-      vectorSizeHints[0] = 1;
-    }
-    distTileSizes = getDefaultDistributedLevelTileSizes(
-        linalgOp, vecTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true, vectorSizeHints);
-  } else {
-    distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, vecTileSizes,
-                                                        maxTileSizes);
   }
+
+  SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
+  if (isBM) {
+    vectorSizeHints[0] = 1;
+  }
+  distTileSizes = getDefaultDistributedLevelTileSizes(
+      linalgOp, vecTileSizes, maxTileSizes,
+      /*allowIncompleteTile=*/true, vectorSizeHints);
 
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");

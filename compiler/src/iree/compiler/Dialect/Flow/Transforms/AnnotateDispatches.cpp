@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -208,7 +209,12 @@ static std::string summarizeDispatchRegion(Region &region) {
   Operation *bestOp = NULL;
   const int64_t kMinEstimatedCost = -1;
   int64_t bestEstimatedCost = kMinEstimatedCost;
+  // Collect TilingInterface ops for better heuristic names.
+  SmallVector<Operation *> tileableOps;
   region.walk([&](Operation *op) {
+    if (isa<TilingInterface>(op)) {
+      tileableOps.push_back(op);
+    }
     TypeSwitch<Operation *>(op)
         .Case<linalg::SoftmaxOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgSoftmaxOpCost(op);
@@ -228,19 +234,18 @@ static std::string summarizeDispatchRegion(Region &region) {
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
-        .Case<IREE::LinalgExt::SetEncodingOp, IREE::LinalgExt::UnsetEncodingOp>(
-            [&](auto op) {
-              // SetEncoding/UnsetEncoding is the bestOp only if there are no
-              // other operations.
-              int64_t estimatedCost = kMinEstimatedCost + 1;
-              if (estimatedCost < bestEstimatedCost)
-                return;
-              bestEstimatedCost = estimatedCost;
-              bestOp = op;
-              LLVM_DEBUG(llvm::dbgs()
-                         << "// new best op: '" << bestOp->getName()
-                         << "', cost: " << bestEstimatedCost << "\n");
-            })
+        .Case<IREE::LinalgExt::SetEncodingOp, IREE::LinalgExt::UnsetEncodingOp,
+              tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+          // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
+          // there are no other operations.
+          int64_t estimatedCost = kMinEstimatedCost + 1;
+          if (estimatedCost < bestEstimatedCost)
+            return;
+          bestEstimatedCost = estimatedCost;
+          bestOp = op;
+          LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
+                                  << "', cost: " << bestEstimatedCost << "\n");
+        })
         .Case<IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           int64_t estimatedCost = estimateLinalgExtOpCost(op);
           if (estimatedCost < bestEstimatedCost)
@@ -278,6 +283,10 @@ static std::string summarizeDispatchRegion(Region &region) {
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
       .Case<linalg::LinalgOp>(
           [&](auto op) { bestSummary = summarizeLinalgOp(op); })
+      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+        auto opName = getOpNameWithoutDialectName(op);
+        bestSummary = opName + "_" + operandTypeToString(op.getSource());
+      })
       .Case<IREE::LinalgExt::SetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = op.getResultType()
@@ -307,6 +316,19 @@ static std::string summarizeDispatchRegion(Region &region) {
         // No summarization implemented, default to the op's name.
         bestSummary = op->getName().getStringRef().str();
       });
+
+  // Add heuristic hint to dispatch name if the unpack op is the first op and
+  // the pack op is the last op.
+  if (!tileableOps.empty()) {
+    if (!isa<tensor::UnPackOp>(bestOp) &&
+        isa<tensor::UnPackOp>(tileableOps.front())) {
+      bestSummary = "unpack_" + bestSummary;
+    }
+    if (!isa<tensor::PackOp>(bestOp) &&
+        isa<tensor::PackOp>(tileableOps.back())) {
+      bestSummary = bestSummary + "_pack";
+    }
+  }
 
   // Sanitize the string so that it contains only C literal-compatible chars.
   bestSummary = sanitizeSymbolName(bestSummary);
