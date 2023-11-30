@@ -277,7 +277,7 @@ hal.executable private @matmul_static {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[49, 8, 0], [7, 4, 0], [0, 0, 60], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[28, 20, 0], [4, 4, 0], [0, 0, 60], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<Mmt4dTilingExpert>
 //       CHECK: hal.executable.export public @matmul_static
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
