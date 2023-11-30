@@ -3516,7 +3516,7 @@ made over time for specific vendors and architectures.</p>
 <td style="text-align: center;">ARM Mali GPU</td>
 <td style="text-align: center;">Mobile</td>
 <td style="text-align: center;">Good</td>
-<td style="text-align: center;">Valhall</td>
+<td style="text-align: center;">Valhall+</td>
 </tr>
 <tr>
 <td style="text-align: center;">Qualcomm Adreno GPU</td>
@@ -3527,14 +3527,14 @@ made over time for specific vendors and architectures.</p>
 <tr>
 <td style="text-align: center;">AMD GPU</td>
 <td style="text-align: center;">Desktop/server</td>
-<td style="text-align: center;">Reasonable</td>
-<td style="text-align: center;">-</td>
+<td style="text-align: center;">Good</td>
+<td style="text-align: center;">RDNA+</td>
 </tr>
 <tr>
 <td style="text-align: center;">NVIDIA GPU</td>
 <td style="text-align: center;">Desktop/server</td>
 <td style="text-align: center;">Good</td>
-<td style="text-align: center;">-</td>
+<td style="text-align: center;">Turing+</td>
 </tr>
 </tbody>
 </table>
@@ -3666,11 +3666,14 @@ command to compile with the <code>vulkan-spirv</code> target:</p>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>A target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
-to compile towards each GPU architecture. If no triple is specified then a safe
-but more limited default will be used. We don't support the full spectrum
-here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
-currently recognized ones:</p>
+<p>Currently a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
+to compile towards a specific GPU architecture.</p>
+<p>We don't support the full spectrum here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
+currently recognized ones.</p>
+<p>If no triple is specified, then a safe but more limited default will be used.</p>
+<p>This is more of a mechanism to help us develop IREE itself--in the long term
+we want to perform multiple targetting to generate to multiple architectures
+if no target triple is given.</p>
 </div>
 <table>
 <thead>
@@ -3682,19 +3685,19 @@ currently recognized ones:</p>
 <tbody>
 <tr>
 <td>ARM Mali GPU</td>
-<td>e.g., <code>valhall-g78-android30</code></td>
+<td>e.g. <code>valhall-unknown-{android30|android31}</code></td>
 </tr>
 <tr>
 <td>Qualcomm Adreno GPU</td>
-<td>e.g., <code>adreno-unknown-android30</code></td>
+<td>e.g. <code>adreno-unknown-{android30|android31}</code></td>
 </tr>
 <tr>
 <td>AMD GPU</td>
-<td>e.g., <code>rdna1-5700xt-linux</code></td>
+<td>e.g. <code>{rdna1|rdna2|rdna3}-unknown-unknown</code></td>
 </tr>
 <tr>
 <td>NVIDIA GPU</td>
-<td>e..g, <code>ampere-rtx3080-windows</code></td>
+<td>e.g. <code>{turing|ampere}-unknown-unknown</code></td>
 </tr>
 <tr>
 <td>SwiftShader CPU</td>
