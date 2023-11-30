@@ -3664,17 +3664,22 @@ command to compile with the <code>vulkan-spirv</code> target:</p>
 </span><span class="hll"><span class="w">    </span>--iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
 </span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_vulkan.vmfb
 </code></pre></div>
-<div class="admonition note">
+<div class="admonition note annotate">
 <p class="admonition-title">Note</p>
 <p>Currently a target triple of the form <code>&lt;vendor/arch&gt;-&lt;product&gt;-&lt;os&gt;</code> is needed
 to compile towards a specific GPU architecture.</p>
-<p>We don't support the full spectrum here<sup id="fnref:1"><a class="footnote-ref" href="#fn:1">1</a></sup>; the following table summarizes the
-currently recognized ones.</p>
+<p>We don't support the full spectrum here(1); the following table summarizes
+the currently recognized ones.</p>
 <p>If no triple is specified, then a safe but more limited default will be used.</p>
 <p>This is more of a mechanism to help us develop IREE itself--in the long term
 we want to perform multiple targetting to generate to multiple architectures
 if no target triple is given.</p>
 </div>
+<ol>
+<li>It's also impossible to capture all details of a Vulkan implementation
+   with a target triple, given the allowed variances on extensions, properties,
+   limits, etc. So the target triple is just an approximation for usage.</li>
+</ol>
 <table>
 <thead>
 <tr>
@@ -3722,17 +3727,6 @@ concrete values.</p>
 <!-- TODO(??): measuring performance -->
 
 <!-- TODO(??): troubleshooting -->
-
-<div class="footnote">
-<hr />
-<ol>
-<li id="fn:1">
-<p>It's also impossible to capture all details of a Vulkan implementation
-with a target triple, given the allowed variances on extensions, properties,
-limits, etc. So the target triple is just an approximation for usage.&#160;<a class="footnote-backref" href="#fnref:1" title="Jump back to footnote 1 in the text">&#8617;</a></p>
-</li>
-</ol>
-</div>
 
 
 
