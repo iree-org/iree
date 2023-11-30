@@ -24,6 +24,43 @@ py_binary(
 ##
 ###########################################################################
 
+# LLVMCPU, non-data-tiling, no microkernels
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    compiler_flags = [
+        "--iree-opt-data-tiling=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--acc_type=%s" % acc_type,
+        "--shapes=%s" % size,
+    ],
+    tags = [
+        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
+        "noriscv",
+        "nowasm",
+    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["default"] +
+                                   # Widening matmuls fail to lower for SVE.
+                                   (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for (lhs_rhs_type, acc_type) in [
+    ("i8", "i32"),
+    ("f32", "f32"),
+    ("f16", "f16"),
+    ("f16", "f32"),
+    # TODO(#15258): enable bf16 tests when that bug is fixed.
+    # ("bf16", "bf16"),
+    # ("bf16", "f32"),
+] for size in [
+    "small",
+    "large",
+]]
+
 X86_64_AVX2 = [
     "+avx",
     "+avx2",
@@ -47,9 +84,12 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     "+avx512bf16",
 ]
 
-# LLVMCPU, default.
+# LLVMCPU, data-tiling.
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_default_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    name = "e2e_matmul_dt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    compiler_flags = [
+        "--iree-opt-data-tiling",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
@@ -102,17 +142,19 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ("f32", "f32"),
     ("f16", "f16"),
     ("f16", "f32"),
-    ("bf16", "bf16"),
-    ("bf16", "f32"),
+    # TODO(#15258): enable bf16 tests when that bug is fixed.
+    # ("bf16", "bf16"),
+    # ("bf16", "f32"),
 ] for size in [
     "small",
     "large",
 ]]
 
-# LLVMCPU, microkernels.
+# LLVMCPU, data-tiling + microkernels.
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_default_uk_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    name = "e2e_matmul_dt_uk_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
+        "--iree-opt-data-tiling",
         "--iree-llvmcpu-enable-ukernels=all",
     ],
     generator = ":generate_e2e_matmul_tests",
@@ -169,43 +211,6 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ("f16", "f32"),
     ("bf16", "bf16"),
     ("bf16", "f32"),
-] for size in [
-    "small",
-    "large",
-]]
-
-# LLVMCPU, non-data-tiling, no microkernels
-[iree_generated_trace_runner_test(
-    name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
-    compiler_flags = [
-        "--iree-opt-data-tiling=false",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=%s" % lhs_rhs_type,
-        "--acc_type=%s" % acc_type,
-        "--shapes=%s" % size,
-    ],
-    tags = [
-        # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
-        "noriscv",
-        "nowasm",
-    ] if (lhs_rhs_type == "f16" or lhs_rhs_type == "bf16") else [],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    target_cpu_features_variants = ["default"] +
-                                   # Widening matmuls fail to lower for SVE.
-                                   (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
-) for (lhs_rhs_type, acc_type) in [
-    ("i8", "i32"),
-    ("f32", "f32"),
-    ("f16", "f16"),
-    ("f16", "f32"),
-    # TODO(#15258): enable bf16 tests when that bug is fixed.
-    # ("bf16", "bf16"),
-    # ("bf16", "f32"),
 ] for size in [
     "small",
     "large",
