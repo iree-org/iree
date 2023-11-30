@@ -1,10 +1,9 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))' -split-input-file %s | FileCheck %s
 
 // Test peeling + vectorization using CPUDoubleTilingPeelingExpert.
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -14,7 +13,7 @@
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
-    hal.executable.export @no_peel_static_matmul layout(#pipeline_layout) {
+    hal.executable.export @no_peel_static_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -34,7 +33,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:tensor<64x512xf32>> -> tensor<64x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<128x64xf32>, tensor<64x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
@@ -57,9 +56,8 @@ hal.executable private @preset_config_matmul  {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -69,7 +67,7 @@ hal.executable private @preset_config_matmul  {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
-    hal.executable.export @peel_static_matmul layout(#pipeline_layout) {
+    hal.executable.export @peel_static_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -89,7 +87,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:tensor<49x512xf32>> -> tensor<49x512xf32>
         %init = tensor.empty() : tensor<128x512xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<128x512xf32>) -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<128x49xf32>, tensor<49x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
@@ -124,9 +122,8 @@ hal.executable private @preset_config_matmul  {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -136,7 +133,7 @@ hal.executable private @preset_config_matmul  {
 ]>
 hal.executable private @preset_config_matmul  {
   hal.executable.variant @system_elf_x86_64 target(<"llvm-cpu", "system-elf-x86_64">) {
-    hal.executable.export @peel_dynamic_matmul layout(#pipeline_layout) {
+    hal.executable.export @peel_dynamic_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -162,7 +159,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2} -> tensor<?x?xf32>
         %init = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
             outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [%dim1, %dim2], strides = [1, 1]
@@ -205,9 +202,8 @@ hal.executable private @preset_config_matmul  {
 
 // -----
 
-#compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[0, 0, 0], [8, [32], 0], [0, 0, 1], [0, 0, 0]]>,
-    translation_info  = <CPUDoubleTilingPeelingExpert>>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [8, [32], 0], [0, 0, 1], [0, 0, 0]]>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -222,7 +218,7 @@ hal.executable private @preset_config_matmul  {
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
   }>) {
-    hal.executable.export @peel_scalable_matmul layout(#pipeline_layout) {
+    hal.executable.export @peel_scalable_matmul layout(#pipeline_layout) attributes {translation_info = #translation} {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
       hal.return %x, %y, %z : index, index, index
@@ -248,7 +244,7 @@ hal.executable private @preset_config_matmul  {
             : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%dim0, %dim2} -> tensor<?x?xf32>
         %init = tensor.empty(%dim1, %dim2) : tensor<?x?xf32>
         %fill = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-        %gemm = linalg.matmul {compilation_info = #compilation}
+        %gemm = linalg.matmul {lowering_config = #config}
             ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
             outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [%dim1, %dim2], strides = [1, 1]
@@ -279,5 +275,3 @@ hal.executable private @preset_config_matmul  {
 // CHECK:                   vector.fma
 
 // CHECK-NOT: scf.for
-
-

@@ -33,6 +33,7 @@ iree_cc_library(
     "PreprocessExecutables.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
+    "StripExecutableContents.cpp"
     "SubstituteExecutables.cpp"
     "TranslateExecutables.cpp"
     "VerifyTargetEnvironment.cpp"

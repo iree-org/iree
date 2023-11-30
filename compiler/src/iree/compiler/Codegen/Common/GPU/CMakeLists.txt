@@ -49,6 +49,7 @@ iree_cc_library(
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUGeneralizeNamedOps.cpp"
     "GPUMultiBuffering.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"

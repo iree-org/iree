@@ -133,7 +133,7 @@ static iree_status_t iree_vm_invoke_marshal_inputs(
         // TODO(benvanik): see if we can't remove this retain by instead relying
         // on the caller still owning the list.
         IREE_RETURN_IF_ERROR(
-            iree_vm_list_get_ref_retain(inputs, arg_i, (iree_vm_ref_t*)p));
+            iree_vm_list_get_ref_assign(inputs, arg_i, (iree_vm_ref_t*)p));
         p += sizeof(iree_vm_ref_t);
       } break;
     }

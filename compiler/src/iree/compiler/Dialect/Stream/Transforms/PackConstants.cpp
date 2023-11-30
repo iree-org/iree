@@ -275,26 +275,60 @@ static ParameterSlice getParameterSlice(Location loc, Attribute value,
   return ParameterSlice{parameterAttr, sourceOffset, sourceLength};
 }
 
-static TimepointResource
-buildParameterLoad(Location loc, Value awaitTimepoint,
-                   IREE::Stream::AffinityAttr affinityAttr, Type targetType,
-                   Value targetSize, const PackedSpan &packedSpan,
-                   IndexSet &indexSet, OpBuilder &builder) {
-  auto parameterSlice =
-      getParameterSlice(loc, packedSpan.slice.value, indexSet, builder);
+static Value buildParameterLoad(Value awaitTimepoint,
+                                IREE::Stream::AffinityAttr affinityAttr,
+                                Type targetType, StringAttr scope,
+                                ArrayRef<StorageResource *> storageResources,
+                                IndexSet &indexSet, OpBuilder &builder) {
+  SmallVector<Location> spanLocs;
+  SmallVector<Attribute> sourceKeys;
+  SmallVector<Value> sourceOffsets;
+  SmallVector<Type> targetTypes;
+  SmallVector<Value> targetLengths;
+  for (auto *storageResource : storageResources) {
+    assert(storageResource->spans.size() == 1 &&
+           "expected single span per resource for load");
+    for (auto &packedSpan : storageResource->spans) {
+      auto spanLoc = packedSpan.slice.result.getLoc();
+      auto parameterSlice =
+          getParameterSlice(spanLoc, packedSpan.slice.value, indexSet, builder);
+      spanLocs.push_back(spanLoc);
+      sourceKeys.push_back(parameterSlice.parameterAttr.getKey());
+      sourceOffsets.push_back(parameterSlice.sourceOffset);
+      targetTypes.push_back(targetType);
+      targetLengths.push_back(indexSet.get(packedSpan.length));
+    }
+  }
+
+  // Load all in a batch. One resource is returned per parameter but they may
+  // alias depending on the runtime implementation.
   auto loadOp = builder.create<IREE::Stream::ParameterLoadOp>(
-      loc, targetType, builder.getType<IREE::Stream::TimepointType>(),
-      parameterSlice.parameterAttr.getScope(),
-      parameterSlice.parameterAttr.getKey(), parameterSlice.sourceOffset,
-      parameterSlice.sourceLength, awaitTimepoint, affinityAttr);
-  return TimepointResource{loadOp.getResultTimepoint(), loadOp.getResult(),
-                           loadOp.getResultSize()};
+      builder.getFusedLoc(spanLocs), targetTypes,
+      builder.getType<IREE::Stream::TimepointType>(), scope,
+      builder.getArrayAttr(sourceKeys), sourceOffsets, targetLengths,
+      awaitTimepoint, affinityAttr);
+
+  // Slice out each span from the allocation.
+  // Note that access must be guarded by the final ready timepoint.
+  unsigned resultIndex = 0;
+  for (auto *storageResource : storageResources) {
+    for (auto &packedSpan : storageResource->spans) {
+      auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
+          packedSpan.slice.result.getLoc(), loadOp.getResult(resultIndex),
+          loadOp.getResultSize(resultIndex), indexSet.get(packedSpan.offset),
+          packedSpan.slice.resultSize);
+      packedSpan.slice.result.replaceAllUsesWith(subviewOp.getResult());
+      ++resultIndex;
+    }
+  }
+
+  return loadOp.getResultTimepoint();
 }
 
 static TimepointResource
 buildParameterGather(Location loc, Value awaitTimepoint,
                      IREE::Stream::AffinityAttr affinityAttr, Type targetType,
-                     Value targetSize, ArrayRef<PackedSpan> packedSpans,
+                     Value targetSize, MutableArrayRef<PackedSpan> packedSpans,
                      IndexSet &indexSet, OpBuilder &builder) {
   // Allocate the resulting storage resource of the final resource type.
   auto allocOp = builder.create<IREE::Stream::ResourceAllocOp>(
@@ -332,6 +366,16 @@ buildParameterGather(Location loc, Value awaitTimepoint,
         allocOp.getResultSize(0), targetOffsets, targetLengths, awaitTimepoint,
         affinityAttr);
     gatherTimepoints.push_back(gatherOp.getResultTimepoint());
+  }
+
+  // Slice out each span from the allocation.
+  // Note that access must be guarded by the final ready timepoint.
+  for (auto &packedSpan : packedSpans) {
+    auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
+        packedSpan.slice.result.getLoc(), allocOp.getResult(),
+        allocOp.getResultSize(0), indexSet.get(packedSpan.offset),
+        packedSpan.slice.resultSize);
+    packedSpan.slice.result.replaceAllUsesWith(subviewOp.getResult());
   }
 
   // Wait until all gathers have completed.
@@ -507,33 +551,40 @@ static Value generateParameterUpload(
   if (storageResources.empty())
     return nullptr;
 
-  // Emit the parameter loads or gathers for each unique resource.
-  SmallVector<Value> uploadTimepoints;
+  // Sort resources by type so we can batch them.
+  // Loads are only possible if we are using the parameter as a constant and
+  // it is a single span as we can't pack externally owned parameters.
+  // A batch of loads happens from a single source scope so we bucket here.
+  // Note that we do this separate from the walk above as we may pack parameters
+  // such that they have a single parameter per resource and introduce more that
+  // we can load than if just looking at the original pre-packed state.
+  llvm::MapVector<StringAttr, SmallVector<StorageResource *>> resourceLoads;
+  SmallVector<StorageResource *> resourceGathers;
   for (auto &storageResource : storageResources) {
-    // Parameter-backed resource that we can either load or gather.
-    // Loads are only possible if we are using the parameter as a constant and
-    // it is a single span as we can't pack externally owned parameters.
-    TimepointResource uploadedResource;
-    auto resourceSize = indexSet.get(storageResource.totalSize);
-    if (resourceType.getLifetime() == IREE::Stream::Lifetime::Constant &&
-        storageResource.spans.size() == 1) {
-      uploadedResource = buildParameterLoad(
-          storageResource.loc, awaitTimepoint, affinityAttr, resourceType,
-          resourceSize, storageResource.spans.front(), indexSet, builder);
+    if (storageResource.spans.size() == 1) {
+      auto parameterAttr = cast<IREE::Stream::NamedParameterAttr>(
+          storageResource.spans.front().slice.value);
+      resourceLoads[parameterAttr.getScope()].push_back(&storageResource);
     } else {
-      uploadedResource = buildParameterGather(
-          storageResource.loc, awaitTimepoint, affinityAttr, resourceType,
-          resourceSize, storageResource.spans, indexSet, builder);
+      resourceGathers.push_back(&storageResource);
     }
+  }
 
-    for (auto &span : storageResource.spans) {
-      auto loc = span.slice.result.getLoc();
-      auto subviewOp = builder.create<IREE::Stream::ResourceSubviewOp>(
-          loc, uploadedResource.resource, uploadedResource.resourceSize,
-          indexSet.get(span.offset), span.slice.resultSize);
-      span.slice.result.replaceAllUsesWith(subviewOp.getResult());
-    }
+  // Emit all loads as a single operation per scope.
+  SmallVector<Value> uploadTimepoints;
+  for (auto &[scope, scopeResources] : resourceLoads) {
+    uploadTimepoints.push_back(
+        buildParameterLoad(awaitTimepoint, affinityAttr, resourceType, scope,
+                           scopeResources, indexSet, builder));
+  }
 
+  // Emit gathers, of which there may be multiple batches based on the target
+  // resource as gathers are 1:1 per target.
+  for (auto *storageResource : resourceGathers) {
+    auto resourceSize = indexSet.get(storageResource->totalSize);
+    auto uploadedResource = buildParameterGather(
+        storageResource->loc, awaitTimepoint, affinityAttr, resourceType,
+        resourceSize, storageResource->spans, indexSet, builder);
     uploadTimepoints.push_back(uploadedResource.timepoint);
   }
 

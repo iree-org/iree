@@ -15,10 +15,10 @@ package(
 iree_runtime_cc_library(
     name = "gguf",
     srcs = [
-        "gguf_format.c",
+        "gguf_parser.c",
     ],
     hdrs = [
-        "gguf_format.h",
+        "gguf_parser.h",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -28,12 +28,10 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_test(
-    name = "gguf_format_test",
-    srcs = ["gguf_format_test.cc"],
-    tags = ["requires-filesystem"],
+    name = "gguf_parser_test",
+    srcs = ["gguf_parser_test.cc"],
     deps = [
         ":gguf",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/io/formats/gguf/testdata:gguf_files",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",

@@ -13,10 +13,6 @@ if(IREE_TARGET_BACKEND_LLVM_CPU)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
 endif()
-if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
-endif()
 if(IREE_TARGET_BACKEND_VMVX)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
@@ -72,6 +68,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::GlobalOptimization::Interfaces::Interfaces
     iree::compiler::InputConversion::Common
     iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect
     iree::compiler::Modules::HAL::Inline::Transforms

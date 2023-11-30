@@ -36,12 +36,10 @@ using IREE::HAL::ExecutableTargetAttr;
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
-  if (hasUkernel(target)) {
-    // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
-    // does not support batch_matmul atm.
-    if (user == EncodingUser::BATCH_MATMUL) {
-      return {};
-    }
+  // TODO(hanchung): The ukernel path does not support 3d
+  // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
+  // batch_matmul.
+  if (hasUkernel(target) && user != EncodingUser::BATCH_MATMUL) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};

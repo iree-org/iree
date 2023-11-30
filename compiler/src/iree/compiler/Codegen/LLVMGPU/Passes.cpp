@@ -598,6 +598,8 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 

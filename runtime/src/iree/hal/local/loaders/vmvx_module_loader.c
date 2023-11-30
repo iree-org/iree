@@ -501,11 +501,6 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
       .workgroup_count_z = dispatch_state->workgroup_count_z,
   };
 
-  // Call arguments are retained by the caller.
-  iree_vm_list_retain(binding_list);            // for call
-  iree_vm_buffer_retain(&local_memory_buffer);  // for call
-  iree_vm_buffer_retain(&constants_buffer);     // for call
-
   // VM stack stored on native stack. We really do abuse the stack too much
   // here but it's 8KB and that should be reasonable given that there isn't too
   // much above us in the stack.

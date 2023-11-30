@@ -190,6 +190,9 @@ findRootGenericOp(DispatchRegionOp regionOp) {
   // Check the yielded value is from a single `linalg.generic`.
   auto returnOp =
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  if (!returnOp->getOperands().size()) {
+    return failure();
+  }
   auto collapsibleOp = dyn_cast_or_null<linalg::GenericOp>(
       returnOp->getOperand(0).getDefiningOp());
   if (!collapsibleOp) {

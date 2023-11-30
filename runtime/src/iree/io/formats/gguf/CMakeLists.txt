@@ -14,9 +14,9 @@ iree_cc_library(
   NAME
     gguf
   HDRS
-    "gguf_format.h"
+    "gguf_parser.h"
   SRCS
-    "gguf_format.c"
+    "gguf_parser.c"
   DEPS
     iree::base
     iree::io::file_handle
@@ -26,17 +26,14 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
-    gguf_format_test
+    gguf_parser_test
   SRCS
-    "gguf_format_test.cc"
+    "gguf_parser_test.cc"
   DEPS
     ::gguf
-    iree::base::internal::file_io
     iree::io::formats::gguf::testdata::gguf_files
     iree::testing::gtest
     iree::testing::gtest_main
-  LABELS
-    "requires-filesystem"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

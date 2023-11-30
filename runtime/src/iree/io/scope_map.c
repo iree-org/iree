@@ -75,3 +75,13 @@ IREE_API_EXPORT iree_status_t iree_io_scope_map_lookup(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+IREE_API_EXPORT iree_status_t iree_io_scope_map_dump(
+    iree_io_scope_map_t* scope_map, iree_string_builder_t* builder) {
+  for (iree_host_size_t i = 0; i < scope_map->count; ++i) {
+    iree_string_view_t scope = scope_map->entries[i]->scope;
+    iree_io_parameter_index_t* index = scope_map->entries[i]->index;
+    IREE_RETURN_IF_ERROR(iree_io_parameter_index_dump(scope, index, builder));
+  }
+  return iree_ok_status();
+}

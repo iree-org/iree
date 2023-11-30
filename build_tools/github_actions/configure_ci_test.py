@@ -132,16 +132,14 @@ class ConfigureCITest(unittest.TestCase):
         self.assertIn(bad_text, msg)
 
     def test_parse_jobs_unknown_job(self):
-        unknown_job = "uknown_job"
+        unknown_job = "unknown_job"
         trailers = {"key": f"job1, {unknown_job}"}
         key = "key"
         all_jobs = {"job1", "job2", "job3"}
-        with self.assertRaises(ValueError) as cm:
-            configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
-
-        msg = str(cm.exception)
-        self.assertIn(unknown_job, msg)
-        self.assertIn("unknown", msg)
+        # Unknown jobs log a warning, as multiple workflows use configure_ci
+        # and a name may be recognized by one workflow and not another.
+        jobs = configure_ci.parse_jobs_trailer(trailers, key, all_jobs)
+        self.assertCountEqual(jobs, {"job1"})
 
     def test_get_enabled_jobs_all(self):
         trailers = {}

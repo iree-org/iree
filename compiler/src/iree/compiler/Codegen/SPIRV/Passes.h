@@ -99,10 +99,6 @@ createSPIRVEraseStorageBufferStaticShapePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
-// This pass generalizes named Linalg ops that are better off as generics.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVGeneralizeNamedOpsPass();
-
 /// Pass to set the lowering strategy for the target variant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVSelectLoweringStrategyPass();

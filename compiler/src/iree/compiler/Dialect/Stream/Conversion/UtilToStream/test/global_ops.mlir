@@ -50,6 +50,27 @@ func.func @initializedGlobal() {
 
 // -----
 
+//  CHECK-DAG: util.global private mutable @var_with_tensor_uninitialized : !stream.resource<variable>
+//  CHECK-DAG: util.global private mutable @var_with_tensor_uninitialized__size : index
+// CHECK-NEXT: util.initializer {
+// CHECK-NEXT:   %[[SIZE:.+]] = stream.tensor.sizeof tensor<4xf32>
+// CHECK-NEXT:   %[[EMPTY:.+]] = stream.tensor.empty : tensor<4xf32> in !stream.resource<variable>{%[[SIZE]]}
+//  CHECK-DAG:   util.global.store %[[EMPTY]], @var_with_tensor_uninitialized : !stream.resource<variable>
+//  CHECK-DAG:   util.global.store %[[SIZE]], @var_with_tensor_uninitialized__size : index
+util.global private mutable @var_with_tensor_uninitialized = #util.uninitialized : tensor<4xf32>
+// CHECK-LABEL: @uninitializedGlobalTensor
+func.func @uninitializedGlobalTensor() {
+  // CHECK-DAG: = util.global.load @var_with_tensor_uninitialized : !stream.resource<variable>
+  // CHECK-DAG: = util.global.load @var_with_tensor_uninitialized__size : index
+  %0 = util.global.load @var_with_tensor_uninitialized : tensor<4xf32>
+  // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_uninitialized : !stream.resource<variable>
+  // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_uninitialized__size : index
+  util.global.store %0, @var_with_tensor_uninitialized : tensor<4xf32>
+  return
+}
+
+// -----
+
 // Checks that the implicit cast allowing a buffer_view to store into a variable
 // that maps to a buffer is permitted.
 

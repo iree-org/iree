@@ -87,15 +87,16 @@ struct GlobalOpExpansion
     // Special handling of the initial value: if it's a tensor then we need to
     // materialize an initializer and initialization ops. This allows the
     // current conversion to pick up the expanded initialization ops.
-    auto initialValue = globalOp.getInitialValueAttr();
+    auto initialValueAttr = globalOp.getInitialValueAttr();
     bool tensorInitializerRequired =
-        initialValue ? llvm::isa<TensorType>(initialValue.getType()) : false;
+        initialValueAttr ? llvm::isa<TensorType>(initialValueAttr.getType())
+                         : false;
 
     // New global holding the initial value only if it is not a tensor type.
     auto resourceOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         globalOp, globalOp.getName(), globalOp.getIsMutable(), resourceType,
-        initialValue && !tensorInitializerRequired
-            ? std::optional<TypedAttr>{initialValue}
+        initialValueAttr && !tensorInitializerRequired
+            ? std::optional<TypedAttr>{initialValueAttr}
             : std::nullopt);
     resourceOp.setVisibility(globalOp.getVisibility());
 
@@ -119,17 +120,29 @@ struct GlobalOpExpansion
           rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
       rewriter.setInsertionPointToStart(entryBlock);
-      auto constantOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-          globalOp.getLoc(), resourceOp.getType(), initialValue,
-          TypeAttr::get(globalOp.getType()),
-          /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
-      auto constantSizeOp = rewriter.create<IREE::Stream::ResourceSizeOp>(
-          globalOp.getLoc(), indexType, constantOp.getResult());
+      Value initialValue, initialValueSize;
+      if (initialValueAttr.isa<IREE::Util::UninitializedAttr>()) {
+        initialValueSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
+            globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
+            /*result_encoding_dims=*/ValueRange{},
+            /*affinity=*/nullptr);
+        initialValue = rewriter.create<IREE::Stream::TensorEmptyOp>(
+            globalOp.getLoc(), resourceOp.getType(),
+            TypeAttr::get(globalOp.getType()),
+            /*result_encoding_dims=*/ValueRange{}, initialValueSize,
+            /*affinity=*/nullptr);
+      } else {
+        initialValue = rewriter.create<IREE::Stream::TensorConstantOp>(
+            globalOp.getLoc(), resourceOp.getType(), initialValueAttr,
+            TypeAttr::get(globalOp.getType()),
+            /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
+        initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
+            globalOp.getLoc(), indexType, initialValue);
+      }
       rewriter.create<IREE::Util::GlobalStoreOp>(
-          globalOp.getLoc(), constantOp.getResult(), resourceOp.getSymName());
-      rewriter.create<IREE::Util::GlobalStoreOp>(globalOp.getLoc(),
-                                                 constantSizeOp.getResult(),
-                                                 resourceSizeOp.getSymName());
+          globalOp.getLoc(), initialValue, resourceOp.getSymName());
+      rewriter.create<IREE::Util::GlobalStoreOp>(
+          globalOp.getLoc(), initialValueSize, resourceSizeOp.getSymName());
       rewriter.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
     }
 

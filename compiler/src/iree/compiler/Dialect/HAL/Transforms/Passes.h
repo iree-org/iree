@@ -114,6 +114,10 @@ createDumpExecutableSourcesPass(StringRef path, StringRef prefix = "");
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableBenchmarksPass(StringRef path);
 
+// Strips executable module contents for reducing IR size during debugging.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createStripExecutableContentsPass();
+
 // Substitutes hal.executable ops by parsing |substitutions| in
 // `executable_name=file.xxx` strings. File paths may be absolute or relative to
 // the paths specified on `--iree-hal-executable-object-search-path=`.
@@ -232,6 +236,7 @@ inline void registerHALPasses() {
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass(TargetBackendRegistry::getGlobal());
   createSerializeTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
+  createStripExecutableContentsPass();
   createSubstituteExecutablesPass();
   createTranslateExecutablesPass(TargetBackendRegistry::getGlobal());
   createTranslateTargetExecutableVariantsPass(

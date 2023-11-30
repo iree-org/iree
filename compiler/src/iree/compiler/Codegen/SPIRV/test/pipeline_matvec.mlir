@@ -89,20 +89,20 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 
 // Load the quantized weight and get 8xi4 out of it.
 //         CHECK:   spirv.Load "StorageBuffer" %{{.+}} : vector<4xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 1 : i32] %{{.*}} : vector<4xi32>, %{{.*}} : vector<4xi32> -> vector<2xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, {{.*}} : vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 1 : i32] %{{.*}}, %{{.*}}  : vector<4xi32>, vector<4xi32> -> vector<2xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, {{.*}} -> vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI320]] : vector<4xi32>
 //         CHECK:   spirv.ShiftRightLogical %{{.*}}, %[[CSTVEC4XI321]] : vector<4xi32>, vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI32]] : vector<4xi32>
 
-//         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %{{.*}} : vector<4xi32>, %{{.*}} : vector<4xi32> -> vector<2xi32>
+//         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %{{.*}}, %{{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 
 // CHECK-COUNT-2:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
 // CHECK-COUNT-2:   spirv.FSub %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-4:   spirv.FMul %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:   spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:   spirv.Bitcast %{{.+}} : vector<4xf16> to vector<2xi32>
-// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<2xi32> -> vector<4xi32>
+// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<4xi32>, vector<2xi32> -> vector<4xi32>
 
 //         CHECK:   spirv.mlir.merge
 
@@ -200,6 +200,7 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //     CHECK-DAG: %[[C2:.+]] = spirv.Constant 2 : i32
 //     CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
 //     CHECK-DAG: %[[CSTVEC4XI32:.+]] = spirv.Constant dense<255> : vector<4xi32>
+//     CHECK-DAG: %[[CSTVEC4ONE:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf16>
 //     CHECK-DAG: %[[CSTVEC4XI320:.+]] = spirv.Constant dense<[15, -16, 15, -16]> : vector<4xi32>
 //     CHECK-DAG: %[[CSTVEC4XI321:.+]] = spirv.Constant dense<[0, 4, 0, 4]> : vector<4xi32>
 
@@ -223,7 +224,7 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //         CHECK:   %[[ACCESS:.+]] = spirv.AccessChain %[[RADDR]][{{.*}}, %[[OFFSET]]] : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>, i32, i32
 //         CHECK:   spirv.Load "StorageBuffer" %[[ACCESS]] : i32
 
-//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, {{.*}} : vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, vector<2xi32> -> vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI320]] : vector<4xi32>
 //         CHECK:   spirv.ShiftRightLogical %{{.*}}, %[[CSTVEC4XI321]] : vector<4xi32>, vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI32]] : vector<4xi32>
@@ -235,15 +236,9 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 
 //         CHECK:   spirv.mlir.merge
 
-//         CHECK: %[[LD:.+]]   = spirv.Load "Function" {{.*}} : vector<4xf16>
-//         CHECK: %[[S0:.+]]   = spirv.CompositeExtract %[[LD]][0 : i32] : vector<4xf16>
-//         CHECK: %[[S1:.+]]   = spirv.CompositeExtract %[[LD]][1 : i32] : vector<4xf16>
-//         CHECK: %[[S2:.+]]   = spirv.CompositeExtract %[[LD]][2 : i32] : vector<4xf16>
-//         CHECK: %[[S3:.+]]   = spirv.CompositeExtract %[[LD]][3 : i32] : vector<4xf16>
-//         CHECK: %[[ADD0:.+]] = spirv.FAdd %[[S0]], %[[S1]] : f16
-//         CHECK: %[[ADD1:.+]] = spirv.FAdd %[[ADD0]], %[[S2]] : f16
-//         CHECK: %[[ADD2:.+]] = spirv.FAdd %[[ADD1]], %[[S3]] : f16
+//         CHECK: %[[LD:.+]] = spirv.Load "Function" {{.*}} : vector<4xf16>
+//         CHECK: %[[RES:.+]] = spirv.Dot %[[LD]], %[[CSTVEC4ONE]] : vector<4xf16> -> f16
 
-//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" %[[ADD2]] : f16
+//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" %[[RES]] : f16
 
 //         CHECK: spirv.mlir.selection

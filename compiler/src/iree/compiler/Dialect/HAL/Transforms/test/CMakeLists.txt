@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "memoize_device_queries.mlir"
     "preprocess_executables.mlir"
     "resolve_export_ordinals.mlir"
+    "strip_executable_contents.mlir"
     "substitute_executables.mlir"
     "verify_target_environment.mlir"
   TOOLS

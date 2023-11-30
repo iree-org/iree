@@ -5,7 +5,6 @@ tags:
   - Python
   - PyTorch
 icon: simple/pytorch
-status: new
 ---
 
 # PyTorch + IREE = :octicons-heart-16:
@@ -401,9 +400,9 @@ their values independently at runtime.
 | -- | -- |
 Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_advanced.ipynb)
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
-Unit tests | [`tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot)
+AOT unit tests | [`tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot)
 Dynamic MLP export | [`examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_dynamic.py)
-llama2 inference example | [`examples/llama2_inference/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/llama2_inference/stateless_llama.py)
+stateless llama2 | [`python/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/python/turbine_models/custom_models/stateless_llama.py)
 
 ## Alternate workflows
 

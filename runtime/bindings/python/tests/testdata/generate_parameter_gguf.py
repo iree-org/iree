@@ -22,10 +22,6 @@ def save_file(tensors, path):
     writer.add_architecture()
     writer.add_custom_alignment(64)
 
-    writer.add_uint32("metadata_uint32", 42)
-    writer.add_string("metadata_str", "hello")
-    writer.add_array("metadata_strs", ["a", "b", "c"])
-
     for key, value in tensors.items():
         writer.add_tensor(key, value)
 

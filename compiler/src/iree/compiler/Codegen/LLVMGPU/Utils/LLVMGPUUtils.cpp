@@ -334,8 +334,7 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp) {
     OpBuilder::InsertionGuard g(rewriter);
     Operation *op = transposeOp.getVector().getDefiningOp();
     rewriter.setInsertionPoint(op);
-    SmallVector<int64_t> perm;
-    transposeOp.getTransp(perm);
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
     SmallVector<Value> transposedOperands;
     for (auto operand : op->getOperands()) {
       Value transposed =

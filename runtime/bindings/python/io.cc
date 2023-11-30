@@ -14,8 +14,9 @@
 #include "./vm.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
-#include "iree/io/formats/gguf/gguf_format.h"
-#include "iree/io/formats/safetensors/safetensors_format.h"
+#include "iree/io/formats/gguf/gguf_parser.h"
+#include "iree/io/formats/irpa/irpa_parser.h"
+#include "iree/io/formats/safetensors/safetensors_parser.h"
 #include "iree/io/parameter_index_provider.h"
 #include "iree/modules/io/parameters/module.h"
 
@@ -101,13 +102,18 @@ void ParameterIndexParseFileHandle(ParameterIndex &self,
     CheckApiStatus(
         iree_io_parse_gguf_index(file_handle.raw_ptr(), self.raw_ptr()),
         "Could not parse gguf file into index");
+  } else if (format == "irpa") {
+    CheckApiStatus(
+        iree_io_parse_irpa_index(file_handle.raw_ptr(), self.raw_ptr()),
+        "Could not parse IREE parameter archive file into index");
   } else if (format == "safetensors") {
     CheckApiStatus(
         iree_io_parse_safetensors_index(file_handle.raw_ptr(), self.raw_ptr()),
         "Could not parse safetensors file into index");
   } else {
     throw std::invalid_argument(
-        "Unrecognized file format. Expected one of: 'gguf', 'safetensors'");
+        "Unrecognized file format. Expected one of: 'gguf', 'irpa', "
+        "'safetensors'");
   }
 }
 

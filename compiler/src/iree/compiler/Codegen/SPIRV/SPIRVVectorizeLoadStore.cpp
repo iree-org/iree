@@ -787,8 +787,8 @@ struct ScalarizeVectorTransferRead final
     if (vectorType.getRank() == 0) {
       Value maybeMaskBit;
       if (maybeMask) {
-        Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, zero);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
+                                                          ArrayRef<int64_t>{0});
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
@@ -821,17 +821,17 @@ struct ScalarizeVectorTransferRead final
     Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-
       // Extract the mask bit for this value if present.
       Value maybeMaskBit;
       if (maybeMask) {
         // The result vector is 1-D and we have a projected permutation, meaning
         // we can just extract the mask bit using the same index as the loaded
         // vector.
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, iVal);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
+                                                          ArrayRef<int64_t>{i});
       }
 
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
       auto thenCond = [&](OpBuilder &b, Location loc) {
         indices[dimPos] = b.create<affine::AffineApplyOp>(
             loc, addMap, ValueRange{oldIndex, iVal});
@@ -912,8 +912,8 @@ struct ScalarizeVectorTransferWrite final
 
       Value maybeMaskBit;
       if (maybeMask) {
-        Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, zero);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
+                                                          ArrayRef<int64_t>{0});
       }
 
       auto thenCond = [&](OpBuilder &b, Location loc) {
@@ -941,16 +941,16 @@ struct ScalarizeVectorTransferWrite final
     auto indices = llvm::to_vector(writeOp.getIndices());
     Value oldIndex = indices[dimPos];
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
-      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-
       Value maybeMaskBit;
       if (maybeMask) {
         // The result vector is 1-D and we have a projected permutation, meaning
         // we can just extract the mask bit using the same index as the written
         // vector.
-        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask, iVal);
+        maybeMaskBit = rewriter.create<vector::ExtractOp>(loc, maybeMask,
+                                                          ArrayRef<int64_t>{i});
       }
 
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
       auto thenCond = [&](OpBuilder &b, Location loc) {
         indices[dimPos] = b.create<affine::AffineApplyOp>(
             loc, addMap, ValueRange{oldIndex, iVal});

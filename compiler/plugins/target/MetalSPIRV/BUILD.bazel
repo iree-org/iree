@@ -1,0 +1,77 @@
+# Copyright 2020 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "hal_target_metal_spirv",
+    target = ":MetalSPIRV",
+)
+
+iree_compiler_cc_library(
+    name = "MetalSPIRV",
+    srcs = ["MetalSPIRVTarget.cpp"],
+    hdrs = ["MetalSPIRVTarget.h"],
+    deps = [
+        ":MSLToMetalLib",
+        ":MetalTargetPlatform",
+        ":SPIRVToMSL",
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/SPIRV",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/compiler/Utils",
+        "//runtime/src/iree/schemas:metal_executable_def_c_fbs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:TargetParser",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:VectorDialect",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "MetalTargetPlatform",
+    hdrs = ["MetalTargetPlatform.h"],
+)
+
+iree_compiler_cc_library(
+    name = "SPIRVToMSL",
+    srcs = [
+        "SPIRVToMSL.cpp",
+    ],
+    hdrs = ["SPIRVToMSL.h"],
+    deps = [
+        ":MetalTargetPlatform",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+        "@spirv_cross//:spirv_cross_lib",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "MSLToMetalLib",
+    srcs = [
+        "MSLToMetalLib.cpp",
+    ],
+    hdrs = ["MSLToMetalLib.h"],
+    deps = [
+        ":MetalTargetPlatform",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Support",
+    ],
+)

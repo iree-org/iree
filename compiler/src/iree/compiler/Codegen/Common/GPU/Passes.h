@@ -124,6 +124,9 @@ createWorkgroupSpecializationPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
+// This pass generalizes named Linalg ops that are better off as generics.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass();
+
 /// Register Common GPU passes.
 void registerCodegenCommonGPUPasses();
 

@@ -30,14 +30,16 @@ def OpGroupParameterOps : OpDocGroup {
 let opDocGroup = OpGroupParameterOps in {
 
 def IOParameters_LoadOp : IOParameters_Op<"load", [
+  AttrSizedOperandSegments,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads a parameter from a parameter scope}];
+  let summary = [{reads one or more parameters from a parameter scope}];
   let description = [{
-    Asynchronously reads a parameter from an external parameter provider and
-    returns the resulting buffer. Depending on the parameter and buffer types
-    this may alias existing cached storage or be directly mapped to the
-    parameter origin or result in a copy as if an allocate + read had been used.
+    Asynchronously reads one or more parameters from an external parameter
+    provider and returns the resulting buffers. Depending on the parameter and
+    buffer types this may alias existing cached storage or be directly mapped to
+    the parameter origin or result in a copy as if an allocate + read had been
+    used.
   }];
 
   let arguments = (ins
@@ -46,14 +48,14 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
     HAL_Fence:$wait_fence,
     HAL_Fence:$signal_fence,
     OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
-    I64:$source_offset,
+    StrArrayAttr:$source_keys,
+    Variadic<I64>:$source_offsets,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
-    HAL_DeviceSize:$length
+    Variadic<HAL_DeviceSize>:$lengths
   );
   let results = (outs
-    HAL_Buffer:$result
+    Variadic<HAL_Buffer>:$results
   );
 
   let assemblyFormat = [{
@@ -61,18 +63,22 @@ def IOParameters_LoadOp : IOParameters_Op<"load", [
     `affinity` `(` $queue_affinity `)`
     `wait` `(` $wait_fence `)`
     `signal` `(` $signal_fence `)`
-    `source` `(` custom<ParameterReference>($source_scope, $source_key) `)`
-    `` `[` $source_offset `]`
     `type` `(` $memory_types `)`
     `usage` `(` $buffer_usage `)`
-    `:` custom<SizeAwareType>(type($result), $length)
+    `{`
+    custom<ParameterLoadOperations>(
+        $source_scope, $source_keys, $source_offsets,
+        type($results), $lengths)
+    `}`
     attr-dict-with-keyword
   }];
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getLength(); }
+    Value getResultSize(unsigned idx) { return getLengths()[idx]; }
   }];
+
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }

@@ -19,6 +19,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -53,25 +54,28 @@ static llvm::cl::opt<bool> clDisableDistribution(
     llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(false));
 
-static llvm::cl::list<int> clMmt4dDistributionTileSizes(
-    "iree-codegen-llvm-mmt4d-distribution-tile-sizes",
-    llvm::cl::desc("linalg.mmt4d distribution tile size"),
-    llvm::cl::ZeroOrMore);
-
-static llvm::cl::list<int>
-    mmt4dL1TileSizes("iree-codegen-llvm-mmt4d-l1-tile-size",
-                     llvm::cl::desc("linalg.mmt4d L1 tile size"),
-                     llvm::cl::ZeroOrMore);
-
-static llvm::cl::list<int>
-    mmt4dVectorSizes("iree-codegen-llvm-mmt4d-vector-size",
-                     llvm::cl::desc("linalg.mmt4d vector tile size"),
-                     llvm::cl::ZeroOrMore);
-
 static llvm::cl::opt<int>
     defaultDistTileSize("iree-codegen-llvm-distribution-size",
                         llvm::cl::desc("default distribution tile size"),
                         llvm::cl::init(64));
+
+static llvm::cl::opt<int> clNarrowMatmulTileBytes(
+    "iree-codegen-llvm-narrow-matmul-tile-bytes",
+    llvm::cl::desc(
+        "target distribution tile size for wide matrix operand of narrow "
+        "matmuls, expressed in bytes. Currently only used in data-tiled "
+        "matmuls (mmt4d). Since this is only used for narrow matmuls, which "
+        "traverse their wide matrix operand once, there is no reuse here and "
+        "this doesn't have to be sized to fit in some CPU cache. This is more "
+        "about distributing work to threads."),
+    llvm::cl::init(64 * 1024));
+
+static llvm::cl::opt<int> clGeneralMatmulTileBytes(
+    "iree-codegen-llvm-general-matmul-tile-bytes",
+    llvm::cl::desc("target distribution tile size for matrix operands of "
+                   "general matmuls, expressed in bytes. Currently only used "
+                   "in data-tiled matmuls (mmt4d)."),
+    llvm::cl::init(64 * 1024));
 
 // TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
 // the previous snapshot.
@@ -871,19 +875,6 @@ static LogicalResult setMatmulNoPadRootConfig(
     VectorPreProcStrategy vecPreProcStrategy) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
-  // Iterate over the inner tile size tuples to check that their sizes divides
-  // the sizes of the iteration space.
-  for (auto tileSizeTuple :
-       llvm::make_range(inputTileSizes.begin(), inputTileSizes.end() - 1)) {
-    for (const auto &[idx, tileSize] : llvm::enumerate(tileSizeTuple)) {
-      // Quantized cases are not fully evaluated yet, so it might go with NoPad
-      // approach.
-      if (tileSize == 0 || shape[idx] == ShapedType::kDynamic)
-        continue;
-      assert(shape[idx] % tileSize == 0);
-      shape[idx] = tileSize;
-    }
-  }
 
   // The tiling for parallel dims and reduction dims are separated.
   const SmallVectorImpl<int64_t> &vecTileSizes = inputTileSizes.back();
@@ -1008,8 +999,8 @@ static void getDefaultMatmulVectorSizes(
 
   // Specialisation for SVE.
   if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr)) {
-    // Mark middle dimensions as scalable, so sizes are (8, [32], 16).
-    sizes.append({8, 32, 16});
+    // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
+    sizes.append({8, 16, 1});
     scalableSizeFlags.append({false, true, false});
     return;
   }
@@ -1164,17 +1155,15 @@ setRootConfig(func::FuncOp entryPointFn,
       maxTileSizes[0] = 192;
       maxTileSizes[1] = 128;
     }
-    SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
-    if (isBM) {
-      vectorSizeHints[0] = 1;
-    }
-    distTileSizes = getDefaultDistributedLevelTileSizes(
-        linalgOp, vecTileSizes, maxTileSizes,
-        /*allowIncompleteTile=*/true, vectorSizeHints);
-  } else {
-    distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, vecTileSizes,
-                                                        maxTileSizes);
   }
+
+  SmallVector<int64_t> vectorSizeHints(numLoops, vectorSize);
+  if (isBM) {
+    vectorSizeHints[0] = 1;
+  }
+  distTileSizes = getDefaultDistributedLevelTileSizes(
+      linalgOp, vecTileSizes, maxTileSizes,
+      /*allowIncompleteTile=*/true, vectorSizeHints);
 
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
@@ -1204,59 +1193,71 @@ setRootConfig(func::FuncOp entryPointFn,
                                   vecPreProcStrategy);
 }
 
-/// Sets the lowering configuration for dispatch region for linalg.mmt4d root
-/// op
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::Mmt4DOp mmt4dOp) {
-  assert(!getLoweringConfig(mmt4dOp) && "expected lowering_config is not set");
-
-  auto lhsShape = cast<ShapedType>(mmt4dOp.getInputs()[0].getType()).getShape();
-  auto rhsShape = cast<ShapedType>(mmt4dOp.getInputs()[1].getType()).getShape();
-  int M0 = lhsShape[2];
-  int N0 = rhsShape[2];
-  int K0 = lhsShape[3];
-
-  auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
-    if (!clMmt4dDistributionTileSizes.empty()) {
-      return SmallVector<int64_t>(clMmt4dDistributionTileSizes.begin(),
-                                  clMmt4dDistributionTileSizes.end());
-    }
-    unsigned numLoops = mmt4dOp.getNumLoops();
-    SmallVector<int64_t> minTileSizes(numLoops, 0);
-    SmallVector<int64_t> maxTileSizes(numLoops, 0);
-    minTileSizes[0] = minTileSizes[1] = 1;
-    // Scale default distribution tile size down because it is already in packed
-    // domain. With outer M dim size=X means that there will be `X * M0`
-    // elements to process. Same for N dimension.
-    maxTileSizes[0] = llvm::divideCeil(defaultDistTileSize, M0);
-    maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, N0);
-    SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-        mmt4dOp, minTileSizes, maxTileSizes);
-    return distTileSizes;
+static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
+  SmallVector<int64_t> minTileSizes(op.getNumLoops(), 0);
+  SmallVector<int64_t> maxTileSizes(op.getNumLoops(), 0);
+  Value lhs = op.getDpsInputs()[0];
+  Value rhs = op.getDpsInputs()[1];
+  ShapedType lhsType = cast<ShapedType>(lhs.getType());
+  ShapedType rhsType = cast<ShapedType>(rhs.getType());
+  int mmt4dDimBase = 0;
+  if (isa<linalg::BatchMmt4DOp>(op)) {
+    mmt4dDimBase = 1;
+    minTileSizes[0] = 1;
+    maxTileSizes[0] = 1; // Force batch dimension tile size 1.
+  }
+  minTileSizes[mmt4dDimBase + 0] = 1;
+  minTileSizes[mmt4dDimBase + 1] = 1;
+  auto lhsShape = lhsType.getShape();
+  auto rhsShape = rhsType.getShape();
+  int64_t M1 = lhsShape[mmt4dDimBase + 0];
+  int64_t N1 = rhsShape[mmt4dDimBase + 0];
+  int64_t K1 = lhsShape[mmt4dDimBase + 1];
+  int64_t M0 = lhsShape[mmt4dDimBase + 2];
+  int64_t N0 = rhsShape[mmt4dDimBase + 2];
+  int64_t K0 = lhsShape[mmt4dDimBase + 3];
+  // Unfortunately we have to compute some tile size at compile-time, even
+  // though that can't be done meaningfully in general, unless specializing the
+  // compilation to fine details of the runtime workload including number of
+  // threads and cache sizes. Another thing that we need to know and can't
+  // really know at compile time is the values of dynamic sizes. Here we have to
+  // guess a reasonable default for the reduction dimension size.
+  int64_t reductionSize = ShapedType::isDynamic(K1) ? 1024 : K0 * K1;
+  auto getMatmulTileSize = [](int64_t targetTileBytes, int bitWidth,
+                              int64_t reductionSize, int64_t Tile0Size) {
+    int64_t targetRhsTileElems = targetTileBytes * 8 / bitWidth;
+    int64_t targetRhsTileNSize = targetRhsTileElems / reductionSize;
+    return llvm::divideCeil(targetRhsTileNSize, Tile0Size);
   };
+  int64_t tileBytes =
+      (M1 == 1 || N1 == 1) ? clNarrowMatmulTileBytes : clGeneralMatmulTileBytes;
+  maxTileSizes[mmt4dDimBase + 0] =
+      M1 == 1 ? 1
+              : getMatmulTileSize(tileBytes, lhsType.getElementTypeBitWidth(),
+                                  reductionSize, M0);
+  maxTileSizes[mmt4dDimBase + 1] =
+      N1 == 1 ? 1
+              : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
+                                  reductionSize, N0);
 
-  auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
-    if (!mmt4dL1TileSizes.empty()) {
-      return SmallVector<int64_t>(mmt4dL1TileSizes.begin(),
-                                  mmt4dL1TileSizes.end());
-    }
-    return {1, 1, 1, M0, N0, K0};
-  };
-
-  SmallVector<int64_t> parallelTileSizes = getL1TileSizes();
+  SmallVector<int64_t> parallelTileSizes(op.getNumLoops(), 1);
+  assert(parallelTileSizes.size() == mmt4dDimBase + 6);
+  parallelTileSizes[mmt4dDimBase + 3] = M0;
+  parallelTileSizes[mmt4dDimBase + 4] = N0;
+  parallelTileSizes[mmt4dDimBase + 5] = K0;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(mmt4dOp.getOperation()),
-                                 parallelTileSizes, reductionTileSizes);
+  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
+  return {getDefaultDistributedLevelTileSizes(op, minTileSizes, maxTileSizes),
+          parallelTileSizes, reductionTileSizes};
+}
 
-  TileSizesListType tileSizes = {getDistTileSizes(), parallelTileSizes,
-                                 reductionTileSizes};
-
-  LLVM_DEBUG(KD_DBGS() << "Parallel tile sizes: " << parallelTileSizes << "\n");
-  LLVM_DEBUG(KD_DBGS() << "Reduction tile sizes: " << reductionTileSizes
-                       << "\n");
-
+/// Sets the lowering configuration for dispatch region for linalg.mmt4d
+/// root op
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   linalg::Mmt4DOp Mmt4dOp) {
+  assert(!getLoweringConfig(Mmt4dOp) && "expected lowering_config is not set");
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, mmt4dOp, tileSizes,
+      entryPointFn, Mmt4dOp, getMmt4dTileSizes(Mmt4dOp),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
@@ -1266,64 +1267,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    linalg::BatchMmt4DOp batchMmt4dOp) {
   assert(!getLoweringConfig(batchMmt4dOp) &&
          "expected lowering_config is not set");
-  auto lhsShape =
-      cast<ShapedType>(batchMmt4dOp.getInputs()[0].getType()).getShape();
-  auto rhsShape =
-      cast<ShapedType>(batchMmt4dOp.getInputs()[1].getType()).getShape();
-  int M0 = lhsShape[3];
-  int N0 = rhsShape[3];
-  int K0 = lhsShape[4];
-  auto getDistTileSizes = [&]() -> SmallVector<int64_t> {
-    if (!clMmt4dDistributionTileSizes.empty()) {
-      SmallVector<int64_t> tileSizes;
-      // If clMmt4dDistributionTileSizes is set, tile batch dim to 1 + the
-      // specified mmt4d tile sizes.
-      tileSizes.push_back(1);
-      tileSizes.append(clMmt4dDistributionTileSizes.begin(),
-                       clMmt4dDistributionTileSizes.end());
-      return tileSizes;
-    }
-    unsigned numLoops = batchMmt4dOp.getNumLoops();
-    SmallVector<int64_t> minTileSizes(numLoops, 0);
-    SmallVector<int64_t> maxTileSizes(numLoops, 0);
-    minTileSizes[0] = maxTileSizes[0] = 1; // Force batch dim being 1.
-    minTileSizes[1] = minTileSizes[2] = 1;
-    // Scale default distribution tile size down because it is already in packed
-    // domain. With outer M dim size=X means that there will be `X * M0`
-    // elements to process. Same for N dimension.
-    maxTileSizes[1] = llvm::divideCeil(defaultDistTileSize, M0);
-    maxTileSizes[2] = llvm::divideCeil(defaultDistTileSize, N0);
-    SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-        batchMmt4dOp, minTileSizes, maxTileSizes);
-    return distTileSizes;
-  };
-
-  auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
-    SmallVector<int64_t> tileSizes;
-    // Tile batch dim to 1
-    tileSizes.push_back(1);
-
-    // If mmt4dL1TileSizes is set, use them as mmt4d L1 tile sizes.
-    if (!mmt4dL1TileSizes.empty()) {
-      tileSizes.append(mmt4dL1TileSizes.begin(), mmt4dL1TileSizes.end());
-      return tileSizes;
-    }
-
-    tileSizes.append({1, 1, 1, M0, N0, K0});
-    return tileSizes;
-  };
-
-  SmallVector<int64_t> parallelTileSizes = getL1TileSizes();
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(
-      cast<linalg::LinalgOp>(batchMmt4dOp.getOperation()), parallelTileSizes,
-      reductionTileSizes);
-
-  TileSizesListType tileSizes = {getDistTileSizes(), parallelTileSizes,
-                                 reductionTileSizes};
-
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, batchMmt4dOp, tileSizes,
+      entryPointFn, batchMmt4dOp, getMmt4dTileSizes(batchMmt4dOp),
       DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
