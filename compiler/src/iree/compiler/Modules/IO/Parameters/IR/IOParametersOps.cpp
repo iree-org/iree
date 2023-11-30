@@ -56,8 +56,94 @@ static void printParameterReference(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<ParameterLoadOperations>(
+//     $source_scope, $source_keys, $source_offsets,
+//     type($results), $result_sizes)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseParameterLoadOperations(
+    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> sourceKeyAttrs;
+  do {
+    StringAttr rowSourceScopeAttr;
+    StringAttr sourceKeyAttr;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    Type resultType;
+    OpAsmParser::UnresolvedOperand resultSize;
+    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
+                                       sourceKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(resultType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(resultSize)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    if (!sourceScopeAttr) {
+      sourceScopeAttr = rowSourceScopeAttr;
+    } else if (rowSourceScopeAttr != sourceScopeAttr) {
+      return parser.emitError(parser.getCurrentLocation(),
+                              "each operation must use the same scope");
+    }
+    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceOffsets.push_back(sourceOffset);
+    resultTypes.push_back(resultType);
+    resultSizes.push_back(resultSize);
+  } while (succeeded(parser.parseOptionalComma()));
+  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
+  return success();
+}
+
+static void printParameterLoadOperations(OpAsmPrinter &p, Operation *op,
+                                         StringAttr sourceScopeAttr,
+                                         ArrayAttr sourceKeysAttr,
+                                         ValueRange sourceOffsets,
+                                         TypeRange resultTypes,
+                                         ValueRange resultSizes) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
+                      resultTypes, resultSizes),
+      [&](std::tuple<StringAttr, Value, Type, Value> it) {
+        auto [sourceKeyAttr, sourceOffset, resultType, resultSize] = it;
+        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << "] : ";
+        p.printType(resultType);
+        p << "{";
+        p.printOperand(resultSize);
+        p << "}";
+      },
+      [&]() {
+        p << ',';
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // io_parameters.load
 //===----------------------------------------------------------------------===//
+
+LogicalResult LoadOp::verify() {
+  LoadOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getLengths().size() != expectedCount) {
+    return op.emitOpError() << "requires that the source keys, source offsets, "
+                               "and result sizes are all 1:1";
+  }
+  return success();
+}
 
 void LoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *context) {

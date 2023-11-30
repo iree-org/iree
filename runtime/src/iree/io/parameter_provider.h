@@ -74,9 +74,34 @@ iree_io_parameter_provider_notify(iree_io_parameter_provider_t* provider,
 IREE_API_EXPORT bool iree_io_parameter_provider_query_support(
     iree_io_parameter_provider_t* provider, iree_string_view_t scope);
 
-// Loads a parameter from |provider| for use on |device|.
-// |source_scope| and |source_key| define the parameter and |target_params|
-// defines how the buffer is to be allocated.
+typedef iree_status_t(IREE_API_PTR* iree_io_parameter_enumerator_fn_t)(
+    void* user_data, iree_host_size_t i, iree_string_view_t* out_key,
+    iree_io_parameter_span_t* out_span);
+
+typedef struct iree_io_parameter_enumerator_t {
+  // Callback function pointer.
+  iree_io_parameter_enumerator_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_io_parameter_enumerator_t;
+
+typedef iree_status_t(IREE_API_PTR* iree_io_parameter_emitter_fn_t)(
+    void* user_data, iree_host_size_t i, iree_hal_buffer_t* buffer);
+
+typedef struct iree_io_parameter_emitter_t {
+  // Callback function pointer.
+  iree_io_parameter_emitter_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_io_parameter_emitter_t;
+
+// Loads zero or more spans from |provider| into buffers for use on |device|.
+// The |enumerator| defines the source keys in |source_scope| and the offset and
+// length in the resulting buffer of each span. Multiple spans may reference the
+// same source parameter but behavior is undefined if multiple span target
+// ranges overlap. The provided |target_emitter| will be called for each
+// parameter and pass back the buffer backing the parameter (possibly a
+// subspan of a larger shared allocation).
 //
 // If the implementation is able to meet the expected |target_params| with an
 // existing buffer it may be returned without a new allocation. If access allows
@@ -84,18 +109,19 @@ IREE_API_EXPORT bool iree_io_parameter_provider_query_support(
 // other users within the same process or across processes.
 //
 // Implementations that have no optimized load/import path can implement this
-// with iree_hal_device_queue_alloca and iree_io_parameter_provider_read.
+// with a series of iree_hal_device_queue_alloca and
+// iree_io_parameter_provider_gather ops. Note that in such a case multiple
+// results may have the same underlying storage buffer.
 //
-// Returns IREE_STATUS_NOT_FOUND if the parameter is not found.
+// Returns IREE_STATUS_NOT_FOUND if any parameter is not found.
 IREE_API_EXPORT iree_status_t iree_io_parameter_provider_load(
     iree_io_parameter_provider_t* provider, iree_hal_device_t* device,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
-    iree_string_view_t source_scope, iree_string_view_t source_key,
-    uint64_t source_offset, iree_hal_buffer_params_t target_params,
-    iree_device_size_t length,
-    iree_hal_buffer_t** IREE_RESTRICT out_target_buffer);
+    iree_string_view_t source_scope, iree_hal_buffer_params_t target_params,
+    iree_host_size_t count, iree_io_parameter_enumerator_t enumerator,
+    iree_io_parameter_emitter_t emitter);
 
 // Reads a parameter from |provider| for use on |device|.
 // |source_scope| and |source_key| define the parameter to be read into
@@ -124,17 +150,6 @@ IREE_API_EXPORT iree_status_t iree_io_parameter_provider_write(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_string_view_t target_scope, iree_string_view_t target_key,
     uint64_t target_offset, iree_device_size_t length);
-
-typedef iree_status_t(IREE_API_PTR* iree_io_parameter_enumerator_fn_t)(
-    void* user_data, iree_host_size_t i, iree_string_view_t* out_key,
-    iree_io_parameter_span_t* out_span);
-
-typedef struct iree_io_parameter_enumerator_t {
-  // Callback function pointer.
-  iree_io_parameter_enumerator_fn_t fn;
-  // User data passed to the callback function. Unowned.
-  void* user_data;
-} iree_io_parameter_enumerator_t;
 
 // Gathers zero or more spans from |provider| into the given |target_buffer|.
 // The |enumerator| defines the source keys in |source_scope| and the offset and
@@ -186,28 +201,9 @@ typedef struct iree_io_parameter_provider_vtable_t {
       iree_hal_queue_affinity_t queue_affinity,
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_string_view_t source_scope, iree_string_view_t source_key,
-      uint64_t source_offset, iree_hal_buffer_params_t target_params,
-      iree_device_size_t length,
-      iree_hal_buffer_t** IREE_RESTRICT out_target_buffer);
-
-  iree_status_t(IREE_API_PTR* read)(
-      iree_io_parameter_provider_t* provider, iree_hal_device_t* device,
-      iree_hal_queue_affinity_t queue_affinity,
-      const iree_hal_semaphore_list_t wait_semaphore_list,
-      const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_string_view_t source_scope, iree_string_view_t source_key,
-      uint64_t source_offset, iree_hal_buffer_t* target_buffer,
-      iree_device_size_t target_offset, iree_device_size_t length);
-
-  iree_status_t(IREE_API_PTR* write)(
-      iree_io_parameter_provider_t* provider, iree_hal_device_t* device,
-      iree_hal_queue_affinity_t queue_affinity,
-      const iree_hal_semaphore_list_t wait_semaphore_list,
-      const iree_hal_semaphore_list_t signal_semaphore_list,
-      iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
-      iree_string_view_t target_scope, iree_string_view_t target_key,
-      uint64_t target_offset, iree_device_size_t length);
+      iree_string_view_t source_scope, iree_hal_buffer_params_t target_params,
+      iree_host_size_t count, iree_io_parameter_enumerator_t enumerator,
+      iree_io_parameter_emitter_t emitter);
 
   iree_status_t(IREE_API_PTR* gather)(
       iree_io_parameter_provider_t* provider, iree_hal_device_t* device,
