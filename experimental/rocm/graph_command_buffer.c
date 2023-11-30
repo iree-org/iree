@@ -19,6 +19,10 @@
 #include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
+// The maximal number of ROCM graph nodes that can run concurrently between
+// barriers.
+#define IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT 32
+
 #define IREE_HAL_ROCM_MAX_BINDING_COUNT 64
 // Kernel arguments contains binding and push constants.
 #define IREE_HAL_ROCM_MAX_KERNEL_ARG 128
@@ -39,12 +43,15 @@ typedef struct iree_hal_rocm_graph_command_buffer_t {
   // asynchronous operations.
   iree_arena_allocator_t arena;
 
-  hipGraph_t graph;
-  hipGraphExec_t exec;
+  hipGraph_t hip_graph;
+  hipGraphExec_t hip_graph_exec;
 
-  // Keep track of the last node added to the command buffer as we are currently
-  // serializing all the nodes (each node depends on the previous one).
-  hipGraphNode_t last_node;
+  // A node acting as a barrier for all commands added to the command buffer.
+  hipGraphNode_t hip_barrier_node;
+
+  // Nodes added to the command buffer after the last barrier.
+  hipGraphNode_t hip_graph_nodes[IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT];
+  iree_host_size_t graph_node_count;
 
   // Iteratively constructed batch of collective operations.
   iree_hal_collective_batch_t collective_batch;
@@ -96,10 +103,10 @@ iree_status_t iree_hal_rocm_graph_command_buffer_create(
         &iree_hal_rocm_graph_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     iree_arena_initialize(block_pool, &command_buffer->arena);
-    command_buffer->graph = NULL;
-    command_buffer->exec = NULL;
-    command_buffer->last_node = NULL;
-
+    command_buffer->hip_graph = NULL;
+    command_buffer->hip_graph_exec = NULL;
+    command_buffer->hip_barrier_node = NULL;
+    command_buffer->graph_node_count = 0;
     hipDeviceptr_t* device_ptrs =
         (hipDeviceptr_t*)(command_buffer->current_descriptor +
                           IREE_HAL_ROCM_MAX_KERNEL_ARG);
@@ -134,17 +141,18 @@ static void iree_hal_rocm_graph_command_buffer_destroy(
   // Drop any pending collective batches before we tear things down.
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
 
-  if (command_buffer->graph != NULL) {
+  if (command_buffer->hip_graph != NULL) {
     ROCM_IGNORE_ERROR(command_buffer->context->syms,
-                      hipGraphDestroy(command_buffer->graph));
-    command_buffer->graph = NULL;
+                      hipGraphDestroy(command_buffer->hip_graph));
+    command_buffer->hip_graph = NULL;
   }
-  if (command_buffer->exec != NULL) {
+  if (command_buffer->hip_graph_exec != NULL) {
     ROCM_IGNORE_ERROR(command_buffer->context->syms,
-                      hipGraphExecDestroy(command_buffer->exec));
-    command_buffer->exec = NULL;
+                      hipGraphExecDestroy(command_buffer->hip_graph_exec));
+    command_buffer->hip_graph_exec = NULL;
   }
-  command_buffer->last_node = NULL;
+  command_buffer->hip_barrier_node = NULL;
+  command_buffer->graph_node_count = 0;
 
   iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -159,7 +167,7 @@ hipGraphExec_t iree_hal_rocm_graph_command_buffer_handle(
   if (!iree_hal_rocm_graph_command_buffer_isa(base_command_buffer)) return NULL;
   iree_hal_rocm_graph_command_buffer_t* command_buffer =
       iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
-  return command_buffer->exec;
+  return command_buffer->hip_graph_exec;
 }
 
 bool iree_hal_rocm_graph_command_buffer_isa(
@@ -215,14 +223,14 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_begin(
       iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
 
   // Fail if re-recording.
-  if (command_buffer->graph != NULL) {
+  if (command_buffer->hip_graph != NULL) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer cannot be re-recorded");
   }
 
   // Create a new empty graph to record into.
   ROCM_RETURN_IF_ERROR(command_buffer->context->syms,
-                       hipGraphCreate(&command_buffer->graph, /*flags=*/0),
+                       hipGraphCreate(&command_buffer->hip_graph, /*flags=*/0),
                        "hipGraphCreate");
 
   return iree_ok_status();
@@ -238,21 +246,22 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_end(
       iree_hal_rocm_graph_command_buffer_flush_collectives(command_buffer));
 
   // Reset state used during recording.
-  command_buffer->last_node = NULL;
+  command_buffer->hip_barrier_node = NULL;
+  command_buffer->graph_node_count = 0;
 
   // Compile the graph.
   hipGraphNode_t error_node = NULL;
   iree_status_t status = ROCM_RESULT_TO_STATUS(
       command_buffer->context->syms,
-      hipGraphInstantiate(&command_buffer->exec, command_buffer->graph,
-                          &error_node,
+      hipGraphInstantiate(&command_buffer->hip_graph_exec,
+                          command_buffer->hip_graph, &error_node,
                           /*logBuffer=*/NULL,
                           /*bufferSize=*/0));
   if (iree_status_is_ok(status)) {
     // No longer need the source graph used for construction.
     ROCM_IGNORE_ERROR(command_buffer->context->syms,
-                      hipGraphDestroy(command_buffer->graph));
-    command_buffer->graph = NULL;
+                      hipGraphDestroy(command_buffer->hip_graph));
+    command_buffer->hip_graph = NULL;
   }
 
   iree_hal_resource_set_freeze(command_buffer->resource_set);
@@ -283,12 +292,32 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_execution_barrier(
     const iree_hal_buffer_barrier_t* buffer_barriers) {
   iree_hal_rocm_graph_command_buffer_t* command_buffer =
       iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   IREE_RETURN_IF_ERROR(
       iree_hal_rocm_graph_command_buffer_flush_collectives(command_buffer));
 
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
+  IREE_ASSERT_GT(command_buffer->graph_node_count, 0,
+                 "expected at least one node before a barrier");
 
+  // Use the last node as a barrier to avoid creating redundant empty nodes.
+  if (IREE_LIKELY(command_buffer->graph_node_count == 1)) {
+    command_buffer->hip_barrier_node = command_buffer->hip_graph_nodes[0];
+    command_buffer->graph_node_count = 0;
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  ROCM_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->context->syms,
+      hipGraphAddEmptyNode(
+          &command_buffer->hip_barrier_node, command_buffer->hip_graph,
+          command_buffer->hip_graph_nodes, command_buffer->graph_node_count),
+      "hipGraphAddEmptyNode");
+
+  command_buffer->graph_node_count = 0;
+
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -395,13 +424,19 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_fill_buffer(
       .height = 1,
       .value = dword_pattern,
   };
-  // Serialize all the nodes for now.
-  hipGraphNode_t dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
+
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipGraphAddMemsetNode(&command_buffer->last_node, command_buffer->graph,
-                            dep, numNode, &params),
+      hipGraphAddMemsetNode(
+          &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
+          dependency_count, &params),
       "hipGraphAddMemsetNode");
 
   return iree_ok_status();
@@ -437,15 +472,20 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_update_buffer(
       (hipDeviceptr_t)((uintptr_t)target_device_buffer +
                        iree_hal_buffer_byte_offset(target_buffer) +
                        target_offset);
-  // Serialize all the nodes for now.
-  hipGraphNode_t dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
 
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
+
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipGraphAddMemcpyNode1D(&command_buffer->last_node, command_buffer->graph,
-                              dep, numNode, dst, storage, length,
-                              hipMemcpyHostToDevice),
+      hipGraphAddMemcpyNode1D(
+          &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
+          dependency_count, dst, storage, length, hipMemcpyHostToDevice),
       "hipGraphAddMemcpyNode1D");
 
   return iree_ok_status();
@@ -481,15 +521,19 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_copy_buffer(
                        iree_hal_buffer_byte_offset(target_buffer) +
                        target_offset);
 
-  // Serialize all the nodes for now.
-  hipGraphNode_t dep[] = {command_buffer->last_node};
-  size_t numNode = command_buffer->last_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipGraphAddMemcpyNode1D(&command_buffer->last_node, command_buffer->graph,
-                              dep, numNode, dst, src, length,
-                              hipMemcpyDeviceToDevice),
+      hipGraphAddMemcpyNode1D(
+          &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
+          dependency_count, dst, src, length, hipMemcpyDeviceToDevice),
       "hipGraphAddMemcpyNode1D");
 
   return iree_ok_status();
@@ -632,14 +676,19 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_dispatch(
       .sharedMemBytes = kernel_params.shared_memory_size,
   };
 
-  // Serialize all the nodes for now.
-  hipGraphNode_t dep[] = {command_buffer->last_node};
-  size_t numNodes = command_buffer->last_node ? 1 : 0;
+  if (command_buffer->graph_node_count >=
+      IREE_HAL_ROCM_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "exceeded max concurrent node limit");
+  }
 
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   ROCM_RETURN_IF_ERROR(
       command_buffer->context->syms,
-      hipGraphAddKernelNode(&command_buffer->last_node, command_buffer->graph,
-                            dep, numNodes, &params),
+      hipGraphAddKernelNode(
+          &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
+          dependency_count, &params),
       "hipGraphAddKernelNode");
 
   return iree_ok_status();
@@ -691,6 +740,5 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_rocm_graph_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_rocm_graph_command_buffer_dispatch_indirect,
-        .execute_commands = 
-            iree_hal_rocm_graph_command_buffer_execute_commands,
+        .execute_commands = iree_hal_rocm_graph_command_buffer_execute_commands,
 };

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "hip/hip_runtime_api.h"
 RC_PFN_DECL(hipCtxCreate, hipCtx_t *, unsigned int, hipDevice_t)
 RC_PFN_DECL(hipCtxDestroy, hipCtx_t)
 RC_PFN_DECL(hipDeviceGet, hipDevice_t *, int)  // No direct, need to modify
@@ -63,6 +64,7 @@ RC_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
 RC_PFN_DECL(hipDevicePrimaryCtxRelease, hipDevice_t)
 RC_PFN_DECL(hipGraphDestroy, hipGraph_t)
 RC_PFN_DECL(hipGraphExecDestroy, hipGraphExec_t)
+RC_PFN_DECL(hipGraphAddEmptyNode, hipGraphNode_t *, hipGraph_t, const hipGraphNode_t *, size_t)
 RC_PFN_DECL(hipGraphAddMemsetNode, hipGraphNode_t *, hipGraph_t, const hipGraphNode_t *, size_t, const hipMemsetParams *)
 RC_PFN_DECL(hipGraphAddMemcpyNode1D, hipGraphNode_t *, hipGraph_t, const hipGraphNode_t *, size_t, void *, const void *, size_t, hipMemcpyKind)
 RC_PFN_DECL(hipGraphAddKernelNode, hipGraphNode_t *, hipGraph_t, const hipGraphNode_t *, size_t, const hipKernelNodeParams *)
