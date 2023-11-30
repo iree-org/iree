@@ -266,24 +266,3 @@ flow.executable private @ex {
     }
   }
 }
-
-// ------
-
-// Dispatch with only a yield and having indexing_maps only as identity is a slow_memcpy.
-
-flow.executable private @ex {
-  // CHECK: flow.executable.export public @dispatch_slow_memcpy
-  flow.executable.export public @dispatch
-  builtin.module {
-    func.func @dispatch(%arg0: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>) {
-      %0 = tensor.empty() : tensor<4x8xf32>
-      %1 = tensor.empty() : tensor<4x8xf32>
-      %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : tensor<4x8xf32>) outs(%1 : tensor<4x8xf32>) {
-      ^bb0(%in: f32, %out: f32):
-        linalg.yield %in : f32
-      } -> tensor<4x8xf32>
-      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
-      return
-    }
-  }
-}

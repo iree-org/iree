@@ -169,20 +169,12 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
     return WalkResult::interrupt();
   });
 
-  // Check if the indexing maps are only projected permutations.
+  // Check if the indexing maps are only permutations.
   bool hasOnlyPermutation = true;
-  bool hasOnlyIdentity = true;
   for (AffineMap map : op.getIndexingMapsArray()) {
-    if (!map.isIdentity()) {
-      hasOnlyIdentity = false;
-    }
     if (!map.isPermutation()) {
       hasOnlyPermutation = false;
     }
-  }
-
-  if (hasOnlyYield && hasOnlyIdentity) {
-    return "slow_memcpy";
   }
 
   if (hasOnlyYield && hasOnlyPermutation) {
