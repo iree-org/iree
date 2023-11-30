@@ -37,7 +37,7 @@ extern "C" {
 // hipError_t return value to an iree_status_t.
 //
 // Usage:
-//   ROCM_RETURN_AND_END_ZONE_IF_ERROR(zone_id, cuda_symbols,
+//   ROCM_RETURN_AND_END_ZONE_IF_ERROR(zone_id, syms,
 //                                          hipDoThing(...), "message");
 #define ROCM_RETURN_AND_END_ZONE_IF_ERROR(zone_id, syms, expr, ...)           \
   IREE_RETURN_AND_END_ZONE_IF_ERROR(                                          \
