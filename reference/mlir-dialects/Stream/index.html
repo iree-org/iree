@@ -7585,30 +7585,32 @@ additional timeline overhead.</p>
 </tbody>
 </table>
 <h4 id="streamparameterload-streamparameterloadop"><code>stream.parameter.load</code> (Stream::ParameterLoadOp)<a class="headerlink" href="#streamparameterload-streamparameterloadop" title="Permanent link">link</a></h4>
-<p><em>Reads a resource from a parameter scope</em></p>
+<p><em>Reads one or more resources from a parameter scope</em></p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.parameter.load` (`on` `(` $affinity^ `)`)?
               (`await` `(` $await_timepoint^ `)` `=` `` `&gt;`)?
-              custom&lt;ParameterReference&gt;($source_scope, $source_key)
-              `` `[` $source_offset `]` `:`
-              type($result) `` `{` $result_size `}`
+              `{`
+              custom&lt;ParameterLoadOperations&gt;(
+              $source_scope, $source_keys, $source_offsets,
+              type($results), $result_sizes)
+              `}`
               `=` `` `&gt;`
               type($result_timepoint)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Asynchronously reads a resource from an external parameter provider and
-returns the resulting stream resource. Depending on the resource type this
-may alias existing cached storage or be directly mapped to the parameter
-origin or result in a copy as if <code>stream.resource.alloca</code> and
-<code>stream.parameter.read</code> had been used.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_CmdPhaseOp</p>
+<p>Asynchronously reads one or more resources from an external parameter
+provider and returns the resulting stream resources. Depending on the
+resource type this may alias existing cached storage or be directly mapped
+to the parameter origin or result in a copy as if <code>stream.resource.alloca</code>
+and <code>stream.parameter.read</code> had been used per parameter.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
 <p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_TimelineOp, Util_SizeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>source_scope</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
-<tr><td><code>source_key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
+<tr><td><code>source_keys</code></td><td>::mlir::ArrayAttr</td><td>string array attribute</td></tr>
 <tr><td><code>affinity</code></td><td>::mlir::iree_compiler::IREE::Stream::AffinityAttr</td><td>defines execution context affinity</td></tr>
 </table>
 
@@ -7622,12 +7624,12 @@ origin or result in a copy as if <code>stream.resource.alloca</code> and
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>source_offset</code></td>
-<td>64-bit signless integer</td>
+<td style="text-align: center;"><code>source_offsets</code></td>
+<td>variadic of 64-bit signless integer</td>
 </tr>
 <tr>
-<td style="text-align: center;"><code>result_size</code></td>
-<td>index</td>
+<td style="text-align: center;"><code>result_sizes</code></td>
+<td>variadic of index</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>await_timepoint</code></td>
@@ -7645,8 +7647,8 @@ origin or result in a copy as if <code>stream.resource.alloca</code> and
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>resource or external resource or transient resource or variable resource or constant resource</td>
+<td style="text-align: center;"><code>results</code></td>
+<td>variadic of resource or external resource or transient resource or variable resource or constant resource</td>
 </tr>
 <tr>
 <td style="text-align: center;"><code>result_timepoint</code></td>
