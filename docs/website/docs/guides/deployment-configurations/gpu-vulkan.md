@@ -205,10 +205,10 @@ iree-compile \
 
 | GPU Vendor          | Target Triple                                 |
 | ------------------- | --------------------------------------------- |
-| ARM Mali GPU        | e.g., `valhall-unknown-{android30|android31}` |
-| Qualcomm Adreno GPU | e.g., `adreno-unknown-{android30|android31}`  |
-| AMD GPU             | e.g., `{rdna1|rdna2|rdna3}-unknown-unknown`   |
-| NVIDIA GPU          | e..g, `{turing|ampere}-unknown-unknown`       |
+| ARM Mali GPU        | e.g. `valhall-unknown-{android30|android31}` |
+| Qualcomm Adreno GPU | e.g. `adreno-unknown-{android30|android31}`  |
+| AMD GPU             | e.g. `{rdna1|rdna2|rdna3}-unknown-unknown`   |
+| NVIDIA GPU          | e.g. `{turing|ampere}-unknown-unknown`       |
 | SwiftShader CPU     | `cpu-swiftshader-unknown`                     |
 
 ### :octicons-terminal-16: Run a compiled program
