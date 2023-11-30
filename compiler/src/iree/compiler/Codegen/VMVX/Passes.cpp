@@ -58,8 +58,11 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
                                 bool enableUKernels) {
   addTileAndDistributePasses(passManager);
 
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (enableUKernels) {
-    passManager.nest<ModuleOp>().addPass(
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposeBatchMmt4DOpsPass());
+    nestedModulePM.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
@@ -72,7 +75,6 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   }
 
   // Lower to buffers.
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addCPUBufferizePasses(nestedModulePM);
 
   // Cleanup the IR that may now have unused loops.
