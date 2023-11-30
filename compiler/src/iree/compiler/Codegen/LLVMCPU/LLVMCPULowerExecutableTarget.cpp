@@ -200,8 +200,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig,
-                                     enableMicrokernels, lowerToAVX2);
+    addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig, enableMicrokernels,
+                                     lowerToAVX2);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
