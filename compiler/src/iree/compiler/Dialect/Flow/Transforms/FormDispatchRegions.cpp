@@ -146,7 +146,7 @@ static bool hasFusionGroupsAttribute(Operation *op) {
 static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::map_to_vector<1>(fusionGroupsAttr, [](Attribute attr) {
+    fusionGroups = llvm::map_to_vector(fusionGroupsAttr, [](Attribute attr) {
       return llvm::cast<IntegerAttr>(attr).getInt();
     });
   }
@@ -154,7 +154,7 @@ static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
 }
 /// Appends the given `op` to the `newGroups` fusion groups.
 static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
+  SmallVector<int64_t> fusionGroups = getFusionGroups(op);
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
 }
