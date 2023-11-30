@@ -160,6 +160,19 @@ static std::string getOpNameWithoutDialectName(Operation *op) {
 }
 
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
+  // Check if the body only contains a yield.
+  bool hasOnlyYield = true;
+  op.walk([&](Operation *op) {
+    if (isa<linalg::YieldOp>(op))
+      return WalkResult::advance();
+    hasOnlyYield = false;
+    return WalkResult::interrupt();
+  });
+
+  if (hasOnlyYield) {
+    return "slow_memcpy";
+  }
+
   auto opName = op->getName().getStringRef();
   if (!opName.consume_front("linalg."))
     return "";
