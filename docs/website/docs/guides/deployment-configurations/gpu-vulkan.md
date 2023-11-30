@@ -190,25 +190,29 @@ iree-compile \
     mobilenet_iree_input.mlir -o mobilenet_vulkan.vmfb
 ```
 
-!!! note
+!!! note annotate
     Currently a target triple of the form `<vendor/arch>-<product>-<os>` is needed
     to compile towards a specific GPU architecture.
-    
-    We don't support the full spectrum here[^1]; the following table summarizes the
-    currently recognized ones.
-    
+
+    We don't support the full spectrum here(1); the following table summarizes
+    the currently recognized ones.
+
     If no triple is specified, then a safe but more limited default will be used.
-    
+
     This is more of a mechanism to help us develop IREE itself--in the long term
     we want to perform multiple targetting to generate to multiple architectures
     if no target triple is given.
 
+1. It's also impossible to capture all details of a Vulkan implementation
+   with a target triple, given the allowed variances on extensions, properties,
+   limits, etc. So the target triple is just an approximation for usage.
+
 | GPU Vendor          | Target Triple                                 |
 | ------------------- | --------------------------------------------- |
-| ARM Mali GPU        | e.g. `valhall-unknown-{android30|android31}` |
-| Qualcomm Adreno GPU | e.g. `adreno-unknown-{android30|android31}`  |
-| AMD GPU             | e.g. `{rdna1|rdna2|rdna3}-unknown-unknown`   |
-| NVIDIA GPU          | e.g. `{turing|ampere}-unknown-unknown`       |
+| ARM Mali GPU        | e.g. `valhall-unknown-{android30|android31}`  |
+| Qualcomm Adreno GPU | e.g. `adreno-unknown-{android30|android31}`   |
+| AMD GPU             | e.g. `{rdna1|rdna2|rdna3}-unknown-unknown`    |
+| NVIDIA GPU          | e.g. `{turing|ampere}-unknown-unknown`        |
 | SwiftShader CPU     | `cpu-swiftshader-unknown`                     |
 
 ### :octicons-terminal-16: Run a compiled program
@@ -233,7 +237,3 @@ concrete values.
 <!-- TODO(??): measuring performance -->
 
 <!-- TODO(??): troubleshooting -->
-
-[^1]: It's also impossible to capture all details of a Vulkan implementation
-with a target triple, given the allowed variances on extensions, properties,
-limits, etc. So the target triple is just an approximation for usage.
