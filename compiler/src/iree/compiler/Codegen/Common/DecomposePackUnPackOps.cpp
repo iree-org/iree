@@ -44,24 +44,6 @@ struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   }
 };
 
-/// A warpper pattern that calls linalg::lowerUnPack on tensor::UnPackOp. It
-/// lowers a tensor.unpack op to tensor.empty + linalg.transpose +
-/// tensor.collapse_shape + tensor.extract_slice ops.
-struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
-  using OpRewritePattern<tensor::UnPackOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::UnPackOp op,
-                                PatternRewriter &rewriter) const override {
-    FailureOr<linalg::LowerUnPackOpResult> res =
-        linalg::lowerUnPack(rewriter, op);
-    if (failed(res)) {
-      return rewriter.notifyMatchFailure(
-          op, "cannot lower to empty + transpose + reshape + extract_slice");
-    }
-    return success();
-  }
-};
-
 /// Folding trailing unit dims away from transpose op if they are not
 /// transposed.
 /// TODO(hanchung): Remove the workaround after we materialize encoding to do 1D
@@ -144,8 +126,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   // they do not generate reshape ops.
   {
     RewritePatternSet patterns(ctx);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
@@ -158,7 +139,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   // tiled to one.
   if (!tileOuterToOne) {
     RewritePatternSet patterns(ctx);
-    patterns.add<LowerPackPattern, LowerUnPackPattern>(ctx);
+    patterns.add<LowerPackPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitError(
           "failed to apply generalization patterns on pack/unpack ops for "
@@ -200,31 +181,6 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
       rewriter.replaceOp(op, tileAndFuseResult->replacements[op.getResult()]);
     });
 
-    auto unpackTilingOptions =
-        scf::SCFTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder, Operation *op) {
-              auto unpackOp = cast<tensor::UnPackOp>(op);
-              int numLoops = unpackOp.getDestRank();
-              auto dimAndTileMapping = unpackOp.getDimAndTileMapping();
-              SmallVector<OpFoldResult> tileSizes;
-              for (int i = 0; i < numLoops; ++i) {
-                if (dimAndTileMapping.count(i)) {
-                  tileSizes.push_back(dimAndTileMapping[i]);
-                } else {
-                  tileSizes.push_back(builder.getIndexAttr(1));
-                }
-              }
-              return tileSizes;
-            });
-    funcOp->walk([&](tensor::UnPackOp op) {
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(op.getOperation()),
-          unpackTilingOptions);
-      if (failed(tilingResult))
-        return signalPassFailure();
-      rewriter.replaceOp(op, tilingResult->replacements);
-    });
-
     LLVM_DEBUG({
       llvm::dbgs()
           << "--- After applying tiling that makes outer dims be all 1s ---\n";
@@ -253,8 +209,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 
   {
     RewritePatternSet patterns(ctx);
-    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
-                 linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
+    patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
