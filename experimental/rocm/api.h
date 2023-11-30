@@ -24,10 +24,8 @@ extern "C" {
 typedef enum iree_hal_rocm_command_buffer_mode_e {
   // Command buffers are recorded into ROCM null stream.
   IREE_HAL_ROCM_COMMAND_BUFFER_MODE_DIRECT = 0,
-  // Command buffers are directly issued against ROCM stream.
-  IREE_HAL_ROCM_COMMAND_BUFFER_MODE_STREAM = 1,
   // Command buffers are recorded into ROCM graphs.
-  IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH = 2,
+  IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH = 1,
 } iree_hal_rocm_command_buffer_mode_t;
 
 // Parameters configuring an iree_hal_rocm_device_t.

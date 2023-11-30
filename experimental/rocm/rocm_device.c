@@ -75,7 +75,7 @@ IREE_API_EXPORT void iree_hal_rocm_device_params_initialize(
     iree_hal_rocm_device_params_t* out_params) {
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
-  out_params->command_buffer_mode = IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH;
+  out_params->command_buffer_mode = IREE_HAL_ROCM_COMMAND_BUFFER_MODE_DIRECT;
   out_params->stream_tracing = false;
 }
 

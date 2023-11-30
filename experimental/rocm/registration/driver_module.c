@@ -6,18 +6,17 @@
 
 #include "experimental/rocm/registration/driver_module.h"
 
-#include <inttypes.h>
 #include <stddef.h>
 
 #include "experimental/rocm/api.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 
-// Force using ROCM streams until we support command buffer caching to avoid the
+// Force using ROCM direct until we support command buffer caching to avoid the
 // overhead of graph creation.
 IREE_FLAG(
-  bool, rocm_use_streams, false,
-  "Use ROCM streams for executing command buffers (instead of graphs).");
+  bool, rocm_use_graph, false,
+  "Use ROCM graph for executing command buffers (instead of direct).");
 
 IREE_FLAG(
   bool, rocm_tracing, true,
@@ -52,9 +51,9 @@ static iree_status_t iree_hal_rocm_driver_factory_try_create(
 
     iree_hal_rocm_device_params_t default_params;
   iree_hal_rocm_device_params_initialize(&default_params);
-  if (FLAG_rocm_use_streams) {
+  if (FLAG_rocm_use_graph) {
     default_params.command_buffer_mode =
-        IREE_HAL_ROCM_COMMAND_BUFFER_MODE_STREAM;
+        IREE_HAL_ROCM_COMMAND_BUFFER_MODE_GRAPH;
   }
   default_params.stream_tracing = FLAG_rocm_tracing;
   iree_hal_rocm_driver_options_t driver_options;

@@ -1,10 +1,11 @@
+// Copyright 2023 The IREE Authors
+//
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "experimental/rocm/graph_command_buffer.h"
 
-#include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -190,24 +191,6 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_flush_collectives(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // TODO(#9580): use ROCM graph capture so that the RCCL/NCCL calls end up in
-  // the graph:
-  // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/cudagraph.html
-  //
-  // Something like:
-  //  syms->hipStreamBeginCapture(nccl_stream);
-  //  iree_hal_rocm_nccl_submit_batch(command_buffer->context,
-  //                                  &command_buffer->collective_batch,
-  //                                  nccl_stream);
-  //  syms->hipStreamEndCapture(nccl_stream, &child_graph);
-  //  syms->hipGraphAddChildGraphNode(..., child_graph);
-  //  syms->hipGraphDestroy(child_graph);  // probably, I think it gets cloned
-  //
-  // Note that we'll want to create a scratch stream that we use to perform the
-  // capture - we could memoize that on the command buffer or on the device
-  // (though that introduces potential threading issues). There may be a special
-  // stream mode for these capture-only streams that is lighter weight than a
-  // normal stream.
   iree_status_t status = iree_make_status(
       IREE_STATUS_UNIMPLEMENTED,
       "ROCM graph capture of collective operations not yet implemented");
@@ -324,29 +307,13 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_execution_barrier(
 static iree_status_t iree_hal_rocm_graph_command_buffer_signal_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_rocm_graph_command_buffer_t* command_buffer =
-      iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_rocm_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_rocm_graph_command_buffer_reset_event(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_event_t* event,
     iree_hal_execution_stage_t source_stage_mask) {
-  iree_hal_rocm_graph_command_buffer_t* command_buffer =
-      iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_rocm_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_rocm_graph_command_buffer_wait_events(
@@ -358,15 +325,7 @@ static iree_status_t iree_hal_rocm_graph_command_buffer_wait_events(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
-  iree_hal_rocm_graph_command_buffer_t* command_buffer =
-      iree_hal_rocm_graph_command_buffer_cast(base_command_buffer);
-  IREE_RETURN_IF_ERROR(
-      iree_hal_rocm_graph_command_buffer_flush_collectives(command_buffer));
-
-  // TODO: Implement barrier with Graph edges. Right now all the nodes are
-  // serialized so this is a no-op.
-
-  return iree_ok_status();
+    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "event not yet supported");
 }
 
 static iree_status_t iree_hal_rocm_graph_command_buffer_discard_buffer(
