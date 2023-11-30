@@ -77,6 +77,19 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
           .setVectorTransformsOptions(vectorContractLowering)
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
+
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorGatherLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After applying patterns for vector.gather Ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {

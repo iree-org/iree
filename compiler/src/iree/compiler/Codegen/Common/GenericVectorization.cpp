@@ -225,9 +225,6 @@ void GenericVectorizationPass::runOnOperation() {
         funcOp.getContext(), /*benefit=*/2);
   }
 
-  // Fixes #15364
-  vector::populateVectorGatherLoweringPatterns(vectorizationPatterns);
-
   if (enableCleanup) {
     vector::TransferReadOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                         funcOp.getContext());
