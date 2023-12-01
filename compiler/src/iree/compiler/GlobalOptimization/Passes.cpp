@@ -25,6 +25,11 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableExpandVectors(
+    "iree-global-opt-enable-expand-vectors",
+    llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
+    llvm::cl::init(false));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -95,7 +100,9 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-    // mainPassManager.addPass(createExpandVectorsPass());
+    if (clEnableExpandVectors) {
+      mainPassManager.addPass(createExpandVectorsPass());
+    }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
