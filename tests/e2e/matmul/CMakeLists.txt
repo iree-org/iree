@@ -27,6 +27,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -50,6 +51,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -73,6 +75,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -97,6 +100,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -121,6 +125,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -146,6 +151,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -171,6 +177,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -195,6 +202,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -219,6 +227,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -245,6 +254,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noasan"
     "notsan"
@@ -272,6 +282,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
 
   TARGET_CPU_FEATURES_VARIANTS
@@ -297,6 +308,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noasan"
     "notsan"
@@ -323,6 +335,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -350,6 +363,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noasan"
     "notsan"
@@ -379,6 +393,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noriscv"
     "nowasm"
@@ -406,6 +421,7 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling"
+    "--iree-llvmcpu-enable-ukernels=none"
   LABELS
     "noasan"
     "notsan"

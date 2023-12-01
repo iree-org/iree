@@ -29,6 +29,7 @@ py_binary(
     name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
+        "--iree-llvmcpu-enable-ukernels=none",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -94,7 +95,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     ),
     compiler_flags = [
         "--iree-opt-data-tiling",
-    ] + (["--iree-llvmcpu-enable-ukernels=all"] if use_uk else []),
+    ] + ["--iree-llvmcpu-enable-ukernels=%s" % ("all" if use_uk else "none")],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
