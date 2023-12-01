@@ -15,24 +15,12 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "f32_to_i4.mlir"
     "i4_to_f32.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_i4_llvm-cpu_local-task
-  SRCS
-    "f32_to_i4.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  LABELS
-    "noriscv"
 )
 
 iree_check_single_backend_test_suite(
@@ -51,6 +39,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
+    "f32_to_i4.mlir"
     "i4_to_f32.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
