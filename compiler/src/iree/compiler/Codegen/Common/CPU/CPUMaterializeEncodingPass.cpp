@@ -53,6 +53,23 @@ enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
   };
 }
 
+// Enumerate tile sizes to choose from on riscv32.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+static SmallVector<TileMxNxK>
+enumerateMatmulTileRiscv32(EncodingUser user, ExecutableTargetAttr target) {
+  if (hasUkernel(target)) {
+    return {
+        TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
+        TileMxNxK{4, 8, 4}, // Truncation of the above.
+        TileMxNxK{2, 8, 4}, // Truncation of the above.
+        TileMxNxK{1, 8, 4}, // Truncation of the above.
+    };
+  }
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
@@ -327,6 +344,9 @@ SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
   }
   if (isX86_64(target)) {
     return enumerateMatmulTileX86_64(user, elementTypes, target);
+  }
+  if (isRISCV32(target)) {
+    return enumerateMatmulTileRiscv32(user, target);
   }
   return {};
 }

@@ -234,6 +234,11 @@ bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return triple && triple.value().isRISCV();
 }
 
+bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV32();
+}
+
 bool isReadOnly(Value v) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp)
