@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
+#include <cstdint>
 #include <mutex>
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
@@ -205,6 +206,7 @@ public:
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
+    int32_t subgroupSize = 64;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
@@ -221,6 +223,15 @@ public:
       } else {
         workgroupSize = {1, 1, 1};
       }
+
+      if (auto setSubgroupSize = getSubgroupSize(exportOp)) {
+        if (subgroupSize != 32 && subgroupSize != 64) {
+          return variantOp.emitError()
+                 << "invalid subgroup size " << subgroupSize;
+        }
+        subgroupSize = *setSubgroupSize;
+      }
+
       workgroupSizes.push_back(workgroupSize);
       uint32_t workgroupLocalMemory = 0;
       if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
@@ -253,11 +264,18 @@ public:
       opt.UnsafeFPMath = false;
       opt.NoInfsFPMath = false;
       opt.NoNaNsFPMath = true;
-      std::string features{""};
+      std::string features;
       std::string subTarget = targetChip.substr(0, 4);
       if (GFX9 == subTarget) {
         features = "+sramecc,-xnack";
+      } else {
+        // GFX 10 or 11.
+        if (subgroupSize == 32)
+          features = "+wavefrontsize32";
+        if (subgroupSize == 64)
+          features = "+wavefrontsize64";
       }
+
       targetMachine.reset(target->createTargetMachine(
           triple.str(), targetChip, features, opt, llvm::Reloc::Model::PIC_,
           std::nullopt, llvm::CodeGenOptLevel::Aggressive));
@@ -294,10 +312,8 @@ public:
     std::unique_ptr<llvm::Module> moduleCopy;
     if (!options.dumpIntermediatesPath.empty()) {
       moduleCopy = llvm::CloneModule(*llvmModule);
-      if (!moduleCopy) {
-        llvm::errs() << "Error: cloning LLIR failed"
-                     << "\n";
-      }
+      if (!moduleCopy)
+        llvm::errs() << "Error: cloning LLVM IR failed\n";
     }
     std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
     std::string targetHSACO =
