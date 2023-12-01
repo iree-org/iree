@@ -59,6 +59,6 @@ module attributes { transform.with_named_sequence } {
         matmul_packed_sizes = [8, 16, 32]
         matmul_inner_dims_order = [0, 1, 2]
       : (!transform.any_op) -> !transform.op<"linalg.generic">
-    transform.yield 
+    transform.yield
   }
 } // module

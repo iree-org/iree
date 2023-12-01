@@ -105,6 +105,6 @@ module attributes { transform.with_named_sequence } {
     transform.apply_patterns to %func_op {
       transform.apply_patterns.iree.fold_tensor_slice_into_transfer
     } : !transform.op<"func.func">
-    transform.yield 
+    transform.yield
   }
 } // module

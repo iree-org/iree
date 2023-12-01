@@ -43,9 +43,9 @@ func.func @batch_mmt4d_with_no_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tenso
 func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> {
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.empty() : tensor<1x10x32x8x1xi32>
-  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, 
-                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], 
-                       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+  %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>,
+                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>],
+                       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
                        ins(%arg0 : tensor<1x10x32x8x1xi8>) outs(%0 : tensor<1x10x32x8x1xi32>) {
   ^bb0(%in: i8, %out: i32):
     %6 = arith.extsi %in : i8 to i32
@@ -53,7 +53,7 @@ func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1:
   } -> tensor<1x10x32x8x1xi32>
   %2 = tensor.empty() : tensor<1x80x32x4x1xi32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>,
-                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], 
+                                        affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>],
                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
                        ins(%arg1 : tensor<1x80x32x4x1xi8>) outs(%2 : tensor<1x80x32x4x1xi32>) {
   ^bb0(%in: i8, %out: i32):

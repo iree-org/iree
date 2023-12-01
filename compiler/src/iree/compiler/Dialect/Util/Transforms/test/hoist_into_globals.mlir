@@ -258,7 +258,7 @@ module @do_not_hoist_uses_within_dispatches {
 //       CHECK:   %[[CST:.+]] = arith.constant
 //       CHECK:   %[[EXPANDED:.+]] = tensor.expand_shape %[[CST]]
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
-//       CHECK:     %[[ADD:.+]] = linalg.generic 
+//       CHECK:     %[[ADD:.+]] = linalg.generic
 //  CHECK-SAME:     %[[EXPANDED]]
 //       CHECK:     flow.return %[[ADD]]
 //       CHECK:   return %[[RESULT]]
@@ -277,7 +277,7 @@ module @hoist_no_significant_size_increase_const_expr {
   func.func @main() -> (tensor<128xi8>) {
     %0 = arith.constant dense<0> : tensor<32xi8>
     %1 = arith.constant dense<0> : tensor<32xi8>
-    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    %2 = "iree_unregistered.const_expr"(%0, %1)
     : (tensor<32xi8>, tensor<32xi8>) -> tensor<128xi8>
     return %2 : tensor<128xi8>
   }
@@ -294,7 +294,7 @@ module @do_not_hoist_significant_size_increase_const_expr {
   func.func @main() -> (tensor<129xi8>) {
     %0 = arith.constant dense<0> : tensor<32xi8>
     %1 = arith.constant dense<0> : tensor<32xi8>
-    %2 = "iree_unregistered.const_expr"(%0, %1) 
+    %2 = "iree_unregistered.const_expr"(%0, %1)
     : (tensor<32xi8>, tensor<32xi8>) -> tensor<129xi8>
     return %2 : tensor<129xi8>
   }

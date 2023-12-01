@@ -26,9 +26,9 @@ func.func @matmul_nnn(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 32]
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   //      CHECK: linalg.generic
-  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_res]]] 
+  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_res]]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<18x56x16x32xf32>) 
+  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<18x56x16x32xf32>)
   // CHECK-SAME:  outs(%{{.*}} : tensor<155x56x8x16xf32>)
   //      CHECK: tensor.unpack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   %0 = linalg.matmul
@@ -54,9 +54,9 @@ func.func @matmul_tnn(%arg0: !at_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 32]
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   //      CHECK: linalg.generic
-  // CHECK-SAME:   indexing_maps = [#[[$map_tlhs]], #[[$map_rhs]], #[[$map_res]]] 
+  // CHECK-SAME:   indexing_maps = [#[[$map_tlhs]], #[[$map_rhs]], #[[$map_res]]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-  // CHECK-SAME:   ins(%{{.*}} : tensor<18x155x8x32xf32>, tensor<18x56x16x32xf32>) 
+  // CHECK-SAME:   ins(%{{.*}} : tensor<18x155x8x32xf32>, tensor<18x56x16x32xf32>)
   // CHECK-SAME:  outs(%{{.*}} : tensor<155x56x8x16xf32>)
   //      CHECK: tensor.unpack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   %0 = linalg.generic #matmul_tnn_trait
@@ -87,9 +87,9 @@ func.func @matmul_ntn(%arg0: !a_tensor_t, %arg2: !c_tensor_t) -> !c_tensor_t {
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [16, 32]
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   //      CHECK: linalg.generic
-  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_trhs]], #[[$map_res]]] 
+  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_trhs]], #[[$map_res]]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<56x18x16x32xf32>) 
+  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<56x18x16x32xf32>)
   // CHECK-SAME:  outs(%{{.*}} : tensor<155x56x8x16xf32>)
   //      CHECK: tensor.unpack %{{.*}} inner_dims_pos = [0, 1] inner_tiles = [8, 16]
   %0 = linalg.generic #matmul_ntn_trait
@@ -120,9 +120,9 @@ func.func @matmul_nnt(%arg0: !a_tensor_t, %arg2: !ct_tensor_t) -> !ct_tensor_t {
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [1, 0] inner_tiles = [16, 32]
   //      CHECK: tensor.pack %{{.*}} inner_dims_pos = [1, 0] inner_tiles = [8, 16]
   //      CHECK: linalg.generic
-  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_tres]]] 
+  // CHECK-SAME:   indexing_maps = [#[[$map_lhs]], #[[$map_rhs]], #[[$map_tres]]]
   // CHECK-SAME:   iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"]}
-  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<18x56x16x32xf32>) 
+  // CHECK-SAME:   ins(%{{.*}} : tensor<155x18x8x32xf32>, tensor<18x56x16x32xf32>)
   // CHECK-SAME:  outs(%{{.*}} : tensor<56x155x8x16xf32>)
   //      CHECK: tensor.unpack %{{.*}} inner_dims_pos = [1, 0] inner_tiles = [8, 16]
   %0 = linalg.generic #matmul_nnt_trait
@@ -140,15 +140,15 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %matmul = transform.structured.match interface{LinalgOp} in %module_op
       : (!transform.any_op) -> (!transform.any_op)
-    
-    // Generalized packing rewrite extracts a gemm from any linalg op that contains 
+
+    // Generalized packing rewrite extracts a gemm from any linalg op that contains
     // one. This acts as a powerful normalization step: after this point, we have a
     // gemm (i.e. 3-D contraction with (m,n,k)=(8,16,32) ) on the 3 most minor
     // dimensions.
     transform.structured.pack_greedily %matmul
         matmul_packed_sizes = [8, 16, 32] matmul_inner_dims_order = [0, 1, 2]
       : (!transform.any_op) -> !transform.op<"linalg.generic">
-    transform.yield 
+    transform.yield
   }
 } // module
 

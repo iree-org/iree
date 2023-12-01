@@ -113,7 +113,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[RHS:.+]] = transform.get_producer_of_operand %[[PADDED]][1]
 // CHECK:   %[[RHS_DPS:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 
-// CHECK:   transform.structured.tile_using_forall %[[LHS]] 
+// CHECK:   transform.structured.tile_using_forall %[[LHS]]
 // DEFAULT:  num_threads [1, 32, 4](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // OPTIONS:  num_threads [1, 64, 2](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
@@ -122,10 +122,10 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.structured.match ops{["scf.if"]}
 // CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch
 
-// CHECK:   transform.structured.tile_using_forall %[[RHS_DPS]]  
+// CHECK:   transform.structured.tile_using_forall %[[RHS_DPS]]
 // DEFAULT:  num_threads [8, 16, 1](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // OPTIONS:  num_threads [2, 8, 8](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
@@ -139,7 +139,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.structured.tile_using_forall
 // DEFAULT:  num_threads [1, 2, 64](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // OPTIONS:  num_threads [1, 4, 32](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
@@ -211,7 +211,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // OPTIONS:   factor = 3
 // CHECK:   apply_patterns
 // CHECK:     transform.apply_patterns.vector.transfer_to_scf   full_unroll = true
-// CHECK:   apply_patterns 
+// CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.iree.create_async_groups

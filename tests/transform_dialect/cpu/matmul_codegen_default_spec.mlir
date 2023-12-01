@@ -22,6 +22,6 @@ module attributes { transform.with_named_sequence } {
     // =========================================================
     %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
-    transform.yield 
+    transform.yield
   }
 } // module

@@ -37,7 +37,7 @@ module attributes { transform.with_named_sequence } {
     } : !transform.any_op
     transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!transform.any_op) -> ()
 
-    // Apply canonicalization post-hoc to trigger DCE and pass the test 
+    // Apply canonicalization post-hoc to trigger DCE and pass the test
     // (i.e. all vector.contract are dead).
     // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
     transform.apply_patterns to %func {
@@ -85,7 +85,7 @@ module attributes { transform.with_named_sequence } {
     } : !transform.any_op
     transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!transform.any_op) -> ()
 
-    // Apply canonicalization post-hoc to trigger DCE and pass the test 
+    // Apply canonicalization post-hoc to trigger DCE and pass the test
     // (i.e. all vector.contract are dead).
     // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
     transform.apply_patterns to %func {
