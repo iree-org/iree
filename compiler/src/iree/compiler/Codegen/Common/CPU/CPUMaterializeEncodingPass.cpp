@@ -161,13 +161,24 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      return {
-          TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-          TileMxNxK{8, 16, 1},  // Truncation of the above.
-          TileMxNxK{4, 16, 1},  // Truncation of the above.
-          TileMxNxK{2, 16, 1},  // Truncation of the above.
-          TileMxNxK{1, 16, 1},  // Truncation of the above.
-      };
+      if (hasUkernel(target)) {
+        return {
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 16, 1},  // Truncation of the above.
+            TileMxNxK{4, 16, 1},  // Truncation of the above.
+            TileMxNxK{2, 16, 1},  // Truncation of the above.
+            TileMxNxK{1, 16, 1},  // Truncation of the above.
+        };
+      } else {
+        // Code generation tile sizes.
+        return {
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 32, 1},  // Use same number of accumulators.
+            TileMxNxK{4, 64, 1},  // Use same number of accumulators.
+            TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
+            TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
+        };
+      }
     }
     if (hasFeature(target, "+avx")) {
       // Note: for good performance, most +avx users will also want to add
