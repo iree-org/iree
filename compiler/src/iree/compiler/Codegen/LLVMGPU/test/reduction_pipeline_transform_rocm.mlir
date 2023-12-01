@@ -29,7 +29,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {t
 }
 
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @group_redution_1d
+// CHECK-LABEL: hal.executable.export public @group_reduction_1d
 // CHECK-SAME:    subgroup_size = 32
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:    workgroup_size = [32 : index, 1 : index, 1 : index]
@@ -69,7 +69,7 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {t
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @group_redution_1d
+// CHECK-LABEL: hal.executable.export public @group_reduction_1d
 // CHECK-SAME:    subgroup_size = 64
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
@@ -123,7 +123,7 @@ hal.executable private @i4_dequant_matvec {
 }
 
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @i4_dequent_matvec
+// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
 // CHECK-SAME:    subgroup_size = 32
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
@@ -196,7 +196,7 @@ hal.executable private @i4_dequant_matvec {
 }
 
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @i4_dequent_matvec
+// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
 // CHECK-SAME:    subgroup_size = 64
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 // CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
