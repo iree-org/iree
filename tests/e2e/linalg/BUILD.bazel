@@ -19,10 +19,11 @@ package(
 )
 
 LLVM_SRCS = enforce_glob(
+    # keep sorted
     [
         "conv2d.mlir",
-        "i4_to_f32.mlir",
         "f32_to_i4.mlir",
+        "i4_to_f32.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
