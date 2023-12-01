@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include <iree/compiler/Dialect/HAL/IR/HALOps.h>
 #include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
