@@ -63,7 +63,7 @@ struct TargetInfo {
   bool hasTF32TensorCore = false;
   bool hasWarpShuffle = false;
   bool hasMmaSync = false;
-  // These are listed in the order of preference.
+  // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
 };
 
@@ -835,7 +835,6 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   // get peak performance. For now, just use the warp size.
   if (numDynamicReductionDims) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-    // TODO: Don't hard code this.
     int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
     TileSizesListType tileSizes;
