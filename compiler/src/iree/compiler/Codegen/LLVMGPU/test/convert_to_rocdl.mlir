@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -33,12 +34,15 @@ hal.executable @abs_ex_dispatch_0 {
     }
   }
 }
-// CHECK-LABEL: llvm.func @abs_ex_dispatch_0
-//  CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
-//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
-//  CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
-//      CHECK:    rocdl.workgroup.dim.x
-//      CHECK:    llvm.fadd
+//   CHECK-LABEL: llvm.func @abs_ex_dispatch_0
+// INDEX32-LABEL: llvm.func @abs_ex_dispatch_0
+//    CHECK-SAME: (%{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias, llvm.readonly},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias},
+//    CHECK-SAME:  %{{[a-zA-Z0-9]*}}: !llvm.ptr {llvm.align = 16 : i32, llvm.noalias})
+//         CHECK:    rocdl.workgroup.dim.x
+//         CHECK:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i64) -> !llvm.ptr, f32
+//       INDEX32:    llvm.getelementptr %{{.*}} : (!llvm.ptr, i32) -> !llvm.ptr, f32
+//         CHECK:    llvm.fadd
 
 
 // -----
