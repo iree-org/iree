@@ -186,6 +186,40 @@ func.func @mmt4d_i16i16i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi
 
 // -----
 
+func.func @mmt4d_i16i8i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi8>,
+    %arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
+} {
+  %0 = linalg.mmt4d ins(%arg0, %arg1 : tensor<?x?x?x?xi16>, tensor<?x?x?x?xi8>)
+      outs(%arg2 : tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32>
+  return %0 : tensor<?x?x?x?xi32>
+}
+//      CHECK: func @mmt4d_i16i8i32(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
+//  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
+//  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1289 : i32
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[M0_index:.+]] = tensor.dim %[[ARG0]], %[[C2]]
+//  CHECK-DAG:   %[[M0:.+]] = arith.index_cast %[[M0_index]] : index to i32
+//  CHECK-DAG:   %[[N0_index:.+]] = tensor.dim %[[ARG1]], %[[C2]]
+//  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
+//  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
+//  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
+//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+// CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
+// CHECK-SAME:       outs(%[[ARG2]] :
+// CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
+//      CHECK:   return %[[MICRO_KERNEL]]
+
+// -----
+
 func.func @mmt4d_f16f16f32(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf16>,
     %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
