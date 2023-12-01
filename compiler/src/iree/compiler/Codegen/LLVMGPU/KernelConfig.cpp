@@ -836,13 +836,12 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if (numDynamicReductionDims) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
     // TODO: Don't hard code this.
-    reductionTileSizes[reductionDims[0]] =
-        targetInfo.supportedSubgroupSizes.front();
+    int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+    reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
     TileSizesListType tileSizes;
     tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
     tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
-    std::array<int64_t, 3> workgroupSize = {
-        targetInfo.supportedSubgroupSizes.front(), 1, 1};
+    std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes,
             IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
