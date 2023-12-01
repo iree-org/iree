@@ -88,6 +88,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_large_linalg_matmul_cuda
   SRCS
+    "conv2d.mlir"
+    "f32_to_i4.mlir"
+    "i4_to_f32.mlir"
     "large_linalg_matmul.mlir"
   TARGET_BACKEND
     "cuda"
