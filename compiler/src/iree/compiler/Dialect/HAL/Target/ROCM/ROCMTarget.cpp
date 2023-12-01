@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
+#include <cstdint>
 #include <mutex>
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
@@ -205,7 +206,7 @@ public:
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
-    std::optional<int32_t> setSubgroupSize;
+    int32_t subgroupSize = 64;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
@@ -223,18 +224,12 @@ public:
         workgroupSize = {1, 1, 1};
       }
 
-      int32_t subgroupSize = getSubgroupSize(exportOp).value_or(32);
-      if (setSubgroupSize) {
-        if (*setSubgroupSize != subgroupSize) {
-          return variantOp.emitError()
-                 << "subgroup size mismatch among rocdl funcs";
-        }
-      } else {
+      if (auto setSubgroupSize = getSubgroupSize(exportOp)) {
         if (subgroupSize != 32 && subgroupSize != 64) {
           return variantOp.emitError()
                  << "invalid subgroup size " << subgroupSize;
         }
-        setSubgroupSize = subgroupSize;
+        subgroupSize = *setSubgroupSize;
       }
 
       workgroupSizes.push_back(workgroupSize);
@@ -273,8 +268,12 @@ public:
       std::string subTarget = targetChip.substr(0, 4);
       if (GFX9 == subTarget) {
         features = "+sramecc,-xnack";
-      } else if (setSubgroupSize && *setSubgroupSize == 64) {
-        features = "+wavefrontsize64";
+      } else {
+        // GFX 10 or 11.
+        if (subgroupSize == 32)
+          features = "+wavefrontsize32";
+        if (subgroupSize == 64)
+          features = "+wavefrontsize64";
       }
 
       targetMachine.reset(target->createTargetMachine(

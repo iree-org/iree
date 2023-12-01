@@ -203,7 +203,7 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
   info.hasWarpShuffle = true;
 
   // RDNA supports wave32 and wave64, GCN and CDNA only wave64.
-  if (llvm::is_contained({"gfx1000", "gfx1100"}, targetName))
+  if (targetName.starts_with("gfx10") || targetName.starts_with("gfx11"))
     info.supportedSubgroupSizes = {32, 64};
   else
     info.supportedSubgroupSizes = {64};
