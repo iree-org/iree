@@ -141,9 +141,9 @@ class BuildFileFunctions(object):
         if not pkg_root_relative_label:
             return src
         elif os.path.exists(os.path.join(self._build_dir, src)):
-            return f"${{CMAKE_SOURCE_DIR}}/{src}"
+            return f"${{PROJECT_SOURCE_DIR}}/{src}"
         else:
-            return f"${{CMAKE_BINARY_DIR}}/{src}"
+            return f"${{PROJECT_BINARY_DIR}}/{src}"
 
     def _convert_srcs_block(self, srcs, is_generated=False, block_name="SRCS"):
         if not srcs:
