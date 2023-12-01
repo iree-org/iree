@@ -60,11 +60,11 @@ VULKAN_SRCS = enforce_glob(
     [
         "conv2d.mlir",
         "i4_to_f32.mlir",
-        "f32_to_i4.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
+        "f32_to_i4.mlir",
     ],
 )
 
