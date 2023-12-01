@@ -97,6 +97,7 @@ RankedTensorType getExpandedType(RankedTensorType type, bool isBatched,
     return RankedTensorType::get({type.getDimSize(0), 1, type.getDimSize(1), 1},
                                  type.getElementType());
   }
+
   ri.assign({{0}, {1, 2}, {3, 4}});
   if (!isTransposed) {
     return RankedTensorType::get(

@@ -131,7 +131,7 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
     M = outType.getDimSize(rank - 2);
     N = outType.getDimSize(rank - 1);
     break;
-  } 
+  }
   case ContractionOpType::kVecmat:
   case ContractionOpType::kBatchVecmat: {
     M = 1;
