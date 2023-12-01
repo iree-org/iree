@@ -47,9 +47,9 @@ struct ROCMOptions {
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
-    binder.opt<std::string>(
-        "iree-rocm-target-chip", targetChip, llvm::cl::cat(category),
-        llvm::cl::desc("ROCm target Chip"), llvm::cl::init("gfx908"));
+    binder.opt<std::string>("iree-rocm-target-chip", targetChip,
+                            llvm::cl::cat(category),
+                            llvm::cl::desc("ROCm target Chip"));
     binder.opt<bool>("iree-rocm-link-bc", linkBitcode, llvm::cl::cat(category),
                      llvm::cl::desc("Whether to try Linking to AMD Bitcodes"));
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
