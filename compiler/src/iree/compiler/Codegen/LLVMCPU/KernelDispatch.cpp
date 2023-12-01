@@ -781,44 +781,6 @@ setVectorSizesForDynamicShapes(linalg::LinalgOp op,
   return;
 }
 
-/// Sets the default configuration to use for an operation that implements the
-/// `PartitionableLoopsInterface`, given the `lbs` and `ubs` of all the loops.
-static LogicalResult
-setDefaultRootConfig(func::FuncOp entryPointFn,
-                     PartitionableLoopsInterface partitionableLoopsInterfaceOp,
-                     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs) {
-  assert(!getLoweringConfig(partitionableLoopsInterfaceOp) &&
-         "expected lowering_config is not set");
-  SmallVector<unsigned> partitionableLoops =
-      partitionableLoopsInterfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-
-  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
-  SmallVector<int64_t> maxTileSizes(lbs.size(), 1);
-  if (!partitionableLoops.empty()) {
-    // TODO: Here the min tile size is just looking at the type of the data in
-    // the entry point function, and using a vector size that depends on just
-    // that. For `LinalgOp`s we can use the indexing map, find the loops that
-    // are fastest varying and set those to have a min tile size of vector
-    // length. A version of this is done for generic ops. Generalize that and
-    // use it for `LinalgOp`s.
-    unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
-    minTileSizes[partitionableLoops.back()] =
-        getVectorSize(entryPointFn, typeWidthInBytes);
-    for (auto partitionableLoopId : partitionableLoops) {
-      maxTileSizes[partitionableLoopId] = defaultDistTileSize;
-    }
-  }
-
-  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(distTileSizes));
-  auto loweringConfig = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes);
-  setLoweringConfig(partitionableLoopsInterfaceOp, loweringConfig);
-  return success();
-}
-
 static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
                                             linalg::ContractionOpInterface op,
                                             ArrayRef<int64_t> distTileSizes,
@@ -1932,36 +1894,16 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
-/// Set default configuration for Linalg ops.
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   linalg::LinalgOp linalgOp) {
-  auto partitionableLoopOp =
-      cast<PartitionableLoopsInterface>(linalgOp.getOperation());
-  SmallVector<int64_t> lbs(linalgOp.getNumLoops(), 0);
-  SmallVector<int64_t> ubs = linalgOp.getStaticLoopRanges();
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
-
-  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
-    return failure();
-  }
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
-}
-
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
-                                   TilingInterface tilingInterfaceOp) {
-  assert(!getLoweringConfig(tilingInterfaceOp) &&
-         "expected lowering_config is not set");
-  auto partitionableLoopOp =
-      cast<PartitionableLoopsInterface>(tilingInterfaceOp.getOperation());
+                                   TilingInterface op) {
+  assert(!getLoweringConfig(op) && "expected lowering_config is not set");
 
-  // TODO(hanchung): Implement getStaticLoopRanges method for TiledOpInterface.
-  OpBuilder builder(tilingInterfaceOp.getContext());
-  builder.setInsertionPoint(tilingInterfaceOp);
-  SmallVector<Range> iterationDomain =
-      tilingInterfaceOp.getIterationDomain(builder);
+  // Get the lower bound and upper bound sizes for the TilingInterface op.
+  OpBuilder builder(op.getContext());
+  builder.setInsertionPoint(op);
+  SmallVector<Range> iterationDomain = op.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     std::optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal)
@@ -1972,12 +1914,33 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       iterationDomain, [&](Range r) { return getStaticValue(r.offset); });
   auto ubs = llvm::map_to_vector(
       iterationDomain, [&](Range r) { return getStaticValue(r.size); });
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), DispatchLoweringPassPipeline::CPUDefault);
-  if (failed(setTranslationInfo(entryPointFn, translationInfo))) {
-    return failure();
+
+  // Compute the distribution tile sizes.
+  SmallVector<unsigned> partitionableLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
+  SmallVector<int64_t> maxTileSizes(lbs.size(), 1);
+  if (!partitionableLoops.empty()) {
+    // TODO: Here the min tile size is just looking at the type of the data in
+    // the entry point function, and using a vector size that depends on just
+    // that. For `LinalgOp`s we can use the indexing map, find the loops that
+    // are fastest varying and set those to have a min tile size of vector
+    // length. A version of this is done for generic ops. Generalize that and
+    // use it for `LinalgOp`s.
+    unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
+    minTileSizes[partitionableLoops.back()] =
+        getVectorSize(entryPointFn, typeWidthInBytes);
+    for (auto partitionableLoopId : partitionableLoops) {
+      maxTileSizes[partitionableLoopId] = defaultDistTileSize;
+    }
   }
-  return setDefaultRootConfig(entryPointFn, partitionableLoopOp, lbs, ubs);
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
+
+  TileSizesListType tileSizes = {distTileSizes};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Redirects to methods that set the configuration based on operation type.
@@ -2002,8 +1965,6 @@ setRootConfigImpl(func::FuncOp entryPointFn, Operation *op,
               return setConvInterfaceRootConfig(entryPointFn, op);
             })
         .Case<linalg::ContractionOpInterface>(
-            [&](auto op) { return setRootConfig(entryPointFn, op); })
-        .Case<linalg::LinalgOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<TilingInterface>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
