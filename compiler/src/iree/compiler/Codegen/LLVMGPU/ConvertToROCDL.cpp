@@ -37,6 +37,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+static llvm::cl::opt<int>
+    clROCMIndexingBits("iree-rocm-index-bits",
+                       llvm::cl::desc("Set the bit width of indices in ROCm."),
+                       llvm::cl::init(64));
+
 namespace {
 
 static StringRef getTargetArch(func::FuncOp entryPoint) {
@@ -95,9 +100,17 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   void runOnOperation() override {
     ModuleOp m = getOperation();
 
+    if (clROCMIndexingBits != 32 && clROCMIndexingBits != 64) {
+      m.emitOpError() << "unsupported: ROCm index bit widths must either be "
+                         "64 or 32, got "
+                      << clROCMIndexingBits;
+      return signalPassFailure();
+    }
+    bool use32BitIndices = clROCMIndexingBits == 32;
+
     /// Customize the bitwidth used for the device side index computations.
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
-    options.overrideIndexBitwidth(64);
+    options.overrideIndexBitwidth(use32BitIndices ? 32 : 64);
     LLVMTypeConverter converter(m.getContext(), options);
     populateGpuMemorySpaceAttributeConversions(
         converter, [](gpu::AddressSpace space) {
@@ -132,7 +145,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       // We currently always use 64 bit indices, thus ensure the bit width of
       // the mask compare is consistent.
       vector::populateVectorMaskMaterializationPatterns(
-          patterns, /*force32BitVectorIndices=*/false);
+          patterns, /*force32BitVectorIndices=*/use32BitIndices);
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       // TODO: doubtful that the "default" does what one want here, it is likely
       // better to use something else.
