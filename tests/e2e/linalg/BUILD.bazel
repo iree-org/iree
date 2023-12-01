@@ -100,13 +100,23 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+CUDA_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "conv2d.mlir",
+        "f32_to_i4.mlir",
+        "i4_to_f32.mlir",
+        # currently only enabled on cuda as it can be slow on other backends.
+        "large_linalg_matmul.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_large_linalg_matmul_cuda",
-    srcs =
-        [
-            # currently only enabled on cuda as it can be slow on other backends.
-            "large_linalg_matmul.mlir",
-        ],
+    srcs = CUDA_SRCS,
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
