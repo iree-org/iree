@@ -19,37 +19,22 @@ package(
 )
 
 LLVM_SRCS = enforce_glob(
+    # keep sorted
     [
         "conv2d.mlir",
+        "f32_to_i4.mlir",
         "i4_to_f32.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
         "large_linalg_matmul.mlir",
-        "f32_to_i4.mlir",
     ],
 )
-
-LLVM_I4_SRCS = [
-    "f32_to_i4.mlir",
-]
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_i4_llvm-cpu_local-task",
-    srcs = LLVM_I4_SRCS,
-    driver = "local-task",
-    tags = [
-        # TODO(#15540): RISC-V needs sub-byte emulation for vector.maskedstore
-        # ops. Enable the test after it is supported.
-        "noriscv",
-    ],
     target_backend = "llvm-cpu",
 )
 
