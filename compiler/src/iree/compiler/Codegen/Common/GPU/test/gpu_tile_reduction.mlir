@@ -192,7 +192,7 @@ func.func @warp_reduction_multi_reduction() {
 //       CHECK:      scf.yield %{{.+}} : tensor<1x2x64xf32>
 //       CHECK:    scf.yield %{{.+}} : tensor<1x2x64xf32>
 
-//       CHECK:  linalg.generic 
+//       CHECK:  linalg.generic
 //  CHECK-SAME:    iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:    ins(%[[LN]] : tensor<1x2x64xf32>)
 //  CHECK-SAME:    outs(%{{.+}} : tensor<1xf32>)

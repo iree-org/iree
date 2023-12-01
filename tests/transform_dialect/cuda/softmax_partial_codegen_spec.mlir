@@ -92,6 +92,6 @@ module attributes { transform.with_named_sequence } {
       : (!transform.any_op) -> !transform.any_op
     transform.iree.vector.warp_distribute %end_func : (!transform.any_op) -> ()
 
-    transform.yield 
+    transform.yield
   }
 } // module

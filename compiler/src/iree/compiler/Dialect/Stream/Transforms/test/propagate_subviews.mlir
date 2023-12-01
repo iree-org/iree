@@ -170,7 +170,7 @@ func.func private @switch(%resource0: !stream.resource<external>, %resource1: !s
   cf.switch %flag : i32, [
     default: ^bb1(%resource0, %resource1 : !stream.resource<external>, !stream.resource<transient>),
     0: ^bb1(%resource0, %resource1 : !stream.resource<external>, !stream.resource<transient>)
-  ]  
+  ]
 
 // CHECK: ^bb1(%[[BB1_RESOURCE0:.+]]: !stream.resource<external>, %[[BB1_STORAGE_SIZE0:.+]]: index, %[[BB1_OFFSET0:.+]]: index, %[[BB1_LENGTH0:.+]]: index, %[[BB1_RESOURCE1:.+]]: !stream.resource<transient>, %[[BB1_STORAGE_SIZE1:.+]]: index, %[[BB1_OFFSET1:.+]]: index, %[[BB1_LENGTH1:.+]]: index):
 ^bb1(%bb1_resource0: !stream.resource<external>, %bb1_resource1: !stream.resource<transient>):

@@ -136,13 +136,13 @@ hal.executable private @subgroup_reduce_dynamic {
       func.func @subgroup_reduce_dynamic() {
         %c32_i64 = arith.constant 32 : i64
         %cst = arith.constant 0.000000e+00 : f32
-        %cst_0 = arith.constant 2.000000e+00 : f32 
+        %cst_0 = arith.constant 2.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.constant.load[0] : i32
-        %1 = hal.interface.constant.load[1] : i32 
+        %1 = hal.interface.constant.load[1] : i32
         %2 = arith.extui %0 : i32 to i64
         %3 = arith.extui %1 : i32 to i64
-        %4 = arith.shli %3, %c32_i64 : i64 
+        %4 = arith.shli %3, %c32_i64 : i64
         %5 = arith.ori %2, %4 : i64
         %6 = arith.index_castui %5 : i64 to index
         %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8xf32>>
@@ -155,7 +155,7 @@ hal.executable private @subgroup_reduce_dynamic {
         ^bb0(%in: f32, %out: f32):
           %14 = math.powf %in, %cst_0 : f32
           %15 = arith.addf %14, %out : f32
-          linalg.yield %15 : f32 
+          linalg.yield %15 : f32
         } -> tensor<8xf32>
         flow.dispatch.tensor.store %13, %7, offsets = [0], sizes = [8], strides = [1] : tensor<8xf32> -> !flow.dispatch.tensor<writeonly:tensor<8xf32>>
         return

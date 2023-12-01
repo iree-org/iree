@@ -170,12 +170,12 @@ func.func @copies_to_asyncs_mask(%a: memref<1024x1024xf32>, %i: index) {
   %mask1 = vector.create_mask %i : vector<1xi1>
   // CHECK: %[[CP1:.*]] = nvgpu.device_async_copy {{.*}}, {{.*}}, 1, %[[I]]
   %2 = vector.transfer_read %a[%c0, %c4], %cst_0, %mask1 {in_bounds = [true]} : memref<1024x1024xf32>, vector<1xf32>
-  vector.transfer_write %2, %0[%c0, %c4, %c0] {in_bounds = [true]} : vector<1xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>  
+  vector.transfer_write %2, %0[%c0, %c4, %c0] {in_bounds = [true]} : vector<1xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>
   // CHECK: %[[G:.*]] = nvgpu.device_async_create_group %[[CP0]], %[[CP1]]
   // CHECK: nvgpu.device_async_wait %[[G]]
 
   %3 = vector.transfer_read %a[%c0, %c4], %cst_0, %mask1 {in_bounds = [true]} : memref<1024x1024xf32>, vector<1xf32>
-  vector.transfer_write %3, %0[%c0, %c4, %c0], %mask1 {in_bounds = [true]} : vector<1xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>  
+  vector.transfer_write %3, %0[%c0, %c4, %c0], %mask1 {in_bounds = [true]} : vector<1xf32>, memref<4x32x16xf32, #gpu.address_space<workgroup>>
   // We cannot generate async copy if the write is masked.
   // CHECK-NOT: nvgpu.device_async_copy
   return

@@ -133,10 +133,10 @@ func.func @vecmat_bf16bf16f32_casted_dynamic(%arg0 : tensor<?xbf16>, %arg1 : ten
   %c0 = arith.constant 0 : index
   %dim = tensor.dim %arg0, %c0 : tensor<?xbf16>
   %0 = tensor.empty(%dim) : tensor<?xf32>
-  %casted0 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, 
-                                              affine_map<(d0) -> (d0)>], 
-                             iterator_types = ["parallel"]} 
-                             ins(%arg0 : tensor<?xbf16>) 
+  %casted0 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                              affine_map<(d0) -> (d0)>],
+                             iterator_types = ["parallel"]}
+                             ins(%arg0 : tensor<?xbf16>)
                              outs(%0 : tensor<?xf32>) {
   ^bb0(%in: bf16, %out: f32):
     %2 = arith.extf %in : bf16 to f32
@@ -169,10 +169,10 @@ func.func @matvec_i8i8i32_casted_dynamic(%arg0 : tensor<?x?xi32>, %arg1 : tensor
   %c0 = arith.constant 0 : index
   %dim = tensor.dim %arg1, %c0 : tensor<?xi8>
   %0 = tensor.empty(%dim) : tensor<?xi32>
-  %casted1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, 
-                                              affine_map<(d0) -> (d0)>], 
-                             iterator_types = ["parallel"]} 
-                             ins(%arg1 : tensor<?xi8>) 
+  %casted1 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>,
+                                              affine_map<(d0) -> (d0)>],
+                             iterator_types = ["parallel"]}
+                             ins(%arg1 : tensor<?xi8>)
                              outs(%0 : tensor<?xi32>) {
   ^bb0(%in: i8, %out: i32):
     %2 = arith.extsi %in : i8 to i32
@@ -206,10 +206,10 @@ func.func @batch_vecmat_casted_f16f32f32_dynamic(%arg0 : tensor<3x?xf16>, %arg1 
   %c1 = arith.constant 1 : index
   %dim = tensor.dim %arg0, %c1 : tensor<3x?xf16>
   %0 = tensor.empty(%dim) : tensor<3x?xf32>
-  %casted0 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, 
-                                              affine_map<(d0, d1) -> (d0, d1)>], 
-                             iterator_types = ["parallel", "parallel"]} 
-                             ins(%arg0 : tensor<3x?xf16>) 
+  %casted0 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                                              affine_map<(d0, d1) -> (d0, d1)>],
+                             iterator_types = ["parallel", "parallel"]}
+                             ins(%arg0 : tensor<3x?xf16>)
                              outs(%0 : tensor<3x?xf32>) {
   ^bb0(%in: f16, %out: f32):
     %2 = arith.extf %in : f16 to f32

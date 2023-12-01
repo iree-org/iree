@@ -33,7 +33,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op
         : (!transform.any_op) -> !transform.any_op
       %promoted_matmul, %alloc_0, %alloc_1 =
-        transform.iree.promote_operands %matmul [0, 1] 
+        transform.iree.promote_operands %matmul [0, 1]
           : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
       // Late canonicalizations to cleanup and pass the checks.

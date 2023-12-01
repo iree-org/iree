@@ -621,8 +621,8 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
   %dim_2 = tensor.dim %arg0, %c3 : tensor<?x?x?x?xi8>
   %0 = tensor.empty(%dim, %dim_0, %dim_1, %dim_2) : tensor<?x?x?x?xi32>
   %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
-                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
-                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
                         ins(%arg0 : tensor<?x?x?x?xi8>) outs(%0 : tensor<?x?x?x?xi32>) {
   ^bb0(%in: i8, %out: i32):
     %5 = arith.extsi %in : i8 to i32
@@ -634,8 +634,8 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
   %dim_6 = tensor.dim %arg1, %c3 : tensor<?x?x?x?xi8>
   %2 = tensor.empty(%dim_3, %dim_4, %dim_5, %dim_6) : tensor<?x?x?x?xi32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
-                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
-                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
                         ins(%arg1 : tensor<?x?x?x?xi8>) outs(%2 : tensor<?x?x?x?xi32>) {
   ^bb0(%in: i8, %out: i32):
     %5 = arith.extsi %in : i8 to i32
@@ -683,8 +683,8 @@ func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: te
   %dim_2 = tensor.dim %arg0, %c3 : tensor<?x?x?x?xi16>
   %0 = tensor.empty(%dim, %dim_0, %dim_1, %dim_2) : tensor<?x?x?x?xi32>
   %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
-                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
-                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
                         ins(%arg0 : tensor<?x?x?x?xi16>) outs(%0 : tensor<?x?x?x?xi32>) {
   ^bb0(%in: i16, %out: i32):
     %5 = arith.extsi %in : i16 to i32
@@ -696,8 +696,8 @@ func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: te
   %dim_6 = tensor.dim %arg1, %c3 : tensor<?x?x?x?xi4>
   %2 = tensor.empty(%dim_3, %dim_4, %dim_5, %dim_6) : tensor<?x?x?x?xi32>
   %3 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
-                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], 
-                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]} 
+                                        affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
                         ins(%arg1 : tensor<?x?x?x?xi4>) outs(%2 : tensor<?x?x?x?xi32>) {
   ^bb0(%in: i4, %out: i32):
     %5 = arith.extui %in : i4 to i32

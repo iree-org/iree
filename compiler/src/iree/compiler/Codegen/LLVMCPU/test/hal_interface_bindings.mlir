@@ -17,7 +17,7 @@ func.func @binding_ptrs() {
   // CHECK: %[[OFFSET_PTR0:.+]] = llvm.getelementptr %[[BASE_PTR]][18]
   // CHECK: %[[OFFSET_D0:.+]] = llvm.mul %[[C5]], %[[C2]]
   // CHECK: %[[INDEX1:.+]] = llvm.add %[[OFFSET_D0]], %[[C1]]
-  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[INDEX1]]] 
+  // CHECK: %[[OFFSET_PTR1:.+]] = llvm.getelementptr %[[OFFSET_PTR0]][%[[INDEX1]]]
   // CHECK: %[[VALUE:.+]] = llvm.load %[[OFFSET_PTR1]]
   %c1 = arith.constant 1 : index
   %c5 = arith.constant 5 : index
@@ -105,7 +105,7 @@ func.func @binding_ptrs_sub_byte_dynamic() {
   // CHECK: %[[OFFSET_ZEXT:.+]] = llvm.zext %[[OFFSET]]
   %offset = hal.interface.constant.load[0] : index
   %dim0 = hal.interface.constant.load[1]: index
-  
+
   // CHECK: %[[STATE3:.+]] = llvm.load %arg1
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE3]][10]
   // CHECK: %[[ARRAY_PTR:.+]] = llvm.getelementptr %[[BINDING_PTRS]][1] : (!llvm.ptr) -> !llvm.ptr, !llvm.ptr

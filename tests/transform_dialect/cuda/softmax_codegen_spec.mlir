@@ -109,6 +109,6 @@ module attributes { transform.with_named_sequence } {
     %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
     transform.iree.vector.warp_distribute %end_func : (!transform.any_op) -> ()
 
-    transform.yield 
+    transform.yield
   }
 } // module

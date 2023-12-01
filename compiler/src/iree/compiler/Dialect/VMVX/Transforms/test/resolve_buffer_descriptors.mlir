@@ -8,7 +8,7 @@
     %base_buffer, %offset, %sizes:2, %strides:2 = vmvx.get_buffer_descriptor %0 : memref<64x64xf32, #map0> -> !util.buffer, index, index, index, index, index
     return %base_buffer, %offset, %sizes#0, %sizes#1, %strides#0, %strides#1 : !util.buffer, index, index, index, index, index
   }
-//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 + s1 * s2 + s3 * s4)>       
+//     CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 + s1 * s2 + s3 * s4)>
 //     CHECK: func @resolve_subview(
 // CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:2, %[[BASE_STRIDES:.+]]:2 = vmvx.get_buffer_descriptor %arg0
 // CHECK-DAG:   %[[C64:.+]] = arith.constant 64 : index
