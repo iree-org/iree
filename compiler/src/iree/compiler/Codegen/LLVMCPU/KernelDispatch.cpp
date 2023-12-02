@@ -513,36 +513,35 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
 /// target. The resulting tile size will be a multiple of the provided vector
 /// size, except when `allowIncompleteTile` is set to true.
 static int64_t getMaxDistributionTileSize(int64_t lb, int64_t ub,
-                                          int64_t maxSize, int64_t vectorSize,
-                                          bool allowIncompleteTile = false) {
-  if (ShapedType::isDynamic(ub) || ShapedType::isDynamic(lb)) {
-    return maxSize;
+                                          int64_t tileSize, int64_t vectorSize,
+                                          bool allowIncompleteTile) {
+  if (allowIncompleteTile) {
+    tileSize = llvm::alignTo(tileSize, vectorSize);
   }
+
+  if (ShapedType::isDynamic(ub) || ShapedType::isDynamic(lb)) {
+    return tileSize;
+  }
+
   int64_t numIters = ub - lb;
-  if (numIters <= maxSize && numIters < vectorSize) {
+  if (numIters <= tileSize && numIters <= vectorSize) {
     return numIters;
   }
 
-  int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
+  if (allowIncompleteTile) {
+    return tileSize;
+  }
+
+  int64_t scaledUB = std::min(tileSize, numIters) / vectorSize * vectorSize;
   for (int64_t i = scaledUB; i > 0; i -= vectorSize) {
     if (numIters % i == 0) {
       return i;
     }
   }
-  if (allowIncompleteTile) {
-    // Set bound to half to avoid too many workgroup.
-    int64_t start = std::min(maxSize, numIters);
-    int64_t end = start / 2;
-    for (int64_t i = start; i >= end; --i) {
-      if (numIters % i == 0) {
-        return i;
-      }
-    }
-    return maxSize;
-  }
+
   // If it can't be a multiple of `vectorSize`, let's choose a factor of
   // `numIters` sizes heuristically.
-  int64_t start = std::min(maxSize, numIters);
+  int64_t start = std::min(tileSize, numIters);
   for (int64_t i = start; i > 0; --i) {
     if (numIters % i == 0) {
       return i;
