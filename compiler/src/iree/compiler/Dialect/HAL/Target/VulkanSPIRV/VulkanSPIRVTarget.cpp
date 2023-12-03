@@ -15,13 +15,8 @@
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/schemas/spirv_executable_def_builder.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/FormatVariadic.h"
-#include "llvm/Support/Path.h"
-#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/AsmParser/AsmParser.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -32,7 +27,6 @@
 #include "mlir/Dialect/SPIRV/Linking/ModuleCombiner.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir {

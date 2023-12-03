@@ -58,6 +58,18 @@ def SPIRVEraseStorageBufferStaticShape :
   let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
+def SPIRVFinalVectorLowering : Pass<
+    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
+}
+
+def SPIRVInitialVectorLowering : Pass<
+    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
+}
+
 def SPIRVLowerExecutableTarget :
     Pass<"iree-spirv-lower-executable-target-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
@@ -113,18 +125,6 @@ def SPIRVTileToCooperativeOps : Pass<
                 "cooperative ops";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
-}
-
-def SPIRVInitialVectorLowering : Pass<
-    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
-  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
-  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
-}
-
-def SPIRVFinalVectorLowering : Pass<
-    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
-  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
-  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
 }
 
 def SPIRVVectorizeLoadStore :
