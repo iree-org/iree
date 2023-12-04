@@ -4,15 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-<<<<<<< HEAD:compiler/plugins/target/ROCM/ROCMTarget.cpp
 #include "./ROCMTargetUtils.h"
-=======
-#include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
 
 #include <cstdint>
 #include <mutex>
 
->>>>>>> upstream/main:compiler/src/iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.cpp
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
