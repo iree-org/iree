@@ -35,7 +35,9 @@ hal.executable private @dispatch_1 {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
     }
-    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) {
+    hal.executable.export @dispatch_1 ordinal(0) layout(#pipeline_layout) attributes {
+      workgroup_size = [64: index, 1: index, 1: index], subgroup_size = 64: index
+    } {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
@@ -44,7 +46,7 @@ hal.executable private @dispatch_1 {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []> {
         spirv.func @dispatch_1() "None" { spirv.Return }
         spirv.EntryPoint "GLCompute" @dispatch_1
-        spirv.ExecutionMode @dispatch_1 "LocalSize", 32, 1, 1
+        spirv.ExecutionMode @dispatch_1 "LocalSize", 8, 4, 1
       }
     }
   }
@@ -54,13 +56,14 @@ hal.executable private @dispatch_2 {
     hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
-      hal.return %c1, %c1, %c1 : index, index, index
+      %c4 = arith.constant 4 : index
+      hal.return %c4, %c4, %c1 : index, index, index
     }
     builtin.module {
       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []> {
         spirv.func @dispatch_2() "None" { spirv.Return }
         spirv.EntryPoint "GLCompute" @dispatch_2
-        spirv.ExecutionMode @dispatch_2 "LocalSize", 32, 1, 1
+        spirv.ExecutionMode @dispatch_2 "LocalSize", 16, 16, 1
       }
     }
   }
@@ -104,10 +107,14 @@ util.initializer {
 // CHECK-NEXT:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:       = arith.constant 1
 //      CHECK:     hal.executable.export public @dispatch_0 ordinal(0)
-// CHECK-NEXT:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
+//      CHECK:       hal.return %c1, %c1, %c1
+//      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:       = arith.constant 2
 //      CHECK:     hal.executable.export public @dispatch_1 ordinal(1)
+// CHECK-SAME:       {subgroup_size = 64 : index, workgroup_size = [64 : index, 1 : index, 1 : index]}
+//      CHECK:       hal.return %c1, %c1, %c1
 //      CHECK:     hal.executable.export public @dispatch_2 ordinal(2)
+//      CHECK:       hal.return %c4, %c4, %c1
 //      CHECK:     builtin.module {
 //      CHECK:       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []>
 // CHECK-NEXT:         spirv.func @dispatch_0()
@@ -116,11 +123,11 @@ util.initializer {
 //      CHECK:       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []>
 // CHECK-NEXT:         spirv.func @dispatch_1()
 //      CHECK:         spirv.EntryPoint "GLCompute" @dispatch_1
-//      CHECK:         spirv.ExecutionMode @dispatch_1 "LocalSize", 32, 1, 1
+//      CHECK:         spirv.ExecutionMode @dispatch_1 "LocalSize", 8, 4, 1
 //      CHECK:       spirv.module Logical GLSL450 requires #spirv.vce<v1.3, [Shader], []>
 // CHECK-NEXT:         spirv.func @dispatch_2()
 //      CHECK:         spirv.EntryPoint "GLCompute" @dispatch_2
-//      CHECK:         spirv.ExecutionMode @dispatch_2 "LocalSize", 32, 1, 1
+//      CHECK:         spirv.ExecutionMode @dispatch_2 "LocalSize", 16, 16, 1
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
 // CHECK-NEXT: }

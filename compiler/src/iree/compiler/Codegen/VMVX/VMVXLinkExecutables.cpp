@@ -63,8 +63,7 @@ struct VMVXLinkExecutablesPass
               moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
               [](mlir::ModuleOp moduleOp) {
                 return *moduleOp.getOps<IREE::VM::ModuleOp>().begin();
-              },
-              nestedBuilder))) {
+              }))) {
         return signalPassFailure();
       }
     }

@@ -8,7 +8,6 @@
 #define IREE_COMPILER_CODEGEN_UTILS_LINKINGUTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -25,8 +24,7 @@ LogicalResult linkExecutablesInto(
     ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
     IREE::HAL::ExecutableOp linkedExecutableOp,
     IREE::HAL::ExecutableVariantOp linkedTargetOp,
-    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
-    OpBuilder &builder);
+    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn);
 
 } // namespace iree_compiler
 } // namespace mlir

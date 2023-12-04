@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
 
-#include "llvm/ADT/StringExtras.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/SymbolTable.h"
 
@@ -190,8 +190,8 @@ LogicalResult linkExecutablesInto(
     ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
     IREE::HAL::ExecutableOp linkedExecutableOp,
     IREE::HAL::ExecutableVariantOp linkedTargetOp,
-    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
-    OpBuilder &builder) {
+    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn) {
+  MLIRContext *context = linkedTargetOp.getContext();
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
   SymbolReplacements symbolReplacements;
@@ -226,10 +226,10 @@ LogicalResult linkExecutablesInto(
 
       // Remap variant refs.
       auto oldVariantRefAttr =
-          SymbolRefAttr::get(builder.getContext(), sourceExecutableOp.getName(),
+          SymbolRefAttr::get(context, sourceExecutableOp.getName(),
                              {SymbolRefAttr::get(variantOp)});
       auto newVariantRefAttr =
-          SymbolRefAttr::get(builder.getContext(), linkedExecutableOp.getName(),
+          SymbolRefAttr::get(context, linkedExecutableOp.getName(),
                              {SymbolRefAttr::get(linkedTargetOp)});
       symbolReplacements.variantRefs[oldVariantRefAttr] = newVariantRefAttr;
 
@@ -244,24 +244,20 @@ LogicalResult linkExecutablesInto(
       // Clone export ops and queue remapping ordinals and updating
       // symbol refs.
       for (auto exportOp : variantOp.getExportOps()) {
-        auto newExportOp =
-            linkedTargetBuilder.create<IREE::HAL::ExecutableExportOp>(
-                exportOp.getLoc(), exportOp.getSymNameAttr(),
-                builder.getIndexAttr(nextEntryPointOrdinal++),
-                exportOp.getLayout(), /*workgroup_size=*/ArrayAttr{},
-                /*subgroup_size=*/IntegerAttr{},
-                /*workgroup_local_memory=*/IntegerAttr{});
-        newExportOp->setDialectAttrs(exportOp->getDialectAttrs());
+        auto newExportOp = cast<IREE::HAL::ExecutableExportOp>(
+            linkedTargetBuilder.clone(*exportOp));
+        newExportOp.setOrdinalAttr(
+            linkedTargetBuilder.getIndexAttr(nextEntryPointOrdinal++));
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this export.
         auto oldExportRefAttr = SymbolRefAttr::get(
-            builder.getContext(), sourceExecutableOp.getName(),
+            context, sourceExecutableOp.getName(),
             {SymbolRefAttr::get(variantOp), SymbolRefAttr::get(exportOp)});
-        auto newExportRefAttr = SymbolRefAttr::get(
-            builder.getContext(), linkedExecutableOp.getName(),
-            {SymbolRefAttr::get(linkedTargetOp),
-             SymbolRefAttr::get(newExportOp)});
+        auto newExportRefAttr =
+            SymbolRefAttr::get(context, linkedExecutableOp.getName(),
+                               {SymbolRefAttr::get(linkedTargetOp),
+                                SymbolRefAttr::get(newExportOp)});
         symbolReplacements.exportRefs[oldExportRefAttr] = newExportRefAttr;
       }
 
@@ -283,7 +279,7 @@ LogicalResult linkExecutablesInto(
   // Attach object files from source variants.
   if (!objectAttrs.empty()) {
     linkedTargetOp.setObjectsAttr(
-        builder.getArrayAttr(objectAttrs.takeVector()));
+        linkedTargetBuilder.getArrayAttr(objectAttrs.takeVector()));
   }
 
   // Update references to @executable::@target::@entry symbols.
