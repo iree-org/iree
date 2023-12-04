@@ -11,13 +11,12 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
-struct SPIRVLinkExecutablesPass
-    : public SPIRVLinkExecutablesBase<SPIRVLinkExecutablesPass> {
+struct SPIRVLinkExecutablesPass final
+    : SPIRVLinkExecutablesBase<SPIRVLinkExecutablesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
     OpBuilder moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
@@ -41,7 +40,8 @@ struct SPIRVLinkExecutablesPass
         OpBuilder::atBlockBegin(&linkedExecutableOp.getBlock());
 
     // Gather all unique executable targets - we may have multiple.
-    auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs =
+        gatherExecutableTargets(sourceExecutableOps);
     for (auto executableTargetAttr : executableTargetAttrs) {
       // Add our hal.executable.variant with an empty module.
       auto linkedTargetOp =
@@ -69,5 +69,4 @@ createSPIRVLinkExecutablesPass() {
   return std::make_unique<SPIRVLinkExecutablesPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
