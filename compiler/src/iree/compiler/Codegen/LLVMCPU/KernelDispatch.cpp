@@ -157,11 +157,13 @@ operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-/// Splits the given `Range` vector and returns the `lbs` and the `ubs` as
+/// Splits the iteration ranges from `op` and returns the `lbs` and the `ubs` as
 /// separate lists.
-static void getBoundsFromRange(ArrayRef<Range> loopRange,
-                               SmallVector<int64_t> &lb,
-                               SmallVector<int64_t> &ub) {
+static void getRangeBounds(TilingInterface op, SmallVectorImpl<int64_t> &lb,
+                           SmallVectorImpl<int64_t> &ub) {
+  OpBuilder builder(op.getContext());
+  builder.setInsertionPoint(op);
+  SmallVector<Range> loopRange = op.getIterationDomain(builder);
   auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
     std::optional<int64_t> intVal = getConstantIntValue(ofr);
     if (!intVal)
@@ -1853,12 +1855,8 @@ setConvInterfaceRootConfig(func::FuncOp entryPointFn,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::PadOp padOp) {
-  OpBuilder builder(padOp.getContext());
-  builder.setInsertionPoint(padOp);
-  SmallVector<Range> iterationDomain =
-      cast<TilingInterface>(padOp.getOperation()).getIterationDomain(builder);
   SmallVector<int64_t> lbs, ubs;
-  getBoundsFromRange(iterationDomain, lbs, ubs);
+  getRangeBounds(cast<TilingInterface>(padOp.getOperation()), lbs, ubs);
 
   SmallVector<int64_t> minTileSizes(lbs.size(), 1);
   SmallVector<int64_t> maxTileSizes(ubs.size(), defaultDistTileSize);
@@ -1900,20 +1898,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    TilingInterface op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
 
-  // Get the lower bound and upper bound sizes for the TilingInterface op.
-  OpBuilder builder(op.getContext());
-  builder.setInsertionPoint(op);
-  SmallVector<Range> iterationDomain = op.getIterationDomain(builder);
-  auto getStaticValue = [](OpFoldResult ofr) -> int64_t {
-    std::optional<int64_t> intVal = getConstantIntValue(ofr);
-    if (!intVal)
-      return ShapedType::kDynamic;
-    return intVal.value();
-  };
-  auto lbs = llvm::map_to_vector(
-      iterationDomain, [&](Range r) { return getStaticValue(r.offset); });
-  auto ubs = llvm::map_to_vector(
-      iterationDomain, [&](Range r) { return getStaticValue(r.size); });
+  SmallVector<int64_t> lbs, ubs;
+  getRangeBounds(op, lbs, ubs);
 
   // Compute the distribution tile sizes.
   SmallVector<unsigned> partitionableLoops =
