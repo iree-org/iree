@@ -11,7 +11,7 @@ func.func @reduction_with_extra_op_in_func(%arg0: tensor<8x479xf32>, %arg1: tens
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]} 
+    iterator_types = ["parallel", "reduction"]}
     ins(%arg0 : tensor<8x479xf32>)
     outs(%fill : tensor<8xf32>) {
   ^bb0(%in: f32, %out: f32):

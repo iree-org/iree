@@ -425,7 +425,7 @@ func.func @no_yield_dead_results(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?xf32>,
   return %0#1 : tensor<?xf32>
 }
 // CHECK: func @no_yield_dead_results
-// CHECK:   %[[RESULT:.+]] = flow.dispatch.region 
+// CHECK:   %[[RESULT:.+]] = flow.dispatch.region
 // CHECK:     %[[GENERIC:.+]]:2 = linalg.generic
 // CHECK:     flow.return %[[GENERIC]]#1
 // CHECK:   return %[[RESULT]]

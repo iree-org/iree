@@ -18,9 +18,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/Triple.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -33,9 +31,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+namespace {
 struct MetalSPIRVOptions {
-  MetalTargetPlatform targetPlatform;
-  bool compileToMetalLib;
+  MetalTargetPlatform targetPlatform = MetalTargetPlatform::macOS;
+  bool compileToMetalLib = true;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("MetalSPIRV HAL Target");
@@ -46,17 +45,16 @@ struct MetalSPIRVOptions {
             clEnumValN(MetalTargetPlatform::macOS, "macos", "macOS platform"),
             clEnumValN(MetalTargetPlatform::iOS, "ios", "iOS platform"),
             clEnumValN(MetalTargetPlatform::iOSSimulator, "ios-simulator",
-                       "iOS simulator platform")),
-        llvm::cl::init(MetalTargetPlatform::macOS));
+                       "iOS simulator platform")));
     binder.opt<bool>(
         "iree-metal-compile-to-metallib", compileToMetalLib,
         llvm::cl::cat(category),
         llvm::cl::desc("Compile to .metallib and embed in IREE deployable "
                        "flatbuffer if true; "
-                       "otherwise stop at and embed MSL source code"),
-        llvm::cl::init(true));
+                       "otherwise stop at and embed MSL source code"));
   }
 };
+} // namespace
 
 static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
   using spirv::Capability;
@@ -114,8 +112,8 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
 
 class MetalSPIRVTargetBackend : public TargetBackend {
 public:
-  MetalSPIRVTargetBackend(MetalSPIRVOptions options)
-      : options_(std::move(options)) {}
+  MetalSPIRVTargetBackend(const MetalSPIRVOptions &options)
+      : options(options) {}
 
   // NOTE: we could vary this based on the options such as 'metal-v2'.
   std::string name() const override { return "metal"; }
@@ -159,16 +157,16 @@ public:
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 
-  LogicalResult serializeExecutable(const SerializationOptions &options,
+  LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spvModuleOp = *innerModuleOp.getOps<spirv::ModuleOp>().begin();
-    if (!options.dumpIntermediatesPath.empty()) {
+    if (!serOptions.dumpIntermediatesPath.empty()) {
       std::string assembly;
       llvm::raw_string_ostream os(assembly);
       spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
-      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+      dumpDataToPath(serOptions.dumpIntermediatesPath, serOptions.dumpBaseName,
                      variantOp.getName(), ".mlir", assembly);
     }
 
@@ -185,9 +183,9 @@ public:
     if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
       return variantOp.emitError() << "failed to serialize spirv.module";
     }
-    if (!options.dumpIntermediatesPath.empty()) {
-      dumpDataToPath<uint32_t>(options.dumpIntermediatesPath,
-                               options.dumpBaseName, variantOp.getName(),
+    if (!serOptions.dumpIntermediatesPath.empty()) {
+      dumpDataToPath<uint32_t>(serOptions.dumpIntermediatesPath,
+                               serOptions.dumpBaseName, variantOp.getName(),
                                ".spv", spvBinary);
     }
 
@@ -200,7 +198,7 @@ public:
       // We can use ArrayRef here given spvBinary reserves 0 bytes on stack.
       ArrayRef spvData(spvBinary.data(), spvBinary.size());
       std::optional<std::pair<MetalShader, std::string>> msl =
-          crossCompileSPIRVToMSL(options_.targetPlatform, spvData, entryPoint);
+          crossCompileSPIRVToMSL(options.targetPlatform, spvData, entryPoint);
       if (!msl) {
         return variantOp.emitError()
                << "failed to cross compile SPIR-V to Metal shader";
@@ -209,10 +207,10 @@ public:
       mslEntryPointNames.push_back(std::move(msl->second));
     }
 
-    if (!options.dumpBinariesPath.empty()) {
+    if (!serOptions.dumpBinariesPath.empty()) {
       for (auto shader : llvm::enumerate(mslShaders)) {
         dumpDataToPath(
-            options.dumpBinariesPath, options.dumpBaseName,
+            serOptions.dumpBinariesPath, serOptions.dumpBaseName,
             (variantOp.getName() + std::to_string(shader.index())).str(),
             ".metal", shader.value().source);
       }
@@ -220,7 +218,7 @@ public:
 
     // 3. Compile MSL to MTLLibrary.
     SmallVector<std::unique_ptr<llvm::MemoryBuffer>> metalLibs;
-    if (options_.compileToMetalLib) {
+    if (options.compileToMetalLib) {
       // We need to use offline Metal shader compilers.
       // TODO(#14048): The toolchain can also exist on other platforms. Probe
       // the PATH instead.
@@ -229,7 +227,7 @@ public:
         for (auto [shader, entryPoint] :
              llvm::zip(mslShaders, mslEntryPointNames)) {
           std::unique_ptr<llvm::MemoryBuffer> lib = compileMSLToMetalLib(
-              options_.targetPlatform, shader.source, entryPoint);
+              options.targetPlatform, shader.source, entryPoint);
           if (!lib) {
             return variantOp.emitError()
                    << "failed to compile to MTLLibrary from MSL:\n\n"
@@ -313,7 +311,7 @@ private:
         configAttr);
   }
 
-  MetalSPIRVOptions options_;
+  const MetalSPIRVOptions &options;
 };
 
 struct MetalSPIRVSession

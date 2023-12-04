@@ -170,8 +170,8 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // TILING-SAME:       [1, 1, 1] : tensor<?x?x?xf32> to tensor<?x?xf32>
 // TILING:          %[[EXTRACTED_SLICE_4:.+]] = tensor.extract_slice %[[QUERY]][0, 0, 0] [1, %[[DIM]], %[[DIM_0]]] [1, 1,
 // TILING-SAME:       1] : tensor<?x?x?xf32> to tensor<?x?xf32>
-// TILING:          %[[TILED_ATTENTION]]:3 = iree_linalg_ext.attention ins(%[[EXTRACTED_SLICE_4]], %[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE_3]] : 
-// TILING-SAME:                      outs(%[[ARG7]], %[[ARG8]], %[[ARG9]] : 
+// TILING:          %[[TILED_ATTENTION]]:3 = iree_linalg_ext.attention ins(%[[EXTRACTED_SLICE_4]], %[[EXTRACTED_SLICE]], %[[EXTRACTED_SLICE_3]] :
+// TILING-SAME:                      outs(%[[ARG7]], %[[ARG8]], %[[ARG9]] :
 // TILING-SAME:                      -> tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
 // TILING:          scf.yield %[[TILED_ATTENTION]]#0, %[[TILED_ATTENTION]]#1, %[[TILED_ATTENTION]]#2 : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>
 // TILING:        }

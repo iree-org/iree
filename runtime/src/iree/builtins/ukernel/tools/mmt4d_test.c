@@ -202,6 +202,20 @@ static void iree_mmt4d_reference_innerloop_s16u4s32(
   *out_ptr = acc;
 }
 
+static void iree_mmt4d_reference_innerloop_s16s8s32(
+    int32_t* out_ptr, const int16_t* lhs_ptr, const int8_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      int32_t lhs_i32 = lhs_ptr[k * params->M0 * params->K0 + k0];
+      int32_t rhs_i32 = rhs_ptr[k * params->N0 * params->K0 + k0];
+      acc += lhs_i32 * rhs_i32;
+    }
+  }
+  *out_ptr = acc;
+}
+
 static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
   iree_uk_index_t lhs_elem_bits =
@@ -274,6 +288,11 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
               iree_mmt4d_reference_innerloop_s16u4s32(
                   (int32_t*)out_ptr, (const int16_t*)lhs_ptr,
                   (const uint8_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_S16S8S32:
+              iree_mmt4d_reference_innerloop_s16s8s32(
+                  (int32_t*)out_ptr, (const int16_t*)lhs_ptr,
+                  (const int8_t*)rhs_ptr, params);
               break;
             default:
               IREE_UK_ASSERT(false && "unhandled type");
@@ -481,6 +500,7 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");

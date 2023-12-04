@@ -8,10 +8,10 @@ func.func @collapse1() -> !type {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse All (d0, d1, d2, d3, d4, d5)
-  %6 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>, 
+  %6 = linalg.generic { indexing_maps = [
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>,
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>],
             iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
          }
@@ -43,10 +43,10 @@ func.func @collapse2() -> !type {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse (d0, d1) and (d5, d6)
-  %6 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d3, d5, d6)>, 
+  %6 = linalg.generic { indexing_maps = [
+            affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d4, d3, d5, d6)>,
             affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4, d5, d6)>],
             iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "parallel", "parallel"]
          }
@@ -78,10 +78,10 @@ func.func @collapse3() -> !type {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse (d0, d1) and (d3, d4, d5, d6, d7)
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>,
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
           iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "parallel", "parallel", "parallel"]
         }
@@ -112,10 +112,10 @@ func.func @collapse4() -> !type {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse (d0, d1) and (d6, d7)
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>,
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d5, d4, d6, d7)>],
           iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "parallel", "parallel", "parallel"]
         }
@@ -149,16 +149,16 @@ func.func @collapse5() -> !type {
   %input2 = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %input3 = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse (d0, d1) and (d6, d7)
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4, d3, d5, d6, d7)>, 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d4, d3, d2, d5, d6, d7)>, 
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>,
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d4, d3, d5, d6, d7)>,
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d4, d3, d2, d5, d6, d7)>,
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>],
           iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "parallel", "parallel"]
         }
-  ins(%input, %input2, %input3  : !type, !type, !type) 
+  ins(%input, %input2, %input3  : !type, !type, !type)
   outs(%output : !type) {
   ^bb0(%arg1: f32, %arg2: f32, %arg3: f32, %arg4: f32):
     linalg.yield %arg1 : f32
@@ -190,10 +190,10 @@ func.func @collapse6() -> !type {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type> -> !type
   %output = tensor.empty() : !type
-  
+
   // Can collapse (d2, d3) and (d6, d7)
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>,
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d5, d4, d6, d7)>],
           iterator_types = ["parallel", "reduction", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
         }
@@ -226,9 +226,9 @@ func.func @collapse7() -> !type_out {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type_in>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type_in> -> !type_in
   %output = tensor.empty() : !type_out
-  
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>, 
+
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>,
           affine_map<(d0, d1, d2, d3) -> (d1, d2, d3, d0)>],
           iterator_types = ["parallel", "parallel", "parallel", "parallel"]
         }
@@ -258,8 +258,8 @@ func.func @collapse8(%input : !type_in) -> !type_out {
   %c0 = arith.constant 0 : index
   %output = tensor.empty() : !type_out
   // Can collapse (d3, d0, d1)
-  %6 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0, d1, d5)>, 
+  %6 = linalg.generic { indexing_maps = [
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d3, d0, d1, d5)>,
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d2, d3, d0, d1, d4, d5)>],
             iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
          }
@@ -291,8 +291,8 @@ func.func @dont_collapse() -> !type_out {
   %c0 = arith.constant 0 : index
   %input = tensor.empty() : !type_in
   %output = tensor.empty() : !type_out
-  %6 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2) -> (d0, d2)>, 
+  %6 = linalg.generic { indexing_maps = [
+            affine_map<(d0, d1, d2) -> (d0, d2)>,
             affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
             iterator_types = ["parallel", "parallel", "parallel"]
          }
@@ -318,10 +318,10 @@ func.func @collapse9() -> !type_out {
   %input_ptr = util.global.address @"__transpose_10_input" : !util.ptr<!type_in>
   %input = util.global.load.indirect %input_ptr : !util.ptr<!type_in> -> !type_in
   %output = tensor.empty() : !type_out
-  
+
   // Can collapse (d0, d1) and (d6, d7)
-  %result = linalg.generic { indexing_maps = [ 
-          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>, 
+  %result = linalg.generic { indexing_maps = [
+          affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>,
           affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d3, d5, d4, d6, d7)>],
           iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "parallel", "parallel", "parallel"]
         }
@@ -352,7 +352,7 @@ func.func @collapse10(%input : !type_in) -> !type_out {
 
   // Can collapse (d1, d3, d0)
   %result = linalg.generic {
-    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d0)>, 
+    indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d0)>,
                      affine_map<(d0, d1, d2, d3, d4) -> (d2, d1, d3, d0, d4)>],
     iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
   ins(%input : !type_in) outs(%output : !type_out) {
@@ -378,9 +378,9 @@ func.func @collapse11(%input : !type_in) -> !type_out {
   %output = tensor.empty() : !type_out
 
   // Can collapse (d1, d0)
-  %result = linalg.generic { 
+  %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>],
-    iterator_types = ["parallel", "parallel"] }     
+    iterator_types = ["parallel", "parallel"] }
   ins(%input : !type_in) outs(%output : !type_out) {
   ^bb0(%arg1: f32, %arg2: f32):
     linalg.yield %arg1 : f32
@@ -432,12 +432,12 @@ func.func @collapse12() -> (!type,!type,!type,!type) {
   %output1 = tensor.empty() : !type
   %output2 = tensor.empty() : !type
   %output3 = tensor.empty() : !type
-  
-  %6, %7, %8, %9 = linalg.generic { indexing_maps = [ 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
-            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>, 
+
+  %6, %7, %8, %9 = linalg.generic { indexing_maps = [
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>,
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>,
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>,
+            affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>,
             affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d3, d5)>],
             iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]
          }

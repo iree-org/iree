@@ -19,7 +19,7 @@ module attributes { transform.with_named_sequence } {
     // Promote operands in order to test loading from shared memory.
     %matmul_2 = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %promoted_matmul, %alloc_0, %alloc_1 =
-      transform.iree.promote_operands %matmul_2 [0, 1] 
+      transform.iree.promote_operands %matmul_2 [0, 1]
         : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
 
 
@@ -70,6 +70,6 @@ module attributes { transform.with_named_sequence } {
     // ===========================================================================
     %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
-    transform.yield 
+    transform.yield
   }
 } // module

@@ -24,7 +24,7 @@ hal.executable private @pad_matmul_static_dispatch_0  {
       %6 = linalg.matmul ins(%p, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
 
       flow.dispatch.tensor.store %6, %2, offsets=[0, 0], sizes=[250, 1020], strides=[1, 1] : tensor<250x1020xf32> -> !flow.dispatch.tensor<readwrite:tensor<250x1020xf32>>
-      return 
+      return
     }
   }
 
