@@ -107,6 +107,9 @@ createSPIRVFoldProcessorIDUsesPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVInitialVectorLoweringPass();
 
+/// Links SPIR-V HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSPIRVLinkExecutablesPass();
+
 /// Pass to set the lowering strategy for the target variant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVSelectLoweringStrategyPass();
