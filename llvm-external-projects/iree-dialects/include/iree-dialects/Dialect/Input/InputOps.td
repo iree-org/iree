@@ -506,6 +506,32 @@ def IREEInput_TensorReshapeOp : IREEInput_PureOp<"tensor.reshape", [
   }];
 }
 
+def IREEInput_TensorBitCastOp : IREEInput_PureOp<"tensor.bitcast", [
+    AllElementTypesMatch<["source", "result"]>,
+    AttrSizedOperandSegments,
+  ]> {
+  let summary = [{bitcasts a tensor}];
+  let description = [{
+    Bitcasts a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    IREEInput_Tensor:$source,
+    IREEInput_ShapeDynamicDims:$source_dims,
+    IREEInput_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    IREEInput_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+}
+
 def IREEInput_TensorLoadOp : IREEInput_PureOp<"tensor.load", [
     TypesMatchWith<"value type matches element type of target operand",
                    "source", "result",

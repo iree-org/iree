@@ -48,8 +48,8 @@ void iree_hal_cuda2_pending_queue_actions_destroy(iree_hal_resource_t* actions);
 // Enqueues the given list of |command_buffers| that waits on
 // |wait_semaphore_list| and signals |signal_semaphore_lsit|.
 iree_status_t iree_hal_cuda2_pending_queue_actions_enqueue_execution(
-    CUstream dispatch_stream, CUstream callback_stream,
-    iree_hal_cuda2_pending_queue_actions_t* actions,
+    iree_hal_device_t* device, CUstream dispatch_stream,
+    CUstream callback_stream, iree_hal_cuda2_pending_queue_actions_t* actions,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,

@@ -1,7 +1,7 @@
-// RUN: iree-opt  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target)))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-vmvx-select-lowering-strategy, iree-vmvx-lower-executable-target)))" --split-input-file %s | FileCheck %s
 
 hal.executable private @mmt4d_ukernel {
-  hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = true}>) {
+  hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>) {
     hal.executable.export public @mmt4d_i8 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

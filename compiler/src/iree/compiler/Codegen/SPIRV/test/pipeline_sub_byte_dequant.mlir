@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -52,12 +52,12 @@ hal.executable @i4_dequant {
 
 //   CHECK-LABEL: spirv.func @i4_dequant()
 
-//         CHECK: spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32> -> vector<2xi32>
+//         CHECK: spirv.VectorShuffle [0 : i32, 1 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 //         CHECK: spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32]
 //         CHECK: spirv.BitwiseAnd
 //         CHECK: spirv.ShiftRightLogical
 //         CHECK: spirv.BitwiseAnd
-//         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32] {{.*}} : vector<4xi32> -> vector<2xi32>
+//         CHECK: spirv.VectorShuffle [2 : i32, 3 : i32] {{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 // CHECK-COUNT-3: spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32]
 
 // CHECK-COUNT-4: spirv.ConvertUToF {{.+}} : vector<4xi32> to vector<4xf32>

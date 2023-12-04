@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "attention.mlir"
     "cast_address_space_function.mlir"
+    "config_matvec.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
@@ -61,6 +62,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    attention_transform_spec.mlir
     transform_dialect_codegen_bufferize_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir
     transform_dialect_codegen_vector_distribution_spec.mlir

@@ -143,10 +143,9 @@ struct Statistics {
       }
     }
     for (auto constantOp : usageInfo.bufferConstantOps) {
-      if (auto serializableAttr =
-              constantOp.getValue()
-                  .dyn_cast<IREE::Util::SerializableAttrInterface>()) {
-        constantSize += serializableAttr.getStorageSize();
+      if (auto storageAttr =
+              constantOp.getValue().dyn_cast<IREE::Util::SizedStorageAttr>()) {
+        constantSize += storageAttr.getStorageSize();
       }
     }
 

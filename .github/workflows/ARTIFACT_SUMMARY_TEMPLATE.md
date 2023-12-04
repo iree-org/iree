@@ -44,4 +44,4 @@ gcloud storage cp -r "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/*" /tmp/ir
 </details>
 
 To run benchmarks locally with the CI-built e2e test artifacts, see [IREE Benchmark Suites](
-https://github.com/${GITHUB_REPOSITORY}/blob/main/docs/developers/developing_iree/benchmark_suites.md#3-fetch-the-benchmark-artifacts).
+https://iree.dev/developers/performance/benchmark-suites/#3-fetch-the-benchmark-artifacts).

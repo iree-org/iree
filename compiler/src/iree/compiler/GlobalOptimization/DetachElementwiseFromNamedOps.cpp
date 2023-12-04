@@ -95,7 +95,7 @@ struct DetachElementwisePattern
     SmallVector<utils::IteratorType> iterators;
     iterators.reserve(outputMap.getNumResults());
     for (int i = 0, e = outputMap.getNumResults(); i < e; ++i) {
-      int pos = outputMap.getResult(i).cast<AffineDimExpr>().getPosition();
+      int pos = cast<AffineDimExpr>(outputMap.getResult(i)).getPosition();
       auto attr = linalgOp.getIteratorTypesArray()[pos];
       if (!linalg::isParallelIterator(attr))
         return failure();
@@ -154,7 +154,7 @@ struct DetachSplatConstantOutsOperands
       if (!resultType || !resultType.getElementType().isIntOrFloat())
         continue;
 
-      auto attr = llvm::dyn_cast<DenseElementsAttr>(constOp.getValue());
+      auto attr = llvm::dyn_cast<ElementsAttr>(constOp.getValue());
       if (!attr || !attr.isSplat())
         continue;
 

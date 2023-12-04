@@ -261,10 +261,11 @@ private:
       // Branch argument.
       traversalResult |= solver.getExplorer().walkIncomingBranchOperands(
           arg.getParentBlock(),
-          [&](Block *sourceBlock, OperandRange operands) -> WalkResult {
+          [&](Block *sourceBlock, OperandRange operands,
+              size_t offset) -> WalkResult {
             unsigned baseIdx = operands.getBeginOperandIndex();
             auto &sourceOperand = sourceBlock->getTerminator()->getOpOperand(
-                baseIdx + arg.getArgNumber());
+                baseIdx + arg.getArgNumber() + offset);
             updateFromPredecessorUse(sourceOperand, solver);
             return WalkResult::advance();
           });
@@ -429,17 +430,6 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   // Not safe.
   LLVM_DEBUG(llvm::dbgs() << "  - clone source cannot be elided\n");
   return false;
-}
-
-// Tries to elide |cloneOp| by replacing all uses with its source if safe.
-// Returns true if the op was elided.
-static bool tryElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
-                            LastUseAnalysis &analysis) {
-  if (!isSafeToElideCloneOp(cloneOp, analysis))
-    return false;
-  cloneOp.replaceAllUsesWith(cloneOp.getSource());
-  cloneOp.erase();
-  return true;
 }
 
 // Tries to elide copies nested within |region| when safe.

@@ -54,150 +54,57 @@ public:
   }
 
   void runOnOperation() override;
-
-private:
-  Option<bool> testLoweringConfiguration{
-      *this, "test-lowering-configuration",
-      llvm::cl::desc("Flag used for lit-testing the configuration set for root "
-                     "ops in hal.executable.variants. Defaults to false. Set "
-                     "to true for lit tests; not for general usage"),
-      llvm::cl::init(false)};
 };
 } // namespace
 
-/// Verify that valid configuration is set for all ops within the compiled
-/// module.
-template <typename F>
-static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
-  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig)
-      return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
-  });
-  return failure(walkResult.wasInterrupted());
-}
-
-static LogicalResult
-verifyEntryPoint(ModuleOp moduleOp,
-                 IREE::Codegen::TranslationInfoAttr translationInfo,
-                 IREE::HAL::ExecutableExportOp exportOp) {
-  if (translationInfo.getDispatchLoweringPassPipeline() ==
-      CodeGenPipeline::TransformDialectCodegen) {
-    // Transform dialect encodes configuration into the schedule directly.
-    return success();
-  }
-
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp.getWorkgroupSize();
-  if (!workgroupSizeAttr || workgroupSizeAttr->size() != 3) {
-    return moduleOp.emitError(
-        "expected workgroup size to have three dimensions for SPIR-V "
-        "pipelines");
-  }
-
-  std::array<int64_t, 3> workgroupSizes;
-  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
-  }
-
-  switch (translationInfo.getDispatchLoweringPassPipeline()) {
-  case CodeGenPipeline::SPIRVBaseVectorize:
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes,
-                                       verifySPIRVBaseVectorizePassPipeline);
-  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-    return verifyLoweringConfiguration(
-        moduleOp, translationInfo, workgroupSizes,
-        verifySPIRVMatmulPromoteVectorizePassPipeline);
-  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-    return verifyLoweringConfiguration(
-        moduleOp, translationInfo, workgroupSizes,
-        verifySPIRVCooperativeMatrixVectorizePassPipeline);
-  default:
-    break;
-  }
-  return success();
-}
-
 void SPIRVLowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
 
-  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
-
-  if (failed(initSPIRVLaunchConfig(moduleOp))) {
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    variantOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
     return signalPassFailure();
   }
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. For now this restriction
-  // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitError(
-              "unhandled compilation of entry point function with different "
-              "translation info within a module");
-          return signalPassFailure();
-        }
-        continue;
-      }
 
-      // Verify the properties of each entry point based on the target
-      // pipeline.
-      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
-        return signalPassFailure();
-      }
-
-      translationInfo = currTranslationInfo;
-    }
-  }
-
-  if (!testLoweringConfiguration && translationInfo.has_value()) {
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case CodeGenPipeline::SPIRVBaseLowering:
-      addSPIRVBaseLoweringPassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseDistribute:
-      addSPIRVBaseDistributePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVBaseVectorize:
-      addSPIRVBaseVectorizePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVSubgroupReduce:
-      addSPIRVSubgroupReducePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-      addSPIRVCooperativeMatrixVectorizePassPipeline(
-          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-          translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-      addSPIRVMatmulPromoteVectorizePassPipeline(
-          pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-          translationInfo.value().getSoftwarePipelineStoreStage());
-      break;
-    case CodeGenPipeline::SPIRVWinogradVectorize:
-      addSPIRVWinogradVectorizePassPipeline(pipeline);
-      break;
-    case CodeGenPipeline::TransformDialectCodegen:
-      addSPIRVTransformDialectPassPipeline(pipeline);
-      break;
-    default:
-      variantOp.emitOpError("Unsupported pipeline on GPU target.");
-      return signalPassFailure();
-    }
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
+  switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+  case CodeGenPipeline::SPIRVBaseLowering:
+    addSPIRVBaseLoweringPassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVBaseDistribute:
+    addSPIRVBaseDistributePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVBaseVectorize:
+    addSPIRVBaseVectorizePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVSubgroupReduce:
+    addSPIRVSubgroupReducePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
+    addSPIRVCooperativeMatrixVectorizePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+        translationInfo.value().getSoftwarePipelineStoreStage());
+    break;
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
+    addSPIRVMatmulPromoteVectorizePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
+        translationInfo.value().getSoftwarePipelineStoreStage());
+    break;
+  case CodeGenPipeline::SPIRVWinogradVectorize:
+    addSPIRVWinogradVectorizePassPipeline(pipeline);
+    break;
+  case CodeGenPipeline::TransformDialectCodegen:
+    addSPIRVTransformDialectPassPipeline(pipeline);
+    break;
+  // No pipeline specified, nothing to do.
+  case CodeGenPipeline::None:
+    return;
+  default:
+    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    return signalPassFailure();
   }
 
   LLVM_DEBUG({

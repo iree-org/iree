@@ -66,6 +66,11 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_task_topology_group_initialize(i, group);
     group->processor_index = cpu_ids[i];
 
+    // NOTE: without cpuinfo we can't get cache sizes so we just guess some
+    // conservative values.
+    group->caches.l1_data = 32 * 1024;
+    group->caches.l2_data = 128 * 1024;
+
     // NOTE: without cpuinfo we can't get SMT and node info but this isn't
     // really used on Linux today anyway.
     iree_thread_affinity_t* affinity = &group->ideal_thread_affinity;
@@ -191,6 +196,12 @@ static void iree_task_topology_group_initialize_from_processor(
   out_group->processor_index =
       processor->core->processor_start + processor->smt_id;
 #endif  // __linux__
+  out_group->caches.l1_data =
+      processor->cache.l1d ? processor->cache.l1d->size : 0;
+  out_group->caches.l2_data =
+      processor->cache.l2 ? processor->cache.l2->size : 0;
+  out_group->caches.l3_data =
+      processor->cache.l3 ? processor->cache.l3->size : 0;
   iree_task_topology_set_affinity_from_processor(
       processor, &out_group->ideal_thread_affinity);
 }
@@ -322,12 +333,6 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 // |user_data| is the value passed alongside the filter function.
 typedef bool (*iree_task_topology_core_filter_t)(
     const struct cpuinfo_core* core, uintptr_t user_data);
-
-// Matches all cores.
-static bool iree_task_topology_core_filter_all(const struct cpuinfo_core* core,
-                                               uintptr_t user_data) {
-  return true;
-}
 
 // Matches all cores that have the provided cluster ID.
 static bool iree_task_topology_core_filter_by_cluster_id(

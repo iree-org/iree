@@ -42,8 +42,7 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
     registry
-        .insert<IREE::Codegen::IREECodegenDialect,
-                IREE::HAL::HALDialect,
+        .insert<IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 linalg::LinalgDialect,
                 gpu::GPUDialect,
@@ -62,138 +61,66 @@ public:
       const LLVMGPULowerExecutableTargetPass &pass){};
 
   void runOnOperation() override;
-
-private:
-  Option<bool> testLoweringConfiguration{
-      *this, "test-lowering-configuration",
-      llvm::cl::desc(
-          "Flag used for lit-testing the default configuration set for root "
-          "ops in hal.executable.variants. Defaults to false and is set to "
-          "true "
-          "for lit tests. Not for general usage"),
-      llvm::cl::init(false)};
 };
 } // namespace
 
-/// Verify that valid configuration is set for all ops within the compiled
-/// module.
-template <typename F>
-static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
-  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
-    if (!loweringConfig)
-      return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
-  });
-  return failure(walkResult.wasInterrupted());
-}
-
-static LogicalResult
-verifyEntryPoint(ModuleOp moduleOp,
-                 IREE::Codegen::TranslationInfoAttr translationInfo,
-                 IREE::HAL::ExecutableExportOp exportOp) {
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp.getWorkgroupSize();
-
-  if (workgroupSizeAttr.has_value()) {
-    std::array<int64_t, 3> workgroupSizes;
-    for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-      workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
-    }
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes, verifyGPUMatmulPipeline);
-  }
-  return success();
-}
-
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-  OpPassManager executableLoweringPipeline(
-      IREE::HAL::ExecutableVariantOp::getOperationName());
 
-  if (failed(initGPULaunchConfig(moduleOp))) {
+  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+      getIdenticalTranslationInfo(variantOp);
+  if (!translationInfo) {
+    variantOp.emitOpError(
+        "unhandled compilation of entry point functions with different "
+        "translation info");
     return signalPassFailure();
   }
 
-  // There might be multiple entry points in the module. Currently, all of
-  // them need to have the same pipeline.
-  // TODO(ravishankarm): This is strange that this is not enforced
-  // structurally, but something to address later on. For now this restriction
-  // is fine.
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto &it : exportOps) {
-    auto exportOp = it.second;
-    if (IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-            getTranslationInfo(exportOp)) {
-      if (translationInfo) {
-        if (currTranslationInfo != translationInfo.value()) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with different "
-              "translation info");
-        }
-      } else {
-        translationInfo = currTranslationInfo;
-      }
-
-      // Verify the properties of each entry point based on the target
-      // pipeline.
-      if (failed(verifyEntryPoint(moduleOp, currTranslationInfo, exportOp))) {
-        return signalPassFailure();
-      }
-    }
+  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
+  switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
+    addGPUDefaultPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
+    addGPUSimpleDistributePassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
+    addGPUVectorizationPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+    addGPUMatmulSimtPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+    addGPUMatmulTensorCorePassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      LLVMGPUMatmulTensorCoreMmaSync:
+    addGPUMatmulTensorCoreMmaSyncPassPipeline(
+        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
+    addGPUTransposePassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
+    addGPUWarpReductionPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
+    addGPUPackUnPackPasses(pipeline);
+    break;
+  // Transform-dialect pipelines.
+  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
+    addGPUTransformDialectPasses(pipeline);
+    break;
+  // no pipeline specified, nothing to do.
+  case IREE::Codegen::DispatchLoweringPassPipeline::None:
+    return;
+  default:
+    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    return signalPassFailure();
   }
 
-  if (!testLoweringConfiguration && translationInfo.has_value()) {
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
-      addGPUDefaultPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
-      addGPUSimpleDistributePassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize:
-      addGPUVectorizationPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-      addGPUMatmulSimtPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-      addGPUMatmulTensorCorePassPipeline(
-          executableLoweringPipeline,
-          translationInfo.value().getSoftwarePipelineDepth());
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::
-        LLVMGPUMatmulTensorCoreMmaSync:
-      addGPUMatmulTensorCoreMmaSyncPassPipeline(
-          executableLoweringPipeline,
-          translationInfo.value().getSoftwarePipelineDepth());
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-      addGPUTransposePassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
-      addGPUWarpReductionPassPipeline(executableLoweringPipeline);
-      break;
-    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
-      addGPUPackUnPackPasses(executableLoweringPipeline);
-      break;
-    // Transform-dialect pipelines.
-    case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-      addGPUTransformDialectPasses(executableLoweringPipeline);
-      break;
-    default:
-      variantOp.emitOpError("Unsupported pipeline on GPU target.");
-      return signalPassFailure();
-    }
-  }
-
-  if (failed(runPipeline(executableLoweringPipeline, variantOp))) {
+  if (failed(runPipeline(pipeline, variantOp))) {
     return signalPassFailure();
   }
 }

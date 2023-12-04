@@ -25,7 +25,7 @@ namespace Util {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
-  if (auto elementsAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
+  if (auto elementsAttr = llvm::dyn_cast<ElementsAttr>(value)) {
     // Don't outline splats - we want those fused.
     return !elementsAttr.isSplat();
   }

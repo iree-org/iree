@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -80,7 +80,7 @@ hal.executable @i4_dequant_matvec_f32 {
 //         CHECK:     scf.yield %[[BCAST]] : vector<1x4xf32>
 
 //         CHECK:   %[[SCAST:.+]] = vector.shape_cast %[[FOR]] : vector<1x4xf32> to vector<4xf32>
-//         CHECK:   vector.reduction <add>, %[[SCAST]] : vector<4xf32> into f32
-// CHECK-COUNT-6:   gpu.shuffle  xor
+//         CHECK:   %[[REDUCE:.+]] = vector.reduction <add>, %[[SCAST]] : vector<4xf32> into f32
+//         CHECK:   gpu.subgroup_reduce add %[[REDUCE]] : (f32) -> f32
 //         CHECK:   scf.if
 //         CHECK:     vector.transfer_write

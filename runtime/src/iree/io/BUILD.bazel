@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -21,7 +21,95 @@ iree_runtime_cc_library(
         "file_handle.h",
     ],
     deps = [
+        ":stream",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "parameter_index",
+    srcs = [
+        "parameter_index.c",
+    ],
+    hdrs = [
+        "parameter_index.h",
+    ],
+    deps = [
+        ":file_handle",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+        "//runtime/src/iree/base/internal:synchronization",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "parameter_index_provider",
+    srcs = [
+        "parameter_index_provider.c",
+    ],
+    hdrs = [
+        "parameter_index_provider.h",
+    ],
+    deps = [
+        ":parameter_index",
+        ":parameter_provider",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/utils:file_cache",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "parameter_provider",
+    srcs = [
+        "parameter_provider.c",
+    ],
+    hdrs = [
+        "parameter_provider.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "scope_map",
+    srcs = [
+        "scope_map.c",
+    ],
+    hdrs = [
+        "scope_map.h",
+    ],
+    deps = [
+        ":parameter_index",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "stream",
+    srcs = [
+        "stream.c",
+    ],
+    hdrs = [
+        "stream.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "stream_test",
+    srcs = ["stream_test.cc"],
+    deps = [
+        ":stream",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
     ],
 )

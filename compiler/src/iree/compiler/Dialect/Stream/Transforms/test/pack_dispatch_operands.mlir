@@ -228,3 +228,41 @@ func.func @host_complex_f32(%arg0: complex<f32>) -> !stream.timepoint {
   } => !stream.timepoint
   return %1 : !stream.timepoint
 }
+
+// -----
+
+stream.executable private @ex5 {
+  // CHECK-LABEL: @device_complex_f32_bitcast
+  stream.executable.export public @device_complex_f32_bitcast
+  builtin.module {
+    // CHECK-LABEL: func.func @device_complex_f32
+    // CHECK-SAME: (%[[DEV_REAL_I32:.+]]: i32, %[[DEV_IMAG_I32:.+]]: i32, %arg2: !stream.binding)
+    func.func @device_complex_f32_bitcast(%arg0: complex<f32>, %arg1: !stream.binding) {
+      // CHECK-DAG: %[[DEV_REAL_F32:.+]] = arith.bitcast %[[DEV_REAL_I32]] : i32 to f32
+      // CHECK-DAG: %[[DEV_IMAG_F32:.+]] = arith.bitcast %[[DEV_IMAG_I32]] : i32 to f32
+      // CHECK-DAG: %[[DEV_COMPLEX:.+]] = complex.create %[[DEV_REAL_F32]], %[[DEV_IMAG_F32]]
+      // CHECK-NEXT: util.optimization_barrier %[[DEV_COMPLEX]]
+      util.optimization_barrier %arg0 : complex<f32>
+      return
+    }
+  }
+}
+// CHECK-LABEL: func.func @host_complex_bitcast
+func.func @host_complex_bitcast(%arg0: complex<f32>) -> !stream.timepoint {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %0 = stream.resource.alloc uninitialized : !stream.resource<external>{%c128}
+  // CHECK-DAG: %[[HOST_REAL_F32:.+]] = complex.re %arg0
+  // CHECK-DAG: %[[HOST_IMAG_F32:.+]] = complex.im %arg0
+  // CHECK-DAG: %[[HOST_REAL_I32:.+]] = arith.bitcast %[[HOST_REAL_F32]] : f32 to i32
+  // CHECK-DAG: %[[HOST_IMAG_I32:.+]] = arith.bitcast %[[HOST_IMAG_F32]] : f32 to i32
+  %1 = complex.bitcast %arg0 : complex<f32> to i64
+  %2 = stream.cmd.execute with(%0 as %arg1: !stream.resource<external>{%c128}) {
+    // CHECK: stream.cmd.dispatch {{.+}}(%[[HOST_REAL_I32]], %[[HOST_IMAG_I32]] : i32, i32)
+    stream.cmd.dispatch @ex5::@device_complex_f32_bitcast[%c1, %c1, %c1](%1 : i64) {
+      wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
+    }
+  } => !stream.timepoint
+  return %2 : !stream.timepoint
+}

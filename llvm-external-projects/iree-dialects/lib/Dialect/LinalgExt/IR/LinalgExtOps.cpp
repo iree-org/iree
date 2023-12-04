@@ -2095,15 +2095,25 @@ LogicalResult WinogradInputTransformOp::verify() {
   }
   auto inputType = input().getType().cast<ShapedType>();
   auto outputType = output().getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  if (inputShape.size() != 4) {
-    return op->emitOpError("expected input operand to have rank 4");
-  }
-  ArrayRef<int64_t> outputShape = outputType.getShape();
   if (outputType.getElementType() != inputType.getElementType()) {
     return op->emitOpError(
         "expected input/output element types to be identical");
   }
+  unsigned inputRank = inputType.getRank();
+  unsigned outputRank = outputType.getRank();
+
+  if (inputRank != 2 && inputRank != 4) {
+    return op->emitOpError("expected input operand to have rank either 2 or 4");
+  }
+
+  if (inputRank == 2) {
+    if (outputRank != 2) {
+      return op->emitOpError(
+          "expected output operand to have rank 2 if input is of rank 2");
+    }
+    return success();
+  }
+
   if (getOutputOperandRank() != getInputOperandRank() + 2) {
     return op->emitOpError(
         "expected output rank to be equal to input rank + 2");
@@ -2125,6 +2135,7 @@ LogicalResult WinogradInputTransformOp::verify() {
   SmallVector<int64_t> expectedOutputShape(getOutputOperandRank(),
                                            inputTileSize);
   int outputIndex;
+  ArrayRef<int64_t> inputShape = inputType.getShape();
   for (int i = 0; i < inputShape.size(); i++) {
     outputIndex = i + numImageDims;
     if (ShapedType::isDynamic(inputShape[i])) {
@@ -2141,6 +2152,7 @@ LogicalResult WinogradInputTransformOp::verify() {
   if (isNchw()) {
     permute<Permutation::TTNCHW_TO_TTNHWC>(expectedOutputShape);
   }
+  ArrayRef<int64_t> outputShape = outputType.getShape();
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
   }
@@ -2265,16 +2277,26 @@ LogicalResult WinogradOutputTransformOp::verify() {
   }
   auto inputType = input().getType().cast<ShapedType>();
   auto outputType = output().getType().cast<ShapedType>();
-  SmallVector<int64_t> inputShape(inputType.getShape());
-  if (inputShape.size() != 6) {
-    return op->emitOpError("expected input operand to have rank 6");
+  unsigned inputRank = inputType.getRank();
+  unsigned outputRank = outputType.getRank();
+
+  if (inputRank != 2 && inputRank != 6) {
+    return op->emitOpError("expected input operand to have rank either 2 or 6");
+  }
+
+  if (inputRank == 2) {
+    if (outputRank != 2) {
+      return op->emitOpError(
+          "expected output operand to have rank 2 if input is of rank 2");
+    }
+    return success();
   }
   ArrayRef<int64_t> outputShape = outputType.getShape();
   if (outputType.getElementType() != inputType.getElementType()) {
     return op->emitOpError(
         "expected input/output element types to be identical");
   }
-  if (getOutputOperandRank() != getInputOperandRank() - 2) {
+  if (outputRank != inputRank - 2) {
     return op->emitOpError(
         "expected output rank to be equal to input rank - 2");
   }
@@ -2289,6 +2311,7 @@ LogicalResult WinogradOutputTransformOp::verify() {
     return op->emitOpError(
         "expect image dimensions to be either [1, 2] or [2, 3]");
   }
+  SmallVector<int64_t> inputShape(inputType.getShape());
   if (isNchw()) {
     permute<Permutation::TTNHWC_TO_TTNCHW>(inputShape);
   }

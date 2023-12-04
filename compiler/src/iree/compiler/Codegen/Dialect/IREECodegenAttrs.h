@@ -56,6 +56,18 @@ getTranslationInfo(func::FuncOp funcOp) {
   return getTranslationInfo(*exportOp);
 }
 
+/// Returns the identical TranslationInfoAttr. Returns nullptr if entry point
+/// functions have different TranslationInfoAttr.
+/// There might be multiple entry points in the module. Currently, all of them
+/// need to have the same translation info.
+/// TODO(ravishankarm): This is strange that this is not enforced
+/// structurally, but something to address later on. The main issue is how
+/// to invoke separate dynamic pass pipelines on  entry point functions,
+/// when the passes might have module level changes. For now this
+/// restriction is fine.
+std::optional<IREE::Codegen::TranslationInfoAttr>
+getIdenticalTranslationInfo(IREE::HAL::ExecutableVariantOp variantOp);
+
 // TODO(ravishankarm, benvanik): Eventually all the information needed for the
 // lowering will be consolidated into a single attribute with richer
 // information.

@@ -116,7 +116,7 @@ serializeEmbeddedData(Location loc, Attribute valueAttr, uint64_t alignment,
 
   // Serialize the constant into the reserved memory.
   if (failed(value.serializeToBuffer(
-          loc, llvm::support::endianness::little,
+          loc, llvm::endianness::little,
           ArrayRef<char>(reinterpret_cast<char *>(bytePtr),
                          static_cast<size_t>(totalSize))))) {
     mlir::emitError(loc) << "constant attribute failed to serialize: "
@@ -260,19 +260,6 @@ makeFunctionSignatureDef(IREE::VM::FuncOp funcOp,
 
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.value(), attrsRef, fbb);
-}
-
-// Returns a serialized function signature.
-static iree_vm_FunctionSignatureDef_ref_t
-makeInternalFunctionSignatureDef(IREE::VM::FuncOp funcOp,
-                                 llvm::DenseMap<Type, int> &typeTable,
-                                 FlatbufferBuilder &fbb) {
-  // Generate the signature calling convention string based on types.
-  auto cconv = makeCallingConventionString(funcOp);
-  if (!cconv.has_value())
-    return {};
-  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
-                                    cconv.value(), /*attrsRef=*/0, fbb);
 }
 
 // Walks |rootOp| to find all VM features required by it and its children.
@@ -666,8 +653,8 @@ translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
       rodataRef.archiveFile = archiveWriter->declareFile(
           fileName, rodataRef.alignment, rodataRef.totalSize,
           [=](llvm::raw_ostream &os) {
-            return rodataValue.serializeToStream(
-                rodataLoc, llvm::support::endianness::little, os);
+            return rodataValue.serializeToStream(rodataLoc,
+                                                 llvm::endianness::little, os);
           });
     }
     rodataRefs[rodataOp.getOrdinal()->getLimitedValue()] = rodataRef;

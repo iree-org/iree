@@ -1,4 +1,4 @@
-# Copyright 2023 Nod Labs, Inc
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,6 +13,7 @@ iree_cc_library(
     "PluginRegistration.cpp"
   DEPS
     MLIRIR
+    MLIRMLProgramDialect
     MLIRPass
     iree::compiler::PluginAPI
     torch-iree::InputConversion
@@ -26,7 +27,7 @@ iree_cc_library(
 
 iree_compiler_register_plugin(
   PLUGIN_ID
-    torch_iree
+    input_torch
   TARGET
     ::registration
 )

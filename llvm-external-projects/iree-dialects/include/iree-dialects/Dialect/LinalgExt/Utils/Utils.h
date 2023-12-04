@@ -57,7 +57,7 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 /// Converts a 2D float array to a constant value. The 2D array is stored as
 /// a 1D row-major array in `val` and has shape `rows` x `cols`.
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, PatternRewriter &rewriter);
+                                Location loc, RewriterBase &rewriter);
 
 // Converts OpFoldResults to int64_t shape entries, unconditionally mapping all
 // Value's to kDynamic, even if they are arith.constant values.
@@ -90,30 +90,6 @@ static void permute(SmallVectorImpl<T> &vector) {
     break;
   }
 }
-/// Container of information needed to materialize the pack operation.
-struct MaterializeEncodingInfo {
-  SmallVector<int64_t> innerDimsPos;
-  SmallVector<int64_t> innerTileSizes;
-  SmallVector<int64_t> outerDimsPerm;
-  unsigned srcRank = 0;
-};
-
-using MaterializeEncodingFn =
-    std::function<FailureOr<MaterializeEncodingInfo>(RankedTensorType)>;
-
-struct MaterializeEncodingValueInfo {
-  SmallVector<Value> innerTileSizes;
-};
-
-using MaterializeEncodingValueFn =
-    std::function<FailureOr<MaterializeEncodingValueInfo>(
-        RankedTensorType, OpBuilder &, Location)>;
-
-FailureOr<SmallVector<OpFoldResult>>
-getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
-                     RankedTensorType tensorType,
-                     const MaterializeEncodingInfo &materializeEncodingInfo,
-                     MaterializeEncodingValueFn materializeEncodingValueFn);
 
 } // namespace LinalgExt
 } // namespace IREE

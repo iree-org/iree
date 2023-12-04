@@ -52,6 +52,44 @@ vm.module @my_module {
 
 // -----
 
+// CHECK-LABEL: @br_table_empty
+vm.module @my_module {
+  vm.func @br_table_empty(%arg0: i32, %arg1: i32) -> i32 {
+    //      CHECK: vm.br_table %arg0 {
+    // CHECK-NEXT:   default: ^bb1(%arg1 : i32)
+    // CHECK-NEXT: }
+    vm.br_table %arg0 {
+      default: ^bb1(%arg1 : i32)
+    }
+  ^bb1(%0 : i32):
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @br_table
+vm.module @my_module {
+  vm.func @br_table(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
+    //      CHECK: vm.br_table %arg0 {
+    // CHECK-NEXT:   default: ^bb1(%arg0 : i32),
+    // CHECK-NEXT:   0: ^bb2(%arg1 : i32),
+    // CHECK-NEXT:   1: ^bb2(%arg2 : i32)
+    // CHECK-NEXT: }
+    vm.br_table %arg0 {
+      default: ^bb1(%arg0 : i32),
+      0: ^bb2(%arg1 : i32),
+      1: ^bb2(%arg2 : i32)
+    }
+  ^bb1(%0 : i32):
+    vm.return %0 : i32
+  ^bb2(%1 : i32):
+    vm.return %1 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @call_fn
 vm.module @my_module {
   vm.import private @import_fn(%arg0 : i32) -> i32

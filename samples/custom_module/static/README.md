@@ -36,7 +36,7 @@ the same module code between all various modes with minor differences.
     python -m pip install iree-compiler
     ```
 
-    [See here](https://openxla.github.io/iree/reference/bindings/python/)
+    [See here](https://iree.dev/reference/bindings/python/)
     for general instructions on installing the compiler.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
@@ -50,7 +50,7 @@ the same module code between all various modes with minor differences.
 3. Configure the IREE tools to include the custom module:
 
     ```
-    cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1 \
         -DIREE_EXTERNAL_TOOLING_MODULES=static_sample \
         -DIREE_EXTERNAL_TOOLING_MODULE_STATIC_SAMPLE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/samples/custom_module/static \
@@ -63,7 +63,7 @@ the same module code between all various modes with minor differences.
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
+    [See here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 4. Run the example program using the main `iree-run-module` tool:

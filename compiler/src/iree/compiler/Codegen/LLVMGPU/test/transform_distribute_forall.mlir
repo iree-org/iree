@@ -46,24 +46,24 @@ hal.executable private @distribute {
         } {mapping = [#gpu.warp<x>]}
         return
       }
-      module {
-        transform.sequence failures(propagate) {
-        ^bb0(%variant_op: !transform.any_op):
-        %17 = transform.structured.match ops{["func.func"]} in %variant_op
-          : (!transform.any_op) -> !transform.any_op
-        transform.iree.map_nested_forall_to_gpu_threads %17
-          workgroup_dims = [256, 1, 1] subgroup_size = 32 : (!transform.any_op) -> ()
+      builtin.module attributes { transform.with_named_sequence } {
+        transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+          %17 = transform.structured.match ops{["func.func"]} in %variant_op
+            : (!transform.any_op) -> !transform.any_op
+          transform.iree.map_nested_forall_to_gpu_threads %17
+            workgroup_dims = [256, 1, 1] subgroup_size = 32 : (!transform.any_op) -> ()
 
-        // Late canonicalizations to cleanup and pass the checks.
-        // Needs to occur on the whole variant to perform cse on the workgroup_count region
-        %func_op = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-        transform.apply_patterns to %func_op {
-          transform.apply_patterns.canonicalization
-        } : !transform.any_op
-        transform.iree.apply_licm %func_op : !transform.any_op
-        transform.iree.apply_cse %func_op : !transform.any_op
-      }
+          // Late canonicalizations to cleanup and pass the checks.
+          // Needs to occur on the whole variant to perform cse on the workgroup_count region
+          %func_op = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+          transform.apply_patterns to %func_op {
+            transform.apply_patterns.canonicalization
+          } : !transform.any_op
+          transform.iree.apply_licm %func_op : !transform.any_op
+          transform.iree.apply_cse %func_op : !transform.any_op
+          transform.yield
+        } // @__transform_main
+      } // module
     }
   }
-}
 }

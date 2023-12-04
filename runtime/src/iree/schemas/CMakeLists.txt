@@ -88,12 +88,33 @@ flatbuffer_c_library(
   PUBLIC
 )
 
+add_custom_command(OUTPUT cpu_data_headers_filegroup.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch cpu_data_headers_filegroup.stamp
+  DEPENDS
+    "cpu_data.h"
+    "cpu_feature_bits.inl"
+)
+
+add_custom_target(cpu_data_headers_filegroup
+    DEPENDS cpu_data_headers_filegroup.stamp
+)
+
 iree_cc_library(
   NAME
     cpu_data
   HDRS
     "cpu_data.h"
     "cpu_feature_bits.inl"
+  DEPS
+
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    parameter_archive
+  HDRS
+    "parameter_archive.h"
   DEPS
 
   PUBLIC

@@ -12,22 +12,31 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    static_assert
+    exported_bits
   HDRS
-    "static_assert.h"
+    "exported_bits.h"
   DEPS
 
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    exported_bits
-  HDRS
+add_custom_command(OUTPUT internal_headers_filegroup.stamp
+    COMMAND ${CMAKE_COMMAND} -E touch internal_headers_filegroup.stamp
+  DEPENDS
+    "common.h"
     "exported_bits.h"
-  DEPS
-    ::static_assert
-  PUBLIC
+    "mmt4d.h"
+    "mmt4d_internal.h"
+    "pack.h"
+    "pack_internal.h"
+    "query_tile_sizes.h"
+    "query_tile_sizes_internal.h"
+    "unpack.h"
+    "unpack_internal.h"
+)
+
+add_custom_target(internal_headers_filegroup
+    DEPENDS internal_headers_filegroup.stamp
 )
 
 iree_cc_library(
@@ -42,7 +51,6 @@ iree_cc_library(
     "pack_internal.h"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
-    "static_assert.h"
     "unpack.h"
     "unpack_internal.h"
   DEPS
@@ -69,14 +77,12 @@ iree_cc_library(
     "query_tile_sizes.c"
     "query_tile_sizes.h"
     "query_tile_sizes_internal.h"
-    "static_assert.h"
     "unpack.c"
     "unpack.h"
     "unpack_internal.h"
     "unpack_tile.c"
   DEPS
     ::exported_bits
-    ::static_assert
     iree::base::core_headers
     iree::builtins::ukernel::arch::ukernel_arch
   PUBLIC
@@ -110,6 +116,9 @@ iree_bitcode_library(
     ukernel_bitcode_32bit_base
   ARCH
     wasm_32
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "internal_headers_filegroup.stamp"
   SRCS
     "mmt4d.c"
     "mmt4d_tile.c"
@@ -125,6 +134,9 @@ iree_bitcode_library(
     ukernel_bitcode_64bit_base
   ARCH
     wasm_64
+  INTERNAL_HDRS
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "internal_headers_filegroup.stamp"
   SRCS
     "mmt4d.c"
     "mmt4d_tile.c"
@@ -139,10 +151,10 @@ iree_c_embed_data(
   NAME
     embed_ukernel_bitcode
   SRCS
-    "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64.bc"
-    "runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64_entry_points.bc"
-    "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
-    "runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64_entry_points.bc"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64.bc"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/arch/arm_64/ukernel_bitcode_arm_64_entry_points.bc"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64.bc"
+    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/arch/x86_64/ukernel_bitcode_x86_64_entry_points.bc"
     "ukernel_bitcode_32bit_base.bc"
     "ukernel_bitcode_64bit_base.bc"
   DEPS

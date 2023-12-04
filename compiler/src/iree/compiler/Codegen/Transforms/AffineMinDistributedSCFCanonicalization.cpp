@@ -96,7 +96,7 @@ static bool affineMinOpDivisible(affine::AffineMinOp minOp, int64_t dividend) {
   // Check that all the affine map results are either constant divisible by
   // `dividend` or equal to `%ub - %iv`.
   for (AffineExpr result : minOp.getAffineMap().getResults()) {
-    if (auto cst = result.dyn_cast<AffineConstantExpr>()) {
+    if (auto cst = dyn_cast<AffineConstantExpr>(result)) {
       if (cst.getValue() <= 0 || cst.getValue() % dividend != 0)
         return false;
     } else {
@@ -123,7 +123,7 @@ static bool isDivisible(Value v, int64_t dividend) {
   affine::fullyComposeAffineMapAndOperands(&modMap, &ops);
   affine::canonicalizeMapAndOperands(&modMap, &ops);
   modMap = simplifyAffineMap(modMap);
-  auto cst = modMap.getResult(0).dyn_cast<AffineConstantExpr>();
+  auto cst = dyn_cast<AffineConstantExpr>(modMap.getResult(0));
   if (cst)
     return (cst.getValue() == 0);
   // If the map doesn't fold to 0 but simplifies to (d0 %n) with d0 an
@@ -148,7 +148,7 @@ static std::optional<int64_t> foldAffineMin(affine::AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
-    if (auto cst = result.dyn_cast<AffineConstantExpr>()) {
+    if (auto cst = dyn_cast<AffineConstantExpr>(result)) {
       constantResult = cst.getValue();
     }
   }

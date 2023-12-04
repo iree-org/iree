@@ -18,9 +18,93 @@ iree_cc_library(
   SRCS
     "file_handle.c"
   DEPS
+    ::stream
     iree::base
     iree::base::internal
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    parameter_index
+  HDRS
+    "parameter_index.h"
+  SRCS
+    "parameter_index.c"
+  DEPS
+    ::file_handle
+    iree::base
+    iree::base::internal
+    iree::base::internal::synchronization
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    parameter_index_provider
+  HDRS
+    "parameter_index_provider.h"
+  SRCS
+    "parameter_index_provider.c"
+  DEPS
+    ::parameter_index
+    ::parameter_provider
+    iree::base
+    iree::hal
+    iree::hal::utils::file_cache
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    parameter_provider
+  HDRS
+    "parameter_provider.h"
+  SRCS
+    "parameter_provider.c"
+  DEPS
+    iree::base
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    scope_map
+  HDRS
+    "scope_map.h"
+  SRCS
+    "scope_map.c"
+  DEPS
+    ::parameter_index
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    stream
+  HDRS
+    "stream.h"
+  SRCS
+    "stream.c"
+  DEPS
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    stream_test
+  SRCS
+    "stream_test.cc"
+  DEPS
+    ::stream
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

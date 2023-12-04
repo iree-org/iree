@@ -8,7 +8,7 @@
 # Each test file should have a name matching the corresponding TOSA op and test only the
 # functionality of that op (though may make use of other ops where necessary). Tests should be
 # written using the IREE Check framework.
-# See https://github.com/openxla/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
+# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
@@ -19,27 +19,21 @@ package(
 )
 
 LLVM_SRCS = enforce_glob(
+    # keep sorted
     [
         "conv2d.mlir",
+        "f32_to_i4.mlir",
         "i4_to_f32.mlir",
     ],
     include = ["*.mlir"],
-    exclude = ["large_linalg_matmul.mlir"],
+    exclude = [
+        "large_linalg_matmul.mlir",
+    ],
 )
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
-    driver = "local-task",
-    target_backend = "llvm-cpu",
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_winograd_llvm-cpu_local-task",
-    srcs = LLVM_SRCS,
-    compiler_flags = [
-        "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
-    ],
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -52,6 +46,7 @@ VMVX_SRCS = enforce_glob(
     exclude = [
         "large_linalg_matmul.mlir",
         "i4_to_f32.mlir",
+        "f32_to_i4.mlir",
     ],
 )
 
@@ -68,7 +63,10 @@ VULKAN_SRCS = enforce_glob(
         "i4_to_f32.mlir",
     ],
     include = ["*.mlir"],
-    exclude = ["large_linalg_matmul.mlir"],
+    exclude = [
+        "large_linalg_matmul.mlir",
+        "f32_to_i4.mlir",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -78,9 +76,23 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+WINOGRAD_CONV_SRCS = [
+    "conv2d.mlir",
+]
+
+iree_check_single_backend_test_suite(
+    name = "check_winograd_llvm-cpu_local-task",
+    srcs = WINOGRAD_CONV_SRCS,
+    compiler_flags = [
+        "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
+    ],
+    driver = "local-task",
+    target_backend = "llvm-cpu",
+)
+
 iree_check_single_backend_test_suite(
     name = "check_winograd_vulkan-spirv_vulkan",
-    srcs = VULKAN_SRCS,
+    srcs = WINOGRAD_CONV_SRCS,
     compiler_flags = [
         "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
     ],
@@ -88,13 +100,23 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+CUDA_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "conv2d.mlir",
+        "f32_to_i4.mlir",
+        "i4_to_f32.mlir",
+        # currently only enabled on cuda as it can be slow on other backends.
+        "large_linalg_matmul.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+    ],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_large_linalg_matmul_cuda",
-    srcs =
-        [
-            # currently only enabled on cuda as it can be slow on other backends.
-            "large_linalg_matmul.mlir",
-        ],
+    srcs = CUDA_SRCS,
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.

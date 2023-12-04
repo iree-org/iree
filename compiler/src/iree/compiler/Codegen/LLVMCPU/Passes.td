@@ -73,19 +73,6 @@ def LLVMCPULowerExecutableTarget :
       "mlir::iree_compiler::createLLVMCPULowerExecutableTargetPass()";
 }
 
-def LLVMCPULowerToUKernels :
-    Pass<"iree-llvmcpu-lower-to-ukernels", ""> {
-  let summary =
-      "Separate out parts of the IR that lower to a micro-kernel";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPULowerToUKernelsPass()";
-  let options = [
-    Option<"optionSkipIntermediateRoundings", "skip-intermediate-roundings",
-      "bool", /*default=*/"true",
-      "Allow skipping intermediate roundings, e.g. in f16 ukernels internally doing f32 arithmetic.">,
-  ];
-}
-
 def LLVMCPUMmt4dVectorLowering
     : Pass<"iree-llvmcpu-mmt4d-vector-lowering", "func::FuncOp"> {
   let summary = "Apply vector lowering logic to vector ops";
@@ -98,6 +85,15 @@ def LLVMCPUPeel :
   let summary = "Pass to perform peeling on non-distributed loops.";
   let constructor =
       "mlir::iree_compiler::createLLVMCPUPeelPass()";
+}
+
+def LLVMCPUSelectLoweringStrategy :
+    Pass<"iree-llvmcpu-select-lowering-strategy",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUSelectLoweringStrategyPass()";
 }
 
 def LLVMCPUSplitReduction : Pass<"iree-llvmcpu-split-reduction", "func::FuncOp"> {

@@ -72,8 +72,7 @@ private:
 
 // Returns true if the raw data of the attribute matches our expected output
 // format. This allows the use of the attribute getRawData() method.
-static bool canUseRawData(DenseElementsAttr attr,
-                          llvm::support::endianness endian) {
+static bool canUseRawData(DenseElementsAttr attr, llvm::endianness endian) {
   Type elementType = attr.getElementType();
   if (!isa<IntegerType, FloatType, ComplexType>(elementType)) {
     // We cannot assume composite element types have the raw layout we want,
@@ -102,7 +101,7 @@ static bool canUseRawData(DenseElementsAttr attr,
 // bit width (i1 -> i8, i4 -> i8, i17 -> i32, etc).
 static LogicalResult serializeAPIntRawData(Location loc, APInt value,
                                            uint64_t bitWidth,
-                                           llvm::support::endianness endian,
+                                           llvm::endianness endian,
                                            SmallVectorImpl<char> &buffer) {
   // Round up to 8-bit aligned bytes.
   uint64_t byteAligned = llvm::divideCeil(bitWidth, 8);
@@ -145,7 +144,7 @@ static LogicalResult serializeAPIntRawData(Location loc, APInt value,
 // Appends the raw bytes of |value| in the given endianness to |buffer|.
 static LogicalResult serializeAPFloatRawData(Location loc, APFloat value,
                                              size_t bitWidth,
-                                             llvm::support::endianness endian,
+                                             llvm::endianness endian,
                                              SmallVectorImpl<char> &buffer) {
   buffer.resize(bitWidth / 8);
   switch (bitWidth) {
@@ -183,8 +182,7 @@ static LogicalResult serializeAPFloatRawData(Location loc, APFloat value,
 // Significantly faster than the generic ElementsAttr path that needs to perform
 // conversion of the same splat value |count| times.
 static LogicalResult serializeSplatValue(Location loc, Attribute splatAttr,
-                                         int64_t count,
-                                         llvm::support::endianness endian,
+                                         int64_t count, llvm::endianness endian,
                                          llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
@@ -227,6 +225,18 @@ static LogicalResult serializeRawData(Location loc,
   return success();
 }
 
+// Serializes the raw data of the given |resourceElementsAttr| to |os|.
+// Assumes that the caller knows what they are doing; the raw data must be in
+// the expected endianness and be densely packed.
+static LogicalResult
+serializeResourceRawData(Location loc,
+                         DenseResourceElementsAttr resourceElementsAttr,
+                         llvm::raw_ostream &os) {
+  auto rawData = resourceElementsAttr.getRawHandle().getBlob()->getData();
+  os.write(rawData.data(), rawData.size());
+  return success();
+}
+
 // Stream writer that supports bit packing.
 // In the initial state the writer starts at a byte-aligned offset 0 and as new
 // values of |logicalBitWidth| are written they will be appended in
@@ -241,8 +251,8 @@ template <typename physicalType,
           unsigned physicalBitWidth = sizeof(physicalType) * 8>
 class PackedWriter {
 public:
-  explicit PackedWriter(unsigned logicalBitWidth,
-                        llvm::support::endianness endian, llvm::raw_ostream &os)
+  explicit PackedWriter(unsigned logicalBitWidth, llvm::endianness endian,
+                        llvm::raw_ostream &os)
       : logicalBitWidth(logicalBitWidth), endian(endian), os(os) {}
 
   void write(const uint64_t value) {
@@ -264,16 +274,16 @@ public:
 
 private:
   const unsigned logicalBitWidth;
-  const llvm::support::endianness endian;
+  const llvm::endianness endian;
   llvm::raw_ostream &os;
   unsigned bitOffset = 0;
   physicalType physicalBuffer = 0;
 };
 
-static LogicalResult
-serializeSubByteIntegerElements(Location loc, DenseIntElementsAttr attr,
-                                llvm::support::endianness endian,
-                                llvm::raw_ostream &os) {
+static LogicalResult serializeSubByteIntegerElements(Location loc,
+                                                     DenseIntElementsAttr attr,
+                                                     llvm::endianness endian,
+                                                     llvm::raw_ostream &os) {
   const unsigned logicalBitWidth =
       attr.getElementType().getIntOrFloatBitWidth();
   // Round up to the next power of two (unless already a power of two) of the
@@ -320,10 +330,9 @@ serializeSubByteIntegerElements(Location loc, DenseIntElementsAttr attr,
 }
 
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
-static LogicalResult
-serializeGenericIntegerElements(DenseIntElementsAttr attr,
-                                llvm::support::endianness endian,
-                                llvm::raw_ostream &os) {
+static LogicalResult serializeGenericIntegerElements(DenseIntElementsAttr attr,
+                                                     llvm::endianness endian,
+                                                     llvm::raw_ostream &os) {
   for (const APInt &value : attr.getValues<APInt>()) {
     elementType rawValue = llvm::support::endian::byte_swap<elementType>(
         value.extractBitsAsZExtValue(numBits, 0), endian);
@@ -333,10 +342,9 @@ serializeGenericIntegerElements(DenseIntElementsAttr attr,
 }
 
 template <typename elementType, unsigned numBits = sizeof(elementType) * 8>
-static LogicalResult
-serializeGenericFloatElements(DenseFPElementsAttr attr,
-                              llvm::support::endianness endian,
-                              llvm::raw_ostream &os) {
+static LogicalResult serializeGenericFloatElements(DenseFPElementsAttr attr,
+                                                   llvm::endianness endian,
+                                                   llvm::raw_ostream &os) {
   for (const APFloat &value : attr.getValues<APFloat>()) {
     elementType rawValue = llvm::support::endian::byte_swap<elementType>(
         value.bitcastToAPInt().extractBitsAsZExtValue(numBits, 0), endian);
@@ -368,10 +376,10 @@ static LogicalResult serializeBitIntegerValuesAsBytes(DenseIntElementsAttr attr,
 
 // Performs slow generic serialization of all of the elements in |elementsAttr|.
 // Respects the target |endian| setting, performing byte swaps if required.
-static LogicalResult
-serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
-                            llvm::support::endianness endian,
-                            llvm::raw_ostream &os) {
+static LogicalResult serializeGenericElementData(Location loc,
+                                                 DenseElementsAttr elementsAttr,
+                                                 llvm::endianness endian,
+                                                 llvm::raw_ostream &os) {
   if (auto attr = llvm::dyn_cast<DenseIntElementsAttr>(elementsAttr)) {
     // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
     // element type is not integer or floating-point.
@@ -427,6 +435,60 @@ serializeGenericElementData(Location loc, DenseElementsAttr elementsAttr,
   return emitError(loc) << "unhandled constant type " << elementsAttr.getType();
 }
 
+// Performs serialization of all of the elements in |resourceElementsAttr|.
+// Throws error if not supported.
+static LogicalResult serializeGenericResourceElementData(
+    Location loc, DenseResourceElementsAttr resourceElementsAttr,
+    llvm::endianness endian, llvm::raw_ostream &os) {
+
+  if (endian != llvm::endianness::native) {
+    return emitError(loc) << "the endian of the "
+                             "DenseResourceElementsAttr is not supported";
+  }
+  if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    // At the time of writing, DenseResourceElementsAttr byte aligned physical
+    // element types only with the exception of i1, which is stored as a full
+    // byte. This is in contrast to DenseElementsAttr which has an exception for
+    // i1 where it is bit-packed.
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 1:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 8:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 16:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 64:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc)
+             << "unhandled integer element bit width " << bitWidth
+             << " for type " << resourceElementsAttr.getType();
+    }
+  } else if (llvm::isa<FloatType>(
+                 resourceElementsAttr.getType().getElementType())) {
+    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
+    // element type is not integer or floating-point.
+    // TODO(saienduri): implement float64 support (not neccesary now)
+    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    switch (bitWidth) {
+    case 16:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    default:
+      return emitError(loc) << "unhandled float element bit width " << bitWidth
+                            << " for type " << resourceElementsAttr.getType();
+    }
+  }
+  return emitError(loc) << "unhandled constant type "
+                        << resourceElementsAttr.getType();
+}
+
 //===----------------------------------------------------------------------===//
 // #util.byte_pattern
 //===----------------------------------------------------------------------===//
@@ -439,19 +501,17 @@ int64_t BytePatternAttr::getStorageSize() const {
   }
 }
 
-LogicalResult
-BytePatternAttr::serializeToBuffer(Location loc,
-                                   llvm::support::endianness endian,
-                                   ArrayRef<char> buffer) const {
+LogicalResult BytePatternAttr::serializeToBuffer(Location loc,
+                                                 llvm::endianness endian,
+                                                 ArrayRef<char> buffer) const {
   const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
   std::memset(const_cast<char *>(buffer.data()), byte, buffer.size());
   return success();
 }
 
-LogicalResult
-BytePatternAttr::serializeToStream(Location loc,
-                                   llvm::support::endianness endian,
-                                   llvm::raw_ostream &os) const {
+LogicalResult BytePatternAttr::serializeToStream(Location loc,
+                                                 llvm::endianness endian,
+                                                 llvm::raw_ostream &os) const {
   const uint8_t byte = static_cast<uint8_t>(getPattern() % 256);
   const char bytes[256] = {static_cast<char>(byte)};
   int64_t remaining = getStorageSize();
@@ -538,9 +598,8 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
                                  ArrayRef<Attribute> valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto serializableAttr =
-            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
-      calculatedLength += serializableAttr.getStorageSize();
+    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+      calculatedLength += storageAttr.getStorageSize();
     } else {
       return {};
     }
@@ -554,9 +613,8 @@ CompositeAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                       int64_t totalLength, ArrayAttr valueAttrs) {
   int64_t calculatedLength = 0;
   for (auto valueAttr : valueAttrs) {
-    if (auto serializableAttr =
-            llvm::dyn_cast<SerializableAttrInterface>(valueAttr)) {
-      calculatedLength += serializableAttr.getStorageSize();
+    if (auto storageAttr = llvm::dyn_cast<SizedStorageAttr>(valueAttr)) {
+      calculatedLength += storageAttr.getStorageSize();
     } else {
       return emitError() << "value is not serializable: " << valueAttr;
     }
@@ -631,14 +689,14 @@ void CompositeAttr::print(AsmPrinter &p) const {
 int64_t CompositeAttr::getStorageSize() const { return getTotalLength(); }
 
 LogicalResult CompositeAttr::serializeToBuffer(Location loc,
-                                               llvm::support::endianness endian,
+                                               llvm::endianness endian,
                                                ArrayRef<char> buffer) const {
   raw_inplace_ostream os(buffer);
   return serializeToStream(loc, endian, os);
 }
 
 LogicalResult CompositeAttr::serializeToStream(Location loc,
-                                               llvm::support::endianness endian,
+                                               llvm::endianness endian,
                                                llvm::raw_ostream &os) const {
   for (auto valueAttr : getValues()) {
     auto serializableAttr =
@@ -656,6 +714,54 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 }
 
 //===----------------------------------------------------------------------===//
+// #util.uninitialized
+//===----------------------------------------------------------------------===//
+
+int64_t UninitializedAttr::getStorageSize() const {
+  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// SizedStorageAttr implementations
+//===----------------------------------------------------------------------===//
+
+struct SizedStorageDenseElementsAttrModel
+    : public SizedStorageAttr::ExternalModel<SizedStorageDenseElementsAttrModel,
+                                             DenseIntOrFPElementsAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<ElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(),
+        cast<ShapedType>(attr.getType()).getElementType());
+  }
+};
+
+struct SizedStorageDenseResourceElementsAttrModel
+    : public SizedStorageAttr::ExternalModel<
+          SizedStorageDenseResourceElementsAttrModel,
+          DenseResourceElementsAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
+    return IREE::Util::getRoundedPhysicalStorageSize(
+        attr.getNumElements(), attr.getType().getElementType());
+  }
+};
+
+// We don't include NUL terminators as it's 2023.
+struct SizedStorageStringAttrModel
+    : public SizedStorageAttr::ExternalModel<SizedStorageStringAttrModel,
+                                             StringAttr> {
+  int64_t getStorageSize(Attribute baseAttr) const {
+    auto attr = llvm::cast<StringAttr>(baseAttr);
+    return attr.getValue().size();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // SerializableAttrInterface implementations
 //===----------------------------------------------------------------------===//
 
@@ -664,33 +770,26 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 struct SerializableDenseElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseElementsAttrModel, DenseIntOrFPElementsAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<ElementsAttr>(baseAttr);
-    return IREE::Util::getRoundedPhysicalStorageSize(
-        attr.getNumElements(),
-        cast<ShapedType>(attr.getType()).getElementType());
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
   LogicalResult serializeToBuffer(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   ArrayRef<char> buffer) const {
     raw_inplace_ostream os(buffer);
     return serializeToStream(baseAttr, loc, endian, os);
   }
 
   LogicalResult serializeToStream(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   llvm::raw_ostream &os) const {
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
-    os.reserveExtraSpace(getStorageSize(baseAttr));
+    os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
 
     auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
@@ -717,28 +816,22 @@ struct SerializableDenseResourceElementsAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableDenseResourceElementsAttrModel,
           DenseResourceElementsAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
-    return IREE::Util::getRoundedPhysicalStorageSize(
-        attr.getNumElements(), attr.getType().getElementType());
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
   LogicalResult serializeToBuffer(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   ArrayRef<char> buffer) const {
     raw_inplace_ostream os(buffer);
     return serializeToStream(baseAttr, loc, endian, os);
   }
 
   LogicalResult serializeToStream(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   llvm::raw_ostream &os) const {
     auto attr = llvm::cast<DenseResourceElementsAttr>(baseAttr);
     auto handle = attr.getRawHandle();
@@ -753,8 +846,11 @@ struct SerializableDenseResourceElementsAttrModel
                   "values or pass --iree-util-zero-fill-elided-attrs for "
                   "testing and expect invalid execution results";
       }
-      os.write_zeros(getStorageSize(baseAttr));
+      os.write_zeros(cast<SizedStorageAttr>(baseAttr).getStorageSize());
       return success();
+    } else {
+      os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
+      return serializeGenericResourceElementData(loc, attr, endian, os);
     }
 
     return mlir::emitError(loc)
@@ -767,31 +863,26 @@ struct SerializableDenseResourceElementsAttrModel
 struct SerializableStringAttrModel
     : public SerializableAttrInterface::ExternalModel<
           SerializableStringAttrModel, StringAttr> {
-  int64_t getStorageSize(Attribute baseAttr) const {
-    auto attr = llvm::cast<StringAttr>(baseAttr);
-    return attr.getValue().size();
-  }
-
   LogicalResult serializeToVector(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   SmallVectorImpl<char> &buffer) const {
-    buffer.resize(getStorageSize(baseAttr));
+    buffer.resize(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     return serializeToBuffer(baseAttr, loc, endian, buffer);
   }
 
   LogicalResult serializeToBuffer(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   ArrayRef<char> buffer) const {
     raw_inplace_ostream os(buffer);
     return serializeToStream(baseAttr, loc, endian, os);
   }
 
   LogicalResult serializeToStream(Attribute baseAttr, Location loc,
-                                  llvm::support::endianness endian,
+                                  llvm::endianness endian,
                                   llvm::raw_ostream &os) const {
     // NOTE: not all ostream implementations handle this but for buffering ones
     // it can really help.
-    os.reserveExtraSpace(getStorageSize(baseAttr));
+    os.reserveExtraSpace(cast<SizedStorageAttr>(baseAttr).getStorageSize());
     auto stringAttr = llvm::cast<StringAttr>(baseAttr);
     os.write(stringAttr.data(), stringAttr.size());
     return success();
@@ -819,13 +910,17 @@ void UtilDialect::registerAttributes() {
   // up in the stack - things that end up here are generally already in a target
   // encoding.
   auto &context = *getContext();
-  DenseIntElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
+  DenseIntElementsAttr::attachInterface<SizedStorageDenseElementsAttrModel,
+                                        SerializableDenseElementsAttrModel>(
       context);
-  DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
+  DenseFPElementsAttr::attachInterface<SizedStorageDenseElementsAttrModel,
+                                       SerializableDenseElementsAttrModel>(
       context);
   DenseResourceElementsAttr::attachInterface<
+      SizedStorageDenseResourceElementsAttrModel,
       SerializableDenseResourceElementsAttrModel>(context);
-  StringAttr::attachInterface<SerializableStringAttrModel>(context);
+  StringAttr::attachInterface<SizedStorageStringAttrModel,
+                              SerializableStringAttrModel>(context);
 }
 
 } // namespace Util

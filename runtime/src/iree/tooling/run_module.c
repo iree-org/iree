@@ -173,6 +173,17 @@ static iree_status_t iree_tooling_create_run_context(
   return status;
 }
 
+static iree_status_t iree_tooling_annotate_status_with_function_decl(
+    iree_status_t base_status, iree_vm_function_t function) {
+  iree_string_view_t decl = iree_vm_function_lookup_attr_by_name(
+      &function, IREE_SV("iree.abi.declaration"));
+  if (!iree_string_view_is_empty(decl)) {
+    return iree_status_annotate_f(base_status, "`%.*s`", (int)decl.size,
+                                  decl.data);
+  }
+  return base_status;
+}
+
 static iree_status_t iree_tooling_run_function(
     iree_vm_context_t* context, iree_vm_function_t function,
     iree_hal_device_t* device, iree_hal_allocator_t* device_allocator,
@@ -232,6 +243,7 @@ static iree_status_t iree_tooling_run_function(
         iree_hal_fence_wait(finish_fence, iree_infinite_timeout()),
         "waiting on finish fence");
   }
+  iree_hal_fence_release(finish_fence);
 
   // End profiling after waiting for the invocation to finish.
   if (iree_status_is_ok(status)) {
@@ -365,6 +377,11 @@ iree_status_t iree_tooling_run_module_with_data(
   iree_status_t status =
       iree_tooling_run_function(context, function, device, device_allocator,
                                 host_allocator, out_exit_code);
+
+  // Annotate errors with the function description.
+  if (!iree_status_is_ok(status)) {
+    status = iree_tooling_annotate_status_with_function_decl(status, function);
+  }
 
   // Release the context and all retained resources (variables, constants, etc).
   iree_vm_context_release(context);

@@ -111,6 +111,22 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-convert-parameters
+  SRCS
+    "iree-convert-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::hal
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::tooling::parameter_util
+)
+
+iree_cc_binary(
+  NAME
     iree-cpuinfo
   SRCS
     "iree-cpuinfo.c"
@@ -118,6 +134,22 @@ iree_cc_binary(
     iree::base
     iree::base::internal::cpu
     iree::schemas::cpu_data
+)
+
+iree_cc_binary(
+  NAME
+    iree-create-parameters
+  SRCS
+    "iree-create-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::hal
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::io::stream
 )
 
 iree_cc_binary(
@@ -148,6 +180,20 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
+)
+
+iree_cc_binary(
+  NAME
+    iree-dump-parameters
+  SRCS
+    "iree-dump-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::tooling::parameter_util
 )
 
 # Only enable fatelf tool when we're compiling it in.

@@ -106,7 +106,7 @@ static void iree_mmt4d_reference_innerloop_bf16bf16f32(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16_noskipround(
     uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   uint16_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
@@ -123,8 +123,87 @@ static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
   *out_ptr = acc;
 }
 
-static void iree_mmt4d_reference_innerloop_i8i8i32(
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16_skipround(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  float acc_f32 = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE
+                      ? iree_math_bf16_to_f32(*out_ptr)
+                      : 0.f;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      float lhs_f32 =
+          iree_math_bf16_to_f32(lhs_ptr[k * params->M0 * params->K0 + k0]);
+      float rhs_f32 =
+          iree_math_bf16_to_f32(rhs_ptr[k * params->N0 * params->K0 + k0]);
+      acc_f32 += lhs_f32 * rhs_f32;
+    }
+  }
+  *out_ptr = iree_math_f32_to_bf16(acc_f32);
+}
+
+static void iree_mmt4d_reference_innerloop_bf16bf16bf16(
+    uint16_t* out_ptr, const uint16_t* lhs_ptr, const uint16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS) {
+    iree_mmt4d_reference_innerloop_bf16bf16bf16_skipround(out_ptr, lhs_ptr,
+                                                          rhs_ptr, params);
+  } else {
+    iree_mmt4d_reference_innerloop_bf16bf16bf16_noskipround(out_ptr, lhs_ptr,
+                                                            rhs_ptr, params);
+  }
+}
+
+static void iree_mmt4d_reference_innerloop_s8s8s32(
     int32_t* out_ptr, const int8_t* lhs_ptr, const int8_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      int32_t lhs_i32 = lhs_ptr[k * params->M0 * params->K0 + k0];
+      int32_t rhs_i32 = rhs_ptr[k * params->N0 * params->K0 + k0];
+      acc += lhs_i32 * rhs_i32;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_s16s16s32(
+    int32_t* out_ptr, const int16_t* lhs_ptr, const int16_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    for (iree_uk_index_t k0 = 0; k0 < params->K0; ++k0) {
+      int32_t lhs_i32 = lhs_ptr[k * params->M0 * params->K0 + k0];
+      int32_t rhs_i32 = rhs_ptr[k * params->N0 * params->K0 + k0];
+      acc += lhs_i32 * rhs_i32;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_s16u4s32(
+    int32_t* out_ptr, const int16_t* lhs_ptr, const uint8_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  // K0 must be even.
+  IREE_UK_ASSERT(!(params->K0 % 2));
+  iree_uk_int16_t K0half = params->K0 / 2;
+  int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    // As K0 must be even, we 2x-unroll the K0 loop, writing a 2D dot product.
+    for (iree_uk_index_t k0h = 0; k0h < K0half; ++k0h) {
+      int32_t lhs_0 = lhs_ptr[k * params->M0 * params->K0 + 2 * k0h];
+      int32_t lhs_1 = lhs_ptr[k * params->M0 * params->K0 + 2 * k0h + 1];
+      uint8_t rhs_byte = rhs_ptr[k * params->N0 * K0half + k0h];
+      int32_t rhs_0 = rhs_byte & 0xf;
+      int32_t rhs_1 = rhs_byte >> 4;
+      acc += lhs_0 * rhs_0 + lhs_1 * rhs_1;
+    }
+  }
+  *out_ptr = acc;
+}
+
+static void iree_mmt4d_reference_innerloop_s16s8s32(
+    int32_t* out_ptr, const int16_t* lhs_ptr, const int8_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
   for (iree_uk_index_t k = 0; k < params->K; ++k) {
@@ -139,10 +218,10 @@ static void iree_mmt4d_reference_innerloop_i8i8i32(
 
 static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
-  iree_uk_index_t lhs_elem_size =
-      iree_uk_type_size(iree_uk_mmt4d_lhs_type(mmt4d_type));
-  iree_uk_index_t rhs_elem_size =
-      iree_uk_type_size(iree_uk_mmt4d_rhs_type(mmt4d_type));
+  iree_uk_index_t lhs_elem_bits =
+      iree_uk_type_bit_count(iree_uk_mmt4d_lhs_type(mmt4d_type));
+  iree_uk_index_t rhs_elem_bits =
+      iree_uk_type_bit_count(iree_uk_mmt4d_rhs_type(mmt4d_type));
   iree_uk_index_t out_elem_size =
       iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type));
   for (iree_uk_index_t i = 0; i < params->M; ++i) {
@@ -153,18 +232,22 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
                                out_elem_size;
       const void* lhs_panel_ptr =
           ((const char*)params->lhs_buffer) +
-          (params->lhs_offset + i * params->lhs_stride0) * lhs_elem_size;
+          iree_uk_bits_to_bytes_exact(
+              (params->lhs_offset + i * params->lhs_stride0) * lhs_elem_bits);
       const void* rhs_panel_ptr =
           ((const char*)params->rhs_buffer) +
-          (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_size;
+          iree_uk_bits_to_bytes_exact(
+              (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_bits);
       for (iree_uk_index_t i0 = 0; i0 < params->M0; ++i0) {
         for (iree_uk_index_t j0 = 0; j0 < params->N0; ++j0) {
           void* out_ptr =
               ((char*)out_tile_ptr) + (i0 * params->N0 + j0) * out_elem_size;
           const void* lhs_ptr =
-              ((char*)lhs_panel_ptr) + i0 * params->K0 * lhs_elem_size;
+              ((char*)lhs_panel_ptr) +
+              iree_uk_bits_to_bytes_exact(i0 * params->K0 * lhs_elem_bits);
           const void* rhs_ptr =
-              ((char*)rhs_panel_ptr) + j0 * params->K0 * rhs_elem_size;
+              ((char*)rhs_panel_ptr) +
+              iree_uk_bits_to_bytes_exact(j0 * params->K0 * rhs_elem_bits);
           switch (params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK) {
             case IREE_UK_FLAG_MMT4D_TYPE_F32F32F32:
               iree_mmt4d_reference_innerloop_f32f32f32(
@@ -191,9 +274,24 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
                   (uint16_t*)out_ptr, (const uint16_t*)lhs_ptr,
                   (const uint16_t*)rhs_ptr, params);
               break;
-            case IREE_UK_FLAG_MMT4D_TYPE_I8I8I32:
-              iree_mmt4d_reference_innerloop_i8i8i32(
+            case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
+              iree_mmt4d_reference_innerloop_s8s8s32(
                   (int32_t*)out_ptr, (const int8_t*)lhs_ptr,
+                  (const int8_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_S16S16S32:
+              iree_mmt4d_reference_innerloop_s16s16s32(
+                  (int32_t*)out_ptr, (const int16_t*)lhs_ptr,
+                  (const int16_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_S16U4S32:
+              iree_mmt4d_reference_innerloop_s16u4s32(
+                  (int32_t*)out_ptr, (const int16_t*)lhs_ptr,
+                  (const uint8_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_S16S8S32:
+              iree_mmt4d_reference_innerloop_s16s8s32(
+                  (int32_t*)out_ptr, (const int16_t*)lhs_ptr,
                   (const int8_t*)rhs_ptr, params);
               break;
             default:
@@ -206,23 +304,47 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   }
 }
 
+static iree_uk_index_t iree_uk_test_round_up_to_ensure_multiple_of_8_bits(
+    iree_uk_index_t index, iree_uk_type_t type) {
+  // Honor the requirement that strides should be multiples of 8 bits.
+  while ((index << iree_uk_type_bit_count_log2(type)) & 7) {
+    ++index;
+  }
+  return index;
+}
+
+static iree_uk_index_t iree_uk_test_random_stride(
+    iree_uk_index_t min_stride, iree_uk_type_t type,
+    iree_uk_random_engine_t* engine) {
+  // Randomly make strides either tight or not to exercise all cases.
+  iree_uk_index_t stride = min_stride + iree_uk_random_engine_get_0_1(engine);
+  return iree_uk_test_round_up_to_ensure_multiple_of_8_bits(stride, type);
+}
+
+static iree_uk_index_t iree_uk_test_random_offset(
+    iree_uk_type_t type, iree_uk_random_engine_t* engine) {
+  // Randomly make strides either tight or not to exercise all cases.
+  iree_uk_index_t stride = iree_uk_random_engine_get_0_1(engine);
+  return iree_uk_test_round_up_to_ensure_multiple_of_8_bits(stride, type);
+}
+
 static void iree_uk_test_mmt4d_for_shape_params(
     iree_uk_test_t* test, const iree_uk_mmt4d_params_t* src_params) {
   iree_uk_mmt4d_params_t params;
   memcpy(&params, src_params, sizeof params);
-  // Populate strides first - we need them below to compute buffer lengths.
-  // Randomly make strides either tight or not to exercise all cases.
-  iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
-  params.lhs_stride0 =
-      params.K * params.M0 * params.K0 + iree_uk_random_engine_get_0_1(engine);
-  params.rhs_stride0 =
-      params.K * params.N0 * params.K0 + iree_uk_random_engine_get_0_1(engine);
-  params.out_stride0 =
-      params.N * params.M0 * params.N0 + iree_uk_random_engine_get_0_1(engine);
   iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params.flags);
   iree_uk_type_t lhs_type = iree_uk_mmt4d_lhs_type(mmt4d_type);
   iree_uk_type_t rhs_type = iree_uk_mmt4d_rhs_type(mmt4d_type);
   iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
+  // Populate strides first - we need them below to compute buffer lengths.
+  // Randomly make strides either tight or not to exercise all cases.
+  iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
+  params.lhs_stride0 = iree_uk_test_random_stride(
+      params.K * params.M0 * params.K0, lhs_type, engine);
+  params.rhs_stride0 = iree_uk_test_random_stride(
+      params.K * params.N0 * params.K0, rhs_type, engine);
+  params.out_stride0 = iree_uk_test_random_stride(
+      params.N * params.M0 * params.N0, out_type, engine);
   iree_uk_index_t lhs_buffer_size =
       iree_uk_2d_buffer_length(lhs_type, params.M, params.lhs_stride0);
   iree_uk_index_t rhs_buffer_size =
@@ -231,13 +353,17 @@ static void iree_uk_test_mmt4d_for_shape_params(
   void* rhs_buffer = malloc(rhs_buffer_size);
   iree_uk_write_random_buffer(lhs_buffer, lhs_buffer_size, lhs_type, engine);
   iree_uk_write_random_buffer(rhs_buffer, rhs_buffer_size, rhs_type, engine);
-  params.lhs_offset = iree_uk_random_engine_get_0_65535(engine);
-  params.rhs_offset = iree_uk_random_engine_get_0_65535(engine);
-  params.out_offset = iree_uk_random_engine_get_0_65535(engine);
-  params.lhs_buffer = (const char*)lhs_buffer -
-                      (params.lhs_offset * iree_uk_type_size(lhs_type));
-  params.rhs_buffer = (const char*)rhs_buffer -
-                      (params.rhs_offset * iree_uk_type_size(rhs_type));
+  params.lhs_offset = iree_uk_test_random_offset(lhs_type, engine);
+  params.rhs_offset = iree_uk_test_random_offset(rhs_type, engine);
+  params.out_offset = iree_uk_test_random_offset(out_type, engine);
+  params.lhs_buffer =
+      (const char*)lhs_buffer -
+      iree_uk_bits_to_bytes_exact(params.lhs_offset
+                                  << iree_uk_type_bit_count_log2(lhs_type));
+  params.rhs_buffer =
+      (const char*)rhs_buffer -
+      iree_uk_bits_to_bytes_exact(params.rhs_offset
+                                  << iree_uk_type_bit_count_log2(rhs_type));
 
   iree_uk_mmt4d_params_t reference_params;
   memcpy(&reference_params, &params, sizeof params);
@@ -250,14 +376,17 @@ static void iree_uk_test_mmt4d_for_shape_params(
   memcpy(reference_out_buffer, init_out_buffer, out_buffer_size);
   reference_params.out_buffer =
       (char*)reference_out_buffer -
-      (params.out_offset * iree_uk_type_size(out_type));
+      iree_uk_bits_to_bytes_exact(params.out_offset
+                                  << iree_uk_type_bit_count_log2(out_type));
 
   iree_uk_mmt4d_params_t actual_params;
   memcpy(&actual_params, &params, sizeof params);
   void* actual_out_buffer = malloc(out_buffer_size);
   memcpy(actual_out_buffer, init_out_buffer, out_buffer_size);
-  actual_params.out_buffer = (char*)actual_out_buffer -
-                             (params.out_offset * iree_uk_type_size(out_type));
+  actual_params.out_buffer =
+      (char*)actual_out_buffer -
+      iree_uk_bits_to_bytes_exact(params.out_offset
+                                  << iree_uk_type_bit_count_log2(out_type));
 
   iree_mmt4d_reference(&reference_params);
   iree_uk_mmt4d(&actual_params);
@@ -266,22 +395,10 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // code accumulates in a different order compared to the actual code. This
   // relies on picking input test matrix elements so that all intermediate
   // values are exactly representable - i.e. small integer numerators.
+  // This also relies on honoring IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS
+  // consistently between actual tile functions (including generic fallback
+  // ones) and the reference code in this test.
   bool fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
-  if (fail) {
-    // The one thing that causes legitimate bit differences at the moment is
-    // when we enable skipping intermediate roundings but the actual kernel does
-    // not skip intermediate roundings, such as when falling back on a generic
-    // code path. In that case, we retry with reference code not skipping
-    // intermediate roundings. This currently only happens when the output type
-    // is f16.
-    if (out_type == IREE_UK_TYPE_FLOAT_16 &&
-        (params.flags & IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS)) {
-      reference_params.flags &= ~IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
-      memcpy(reference_out_buffer, init_out_buffer, out_buffer_size);
-      iree_mmt4d_reference(&reference_params);
-      fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
-    }
-  }
 
   if (fail) {
     IREE_UK_TEST_FAIL(test);
@@ -299,6 +416,11 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
   typedef struct shape_mnk_t {
     int m, n, k;
   } shape_mnk_t;
+  const iree_uk_mmt4d_type_t mmt4d_type =
+      iree_uk_mmt4d_type(((const iree_uk_mmt4d_params_t*)src_params)->flags);
+  const iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
+  const int max_reduction_size =
+      (out_type == IREE_UK_TYPE_BFLOAT_16) ? 100 : 1000;
   const shape_mnk_t shapes[] = {
       // Degenerate case M==0. Vacuous.
       {0, 1, 1},
@@ -314,7 +436,7 @@ static void iree_uk_test_mmt4d_for_tile_params(iree_uk_test_t* test,
       {1, 1, 1},
       {1, 1, 2},
       {1, 1, 10},
-      {1, 1, 1000},
+      {1, 1, max_reduction_size},
       {2, 1, 1},
       {1, 2, 1},
       {2, 2, 2},
@@ -375,7 +497,10 @@ int main(int argc, char** argv) {
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
@@ -388,11 +513,12 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
   iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
-      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fp16");
+      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fullfp16");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 8, 8, 4, "bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 8, "i8mm");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
@@ -407,10 +533,19 @@ int main(int argc, char** argv) {
       IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 16, 16, 1, "avx512_base");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
                      "avx512_bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 4, 2, "");  // SSE2
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 8, 8, 2, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_I8I8I32, 16, 16, 2, "avx512_vnni");
+  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+      IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 16, 16, 2, "avx512_bf16");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 4, 2, "");  // SSE2
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_vnni");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
+                     "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
+                     "avx512_vnni");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 1, 16, 8, "avx512_vnni");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 1, 32, 8, "avx512_vnni");
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();

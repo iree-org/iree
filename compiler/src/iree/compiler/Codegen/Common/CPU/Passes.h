@@ -45,6 +45,14 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeUpperBoundTileSizePass(
     ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs = {});
 
+/// Adds CPU bufferization passes to the pipeline.
+void addCPUBufferizePasses(OpPassManager &passManager);
+
+/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
+/// operation.
+std::unique_ptr<OperationPass<>>
+createCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
+
 void registerCodegenCommonCPUPasses();
 
 } // namespace iree_compiler

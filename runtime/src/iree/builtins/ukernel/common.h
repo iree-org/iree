@@ -26,11 +26,12 @@
 //       themselves, other ukernels, or any other code, on any thread.
 //    c. Stateless: ukernels can't access any nonconstant global variable.
 
+#ifdef __cplusplus
+#error This file should only be included in ukernel/ code, which should be C, not C++.
+#endif  // __cplusplus
+
 // Include common flag values, shared with the compiler.
 #include "iree/builtins/ukernel/exported_bits.h"
-
-// Include IREE_UK_STATIC_ASSERT.
-#include "iree/builtins/ukernel/static_assert.h"
 
 // Clang on Windows has __builtin_clzll; otherwise we need to use the
 // windows intrinsic functions.
@@ -39,10 +40,6 @@
 #pragma intrinsic(_BitScanReverse)
 #pragma intrinsic(_BitScanForward)
 #endif  // defined(_MSC_VER)
-
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // Compiler/version checks
@@ -109,8 +106,6 @@ extern "C" {
 #define IREE_UK_RESTRICT __restrict
 #elif defined(IREE_UK_COMPILER_MSVC)
 #define IREE_UK_RESTRICT
-#elif defined(__cplusplus)
-#define IREE_UK_RESTRICT __restrict__
 #else
 #define IREE_UK_RESTRICT restrict
 #endif  // IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1900)
@@ -207,7 +202,6 @@ extern "C" {
 // Local replacement for stdbool.h
 //===----------------------------------------------------------------------===//
 
-#ifndef __cplusplus
 // Exactly as in stdbool.h.
 // As stdbool.h is only macros, not typedefs, and it is standardized how these
 // macros expand, we can simply do them here. We still avoid #including it
@@ -215,7 +209,14 @@ extern "C" {
 #define bool _Bool
 #define true 1
 #define false 0
-#endif
+
+//===----------------------------------------------------------------------===//
+// IREE_UK_STATIC_ASSERT, a wrapper around the static-assertion keyword.
+//===----------------------------------------------------------------------===//
+
+// Currently unconditionally _Static_assert since C11, but will have to evaluate
+// to static_assert on C23.
+#define IREE_UK_STATIC_ASSERT(COND) _Static_assert(COND, #COND)
 
 //===----------------------------------------------------------------------===//
 // Local replacements for stdint.h types and constants
@@ -433,7 +434,7 @@ typedef iree_uk_uint8_t iree_uk_type_t;
 // Signless integers. Use in microkernels that perform same-bit-width integer
 // arithmetic that is insensitive to signedness. For example, same-bit-width
 // element-wise integer add and mul ops.
-#define IREE_UK_TYPE_CATEGORY_INTEGER 0x20u
+#define IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS 0x20u
 // Signed integers. Use in microkernels that are specifically performing signed
 // integer arithmetic. For example, any mixed-bit-width op that involves a
 // sign-extension (as in arith.extsi).
@@ -461,14 +462,17 @@ enum {
   IREE_UK_TYPE_OPAQUE_16 = IREE_UK_TYPE_CATEGORY_OPAQUE | 4,
   IREE_UK_TYPE_OPAQUE_32 = IREE_UK_TYPE_CATEGORY_OPAQUE | 5,
   IREE_UK_TYPE_OPAQUE_64 = IREE_UK_TYPE_CATEGORY_OPAQUE | 6,
-  IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER | 3,
-  IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER | 4,
-  IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER | 5,
-  IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER | 6,
+  IREE_UK_TYPE_INT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 2,
+  IREE_UK_TYPE_INT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 3,
+  IREE_UK_TYPE_INT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 4,
+  IREE_UK_TYPE_INT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 5,
+  IREE_UK_TYPE_INT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS | 6,
+  IREE_UK_TYPE_SINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 2,
   IREE_UK_TYPE_SINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 3,
   IREE_UK_TYPE_SINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 4,
   IREE_UK_TYPE_SINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 5,
   IREE_UK_TYPE_SINT_64 = IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED | 6,
+  IREE_UK_TYPE_UINT_4 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 2,
   IREE_UK_TYPE_UINT_8 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 3,
   IREE_UK_TYPE_UINT_16 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 4,
   IREE_UK_TYPE_UINT_32 = IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED | 5,
@@ -490,11 +494,50 @@ static inline int iree_uk_type_bit_count_log2(iree_uk_type_t t) {
   return t & IREE_UK_TYPE_BIT_COUNT_LOG2_MASK;
 }
 
+// Mutate type category while keeping the same bit-width
+static inline iree_uk_uint8_t iree_uk_type_mutate_category(
+    iree_uk_type_t t, iree_uk_uint8_t new_category) {
+  return new_category | iree_uk_type_bit_count_log2(t);
+}
+
+// Integer type helpers
+static inline iree_uk_uint8_t iree_uk_type_is_integer(iree_uk_type_t t) {
+  switch (iree_uk_type_category(t)) {
+    case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS:
+    case IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED:
+    case IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED:
+      return true;
+    default:
+      return false;
+  }
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_signless(
+    iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t,
+                                      IREE_UK_TYPE_CATEGORY_INTEGER_SIGNLESS);
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_signed(iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t, IREE_UK_TYPE_CATEGORY_INTEGER_SIGNED);
+}
+
+static inline iree_uk_uint8_t iree_uk_integer_type_as_unsigned(
+    iree_uk_type_t t) {
+  IREE_UK_ASSERT(iree_uk_type_is_integer(t));
+  return iree_uk_type_mutate_category(t,
+                                      IREE_UK_TYPE_CATEGORY_INTEGER_UNSIGNED);
+}
+
 // Behavior is undefined if the bit-count is not a multiple of 8!
 // The current implementation might return a negative value, but don't rely on
 // that.
 static inline int iree_uk_type_size_log2(iree_uk_type_t t) {
-  return iree_uk_type_bit_count_log2(t) - 3;
+  int bit_count_log2 = iree_uk_type_bit_count_log2(t);
+  IREE_UK_ASSERT(bit_count_log2 >= 3);
+  return bit_count_log2 - 3;
 }
 
 static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
@@ -506,6 +549,21 @@ static inline int iree_uk_type_bit_count(iree_uk_type_t t) {
 // compiler to assume this can't happen.
 static inline int iree_uk_type_size(iree_uk_type_t t) {
   return 1 << iree_uk_type_size_log2(t);
+}
+
+// Helper to correctly convert a bit-size to a byte-size, rounding up if the
+// bit-size is not a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_rounding_up(
+    iree_uk_index_t bits) {
+  return (bits + 7) / 8;
+}
+
+// Helper to correctly convert a bit-size to a byte-size, asserting that the
+// bit-size is a multiple of 8.
+static inline iree_uk_index_t iree_uk_bits_to_bytes_exact(
+    iree_uk_index_t bits) {
+  IREE_UK_ASSERT(!(bits % 8));
+  return bits / 8;
 }
 
 //===----------------------------------------------------------------------===//
@@ -646,6 +704,12 @@ static inline int iree_uk_ceil_log2_u32(const iree_uk_uint32_t n) {
 // Adapted from runtime/src/iree/base/internal/math.h.
 //===----------------------------------------------------------------------===//
 
+// NOTE: We used to have code here using built-in _Float16 type support.
+// It worked well (https://godbolt.org/z/3a6WM39M1) until it didn't for
+// some people (#14549). It's not worth the hassle, this is only used
+// in slow generic fallbacks or test code, and we weren't able to use
+// a builtin for bf16 anyway.
+
 #define IREE_UK_FP_FORMAT_CONSTANTS(prefix, bits, ebits)            \
   const int prefix##exp_bits IREE_UK_ATTRIBUTE_UNUSED = ebits;      \
   const int prefix##mantissa_bits IREE_UK_ATTRIBUTE_UNUSED =        \
@@ -767,55 +831,16 @@ static inline iree_uk_uint16_t iree_uk_f32_to_generic_fp16(float value,
   return f16_value;
 }
 
-// https://godbolt.org/z/3a6WM39M1 shows that _Float16 <-> float conversions
-// work on:
-// * Clang >= 15 on x86-64
-// * Clang >= 13 on riscv32
-// * Clang >= 9 on arm64 and arm32
-// * GCC >= 13 on arm64 and riscv32
-// * GCC >= 12 on x86-64
-// We have to limit this to x86 and Arm architectures at the moment, because:
-// * On RISC-V this compiles, but the resulting references to builtin functions
-//   cause linking error in some of our CI configurations.
-// * On Wasm this just fails to compile.
-#if (defined(IREE_UK_ARCH_X86_32) || defined(IREE_UK_ARCH_X86_64) ||  \
-     defined(IREE_UK_ARCH_ARM_32) || defined(IREE_UK_ARCH_ARM_64)) && \
-    (IREE_UK_COMPILER_CLANG_VERSION_AT_LEAST(15, 0) ||                \
-     IREE_UK_COMPILER_GCC_VERSION_AT_LEAST(13, 0))
-#define IREE_UK_HAVE_BUILTIN_FLOAT16
-#endif  // Compiler and architecture checks for _Float16.
-
 // Converts a fp16 value to a 32-bit C `float`.
 static inline float iree_uk_f16_to_f32(iree_uk_uint16_t f16_value) {
-#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value;
-  iree_uk_memcpy(&builtin_float16_value, &f16_value, sizeof f16_value);
-  return (float)builtin_float16_value;
-#else
   return iree_uk_generic_fp16_to_f32(f16_value, 5);
-#endif
 }
 
 // Converts a 32-bit C `float` value to a fp16 value, rounding to nearest
 // even.
 static inline iree_uk_uint16_t iree_uk_f32_to_f16(float value) {
-#ifdef IREE_UK_HAVE_BUILTIN_FLOAT16
-  _Float16 builtin_float16_value = (_Float16)value;
-  iree_uk_uint16_t f16_value;
-  iree_uk_memcpy(&f16_value, &builtin_float16_value, sizeof f16_value);
-  return f16_value;
-#else
   return iree_uk_f32_to_generic_fp16(value, 5);
-#endif
 }
-
-// TODO(bjacob): Use the built-in compiler type __bf16 when available.
-// It is mentioned at
-//   https://clang.llvm.org/docs/LanguageExtensions.html#half-precision-floating-point
-// but at the moment the only place where it seems to be supported is GCC 13 and
-// only on some architectures (arm64 and x86_64, but not arm32 or riscv32):
-//   https://godbolt.org/z/5Wz3jPh69
-// Revisit that compiler explorer link in the future.
 
 // Converts a bfloat16 value to a 32-bit C `float`.
 static inline float iree_uk_bf16_to_f32(iree_uk_uint16_t bf16_value) {
@@ -827,9 +852,5 @@ static inline float iree_uk_bf16_to_f32(iree_uk_uint16_t bf16_value) {
 static inline iree_uk_uint16_t iree_uk_f32_to_bf16(float value) {
   return iree_uk_f32_to_generic_fp16(value, 8);
 }
-
-#ifdef __cplusplus
-}  // extern "C"
-#endif  // __cplusplus
 
 #endif  // IREE_BUILTINS_UKERNEL_COMMON_H_

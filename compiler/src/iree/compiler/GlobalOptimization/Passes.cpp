@@ -1,10 +1,10 @@
-// Copyright 2023 The IREE Authors
-//
+// Copyright 2023 The IREE Authors //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -18,6 +18,23 @@ namespace iree_compiler {
 namespace GlobalOptimization {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+
+static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
+    "iree-global-opt-enable-quantized-matmul-reassociation",
+    llvm::cl::desc(
+        "Enables reassociation of quantized matmul ops (experimental)."),
+    llvm::cl::init(false));
+
+void buildGlobalOptExprHoistingPassPipeline(
+    OpPassManager &passManager, const TransformOptions &transformOptions) {
+  IREE::Util::ExprHoistingOptions options;
+  options.maxSizeIncreaseThreshold =
+      transformOptions.options.constExprMaxSizeIncreaseThreshold;
+  options.registerDependentDialectsFn = [](DialectRegistry &registry) {
+    registry.insert<IREE::Flow::FlowDialect>();
+  };
+  passManager.addPass(IREE::Util::createHoistIntoGlobalsPass(options));
+}
 
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
@@ -54,26 +71,38 @@ void buildGlobalOptimizationPassPipeline(
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
   // better our fusions will be.
-  mainPassManager.addPass(IREE::Flow::createExpandTensorShapesPass());
+  mainPassManager.addPass(createExpandTensorShapesPass());
 
   FunctionLikeNest(mainPassManager)
       // Preprocess the input to a form more amenable for fusion
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(IREE::Flow::createGeneralizeLinalgNamedOpsPass)
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
-      .addPass(IREE::Flow::createFuseDequantizationMatmulPass)
-      // Enable data tiling after they are in a canonical form.
-      .addPredicatedPass(transformOptions.options.dataTiling,
-                         createSetEncodingPass)
+      .addPass([&]() {
+        return createFuseDequantizationMatmulPass(
+            clEnableQuantizedMatmulReassociation);
+      })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
-  mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+
+  // Enable data tiling after they are in a canonical form.
+  if (transformOptions.options.dataTiling) {
+    mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
+    // Expand all vectors in vecmat/matvec ops into matrices for tiling.
+    mainPassManager.addPass(createExpandVectorsPass());
+    mainPassManager.addPass(createSetEncodingPass());
+    mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+    mainPassManager.addPass(createCanonicalizerPass());
+    mainPassManager.addPass(createCSEPass());
+    FunctionLikeNest(mainPassManager)
+        .addPass(createGeneralizeLinalgNamedOpsPass);
+  }
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -86,10 +115,11 @@ void buildGlobalOptimizationPassPipeline(
   pipeline.addPass(IREE::Util::createApplyPatternsPass());
   pipeline.addPass(IREE::Util::createFoldGlobalsPass());
   pipeline.addPass(IREE::Util::createIPOPass());
+  pipeline.addPass(createCanonicalizerPass());
+  pipeline.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
-    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass(
-        transformOptions.options.constExprMaxSizeIncreaseThreshold));
+    buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {
@@ -97,9 +127,9 @@ void buildGlobalOptimizationPassPipeline(
   }
 
   if (transformOptions.options.numericPrecisionReduction) {
-    pipeline.addPass(IREE::Flow::createInferNumericNarrowingPass());
-    pipeline.addPass(IREE::Flow::createOptimizeNumericsPass());
-    pipeline.addPass(IREE::Flow::createCleanupNumericNarrowingPass());
+    pipeline.addPass(createInferNumericNarrowingPass());
+    pipeline.addPass(createOptimizeNumericsPass());
+    pipeline.addPass(createCleanupNumericNarrowingPass());
   }
 
   FunctionLikeNest(pipeline)
@@ -133,6 +163,16 @@ void registerGlobalOptimizationPipeline() {
           [](OpPassManager &passManager,
              const TransformOptions &transformOptions) {
             buildGlobalOptimizationPassPipeline(passManager, transformOptions);
+          });
+  PassPipelineRegistration<TransformOptions>
+      globalOptimizationConstantHoistingPassPipeline(
+          "iree-global-optimization-hoist-constant-expressions",
+          "Hoists constant expressions with the preferred storage types for "
+          "global optimization",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildGlobalOptExprHoistingPassPipeline(passManager,
+                                                   transformOptions);
           });
 }
 

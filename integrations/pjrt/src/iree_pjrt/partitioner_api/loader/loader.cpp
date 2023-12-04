@@ -57,16 +57,10 @@ DlHandle loadLibrary(const char *libraryPath) {
   return lib;
 }
 void *lookupLibrarySymbol(DlHandle lib, const char *symbol) {
+  // note: on macOS, dlsym already prepends CDECL_SYMBOL_PREFIX _
   return dlsym(lib, symbol);
 }
 }  // namespace
-#endif
-
-// Some operating systems have a prefix for cdecl exported symbols.
-#if __APPLE__
-#define OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX "_"
-#else
-#define OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX ""
 #endif
 
 namespace {
@@ -100,8 +94,7 @@ bool openxlaPartitionerLoadLibrary(const char *libraryPath) {
 
   // Resolve the api version separately.
   int (*apiVersionFn)() = (int (*)())lookupLibrarySymbol(
-      localLibraryHandle, OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX
-      "openxlaPartitionerGetAPIVersion");
+      localLibraryHandle, "openxlaPartitionerGetAPIVersion");
   if (!apiVersionFn) {
     fprintf(stderr,
             "OpenXLA partitioner ERROR: Could not find symbol "
@@ -114,13 +107,13 @@ bool openxlaPartitionerLoadLibrary(const char *libraryPath) {
   (void)apiMinor;
   (void)apiMajor;
 
-#define HANDLE_SYMBOL(fn_name)                                               \
-  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(                  \
-      localLibraryHandle, OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX #fn_name); \
-  if (!__##fn_name) {                                                        \
-    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n",     \
-            OPENXLA_PARTITIONER_CDECL_SYMBOL_PREFIX #fn_name);               \
-    return false;                                                            \
+#define HANDLE_SYMBOL(fn_name)                                                 \
+  __##fn_name = (decltype(__##fn_name))lookupLibrarySymbol(localLibraryHandle, \
+                                                           #fn_name);          \
+  if (!__##fn_name) {                                                          \
+    fprintf(stderr, "IREE COMPILER ERROR: Could not find symbol '%s'\n",       \
+            #fn_name);                                                         \
+    return false;                                                              \
   }
 #define HANDLE_VERSIONED_SYMBOL(fn_name, availApiMajor, availApiMinor) \
   if (apiMajor > availApiMajor ||                                      \

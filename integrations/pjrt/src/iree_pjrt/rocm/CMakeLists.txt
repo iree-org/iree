@@ -45,5 +45,9 @@ set_target_properties(iree_pjrt_rocm_dylib
 
 # TODO: Find a better way to decide whether can link with undefined symbols.
 if(NOT IREE_ENABLE_ASAN)
-  target_link_options(iree_pjrt_rocm_dylib PRIVATE "-Wl,--no-undefined")
+  if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    target_link_options(iree_pjrt_rocm_dylib PRIVATE "-Wl,-undefined,error")
+  else()
+    target_link_options(iree_pjrt_rocm_dylib PRIVATE "-Wl,--no-undefined")
+  endif()
 endif()

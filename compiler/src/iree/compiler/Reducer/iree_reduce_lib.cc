@@ -20,7 +20,16 @@ Operation *mlir::iree_compiler::Reducer::ireeRunReducingStrategies(
   Oracle oracle(config.testScript, config.useBytecode);
   Delta delta(oracle, workItem);
 
-  delta.runDeltaPass(reduceFlowDispatchOperandToResultDelta,
+  // Check if the initial module is interesting.
+  if (!oracle.isInteresting(workItem)) {
+    llvm::report_fatal_error(
+        "Initial test input is not interesting. Make sure you "
+        "are returning 0 in your interesting check script if the input is "
+        "interesting. Try running your interesting check script on the input "
+        "and check the return code.");
+  }
+
+  delta.runDeltaPass(reduceOperandToResultDelta,
                      "Dispatch operand to result delta");
   delta.runDeltaPass(reduceFlowDispatchResultBySplatDelta,
                      "Dispatch result to splat delta");

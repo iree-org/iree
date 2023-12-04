@@ -29,6 +29,24 @@ void iree_task_executor_options_initialize(
   memset(out_options, 0, sizeof(*out_options));
 }
 
+// Returns the size of the worker local memory required by |group| in bytes.
+// We don't want destructive sharing between workers so ensure we are aligned to
+// at least the destructive interference size, even if a bit larger than what
+// the user asked for or the device supports.
+static iree_host_size_t iree_task_topology_group_local_memory_size(
+    iree_task_executor_options_t options,
+    const iree_task_topology_group_t* group) {
+  iree_host_size_t worker_local_memory_size = options.worker_local_memory_size;
+  if (!worker_local_memory_size) {
+    worker_local_memory_size = group->caches.l2_data;
+  }
+  if (!worker_local_memory_size) {
+    worker_local_memory_size = group->caches.l1_data;
+  }
+  return iree_host_align(worker_local_memory_size,
+                         iree_hardware_destructive_interference_size);
+}
+
 iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
                                         const iree_task_topology_t* topology,
                                         iree_allocator_t allocator,
@@ -54,13 +72,14 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
   *out_executor = NULL;
 
   // The executor is followed in memory by worker[] + worker_local_memory[].
-  // The whole point is that we don't want destructive sharing between workers
-  // so ensure we are aligned to at least the destructive interference size.
-  options.worker_local_memory_size =
-      iree_host_align(options.worker_local_memory_size,
-                      iree_hardware_destructive_interference_size);
-  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0,
-                                   (int64_t)options.worker_local_memory_size);
+  iree_host_size_t total_worker_local_memory_size = 0;
+  for (iree_host_size_t i = 0; i < worker_count; ++i) {
+    total_worker_local_memory_size +=
+        iree_task_topology_group_local_memory_size(
+            options, iree_task_topology_get_group(topology, i));
+  }
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)total_worker_local_memory_size);
+
   iree_host_size_t executor_base_size =
       iree_host_align(sizeof(iree_task_executor_t),
                       iree_hardware_destructive_interference_size);
@@ -68,8 +87,7 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
       iree_host_align(worker_count * sizeof(iree_task_worker_t),
                       iree_hardware_destructive_interference_size);
   iree_host_size_t executor_size =
-      executor_base_size + worker_list_size +
-      worker_count * options.worker_local_memory_size;
+      executor_base_size + worker_list_size + total_worker_local_memory_size;
 
   iree_task_executor_t* executor = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -157,14 +175,16 @@ iree_status_t iree_task_executor_create(iree_task_executor_options_t options,
         iree_task_affinity_set_ones(worker_count);
 
     for (iree_host_size_t i = 0; i < worker_count; ++i) {
+      const iree_task_topology_group_t* group =
+          iree_task_topology_get_group(topology, i);
+      iree_host_size_t worker_local_memory_size =
+          iree_task_topology_group_local_memory_size(options, group);
       iree_task_worker_t* worker = &executor->workers[i];
       status = iree_task_worker_initialize(
-          executor, i, iree_task_topology_get_group(topology, i),
-          options.worker_stack_size,
-          iree_make_byte_span(worker_local_memory,
-                              options.worker_local_memory_size),
+          executor, i, group, options.worker_stack_size,
+          iree_make_byte_span(worker_local_memory, worker_local_memory_size),
           &seed_prng, worker);
-      worker_local_memory += options.worker_local_memory_size;
+      worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
 

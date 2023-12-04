@@ -27,6 +27,9 @@ def enforce_glob(files, **kwargs):
         files. The input argument unchanged
     """
     glob_result = native.glob(**kwargs)
+    for skip_file in ["CMakeLists.txt"]:
+        if skip_file in glob_result:
+            glob_result.remove(skip_file)
 
     # glob returns a sorted list.
     if sorted(files) != glob_result:

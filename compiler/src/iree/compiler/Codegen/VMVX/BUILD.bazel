@@ -47,18 +47,23 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "VMVX",
     srcs = [
+        "KernelDispatch.cpp",
         "LowerLinalgMicrokernels.cpp",
         "Passes.cpp",
         "VMVXAssignConstantOrdinals.cpp",
         "VMVXLinkExecutables.cpp",
+        "VMVXLowerExecutableTargetPass.cpp",
+        "VMVXSelectLoweringStrategy.cpp",
     ],
     hdrs = [
+        "KernelDispatch.h",
         "Passes.h",
     ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
@@ -70,9 +75,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
-        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -82,7 +85,9 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )

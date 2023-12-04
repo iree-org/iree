@@ -17,12 +17,19 @@
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen-reduction-distribution"
+#define DEBUG_TYPE "iree-codegen-vector-reduction-to-gpu"
 
 namespace mlir {
 namespace iree_compiler {
+
+void debugPrint(func::FuncOp funcOp, const char *message) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << message << " ---//\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
 
 /// Emit shared local memory allocation in case it is needed when lowering the
 /// warp operations.
@@ -88,6 +95,13 @@ moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
       return true;
     if (isUniformLoad(op))
       return true;
+    // Shared memory is already scoped to the workgroup and can safely be
+    // hoisted out of the the warp op.
+    if (auto allocOp = dyn_cast<memref::AllocOp>(op)) {
+      if (hasSharedMemoryAddressSpace(allocOp.getType())) {
+        return true;
+      }
+    }
 
     return false;
   };
@@ -139,6 +153,26 @@ public:
   }
 };
 
+/// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
+class WarpOpBarrier : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
+  using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
+                                PatternRewriter &rewriter) const override {
+    auto yield = cast<vector::YieldOp>(
+        warpOp.getBodyRegion().getBlocks().begin()->getTerminator());
+    Operation *lastNode = yield->getPrevNode();
+    auto barrierOp = dyn_cast_or_null<gpu::BarrierOp>(lastNode);
+    if (!barrierOp)
+      return failure();
+
+    rewriter.setInsertionPointAfter(warpOp);
+    (void)rewriter.create<gpu::BarrierOp>(barrierOp.getLoc());
+    rewriter.eraseOp(barrierOp);
+    return success();
+  }
+};
+
 static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
                                        Value val, Value srcIdx,
                                        int64_t warpSz) {
@@ -155,11 +189,14 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   return result;
 }
 
-class VectorReduceToGPUPass
-    : public VectorReduceToGPUBase<VectorReduceToGPUPass> {
+class VectorReductionToGPUPass
+    : public VectorReductionToGPUBase<VectorReductionToGPUPass> {
 public:
-  explicit VectorReduceToGPUPass(std::function<int(func::FuncOp)> getWarpSize)
-      : getWarpSize(getWarpSize) {}
+  explicit VectorReductionToGPUPass(
+      bool expandSubgroupReduction,
+      std::function<int(func::FuncOp)> getWarpSize)
+      : expandSubgroupReduction(expandSubgroupReduction),
+        getWarpSize(getWarpSize) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
@@ -169,6 +206,8 @@ public:
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     MLIRContext *ctx = &getContext();
+
+    debugPrint(funcOp, "after step #0: before vector reduction to gpu");
 
     // 1. Pre-process multiDimReductions.
     // TODO: Remove once MultiDimReduce is supported by distribute patterns.
@@ -184,12 +223,7 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs()
-          << "\n--- After Step 1: Preprocessing of reduction ops ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #1: preprocessing reduction ops");
 
     auto workgroupSize = llvm::map_to_vector(
         getEntryPoint(funcOp)->getWorkgroupSize().value(),
@@ -214,41 +248,34 @@ public:
     builder.setInsertionPointToEnd(&warpOp.getWarpRegion().getBlocks().back());
     builder.create<vector::YieldOp>(loc);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 2: Adding the distribution op ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #2: wrapping code with the warp execute op");
 
     // 3. Hoist the scalar code outside of the warp region.
     moveScalarAndBindingUniformCode(warpOp);
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 3: Hoist uniform code ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #3: hosting uniform code");
 
     // 4. Distribute transfer write operations and propagate vector
     // distribution.
     {
       int warpSize = this->getWarpSize ? this->getWarpSize(funcOp) : 32;
-      auto groupReductionFn = [&](Location loc, OpBuilder &builder, Value input,
-                                  vector::CombiningKind kind, uint32_t size) {
-        return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize);
+      auto groupReductionFn = [=](Location loc, OpBuilder &builder, Value input,
+                                  vector::CombiningKind kind,
+                                  uint32_t size) -> Value {
+        return emitGPUGroupReduction(loc, builder, input, kind, size, warpSize,
+                                     expandSubgroupReduction);
       };
       auto distributionFn = [](Value val) {
-        AffineMap map = AffineMap::get(val.getContext());
         auto vecType = llvm::dyn_cast<VectorType>(val.getType());
         if (!vecType)
-          return map;
+          return AffineMap::get(val.getContext());
         // Create a map (d0, d1) -> (d1) to distribute along the inner
         // dimension. Once we support n-d distribution we can add more
         // complex cases.
         int64_t vecRank = vecType.getRank();
         OpBuilder builder(val.getContext());
-        map = AffineMap::get(vecRank, 0, builder.getAffineDimExpr(vecRank - 1));
-        return map;
+        return AffineMap::get(vecRank, 0,
+                              builder.getAffineDimExpr(vecRank - 1));
       };
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(
@@ -256,14 +283,11 @@ public:
       vector::populateDistributeReduction(patterns, groupReductionFn);
       vector::populateDistributeTransferWriteOpPatterns(patterns,
                                                         distributionFn);
+      patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 4: Propagate distribution ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #4: propagating distribution");
 
     // 5. Lower the remaining WarpExecuteOnLane0 ops.
     {
@@ -278,14 +302,11 @@ public:
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After Step 5: Lower remaining ops ---\n";
-      funcOp.dump();
-      llvm::dbgs() << "\n\n";
-    });
+    debugPrint(funcOp, "after step #5: lowering remaining ops");
   }
 
 private:
+  bool expandSubgroupReduction;
   std::function<int(func::FuncOp)> getWarpSize;
 };
 
@@ -293,8 +314,10 @@ private:
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
+    bool expandSubgroupReduction,
     std::function<int(func::FuncOp)> getWarpSize) {
-  return std::make_unique<VectorReduceToGPUPass>(getWarpSize);
+  return std::make_unique<VectorReductionToGPUPass>(expandSubgroupReduction,
+                                                    getWarpSize);
 }
 
 } // namespace iree_compiler

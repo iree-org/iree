@@ -6,6 +6,12 @@ util.global @v_initialized_const = 4 : i32
 // CHECK: vm.global.i32 private @v_private_const = 5 : i32
 util.global private @v_private_const = 5 : i32
 
+// CHECK: vm.global.i32 private @v_uninitialized : i32
+util.global private @v_uninitialized = #util.uninitialized : i32
+
+// CHECK: vm.global.ref private @v_uninitialized_ref : !vm.ref<!hal.buffer>
+util.global private @v_uninitialized_ref = #util.uninitialized : !vm.ref<!hal.buffer>
+
 // -----
 
 // CHECK: vm.global.ref public @v_initialized : !vm.ref<!hal.buffer>

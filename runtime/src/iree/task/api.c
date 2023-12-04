@@ -34,15 +34,15 @@ IREE_FLAG(
     "the stack for storage over ~16-32KB and instead use local workgroup\n"
     "memory.");
 
-// TODO(benvanik): enable this when we use it - though hopefully we don't!
 IREE_FLAG(
-    int32_t, task_worker_local_memory, 0,  // 64 * 1024,
-    "Specifies the bytes of per-worker local memory allocated for use by\n"
+    int32_t, task_worker_local_memory, 0,
+    "Overrides the bytes of per-worker local memory allocated for use by\n"
     "dispatched tiles. Tiles may use less than this but will fail to dispatch\n"
     "if they require more. Conceptually it is like a stack reservation and\n"
     "should be treated the same way: the source programs must be built to\n"
     "only use a specific maximum amount of local memory and the runtime must\n"
-    "be configured to make at least that amount of local memory available.");
+    "be configured to make at least that amount of local memory available.\n"
+    "By default the CPU L2 cache size is used if such queries are supported.");
 
 iree_status_t iree_task_executor_options_initialize_from_flags(
     iree_task_executor_options_t* out_options) {
@@ -214,7 +214,11 @@ static void iree_task_flags_dump_task_topology(
       fprintf(stdout, "(unspecified)");
     }
     fprintf(stdout, "\n");
-    fprintf(stdout, "#  cache sharing: ");
+
+    fprintf(stdout, "#  caches: l1d=%u, l2d=%u\n", group->caches.l1_data,
+            group->caches.l2_data);
+
+    fprintf(stdout, "#  last level cache sharing: ");
     if (group->constructive_sharing_mask == 0) {
       fprintf(stdout, "(none)\n");
     } else if (group->constructive_sharing_mask ==
@@ -233,6 +237,7 @@ static void iree_task_flags_dump_task_topology(
       }
       fprintf(stdout, "\n");
     }
+
     fprintf(stdout, "#\n");
   }
 }

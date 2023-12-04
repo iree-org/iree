@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy |\
 // RUN:   FileCheck %s --check-prefixes=CHECK,DEFAULT
 
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,32,2 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
@@ -81,12 +81,12 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 }
 
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK:   transform.iree.register_match_callbacks
 // CHECK:   %[[MATCH:.+]]:2 = transform.iree.match_callback failures(propagate) "batch_matmul"
 // CHECK:   %[[TILED:.+]], %[[FORALL:.+]] = transform.structured.tile_using_forall %[[MATCH]]#1
-// DEFAULT:   num_threads [] tile_sizes [64, 64, 1](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
-// OPTIONS:   num_threads [] tile_sizes [128, 64, 32](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
+// DEFAULT:   tile_sizes [64, 64, 1](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
+// OPTIONS:   tile_sizes [128, 64, 32](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -98,7 +98,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op
 // CHECK:     pack_paddings = [1, 1, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
-// CHECK:   %[[V3:.+]] = get_producer_of_operand %[[PADDED]][2]
+// CHECK:   %[[V3:.+]] = transform.get_producer_of_operand %[[PADDED]][2]
 // CHECK:   transform.structured.hoist_pad %{{.*}} by 1 loops
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
@@ -109,13 +109,13 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.iree.apply_cse
 // CHECK:   transform.structured.match ops{["tensor.parallel_insert_slice"]}
 // CHECK:   transform.structured.insert_slice_to_copy
-// CHECK:   %[[LHS:.+]] = get_producer_of_operand %[[PADDED]][0]
-// CHECK:   %[[RHS:.+]] = get_producer_of_operand %[[PADDED]][1]
+// CHECK:   %[[LHS:.+]] = transform.get_producer_of_operand %[[PADDED]][0]
+// CHECK:   %[[RHS:.+]] = transform.get_producer_of_operand %[[PADDED]][1]
 // CHECK:   %[[RHS_DPS:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS]]
 
 // CHECK:   transform.structured.tile_using_forall %[[LHS]]
-// DEFAULT:  num_threads [1, 32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// OPTIONS:  num_threads [1, 64, 2] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// DEFAULT:  num_threads [1, 32, 4](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [1, 64, 2](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -123,29 +123,29 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch
 
 // CHECK:   transform.structured.tile_using_forall %[[RHS_DPS]]
-// DEFAULT:  num_threads [8, 16, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// OPTIONS:  num_threads [2, 8, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// DEFAULT:  num_threads [8, 16, 1](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [2, 8, 8](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
 // CHECK:   transform.structured.tile_using_forall
-// DEFAULT:  num_threads [2, 64, 1] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// OPTIONS:  num_threads [1, 16, 8] tile_sizes [](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// DEFAULT:  num_threads [2, 64, 1](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// OPTIONS:  num_threads [1, 16, 8](mapping = [#gpu.thread<linear_dim_2>, #gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
 // CHECK:   transform.structured.tile_using_forall
-// DEFAULT:  num_threads [1, 2, 64] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
-// OPTIONS:  num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
+// DEFAULT:  num_threads [1, 2, 64](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
+// OPTIONS:  num_threads [1, 4, 32](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
 
 // CHECK:   %tiled_op_8, %forall_op_9 = transform.structured.tile_using_forall %[[FILL]]
-// DEFAULT:   num_threads [1, 2, 64] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
-// OPTIONS:   num_threads [1, 4, 32] tile_sizes [](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
+// DEFAULT:   num_threads [1, 2, 64](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
+// OPTIONS:   num_threads [1, 4, 32](mapping = [#gpu.thread<z>, #gpu.thread<y>, #gpu.thread<x>])
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse
@@ -210,7 +210,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
 // DEFAULT:   factor = 2
 // OPTIONS:   factor = 3
 // CHECK:   apply_patterns
-// CHECK:     transform.apply_patterns.vector.transfer_to_scf   max_transfer_rank = 1 full_unroll = true
+// CHECK:     transform.apply_patterns.vector.transfer_to_scf   full_unroll = true
 // CHECK:   apply_patterns
 // CHECK:   transform.iree.apply_licm
 // CHECK:   transform.iree.apply_cse

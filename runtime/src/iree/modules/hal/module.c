@@ -1210,17 +1210,62 @@ IREE_VM_ABI_EXPORT(iree_hal_module_fence_create,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_fence_join,  //
                    iree_hal_module_state_t,     //
                    CrD, r) {
-  iree_host_size_t fence_count = 0;
-  iree_hal_fence_t** fences = NULL;
-  IREE_VM_ABI_VLA_STACK_DEREF_OR_NULL(args, a0_count, a0, iree_hal_fence, 32,
-                                      &fence_count, &fences);
+  // NOTE: this is an inlined version of iree_hal_fence_join that avoids the
+  // need for mapping VM types to HAL types via temporary stack/heap storage.
+  // This lets us avoid allocations/stack exhaustion in pathological cases of
+  // hundreds of fences (say, one per input argument in stateless programs with
+  // hundreds/thousands of inputs).
 
-  iree_hal_fence_t* fence = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_fence_join(fence_count, fences, state->host_allocator, &fence));
+  // Find the maximum required timepoint capacity by scanning the fence list.
+  // This ensures all fences passed in are actually fences _or_ are NULL so
+  // the subsequent scan below only needs to check for NULL cases.
+  iree_host_size_t total_timepoint_capacity = 0;
+  for (iree_host_size_t i = 0; i < args->a0_count; ++i) {
+    iree_hal_fence_t* fence = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_hal_fence_check_deref_or_null(args->a0[i].r0, &fence));
+    if (fence) {
+      total_timepoint_capacity += iree_hal_fence_timepoint_count(fence);
+    }
+  }
 
-  rets->r0 = iree_hal_fence_move_ref(fence);
-  return iree_ok_status();
+  // If all fences were empty then we no-op by returning a NULL fence
+  // (immediately signaled).
+  if (!total_timepoint_capacity) {
+    rets->r0 = iree_vm_ref_null();
+    return iree_ok_status();
+  }
+
+  // Create the fence with the maximum capacity. Hopefully there is some
+  // deduplication.
+  iree_hal_fence_t* joined_fence = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_fence_create(
+      total_timepoint_capacity, state->host_allocator, &joined_fence));
+
+  // Insert all timepoints from all fences. This is slow in cases where there
+  // are a lot of unique fences.
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < args->a0_count; ++i) {
+    // NOTE: only possible because we checked above and know this is NULL or an
+    // iree_hal_fence_t.
+    iree_hal_fence_t* fence = (iree_hal_fence_t*)args->a0[i].r0.ptr;
+    if (!fence) continue;
+    iree_hal_semaphore_list_t source_list =
+        iree_hal_fence_semaphore_list(fence);
+    for (iree_host_size_t j = 0; j < source_list.count; ++j) {
+      status = iree_hal_fence_insert(joined_fence, source_list.semaphores[j],
+                                     source_list.payload_values[j]);
+      if (!iree_status_is_ok(status)) break;
+    }
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  if (iree_status_is_ok(status)) {
+    rets->r0 = iree_hal_fence_move_ref(joined_fence);
+  } else {
+    iree_hal_fence_release(joined_fence);
+  }
+  return status;
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_fence_query,  //

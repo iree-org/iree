@@ -5,7 +5,6 @@ tags:
   - Python
   - PyTorch
 icon: simple/pytorch
-status: new
 ---
 
 # PyTorch + IREE = :octicons-heart-16:
@@ -102,7 +101,7 @@ graph TD
   end
 ```
 
-For deployment outside of Python, see the ahead-of-time section below.
+For deployment outside of Python, see the ahead-of-time sections below.
 
 ### :octicons-rocket-16: Quickstart
 
@@ -141,9 +140,10 @@ turbine_output = opt_linear_module(args)
 
 ### :octicons-code-16: Samples
 
-| Colab notebooks |  |
+| Code samples |  |
 | -- | -- |
-Eager execution / JIT compilation | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_jit.ipynb)
+JIT compilation notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_jit.ipynb)
+Simple MLP eager | [`examples/eager_mlp/mlp_eager_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/eager_mlp/mlp_eager_simple.py)
 
 ## :octicons-package-dependents-16: Ahead-of-time (AOT) export
 
@@ -152,94 +152,263 @@ Python and then export deployment-ready artifacts that can be used in IREE's
 [deployment configurations](../deployment-configurations/index.md) via the
 [API bindings](../../reference/bindings/index.md).
 
-=== ":octicons-plug-16: Simple API"
+### :octicons-plug-16: Simple API
 
-    For simple models, a one-shot export API is available.
+For simple models, a one-shot export API is available.
 
-    ```mermaid
-    graph LR
-      accTitle: PyTorch simple AOT workflow overview
-      accDescr {
-        Programs start as PyTorch nn.Module objects.
-        Modules are exported using the "aot" API.
-        Exported outputs are then compiled to .vmfb files with executable binaries.
-      }
+```mermaid
+graph LR
+  accTitle: PyTorch simple AOT workflow overview
+  accDescr {
+    Programs start as PyTorch nn.Module objects.
+    Modules are exported using the "aot" API.
+    Exported outputs are then compiled to .vmfb files with executable binaries.
+  }
 
-      subgraph Python
-        input([nn.Module])
-        export(["ExportOutput (MLIR)"])
-      end
+  subgraph Python
+    input([nn.Module])
+    export(["ExportOutput (MLIR)"])
+    input -- "aot.export()" --> export
+  end
 
-      subgraph Native
-        binary(["binary (.vmfb)"])
-      end
+  subgraph Native
+    binary(["binary (.vmfb)"])
+  end
 
-      input -- "aot.export()" --> export
-      export -. "compile()" .-> binary
-    ```
+  export -. "compile()" .-> binary
+```
 
-=== ":octicons-tools-16: Advanced API"
+```python
+import iree.runtime as ireert
+import numpy as np
+import shark_turbine.aot as aot
+import torch
 
-    For more complex models, an underlying advanced API is available that gives
-    access to more features.
+# Define the `nn.Module` to export.
+class LinearModule(torch.nn.Module):
+  def __init__(self, in_features, out_features):
+    super().__init__()
+    self.weight = torch.nn.Parameter(torch.randn(in_features, out_features))
+    self.bias = torch.nn.Parameter(torch.randn(out_features))
 
-    !!! note "Documentation coming soon!"
+  def forward(self, input):
+    return (input @ self.weight) + self.bias
 
-### :octicons-rocket-16: Quickstart
+linear_module = LinearModule(4, 3)
 
-=== ":octicons-plug-16: Simple API"
+# Export the program using the simple API.
+example_arg = torch.randn(4)
+export_output = aot.export(linear_module, example_arg)
+
+# Compile to a deployable artifact.
+binary = export_output.compile(save_to=None)
+
+# Use the IREE runtime API to test the compiled program.
+config = ireert.Config("local-task")
+vm_module = ireert.load_vm_module(
+    ireert.VmModule.wrap_buffer(config.vm_instance, binary.map_memory()),
+    config,
+)
+input = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
+result = vm_module.main(input)
+print(result.to_host())
+```
+
+#### :octicons-code-16: Samples
+
+| Code samples |  |
+| -- | -- |
+Simple AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
+Simple MLP export | [`examples/aot_mlp/mlp_export_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_simple.py)
+
+### :octicons-tools-16: Advanced API
+
+For more complex models, an underlying advanced API is available that gives
+access to more features.
+
+```mermaid
+graph LR
+  accTitle: PyTorch advanced AOT workflow overview
+  accDescr {
+    Programs are represented using the aot.CompiledModule class.
+    CompiledModules can extend nn.Module objects, export globals, and set
+    shapes and dtypes for each function.
+    Modules are exported using the "aot" API.
+    Exported outputs are then compiled to .vmfb files with executable binaries.
+  }
+
+  subgraph Python
+    compiledmodule("aot.CompiledModule\n\n- extend nn.Module\n- export globals\n- set shapes/dtypes")
+    export(["ExportOutput (MLIR)"])
+    compiledmodule -- "aot.export()" --> export
+  end
+
+  subgraph Native
+    binary(["binary (.vmfb)"])
+  end
+
+  export -. "compile()" .-> binary
+```
+
+Advanced export workflows can use the
+[`aot.CompiledModule`](https://github.com/nod-ai/SHARK-Turbine/blob/main/python/shark_turbine/aot/compiled_module.py)
+class to define and constrain the structure of a program prior to compiling it.
+
+<!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
+                      https://github.com/nod-ai/SHARK-Turbine/issues/106
+-->
+
+```python
+import shark_turbine.aot as aot
+
+# A minimal program, with no functions or variables.
+class BasicModule(aot.CompiledModule):
+  ...
+
+# Create an instance of the program and convert it to MLIR.
+from iree.compiler.ir import Context
+instance = BasicModule(context=Context())
+module_str = str(aot.CompiledModule.get_mlir_module(instance))
+
+print(module_str)
+# module @basic {
+# }
+```
+
+#### :material-function: Exporting functions
+
+_Exported functions_ are the API entry points into a compiled program.
+
+Simple feed-forward neural networks used for inference may have a single
+exported function (typically called "forward"), while more complex programs can
+have multiple computation functions, initialization functions, "backward"
+methods for training, state management functions, debugging functions, etc.
+
+* Each instance method on a `aot.CompiledModule`-derived class is exported.
+  These instance methods can include calls to other `aot` components, such as
+  `aot.jittable` compute functions:
 
     ```python
-    import iree.runtime as ireert
-    import numpy as np
-    import shark_turbine.aot as aot
-    import torch
+    class GetOnesModule(aot.CompiledModule):
+      @aot.jittable
+      def compute_ones():
+        return torch.ones(3)
 
-    # Define the `nn.Module` to export.
-    class LinearModule(torch.nn.Module):
-      def __init__(self, in_features, out_features):
-        super().__init__()
-        self.weight = torch.nn.Parameter(torch.randn(in_features, out_features))
-        self.bias = torch.nn.Parameter(torch.randn(out_features))
-
-      def forward(self, input):
-        return (input @ self.weight) + self.bias
-
-    linear_module = LinearModule(4, 3)
-
-    # Export the program using the simple API.
-    example_arg = torch.randn(4)
-    export_output = aot.export(linear_module, example_arg)
-
-    # Compile to a deployable artifact.
-    binary = export_output.compile(save_to=None)
-
-    # Use the IREE runtime API to test the compiled program.
-    config = ireert.Config("local-task")
-    vm_module = ireert.load_vm_module(
-        ireert.VmModule.wrap_buffer(config.vm_instance, binary.map_memory()),
-        config,
-    )
-    input = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-    result = vm_module.main(input)
-    print(result.to_host())
+      def get_ones(self):
+        return self.compute_ones()
     ```
 
-=== ":octicons-tools-16: Advanced API"
+* Instance methods can use `aot.AbstractTensor` to specify data types:
 
-    !!! note "Documentation coming soon!"
+    ```python hl_lines="8-9"
+    class IntSumModule(aot.CompiledModule):
+      @aot.jittable
+      def compute_sum(a, b):
+        return a + b
 
-### :octicons-code-16: Samples
+      def sum_int32(
+        self,
+        a=aot.AbstractTensor(2, dtype=torch.int32),
+        b=aot.AbstractTensor(2, dtype=torch.int32),
+      ):
+        return self.compute_sum(a, b)
+    ```
 
-| Colab notebooks |  |
+* Shapes can be made dynamic using `aot.AbstractTensor` and `aot.jittable`
+  constraints:
+
+    ```python hl_lines="8-9 14-16"
+    class DynamicSumModule(aot.CompiledModule):
+      @aot.jittable
+      def compute_sum(a, b):
+        return a + b
+
+      def sum_dynamic(
+        self,
+        a=aot.AbstractTensor(None),
+        b=aot.AbstractTensor(None),
+      ):
+        return self.compute_sum(
+            a,
+            b,
+            constraints=[
+                a.dynamic_dim(0) == b.dynamic_dim(0),
+            ],
+        )
+    ```
+
+#### :material-variable: Global variables
+
+_Global variables_ are used to represent persistent state within a program
+instance.
+
+For example, they can be used to represent the weights and biases in a neural
+network, and exporting these as mutable variables can allow for setting
+their values independently at runtime.
+
+* Individual globals can be exported using `aot.export_global()`:
+
+    ```python
+    state_example = torch.tensor(0, dtype=torch.int32)
+    update_example = torch.tensor(0, dtype=torch.int32)
+
+    class SampleModule(aot.CompiledModule):
+      value = aot.export_global(state_example, mutable=True)
+
+      def get_value(self):
+        return self.value
+
+      def update_value(self, new_value=aot.abstractify(update_example)):
+        self.value = new_value
+    ```
+
+* All named parameters on a `nn.Module` can be exported using
+  `export_parameters()`:
+
+    ```python hl_lines="12 18-26"
+    class SimpleParams(torch.nn.Module):
+      def __init__(self):
+        super().__init__()
+        self.classifier = torch.nn.Linear(20, 30)
+
+      def forward(self, x):
+        return self.classifier(x)
+
+    m = SimpleParams()
+
+    class SimpleParamsModule(aot.CompiledModule):
+      params = aot.export_parameters(m)
+      compute = aot.jittable(m.forward)
+
+      def run(self, x=aot.AbstractTensor(128, 20)):
+        return self.compute(x)
+
+      # torch.nn.Linear has 'weight' and 'bias' variables:
+      #   https://pytorch.org/docs/stable/generated/torch.nn.Linear.html
+      # Add getters for both exported parameters.
+
+      def get_weight(self):
+        return self.params["classifier.weight"]
+
+      def get_bias(self):
+        return self.params["classifier.bias"]
+    ```
+
+#### :octicons-code-16: Samples
+
+| Code samples |  |
 | -- | -- |
-Simple AOT export | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
+Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_advanced.ipynb)
+PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
+AOT unit tests | [`tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot)
+Dynamic MLP export | [`examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_dynamic.py)
+stateless llama2 | [`python/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/python/turbine_models/custom_models/stateless_llama.py)
 
 ## Alternate workflows
 
 !!! caution "Caution - These are due for migration to SHARK-Turbine."
 
-| Colab notebooks |  |
+| Code samples |  |
 | -- | -- |
 (Deprecated) Inference on BERT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree-torch/blob/main/examples/bert.ipynb)
 

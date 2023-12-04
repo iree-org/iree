@@ -41,7 +41,7 @@ namespace HAL {
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.h.inc" // IWYU pragma: export
 
 //===----------------------------------------------------------------------===//
-// Enum utilities
+// Utilities
 //===----------------------------------------------------------------------===//
 
 // Returns a stable identifier for the MLIR element type or nullopt if the

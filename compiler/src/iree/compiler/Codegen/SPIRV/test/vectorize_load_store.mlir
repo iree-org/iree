@@ -537,3 +537,92 @@ func.func @transfer_write_vector2_vector8(%x: index, %val0: vector<2xi32>, %val1
 //       CHECK:   %[[SLICE3:.+]] = vector.extract_strided_slice %[[VAL1]] {offsets = [6], sizes = [2], strides = [1]} : vector<8xi32> to vector<2xi32>
 //       CHECK:   %[[OFFSET3:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 2 + 3)>()[%[[INDEX]]]
 //       CHECK:   memref.store %[[SLICE3]], %[[SUBSPAN]][%[[OFFSET3]]]
+
+// -----
+
+func.func @scalarize_masked_vector_transfer_op(%arg: vector<3xf32>, %mask: vector<3xi1>) -> (vector<3xf32>) {
+  %c0 = arith.constant 0: index
+  %c3 = arith.constant 3: index
+  %f0 = arith.constant 0.0 : f32
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<20xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<20xf32>
+  %3 = vector.transfer_read %0[%c3], %f0, %mask : memref<20xf32>, vector<3xf32>
+  vector.transfer_write %arg, %2[%c3], %mask : vector<3xf32>, memref<20xf32>
+  return %3: vector<3xf32>
+}
+
+// CHECK-LABEL: func.func @scalarize_masked_vector_transfer_op
+// CHECK-DAG: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<3xf32>
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+
+/// Transfer read.
+//     CHECK: %[[MB0:.+]] = vector.extract %{{.*}}[0] : i1 from vector<3xi1>
+//     CHECK: %[[MASK_LD0:.+]] = scf.if %[[MB0]] -> (f32) {
+//     CHECK:   %[[LD0:.+]] = memref.load {{.*}}[%[[C3]]] : memref<20xf32>
+//     CHECK:   scf.yield %[[LD0]] : f32
+//     CHECK: } else {
+//     CHECK:   scf.yield %[[PAD]] : f32
+//     CHECK: }
+//     CHECK: vector.insert %[[MASK_LD0]], %[[INIT]] [0] : f32 into vector<3xf32>
+//     CHECK: vector.extract %{{.*}}[1] : i1 from vector<3xi1>
+//     CHECK: scf.if %{{.*}} -> (f32) {
+//     CHECK:   memref.load %{{.*}}[%[[C4]]] : memref<20xf32>
+//     CHECK: vector.extract %{{.*}}[2] : i1 from vector<3xi1>
+//     CHECK: scf.if %{{.*}} -> (f32) {
+//     CHECK:   memref.load %{{.*}}[%[[C5]]] : memref<20xf32>
+//     CHECK: %[[MASK_TR:.+]] = vector.insert {{.*}} [2] : f32 into vector<3xf32>
+
+/// Transfer write.
+//     CHECK: scf.if %[[MB0]] {
+//     CHECK:   %[[E0:.+]] = vector.extract {{.*}}[0] : f32 from vector<3xf32>
+//     CHECK:   memref.store %[[E0]], %{{.*}}[%[[C3]]] : memref<20xf32>
+//     CHECK: }
+//     CHECK: scf.if %{{.*}} {
+//     CHECK:   %[[E1:.+]] = vector.extract {{.*}}[1] : f32 from vector<3xf32>
+//     CHECK:   memref.store %[[E1]], %{{.*}}[%[[C4]]] : memref<20xf32>
+//     CHECK: }
+//     CHECK: scf.if %{{.*}} {
+//     CHECK:   %[[E2:.+]] = vector.extract {{.*}}[2] : f32 from vector<3xf32>
+//     CHECK:   memref.store %[[E2]], %{{.*}}[%[[C5]]] : memref<20xf32>
+//     CHECK: }
+//     CHECK: return %[[MASK_TR]] : vector<3xf32>
+
+// -----
+
+func.func @extract_vector_transfer_read_mask_bits(%arg: vector<3xf32>, %index: index) -> (vector<3xf32>) {
+  %c3 = arith.constant 3: index
+  %f0 = arith.constant 0.0 : f32
+  %mask = vector.create_mask %index : vector<3xi1>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<20xf32>
+  %1 = vector.transfer_read %0[%c3], %f0, %mask : memref<20xf32>, vector<3xf32>
+  return %1: vector<3xf32>
+}
+
+// CHECK-LABEL: func.func @extract_vector_transfer_read_mask_bits
+// CHECK-SAME:    %{{.*}}: vector<3xf32>, %[[MASK_SIZE:.+]]: index
+// CHECK-DAG: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<3xf32>
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+// CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
+// CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+// CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
+
+//     CHECK: %[[MB0:.+]] = arith.cmpi sgt, %[[MASK_SIZE]], %[[C0]] : index
+//     CHECK: %[[MASK_LD0:.+]] = scf.if %[[MB0]] -> (f32) {
+//     CHECK:   %[[LD0:.+]] = memref.load {{.*}}[%[[C3]]] : memref<20xf32>
+//     CHECK:   scf.yield %[[LD0]] : f32
+//     CHECK: } else {
+//     CHECK:   scf.yield %[[PAD]] : f32
+//     CHECK: }
+//     CHECK: vector.insert %[[MASK_LD0]], %[[INIT]] [0] : f32 into vector<3xf32>
+//     CHECK: %[[MB1:.+]] = arith.cmpi sgt, %[[MASK_SIZE]], %[[C1]] : index
+//     CHECK: scf.if %[[MB1]] -> (f32) {
+//     CHECK:   memref.load %{{.*}}[%[[C4]]] : memref<20xf32>
+//     CHECK: %[[MB2:.+]] = arith.cmpi sgt, %[[MASK_SIZE]], %[[C2]] : index
+//     CHECK: scf.if %[[MB2]] -> (f32) {
+//     CHECK:   memref.load %{{.*}}[%[[C5]]] : memref<20xf32>

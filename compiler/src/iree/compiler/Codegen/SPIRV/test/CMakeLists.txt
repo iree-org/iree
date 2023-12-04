@@ -38,8 +38,8 @@ iree_lit_test_suite(
     "distribute_to_invocations.mlir"
     "emulate_i64.mlir"
     "erase_storage_buffer_static_shape.mlir"
-    "generalize_named_ops.mlir"
     "illegal_configuration.mlir"
+    "lower_masks.mlir"
     "lowering_matmul_fusion.mlir"
     "lowering_matmul_promotion.mlir"
     "lowering_matvec.mlir"
@@ -53,7 +53,6 @@ iree_lit_test_suite(
     "pipeline_reduction_subgroup.mlir"
     "pipeline_sub_byte_dequant.mlir"
     "set_transform_strategy.mlir"
-    "set_transform_strategy_from_file.mlir"
     "tile_and_distribute.mlir"
     "tile_and_distribute_scatter.mlir"
     "tile_and_distribute_sort.mlir"
@@ -74,8 +73,6 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
-  DATA
-    transform_dialect_dummy_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

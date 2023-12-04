@@ -1,0 +1,27 @@
+# Copyright 2023 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/embed_data:build_defs.bzl", "c_embed_data")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+c_embed_data(
+    name = "safetensors_files",
+    testonly = True,
+    srcs = [
+        "empty.safetensors",
+        "multiple.safetensors",
+        "single.safetensors",
+    ],
+    c_file_output = "safetensors_files.c",
+    flatten = True,
+    h_file_output = "safetensors_files.h",
+    identifier = "iree_io_safetensors_files",
+)

@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 from typing import Any, List, Optional
 import atexit
 import json
+import requests
 import shutil
 import subprocess
 import tarfile
@@ -33,7 +34,7 @@ from common.benchmark_definition import (
 )
 from common.linux_device_utils import get_linux_device_info
 from e2e_test_artifacts import iree_artifacts
-from e2e_model_tests import run_module_utils
+
 import common.common_arguments
 
 
@@ -50,46 +51,148 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         benchmark_results_filename: Optional[pathlib.Path],
         capture_filename: Optional[pathlib.Path],
     ) -> None:
+        module_dir = benchmark_case.module_dir
+        local_module_dir = module_dir.get_local_path()
+        if local_module_dir:
+            case_tmp_dir = local_module_dir
+            module_path = local_module_dir / iree_artifacts.MODULE_FILENAME
+        else:
+            module_rel_dir = iree_artifacts.get_module_dir_path(
+                benchmark_case.run_config.module_generation_config
+            )
+            case_tmp_dir = self.config.tmp_dir / module_rel_dir
+            case_tmp_dir.mkdir(parents=True, exist_ok=True)
+            module_url = (module_dir / iree_artifacts.MODULE_FILENAME).get_url()
+            assert module_url is not None
+            module_path = self.__fetch_file(
+                uri=module_url, dest=case_tmp_dir / iree_artifacts.MODULE_FILENAME
+            )
+
+        inputs_dir = None
+        expected_output_dir = None
+        if benchmark_case.input_uri:
+            inputs_dir = self.__fetch_and_unpack_npy(
+                uri=benchmark_case.input_uri, dest_dir=case_tmp_dir / "inputs_npy"
+            )
+        if benchmark_case.expected_output_uri:
+            expected_output_dir = self.__fetch_and_unpack_npy(
+                uri=benchmark_case.expected_output_uri,
+                dest_dir=case_tmp_dir / "expected_outputs_npy",
+            )
+
         if benchmark_results_filename:
+            if self.config.normal_benchmark_tool_dir is None:
+                raise ValueError("normal_benchmark_tool_dir can't be None.")
+
+            if self.config.verify and expected_output_dir:
+                if not inputs_dir:
+                    raise ValueError(f"Input data is missing for {benchmark_case}.")
+                self.__run_verify(
+                    tool_dir=self.config.normal_benchmark_tool_dir,
+                    benchmark_case=benchmark_case,
+                    module_path=module_path,
+                    inputs_dir=inputs_dir,
+                    expected_outputs_dir=expected_output_dir,
+                )
+
             self.__run_benchmark(
+                tool_dir=self.config.normal_benchmark_tool_dir,
                 benchmark_case=benchmark_case,
+                module_path=module_path,
                 results_filename=benchmark_results_filename,
             )
 
         if capture_filename:
             self.__run_capture(
-                benchmark_case=benchmark_case, capture_filename=capture_filename
+                benchmark_case=benchmark_case,
+                module_path=module_path,
+                capture_filename=capture_filename,
             )
 
     def __build_tool_cmds(
-        self, benchmark_case: BenchmarkCase, tool_path: pathlib.Path
+        self,
+        benchmark_case: BenchmarkCase,
+        tool_path: pathlib.Path,
+        module_path: pathlib.Path,
+        inputs_dir: Optional[pathlib.Path] = None,
     ) -> List[Any]:
         run_config = benchmark_case.run_config
-        cmds: List[Any] = run_module_utils.build_linux_wrapper_cmds_for_device_spec(
-            run_config.target_device_spec
+        cmds = [tool_path, f"--module={module_path}"]
+        cmds += run_config.materialize_run_flags(
+            gpu_id=self.gpu_id,
+            inputs_dir=inputs_dir,
         )
-        cmds.append(tool_path)
-
-        module_dir_path = benchmark_case.benchmark_case_dir
-        cmds += [f"--module={module_dir_path / iree_artifacts.MODULE_FILENAME}"]
-        cmds += run_config.materialize_run_flags(gpu_id=self.gpu_id)
-
+        cpu_params = run_config.target_device_spec.device_parameters.cpu_params
+        if cpu_params:
+            raise ValueError("CPU pinning is not supported yet.")
         return cmds
 
-    def __run_benchmark(
-        self, benchmark_case: BenchmarkCase, results_filename: pathlib.Path
-    ):
-        if self.config.normal_benchmark_tool_dir is None:
-            raise ValueError("normal_benchmark_tool_dir can't be None.")
+    def __fetch_and_unpack_npy(self, uri: str, dest_dir: pathlib.Path) -> pathlib.Path:
+        out_dir = self.__unpack_file(
+            src=self.__fetch_file(
+                uri=uri,
+                dest=dest_dir.with_suffix(".tgz"),
+            ),
+            dest=dest_dir,
+        )
+        return out_dir.absolute()
 
+    def __fetch_file(self, uri: str, dest: pathlib.Path) -> pathlib.Path:
+        """Check and fetch file if needed."""
+        if dest.exists():
+            return dest
+        req = requests.get(uri, stream=True, timeout=60)
+        if not req.ok:
+            raise RuntimeError(f"Failed to fetch {uri}: {req.status_code} - {req.text}")
+        with dest.open("wb") as dest_file:
+            for data in req.iter_content(chunk_size=64 * 1024 * 1024):
+                dest_file.write(data)
+        return dest
+
+    def __unpack_file(self, src: pathlib.Path, dest: pathlib.Path) -> pathlib.Path:
+        """Unpack tar with/without compression."""
+        if dest.exists():
+            return dest
+        with tarfile.open(src) as tar_file:
+            tar_file.extractall(dest)
+        return dest
+
+    def __run_verify(
+        self,
+        tool_dir: pathlib.Path,
+        benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
+        inputs_dir: pathlib.Path,
+        expected_outputs_dir: pathlib.Path,
+    ):
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=tool_dir / "iree-run-module",
+            module_path=module_path,
+            inputs_dir=inputs_dir,
+        )
+        # Currently only support single output.
+        cmd.append(f'--expected_output=@{expected_outputs_dir / "output_0.npy"}')
+        cmd += benchmark_case.verify_params
+        execute_cmd_and_get_output(cmd, verbose=self.verbose)
+
+    def __run_benchmark(
+        self,
+        tool_dir: pathlib.Path,
+        benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
+        results_filename: pathlib.Path,
+    ):
         tool_name = benchmark_case.benchmark_tool_name
-        tool_path = self.config.normal_benchmark_tool_dir / tool_name
-        cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=tool_dir / tool_name,
+            module_path=module_path,
+        )
 
         if tool_name == "iree-benchmark-module":
             cmd.extend(
                 get_iree_benchmark_module_arguments(
-                    results_filename=str(results_filename),
                     driver_info=benchmark_case.driver_info,
                     benchmark_min_time=self.config.benchmark_min_time,
                 )
@@ -106,24 +209,28 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
     def __run_capture(
-        self, benchmark_case: BenchmarkCase, capture_filename: pathlib.Path
+        self,
+        benchmark_case: BenchmarkCase,
+        module_path: pathlib.Path,
+        capture_filename: pathlib.Path,
     ):
         capture_config = self.config.trace_capture_config
         if capture_config is None:
             raise ValueError("capture_config can't be None.")
 
         tool_name = benchmark_case.benchmark_tool_name
-        tool_path = (
-            capture_config.traced_benchmark_tool_dir
-            / benchmark_case.benchmark_tool_name
+        cmd = self.__build_tool_cmds(
+            benchmark_case=benchmark_case,
+            tool_path=capture_config.traced_benchmark_tool_dir / tool_name,
+            module_path=module_path,
         )
-        cmd = self.__build_tool_cmds(benchmark_case=benchmark_case, tool_path=tool_path)
 
         if tool_name == "iree-benchmark-module":
             cmd.extend(
                 get_iree_benchmark_module_arguments(
                     driver_info=benchmark_case.driver_info,
                     benchmark_min_time=self.config.benchmark_min_time,
+                    dump_results=False,
                     capture_mode=True,
                 )
             )

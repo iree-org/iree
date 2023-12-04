@@ -40,17 +40,6 @@ struct InputDialectOptions {
     // A named input pipeline from a plugin. If set, then 'pluginInputPipeline'
     // must be set.
     plugin,
-#ifdef IREE_HAVE_STABLEHLO_INPUT
-    // Legalizes input defined over StableHLO ops.
-    stablehlo,
-    // Special case of 'stablehlo' legalization which also performs some XLA
-    // preprocessing, e.g., flattening of tuples.
-    stablehlo_xla,
-#endif // IREE_HAVE_STABLEHLO_INPUT
-#ifdef IREE_HAVE_TOSA_INPUT
-    // Legalizes input defined over TOSA ops.
-    tosa,
-#endif // IREE_HAVE_TOSA_INPUT
   };
   // The flag value is captured into spec by the CL system and it must be
   // interpreted by parseInputTypeSpec.
@@ -80,7 +69,7 @@ struct GlobalOptimizationOptions {
   bool demoteI64ToI32 = false;
 
   // Enables data tiling.
-  bool dataTiling = false;
+  bool dataTiling = true;
 
   // Enables const-expr hoisting into globals.
   bool constExprHoisting = true;

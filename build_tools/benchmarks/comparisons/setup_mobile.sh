@@ -6,7 +6,7 @@
 
 # Run commands below on the workstation that the phone is attached to.
 # Prerequisites:
-#   Manual installations of the Android NDK and ADB are needed. See https://openxla.github.io/iree/building-from-source/android/#install-android-ndk-and-adb for instructions.
+#   Manual installations of the Android NDK and ADB are needed. See https://iree.dev/building-from-source/android/#install-android-ndk-and-adb for instructions.
 #   Manual installations of the Termux App and python are needed on the Android device. See README.md for instructions.
 
 #!/bin/bash

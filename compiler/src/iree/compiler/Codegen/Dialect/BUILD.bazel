@@ -44,6 +44,7 @@ iree_compiler_cc_library(
     srcs = [
         "IREECodegenAttrs.cpp",
         "IREECodegenDialect.cpp",
+        "IREECodegenLibraryManager.cpp",
         "IREECodegenOps.cpp",
         "UKernelOps.cpp",
     ],
@@ -73,7 +74,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
@@ -84,6 +84,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformDialectTransforms",
     ],
 )
 

@@ -23,6 +23,57 @@ class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
     Stream_Op<mnemonic, !listconcat(traits, [Pure])>;
 
 //===----------------------------------------------------------------------===//
+// Execution context ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupContextOps : OpDocGroup {
+  let summary = "Execution context ops";
+  let description = [{
+    Operations for interacting with the execution context that stream operations
+    execute within.
+  }];
+}
+
+let opDocGroup = OpGroupContextOps in {
+
+def Stream_ContextResolveOp : Stream_PureOp<"context.resolve", [
+  Stream_AffinityOp,
+]> {
+  let summary = [{resolves low-level context resources based on type}];
+  let description = [{
+    WIP; allows for accessing the implementation details of lower-level dialects
+    such as the HAL. This will likely be reworked in the future to either
+    live inside other dialects, use some op interface instead of having a
+    dedicated op here, or remove the op entirely and make resolution happen
+    explicitly.
+
+    Examples:
+    ```
+    // Returns a HAL device.
+    = stream.context.resolve on(#something) : !hal.device
+    // Returns a HAL device and (optional) queue affinity.
+    = stream.context.resolve on(#something) : !hal.device, i64
+    // Returns a HAL allocator and (optional) queue affinity.
+    = stream.context.resolve on(#something) : !hal.allocator, i64
+    ```
+  }];
+
+  let arguments = (ins
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    attr-dict `:` type($results)
+  }];
+}
+
+}  // OpGroupContextOps
+
+//===----------------------------------------------------------------------===//
 // Generic resource ops
 //===----------------------------------------------------------------------===//
 
@@ -582,6 +633,306 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
 } // OpGroupResourceOps
 
 //===----------------------------------------------------------------------===//
+// Parameter I/O ops
+//===----------------------------------------------------------------------===//
+
+def OpGroupParameterOps : OpDocGroup {
+  let summary = "Resource parameter I/O ops";
+  let description = "Resource parameter I/O ops.";
+}
+
+let opDocGroup = OpGroupParameterOps in {
+
+def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
+  AttrSizedOperandSegments,
+  AllTypesMatch<["results"]>,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{reads one or more resources from a parameter scope}];
+  let description = [{
+    Asynchronously reads one or more resources from an external parameter
+    provider and returns the resulting stream resources. Depending on the
+    resource type this may alias existing cached storage or be directly mapped
+    to the parameter origin or result in a copy as if `stream.resource.alloca`
+    and `stream.parameter.read` had been used per parameter.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$source_scope,
+    StrArrayAttr:$source_keys,
+    Variadic<I64>:$source_offsets,
+    Variadic<Stream_Size>:$result_sizes,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<Stream_AnyStreamResource>:$results,
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    `{`
+    custom<ParameterLoadOperations>(
+        $source_scope, $source_keys, $source_offsets,
+        type($results), $result_sizes)
+    `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return {}; }
+    Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{reads a resource from a parameter scope}];
+  let description = [{
+    Asynchronously reads a resource from an external parameter provider into the
+    provided target resource range.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$source_scope,
+    StrAttr:$source_key,
+    I64:$source_offset,
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    Stream_Size:$target_length,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    custom<ParameterReference>($source_scope, $source_key)
+    `` `[` $source_offset `]` `->`
+    $target `[` $target_offset `for` $target_length `]` `:`
+    type($target) `` `{` $target_size `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{writes a resource to a parameter scope}];
+  let description = [{
+    Asynchronously writes a resource to an external parameter provider from
+    the provided source resource range.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset,
+    Stream_Size:$source_length,
+    OptionalAttr<StrAttr>:$target_scope,
+    StrAttr:$target_key,
+    I64:$target_offset,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    $source `[` $source_offset `for` $source_length `]` `:`
+    type($source) `` `{` $source_size `}` `->`
+    custom<ParameterReference>($target_scope, $target_key)
+    `` `[` $target_offset `]`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{gathers multiple resources from a parameter scope}];
+  let description = [{
+    Asynchronously gathers one or more resources into a single target stream
+    resource. This is equivalent to one `stream.parameter.read` per parameter
+    but allows implementations that can batch operations to do so without
+    additional timeline overhead.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$source_scope,
+    StrArrayAttr:$source_keys,
+    Variadic<I64>:$source_offsets,
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Variadic<Stream_Offset>:$target_offsets,
+    Variadic<Stream_Size>:$target_lengths,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    `{`
+    custom<ParameterGatherOperations>(
+        $source_scope, $source_keys, $source_offsets,
+        $target, type($target), $target_size, $target_offsets, $target_lengths)
+    `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getTargetSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_ParameterScatterOp : Stream_Op<"parameter.scatter", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinity",
+    "setAffinity",
+  ]>,
+  Stream_CmdPhaseOp,
+  Stream_TimelineOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{scatters multiple resources to a parameter scope}];
+  let description = [{
+    Asynchronously scatters one or more resources from a single source resource
+    into one or more parameters. This is equivalent to one
+    `stream.parameter.write` per parameter but allows implementations that can
+    batch operations to do so without additional overhead.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$source,
+    Stream_Size:$source_size,
+    Variadic<Stream_Offset>:$source_offsets,
+    Variadic<Stream_Size>:$source_lengths,
+    OptionalAttr<StrAttr>:$target_scope,
+    StrArrayAttr:$target_keys,
+    Variadic<I64>:$target_offsets,
+    Optional<Stream_Timepoint>:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
+    `{`
+    custom<ParameterScatterOperations>(
+        $source, type($source), $source_size, $source_offsets, $source_lengths,
+        $target_scope, $target_keys, $target_offsets)
+    `}`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+    SmallVector<Value> getAwaitTimepoints() {
+      if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
+    }
+  }];
+
+  let hasVerifier = 1;
+
+  let hasCanonicalizer = 1;
+}
+
+} // OpGroupParameterOps
+
+//===----------------------------------------------------------------------===//
 // File ops
 //===----------------------------------------------------------------------===//
 
@@ -644,9 +995,9 @@ def Stream_FileReadOp : Stream_Op<"file.read", [
   let description = [{
     Asynchronously reads a segment of a file into a resource.
 
-    Some implementations this can stream directly from the file into
-    device-local memory and should be preferred to manually staging memory
-    through host buffers.
+    Some implementations can stream directly from the source file into
+    device-local memory and file ops should be preferred to manually staging
+    memory through host buffers.
   }];
 
   let arguments = (ins
@@ -704,8 +1055,8 @@ def Stream_FileWriteOp : Stream_Op<"file.write", [
     The file range must be valid within the file as this operation cannot
     grow the underlying file storage.
 
-    Some implementations this can stream directly from device-local memory into
-    the file and should be preferred to manually staging memory
+    Some implementations can stream directly from device-local memory into the
+    target file and file ops should be preferred to manually staging memory
     through host buffers.
   }];
 
@@ -2057,7 +2408,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let arguments = (ins
     Variadic<Index>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyTypeOf<[
       Stream_AnyStreamResource,
       Stream_PrimitiveType,
@@ -2076,7 +2427,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     custom<DispatchOperands>($resource_operands,
                              $resource_operand_offsets,
@@ -2089,6 +2440,13 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   }];
 
   let extraClassDeclaration = [{
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
     Value getOperandSize(unsigned idx) {
       return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
@@ -3321,6 +3679,13 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
   let assemblyFormat = [{
     `max` `(` $await_timepoints `)` `=` `` `>` type($result_timepoint)
     attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    // Joins one or more timepoints and returns a new timepoint representing a
+    // point on the timeline where all timepoints have been resolved.
+    static Value join(Location loc, ValueRange timepoints, OpBuilder &builder);
+    static Value join(ValueRange timepoints, OpBuilder &builder);
   }];
 
   let hasVerifier = 1;

@@ -31,6 +31,9 @@ enum class PipelinePhase {
   Start,
   // Runs the transform pipeline up to executable sources (pre translation).
   ExecutableSources,
+  // Runs the transform pipeline up to executable configurations (before
+  // translation strategy selection).
+  ExecutableConfigurations,
   // Runs the transform pipeline until just after executable translation.
   ExecutableTargets,
   // Runs the full pipeline.
@@ -90,9 +93,6 @@ createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
 // removed.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass();
 
-// Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<void>> createInlineDeviceSwitchesPass();
-
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createMemoizeDeviceQueriesPass();
 
@@ -108,11 +108,15 @@ createMaterializeInterfacesPass();
 
 // Dumps individual hal.executable source listings to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createDumpExecutableSourcesPass(StringRef path);
+createDumpExecutableSourcesPass(StringRef path, StringRef prefix = "");
 
 // Dumps standalone hal.executable benchmarks to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableBenchmarksPass(StringRef path);
+
+// Strips executable module contents for reducing IR size during debugging.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createStripExecutableContentsPass();
 
 // Substitutes hal.executable ops by parsing |substitutions| in
 // `executable_name=file.xxx` strings. File paths may be absolute or relative to
@@ -133,6 +137,16 @@ createPreprocessExecutablesWithPipelinePass(std::string pipeline);
 // Preprocesses each executable with an external tool.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createPreprocessExecutablesWithToolPass(std::string command);
+
+// Configures hal.executable.variant ops in all hal.executable ops via a nested
+// translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createConfigureExecutablesPass(const TargetBackendRegistry &targetRegistry);
+
+// Configures hal.executable.variant ops for the specified |target| backend.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createConfigureTargetExecutableVariantsPass(
+    const TargetBackendRegistry &targetRegistry, StringRef target);
 
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
@@ -205,10 +219,12 @@ inline void registerHALPasses() {
   auto targetOptions = TargetOptions::FromFlags::get();
   createAssignTargetDevicesPass(TargetBackendRegistry::getGlobal(), {});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
+  createConfigureExecutablesPass(TargetBackendRegistry::getGlobal());
+  createConfigureTargetExecutableVariantsPass(
+      TargetBackendRegistry::getGlobal(), "");
   createConvertToHALPass();
   createDumpExecutableSourcesPass("");
   createElideRedundantCommandsPass();
-  createInlineDeviceSwitchesPass();
   createFixupLegacySyncPass();
   createLinkExecutablesPass(TargetBackendRegistry::getGlobal());
   createLinkTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
@@ -220,6 +236,7 @@ inline void registerHALPasses() {
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass(TargetBackendRegistry::getGlobal());
   createSerializeTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
+  createStripExecutableContentsPass();
   createSubstituteExecutablesPass();
   createTranslateExecutablesPass(TargetBackendRegistry::getGlobal());
   createTranslateTargetExecutableVariantsPass(

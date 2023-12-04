@@ -67,6 +67,38 @@ static void iree_task_topology_set_affinity_from_processor(
       iree_task_count_trailing_zeros_kaffinity(processor->GroupMask[0].Mask);
 }
 
+// Uses |group_mask| to assign |cache| information to select topology groups.
+static void iree_task_topology_assign_cache_info(
+    iree_task_topology_t* topology, GROUP_AFFINITY group_mask,
+    const CACHE_RELATIONSHIP* cache) {
+  iree_task_topology_caches_t caches = {0};
+  if (cache->Type == CacheUnified || cache->Type == CacheData) {
+    switch (cache->Level) {
+      case 1:
+        caches.l1_data = cache->CacheSize;
+        break;
+      case 2:
+        caches.l2_data = cache->CacheSize;
+        break;
+      case 3:
+        caches.l3_data = cache->CacheSize;
+        break;
+      default:
+        break;  // not yet used
+    }
+  }
+  for (iree_host_size_t group_i = 0; group_i < topology->group_count;
+       ++group_i) {
+    iree_task_topology_group_t* group = &topology->groups[group_i];
+    if (group->ideal_thread_affinity.group == group_mask.Group &&
+        (group_mask.Mask & (1ull << group->ideal_thread_affinity.id))) {
+      if (caches.l1_data) group->caches.l1_data = caches.l1_data;
+      if (caches.l2_data) group->caches.l2_data = caches.l2_data;
+      if (caches.l3_data) group->caches.l3_data = caches.l3_data;
+    }
+  }
+}
+
 // Uses |group_mask| to assign constructive sharing masks to all topology groups
 // that constructively share some level of the cache hierarchy.
 static void iree_task_topology_assign_constructive_sharing(
@@ -100,6 +132,15 @@ iree_task_topology_fixup_constructive_sharing_masks_from_relationships(
        p < relationships_end;
        p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
     if (p->Relationship == RelationCache) {
+      if (p->Cache.GroupCount == 0) {
+        iree_task_topology_assign_cache_info(topology, p->Cache.GroupMask,
+                                             &p->Cache);
+      } else {
+        for (WORD i = 0; i < p->Cache.GroupCount; ++i) {
+          iree_task_topology_assign_cache_info(topology, p->Cache.GroupMasks[i],
+                                               &p->Cache);
+        }
+      }
       if (p->Cache.Level == 3 &&
           (p->Cache.Type == CacheUnified || p->Cache.Type == CacheData)) {
         if (p->Cache.GroupCount == 0) {

@@ -333,6 +333,44 @@ static void printDispatchWorkgroupsCountRegion(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<DispatchEntryPoints>($entry_points)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseDispatchEntryPoints(OpAsmParser &parser,
+                                            ArrayAttr &entryPointAttrsArray) {
+  SmallVector<Attribute> entryPointAttrs;
+  if (succeeded(parser.parseOptionalLBrace())) {
+    do {
+      SymbolRefAttr entryPointAttr;
+      if (failed(parser.parseAttribute(entryPointAttr)))
+        return failure();
+      entryPointAttrs.push_back(entryPointAttr);
+    } while (succeeded(parser.parseOptionalComma()));
+    if (failed(parser.parseRBrace()))
+      return failure();
+  } else {
+    SymbolRefAttr entryPointAttr;
+    if (failed(parser.parseAttribute(entryPointAttr)))
+      return failure();
+    entryPointAttrs.push_back(entryPointAttr);
+  }
+  entryPointAttrsArray = parser.getBuilder().getArrayAttr(entryPointAttrs);
+  return success();
+}
+
+static void printDispatchEntryPoints(OpAsmPrinter &p, Operation *op,
+                                     ArrayAttr entryPointAttrs) {
+  if (entryPointAttrs.size() == 1) {
+    p.printAttribute(entryPointAttrs.getValue().front());
+  } else {
+    p << '{';
+    llvm::interleaveComma(entryPointAttrs, p.getStream(),
+                          [&](Attribute attr) { p.printAttribute(attr); });
+    p << '}';
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
 
@@ -1329,7 +1367,7 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                        ValueRange operands, ValueRange operandDims,
                        ArrayAttr tiedOperands,
                        ArrayRef<NamedAttribute> attributes) {
-  state.addAttribute("entry_point", entryPoint);
+  state.addAttribute("entry_points", builder.getArrayAttr(entryPoint));
   state.addOperands(workload);
   state.addTypes(resultTypes);
   state.addOperands(operands);
@@ -1349,13 +1387,23 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-StringAttr DispatchOp::executable() {
-  return getEntryPoint().getRootReference();
-}
-
 FunctionType DispatchOp::getEntryPointType() {
   SmallVector<Type, 8> argTypes(operand_type_range{getArguments()});
   return FunctionType::get(getContext(), argTypes, getResultTypes());
+}
+
+std::string DispatchOp::getEntryPointName() {
+  // Pick the first entry point we have. The common case is we only have one
+  // but frontends may provide multiple variants - they're all likely the
+  // same name but with slight differences and enough for a user to know what's
+  // happening.
+  auto anyEntryPoint = *getEntryPointRefs().begin();
+  std::string entryPointName =
+      anyEntryPoint.getRootReference().getValue().str();
+  for (FlatSymbolRefAttr nestedRef : anyEntryPoint.getNestedReferences()) {
+    entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
+  }
+  return entryPointName;
 }
 
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
@@ -1364,36 +1412,47 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 
 LogicalResult DispatchOp::verify() {
   Operation *op = getOperation();
+
+  if (getEntryPoints().empty()) {
+    return op->emitOpError("at least one entry point reference is required");
+  }
+
   if (failed(verifyOpDynamicDims(op, getArguments(), getArgumentDims())) ||
       failed(verifyOpDynamicDims(op, getResults(), getResultDims()))) {
     return failure();
   }
+
   return success();
 }
 
 LogicalResult DispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   Operation *op = getOperation();
-  auto exportOp =
-      symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
-          op, getEntryPoint());
-  if (!exportOp) {
-    // TODO(benvanik): there are a lot of tests that are assuming this is not
-    // verified. We'll need to go add dummy executables for all of them. Today
-    // we just bail on the verifier if the symbol isn't found.
-    //
-    // Should be:
-    //   return op->emitOpError() << "undefined entry point: " <<
-    //   getEntryPoint();
-    return success();
+  auto entryPointRefs = getEntryPointRefs();
+  if (entryPointRefs.empty()) {
+    return emitOpError() << "at least one entry point must be defined";
   }
+  for (auto entryPointAttr : entryPointRefs) {
+    auto exportOp =
+        symbolTable.lookupNearestSymbolFrom<IREE::Flow::ExecutableExportOp>(
+            op, entryPointAttr);
+    if (!exportOp) {
+      // TODO(benvanik): there are a lot of tests that are assuming this is not
+      // verified. We'll need to go add dummy executables for all of them. Today
+      // we just bail on the verifier if the symbol isn't found.
+      //
+      // Should be:
+      //   return op->emitOpError() << "undefined entry point: " <<
+      //   getEntryPoint();
+      return success();
+    }
 
-  // Verify that the workload parameters captured match the target export.
-  if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
-    return failure();
+    // Verify that the workload parameters captured match the target export.
+    if (failed(verifyDispatchWorkload(op, exportOp, getWorkload()))) {
+      return failure();
+    }
+
+    // TODO(benvanik): verify that the target function has matching operands.
   }
-
-  // TODO(benvanik): verify that the target function has matching operands.
-
   return success();
 }
 
@@ -1564,6 +1623,36 @@ TensorReshapeOp::getTiedResultOperandIndex(unsigned resultIndex) {
 }
 
 SmallVector<int64_t> TensorReshapeOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.bitcast
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorBitCastOp::verify() {
+  // The element types don't need to match, we can just check the requisite
+  // number of dynamic dims.
+  if (failed(verifyOpDynamicDims(getOperation(), {getSource()},
+                                 getSourceDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 {getResultDims()}))) {
+    return failure();
+  }
+
+  return success();
+}
+
+Value TensorBitCastOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+TensorBitCastOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> TensorBitCastOp::getTiedResultOperandIndices() {
   return {0}; // source
 }
 

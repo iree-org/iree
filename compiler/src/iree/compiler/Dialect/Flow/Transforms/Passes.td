@@ -27,12 +27,6 @@ def CleanupTensorShapes :
   let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupTensorShapesPass()";
 }
 
-def CleanupNumericNarrowing :
-    Pass<"iree-flow-cleanup-numeric-narrowing", ""> {
-  let summary = "Cleans up any numeric narrowing ops inserted by iree-flow-infer-numeric-narrowing";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupNumericNarrowingPass()";
-}
-
 def CloneProducersIntoDispatchRegions :
     InterfacePass<"iree-flow-clone-producers-into-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Clone producers into dispatch regions to be isolated above";
@@ -101,12 +95,6 @@ def FormScalarDispatches :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormScalarDispatchesPass()";
 }
 
-def FuseDequantizationMatmul:
-    Pass<"iree-flow-fuse-dequantization-matmul", ""> {
-  let summary = "Fuse dequantization and matmul linalg.generic ops";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseDequantizationMatmulPass()";
-}
-
 def CollapseDimensions :
     InterfacePass<"iree-flow-collapse-dimensions", "mlir::FunctionOpInterface"> {
   let summary = "Collapse dimensions of Linalg Ops on tensor ops.";
@@ -167,12 +155,6 @@ def DumpDispatchGraph : Pass<"iree-flow-dump-dispatch-graph-pass"> {
   let constructor = "mlir::iree_compiler::IREE::Flow::createDumpDispatchGraphPass()";
 }
 
-def ExpandTensorShapes :
-    Pass<"iree-flow-expand-tensor-shapes", "mlir::ModuleOp"> {
-  let summary = "Expands tensor shape dimensions into SSA values across the program.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createExpandTensorShapesPass()";
-}
-
 def ExportBenchmarkFuncs :
     Pass<"iree-flow-export-benchmark-funcs-pass", "mlir::ModuleOp"> {
   let summary = "Exports benchmark functions";
@@ -189,18 +171,6 @@ def FusionOfTensorOps :
     Option<"multiUseFusionIteration", "multi-use-fusion-iteration", "unsigned",
            /*default=*/"2", "Number of iterations to fuse multiuse ops">
   ];
-}
-
-def GeneralizeLinalgNamedOps :
-    InterfacePass<"iree-flow-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Convert some Linalg named ops into linalg.generics";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createGeneralizeLinalgNamedOpsPass()";
-}
-
-def InferNumericNarrowing :
-    Pass<"iree-flow-infer-numeric-narrowing", ""> {
-  let summary = "Infers and inserts util.numeric.optional_narrow ops at points that may be beneficial";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createInferNumericNarrowingPass()";
 }
 
 def InitializeEmptyTensors :
@@ -259,12 +229,6 @@ def InterchangeTransposeGenericOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeTransposeGenericOpsPass()";
 }
 
-def OptimizeNumerics :
-    Pass<"iree-flow-optimize-numerics", ""> {
-  let summary = "Optimizes numerics given annotations added via iree-flow-infer-numeric-narrowing";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createOptimizeNumericsPass()";
-}
-
 def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";
@@ -281,12 +245,6 @@ def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createSplitReductionPass()";
-}
-
-def StripSignedness :
-    InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
-  let summary = "Legalizes ui tensors constants to uis";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
 def TensorPadToTensorInsertSlice :

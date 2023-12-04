@@ -16,8 +16,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "iree/compiler/Codegen/Common/EncodingInfo.h"
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
@@ -118,26 +117,6 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
   staticLoopRanges.resize(tileSizes.size(), ShapedType::kDynamic);
 
   return success();
-}
-
-/// Get the materialization information from a `tensor.pack` operation.
-static FailureOr<IREE::LinalgExt::MaterializeEncodingInfo>
-getMaterializationInfo(tensor::PackOp packOp) {
-  IREE::LinalgExt::MaterializeEncodingInfo encodingInfo;
-  SmallVector<OpFoldResult> mixedTileSizes = packOp.getMixedTiles();
-  encodingInfo.innerTileSizes.reserve(mixedTileSizes.size());
-  for (auto tileSize : mixedTileSizes) {
-    if (tileSize.is<Value>()) {
-      encodingInfo.innerTileSizes.push_back(ShapedType::kDynamic);
-    } else {
-      encodingInfo.innerTileSizes.push_back(
-          llvm::cast<IntegerAttr>(tileSize.get<Attribute>()).getInt());
-    }
-  }
-  encodingInfo.innerDimsPos = llvm::to_vector(packOp.getInnerDimsPos());
-  encodingInfo.outerDimsPerm = llvm::to_vector(packOp.getOuterDimsPerm());
-  encodingInfo.srcRank = packOp.getSourceRank();
-  return encodingInfo;
 }
 
 //===---------------------------------------------------------------------===//

@@ -26,6 +26,11 @@ extern "C" {
 MLIR_CAPI_EXPORTED void
 ireeCompilerRegisterDialects(MlirDialectRegistry registry);
 
+// Performs post-creation initialization of an externally derived context.
+// This configures things such as threading behavior. Dialect registration
+// is done via ireeCompilerRegisterDialects.
+MLIR_CAPI_EXPORTED void ireeCompilerInitializeContext(MlirContext context);
+
 // Gets the MlirContext that the session manages. The context is owned by the
 // session and valid until it is destroyed.
 // This implicitly "activates" the session: make sure that any configuration

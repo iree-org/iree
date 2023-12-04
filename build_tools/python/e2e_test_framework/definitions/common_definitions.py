@@ -8,7 +8,7 @@
 import dataclasses
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Sequence
+from typing import List, Optional, Sequence
 
 from e2e_test_framework import serialization, unique_ids
 
@@ -109,11 +109,21 @@ class ModelSourceType(Enum):
     EXPORTED_TFLITE = "exported_tflite"
 
 
-class InputDataFormat(Enum):
-    """Model input data format."""
+@serialization.serializable
+@dataclass(frozen=True)
+class CPUParameters:
+    """Describes CPU related parameters."""
 
-    ZEROS = "zeros"
-    NUMPY_NPY = "numpy_npy"
+    # CPU cores to pin at, ordered from the slowest to the fastest.
+    pinned_cores: List[int]
+
+
+@serialization.serializable
+@dataclass(frozen=True)
+class DeviceParameters:
+    """Describes device parameters."""
+
+    cpu_params: Optional[CPUParameters] = None
 
 
 @serialization.serializable(type_key="device_specs")
@@ -145,7 +155,7 @@ class DeviceSpec(object):
     # This is for modeling the spec of a heterogeneous processor. Depending on
     # which cores you run, the device has a different spec. Benchmark machines use
     # these parameters to set up the devices. E.g. set CPU mask.
-    device_parameters: List[str] = dataclasses.field(default_factory=list)
+    device_parameters: DeviceParameters
 
     def __str__(self):
         return self.name
@@ -157,7 +167,7 @@ class DeviceSpec(object):
         device_name: str,
         host_environment: HostEnvironment,
         architecture: DeviceArchitecture,
-        device_parameters: Sequence[str] = (),
+        device_parameters: DeviceParameters = DeviceParameters(),
         tags: Sequence[str] = (),
     ):
         tag_part = ",".join(tags)
@@ -170,7 +180,7 @@ class DeviceSpec(object):
             device_name=device_name,
             host_environment=host_environment,
             architecture=architecture,
-            device_parameters=list(device_parameters),
+            device_parameters=device_parameters,
         )
 
 
@@ -189,6 +199,15 @@ class Model(object):
     entry_function: str
     # Input types. E.g., ["100x100xf32", "200x200x5xf32"].
     input_types: List[str]
+    # URL to fetch input data tgz. The archive should contain
+    # "input_{0,1,...}.npy" for each input.
+    input_url: Optional[str] = None
+    # URL to fetch expected output tgz. The archive should contain
+    # "ouptut_0.npy".
+    expected_output_url: Optional[str] = None
+    # Parameters for iree-run-module to control the tolerance.
+    # For example: --expected_f32_threshold=0.0001
+    verify_params: List[str] = dataclasses.field(default_factory=list)
 
     def __str__(self):
         return self.name
@@ -201,27 +220,16 @@ class ModelInputData(object):
 
     id: str
     # Associated model.
-    model_id: str
-    # Friendly name.
     name: str
-    # Tags that describe the data characteristics.
-    tags: List[str]
-    data_format: InputDataFormat
-    source_url: str
 
     def __str__(self):
         return self.name
 
 
-# All-zeros dummy input data. Runners will generate the zeros input with proper
-# shapes.
-ZEROS_MODEL_INPUT_DATA = ModelInputData(
+# Get input from model input_url if available; otherwise use all zeros.
+DEFAULT_INPUT_DATA = ModelInputData(
     id=unique_ids.MODEL_INPUT_DATA_ZEROS,
-    model_id="",
-    name="zeros",
-    tags=[],
-    data_format=InputDataFormat.ZEROS,
-    source_url="",
+    name="default",
 )
 
 

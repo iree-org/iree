@@ -263,13 +263,9 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
 }
 
-extern llvm::cl::opt<std::string> clSPIRVTransformDialectFileName;
-
 void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
-  // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(
-          clSPIRVTransformDialectFileName));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -549,6 +545,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   // unrolling or lowering, which is done later.
   {
     GenericVectorizationPassOptions options;
+    options.enableVectorMasking = true;
+    options.useConfiguredVectorSizes = false;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
@@ -568,7 +566,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Bufferize and distribute.
-  addSPIRVBufferizePasses(nestedModulePM, gpuAllocateFunctionMemoryFn);
+  // We bufferize before distributing to threads there; so we are still at the
+  // block level. Therefore, need to allocate workgroup memory.
+  addSPIRVBufferizePasses(nestedModulePM, gpuAllocateWorkgroupMemoryFn);
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
@@ -593,7 +593,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
 
   // Handle vector reduction operations specifically.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertVectorReductionToGPUPass(getWarpSize));
+      createConvertVectorReductionToGPUPass(/*expandSubgroupReduction=*/false,
+                                            getWarpSize));
   // Perform normal vector unrolling and lowering transformations. This breaks
   // vectors down to native machine size.
   addSPIRVVectorLoweringPasses(nestedModulePM);
@@ -658,11 +659,14 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
-  addCommonTargetExecutablePreprocessingPasses(pm.nest<ModuleOp>());
+void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm) {
+  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVGeneralizeNamedOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  pm.addPass(createSPIRVSelectLoweringStrategyPass());
+}
+
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
@@ -687,6 +691,13 @@ namespace {
 void registerCodegenSPIRVPasses() {
   // Generated.
   registerPasses();
+
+  static PassPipelineRegistration<> SPIRVConfigPipeline(
+      "iree-codegen-spirv-configuration-pipeline",
+      "Runs the pipeline for configuring the lowering from linalg to SPIR-V",
+      [](OpPassManager &passManager) {
+        buildSPIRVCodegenConfigurationPassPipeline(passManager);
+      });
 
   static PassPipelineRegistration<> LinalgSPIRVPipeline(
       "iree-codegen-linalg-to-spirv-pipeline",

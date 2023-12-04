@@ -742,6 +742,12 @@ void AppendListContents(std::string& out, iree_vm_list_t* list,
           out.append("...circular...");
         }
         out.append("]");
+      } else if (iree_hal_fence_isa(variant.ref)) {
+        out.append("fence(");
+        auto* hal_fence = iree_hal_fence_deref(variant.ref);
+        iree_host_size_t timepoint_count =
+            iree_hal_fence_timepoint_count(hal_fence);
+        out.append(std::to_string(timepoint_count) + ")");
       } else {
         out += "Unknown(" +
                std::to_string(iree_vm_type_def_as_ref(variant.type)) + ")";

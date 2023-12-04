@@ -1,0 +1,60 @@
+{
+    "version": 4,
+    "cmakeMinimumRequired": {
+      "major": 3,
+      "minor": 23,
+      "patch": 0
+    },
+    "include": [
+        "new.json",
+        "options.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "turbine",
+            "displayName": "Minimal Turbine Dev",
+            "description": "Enable minimal development of SHARK-Turbine with a CPU backend",
+            "inherits": [
+                "minimal",
+                "python-bindings"
+            ],
+            "cacheVariables": {
+                "IREE_INPUT_TORCH": {
+                    "type": "BOOL",
+                    "value": "ON"
+                },
+                "IREE_TARGET_BACKEND_LLVM_CPU": {
+                    "type": "BOOL",
+                    "value": "ON"
+                }
+            }
+        },
+        {
+            "name": "new-linux-turbine",
+            "displayName": "(START HERE) Set Up New Minimal Turbine Dev",
+            "description": "Recommended minimal config for new Turbine dev directory",
+            "inherits": [
+                "new-linux-dev",
+                "turbine"
+            ]
+        },
+        {
+            "name": "new-macos-turbine",
+            "displayName": "(START HERE) Set Up New Minimal Turbine Dev",
+            "description": "Recommended minimal config for new Turbine dev directory",
+            "inherits": [
+                "new-macos-dev",
+                "turbine"
+            ]
+        },
+        {
+            "name": "new-windows-turbine",
+            "displayName": "(START HERE) Set Up New Minimal Turbine Dev",
+            "description": "Recommended minimal config for new Turbine dev directory",
+            "inherits": [
+                "new-windows-dev",
+                "turbine"
+            ]
+        }
+    ]
+}

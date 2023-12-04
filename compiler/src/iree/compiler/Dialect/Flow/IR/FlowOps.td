@@ -766,7 +766,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
 
   let arguments = (ins
     Variadic<FLOW_Dim>:$workload,
-    SymbolRefAttr:$entry_point,
+    SymbolRefArrayAttr:$entry_points,
     Variadic<AnyType>:$arguments,
     FLOW_ShapeDynamicDims:$argument_dims,
     FLOW_ShapeDynamicDims:$result_dims,
@@ -777,7 +777,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   );
 
   let assemblyFormat = [{
-    $entry_point
+    custom<DispatchEntryPoints>($entry_points)
     (`[` $workload^ `]`)? ``
     `(` $arguments `)` attr-dict `:`
     custom<ShapedFunctionType>(ref($arguments),
@@ -827,8 +827,18 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   ];
 
   let extraClassDeclaration = [{
-    StringAttr executable();
     FunctionType getEntryPointType();
+
+    auto getEntryPointRefs() {
+      return getEntryPoints().getAsRange<SymbolRefAttr>();
+    }
+    void forEachEntryPointAttr(std::function<void(SymbolRefAttr)> fn) {
+      for (auto entryPointAttr : getEntryPointRefs()) fn(entryPointAttr);
+    }
+
+    // Returns a human-friendly string name for what is being dispatched.
+    // May not be unique or a valid reference to an executable.
+    std::string getEntryPointName();
 
     // StreamableOpInterface:
     bool isTransfer() { return false; }
@@ -841,6 +851,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
     }
   }];
 
+  let hasCanonicalizer = 1;
   let hasVerifier = 1;
 }
 
@@ -1098,6 +1109,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
 
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
+  AllElementTypesMatch<["source", "result"]>,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
       "getTiedResult",
@@ -1109,6 +1121,62 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let summary = [{reshapes a tensor}];
   let description = [{
     Reshapes a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source,
+    FLOW_ShapeDynamicDims:$source_dims,
+    FLOW_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $source `:`
+    type($source) (`{` $source_dims^ `}`)? `->`
+    type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Type":$result_type, "Value":$source, "ValueRange":$target_dims),
+    [{
+      build($_builder, $_state,
+          result_type,
+          source,
+          IREE::Util::buildDynamicDimsForValue($_state.location, source, $_builder),
+          target_dims);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getResultDims(); }
+  }];
+
+  let hasVerifier = 1;
+  let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
+  FLOW_StreamableOp,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+      "getTiedResult",
+      "getTiedResultOperandIndex",
+      "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{bitcasts a tensor}];
+  let description = [{
+    Bitcasts a tensor to a new type without modifying the contents.
   }];
 
   let arguments = (ins

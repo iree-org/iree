@@ -263,6 +263,9 @@ int main(int argc, char** argv) {
   iree_allocator_t host_allocator = iree_allocator_system();
 
   // Pass through flags to benchmark (allowing --help to fall through).
+  iree_flags_set_usage(
+      "iree-benchmark-trace",
+      "Benchmarks a YAML trace file. See iree-run-trace for general usage.");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_UNDEFINED_OK |
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);

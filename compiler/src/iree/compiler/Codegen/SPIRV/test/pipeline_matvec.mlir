@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-codegen-linalg-to-spirv-pipeline)))' \
+// RUN:   %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -11,11 +13,16 @@
 ]>
 hal.executable @i4_dequant_unit_matmul_f16 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU, #spirv.resource_limits<
-        max_compute_shared_memory_size = 32768,
-        max_compute_workgroup_invocations = 1024,
-        max_compute_workgroup_size = [1024, 1024, 64],
-        subgroup_size = 32>>
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [
+          Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform,
+          GroupNonUniformArithmetic, GroupNonUniformShuffle
+        ], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU,
+        #spirv.resource_limits<
+          max_compute_shared_memory_size = 32768,
+          max_compute_workgroup_invocations = 1024,
+          max_compute_workgroup_size = [1024, 1024, 64],
+          subgroup_size = 32
+        >>
     }>) {
     hal.executable.export @i4_dequant_unit_matmul_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -82,30 +89,30 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 
 // Load the quantized weight and get 8xi4 out of it.
 //         CHECK:   spirv.Load "StorageBuffer" %{{.+}} : vector<4xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 1 : i32] %{{.*}} : vector<4xi32>, %{{.*}} : vector<4xi32> -> vector<2xi32>
-//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, %75 : vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 1 : i32] %{{.*}}, %{{.*}}  : vector<4xi32>, vector<4xi32> -> vector<2xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, {{.*}} -> vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI320]] : vector<4xi32>
 //         CHECK:   spirv.ShiftRightLogical %{{.*}}, %[[CSTVEC4XI321]] : vector<4xi32>, vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI32]] : vector<4xi32>
 
-//         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %{{.*}} : vector<4xi32>, %{{.*}} : vector<4xi32> -> vector<2xi32>
+//         CHECK:   spirv.VectorShuffle [2 : i32, 3 : i32] %{{.*}}, %{{.*}} : vector<4xi32>, vector<4xi32> -> vector<2xi32>
 
 // CHECK-COUNT-2:   spirv.ConvertUToF %{{.+}} : vector<4xi32> to vector<4xf16>
 // CHECK-COUNT-2:   spirv.FSub %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-4:   spirv.FMul %{{.+}}, %{{.+}} : vector<4xf16>
 // CHECK-COUNT-2:   spirv.FAdd %{{.+}}, %{{.+}} : vector<4xf16>
-// CHECK-COUNT-2:   spirv.Bitcast %{{.+}} : vector<4xf16> to vector<2xf32>
-// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<2xf32> -> vector<4xf32>
+// CHECK-COUNT-2:   spirv.Bitcast %{{.+}} : vector<4xf16> to vector<2xi32>
+// CHECK-COUNT-2:   spirv.VectorShuffle {{.+}} : vector<4xi32>, vector<2xi32> -> vector<4xi32>
 
 //         CHECK:   spirv.mlir.merge
 
-//         CHECK: %[[LD:.+]] = spirv.Load "Function" %4 : vector<4xf32>
+//         CHECK: %[[LD:.+]] = spirv.Load "Function" {{.*}} : vector<4xi32>
 //         CHECK: %[[VS0:.+]] = spirv.VectorShuffle [0 : i32, 1 : i32] %[[LD]]
-//         CHECK: spirv.Bitcast %[[VS0]] : vector<2xf32> to vector<4xf16>
+//         CHECK: spirv.Bitcast %[[VS0]] : vector<2xi32> to vector<4xf16>
 //         CHECK: %[[VS1:.+]] = spirv.VectorShuffle [2 : i32, 3 : i32] %[[LD]]
-//         CHECK: spirv.Bitcast %[[VS1]] : vector<2xf32> to vector<4xf16>
+//         CHECK: spirv.Bitcast %[[VS1]] : vector<2xi32> to vector<4xf16>
 
-// CHECK-COUNT-5: spirv.GroupNonUniformShuffleXor <Subgroup>
+//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" {{.*}} : f16
 
 //         CHECK: spirv.mlir.selection
 
@@ -122,11 +129,16 @@ hal.executable @i4_dequant_unit_matmul_f16 {
 ]>
 hal.executable @i4_dequant_matvec_f16_subgroup_64 {
   hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU, #spirv.resource_limits<
-        max_compute_shared_memory_size = 32768,
-        max_compute_workgroup_invocations = 1024,
-        max_compute_workgroup_size = [1024, 1024, 64],
-        subgroup_size = 64>>
+      spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [
+          Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform,
+          GroupNonUniformArithmetic, GroupNonUniformShuffle
+        ], [SPV_KHR_16bit_storage]>, Unknown:IntegratedGPU,
+        #spirv.resource_limits<
+          max_compute_shared_memory_size = 32768,
+          max_compute_workgroup_invocations = 1024,
+          max_compute_workgroup_size = [1024, 1024, 64],
+          subgroup_size = 64
+        >>
     }>) {
     hal.executable.export @i4_dequant_matvec_f16_subgroup_64 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -188,6 +200,7 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //     CHECK-DAG: %[[C2:.+]] = spirv.Constant 2 : i32
 //     CHECK-DAG: %[[C0:.+]] = spirv.Constant 0 : i32
 //     CHECK-DAG: %[[CSTVEC4XI32:.+]] = spirv.Constant dense<255> : vector<4xi32>
+//     CHECK-DAG: %[[CSTVEC4ONE:.+]] = spirv.Constant dense<1.000000e+00> : vector<4xf16>
 //     CHECK-DAG: %[[CSTVEC4XI320:.+]] = spirv.Constant dense<[15, -16, 15, -16]> : vector<4xi32>
 //     CHECK-DAG: %[[CSTVEC4XI321:.+]] = spirv.Constant dense<[0, 4, 0, 4]> : vector<4xi32>
 
@@ -211,7 +224,7 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 //         CHECK:   %[[ACCESS:.+]] = spirv.AccessChain %[[RADDR]][{{.*}}, %[[OFFSET]]] : !spirv.ptr<!spirv.struct<(!spirv.rtarray<i32, stride=4> [0])>, StorageBuffer>, i32, i32
 //         CHECK:   spirv.Load "StorageBuffer" %[[ACCESS]] : i32
 
-//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, %106 : vector<2xi32> -> vector<4xi32>
+//         CHECK:   spirv.VectorShuffle [0 : i32, 0 : i32, 1 : i32, 1 : i32] %{{.*}} : vector<2xi32>, vector<2xi32> -> vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI320]] : vector<4xi32>
 //         CHECK:   spirv.ShiftRightLogical %{{.*}}, %[[CSTVEC4XI321]] : vector<4xi32>, vector<4xi32>
 //         CHECK:   spirv.BitwiseAnd %{{.*}}, %[[CSTVEC4XI32]] : vector<4xi32>
@@ -223,6 +236,9 @@ hal.executable @i4_dequant_matvec_f16_subgroup_64 {
 
 //         CHECK:   spirv.mlir.merge
 
-// CHECK-COUNT-6: spirv.GroupNonUniformShuffleXor <Subgroup>
+//         CHECK: %[[LD:.+]] = spirv.Load "Function" {{.*}} : vector<4xf16>
+//         CHECK: %[[RES:.+]] = spirv.Dot %[[LD]], %[[CSTVEC4ONE]] : vector<4xf16> -> f16
+
+//         CHECK: spirv.GroupNonUniformFAdd "Subgroup" "Reduce" %[[RES]] : f16
 
 //         CHECK: spirv.mlir.selection

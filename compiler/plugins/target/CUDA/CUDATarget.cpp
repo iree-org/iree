@@ -62,6 +62,7 @@ struct CUDAOptions {
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
   std::string clUsePtxasParams;
+  bool enableLegacySync = true;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("CUDA HAL Target");
@@ -104,6 +105,12 @@ struct CUDAOptions {
         "iree-hal-cuda-use-ptxas-params", clUsePtxasParams,
         llvm::cl::cat(category),
         llvm::cl::desc("Passes the given additional parameters to ptxas."));
+
+    binder.opt<bool>(
+        "iree-hal-cuda-enable-legacy-sync", enableLegacySync,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Enable legacy sync mode that handles semaphores synchronously."));
   }
 };
 } // namespace
@@ -390,7 +397,9 @@ public:
 
     // Indicates that the runtime HAL driver operates only in the legacy
     // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
+    if (options.enableLegacySync) {
+      configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
+    }
 
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
@@ -398,6 +407,16 @@ public:
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::DeviceTargetAttr::get(
         context, b.getStringAttr(deviceID()), configAttr);
+  }
+
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    // For now we disable configuration if the variant has external object
+    // files.
+    if (variantOp.isExternal())
+      return;
+
+    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -408,7 +427,7 @@ public:
     if (variantOp.isExternal())
       return;
 
-    buildLLVMGPUTransformPassPipeline(passManager, false);
+    buildLLVMGPUCodegenPassPipeline(passManager, false);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
@@ -431,7 +450,7 @@ public:
     // Collect all the entry point parameters.
     SmallVector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto exportOp : variantOp.getExportOps()) {
       std::array<int32_t, 3> workgroupSize;
       if (std::optional<ArrayAttr> workgroupSizeAttr =
               exportOp.getWorkgroupSize()) {
@@ -472,7 +491,7 @@ public:
       // these to match the names in their kernels. We don't support any kind of
       // mangling and if the user was silly enough to rely on nvcc C++ mangling
       // they'll have to figure that out.
-      for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      for (auto exportOp : variantOp.getExportOps()) {
         entryPointNames.emplace_back(exportOp.getSymName());
       }
 
@@ -503,8 +522,7 @@ public:
       }
 
       for (auto [exportOp, workgroupSize] :
-           llvm::zip_equal(variantOp.getOps<IREE::HAL::ExecutableExportOp>(),
-                           workgroupSizes)) {
+           llvm::zip_equal(variantOp.getExportOps(), workgroupSizes)) {
         auto *llvmFunc = llvmModule->getFunction(exportOp.getName());
         if (llvmFunc->isDeclaration())
           continue;

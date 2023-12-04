@@ -14,15 +14,28 @@ include "mlir/Pass/PassBase.td"
 //===---------------------------------------------------------------------===//
 
 def CPUMaterializeEncoding :
-    Pass<"iree-cpu-materialize-encoding", "func::FuncOp"> {
+    Pass<"iree-codegen-cpu-materialize-encoding", "func::FuncOp"> {
   let summary = "Materialize the encoding for tensor as specified by the backend";
   let constructor = "mlir::iree_compiler::createCPUMaterializeEncodingPass()";
 }
 
 def CPUMaterializeUpperBoundTileSize :
-    InterfacePass<"iree-cpu-materialize-upper-bound-tile-size", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-codegen-cpu-materialize-upper-bound-tile-size", "mlir::FunctionOpInterface"> {
   let summary = "Materialize upper_bound_tile_size to constants.";
   let constructor = "mlir::iree_compiler::createCPUMaterializeUpperBoundTileSizePass()";
+}
+
+def CPULowerToUKernels :
+    Pass<"iree-codegen-cpu-lower-to-ukernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createCPULowerToUKernelsPass()";
+  let options = [
+    Option<"optionSkipIntermediateRoundings", "skip-intermediate-roundings",
+      "bool", /*default=*/"true",
+      "Allow skipping intermediate roundings, e.g. in f16 ukernels internally doing f32 arithmetic.">,
+  ];
 }
 
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

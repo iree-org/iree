@@ -25,6 +25,14 @@ iree_status_t iree_hal_cuda2_device_create(
     const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
+// Creates a CUDA stream-backed command buffer using resources from the the
+// given |base_device|.
+iree_status_t iree_hal_cuda2_device_create_stream_command_buffer(
+    iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_host_size_t binding_capacity,
+    iree_hal_command_buffer_t** out_command_buffer);
+
 // Returns the CUDA context bound to the given |device| if it is a CUDA device
 // and otherwise returns NULL.
 //

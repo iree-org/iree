@@ -6,8 +6,8 @@
 
 # Tests for common transforms.
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -21,6 +21,7 @@ iree_lit_test_suite(
             "gpu_check_resource_usage.mlir",
             "gpu_distribute.mlir",
             "gpu_distribute_shared_memory.mlir",
+            "gpu_generalize_named_ops.mlir",
             "gpu_pipeline.mlir",
             "gpu_tensor_alloc.mlir",
             "gpu_tensor_tile.mlir",
@@ -28,6 +29,7 @@ iree_lit_test_suite(
             "gpu_tile_reduction.mlir",
             "reduce_bank_conflicts.mlir",
             "transform_gpu_workgroup_swizzle.mlir",
+            "vector_reduction_to_gpu.mlir",
         ],
         include = ["*.mlir"],
         exclude = [

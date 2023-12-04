@@ -49,9 +49,6 @@ class ModelTestConfig(object):
 
     # Either a string literal or a file path.
     expected_output: str
-    input_data: common_definitions.ModelInputData = (
-        common_definitions.ZEROS_MODEL_INPUT_DATA
-    )
 
     # Platforms to ignore this test.
     unsupported_platforms: List[CMakePlatform] = dataclasses.field(default_factory=list)

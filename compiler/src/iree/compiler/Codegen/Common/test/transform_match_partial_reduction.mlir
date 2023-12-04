@@ -11,7 +11,7 @@ func.func @reduction_with_extra_op_in_func(%arg0: tensor<8x479xf32>, %arg1: tens
   %result = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                      affine_map<(d0, d1) -> (d0)>],
-    iterator_types = ["parallel", "reduction"]} 
+    iterator_types = ["parallel", "reduction"]}
     ins(%arg0 : tensor<8x479xf32>)
     outs(%fill : tensor<8xf32>) {
   ^bb0(%in: f32, %out: f32):
@@ -24,20 +24,22 @@ func.func @reduction_with_extra_op_in_func(%arg0: tensor<8x479xf32>, %arg1: tens
   return %result, %fill2 : tensor<8xf32>, tensor<32xf32>
 }
 
-transform.sequence failures(propagate) {
-^bb0(%arg0: !transform.any_op):
-  transform.iree.register_match_callbacks
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    transform.iree.register_match_callbacks
 
-  %leading, %fill, %reduction, %trailing =
-    transform.iree.match_callback failures(propagate) "reduction_partial"(%arg0)
-    : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %leading, %fill, %reduction, %trailing =
+      transform.iree.match_callback failures(propagate) "reduction_partial"(%root)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 
-  transform.iree.emit_remark "leading" at %leading : !transform.any_op
-  transform.iree.emit_remark "fill" at %fill : !transform.any_op
-  transform.iree.emit_remark "reduction" at %reduction : !transform.any_op
-  transform.iree.emit_remark "trailing" at %trailing : !transform.any_op
+    transform.iree.emit_remark "leading" at %leading : !transform.any_op
+    transform.iree.emit_remark "fill" at %fill : !transform.any_op
+    transform.iree.emit_remark "reduction" at %reduction : !transform.any_op
+    transform.iree.emit_remark "trailing" at %trailing : !transform.any_op
 
-  // expected-error @below {{failed to match}}
-  transform.iree.match_callback failures(propagate) "reduction"(%arg0)
-    : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-}
+    // expected-error @below {{failed to match}}
+    transform.iree.match_callback failures(propagate) "reduction"(%root)
+      : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  } // @__transform_main
+} // module

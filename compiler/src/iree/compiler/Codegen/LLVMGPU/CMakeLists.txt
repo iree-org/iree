@@ -55,6 +55,7 @@ iree_cc_library(
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
+    "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
@@ -71,6 +72,10 @@ iree_cc_library(
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUToROCDL
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineToStandard
     MLIRAnalysis
@@ -108,6 +113,8 @@ iree_cc_library(
     MLIRPDLInterpDialect
     MLIRPass
     MLIRROCDLDialect
+    MLIRROCDLTarget
+    MLIRROCDLToLLVMIRTranslation
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSCFTransforms

@@ -26,15 +26,16 @@ py_binary(
 
 # LLVMCPU, non-data-tiling, no microkernels
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_nondt_%s_%s_small" % (lhs_rhs_type, acc_type),
+    name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
+        "--iree-llvmcpu-enable-ukernels=none",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-        "--shapes=small",
+        "--shapes=%s" % size,
     ],
     tags = [
         # f16/bf16 trigger internal LLVM assertion errors on riscv and wasm.
@@ -44,6 +45,9 @@ py_binary(
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
+    target_cpu_features_variants = ["default"] +
+                                   # Widening matmuls fail to lower for SVE.
+                                   (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
 ) for (lhs_rhs_type, acc_type) in [
     ("i8", "i32"),
@@ -53,6 +57,9 @@ py_binary(
     # TODO(#15258): enable bf16 tests when that bug is fixed.
     # ("bf16", "bf16"),
     # ("bf16", "f32"),
+] for size in [
+    "small",
+    "large",
 ]]
 
 X86_64_AVX2 = [
@@ -78,15 +85,17 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     "+avx512bf16",
 ]
 
-# LLVMCPU, data-tiling + microkernels.
-# TODO(#15241, #15215): also test data-tiling alone without microkernels. This currently
-# fails (#15241), which needs to be resolved to unblock data-tiling-by-default (#15215).
+# LLVMCPU, data-tiling, data-tiling + ukernels.
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_dt_uk_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    name = "e2e_matmul_dt%s_%s_%s_%s" % (
+        ("_uk" if use_uk else ""),
+        lhs_rhs_type,
+        acc_type,
+        size,
+    ),
     compiler_flags = [
         "--iree-opt-data-tiling",
-        "--iree-llvmcpu-enable-microkernels",
-    ],
+    ] + ["--iree-llvmcpu-enable-ukernels=%s" % ("all" if use_uk else "none")],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
@@ -117,31 +126,38 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
                                    ] if lhs_rhs_type == "f32" and acc_type == "f32" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "arm_64:fp16:+fp16",
+                                       "arm_64:fullfp16:+fullfp16",
                                    ] if lhs_rhs_type == "f16" and acc_type == "f16" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
-                                       "arm_64:fp16:+fp16fml",
+                                       "arm_64:fp16fml:+fp16fml",
                                    ] if lhs_rhs_type == "f16" and acc_type == "f32" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
                                        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                       "arm_64:fp16:+bf16",
+                                       "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "bf16" else [
                                        "x86_64:avx2:" + ",".join(X86_64_AVX2),
                                        "x86_64:avx512:" + ",".join(X86_64_AVX512),
                                        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
-                                       "arm_64:fp16:+bf16",
+                                       "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for (lhs_rhs_type, acc_type) in [
-    ("i8", "i32"),
-    ("f32", "f32"),
-    ("f16", "f16"),
-    ("f16", "f32"),
-    ("bf16", "bf16"),
-    ("bf16", "f32"),
-] for size in [
+) for use_uk in [
+    False,
+    True,
+] for (lhs_rhs_type, acc_type) in (
+    [
+        ("i8", "i32"),
+        ("f32", "f32"),
+        ("f16", "f16"),
+        ("f16", "f32"),
+    ] + ([
+        # TODO(#15258): enable bf16 tests for !use_uk when that bug is fixed.
+        ("bf16", "bf16"),
+        ("bf16", "f32"),
+    ] if use_uk else [])
+) for size in [
     "small",
     "large",
 ]]

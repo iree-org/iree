@@ -19,10 +19,28 @@ def VMVXAssignConstantOrdinals :
   let constructor = "mlir::iree_compiler::createVMVXAssignConstantOrdinalsPass()";
 }
 
+def VMVXSelectLoweringStrategy :
+    Pass<"iree-vmvx-select-lowering-strategy",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
+  let constructor =
+      "mlir::iree_compiler::createVMVXSelectLoweringStrategyPass()";
+}
+
 def VMVXLinkExecutables :
     Pass<"iree-vmvx-link-executables", "mlir::ModuleOp"> {
   let summary = "Links VMVX HAL executables within the top-level program module.";
   let constructor = "mlir::iree_compiler::createVMVXLinkExecutablesPass()";
+}
+
+def VMVXLowerExecutableTarget :
+    Pass<"iree-vmvx-lower-executable-target",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
+  let constructor =
+      "mlir::iree_compiler::createVMVXLowerExecutableTargetPass()";
 }
 
 def VMVXLowerLinalgMicrokernels :

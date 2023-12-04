@@ -13,8 +13,8 @@ C++ module wrapper layer in [`module.cc`](./module.cc), and called by example in
 [`main.c`](./main.c).
 
 This document uses terminology that can be found in the documentation of
-[IREE's execution model](https://github.com/openxla/iree/blob/main/docs/developers/design_docs/execution_model.md).
-See [IREE's extensibility mechanisms](https://openxla.github.io/iree/reference/extensions/)
+[IREE's execution model](https://iree.dev/developers/design-docs/invocation-execution-model/).
+See [IREE's extensibility mechanisms](https://iree.dev/reference/extensions/)
 documentation for more information specific to extenting IREE and
 alternative approaches to doing so.
 
@@ -36,7 +36,7 @@ are implemented using this mechanism.
     python -m pip install iree-compiler
     ```
 
-    [See here](https://openxla.github.io/iree/reference/bindings/python/)
+    [See here](https://iree.dev/reference/bindings/python/)
     for general instructions on installing the compiler.
 
 3. Compile the [example module](./test/example.mlir) to a .vmfb file:
@@ -50,13 +50,13 @@ are implemented using this mechanism.
 3. Build the `iree_samples_custom_module_run` CMake target :
 
     ```
-    cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo . \
         -DCMAKE_C_FLAGS=-DIREE_VM_EXECUTION_TRACING_FORCE_ENABLE=1
     cmake --build ../iree-build/ --target iree_samples_custom_module_basic_run
     ```
     (here we force runtime execution tracing for demonstration purposes)
 
-    [See here](https://openxla.github.io/iree/building-from-source/getting-started/)
+    [See here](https://iree.dev/building-from-source/getting-started/)
     for general instructions on building using CMake.
 
 4. Run the example program to call the main function:

@@ -30,6 +30,7 @@ public:
     memoizedIndices[value] = memoizedValue;
     return memoizedValue;
   }
+  Value get(APInt value) { return get(value.getSExtValue()); }
 
   void populate(ValueRange values) {
     for (auto value : values) {

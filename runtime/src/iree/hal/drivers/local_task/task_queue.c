@@ -201,21 +201,19 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
 
   // NOTE: it's ok for there to be no command buffers - in that case the
   // submission was purely for synchronization.
-  if (cmd->command_buffer_count > 0) {
-    for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
-      if (iree_hal_task_command_buffer_isa(cmd->command_buffers[i])) {
-        status = iree_hal_task_command_buffer_issue(
-            cmd->command_buffers[i], &cmd->queue->state,
-            cmd->task.header.completion_task, cmd->arena, pending_submission);
-        iree_hal_command_buffer_release(cmd->command_buffers[i]);
-        cmd->command_buffers[i] = NULL;
-      } else {
-        status = iree_make_status(
-            IREE_STATUS_UNIMPLEMENTED,
-            "unsupported command buffer type for task queue submission");
-      }
-      if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
+  for (iree_host_size_t i = 0; i < cmd->command_buffer_count; ++i) {
+    if (iree_hal_task_command_buffer_isa(cmd->command_buffers[i])) {
+      status = iree_hal_task_command_buffer_issue(
+          cmd->command_buffers[i], &cmd->queue->state,
+          cmd->task.header.completion_task, cmd->arena, pending_submission);
+      iree_hal_command_buffer_release(cmd->command_buffers[i]);
+      cmd->command_buffers[i] = NULL;
+    } else {
+      status = iree_make_status(
+          IREE_STATUS_UNIMPLEMENTED,
+          "unsupported command buffer type for task queue submission");
     }
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
   }
 
   IREE_TRACE_ZONE_END(z0);

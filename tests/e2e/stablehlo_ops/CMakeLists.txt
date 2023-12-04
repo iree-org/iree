@@ -78,8 +78,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -148,8 +148,8 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -217,8 +217,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
 
 iree_check_single_backend_test_suite(
@@ -290,8 +290,9 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-cpu-features=host"
+  INPUT_TYPE
+    "stablehlo"
   LABELS
     "hostonly"
     "local"
@@ -366,8 +367,9 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
     "--iree-stream-emulate-memset"
+  INPUT_TYPE
+    "stablehlo"
   RUNNER_ARGS
     "--cuda_use_streams=false"
   LABELS
@@ -446,8 +448,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
   RUNNER_ARGS
     "--cuda_use_streams=true"
   LABELS
@@ -533,75 +535,148 @@ iree_check_single_backend_test_suite(
     "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
 
-# TODO(#14814): Re-enable once flaky segfaults are fixed.
-# iree_check_single_backend_test_suite(
-#   NAME
-#     check_metal-spirv_metal
-#   SRCS
-#     "abs.mlir"
-#     "add.mlir"
-#     "batch_norm_inference.mlir"
-#     "bitcast_convert.mlir"
-#     "broadcast.mlir"
-#     "broadcast_add.mlir"
-#     "broadcast_in_dim.mlir"
-#     "clamp.mlir"
-#     "compare.mlir"
-#     "complex.mlir"
-#     "concatenate.mlir"
-#     "constant.mlir"
-#     "convert.mlir"
-#     "convolution.mlir"
-#     "cosine.mlir"
-#     "divide.mlir"
-#     "dot.mlir"
-#     "dot_bf16.mlir"
-#     "dot_general.mlir"
-#     "dynamic_slice.mlir"
-#     "dynamic_update_slice.mlir"
-#     "exponential.mlir"
-#     "exponential_fp16.mlir"
-#     "exponential_minus_one.mlir"
-#     "fft.mlir"
-#     "finite.mlir"
-#     "floor.mlir"
-#     "gather.mlir"
-#     "iota.mlir"
-#     "log.mlir"
-#     "log_plus_one.mlir"
-#     "maximum.mlir"
-#     "minimum.mlir"
-#     "multiply.mlir"
-#     "negate.mlir"
-#     "pad.mlir"
-#     "philox.mlir"
-#     "pow.mlir"
-#     "reduce.mlir"
-#     # "reduce_window.mlir"  # TODO(15012): fix test crash
-#     "remainder.mlir"
-#     "reshape.mlir"
-#     "reverse.mlir"
-#     "rng_normal.mlir"
-#     "rng_uniform.mlir"
-#     "round.mlir"
-#     "rsqrt.mlir"
-#     "scatter.mlir"
-#     "scatter_dynamic.mlir"
-#     "select.mlir"
-#     "sine.mlir"
-#     "slice.mlir"
-#     "sort.mlir"
-#     "sqrt.mlir"
-#     "subtract.mlir"
-#     "tanh.mlir"
-#     "three_fry.mlir"
-#     "torch_index_select.mlir"
-#     "transpose.mlir"
-#     "while.mlir"
-#   TARGET_BACKEND
-#     "metal-spirv"
-#   DRIVER
-#     "metal"
-#   COMPILER_FLAGS
-#     "--iree-input-type=stablehlo"
-# )
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_metal
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    # "reduce_window.mlir"  # TODO(15012): fix test crash
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "metal-spirv"
+  DRIVER
+    "metal"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+)
+
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm-rocm
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "rocm"
+  # Only test compilation for now, the ROCm driver is experimental.
+  # DRIVER
+  #   "rocm"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+)

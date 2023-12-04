@@ -49,15 +49,8 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Expands tensor shape dimensions into SSA values across the program.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
-
 // Cleans up any remaining shape metadata ops after lowering.
 std::unique_ptr<Pass> createCleanupTensorShapesPass();
-
-// Cleans up any numeric narrowing ops inserted by
-// iree-flow-infer-numeric-narrowing.
-std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
@@ -77,15 +70,6 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
                             unsigned multiUseFusionIteration = 2);
 
-// Create a pass that generalizes some named Linalg ops into `linalg.generic`
-// operations since the IREE compiler can handle that better.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass();
-
-// Infers and inserts util.numeric.optional_narrow ops at points that may be
-// beneficial.
-std::unique_ptr<Pass> createInferNumericNarrowingPass();
-
 // Create a pass to initialize all empty tensors after dispatch formation to
 // zero or uninitialized allocations.
 std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill = false);
@@ -102,14 +86,6 @@ std::unique_ptr<Pass> createInterchangeTransposeGenericOpsPass();
 // only used for testing, since the conversion to Flow ops happens within
 // dispatch region formation.
 std::unique_ptr<Pass> createConvertToFlowPass();
-
-// Optimizes numerics given annotations added via
-// iree-flow-infer-numeric-narrowing.
-std::unique_ptr<Pass> createOptimizeNumericsPass();
-
-// Strips the signed/unsigned portion off of tensors.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createStripSignednessPass();
 
 // Decomposes top-level SCF operations to CFG.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -154,9 +130,6 @@ createCollapseDimensionsPass();
 // converting to dispatch workgroups with explicit captures.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass();
-
-// A pass to fuse dequantization and matmul linalg.generic ops
-std::unique_ptr<Pass> createFuseDequantizationMatmulPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)

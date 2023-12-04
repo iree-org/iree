@@ -61,7 +61,7 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_LSE, hwcap,
                  IREE_HWCAP_ATOMICS);
   // LSE2/lse128 does not seem to be exposed in hwcaps.
-  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP16, hwcap,
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FULLFP16, hwcap,
                  IREE_HWCAP_ASIMDHP);
   IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_ARM_64_FP16FML, hwcap,
                  IREE_HWCAP_ASIMDFHM);
@@ -128,7 +128,7 @@ static void iree_cpu_initialize_from_platform_arm_64(uint64_t* out_fields) {
       {
           .sysctl_key = "hw.optional.arm.FEAT_FP16",
           .out_field_index = 0,
-          .out_field_bits = IREE_CPU_DATA0_ARM_64_FP16,
+          .out_field_bits = IREE_CPU_DATA0_ARM_64_FULLFP16,
       },
       {
           .sysctl_key = "hw.optional.arm.FEAT_FHM",
@@ -310,6 +310,23 @@ static void iree_cpu_initialize_from_platform_x86_64(uint64_t* out_fields) {
   out_fields[0] = out0;
 }
 
+#elif defined(IREE_ARCH_RISCV_64)
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
+
+// For now as we only need ISA feature bits and no CPU identification beyond
+// that, and as we are OK with requiring a sufficiently recent linux kernel to
+// expose the features that we need, we can just rely on the basic HWCAP way.
+#include <sys/auxv.h>
+
+#define IREE_HWCAP_ISA_V (1 << ('V' - 'A'))
+
+static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
+  unsigned long hwcap = getauxval(AT_HWCAP);
+  IREE_COPY_BITS(out_fields[0], IREE_CPU_DATA0_RISCV_64_RVV, hwcap,
+                 IREE_HWCAP_ISA_V);
+}
+
+#endif  // IREE_PLATFORM_*
 #endif  // defined(IREE_ARCH_ARM_64)
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
@@ -318,6 +335,8 @@ static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
   iree_cpu_initialize_from_platform_arm_64(out_fields);
 #elif defined(IREE_ARCH_X86_64)
   iree_cpu_initialize_from_platform_x86_64(out_fields);
+#elif defined(IREE_ARCH_RISCV_64)
+  iree_cpu_initialize_from_platform_riscv_64(out_fields);
 #else
   // No implementation available. CPU data will be all zeros.
 #endif  // defined(IREE_ARCH_ARM_64)

@@ -1,0 +1,89 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "PassHeaders",
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
+        "Passes.h.inc",
+    ],
+    copts = [
+        "-Icompiler/plugins/input/TOSA",
+        "-I$(GENDIR)/compiler/plugins/input/TOSA",
+    ],
+    deps = [
+        ":PassesIncGen",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "InputConversion",
+    srcs = [
+        "Converti48Toi64.cpp",
+        "Passes.cpp",
+        "StripSignedness.cpp",
+        "TosaToLinalgExt.cpp",
+        "VerifyCompilerTOSAInputLegality.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    copts = [
+        "-Icompiler/plugins/input/TOSA",
+        "-I$(GENDIR)/compiler/plugins/input/TOSA",
+    ],
+    deps = [
+        ":PassHeaders",
+        ":PassesIncGen",
+        "//compiler/src/iree/compiler/InputConversion/Common",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFToControlFlow",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TosaDialect",
+        "@llvm-project//mlir:TosaToArith",
+        "@llvm-project//mlir:TosaToLinalg",
+        "@llvm-project//mlir:TosaToSCF",
+        "@llvm-project//mlir:TosaToTensor",
+        "@llvm-project//mlir:Transforms",
+    ],
+)

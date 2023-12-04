@@ -394,10 +394,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
                                type($arguments), $argument_dims,
                                type($results), $result_dims,
                                $tied_operands)
+    `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     `layout` `(` $layout `)`
     (`bindings` `(` $bindings^ `)`)?
     `objects` `(` $objects `)`
-    `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     attr-dict-with-keyword
   }];
 
@@ -1534,88 +1534,8 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   ];
 }
 
-def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
-    NoRegionArguments,
-    RecursiveMemoryEffects,
-  ]> {
-  let summary = [{runtime device switch pseudo op}];
-  let description = [{
-    Switches between multiple regions based on the runtime device type.
-    The provided regions are matched against the runtime backend of the given
-    device and executed only when the device matches the conditions.
-
-    Conditions can match on wildcards and be folded to enable conditions that
-    have similar bodies to be folded. The patterns themselves are only matched
-    once at startup and then the results are cached; the runtime overhead is
-    equivalent to a normal switch statement. In cases where the compiler can
-    statically identify the device type entire cases can be folded away.
-
-    Supported conditions:
-    * `#hal.match...`: execute the region if the expression matches.
-
-    Supported match expressions:
-    * `#hal.match.always`: always matches; useful for defaults.
-    * `#hal.match.any<[...]>`: matches if any of the nested expressions match.
-    * `#hal.match.all<[...]>`: matches only if all of the nested expressions
-      match.
-    * `#hal.device.match.id<"pattern*-?-*">`: matches against the device
-      identifier. The pattern is evaluated with standard file path wildcards
-      (`*` for zero or more characters and `?` for one character).
-
-    If more than one condition is satisfied the first listed will be chosen.
-    More specific conditions should be earlier in the set. If no condition is
-    matched but there are return values the switch will abort at runtime. It's
-    strongly recommend that all switches that return values end with a trailing
-    `#hal.match.always` condition to handle the fallthrough case.
-
-    Upon creation each condition region will have an empty entry block with the
-    specified operands available as arguments. Each region must be setup to
-    return the same types.
-
-    ```mlir
-    %c0 = arith.constant 0 : i32
-    %c1 = arith.constant 1 : i32
-    %c2 = arith.constant 2 : i32
-    %device = ... : !hal.device
-    %0 = hal.device.switch<%device : !hal.device> -> i32
-      #hal.device.match.id<"vulkan-v1.?-*"> {
-        hal.return %c1 : i32
-      },
-      #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
-        hal.return %c2 : i32
-      },
-      #hal.match.always {
-        hal.return %c0 : i32
-      }
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    ArrayAttr:$conditions
-  );
-  let results = (outs
-    Variadic<AnyType>:$results
-  );
-
-  let regions = (region VariadicRegion<AnyRegion>:$condition_regions);
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "TypeRange":$resultTypes,
-      "Value":$device,
-      "ArrayRef<Attribute>":$conditions,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes
-    )>,
-  ];
-
-
-  let hasVerifier = 1;
-}
-
 def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
-  let summary = [{return from a hal.device.switch region}];
+  let summary = [{return from a hal.* region}];
   let description = [{
     Returns the given values from the region and back to the host code.
   }];
@@ -1955,18 +1875,33 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
     OptionalAttr<HAL_ExecutableObjectsAttr>:$objects
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region
+    SizedRegion<1>:$body
+  );
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
     ``
-    regions
+    $body
   }];
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
+
+    IREE::HAL::ExecutableConditionOp getConditionOp() {
+      auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
+      return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    getConstantBlockOps() {
+      return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    getExportOps() {
+      return getBody().getOps<IREE::HAL::ExecutableExportOp>();
+    }
 
     bool isExternal() {
       return getBlock().getOps<::mlir::ModuleOp>().empty();
@@ -1978,6 +1913,8 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
       return *it.begin();
     }
   }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
@@ -2114,6 +2051,12 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
+
+    Variants are selected based on their target and an optional condition
+    op that returns true if the variant is valid for use on the provided
+    runtime `!hal.device`. If no variants within an executable are valid then
+    loading will fail at runtime. If multiple variants are valid the first valid
+    one found will be loaded and used for execution.
   }];
 
   let arguments = (ins
@@ -2123,7 +2066,9 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     OptionalAttr<HAL_ExecutableObjectArrayAttr>:$objects
   );
 
-  let regions = (region SizedRegion<1>:$body);
+  let regions = (region
+    SizedRegion<1>:$body
+  );
 
   let assemblyFormat = [{
     custom<SymbolVisibility>($sym_visibility)
@@ -2131,7 +2076,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     `target` `(` $target `)`
     (`objects` `(` $objects^ `)` )?
     attr-dict-with-keyword
-    regions
+    $body
   }];
 
   let skipDefaultBuilders = 1;
@@ -2141,6 +2086,19 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return getBody().front(); }
+
+    IREE::HAL::ExecutableConditionOp getConditionOp() {
+      auto conditionOps = getBody().getOps<IREE::HAL::ExecutableConditionOp>();
+      return !conditionOps.empty() ? *conditionOps.begin() : IREE::HAL::ExecutableConditionOp{};
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableConstantBlockOp>>
+    getConstantBlockOps() {
+      return getBody().getOps<IREE::HAL::ExecutableConstantBlockOp>();
+    }
+    iterator_range<Region::op_iterator<IREE::HAL::ExecutableExportOp>>
+    getExportOps() {
+      return getBody().getOps<IREE::HAL::ExecutableExportOp>();
+    }
 
     bool isExternal() {
       return getBlock().getOps<::mlir::ModuleOp>().empty();
@@ -2155,9 +2113,13 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     // Returns a map of constant key attributes to ordinals across all constant
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
+
+    // Returns an i1 indicating whether this variant should be selected.
+    Value buildCondition(Value device, OpBuilder &builder);
   }];
 
   let hasCanonicalizer = 1;
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
@@ -2166,6 +2128,59 @@ def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
   ]> {
   let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
+}
+
+def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
+    IsolatedFromAbove,
+    FunctionOpInterface,
+    CallableOpInterface,
+  ]> {
+  let summary = [{host code to determine if the executable is enabled}];
+  let description = [{
+    Variants are selected based on their target and this optional condition
+    op that returns true if the variant is valid for use on the provided
+    runtime `!hal.device`. If no variants within an executable are valid then
+    loading will fail at runtime. If multiple variants are valid the first valid
+    one found will be loaded and used for execution.
+  }];
+
+  let arguments = (ins
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<(ins
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Add an entry block to an empty function and set up the block arguments
+    /// to match the signature of the function.
+    Block *addEntryBlock();
+    Block *addBlock();
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    LogicalResult verifyType() { return success(); }
+
+    Region *getCallableRegion() { return &getBody(); }
+    ArrayRef<Type> getCallableResults() { return getResultTypes(); }
+
+    ::mlir::ArrayAttr getCallableArgAttrs() { return nullptr; }
+    ::mlir::ArrayAttr getCallableResAttrs() { return nullptr; }
+
+    /// Make symbol optional as this op has no symbol.
+    bool isOptionalSymbol() { return true; }
+  }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableConstantBlockOp :

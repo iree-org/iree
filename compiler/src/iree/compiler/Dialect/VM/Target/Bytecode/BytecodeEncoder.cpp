@@ -216,6 +216,19 @@ public:
     return success();
   }
 
+  LogicalResult encodeBranchTable(SuccessorRange caseSuccessors,
+                                  OperandRangeRange caseOperands,
+                                  int baseSuccessorIndex) override {
+    if (failed(writeUint16(caseSuccessors.size())))
+      return failure();
+    for (auto [successor, operands] :
+         llvm::zip_equal(caseSuccessors, caseOperands)) {
+      if (failed(encodeBranch(successor, operands, ++baseSuccessorIndex)))
+        return failure();
+    }
+    return success();
+  }
+
   LogicalResult encodeOperand(Value value, int ordinal) override {
     uint16_t reg =
         registerAllocation_->mapUseToRegister(value, currentOp_, ordinal)

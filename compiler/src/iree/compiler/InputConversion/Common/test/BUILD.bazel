@@ -18,7 +18,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "auto_input_conversion_pipeline.mlir",
             "import_ml_program.mlir",
             "iree_import_public.mlir",
             "linalg_quantized_conv_to_conv.mlir",

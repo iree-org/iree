@@ -15,25 +15,12 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
+    "f32_to_i4.mlir"
     "i4_to_f32.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_winograd_llvm-cpu_local-task
-  SRCS
-    "conv2d.mlir"
-    "i4_to_f32.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
 )
 
 iree_check_single_backend_test_suite(
@@ -61,10 +48,22 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_winograd_llvm-cpu_local-task
+  SRCS
+    "conv2d.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_winograd_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
-    "i4_to_f32.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -77,6 +76,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_large_linalg_matmul_cuda
   SRCS
+    "conv2d.mlir"
+    "f32_to_i4.mlir"
+    "i4_to_f32.mlir"
     "large_linalg_matmul.mlir"
   TARGET_BACKEND
     "cuda"

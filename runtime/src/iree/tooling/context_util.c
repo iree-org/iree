@@ -20,6 +20,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/device_util.h"
 #include "iree/tooling/modules/resolver.h"
+#include "iree/tooling/parameter_util.h"
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/dynamic/module.h"
 
@@ -423,6 +424,10 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
         &state->device_allocator));
   } else if (iree_string_view_equal(dependency->name, IREE_SV("hal_loader"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_load_hal_loader_module(
+        state->instance, state->host_allocator, &module));
+  } else if (iree_string_view_equal(dependency->name,
+                                    IREE_SV("io_parameters"))) {
+    IREE_RETURN_IF_ERROR(iree_tooling_create_parameters_module_from_flags(
         state->instance, state->host_allocator, &module));
   } else {
     // Defer to the generic module resolver registry.

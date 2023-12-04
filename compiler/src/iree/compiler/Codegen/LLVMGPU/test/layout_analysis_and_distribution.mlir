@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule -cse -split-input-file --verify-diagnostics | FileCheck %s
 
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x8x16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
@@ -17,12 +17,14 @@ builtin.module {
     vector.transfer_write %5, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
+
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
@@ -128,7 +130,7 @@ builtin.module {
 
 // -----
 
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_reduction() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
@@ -149,12 +151,13 @@ builtin.module {
     vector.transfer_write %8, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
+
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
@@ -318,7 +321,7 @@ builtin.module {
 #map4 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map5 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_scf() {
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
@@ -348,12 +351,13 @@ builtin.module {
     vector.transfer_write %7, %3[%8, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
+
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (d0 + s0)>
@@ -505,7 +509,7 @@ builtin.module {
 #map4 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map5 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_scf() {
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
@@ -535,12 +539,13 @@ builtin.module {
     vector.transfer_write %7, %3[%8, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
+
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * 16)>
@@ -679,7 +684,7 @@ builtin.module {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x8x16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
@@ -702,12 +707,13 @@ builtin.module {
     vector.transfer_write %10, %subview[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
+
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
@@ -836,7 +842,7 @@ builtin.module {
 
 // -----
 
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x8x16_shared() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x8xf16>
@@ -851,12 +857,12 @@ builtin.module {
     vector.transfer_write %5, %2[%c0, %c0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
 
 // CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>
 // CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0 * 2)>
@@ -913,7 +919,7 @@ builtin.module {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @matmul_dispatch_0_matmul_16x16x16_f16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x16xf16>
@@ -973,13 +979,13 @@ builtin.module {
     vector.transfer_write %32, %subview[%c0_0, %c0_0] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %reordered_func = transform.iree.reorder_transpose %top_level_func : (!transform.any_op) -> !transform.any_op
-     transform.iree.apply_cse %reordered_func : !transform.any_op
+    transform.iree.apply_cse %reordered_func : !transform.any_op
+    transform.yield
   }
-}
+} // module
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
@@ -1064,7 +1070,7 @@ builtin.module {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
-builtin.module {
+builtin.module attributes { transform.with_named_sequence } {
   func.func @double_matmul_dispatch_0_matmul_16x16x16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<16x16xf16>
@@ -1099,12 +1105,12 @@ builtin.module {
     vector.transfer_write %9, %subview[%c0_1, %c0_1] {in_bounds = [true, true]} : vector<16x8xf16>, memref<16x8xf16, strided<[8, 1], offset: ?>>
     return
   }
-  transform.sequence failures(propagate) {
-  ^bb1(%variant_op: !transform.any_op):
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %transformed_func = transform.iree.layout_analysis_and_distribution %top_level_func : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
   }
-}
+} // module
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d1 + d2 * 16)>

@@ -340,7 +340,7 @@ static iree_status_t iree_hal_metal_allocator_import_host_buffer(
 #endif  // IREE_PLATFORM_MACOS
       metal_buffer, base_allocator, params->type, params->access, params->usage,
       external_buffer->size, /*byte_offset=*/0, /*byte_length=*/external_buffer->size,
-      iree_hal_buffer_release_callback_null(), out_buffer);  // +1
+      release_callback, out_buffer);  // +1
 }
 
 static iree_status_t iree_hal_metal_allocator_import_device_buffer(
@@ -350,6 +350,7 @@ static iree_status_t iree_hal_metal_allocator_import_device_buffer(
     iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_metal_allocator_t* allocator = iree_hal_metal_allocator_cast(base_allocator);
+  (void)allocator;
 
   // Device allocation is an unowned MTLBuffer; we need to retain it to keep it live.
   id<MTLBuffer> metal_buffer =

@@ -1,5 +1,5 @@
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/reductions_codegen_spec.mlir' --split-input-file | FileCheck %s
-// RUN: iree-opt %s --iree-transform-dialect-interpreter='transform-file-name=%p/reductions_match_spec.mlir' --split-input-file --verify-diagnostics
+// RUN: iree-opt %s --iree-codegen-transform-dialect-library=%p/reductions_codegen_spec.mlir --iree-transform-dialect-interpreter --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-transform-dialect-library=%p/reductions_match_spec.mlir --iree-transform-dialect-interpreter --split-input-file --verify-diagnostics
 
 // Check that the same transform script applies to reductions with optional
 // leading and trailing elementwise operations, potentially reordered
@@ -114,7 +114,7 @@ func.func @reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
     indexing_maps = [affine_map<(d0) -> (d0)>,
                      affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
-    ins(%5 : !out_tensor_t) outs(%6 : !out_tensor_t) {  
+    ins(%5 : !out_tensor_t) outs(%6 : !out_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %4 = math.sqrt %arg3 : f32
       linalg.yield %4 : f32
@@ -174,7 +174,7 @@ func.func @eltwise_reduce_eltwise(%arg : !in_tensor_t) -> (!out_tensor_t) {
     indexing_maps = [affine_map<(d0) -> (d0)>,
                      affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
-    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {  
+    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %4 = math.sqrt %arg3 : f32
       linalg.yield %4 : f32
@@ -236,7 +236,7 @@ func.func @eltwise_reduce_eltwise_swapped(%arg : !in_tensor_t) -> (!out_tensor_t
     indexing_maps = [affine_map<(d0) -> (d0)>,
                      affine_map<(d0) -> (d0)>],
     iterator_types = ["parallel"]}
-    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {  
+    ins(%6 : !out_tensor_t) outs(%7 : !out_tensor_t) {
     ^bb0(%arg3: f32, %arg4: f32):
       %4 = math.sqrt %arg3 : f32
       linalg.yield %4 : f32

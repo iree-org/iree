@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "gpu_check_resource_usage.mlir"
     "gpu_distribute.mlir"
     "gpu_distribute_shared_memory.mlir"
+    "gpu_generalize_named_ops.mlir"
     "gpu_pipeline.mlir"
     "gpu_tensor_alloc.mlir"
     "gpu_tensor_tile.mlir"
@@ -24,6 +25,7 @@ iree_lit_test_suite(
     "gpu_workgroup_swizzle.mlir"
     "reduce_bank_conflicts.mlir"
     "transform_gpu_workgroup_swizzle.mlir"
+    "vector_reduction_to_gpu.mlir"
   TOOLS
     FileCheck
     iree-opt

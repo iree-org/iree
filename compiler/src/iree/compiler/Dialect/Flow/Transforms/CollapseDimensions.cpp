@@ -103,8 +103,8 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
     return true;
   };
   auto hasSameIteratorType = [&](AffineExpr preExpr, AffineExpr nextExpr) {
-    unsigned prePos = preExpr.cast<AffineDimExpr>().getPosition();
-    unsigned nextPos = nextExpr.cast<AffineDimExpr>().getPosition();
+    unsigned prePos = cast<AffineDimExpr>(preExpr).getPosition();
+    unsigned nextPos = cast<AffineDimExpr>(nextExpr).getPosition();
     return (pDimsSet.count(prePos) && pDimsSet.count(nextPos)) ||
            (rDimsSet.count(prePos) && rDimsSet.count(nextPos));
   };
@@ -132,7 +132,7 @@ getCollapsibleLoops(linalg::GenericOp genericOp) {
         range.clear();
       }
     }
-    range.push_back(nextExpr.cast<AffineDimExpr>().getPosition());
+    range.push_back(cast<AffineDimExpr>(nextExpr).getPosition());
     preExpr = nextExpr;
   }
   if (range.size() > 1)
@@ -190,6 +190,9 @@ findRootGenericOp(DispatchRegionOp regionOp) {
   // Check the yielded value is from a single `linalg.generic`.
   auto returnOp =
       cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+  if (!returnOp->getOperands().size()) {
+    return failure();
+  }
   auto collapsibleOp = dyn_cast_or_null<linalg::GenericOp>(
       returnOp->getOperand(0).getDefiningOp());
   if (!collapsibleOp) {
@@ -421,8 +424,8 @@ static bool collapseDimensions(IRRewriter &rewriter,
   rewriter.setInsertionPoint(genericOp.value());
 
   FailureOr<SmallVector<Value>> maybeReplacements =
-      mlir::linalg::collapseGenericOpIterationDims(genericOp.value(),
-                                                   collapseIndices, rewriter);
+      mlir::linalg::collapseOpIterationDims(genericOp.value(), collapseIndices,
+                                            rewriter);
   if (failed(maybeReplacements))
     return false;
   rewriter.replaceOp(genericOp.value(), maybeReplacements.value());

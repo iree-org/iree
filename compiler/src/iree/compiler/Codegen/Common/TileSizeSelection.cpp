@@ -62,22 +62,32 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   auto [parallelCommonSizes, parallelCommonScalableFlags] =
       getVectorCommonParallelSizes();
   auto [reductionSizes, reductionScalableFlags] = getVectorReductionSizes();
-  auto [parallelInnerSizes, parallelInnerScalableFlags] =
-      getVectorInnerParallelSizes();
+  SizesAndScalableFlags parallelInnerTiles;
+  if (hasVectorInnerParallelLevel()) {
+    parallelInnerTiles = getVectorInnerParallelSizes();
+  }
+
   for (int i = 0; i < numDims; ++i) {
-    unsigned nonZeroCnt = llvm::count(
-        ArrayRef<bool>{
-            !!parallelCommonSizes[i] || parallelCommonScalableFlags[i],
-            !!reductionSizes[i] || reductionScalableFlags[i],
-            !!parallelInnerSizes[i] || parallelInnerScalableFlags[i]},
-        true);
+    SmallVector<bool> dimSizes;
+    dimSizes.push_back(!!parallelCommonSizes[i] ||
+                       parallelCommonScalableFlags[i]);
+    dimSizes.push_back(!!reductionSizes[i] || reductionScalableFlags[i]);
+    if (hasVectorInnerParallelLevel())
+      dimSizes.push_back(!!parallelInnerTiles.first[i] ||
+                         parallelInnerTiles.second[i]);
+
+    unsigned nonZeroCnt = llvm::count(dimSizes, true);
     assert(nonZeroCnt <= 1 && "expected one tile size at most to be non-zero");
     (void)nonZeroCnt;
-    vectorSizes[i] =
-        parallelCommonSizes[i] ^ reductionSizes[i] ^ parallelInnerSizes[i];
-    scalableFlags[i] = parallelCommonScalableFlags[i] ||
-                       reductionScalableFlags[i] ||
-                       parallelInnerScalableFlags[i];
+
+    vectorSizes[i] = parallelCommonSizes[i] ^ reductionSizes[i];
+    if (hasVectorInnerParallelLevel())
+      vectorSizes[i] ^= parallelInnerTiles.first[i];
+
+    scalableFlags[i] =
+        parallelCommonScalableFlags[i] || reductionScalableFlags[i];
+    if (hasVectorInnerParallelLevel())
+      scalableFlags[i] |= parallelInnerTiles.second[i];
   }
 
   return std::make_pair(vectorSizes, scalableFlags);

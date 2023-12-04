@@ -17,8 +17,8 @@ iree_lit_test_suite(
     "assign_constant_ordinals.mlir"
     "link_executables.mlir"
     "lower_linalg_microkernels.mlir"
-    "materialize_encoding.mlir"
     "pipeline.mlir"
+    "select_lowering_strategy.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -72,7 +72,7 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
 }
 
 Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
-                                Location loc, PatternRewriter &rewriter) {
+                                Location loc, RewriterBase &rewriter) {
   ArrayRef<float> vector(val, rows * cols);
   SmallVector<int64_t> shape{rows, cols};
   return rewriter.create<arith::ConstantOp>(
@@ -88,43 +88,6 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
       result.push_back(ShapedType::kDynamic);
     else
       result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));
-  }
-  return result;
-}
-
-FailureOr<SmallVector<OpFoldResult>>
-getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
-                     RankedTensorType tensorType,
-                     const MaterializeEncodingInfo &materializeEncodingInfo,
-                     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  ArrayRef<int64_t> staticTileSizes = materializeEncodingInfo.innerTileSizes;
-  if (llvm::all_of(staticTileSizes,
-                   [](int64_t i) { return !ShapedType::isDynamic(i); })) {
-    return getAsOpFoldResult(rewriter.getI64ArrayAttr(staticTileSizes));
-  }
-  assert(materializeEncodingValueFn &&
-         "When dynamic tile sizes are generated, a MaterializeEncodingValueFn "
-         "should be provided.");
-
-  FailureOr<MaterializeEncodingValueInfo> materializeEncodingValueInfo =
-      materializeEncodingValueFn(tensorType, rewriter, loc);
-  if (failed(materializeEncodingValueInfo)) {
-    return failure();
-  }
-  ArrayRef<Value> innerTileSizeValues =
-      materializeEncodingValueInfo->innerTileSizes;
-
-  SmallVector<OpFoldResult> result(staticTileSizes.size());
-  for (size_t i = 0; i < result.size(); ++i) {
-    if (staticTileSizes[i] == ShapedType::kDynamic) {
-      result[i] = innerTileSizeValues[i];
-    } else if (tensorType.isDynamicDim(i)) {
-      result[i] =
-          rewriter.create<arith::ConstantIndexOp>(loc, staticTileSizes[i])
-              .getResult();
-    } else {
-      result[i] = rewriter.getI64IntegerAttr(staticTileSizes[i]);
-    }
   }
   return result;
 }

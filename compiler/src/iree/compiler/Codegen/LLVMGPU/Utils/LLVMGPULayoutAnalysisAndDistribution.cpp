@@ -301,8 +301,7 @@ static void propagateLayoutToReduceBroadcastTranspose(
   auto reductionDims =
       llvm::to_vector(reductionOp.getReductionDims().getAsRange<IntegerAttr>());
   // Get the transpose permutation
-  SmallVector<int64_t> perm;
-  transposeOp.getTransp(perm);
+  ArrayRef<int64_t> perm = transposeOp.getPermutation();
   // Don't support dim-1 broadcasted dims
   llvm::SetVector<int64_t> dimOneBroadcastedDims =
       broadcastOp.computeBroadcastedUnitDims();
@@ -372,7 +371,7 @@ static void propagateLayoutToFor(scf::ForOp forOp,
     BlockArgument &arg = argIndex.value();
     if (!layoutMap.count(arg))
       continue;
-    OpOperand &operand = forOp.getOpOperandForRegionIterArg(arg);
+    OpOperand &operand = *forOp.getTiedLoopInit(arg);
     Value result = forOp.getResult(argIndex.index());
     Layout newLayout = layoutMap.at(arg);
     layoutMap.try_emplace(operand.get(), newLayout);
@@ -444,7 +443,7 @@ getDistributedIndices(OpBuilder &rewriter, Location loc, Layout &layout,
   SmallVector<Value> newIndices{indices.begin(), indices.end()};
   int64_t laneDim = 0;
   for (AffineExpr expr : permutationMap.getResults()) {
-    auto dimExpr = expr.dyn_cast<AffineDimExpr>();
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
     if (!dimExpr)
       continue;
     unsigned pos = dimExpr.getPosition();
@@ -478,8 +477,8 @@ static bool isTransposedLdMatrix(AffineMap map) {
   if (map.getNumResults() != 2) {
     return false;
   }
-  auto exprX = map.getResult(0).dyn_cast<AffineDimExpr>();
-  auto exprY = map.getResult(1).dyn_cast<AffineDimExpr>();
+  auto exprX = dyn_cast<AffineDimExpr>(map.getResult(0));
+  auto exprY = dyn_cast<AffineDimExpr>(map.getResult(1));
   if (!exprX || !exprY)
     return false;
   return exprX.getPosition() > exprY.getPosition();
@@ -533,7 +532,7 @@ static Value emitLdMatrix(OpBuilder &rewriter, Location loc, Layout &layout,
     std::swap(laneOffsets[0], laneOffsets[1]);
   }
   for (AffineExpr expr : permutationMap.getResults()) {
-    auto dimExpr = expr.dyn_cast<AffineDimExpr>();
+    auto dimExpr = dyn_cast<AffineDimExpr>(expr);
     if (!dimExpr)
       continue;
     unsigned pos = dimExpr.getPosition();
@@ -754,15 +753,6 @@ static int isSingleLaneIdReduced(std::array<int, 4> &order) {
       count++;
   }
   return count == 1;
-}
-
-static int getVecSizes(std::array<int, 4> &order, const Layout &layout) {
-  int size = 1;
-  for (int i = 0; i < 4; i++) {
-    if (isVectorId(i))
-      size *= layout.shape[i];
-  }
-  return size;
 }
 
 using bodyType = std::function<void(std::array<int, DimType::NumDims> &)>;
@@ -1060,7 +1050,7 @@ static void distributeConstants(arith::ConstantOp constantOp,
   Value constant = constantOp.getResult();
   if (!layoutMap.count(constant))
     return;
-  auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+  auto attr = llvm::cast<ElementsAttr>(constantOp.getValue());
   // Only handle splat values for now
   if (!attr.isSplat())
     return;

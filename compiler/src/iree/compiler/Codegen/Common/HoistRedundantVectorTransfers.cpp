@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,8 +32,12 @@ public:
 void HoistRedundantVectorTransfersPass::runOnOperation() {
   auto funcOp = getOperation();
   linalg::hoistRedundantVectorTransfers(funcOp);
-  linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
   IRRewriter rewriter(funcOp->getContext());
+  // Hoist redundant vector transfers on tensors.
+  // TODO: walking in some reverse / inside-out order would be more efficient
+  // and would capture more cases.
+  funcOp.walk(
+      [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
   vector::transferOpflowOpt(rewriter, funcOp);
 }
 } // namespace

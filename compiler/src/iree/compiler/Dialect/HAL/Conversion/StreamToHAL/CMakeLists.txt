@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Patterns.cpp"
   DEPS
+    ::Utils
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
@@ -29,7 +30,26 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    Utils
+  HDRS
+    "Utils.h"
+  SRCS
+    "Utils.cpp"
+  DEPS
+    LLVMSupport
+    MLIRArithDialect
+    MLIRIR
+    MLIRSCFDialect
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

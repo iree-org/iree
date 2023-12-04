@@ -45,9 +45,9 @@ class Parser(argparse.ArgumentParser):
         self.add_argument(
             "--e2e_test_artifacts_dir",
             metavar="<e2e-test-artifacts-dir>",
-            type=_check_dir_path,
+            type=str,
             required=True,
-            help="Path to the IREE e2e test artifacts directory.",
+            help="Path/URL to the IREE e2e test artifacts directory.",
         )
 
         self.add_argument(
@@ -169,6 +169,11 @@ class Parser(argparse.ArgumentParser):
             action="store_true",
             help="Only run compatible benchmarks based on the detected device "
             "information",
+        )
+        self.add_argument(
+            "--verify",
+            action="store_true",
+            help="Verify the output when the expected output is available",
         )
         self.add_argument(
             "--execution_benchmark_config",

@@ -40,7 +40,9 @@ getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
                         StringRef format) {
   SmallVector<NamedAttribute> config;
   config.emplace_back(StringAttr::get(context, "ukernels"),
-                      BoolAttr::get(context, clEnableMicrokernels));
+                      StringAttr::get(context, clEnableMicrokernels.getValue()
+                                                   ? "all"
+                                                   : "none"));
   return IREE::HAL::ExecutableTargetAttr::get(
       context, StringAttr::get(context, backend),
       StringAttr::get(context, format), DictionaryAttr::get(context, config));
@@ -83,6 +85,11 @@ public:
     vmOptions.f32Extension = true;
     vmOptions.optimizeForStackSize = false;
     return vmOptions;
+  }
+
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -186,6 +193,11 @@ public:
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::DeviceTargetAttr::get(
         context, b.getStringAttr(deviceID()), configAttr);
+  }
+
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,

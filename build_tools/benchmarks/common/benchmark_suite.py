@@ -5,23 +5,23 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Utilities for handling the benchmark suite.
 
-See docs/developers/developing_iree/benchmark_suites.md for how to build the
-benchmark suite.
+See https://iree.dev/developers/performance/benchmark-suites/ for how to build
+the benchmark suite.
 """
 
-import collections
 import pathlib
 import re
+import urllib.parse
+import urllib.request
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Sequence, Tuple
+from common import benchmark_definition
 from common.benchmark_definition import IREE_DRIVERS_INFOS, DriverInfo
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework import serialization
-
-MODEL_FLAGFILE_NAME = "flagfile"
-MODEL_TOOLFILE_NAME = "tool"
 
 
 @dataclass
@@ -34,8 +34,10 @@ class BenchmarkCase:
     target_arch: the target CPU/GPU architature.
     driver_info: the IREE driver configuration.
     benchmark_tool_name: the benchmark tool, e.g., 'iree-benchmark-module'.
-    benchmark_case_dir: the path to benchmark case directory.
     run_config: the run config from e2e test framework.
+    module_dir: path/URL of the module directory.
+    input_uri: URI to find the input npy.
+    expected_output_uri: URI to find the expected output npy.
     """
 
     model_name: str
@@ -44,8 +46,11 @@ class BenchmarkCase:
     target_arch: common_definitions.DeviceArchitecture
     driver_info: DriverInfo
     benchmark_tool_name: str
-    benchmark_case_dir: pathlib.Path
     run_config: iree_definitions.E2EModelRunConfig
+    module_dir: benchmark_definition.ResourceLocation
+    input_uri: Optional[str] = None
+    expected_output_uri: Optional[str] = None
+    verify_params: List[str] = dataclasses.field(default_factory=list)
 
 
 # A map from execution config to driver info. This is temporary during migration
@@ -169,12 +174,13 @@ class BenchmarkSuite(object):
     @staticmethod
     def load_from_run_configs(
         run_configs: Sequence[iree_definitions.E2EModelRunConfig],
-        root_benchmark_dir: pathlib.Path,
+        root_benchmark_dir: benchmark_definition.ResourceLocation,
     ):
         """Loads the benchmarks from the run configs.
 
         Args:
           run_configs: list of benchmark run configs.
+          root_benchmark_dir: path/URL of the root benchmark directory.
         Returns:
           A benchmark suite.
         """
@@ -197,10 +203,8 @@ class BenchmarkSuite(object):
             target_arch = target_device_spec.architecture
             model = module_gen_config.imported_model.model
 
-            module_dir_path = iree_artifacts.get_module_dir_path(
-                module_generation_config=module_gen_config, root_path=root_benchmark_dir
-            )
-            module_dir_path = pathlib.Path(module_dir_path)
+            module_rel_dir = iree_artifacts.get_module_dir_path(module_gen_config)
+            module_dir = root_benchmark_dir / module_rel_dir
 
             benchmark_case = BenchmarkCase(
                 model_name=model.name,
@@ -209,7 +213,10 @@ class BenchmarkSuite(object):
                 target_arch=target_arch,
                 driver_info=driver_info,
                 benchmark_tool_name=run_config.tool.value,
-                benchmark_case_dir=module_dir_path,
+                module_dir=module_dir,
+                input_uri=model.input_url,
+                expected_output_uri=model.expected_output_url,
+                verify_params=model.verify_params,
                 run_config=run_config,
             )
             benchmark_cases.append(benchmark_case)

@@ -169,13 +169,8 @@ struct InsertDebugTargetAtOrdinalPass
       // Trace on a valid ordinal.
       if (localTraceOrdinal >= 0 && localTraceOrdinal < dispatchOps.size()) {
         auto traceTarget = dispatchOps[localTraceOrdinal];
-        std::string entryPointName =
-            traceTarget.getEntryPoint().getRootReference().getValue().str();
-        for (FlatSymbolRefAttr nestedRef :
-             traceTarget.getEntryPoint().getNestedReferences()) {
-          entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
-        }
         // Append the ordinal to the trace name.
+        std::string entryPointName = traceTarget.getEntryPointName();
         traceOpWithName(traceTarget, entryPointName + std::string("::") +
                                          std::to_string(localTraceOrdinal));
       }
@@ -226,15 +221,9 @@ struct InsertDebugTargetAtSymbolPass
       // dispatches.
       IREE::Flow::DispatchOp breakTarget;
       funcOp.walk([&](IREE::Flow::DispatchOp dispatchOp) {
-        std::string entryPointName =
-            dispatchOp.getEntryPoint().getRootReference().getValue().str();
-        for (FlatSymbolRefAttr nestedRef :
-             dispatchOp.getEntryPoint().getNestedReferences()) {
-          entryPointName = (entryPointName + "::" + nestedRef.getValue()).str();
-        }
+        std::string entryPointName = dispatchOp.getEntryPointName();
         if (traceMatcher.match(entryPointName))
           traceOpWithName(dispatchOp, entryPointName);
-
         if (!breakTarget && breakMatcher.match(entryPointName))
           breakTarget = dispatchOp;
       });

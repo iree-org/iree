@@ -13,10 +13,6 @@ if(IREE_TARGET_BACKEND_LLVM_CPU)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
 endif()
-if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
-endif()
 if(IREE_TARGET_BACKEND_VMVX)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
@@ -24,10 +20,6 @@ endif()
 if(IREE_TARGET_BACKEND_VULKAN_SPIRV)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
-endif()
-if(IREE_TARGET_BACKEND_WEBGPU)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::WebGPU)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_WEBGPU_TARGET")
 endif()
 if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::ROCM)
@@ -39,34 +31,6 @@ if(IREE_EMBEDDED_RELEASE_INFO)
   list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_REVISION=\"${IREE_RELEASE_REVISION}\"")
   list(APPEND IREE_VERSION_TARGET_COPTS "-DIREE_RELEASE_VERSION=\"${IREE_RELEASE_VERSION}\"")
 endif()
-
-# Enable input dialects based on options.
-set(IREE_INPUT_DEPS "")
-if(IREE_INPUT_STABLEHLO)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::StableHLO)
-  list(APPEND IREE_INPUT_DEPS ChloOps)
-  list(APPEND IREE_INPUT_DEPS StablehloOps)
-endif()
-if(IREE_INPUT_TOSA)
-  list(APPEND IREE_INPUT_DEPS iree::compiler::InputConversion::TOSA)
-  list(APPEND IREE_INPUT_DEPS MLIRTosaDialect)
-  list(APPEND IREE_INPUT_DEPS MLIRTosaTransforms)
-endif()
-
-iree_cc_library(
-  NAME
-    init_input_passes_and_dialects
-  HDRS
-    "init_input_dialects.h"
-    "init_input_passes.h"
-  SRCS
-    "init_input_dialects.cc"
-    "init_input_passes.cc"
-  DEPS
-    ${IREE_INPUT_DEPS}
-    iree::compiler::InputConversion::Common
-  PUBLIC
-)
 
 iree_cc_library(
   NAME
@@ -81,6 +45,7 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
+    IREEVectorExtDialect
     MLIRIR
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
@@ -103,10 +68,13 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::GlobalOptimization::Interfaces::Interfaces
+    iree::compiler::InputConversion::Common
     iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect
     iree::compiler::Modules::HAL::Inline::Transforms
     iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
     iree::compiler::Modules::HAL::Loader::Transforms
+    iree::compiler::Modules::IO::Parameters::IR::IOParametersDialect
     iree::compiler::Pipelines
     iree::compiler::Preprocessing::Passes
   PUBLIC
@@ -158,7 +126,6 @@ iree_cc_library(
     "init_passes.h"
   DEPS
     ::init_compiler_modules
-    ::init_input_passes_and_dialects
     ::init_iree_passes_and_dialects
     ::init_mlir_passes_and_dialects
     iree::compiler::Codegen::Codegen
@@ -225,4 +192,3 @@ iree_cc_library(
   COPTS
     ${IREE_VERSION_TARGET_COPTS}
 )
-

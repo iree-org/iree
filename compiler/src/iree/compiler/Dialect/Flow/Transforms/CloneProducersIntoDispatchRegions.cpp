@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
@@ -36,6 +37,15 @@ void CloneProducersIntoDispatchRegionPass::runOnOperation() {
   funcOp->walk([&](DispatchRegionOp regionOp) {
     if (failed(cloneProducersToRegion(rewriter, regionOp)))
       return signalPassFailure();
+  });
+
+  funcOp->walk([&](Operation *op) {
+    if (!isNonNullAndOutsideDispatch(op) || !isa<linalg::GenericOp>(op)) {
+      return;
+    }
+    if (failed(wrapOpInDispatchRegion(rewriter, op))) {
+      return signalPassFailure();
+    }
   });
 }
 

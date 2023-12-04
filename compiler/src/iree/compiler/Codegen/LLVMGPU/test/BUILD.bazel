@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "distribute_to_thread.mlir",
             "elementwise_pipeline.mlir",
             "cast_address_space_function.mlir",
+            "config_matvec.mlir",
             "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_extract_address_computation.mlir",
@@ -66,6 +67,7 @@ iree_lit_test_suite(
         # tensor_dialect_*_spec is a an MLIR file that specifies a
         # transformation, it needs to be included as data.
         exclude = [
+            "attention_transform_spec.mlir",
             "transform_dialect_codegen_bufferize_spec.mlir",
             "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
             "transform_dialect_codegen_vector_distribution_spec.mlir",
@@ -74,6 +76,7 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
+        "attention_transform_spec.mlir",
         "transform_dialect_codegen_bufferize_spec.mlir",
         "transform_dialect_codegen_foreach_to_gpu_spec.mlir",
         "transform_dialect_codegen_vector_distribution_spec.mlir",

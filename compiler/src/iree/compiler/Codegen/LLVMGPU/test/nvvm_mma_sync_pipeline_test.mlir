@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline, iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-mma-sync %s | FileCheck %s
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect via mma.sync path.
@@ -58,6 +58,9 @@ hal.executable @mma_fused_fp16 {
 // mma.sync.16816.f16.f16 / TensorCore(f16):
 //    CHECK-LABEL: hal.executable public @mma_fused_fp16
 //          CHECK:   hal.executable.variant public @cuda
+//    CHECK-LABEL:     hal.executable.export public @_large_aligned_dispatch_0
+//     CHECK-SAME:       subgroup_size = 32
+//     CHECK-SAME:       workgroup_size = [64 : index, 2 : index, 1 : index]
 //      CHECK-NOT:   llvm.store
 //  CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
 //          CHECK:   nvvm.cp.async.commit.group

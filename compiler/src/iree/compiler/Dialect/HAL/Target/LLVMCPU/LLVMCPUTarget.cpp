@@ -43,13 +43,17 @@
 #define DEBUG_TYPE "iree-llvm-cpu-target"
 using llvm::dbgs;
 
-// TODO(ravishankarm): This is redundant w.r.t `iree-vmvx-enable-microkernels`
-// flag. Fold these into either a single flag, or not have the flag at all.
-static llvm::cl::opt<bool> clEnableCPUMicrokernels(
-    "iree-llvmcpu-enable-microkernels",
-    llvm::cl::desc(
-        "Enables microkernel lowering for llvmcpu backend (experimental)"),
-    llvm::cl::init(false));
+static llvm::cl::opt<std::string> clEnableCPUUkernels(
+    "iree-llvmcpu-enable-ukernels",
+    llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
+                   "`default`, `none`, `all`, or a comma-separated list of "
+                   "specific unprefixed microkernels to enable, e.g. `mmt4d`."),
+    llvm::cl::init("default"));
+
+static llvm::cl::opt<bool> clLinkCPUUKernelBitcode(
+    "iree-llvmcpu-link-ukernel-bitcode",
+    llvm::cl::desc("Link ukernel bitcode libraries into generated executables"),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
     "iree-llvmcpu-native-vector-width-in-bytes",
@@ -139,24 +143,6 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   return success();
 }
 
-/// Helper method to check if the variant op has a `ukernel` attribute
-/// in its `hal.executable.target`. If so, load the ukernel library
-/// for that target and link.
-// Note: This is duplicate of a similar function in Codegen/. For
-// now duplicating this to avoid false linking issues. Eventually
-// presence of this attribute in the `hal.executable.target` should
-// drive everything.
-static bool hasMicrokernel(IREE::HAL::ExecutableVariantOp variantOp) {
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-  if (!targetAttr)
-    return false;
-  auto config = targetAttr.getConfiguration();
-  if (!config)
-    return false;
-  auto attr = config.getAs<BoolAttr>("ukernels");
-  return attr && attr.getValue();
-}
-
 class LLVMCPUTargetBackend final : public TargetBackend {
 public:
   struct AdditionalConfigurationValues {
@@ -207,8 +193,16 @@ public:
 
   std::optional<IREE::HAL::DeviceTargetAttr>
   getHostDeviceTarget(MLIRContext *context) const override {
-    return getDeviceTargetFromTarget(context, LLVMTarget::getForHost(),
-                                     defaultAddlConfig_);
+    std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
+    if (!maybeTarget) {
+      return {};
+    }
+    return getDeviceTargetFromTarget(context, *maybeTarget, defaultAddlConfig_);
+  }
+
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -406,8 +400,10 @@ public:
     if (!target.linkStatic) {
       // Grab a linker tool based on the options (and target environment).
       // This uses the defaultOptions_ in order to get paths and such, which
-      // are environmental.
-      linkerTool = LinkerTool::getForTarget(targetTriple, defaultOptions_);
+      // are environmental, but replace the target with the actual one.
+      LLVMTargetOptions options = defaultOptions_;
+      options.target = target;
+      linkerTool = LinkerTool::getForTarget(targetTriple, options);
       if (!linkerTool) {
         return mlir::emitError(variantOp.getLoc())
                << "failed to find a target linker for the given target triple '"
@@ -483,130 +479,134 @@ public:
       }
     }
 
-    // Tracks ukernel functions, in order to set their linkage to internal
-    // after ukernel bitcode modules are linked but before runLLVMIRPasses, so
-    // that unused ukernel code paths get DCE'd. Notes:
-    // 1. We can't rely on fixupVisibility to do this, because fixupVisibility
-    //    is called after runLLVMIRPasses, which is what performs DCE. The
-    //    reason why fixupVisibility can't be moved before runLLVMIRPasses is
-    //    that causes all math functions to be DCE'd, as references to them get
-    //    introduced only later down. The basic difference here between ukernel
-    //    functions and math functions is that any references to ukernel
-    //    functions already exist at this point.
-    // 2. We can't just set internal linkage right away upon loading ukernel
-    //    bitcode modules, because some ukernel symbols have to override weak
-    //    symbols, and that's disabled when linkage is set to internal.
-    std::unordered_set<std::string> ukernelFunctions;
+    if (clLinkCPUUKernelBitcode) {
+      // Tracks ukernel functions, in order to set their linkage to internal
+      // after ukernel bitcode modules are linked but before runLLVMIRPasses, so
+      // that unused ukernel code paths get DCE'd. Notes:
+      // 1. We can't rely on fixupVisibility to do this, because fixupVisibility
+      //    is called after runLLVMIRPasses, which is what performs DCE. The
+      //    reason why fixupVisibility can't be moved before runLLVMIRPasses is
+      //    that causes all math functions to be DCE'd, as references to them
+      //    get introduced only later down. The basic difference here between
+      //    ukernel functions and math functions is that any references to
+      //    ukernel functions already exist at this point.
+      // 2. We can't just set internal linkage right away upon loading ukernel
+      //    bitcode modules, because some ukernel symbols have to override weak
+      //    symbols, and that's disabled when linkage is set to internal.
+      std::unordered_set<std::string> ukernelFunctions;
 
-    // Link in ukernel bitcode.
-    if (hasMicrokernel(variantOp)) {
-      auto setAlwaysInline = [&](llvm::Module &module) {
-        for (auto &func : module.getFunctionList()) {
-          func.addFnAttr(llvm::Attribute::AlwaysInline);
-        }
-      };
-      auto addUkernelFunctions = [&](const llvm::Module &module) {
-        for (auto &func : module.getFunctionList()) {
-          if (func.isDeclaration()) {
-            continue;
+      // Link in ukernel bitcode.
+      if (hasUkernel(variantOp.getTarget())) {
+        auto setAlwaysInline = [&](llvm::Module &module) {
+          for (auto &func : module.getFunctionList()) {
+            func.addFnAttr(llvm::Attribute::AlwaysInline);
           }
-          ukernelFunctions.insert(func.getName().str());
-        }
-      };
+        };
+        auto addUkernelFunctions = [&](const llvm::Module &module) {
+          for (auto &func : module.getFunctionList()) {
+            if (func.isDeclaration()) {
+              continue;
+            }
+            ukernelFunctions.insert(func.getName().str());
+          }
+        };
 
-      llvm::Expected<std::unique_ptr<llvm::Module>> archBitcode =
-          loadUKernelArchBitcode(targetMachine.get(), context);
-      if (!archBitcode) {
-        return mlir::emitError(variantOp.getLoc())
-               << "failed to load architecture-specific ukernel bitcode: "
-               << llvm::toString(archBitcode.takeError());
-      }
-
-      llvm::Expected<std::unique_ptr<llvm::Module>> archEntryPointsBitcode =
-          loadUKernelArchEntryPointsBitcode(targetMachine.get(), context);
-      if (!archEntryPointsBitcode) {
-        return mlir::emitError(variantOp.getLoc())
-               << "failed to load architecture-specific ukernel entry points "
-                  "bitcode: "
-               << llvm::toString(archEntryPointsBitcode.takeError());
-      }
-
-      // archBitcode and archEntryPointsBitcode are optional, may be null if
-      // there is none for the target architecture. However, they should
-      // simultaneously be null or non-null.
-      if ((archBitcode.get() == nullptr) !=
-          (archEntryPointsBitcode.get() == nullptr)) {
-        return mlir::emitError(variantOp.getLoc())
-               << "there should be architecture-specific ukernel bit code if, "
-                  "and only if there is architecture-specific ukernels entry "
-                  "points bitcode.";
-      }
-
-      if (archBitcode.get()) {
-        addUkernelFunctions(*archBitcode.get());
-        addUkernelFunctions(*archEntryPointsBitcode.get());
-
-        // archEntryPointsBitcode contains overrides for weak symbols that will
-        // come in the baseBitcode below. So we link it before baseBitcode, with
-        // OverrideFromSrc.
-        StringRef archEntryPointsBitcodeName =
-            archEntryPointsBitcode.get()->getName();
-        if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker, 0,
-                                     *targetMachine, archEntryPointsBitcodeName,
-                                     std::move(archEntryPointsBitcode),
-                                     setAlwaysInline))) {
+        llvm::Expected<std::unique_ptr<llvm::Module>> archBitcode =
+            loadUKernelArchBitcode(targetMachine.get(), context);
+        if (!archBitcode) {
           return mlir::emitError(variantOp.getLoc())
-                 << "failed linking in architecture-specific ukernel entry "
-                    "points bitcode "
-                    "for target triple '"
-                 << targetTriple.str() << "'";
+                 << "failed to load architecture-specific ukernel bitcode: "
+                 << llvm::toString(archBitcode.takeError());
         }
 
-        // archEntryPointsBitcode references symbols defined in archBitcode, so
-        // we link that now. We can apply LinkOnlyNeeded, since the only purpose
-        // of archBitcode is to satisfy references made in
-        // archEntryPointsBitcode.
-        StringRef archBitcodeName = archBitcode.get()->getName();
+        llvm::Expected<std::unique_ptr<llvm::Module>> archEntryPointsBitcode =
+            loadUKernelArchEntryPointsBitcode(targetMachine.get(), context);
+        if (!archEntryPointsBitcode) {
+          return mlir::emitError(variantOp.getLoc())
+                 << "failed to load architecture-specific ukernel entry points "
+                    "bitcode: "
+                 << llvm::toString(archEntryPointsBitcode.takeError());
+        }
+
+        // archBitcode and archEntryPointsBitcode are optional, may be null if
+        // there is none for the target architecture. However, they should
+        // simultaneously be null or non-null.
+        if ((archBitcode.get() == nullptr) !=
+            (archEntryPointsBitcode.get() == nullptr)) {
+          return mlir::emitError(variantOp.getLoc())
+                 << "there should be architecture-specific ukernel bit code "
+                    "if, "
+                    "and only if there is architecture-specific ukernels entry "
+                    "points bitcode.";
+        }
+
+        if (archBitcode.get()) {
+          addUkernelFunctions(*archBitcode.get());
+          addUkernelFunctions(*archEntryPointsBitcode.get());
+
+          // archEntryPointsBitcode contains overrides for weak symbols that
+          // will come in the baseBitcode below. So we link it before
+          // baseBitcode, with OverrideFromSrc.
+          StringRef archEntryPointsBitcodeName =
+              archEntryPointsBitcode.get()->getName();
+          if (failed(linkBitcodeModule(
+                  variantOp.getLoc(), moduleLinker, 0, *targetMachine,
+                  archEntryPointsBitcodeName, std::move(archEntryPointsBitcode),
+                  setAlwaysInline))) {
+            return mlir::emitError(variantOp.getLoc())
+                   << "failed linking in architecture-specific ukernel entry "
+                      "points bitcode "
+                      "for target triple '"
+                   << targetTriple.str() << "'";
+          }
+
+          // archEntryPointsBitcode references symbols defined in archBitcode,
+          // so we link that now. We can apply LinkOnlyNeeded, since the only
+          // purpose of archBitcode is to satisfy references made in
+          // archEntryPointsBitcode.
+          StringRef archBitcodeName = archBitcode.get()->getName();
+          if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
+                                       llvm::Linker::LinkOnlyNeeded,
+                                       *targetMachine, archBitcodeName,
+                                       std::move(archBitcode), {}))) {
+            return mlir::emitError(variantOp.getLoc())
+                   << "failed linking in architecture-specific ukernel bitcode "
+                      "for target triple '"
+                   << targetTriple.str() << "'";
+          }
+        }
+
+        // The baseBitcode module contains weak symbols for fallbacks,
+        // potentially overridden by symbols defined in archEntryPointsBitcode
+        // above. So this must be linked after archEntryPointsBitcode. The
+        // baseBitcode module contains the actual ukernel entry points as seen
+        // from the MLIR module, and its purpose is to satisfy these references,
+        // so we can apply LinkOnlyNeeded here.
+        llvm::Expected<std::unique_ptr<llvm::Module>> baseBitcode =
+            loadUKernelBaseBitcode(targetMachine.get(), context);
+        if (baseBitcode) {
+          addUkernelFunctions(*baseBitcode.get());
+        }
+        // Sequence that access before we std::move(baseBitcode)!
+        StringRef baseBitcodeName =
+            baseBitcode ? baseBitcode.get()->getName() : "";
         if (failed(linkBitcodeModule(
                 variantOp.getLoc(), moduleLinker, llvm::Linker::LinkOnlyNeeded,
-                *targetMachine, archBitcodeName, std::move(archBitcode), {}))) {
+                *targetMachine, baseBitcodeName, std::move(baseBitcode),
+                setAlwaysInline))) {
           return mlir::emitError(variantOp.getLoc())
-                 << "failed linking in architecture-specific ukernel bitcode "
-                    "for target triple '"
-                 << targetTriple.str() << "'";
+                 << "failed linking in base ukernel bitcode";
         }
       }
 
-      // The baseBitcode module contains weak symbols for fallbacks, potentially
-      // overridden by symbols defined in archEntryPointsBitcode above. So this
-      // must be linked after archEntryPointsBitcode.
-      // The baseBitcode module contains the actual ukernel entry points as seen
-      // from the MLIR module, and its purpose is to satisfy these references,
-      // so we can apply LinkOnlyNeeded here.
-      llvm::Expected<std::unique_ptr<llvm::Module>> baseBitcode =
-          loadUKernelBaseBitcode(targetMachine.get(), context);
-      if (baseBitcode) {
-        addUkernelFunctions(*baseBitcode.get());
-      }
-      // Sequence that access before we std::move(baseBitcode)!
-      StringRef baseBitcodeName =
-          baseBitcode ? baseBitcode.get()->getName() : "";
-      if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
-                                   llvm::Linker::LinkOnlyNeeded, *targetMachine,
-                                   baseBitcodeName, std::move(baseBitcode),
-                                   setAlwaysInline))) {
-        return mlir::emitError(variantOp.getLoc())
-               << "failed linking in base ukernel bitcode";
-      }
-    }
-
-    // Set internal linkage on all ukernel functions. No new references to
-    // ukernels will be created past this point, so any unreferenced ukernel
-    // symbol is safe to DCE, which will happen below in runLLVMIRPasses, so we
-    // need to set internal linkage before that.
-    for (auto &func : llvmModule->getFunctionList()) {
-      if (ukernelFunctions.count(func.getName().str())) {
-        func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+      // Set internal linkage on all ukernel functions. No new references to
+      // ukernels will be created past this point, so any unreferenced ukernel
+      // symbol is safe to DCE, which will happen below in runLLVMIRPasses, so
+      // we need to set internal linkage before that.
+      for (auto &func : llvmModule->getFunctionList()) {
+        if (ukernelFunctions.count(func.getName().str())) {
+          func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+        }
       }
     }
 
@@ -663,6 +663,10 @@ public:
                                       &objectData))) {
         return variantOp.emitError()
                << "failed to compile LLVM-IR module to an object file";
+      }
+      if (!options.dumpIntermediatesPath.empty()) {
+        dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                       variantOp.getName(), ".o", objectData);
       }
       auto objectFile = Artifact::createTemporary(libraryName, "o");
       auto &os = objectFile.outputFile->os();
@@ -926,9 +930,10 @@ private:
     configAttrs.emplace_back(b.getStringAttr("native_vector_size"),
                              b.getIndexAttr(addlConfig.vectorSize));
 
+    std::string enableUkernels = clEnableCPUUkernels.getValue();
     // Check if microkernels are to be enabled.
     configAttrs.emplace_back(b.getStringAttr("ukernels"),
-                             b.getBoolAttr(clEnableCPUMicrokernels));
+                             b.getStringAttr(enableUkernels));
 
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm-cpu"),

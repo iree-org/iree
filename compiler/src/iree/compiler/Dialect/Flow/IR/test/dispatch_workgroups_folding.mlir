@@ -173,7 +173,7 @@ func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
     flow.dispatch.tensor.store %empty, %binding, offsets = [0, 0], sizes = [%wl0, %wl1], strides = [1, 1]
         : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%wl0, %wl1}
     flow.return
-  }  
+  }
   return %result : tensor<?x?xf32>
 }
 

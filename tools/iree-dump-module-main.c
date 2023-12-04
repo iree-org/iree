@@ -242,6 +242,10 @@ static void iree_tooling_print_exported_function_def(
         iree_vm_FunctionSignatureDef_calling_convention(signature_def));
   }
   fprintf(stdout, "\n");
+  if (iree_vm_FunctionSignatureDef_attrs_is_present(signature_def)) {
+    iree_tooling_print_attr_defs(
+        iree_vm_FunctionSignatureDef_attrs(signature_def), 8);
+  }
 }
 
 static void iree_tooling_print_exported_function_defs(
@@ -550,7 +554,8 @@ int main(int argc, char** argv) {
 
   // Parse command line flags.
   iree_flags_set_usage("iree-dump-module",
-                       "Dumps IREE VM module details to stdout.\n");
+                       "Dumps IREE VM module details to stdout.\n"
+                       "$ iree-dump-module [--output=...] module.vmfb\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
   if (argc < 2) {

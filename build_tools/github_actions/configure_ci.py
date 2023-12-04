@@ -96,7 +96,8 @@ SKIP_PATH_PATTERNS = [
     ".github/ISSUE_TEMPLATE/*",
     "*.cff",
     "*.clang-format",
-    "*.git-ignore",
+    "*.gitignore",
+    "*.git-blame-ignore-revs",
     "*.md",
     "*.natvis",
     "*.pylintrc",
@@ -118,6 +119,7 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 # They may also run on presubmit only under certain conditions.
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
+        "build_test_all_arm64",
         "build_test_all_windows",
         "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
@@ -155,8 +157,10 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
 # See also: https://github.com/openxla/iree/issues/12268
-LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm-project", re.IGNORECASE)
-LLVM_INTEGRATE_BRANCH_PATTERN = re.compile("bump-llvm|llvm-bump", re.IGNORECASE)
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm", re.IGNORECASE)
+LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
+    "bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
+)
 LLVM_INTEGRATE_LABEL = "llvm-integrate"
 
 
@@ -358,9 +362,9 @@ def parse_jobs_trailer(
     jobs = set(jobs)
     unknown_jobs = jobs - all_jobs
     if unknown_jobs:
-        raise ValueError(
-            f"Received unknown jobs '{','.join(unknown_jobs)}' in trailer '{key}'"
-        )
+        # Unknown jobs may be for a different workflow. Warn then continue.
+        print(f"::warning::Unknown jobs '{','.join(unknown_jobs)}' in trailer '{key}'")
+        jobs = jobs - unknown_jobs
     return jobs
 
 

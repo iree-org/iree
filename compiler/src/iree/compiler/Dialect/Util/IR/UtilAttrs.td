@@ -19,6 +19,9 @@ include "mlir/IR/OpBase.td"
 
 def Util_BytePatternAttr : AttrDef<Util_Dialect, "BytePattern", [
   TypedAttrInterface,
+  DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+    "getStorageSize",
+  ]>,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",
@@ -64,6 +67,9 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
 //===----------------------------------------------------------------------===//
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
+  DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+    "getStorageSize",
+  ]>,
   DeclareAttrInterfaceMethods<Util_SerializableAttrInterface, [
     "serializeToBuffer",
     "serializeToStream",
@@ -102,6 +108,32 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   let genVerifyDecl = 1;
 
   let hasCustomAssemblyFormat = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// #util.uninitialized
+//===----------------------------------------------------------------------===//
+
+def Util_UninitializedAttr : AttrDef<Util_Dialect, "Uninitialized", [
+  TypedAttrInterface,
+  DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+    "getStorageSize",
+  ]>,
+]> {
+  let mnemonic = "uninitialized";
+  let summary = [{an attribute specifying uninitialized storage}];
+  let description = [{
+    The contents of the storage backing this attribute _may_ be uninitialized at
+    runtime. This is a hint to implementations that if policy allows memory
+    allocated for the storage of this attribute type is allowed to have
+    undefined contents upon return.
+  }];
+
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type
+  );
+
+  let assemblyFormat = [{}];
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_ATTRS

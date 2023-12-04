@@ -84,6 +84,7 @@ iree_cc_library(
     "context_util.c"
   DEPS
     ::device_util
+    ::parameter_util
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
@@ -163,6 +164,31 @@ iree_cc_test(
     iree::tooling::testdata::npy
   LABELS
     "requires-filesystem"
+)
+
+iree_cc_library(
+  NAME
+    parameter_util
+  HDRS
+    "parameter_util.h"
+  SRCS
+    "parameter_util.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::base::internal::path
+    iree::hal
+    iree::io::formats::gguf
+    iree::io::formats::irpa
+    iree::io::formats::safetensors
+    iree::io::parameter_index
+    iree::io::parameter_index_provider
+    iree::io::parameter_provider
+    iree::io::scope_map
+    iree::modules::io::parameters
+    iree::vm
+  PUBLIC
 )
 
 iree_cc_library(

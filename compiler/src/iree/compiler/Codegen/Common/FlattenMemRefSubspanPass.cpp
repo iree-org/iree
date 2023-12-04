@@ -51,6 +51,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -178,6 +179,10 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
       return splatAttr.reshape(newType);
     } else if (auto denseAttr = llvm::dyn_cast<DenseElementsAttr>(value)) {
       return denseAttr.reshape(newType);
+    } else if (auto denseResourceAttr =
+                   llvm::dyn_cast<DenseResourceElementsAttr>(value)) {
+      return DenseResourceElementsAttr::get(newType,
+                                            denseResourceAttr.getRawHandle());
     }
     return {};
   }
@@ -699,23 +704,6 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
     });
   };
 };
-
-/// Returns the number of bytes of the given `type`. Returns std::nullopt if
-/// cannot deduce.
-///
-/// Note that this should be kept consistent with how the byte offset was
-/// calculated in the subspan ops!
-std::optional<int64_t> getNumBytes(Type type) {
-  if (type.isIntOrFloat())
-    return IREE::Util::getRoundedElementByteWidth(type);
-  if (auto vectorType = llvm::dyn_cast<VectorType>(type)) {
-    auto elementBytes = getNumBytes(vectorType.getElementType());
-    if (!elementBytes)
-      return std::nullopt;
-    return elementBytes.value() * vectorType.getNumElements();
-  }
-  return std::nullopt;
-}
 
 /// Erase alignment hints.
 struct RemoveAssumeAlignOp

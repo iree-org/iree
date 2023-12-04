@@ -31,6 +31,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUGeneralizeNamedOps :
+    Pass<"iree-codegen-gpu-generalize-named-ops", "func::FuncOp"> {
+  let summary = "Convert named Linalg ops to linalg.generic ops";
+  let constructor = "mlir::iree_compiler::createGPUGeneralizeNamedOpsPass()";
+}
+
 def GPUMultiBuffering :
     Pass<"iree-codegen-gpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";
@@ -83,9 +89,9 @@ def GPUTileReduction :
   let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
 }
 
-def VectorReduceToGPU :
-    Pass<"iree-codegen-reduction-to-gpu", "func::FuncOp"> {
-  let summary = "Convert vector reduction to gpu ops.";
+def VectorReductionToGPU :
+    Pass<"iree-codegen-vector-reduction-to-gpu", "func::FuncOp"> {
+  let summary = "Convert vector reduction to GPU ops.";
   let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
 }
 

@@ -49,71 +49,10 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
-    TransformDialectInterpreterPass
-  SRCS
-    "TransformDialectInterpreterPass.cpp"
-  DEPS
-    ::PassHeaders
-    ::PassesIncGen
-    IREEDialectsTransforms
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
-    IREELinalgTransformDialect
-    LLVMSupport
-    MLIRAffineDialect
-    MLIRAffineTransformOps
-    MLIRAffineUtils
-    MLIRAnalysis
-    MLIRArithDialect
-    MLIRArithTransforms
-    MLIRArithUtils
-    MLIRAsyncDialect
-    MLIRBufferizationDialect
-    MLIRBufferizationTransformOps
-    MLIRBufferizationTransforms
-    MLIRFuncDialect
-    MLIRGPUDialect
-    MLIRGPUTransformOps
-    MLIRIR
-    MLIRLLVMDialect
-    MLIRLinalgDialect
-    MLIRLinalgTransformOps
-    MLIRLinalgTransforms
-    MLIRMemRefTransformOps
-    MLIRPDLDialect
-    MLIRPDLInterpDialect
-    MLIRPass
-    MLIRRewrite
-    MLIRSCFDialect
-    MLIRSCFTransformOps
-    MLIRSCFTransforms
-    MLIRSCFUtils
-    MLIRSupport
-    MLIRTensorDialect
-    MLIRTensorTransformOps
-    MLIRTensorTransforms
-    MLIRTransformDialect
-    MLIRTransformDialectTransforms
-    MLIRVectorDialect
-    MLIRVectorTransformOps
-    MLIRVectorTransforms
-    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
-    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
-    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
-    iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
-    iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
-    "EncodingInfo.h"
+    "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "Passes.h"
     "TileSizeSelection.h"
@@ -135,6 +74,7 @@ iree_cc_library(
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
     "EmulateNarrowType.cpp"
+    "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
     "EraseHALDescriptorTypeFromMemRef.cpp"
     "ExtractAddressComputation.cpp"
@@ -152,6 +92,7 @@ iree_cc_library(
     "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
     "LowerUKernelsToCalls.cpp"
+    "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
@@ -176,6 +117,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms
+    IREELinalgExtUtils
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect
@@ -219,7 +161,6 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRViewLikeInterface
-    iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
@@ -230,8 +171,72 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::VMVX::IR
-    iree::compiler::Dialect::VMVX::IR::VMVXDialect
+    iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    TransformDialectInterpreterPass
+  SRCS
+    "CommonDialectRegistration.cpp"
+    "MaterializeUserConfigs.cpp"
+    "TransformDialectInterpreterPass.cpp"
+  DEPS
+    ::Common
+    ::PassHeaders
+    ::PassesIncGen
+    IREEDialectsTransforms
+    IREELinalgExtDialect
+    IREELinalgExtTransformOps
+    IREELinalgTransformDialect
+    LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineTransformOps
+    MLIRAffineUtils
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRArithTransforms
+    MLIRArithUtils
+    MLIRAsyncDialect
+    MLIRBufferizationDialect
+    MLIRBufferizationTransformOps
+    MLIRBufferizationTransforms
+    MLIRFuncDialect
+    MLIRGPUDialect
+    MLIRGPUTransformOps
+    MLIRIR
+    MLIRLLVMDialect
+    MLIRLinalgDialect
+    MLIRLinalgTransformOps
+    MLIRLinalgTransforms
+    MLIRMemRefTransformOps
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRPass
+    MLIRRewrite
+    MLIRSCFDialect
+    MLIRSCFTransformOps
+    MLIRSCFTransforms
+    MLIRSCFUtils
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTensorTransformOps
+    MLIRTensorTransforms
+    MLIRTransformDialect
+    MLIRTransformDialectTransforms
+    MLIRTransformLoopExtension
+    MLIRTransforms
+    MLIRVectorDialect
+    MLIRVectorTransformOps
+    MLIRVectorTransforms
+    iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
+    iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
+    iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Utils
   PUBLIC
 )

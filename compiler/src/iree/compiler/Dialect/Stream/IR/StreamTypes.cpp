@@ -68,6 +68,53 @@ static llvm::cl::opt<bool> clResourceAliasMutableBindings(
     llvm::cl::desc(
         "Fuses bindings that are mutable instead of leaving them split."),
     llvm::cl::init(false));
+// TODO(#15522): Change this to discrete once task system scalability limits
+// are corrected.
+static llvm::cl::opt<IREE::Stream::MemoryModel> clResourceMemoryModel(
+    "iree-stream-resource-memory-model",
+    llvm::cl::desc("Memory model used for host-device resource memory access."),
+    llvm::cl::values(
+        clEnumValN(IREE::Stream::MemoryModel::Unified, "unified",
+                   "Host and device memory are unified and there's "
+                   "(practically) no performance cost for cross-access."),
+        clEnumValN(IREE::Stream::MemoryModel::Discrete, "discrete",
+                   "Host and device memory are discrete and cross-access is "
+                   "expensive.")),
+    llvm::cl::init(IREE::Stream::MemoryModel::Unified));
+
+//===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseParameterReference(AsmParser &parser, StringAttr &scopeAttr,
+                                    StringAttr &keyAttr) {
+  auto builder = parser.getBuilder();
+  StringAttr firstAttr;
+  if (failed(parser.parseCustomAttributeWithFallback(firstAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  if (failed(parser.parseOptionalColon())) {
+    keyAttr = firstAttr;
+    return success();
+  }
+  scopeAttr = firstAttr;
+  if (failed(parser.parseColon()) ||
+      failed(parser.parseCustomAttributeWithFallback(keyAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  return success();
+}
+
+void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
+                             StringAttr keyAttr) {
+  if (scopeAttr) {
+    p << "\"" << scopeAttr.getValue() << "\"";
+    p << "::";
+  }
+  p << "\"" << keyAttr.getValue() << "\"";
+}
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
@@ -84,34 +131,55 @@ Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
   int64_t minBufferRangeAlignment = 0;
   int64_t indexBits = 32;
   bool aliasMutableBindings = false;
+  auto memoryModel = IREE::Stream::MemoryModel::Discrete;
   while (failed(p.parseOptionalRBrace())) {
     StringRef key;
-    int64_t value = 0;
-    if (failed(p.parseKeyword(&key)) || failed(p.parseEqual()) ||
-        failed(p.parseInteger(value))) {
+    if (failed(p.parseKeyword(&key)) || failed(p.parseEqual())) {
       return {};
     }
     if (key == "max_allocation_size") {
-      maxAllocationSize = value;
+      if (failed(p.parseInteger(maxAllocationSize)))
+        return {};
     } else if (key == "min_buffer_offset_alignment") {
-      minBufferOffsetAlignment = value;
+      if (failed(p.parseInteger(minBufferOffsetAlignment)))
+        return {};
     } else if (key == "max_buffer_range") {
-      maxBufferRange = value;
+      if (failed(p.parseInteger(maxBufferRange)))
+        return {};
     } else if (key == "min_buffer_range_alignment") {
-      minBufferRangeAlignment = value;
+      if (failed(p.parseInteger(minBufferRangeAlignment)))
+        return {};
     } else if (key == "index_bits") {
-      indexBits = value;
+      if (failed(p.parseInteger(indexBits)))
+        return {};
     } else if (key == "alias_mutable_bindings") {
-      aliasMutableBindings = (bool)value;
+      StringRef value;
+      if (failed(p.parseKeyword(&value)))
+        return {};
+      if (value == "true")
+        aliasMutableBindings = true;
+      else if (value == "false")
+        aliasMutableBindings = false;
+      else
+        return {};
+    } else if (key == "memory_model") {
+      StringRef value;
+      if (failed(p.parseKeyword(&value)))
+        return {};
+      auto enumValue = symbolizeMemoryModel(value);
+      if (!enumValue.has_value())
+        return {};
+      memoryModel = enumValue.value();
     }
     (void)p.parseOptionalComma();
   }
   if (failed(p.parseGreater()))
     return {};
 
-  return ResourceConfigAttr::get(
-      p.getContext(), maxAllocationSize, minBufferOffsetAlignment,
-      maxBufferRange, minBufferRangeAlignment, indexBits, aliasMutableBindings);
+  return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
+                                 minBufferOffsetAlignment, maxBufferRange,
+                                 minBufferRangeAlignment, indexBits,
+                                 aliasMutableBindings, memoryModel);
 }
 
 void ResourceConfigAttr::print(AsmPrinter &p) const {
@@ -123,7 +191,8 @@ void ResourceConfigAttr::print(AsmPrinter &p) const {
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment() << ", ";
   os << "index_bits = " << getIndexBits() << ", ";
-  os << "alias_mutable_bindings = " << getAliasMutableBindings();
+  os << "alias_mutable_bindings = " << getAliasMutableBindings() << ", ";
+  os << "memory_model = " << stringifyMemoryModel(getMemoryModel());
   os << "}>";
 }
 
@@ -145,7 +214,11 @@ ResourceConfigAttr::intersectBufferConstraints(ResourceConfigAttr lhs,
       std::max(lhs.getMinBufferRangeAlignment(),
                rhs.getMinBufferRangeAlignment()),
       std::max(lhs.getIndexBits(), rhs.getIndexBits()),
-      rhs.getAliasMutableBindings() && lhs.getAliasMutableBindings());
+      rhs.getAliasMutableBindings() && lhs.getAliasMutableBindings(),
+      (lhs.getMemoryModel() == IREE::Stream::MemoryModel::Unified &&
+       rhs.getMemoryModel() == IREE::Stream::MemoryModel::Unified)
+          ? IREE::Stream::MemoryModel::Unified
+          : IREE::Stream::MemoryModel::Discrete);
 }
 
 // static
@@ -157,7 +230,7 @@ ResourceConfigAttr::getDefaultHostConstraints(MLIRContext *context) {
   return ResourceConfigAttr::get(
       context, clResourceMaxAllocationSize, clResourceMinOffsetAlignment,
       clResourceMaxRange, clResourceMinOffsetAlignment, clResourceIndexBits,
-      clResourceAliasMutableBindings);
+      clResourceAliasMutableBindings, clResourceMemoryModel);
 }
 
 // static
@@ -182,6 +255,23 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   }
   // No config found; use conservative host config.
   return getDefaultHostConstraints(context);
+}
+
+//===----------------------------------------------------------------------===//
+// #stream.parameter.named<...>
+//===----------------------------------------------------------------------===//
+
+int64_t NamedParameterAttr::getStorageSize() const {
+  if (auto configAttr = getConfig()) {
+    if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
+      return lengthAttr.getInt();
+    }
+  }
+  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
 }
 
 //===----------------------------------------------------------------------===//

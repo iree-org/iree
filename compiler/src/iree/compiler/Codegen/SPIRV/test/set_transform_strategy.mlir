@@ -1,5 +1,5 @@
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration})))"\
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-spirv-select-lowering-strategy-pass)))"\
 // RUN:   --iree-spirv-enable-transform-dialect-jit=true | FileCheck %s
 
 hal.executable @matmul {
@@ -45,7 +45,7 @@ hal.executable.variant public @vulkan target(<"vulkan-spirv", "vulkan-spirv-fb",
 
 // CHECK-LABEL: func @matmul
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 
 /// The specific vector sizes are tested in the LLVMGPU tests and thus omitted
 /// here. This is just to check that masked vectorization is used.

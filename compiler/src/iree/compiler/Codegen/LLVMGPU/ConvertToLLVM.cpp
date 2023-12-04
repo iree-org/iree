@@ -76,8 +76,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
         loc, IntegerType::get(builder.getContext(), 64),
         builder.getI64IntegerAttr(offset));
     Value shiftedPtr = builder.create<LLVM::GEPOp>(
-        loc, globalPtr.getType(),
-        LLVM::LLVMPointerType::get(globalOp.getContext()), globalPtr,
+        loc, globalPtr.getType(), global.getGlobalType(), globalPtr,
         ValueRange({zero, offsetValue}));
     addressOfOp.replaceAllUsesWith(shiftedPtr);
     addressOfOp.erase();
@@ -85,7 +84,7 @@ void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
   // Add the amount of shared memory required as an attribute.
   auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (variantOp != nullptr) {
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+    for (auto exportOp : variantOp.getExportOps()) {
       exportOp->setAttr(exportOp.getWorkgroupLocalMemoryAttrName(),
                         builder.getIndexAttr(numberOfBytes));
     }

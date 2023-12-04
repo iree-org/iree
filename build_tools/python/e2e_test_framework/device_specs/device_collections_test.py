@@ -30,16 +30,14 @@ class DeviceCollectionTest(unittest.TestCase):
             device_name="c",
             architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
             host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-            device_parameters=["little-cores"],
-            tags=[],
+            tags=["little-cores"],
         )
         big_cores_device_spec = common_definitions.DeviceSpec.build(
             id="android_big",
             device_name="d",
             architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
             host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-            device_parameters=["big-cores"],
-            tags=[],
+            tags=["big-cores"],
         )
         devices = device_collections.DeviceCollection(
             device_specs=[
@@ -61,12 +59,12 @@ class DeviceCollectionTest(unittest.TestCase):
         little_cores_devices = devices.query_device_specs(
             architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
             host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-            device_parameters={"little-cores"},
+            tags=["little-cores"],
         )
         big_cores_devices = devices.query_device_specs(
             architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
             host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-            device_parameters={"big-cores"},
+            tags=["big-cores"],
         )
         all_arm_devices = devices.query_device_specs(
             architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,

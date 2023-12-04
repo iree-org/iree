@@ -23,7 +23,10 @@ class Android_ARMv8_A_Benchmarks(object):
         tf_models.GPT2_117M_1x4_FP32_TF,
         tf_models.GPT2_117M_1x1_FP32_TF,
     ]
-    QUANT_MODELS = [tflite_models.MOBILEBERT_INT8]
+    QUANT_MODELS = [
+        tflite_models.MOBILEBERT_INT8,
+        tflite_models.VIT_INT8_TFL,
+    ]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
         target_architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
@@ -42,7 +45,7 @@ class Android_ARMv8_A_Benchmarks(object):
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-llvmcpu-enable-microkernels",
+            "--iree-llvmcpu-enable-ukernels=all",
         ],
     )
     DATA_TILING_AND_DOTPROD_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -51,7 +54,7 @@ class Android_ARMv8_A_Benchmarks(object):
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-llvmcpu-enable-microkernels",
+            "--iree-llvmcpu-enable-ukernels=all",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )
@@ -66,7 +69,7 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs.get_elf_system_scheduling_local_task_config(
                 thread_num
             )
-            for thread_num in [1, 4]
+            for thread_num in [1, 2]
         ]
 
         default_gen_confings = [
@@ -94,7 +97,7 @@ class Android_ARMv8_A_Benchmarks(object):
             device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
                 architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
                 host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                device_parameters={"big-cores"},
+                tags=["big-cores"],
             )
         )
         run_configs = utils.generate_e2e_model_run_configs(

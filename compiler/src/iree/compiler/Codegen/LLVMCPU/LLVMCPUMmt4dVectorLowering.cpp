@@ -6,9 +6,6 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -102,77 +99,6 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
-  }
-
-  // Apply vector unroll
-  {
-    RewritePatternSet vectorUnrollPatterns(context);
-    // There are issues when unrolling 1Dx1D->0D vector.contract op. Only unroll
-    // the op when there are more than one loop.
-    constexpr int64_t kVectorSize = 4;
-    SmallVector<int64_t> vectorTiles(numLoops.value(), kVectorSize);
-    if (numLoops.value() > 1) {
-      vector::populateVectorUnrollPatterns(
-          vectorUnrollPatterns,
-          vector::UnrollVectorOptions().setNativeShape(vectorTiles));
-    }
-
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(vectorUnrollPatterns)))) {
-      return signalPassFailure();
-    }
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After vector unrolling ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // Apply vector specific operation lowering.
-  // TODO(hanchung): Have better control for choosing vector unrolling sizes.
-  // The lowering config is destroyed when lowering the op to vector ops. This
-  // can be fixed when moving to use transform dialect for scheduling. Because
-  // we still have the config when scheduling transforms.
-  {
-    vector::VectorTransformsOptions vectorTransformsOptions =
-        vector::VectorTransformsOptions().setVectorTransformsOptions(
-            vector::VectorContractLowering::OuterProduct);
-    RewritePatternSet vectorContractLoweringPatterns(&getContext());
-    vector::populateVectorContractLoweringPatterns(
-        vectorContractLoweringPatterns, vectorTransformsOptions, /*benefit=*/1,
-        /*disableOuterProductLowering=*/true);
-    vector::populateVectorTransferPermutationMapLoweringPatterns(
-        vectorContractLoweringPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(vectorContractLoweringPatterns)))) {
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // Flatten transfer ops.
-  {
-    RewritePatternSet patterns(&getContext());
-    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
-    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
-
-  // 'vector.shape_cast' are very expensive operations that are even generated
-  // by some of the lowerings above (e.g., flatten transfer ops). There are
-  // chances to cancel them out if they are not lowered too early so we lower
-  // them at the very end of the pass.
-  {
-    RewritePatternSet patterns(&getContext());
-    vector::populateVectorShapeCastLoweringPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
 }
 

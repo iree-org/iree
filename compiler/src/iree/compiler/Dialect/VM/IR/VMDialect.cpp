@@ -111,8 +111,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     op->erase();
   }
 
-  void handleTerminator(Operation *op,
-                        ArrayRef<Value> valuesToReplace) const final {
+  void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
     // TODO(benvanik): handle other terminators (break/etc).
     auto returnOp = dyn_cast<VM::ReturnOp>(op);
     if (!returnOp) {

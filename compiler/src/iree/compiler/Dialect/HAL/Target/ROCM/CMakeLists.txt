@@ -24,18 +24,26 @@ iree_cc_library(
     "ROCMTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
+    LLVMAnalysis
     LLVMCore
     LLVMIRReader
     LLVMLinker
     LLVMMC
+    LLVMPasses
     LLVMSupport
     LLVMTarget
+    LLVMTransformUtils
     LLVMipo
+    MLIRAMDGPUDialect
+    MLIRAMDGPUToROCDL
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
     MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPass
     MLIRROCDLDialect
+    MLIRROCDLTarget
     MLIRROCDLToLLVMIRTranslation
     MLIRSupport
     MLIRTargetLLVMIRExport
@@ -49,35 +57,75 @@ iree_cc_library(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-# Query for list of device libs to build.
-get_property(AMD_DEVICE_LIBS GLOBAL PROPERTY AMD_DEVICE_LIBS)
-set(AMD_REQUIRED_LIBS "ocml" "ockl" "opencl")
+# We either use device bitcode files from a configurable path
+# or we download them from a fixed location and copy them from
+# there. We default to downloading as it is a better use experience
+# by default.
+# See: https://github.com/shark-infra/amdgpu-device-libs
+set(_amd_required_libs "ocml.bc" "ockl.bc" "opencl.bc")
+set(_amd_device_bc_url 
+    "https://github.com/shark-infra/amdgpu-device-libs/releases/download/v20231101/amdgpu-device-libs-llvm-6086c272a3a59eb0b6b79dcbe00486bf4461856a.tgz")
+set(_amd_device_bc_sha256 "336362416c68fdd8bb80328f65ca7ebaa0c119ea19c95df6df30c832a4df39b9")
+set(_amd_device_bc_stamp "${_amd_device_bc_url} : ${_amd_device_bc_sha256}")
+set(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH "" CACHE PATH 
+    "Optional path to load device bitcode from (default to dynamic fetch)")
+set(_platform_lib_srcdir)
 
+if(IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH)
+  # Don't fetch: Get from local directory.
+  set(_platform_lib_srcdir "${IREE_TARGET_BACKEND_ROCM_DEVICE_BC_PATH}")
+else()
+  # Fetch from remote archive.
+  set(_platform_lib_archive "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.tgz")
+  set(_platform_lib_srcdir "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs")
+  set(_fetch_stamp_file "${CMAKE_CURRENT_BINARY_DIR}/_fetch_device_libs.stamp")
+  set(_needs_fetch ON)
+  if(EXISTS "${_fetch_stamp_file}" AND IS_DIRECTORY "${_platform_lib_srcdir}")
+    file(READ "${_fetch_stamp_file}" _stamp_contents)
+    if ("${_stamp_contents}" STREQUAL "${_amd_device_bc_stamp}")
+      set(_needs_fetch OFF)
+    endif()
+  endif()
+
+  # Download, extract, stamp.
+  if(_needs_fetch)
+    message(STATUS "Downloading AMD Device bitcode from ${_amd_device_bc_url} to ${_platform_lib_srcdir}")
+    file(DOWNLOAD "${_amd_device_bc_url}" "${_platform_lib_archive}"
+      EXPECTED_HASH SHA256=${_amd_device_bc_sha256})
+    file(MAKE_DIRECTORY "${_platform_lib_srcdir}")
+    execute_process(
+      COMMAND
+        ${CMAKE_COMMAND} -E tar xzf ${_platform_lib_archive}
+      WORKING_DIRECTORY "${_platform_lib_srcdir}"
+      COMMAND_ERROR_IS_FATAL ANY
+    )
+    file(WRITE "${_fetch_stamp_file}" "${_amd_device_bc_stamp}")
+  else()
+    message(STATUS "Already fetched AMD Device bitcode into ${_platform_lib_srcdir}")
+  endif()
+endif()
+
+# Set up copy rules.
 set(_platform_lib_reldir "iree_platform_libs/rocm")
-file(MAKE_DIRECTORY "${IREE_COMPILER_DYLIB_DIR}/${_platform_lib_reldir}")
-
-# Transform device lib targets to the generated bc file of each.
-set(_all_device_bc_deps)
+set(_platform_lib_absdir "${IREE_COMPILER_DYLIB_DIR}/${_platform_lib_reldir}")
+file(MAKE_DIRECTORY "${_platform_lib_absdir}")
 set(_all_device_bc_copy_commands)
 set(_all_device_bc_files)
-foreach (_device_lib_target ${AMD_REQUIRED_LIBS})
-  get_target_property(_device_basename ${_device_lib_target} ARCHIVE_OUTPUT_NAME)
-  get_target_property(_device_output_path ${_device_lib_target} OUTPUT_NAME)
-  set(_device_bc_relpath "${_platform_lib_reldir}/${_device_basename}.bc")
+foreach(_amd_lib_name ${_amd_required_libs})
+  # Copy to lib/ tree.
+  set(_device_bc_srcpath "${_platform_lib_srcdir}/${_amd_lib_name}")
+  set(_device_bc_relpath "${_platform_lib_reldir}/${_amd_lib_name}")
+  list(APPEND _all_device_bc_files "${IREE_COMPILER_DYLIB_DIR}/${_device_bc_relpath}")
+  list(APPEND _all_device_bc_deps "${_device_bc_path}")  
+  list(APPEND _all_device_bc_copy_commands
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${_device_bc_srcpath}"
+      "${IREE_COMPILER_DYLIB_DIR}/${_device_bc_relpath}"
+  )
 
   # Note this bc file as being part of the bundle that must be included with
   # the compiler dylib.
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_RELPATHS "${_device_bc_relpath}")
-
-  list(APPEND _all_device_bc_deps "${_device_bc_path}")
-  list(APPEND _all_device_bc_files "${IREE_COMPILER_DYLIB_DIR}/${_device_bc_relpath}")
-
-  # Copy to lib/ tree.
-  list(APPEND _all_device_bc_copy_commands
-    COMMAND ${CMAKE_COMMAND} -E copy 
-      "${_device_output_path}" 
-      "${IREE_COMPILER_DYLIB_DIR}/${_device_bc_relpath}"
-  )
 endforeach()
 
 # Generate a custom target with all file level dependencies and commands to
@@ -91,9 +139,6 @@ add_custom_command(
 )
 add_custom_target(iree_compiler_Dialect_HAL_Target_ROCM_GenDeviceLibs
   DEPENDS
-    # Must depend on both the targets and the bc files in order for the
-    # transitive dep to work.
-    ${AMD_DEVICE_LIBS}
     ${_all_device_bc_files}
 )
 

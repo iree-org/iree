@@ -36,21 +36,21 @@ To use IREE's Python bindings, you will first need to install
     ([about](https://docs.python.org/3/library/venv.html),
     [tutorial](https://docs.python.org/3/tutorial/venv.html)):
 
-    === "Linux"
+    === ":fontawesome-brands-linux: Linux"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "macOS"
+    === ":fontawesome-brands-apple: macOS"
 
         ``` shell
         python -m venv .venv
         source .venv/bin/activate
         ```
 
-    === "Windows"
+    === ":fontawesome-brands-windows: Windows"
 
         ``` powershell
         python -m venv .venv
@@ -81,7 +81,7 @@ To use IREE's Python bindings, you will first need to install
 
     ``` shell
     python -m pip install \
-      --find-links https://openxla.github.io/iree/pip-release-links.html \
+      --find-links https://iree.dev/pip-release-links.html \
       --upgrade \
       iree-compiler \
       iree-runtime
@@ -149,9 +149,42 @@ results = f(arg0, arg1).to_host()
 print("Results:", results)
 ```
 
-### Samples
+### :octicons-code-16: Samples
 
 Check out the samples in IREE's
 [samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
 and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
 examples using the Python APIs.
+
+### :material-console: Console scripts
+
+The Python packages include console scripts for most of IREE's native tools
+like `iree-compile` and `iree-run-module`.  After installing a package from
+pip, these should be added to your path automatically:
+
+```console
+$ python -m pip install iree-runtime
+$ which iree-run-module
+
+/projects/.venv/Scripts/iree-run-module
+```
+
+## :material-chart-line: Profiling
+
+The tools in the `iree-runtime` package support variants:
+
+| Variant name | Description |
+| ------------ | ----------- |
+default | Standard runtime tools
+tracy | Runtime tools instrumented using the [Tracy](https://github.com/wolfpld/tracy) profiler
+
+Switch between variants of the installed tools using the `IREE_PY_RUNTIME`
+environment variable:
+
+```bash
+IREE_PY_RUNTIME=tracy iree-run-module ...
+```
+
+See the developer documentation page on
+[Profiling with Tracy](../../developers/performance/profiling-with-tracy.md)
+for information on using Tracy.

@@ -32,6 +32,7 @@ iree_cc_library(
   SRCS
     "IREECodegenAttrs.cpp"
     "IREECodegenDialect.cpp"
+    "IREECodegenLibraryManager.cpp"
     "IREECodegenOps.cpp"
     "UKernelOps.cpp"
   DEPS
@@ -48,7 +49,8 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRParser
     MLIRSupport
-    iree::builtins::ukernel::exported_bits
+    MLIRTransformDialect
+    MLIRTransformDialectTransforms
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR

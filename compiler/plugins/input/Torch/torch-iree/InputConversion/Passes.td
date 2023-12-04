@@ -9,6 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def BitCastQuantTensorPass :
+    Pass<"torch-iree-bitcast-quant-tensor", "func::FuncOp"> {
+  let summary = "Bitcasts i8 packed tensors of sub-byte types to the actual bit width";
+  let constructor = "mlir::iree_compiler::TorchInput::createBitCastQuantTensorPass()";
+}
+
 def ConvertTMTensorToLinalgExt :
     Pass<"torch-iree-tm-tensor-to-linalg-ext", "func::FuncOp"> {
   let summary = "Convert from TMTensor ops to LinalgExt ops on tensors";

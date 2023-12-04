@@ -27,21 +27,25 @@ func.func @wmma(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x16xf
   return
 }
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
-  %func = transform.structured.match ops{["func.func"]} in %module
-    : (!transform.any_op) -> !transform.any_op
-  transform.apply_patterns to %func {
-    transform.apply_patterns.iree.unroll_vectors_gpu_wmma_sync
-  } : !transform.any_op
-  transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!transform.any_op) -> ()
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(
+      %module: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %module
+      : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.unroll_vectors_gpu_wmma_sync
+    } : !transform.any_op
+    transform.iree.vector.vector_to_mma_conversion %func { use_wmma } : (!transform.any_op) -> ()
 
-  // Apply canonicalization post-hoc to trigger DCE and pass the test 
-  // (i.e. all vector.contract are dead).
-  // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  transform.apply_patterns to %func {
-    transform.apply_patterns.canonicalization
-  } : !transform.any_op
+    // Apply canonicalization post-hoc to trigger DCE and pass the test
+    // (i.e. all vector.contract are dead).
+    // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
+    transform.apply_patterns to %func {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+
+    transform.yield
+  }
 }
 
 // -----
@@ -71,20 +75,23 @@ func.func @mma_sync(%a: memref<16x16xf32>, %b: memref<16x16xf32>, %c: memref<16x
   return
 }
 
-transform.sequence failures(propagate) {
-^bb1(%module: !transform.any_op):
-  %func = transform.structured.match ops{["func.func"]} in %module
-    : (!transform.any_op) -> !transform.any_op
-  transform.apply_patterns to %func {
-    transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
-  } : !transform.any_op
-  transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!transform.any_op) -> ()
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(
+      %module: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %module
+      : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.unroll_vectors_gpu_mma_sync
+    } : !transform.any_op
+    transform.iree.vector.vector_to_mma_conversion %func { use_mma_sync } : (!transform.any_op) -> ()
 
-  // Apply canonicalization post-hoc to trigger DCE and pass the test 
-  // (i.e. all vector.contract are dead).
-  // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
-  transform.apply_patterns to %func {
-    transform.apply_patterns.canonicalization
-  } : !transform.any_op
+    // Apply canonicalization post-hoc to trigger DCE and pass the test
+    // (i.e. all vector.contract are dead).
+    // TODO: consider having the vector_to_mma_conversion do the DCE automatically.
+    transform.apply_patterns to %func {
+      transform.apply_patterns.canonicalization
+    } : !transform.any_op
+
+    transform.yield
+  }
 }
-

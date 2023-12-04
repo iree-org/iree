@@ -304,6 +304,83 @@ struct ScfIfOpConversion : public OpConversionPattern<mlir::scf::IfOp> {
   }
 };
 
+struct ScfForOpConversion : public OpConversionPattern<mlir::scf::ForOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(mlir::scf::ForOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getInitArgs(), rewriter);
+
+    // Expand any resource results to resource + size.
+    SmallVector<Type> expandedTypes;
+    struct Result {
+      size_t originalIndex;
+      size_t newIndex;
+      Type newType;
+    };
+    SmallVector<Result> resultMap;
+    for (auto originalType : llvm::enumerate(op.getResultTypes())) {
+      SmallVector<Type> newTypes;
+      if (failed(getTypeConverter()->convertType(originalType.value(),
+                                                 newTypes))) {
+        return rewriter.notifyMatchFailure(op,
+                                           "unable to convert result types");
+      }
+      resultMap.push_back(
+          Result{originalType.index(), expandedTypes.size(), newTypes.front()});
+      expandedTypes.append(newTypes);
+    }
+
+    auto &block = op.getRegion().front();
+    TypeConverter::SignatureConversion newSignature(block.getNumArguments());
+    for (auto arg : llvm::enumerate(block.getArgumentTypes())) {
+      if (failed(typeConverter.convertSignatureArg(arg.index(), arg.value(),
+                                                   newSignature))) {
+        return failure();
+      }
+    }
+
+    // Create a new loop that takes the expanded input operands and returns the
+    // expanded output results. We can't directly replace the original loop as
+    // the result counts differ.
+    auto forOp = rewriter.create<mlir::scf::ForOp>(
+        op.getLoc(), adaptor.getLowerBound(), adaptor.getUpperBound(),
+        adaptor.getStep(), expandedOperands);
+
+    // Inline the block and update the block arguments.
+    forOp.getRegion().getBlocks().clear();
+    rewriter.inlineRegionBefore(op.getRegion(), forOp.getRegion(),
+                                forOp.getRegion().end());
+    if (failed(rewriter.convertRegionTypes(&forOp.getRegion(), typeConverter,
+                                           &newSignature))) {
+      return failure();
+    }
+
+    // Tie all resource results together so we end up with 1:1 results with the
+    // original op.
+    SmallVector<Value> results;
+    for (auto result : resultMap) {
+      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+        auto oldType = op.getResult(result.originalIndex).getType();
+        auto resource = forOp.getResult(result.newIndex + 0);
+        auto resourceSize = forOp.getResult(result.newIndex + 1);
+        results.push_back(rewriter
+                              .create<mlir::UnrealizedConversionCastOp>(
+                                  op.getLoc(), TypeRange{oldType},
+                                  ValueRange{resource, resourceSize})
+                              .getResult(0));
+      } else {
+        results.push_back(forOp.getResult(result.newIndex));
+      }
+    }
+    rewriter.replaceOp(op, results);
+    return success();
+  }
+};
+
 struct ScfWhileOpConversion : public OpConversionPattern<mlir::scf::WhileOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
@@ -472,6 +549,12 @@ void populateStandardStructuralToStreamPatterns(
           return typeConverter.isLegal(type);
         });
       });
+  conversionTarget.addDynamicallyLegalOp<mlir::scf::ForOp>(
+      [&](mlir::scf::ForOp op) {
+        return llvm::all_of(op.getResultTypes(), [&](Type type) {
+          return typeConverter.isLegal(type);
+        });
+      });
   conversionTarget.addDynamicallyLegalOp<mlir::scf::WhileOp>(
       [&](mlir::scf::WhileOp op) {
         return llvm::all_of(op.getResultTypes(), [&](Type type) {
@@ -495,8 +578,8 @@ void populateStandardStructuralToStreamPatterns(
       .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
               BranchOpConversion, CondBranchOpConversion, SwitchOpConversion,
               SelectOpConversion, ScfConditionOpConversion, ScfIfOpConversion,
-              ScfWhileOpConversion, ScfYieldOpConversion>(typeConverter,
-                                                          context);
+              ScfForOpConversion, ScfWhileOpConversion, ScfYieldOpConversion>(
+          typeConverter, context);
 }
 
 } // namespace iree_compiler

@@ -42,6 +42,8 @@ iree_cc_library(
     "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
+    "stream_command_buffer.c"
+    "stream_command_buffer.h"
     "timepoint_pool.c"
     "timepoint_pool.h"
     "tracing.c"
@@ -56,6 +58,7 @@ iree_cc_library(
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::collective_batch
+    iree::hal::utils::deferred_command_buffer
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set

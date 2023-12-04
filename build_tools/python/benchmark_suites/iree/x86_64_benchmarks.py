@@ -34,7 +34,7 @@ class Linux_x86_64_Benchmarks(object):
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
-            "--iree-llvmcpu-enable-microkernels",
+            "--iree-llvmcpu-enable-ukernels=all",
         ],
     )
 

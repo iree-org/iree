@@ -42,7 +42,7 @@ table FunctionSignatureDef {
   // Function-level attributes, if any.
   // These are typically used to communicate additional ABI metadata needed
   // for dynamic invocation and host language mapping.
-  // See: docs/developers/design_docs/function_abi.md
+  // See: https://iree.dev/developers/design-docs/function-abi/
   attrs:[AttrDef];
 }
 

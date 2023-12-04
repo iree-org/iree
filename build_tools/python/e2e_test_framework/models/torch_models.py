@@ -116,3 +116,13 @@ BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
     ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
 )
+
+FALCON7B_1X100XI64_GPTQ_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_FALCON7B_1X100XI64_GPTQ_TORCH,
+    name="Falcon7bGptqPT",
+    tags=["gptq", "transformer"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon7b_gptq_linalg_zeroed_weights_1698708010.mlirbc",
+    entry_function="forward",
+    input_types=["1x100xi64"],
+)

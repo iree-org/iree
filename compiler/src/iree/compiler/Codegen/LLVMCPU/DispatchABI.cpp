@@ -348,7 +348,6 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
   if (structType.isInitialized())
     return structType;
 
-  auto uint32Type = IntegerType::get(context, 32);
   auto opaquePtrType = LLVM::LLVMPointerType::get(context);
   SmallVector<Type> fieldTypes;
 
@@ -358,11 +357,9 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
   // iree_hal_executable_import_thunk_v0_t import_thunk;
   // const iree_hal_executable_import_v0_t* import_funcs;
   // const void** import_contexts;
-  auto importThunkType = LLVM::LLVMFunctionType::get(
-      uint32Type, {opaquePtrType, opaquePtrType, opaquePtrType, opaquePtrType});
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(opaquePtrType));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(opaquePtrType));
+  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
+  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
+  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
 
   // iree_hal_processor_v0_t processor;
   fieldTypes.push_back(processorType);
@@ -960,12 +957,12 @@ Value HALDispatchABI::loadProcessorData(Operation *forOp, OpBuilder &builder) {
                  di.getPtrOf(di.getConstOf(di.getEnvironmentV0T())), builder);
   Value processorPtrValue = builder.create<LLVM::GEPOp>(
       loc, LLVM::LLVMPointerType::get(context),
-      LLVM::LLVMPointerType::get(environmentType), environmentPtrValue,
+      LLVM::LLVMPointerType::get(context), environmentPtrValue,
       LLVM::GEPArg(int32_t(EnvironmentField::processor)),
       /*inbounds=*/true);
   Value processorDataPtrValue = builder.create<LLVM::GEPOp>(
       loc, LLVM::LLVMPointerType::get(context),
-      LLVM::LLVMPointerType::get(processorType), processorPtrValue,
+      LLVM::LLVMPointerType::get(context), processorPtrValue,
       LLVM::GEPArg(int32_t(ProcessorField::data)),
       /*inbounds=*/true);
   Value updatedProcessorData =
@@ -1011,7 +1008,8 @@ Value HALDispatchABI::loadExecutableConstant(Operation *forOp, StringRef key,
 
   // Load the placeholder global ordinal.
   Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  Value ordinalValue = builder.create<LLVM::LoadOp>(loc, globalPtr);
+  Value ordinalValue =
+      builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
 
   // Load constant from the executable constants struct.
   auto constantsPtrValue =
@@ -1051,7 +1049,7 @@ Value HALDispatchABI::loadImportOrdinal(Operation *forOp, StringRef importName,
 
   // Load the placeholder global ordinal.
   Value globalPtr = builder.create<LLVM::AddressOfOp>(loc, globalOp);
-  return builder.create<LLVM::LoadOp>(loc, globalPtr);
+  return builder.create<LLVM::LoadOp>(loc, globalOp.getType(), globalPtr);
 }
 
 std::pair<Value, Value> HALDispatchABI::loadImportFunc(Operation *forOp,

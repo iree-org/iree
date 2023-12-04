@@ -39,7 +39,10 @@ public:
   }
 
   void runOnOperation() override {
-    auto ops = getOperation().getOps<IREE::HAL::CommandBufferDispatchOp>();
+    // Collect all (nested) command buffer dispatch ops.
+    std::vector<IREE::HAL::CommandBufferDispatchOp> ops;
+    getOperation().walk(
+        [&ops](IREE::HAL::CommandBufferDispatchOp op) { ops.push_back(op); });
     for (auto op : ops) {
       OpBuilder builder(op);
       for (unsigned i = 1; i < repeatCount_; ++i) {

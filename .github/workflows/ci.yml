@@ -16,7 +16,7 @@ name: CI
 # https://github.com/actions/runner/issues/1182
 # Neither does it have any contexts that are available everywhere. The
 # top-level `env` field is available in many places, but not all. We already
-# have a "should-run" job that every other job depends on, so we leverage that
+# have a "setup" job that every other job depends on, so we leverage that
 # for variables that every other job can use, since that *is* available in all
 # sub-fields of the job.
 # See https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
@@ -25,15 +25,6 @@ name: CI
 # Runner label ordering:
 # - self-hosted always has to be listed first in a runs-on block:
 # https://docs.github.com/en/actions/hosting-your-own-runners/using-self-hosted-runners-in-a-workflow
-#
-# Pseudo-ternary hack:
-# - We have to do a weird hack to get a pseudo-ternary operator. See
-# https://github.com/actions/runner/issues/409, hence patterns like:
-# `github.event_name == 'pull_request' && 'presubmit' || 'postsubmit'`
-# to mean `'presubmit' if github.event_name == 'pull_request' else 'postsubmit'`
-# Note that this only works if the true branch value is truthy. If it is falsey
-# then we would always get the false branch condition (`p && false` is always
-# false).
 
 on:
   workflow_dispatch:
@@ -72,6 +63,42 @@ jobs:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
       write-caches: ${{ needs.setup.outputs.write-caches }}
+
+  build_test_all_arm64:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_arm64')
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - arm64
+      - os-family=Linux
+    env:
+      BUILD_DIR: build-arm64
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
+      - name: "Building IREE"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
+            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353" \
+            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            ./build_tools/cmake/build_all.sh \
+            "${BUILD_DIR}"
+      - name: "Testing IREE"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CUDA_DISABLE=1 \
+            --env IREE_VULKAN_DISABLE=1 \
+            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
 
   build_test_all_windows:
     needs: setup
@@ -417,14 +444,14 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d \
+            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VULKAN_DISABLE=1 \
-            gcr.io/iree-oss/base-arm64@sha256:31cdb58f556e415c3c65afae31ae9c54e43c1eb3dcd845f3d107abd9b368ff3d \
+            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -542,6 +569,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - name: "Setting up Python"
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        with:
+          python-version: "3.9"
       - name: Wait for docker pull
         run: |
           wait
@@ -554,7 +585,20 @@ jobs:
           # minimum.
           override_python_versions: cp39-cp39
         run: |
-          ./build_tools/python_deploy/build_linux_packages.sh
+          output_dir="$PWD" ./build_tools/python_deploy/build_linux_packages.sh
+      - name: Validate runtime wheel (Linux)
+        shell: bash
+        run: |
+          pip install --upgrade pip
+          pip install --no-index -f $PWD -v iree-runtime
+          echo "Testing default runtime:"
+          python -m iree.runtime._package_test
+          echo "Testing tracy runtime:"
+          # GH runners don't expose the TSC but we want to make sure the basic packaging
+          # works, so override the check with TRACY_NO_INVARIANT_CHECK=1 (per instructions
+          # if this is left off).
+          TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
+            python -m iree.runtime._package_test
       # Note that it is just a trade-off decision to have this serialized
       # as a separate step vs parallelized as a separate job. The runtime
       # build is fast, pays the clone/docker overhead and provides early
@@ -922,19 +966,19 @@ jobs:
           - platform: linux
             arch: riscv_64
             abi: lp64d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
             abi: ilp32d
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./build_tools/cmake/test_riscv.sh"
           - platform: generic
             arch: riscv_32
             abi: ilp32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             build_script: "./build_tools/cmake/build_riscv.sh"
             test_script: "./tests/riscv32/smoke.sh"
           - platform: emscripten
@@ -1012,27 +1056,28 @@ jobs:
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_benchmark_suites')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
     strategy:
       matrix:
         target:
           - platform: linux
             arch: riscv_64
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: riscv_32
-            docker_image: "gcr.io/iree-oss/riscv@sha256:b827812336aeee4689b342ddba49b06325df6e89cadfd2ec1ad965cf5ae77ac1"
+            docker_image: "gcr.io/iree-oss/riscv@sha256:61af5fee01800033826d851cbcf946a548c76f09306578f8cedb48438328f464"
             run_scripts: "./build_tools/cmake/build_riscv.sh && ./build_tools/cmake/test_riscv.sh"
           - platform: linux
             arch: x86_64
             docker_image: "gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33"
             run_scripts: "./build_tools/cmake/test_benchmark_suites_on_linux.sh"
+            # Requires Intel CascadeLake CPU.
+            host_machine: c2s601t
+    runs-on:
+      - self-hosted # must come first
+      - runner-group=${{ needs.setup.outputs.runner-group }}
+      - environment=${{ needs.setup.outputs.runner-env }}
+      - ${{ matrix.target.host_machine || 'cpu' }} # Default to generic x86_64 VM.
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -1090,6 +1135,7 @@ jobs:
       - build_test_all_bazel
 
       # Platforms
+      - build_test_all_arm64
       - build_test_all_windows
       - build_test_all_macos_arm64
       - build_test_all_macos_x86_64
@@ -1100,6 +1146,7 @@ jobs:
 
       # Subsets
       - build_test_runtime
+      - build_test_runtime_arm64
       - build_test_runtime_windows
 
       # Tensorflow

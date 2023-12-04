@@ -214,6 +214,24 @@ class DeviceInstance {
   bool is_addressable() { return true; }
   int local_hardware_id() { return -1; }
 
+  iree_status_t HostBufferToDeviceZeroDim(
+      PJRT_Buffer_Type type, const int64_t* dims, size_t num_dims,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
+  iree_status_t HostBufferToDeviceSplat(
+      const void* data, PJRT_Buffer_Type type, const int64_t* dims,
+      size_t num_dims, EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
+  iree_status_t TransposeBroadcastDeviceBuffer(
+      BufferInstance* buffer, iree_hal_element_type_t type,
+      const iree_hal_dim_t* input_dims, const iree_hal_dim_t* output_dims,
+      const int64_t* perms, size_t num_dims,
+      PJRT_HostBufferSemantics host_buffer_semantics,
+      EventInstance** out_done_with_host_buffer_event,
+      BufferInstance** out_buffer);
+
   // Copies a host buffer to the device.
   // See PJRT_Client_BufferFromHostBuffer
   iree_status_t HostBufferToDevice(
@@ -433,8 +451,9 @@ class ClientInstance {
 
   // Compiles.
   // See TODOs in PJRT_Client_Compile.
-  PJRT_Error* Compile(PJRT_Program* program, /*xla::CompileOptions options, */
-                      LoadedExecutableInstance** executable);
+  PJRT_Error* Compile(
+      const PJRT_Program* program, /*xla::CompileOptions options, */
+      LoadedExecutableInstance** executable);
 
   // ---------------------------------------------------------------------------
   // Subclass hooks.
@@ -512,7 +531,7 @@ static void BindApi(PJRT_Api* api) {
 
     // Populate config_vars() from the client create_options.
     for (size_t i = 0; i < args->num_options; ++i) {
-      PJRT_NamedValue* nv = args->create_options + i;
+      const PJRT_NamedValue* nv = args->create_options + i;
       // For now, we only support string types.
       if (nv->type != PJRT_NamedValue_kString) continue;
       std::string name(nv->name, nv->name_size);

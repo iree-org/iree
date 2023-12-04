@@ -39,3 +39,13 @@ builtin.module @composite attributes {
     dense<[2, 3]> : vector<2xi8>,
   ]>
 } {}
+
+// -----
+
+// CHECK-LABEL: @uninitialized
+builtin.module @uninitialized attributes {
+  // CHECK: util.i32 = #util.uninitialized : i32
+  util.i32 = #util.uninitialized : i32,
+  // CHECK: util.tensor = #util.uninitialized : tensor<4xf32>
+  util.tensor = #util.uninitialized : tensor<4xf32>
+} {}

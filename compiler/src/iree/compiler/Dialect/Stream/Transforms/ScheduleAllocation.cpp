@@ -765,10 +765,9 @@ static LogicalResult applyAsyncDispatchOp(IREE::Stream::AsyncDispatchOp asyncOp,
   }
 
   auto newOp = builder.create<IREE::Stream::CmdDispatchOp>(
-      asyncOp.getLoc(), asyncOp.getWorkload(),
-      builder.getArrayAttr({asyncOp.getEntryPoint()}), newOperands,
-      newResources, newResourceSizes, newResourceOffsets, newResourceLengths,
-      builder.getArrayAttr(newResourceAccesses));
+      asyncOp.getLoc(), asyncOp.getWorkload(), asyncOp.getEntryPointsAttr(),
+      newOperands, newResources, newResourceSizes, newResourceOffsets,
+      newResourceLengths, builder.getArrayAttr(newResourceAccesses));
   newOp->setDialectAttrs(asyncOp->getDialectAttrs());
   asyncOp.erase();
   return success();
@@ -1138,17 +1137,24 @@ static bool isOnlyUseYield(Value value) {
   return true;
 }
 
-// Extracts stream.async.constant ops from |executeOp| into their own dedicated
-// stream.resource.constants upload op. The uploaded constants will be captured
-// by the region for use within as if they had still existed in there.
+// Extracts stream.async.constant ops with the given lifetime from |executeOp|
+// into their own dedicated stream.resource.constants upload op. The uploaded
+// constants will be captured by the region for use within as if they had still
+// existed in there.
 static std::optional<ConstantAllocation>
-extractConstants(IREE::Stream::AsyncExecuteOp executeOp,
-                 OpBuilder &externalBuilder) {
-  // Gather all constant ops from the region, if any.
-  auto constantOps =
-      llvm::to_vector(executeOp.getOps<IREE::Stream::AsyncConstantOp>());
+extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
+                             IREE::Stream::Lifetime lifetime,
+                             OpBuilder &externalBuilder) {
+  auto constantOps = llvm::to_vector(
+      llvm::make_filter_range(executeOp.getOps<IREE::Stream::AsyncConstantOp>(),
+                              [&](IREE::Stream::AsyncConstantOp op) {
+                                return op.getResult()
+                                           .getType()
+                                           .cast<IREE::Stream::ResourceType>()
+                                           .getLifetime() == lifetime;
+                              }));
   if (constantOps.empty())
-    return std::nullopt;
+    return {};
 
   // Allocate a new constant upload op and insert a subview for each constant.
   SmallVector<Location> locs;
@@ -1192,7 +1198,27 @@ extractConstants(IREE::Stream::AsyncExecuteOp executeOp,
 
     allocation.reservations.push_back(reservation);
   }
+
   return allocation;
+}
+
+// Extracts stream.async.constant ops from |executeOp| into their own dedicated
+// stream.resource.constants upload ops per lifetime. The uploaded constants
+// will be captured by the region for use within as if they had still existed in
+// there.
+static SmallVector<ConstantAllocation>
+extractConstants(IREE::Stream::AsyncExecuteOp executeOp,
+                 OpBuilder &externalBuilder) {
+  SmallVector<ConstantAllocation> allocations;
+  if (auto allocation = extractConstantsWithLifetime(
+          executeOp, IREE::Stream::Lifetime::Constant, externalBuilder)) {
+    allocations.push_back(std::move(allocation).value());
+  }
+  if (auto allocation = extractConstantsWithLifetime(
+          executeOp, IREE::Stream::Lifetime::Variable, externalBuilder)) {
+    allocations.push_back(std::move(allocation).value());
+  }
+  return allocations;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1385,10 +1411,10 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   // op. We'll then capture the result and use that to initialize variables and
   // constants within the region. Note that this removes ops from the region and
   // as such we want to run it first before we go allocate transients.
-  auto constantAllocation = extractConstants(executeOp, externalBuilder);
-  if (constantAllocation.has_value()) {
+  auto constantAllocations = extractConstants(executeOp, externalBuilder);
+  for (auto &constantAllocation : constantAllocations) {
     bool anyCaptured = false;
-    for (auto &reservation : constantAllocation->reservations) {
+    for (auto &reservation : constantAllocation.reservations) {
       if (reservation.capturedArg) {
         newOperands.push_back(reservation.resource);
         newOperandSizes.push_back(reservation.resourceSize);
@@ -1409,7 +1435,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
       });
     }
 
-    auto awaitTimepoint = constantAllocation->constantsOp.getResultTimepoint();
+    auto awaitTimepoint = constantAllocation.constantsOp.getResultTimepoint();
     if (anyCaptured) {
       // The execute region must depend on the constant upload as one or more
       // constants are used. All this code could be much more clever about
@@ -1422,7 +1448,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         awaitTimepoint.printAsOperand(llvm::dbgs(), *asmState);
         llvm::dbgs() << "\n";
       });
-      for (auto &reservation : constantAllocation->reservations) {
+      for (auto &reservation : constantAllocation.reservations) {
         auto resourceRange =
             ResourceRange(reservation.capturedArg, reservation.resourceSize);
         scope.mapResourceRange(reservation.constantOp, resourceRange,
@@ -1442,7 +1468,7 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
     }
 
     // Replace results of escaping uploads with the upload values.
-    for (auto &reservation : constantAllocation->reservations) {
+    for (auto &reservation : constantAllocation.reservations) {
       auto result = findTiedYieldResult(reservation.constantOp.getResult());
       if (!result)
         continue;
@@ -1457,8 +1483,6 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
         llvm::dbgs() << "\n";
       });
     }
-  } else {
-    LLVM_DEBUG(llvm::dbgs() << "  - no constants found\n");
   }
 
   // Compute an updated set of operands/results. After allocation all results
@@ -1659,10 +1683,8 @@ allocateExecutionRegion(IREE::Stream::AsyncExecuteOp executeOp) {
   if (newAwaitTimepoints.size() == 1) {
     newAwaitTimepoint = newAwaitTimepoints.front();
   } else if (newAwaitTimepoints.size() > 1) {
-    newAwaitTimepoint =
-        executeBuilder.createOrFold<IREE::Stream::TimepointJoinOp>(
-            executeOp.getLoc(), newAwaitTimepoints.front().getType(),
-            newAwaitTimepoints);
+    newAwaitTimepoint = IREE::Stream::TimepointJoinOp::join(
+        executeOp.getLoc(), newAwaitTimepoints, executeBuilder);
   }
 
   // Recreate the execution op with all the new arguments. Note that we drop
@@ -1822,9 +1844,12 @@ public:
           callableOp.getCallableRegion()->empty()) {
         continue;
       }
-      for (auto &op : llvm::make_early_inc_range(
-               callableOp.getCallableRegion()->getOps())) {
-        if (failed(TypeSwitch<Operation *, LogicalResult>(&op)
+
+      llvm::SmallVector<Operation *> operations;
+      callableOp.walk([&](Operation *op) { operations.push_back(op); });
+
+      for (auto op : operations) {
+        if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                        .Case([&](IREE::Stream::AsyncExecuteOp op) {
                          return allocateExecutionRegion(op);
                        })

@@ -25,49 +25,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-/// Returns the op that contains lowering config. Checks whether the provided op
-/// contains the lowering config and returns it. Otherwise, tries to find the
-/// lowering config across the function. If there are multiple ops with the same
-/// lowering configs, returns the first one found. Returns failure if there are
-/// multiple op with different lowering config.
-static FailureOr<Operation *> getRootOp(Operation *op) {
-  // Check for self first.
-  if (iree_compiler::getLoweringConfig(op)) {
-    return op;
-  }
-
-  // Get the function op.
-  auto funcOp = dyn_cast<func::FuncOp>(op);
-  if (!funcOp) {
-    funcOp = op->getParentOfType<func::FuncOp>();
-  }
-
-  assert(funcOp && "Missing funcOp");
-
-  Operation *rootOp = nullptr;
-  mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr rootLoweringConfig;
-  auto result = funcOp.walk([&](Operation *op) -> WalkResult {
-    auto loweringConfig = iree_compiler::getLoweringConfig(op);
-    if (!loweringConfig) {
-      return WalkResult::advance();
-    }
-    if (rootLoweringConfig) {
-      if (rootLoweringConfig != loweringConfig) {
-        return WalkResult::interrupt();
-      }
-    } else {
-      rootOp = op;
-      rootLoweringConfig = loweringConfig;
-    }
-    return WalkResult::advance();
-  });
-
-  if (!rootOp || result.wasInterrupted()) {
-    return failure();
-  }
-  return rootOp;
-}
-
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
 static FailureOr<SmallVector<int64_t>>
@@ -129,11 +86,11 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
 // Return the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
 static FailureOr<SizesAndScalableFlags>
-getVectorSizes(linalg::LinalgOp linalgOp) {
+getVectorSizes(linalg::LinalgOp linalgOp, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
   IREE::Codegen::LoweringConfigAttr loweringConfig =
       getLoweringConfig(linalgOp);
-  if (loweringConfig) {
+  if (useConfiguredVectorSizes && loweringConfig) {
     TilingConfig tilingConfig(loweringConfig);
     auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
     // Replace zeros in canonical vector shape to turn it into a valid shape.
@@ -171,10 +128,12 @@ public:
   using GenericVectorizationBase::GenericVectorizationBase;
   GenericVectorizationPass(const GenericVectorizationPassOptions &options) {
     this->enableVectorMasking.setValue(options.enableVectorMasking);
+    this->useConfiguredVectorSizes.setValue(options.useConfiguredVectorSizes);
     this->vectorizePadding.setValue(options.vectorizePadding);
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
     this->enableCleanup.setValue(options.enableCleanup);
     this->generateContract.setValue(options.generateContract);
+    this->foldCastIntoContract.setValue(options.foldCastIntoContract);
     this->maxVectorSize.setValue(options.maxVectorSize);
   }
 
@@ -197,14 +156,15 @@ void GenericVectorizationPass::runOnOperation() {
     if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
-  for (auto op : candidates) {
+  for (Operation *op : candidates) {
     SmallVector<int64_t> vectorSizes;
     SmallVector<bool> scalableVecDims;
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        auto vectorSizesAndScalableDims = getVectorSizes(linalgOp);
+        auto vectorSizesAndScalableDims =
+            getVectorSizes(linalgOp, useConfiguredVectorSizes);
         if (succeeded(vectorSizesAndScalableDims)) {
           auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
           vectorSizes.append(sizes.begin(), sizes.end());
@@ -253,6 +213,8 @@ void GenericVectorizationPass::runOnOperation() {
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
+  }
+  if (foldCastIntoContract) {
     vector::populateFoldArithExtensionPatterns(vectorizationPatterns);
   }
   if (enableVectorMasking) {

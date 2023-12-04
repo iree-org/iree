@@ -61,6 +61,7 @@
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/CAPI/IR.h"
@@ -169,6 +170,36 @@ private:
   }
 };
 
+llvm::ThreadPoolStrategy getGlobalThreadPoolStrategy() {
+  // We allow environment variables to control the compiler thread pool.
+  //   IREE_COMPILER_TASK_COUNT: Specifies a target maximum number of
+  //     concurrent tasks to support at any given time. The actual number
+  //     of threads will be limited to the hardware concurrency if in
+  //     excess. If zero, then the hardware concurrency is used.
+  const char *envTaskCount = getenv("IREE_COMPILER_TASK_COUNT");
+
+  // As of 2023-11-11, the compiler was capable of exploiting ~12x parallelism
+  // on large workloads, and this does not cause much increased latency or
+  // memory usage on untuned build system jobs which are dispatching large
+  // numbers of compilation commands or single-kernel, complicated compilation.
+  // This test was done on a 32-core/64-thread ThreadRipper with 128GB of RAM.
+  unsigned taskCount = 12;
+
+  if (envTaskCount) {
+    StringRef srTaskCount(envTaskCount);
+    if (!srTaskCount.empty() && srTaskCount.getAsInteger(10, taskCount)) {
+      llvm::errs() << "IREE COMPILER: Ignoring malformed value for "
+                      "IREE_COMPILER_TASK_COUNT ('"
+                   << envTaskCount << "')\n";
+    }
+  }
+
+  llvm::ThreadPoolStrategy strategy;
+  strategy.ThreadsRequested = taskCount;
+  strategy.Limit = true;
+  return strategy;
+}
+
 struct Error {
   Error(std::string message) : message(std::move(message)) {}
   std::string message;
@@ -178,10 +209,13 @@ struct GlobalInit {
   GlobalInit();
   ~GlobalInit() { llvm::llvm_shutdown(); }
   void registerCommandLineOptions();
+  std::unique_ptr<MLIRContext> createContext();
+  void initializeContext(MLIRContext &context);
 
   // Reference count of balanced calls to ireeCompilerGlobalInitialize
   // and ireeCompilerGlobalShutdown. Upon reaching zero, must be deleted.
   std::atomic<int> refCount{1};
+  llvm::ThreadPool threadPool;
   llvm::BumpPtrAllocator alloc;
   mlir::DialectRegistry registry;
   PluginManager pluginManager;
@@ -209,7 +243,7 @@ struct GlobalInit {
   IREE::VM::BytecodeTargetOptions *clBytecodeTargetOptions = nullptr;
 };
 
-GlobalInit::GlobalInit() {
+GlobalInit::GlobalInit() : threadPool(getGlobalThreadPoolStrategy()) {
   // Global/static registrations.
   // Allegedly need to register passes to get good reproducers
   // TODO: Verify this (I think that this was fixed some time ago).
@@ -253,6 +287,22 @@ void GlobalInit::registerCommandLineOptions() {
   clBytecodeTargetOptions = &IREE::VM::BytecodeTargetOptions::FromFlags::get();
 
   pluginManager.initializeCLI();
+}
+
+std::unique_ptr<MLIRContext> GlobalInit::createContext() {
+  auto context =
+      std::make_unique<MLIRContext>(MLIRContext::Threading::DISABLED);
+  initializeContext(*context);
+  return context;
+}
+
+void GlobalInit::initializeContext(MLIRContext &context) {
+  if (!context.isMultithreadingEnabled()) {
+    // Configure out threading for the context. Note that an arbitrary context
+    // may already have threading enabled, so we conservatively do nothing
+    // in this case.
+    context.setThreadPool(threadPool);
+  }
 }
 
 struct Session {
@@ -341,7 +391,7 @@ struct Session {
 };
 
 Session::Session(GlobalInit &globalInit)
-    : globalInit(globalInit), ownedContext(std::make_unique<MLIRContext>()),
+    : globalInit(globalInit), ownedContext(globalInit.createContext()),
       context(*ownedContext), binder(OptionsBinder::local()),
       pluginSession(globalInit.pluginManager, binder, pluginManagerOptions) {
   context.allowUnregisteredDialects();
@@ -1016,7 +1066,7 @@ GlobalInit *globalInit = nullptr;
 bool isShutdown = false;
 
 void llvmVersionPrinter(llvm::raw_ostream &os) {
-  os << "IREE (https://openxla.github.io/iree):\n  ";
+  os << "IREE (https://iree.dev):\n  ";
   std::string version = mlir::iree_compiler::getIreeRevision();
   if (version.empty()) {
     version = "(unknown)";
@@ -1474,6 +1524,14 @@ void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {
     llvm::errs() << "error: Failed to initialize IREE compiler plugins\n";
   }
   pluginSession.registerDialects(*cppRegistry);
+}
+
+void ireeCompilerInitializeContext(MlirContext context) {
+  if (!globalInit) {
+    llvm::errs() << "FATAL ERROR: Not initialized\n";
+    abort();
+  }
+  globalInit->initializeContext(*unwrap(context));
 }
 
 MlirContext ireeCompilerSessionBorrowContext(iree_compiler_session_t *session) {

@@ -39,7 +39,7 @@ FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
   if (!variantOp)
     return failure();
 
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     if (op.getSymName() == funcOp.getName()) {
       return op;
     }
@@ -66,7 +66,7 @@ llvm::StringMap<IREE::HAL::ExecutableExportOp>
 getAllEntryPoints(ModuleOp module) {
   auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-  for (auto op : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+  for (auto op : variantOp.getExportOps()) {
     exportOps[op.getSymName()] = op;
   }
   return exportOps;
@@ -148,9 +148,39 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
 }
 
-bool hasMicrokernels(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto enableMicrokernels = getConfigBoolAttr(targetAttr, "ukernels");
-  return enableMicrokernels && enableMicrokernels->getValue();
+bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
+                StringRef ukernelName) {
+  auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
+  if (!enabledUkernels) {
+    return false;
+  }
+  StringRef enabledUkernelsStr = enabledUkernels->getValue();
+  // Resolve `default`.
+  if (enabledUkernelsStr == "default") {
+    // Current defaults implemented here. Could depend on targetAttr.
+    enabledUkernelsStr = "none";
+  }
+  // Resolve `none`.
+  if (enabledUkernelsStr == "none") {
+    return false;
+  }
+  // Resolve `all`.
+  if (enabledUkernelsStr == "all") {
+    return true;
+  }
+  // If `ukernelName` is empty, the question is "are ukernels enabled at all?"
+  // At this point, we already know that enabledUkernelsStr != "none".
+  if (ukernelName.empty()) {
+    return !enabledUkernelsStr.empty();
+  }
+  while (!enabledUkernelsStr.empty()) {
+    auto split = enabledUkernelsStr.split(',');
+    if (split.first == ukernelName) {
+      return true;
+    }
+    enabledUkernelsStr = split.second;
+  }
+  return false;
 }
 
 std::optional<StringRef>
@@ -204,6 +234,11 @@ bool isRISCV(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return triple && triple.value().isRISCV();
 }
 
+bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  std::optional<llvm::Triple> triple = getTargetTriple(targetAttr);
+  return triple && triple.value().isRISCV32();
+}
+
 bool isReadOnly(Value v) {
   Operation *definingOp = v.getDefiningOp();
   if (!definingOp)
@@ -232,7 +267,7 @@ bool isReadOnly(Value v) {
 template <typename T>
 static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
   for (auto expr : exprs) {
-    if (expr.isa<T>())
+    if (isa<T>(expr))
       return expr;
   }
   return nullptr;
@@ -241,11 +276,11 @@ static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
 /// Returns true if the `expr` is on of the types in {`T1`, `T2`, `T3...`}.
 template <typename T>
 static bool isaAffineExprOfType(AffineExpr expr) {
-  return expr.isa<T>();
+  return isa<T>(expr);
 }
 template <typename T1, typename T2, typename... T3>
 static bool isaAffineExprOfType(AffineExpr expr) {
-  if (expr.isa<T1>()) {
+  if (isa<T1>(expr)) {
     return true;
   }
   return isaAffineExprOfType<T2, T3...>(expr);
@@ -256,10 +291,10 @@ static bool isaAffineExprOfType(AffineExpr expr) {
 static Value getValueForDimOrSymbol(affine::AffineApplyOp applyOp,
                                     AffineExpr expr) {
   unsigned numDims = applyOp.getAffineMap().getNumDims();
-  if (auto dimExpr = expr.dyn_cast<AffineDimExpr>()) {
+  if (auto dimExpr = dyn_cast<AffineDimExpr>(expr)) {
     return applyOp.getOperand(dimExpr.getPosition());
   }
-  if (auto symbolExpr = expr.dyn_cast<AffineSymbolExpr>()) {
+  if (auto symbolExpr = dyn_cast<AffineSymbolExpr>(expr)) {
     return applyOp.getOperand(numDims + symbolExpr.getPosition());
   }
   return nullptr;
@@ -353,7 +388,7 @@ public:
         return failure();
       }
       loopInfo.untiledLowerBound = getAsOpFoldResult(v);
-    } else if (auto constExpr = lbExpr.dyn_cast<AffineConstantExpr>()) {
+    } else if (auto constExpr = dyn_cast<AffineConstantExpr>(lbExpr)) {
       loopInfo.untiledLowerBound = IntegerAttr::get(
           IndexType::get(applyOp.getContext()), constExpr.getValue());
     } else {
@@ -366,7 +401,7 @@ public:
     SmallVector<Value> vals;
     std::optional<unsigned> dimension;
     // workgroupSizeOp may have been folded into a constant expression.
-    if (auto wgSize = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
+    if (auto wgSize = dyn_cast<AffineConstantExpr>(expr.getRHS())) {
       vals = getValuesForDimsOrSymbols(applyOp, {expr.getLHS()});
       if (vals.size() != 1 || !vals[0]) {
         return failure();
@@ -434,11 +469,11 @@ public:
       if (failed(processSentinel(otherExpr, sentinels))) {
         return failure();
       }
-      expr = e.cast<AffineBinaryOpExpr>();
+      expr = cast<AffineBinaryOpExpr>(e);
     } else {
       // Check if the workgroup tile size is folded into the affine map itself.
       if (loopInfo.tileSize) {
-        if (auto stepCst = expr.getRHS().dyn_cast<AffineConstantExpr>()) {
+        if (auto stepCst = dyn_cast<AffineConstantExpr>(expr.getRHS())) {
           loopInfo.untiledStep =
               IntegerAttr::get(IndexType::get(applyOp.getContext()),
                                stepCst.getValue() / *loopInfo.tileSize);
@@ -504,7 +539,7 @@ private:
     if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(e)) {
       sentinels.push_back(e);
       return success();
-    } else if (auto constExpr = e.dyn_cast<AffineConstantExpr>()) {
+    } else if (auto constExpr = dyn_cast<AffineConstantExpr>(e)) {
       if (loopInfo.untiledStep) {
         return failure();
       }

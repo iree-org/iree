@@ -38,6 +38,11 @@ OpOperand *findOperandFor(Operation *op, Value input) {
   return nullptr;
 }
 
+bool isHoistableToRootOp(Operation *rootOp, Operation *constOp) {
+  Operation *syms = SymbolTable::getNearestSymbolTable(constOp);
+  return syms == rootOp;
+}
+
 } // namespace
 
 bool ConstExprAnalysis::ConstValueInfo::hasNonAnalyzedConsumer() const {
@@ -68,13 +73,16 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
       auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);
       if (!loadOp)
         continue;
+      if (!isHoistableToRootOp(rootOp, loadOp))
+        continue;
       constantRoots[loadOp.getResult()] = loadOp;
     }
   });
 
   // Populate the constant roots for all inline constants in the program.
   rootOp->walk([&](arith::ConstantOp constOp) {
-    if (isLegalConstExprRootType(constOp.getResult().getType()))
+    if (isHoistableToRootOp(rootOp, constOp) &&
+        isLegalConstExprRootType(constOp.getResult().getType()))
       constantRoots[constOp.getResult()] = constOp;
   });
 

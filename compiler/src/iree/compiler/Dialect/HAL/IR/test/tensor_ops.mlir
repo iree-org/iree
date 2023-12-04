@@ -64,6 +64,15 @@ func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32
   // Dispatch workgroups to the externally defined function "main" in the
   // referenced object files.
   %0 = hal.dispatch.extern "main"[%x, %y](%arg0, %arg1, %arg2) : (tensor<4xi32>, tensor<8xi32>, i32) -> %arg1
+    // Translates the workload (%x and %y captured above) into an XYZ workgroup
+    // count, optionally using device information.
+    count(%device: !hal.device, %x_capture: index, %y_capture: index) -> (index, index, index) {
+      // Shows how device queries can be used when computing the workgroup count.
+      // The device is the one used at runtime.
+      %ok, %z_i32 = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
+      %z = arith.index_cast %z_i32 : i32 to index
+      hal.return %x_capture, %y_capture, %z : index, index, index
+    }
     // Must match the external definition.
     layout(#hal.pipeline.layout<push_constants = 1, sets = [
       <0, bindings = [
@@ -81,14 +90,5 @@ func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32
       #hal.executable.target<"llvm-cpu", "a"> = [#hal.executable.object<{path = "a.o"}>],
       #hal.executable.target<"llvm-cpu", "b"> = [#hal.executable.object<{path = "b.o"}>]
     }>)
-    // Translates the workload (%x and %y captured above) into an XYZ workgroup
-    // count, optionally using device information.
-    count(%device: !hal.device, %x_capture: index, %y_capture: index) -> (index, index, index) {
-      // Shows how device queries can be used when computing the workgroup count.
-      // The device is the one used at runtime.
-      %ok, %z_i32 = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
-      %z = arith.index_cast %z_i32 : i32 to index
-      hal.return %x_capture, %y_capture, %z : index, index, index
-    }
   return %0 : tensor<8xi32>
 }

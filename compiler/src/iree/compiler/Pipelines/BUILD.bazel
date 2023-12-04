@@ -17,8 +17,6 @@ iree_compiler_cc_library(
     srcs = ["Options.cpp"],
     hdrs = ["Options.h"],
     deps = [
-        "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Utils",
     ],
 )
@@ -48,8 +46,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/GlobalOptimization",
         "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/InputConversion/Common:AutoInputConversionPipeline",
-        "//compiler/src/iree/compiler/InputConversion/StableHLO",
-        "//compiler/src/iree/compiler/InputConversion/TOSA",
         "//compiler/src/iree/compiler/Modules/HAL/Inline/Transforms",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Preprocessing:Passes",

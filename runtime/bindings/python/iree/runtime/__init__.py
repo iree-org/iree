@@ -13,6 +13,14 @@
 from . import _binding
 
 # Pull some of the native symbols into the public API.
+# Io imports
+from ._binding import (
+    FileHandle,
+    ParameterIndex,
+    ParameterProvider,
+    create_io_parameters_module,
+)
+
 # Hal imports
 from ._binding import (
     BufferCompatibility,

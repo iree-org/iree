@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-global-opt-materialize-homogeneous-encodings %s | FileCheck %s
 
-#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f"}>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {target_triple = "x86_64-none-elf", cpu_features = "+avx512f"}>
 #map = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
 #device_target_llvm_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#executable_target_embedded_elf_x86_64_]}>
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
@@ -51,7 +51,7 @@ module attributes {hal.device.targets = [#device_target_vulkan]} {
   }
 }
 
-// vulkan does not implement buildMaterializeEncodingsPassPipeline method.
+// vulkan uses default materialization patterns which unsets the encodings.
 // CHECK-LABEL: func.func @lhs_encoding
-// CHECK:         iree_linalg_ext.upper_bound_tile_size
-// CHECK:         iree_linalg_ext.set_encoding
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         return %[[ARG0]]

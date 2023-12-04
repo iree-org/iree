@@ -13,6 +13,7 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
   %c24 = arith.constant 24 : index
+  %c32 = arith.constant 32 : index
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
 
@@ -21,20 +22,25 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
   // CHECK-NEXT: !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>,
   // CHECK-NEXT: !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
 
+  // Initialized variables get hoisted into a dedicated op.
+  // CHECK: %[[VAR_RET:.+]], %[[VAR_TIMEPOINT:.+]] = stream.resource.constants :
+  // CHECK-NEXT: !stream.resource<variable>{%c32} = dense<5> : tensor<8xi32>
+
   // Remaining ops run in a normal execution region.
   // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[OPERAND_TIMEPOINT]])
   // CHECK-SAME: => with(%[[OPERAND]]
   // CHECK-NEXT: stream.cmd.fill
 
-  %results:3, %result_timepoint = stream.async.execute await(%timepoint) => with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}) {
+  %results:4, %result_timepoint = stream.async.execute await(%timepoint) => with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<variable>{%c32}, !stream.resource<transient>{%size}) {
     %0 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
     %1 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
-    %2 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
-    stream.yield %0, %1, %2 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}
+    %2 = stream.async.constant : !stream.resource<variable>{%c32} = dense<5> : tensor<8xi32>
+    %3 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
+    stream.yield %0, %1, %2, %3 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<variable>{%c32}, !stream.resource<transient>{%size}
   } => !stream.timepoint
 
   // Join the two async ops (constant upload and execution should overlap).
-  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CST_TIMEPOINT]], %[[EXEC_TIMEPOINT]])
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[CST_TIMEPOINT]], %[[VAR_TIMEPOINT]], %[[EXEC_TIMEPOINT]])
   // CHECK: util.optimization_barrier %[[JOIN]] : !stream.timepoint
   util.optimization_barrier %result_timepoint : !stream.timepoint
 
@@ -42,8 +48,10 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
   util.optimization_barrier %results#0 : !stream.resource<constant>
   // CHECK: util.optimization_barrier %[[CST_RETS]]#1
   util.optimization_barrier %results#1 : !stream.resource<constant>
+  // CHECK: util.optimization_barrier %[[VAR_RET]]
+  util.optimization_barrier %results#2 : !stream.resource<variable>
   // CHECK: util.optimization_barrier %[[OPERAND]]
-  util.optimization_barrier %results#2 : !stream.resource<transient>
+  util.optimization_barrier %results#3 : !stream.resource<transient>
   return
 }
 
@@ -613,4 +621,35 @@ func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> 
   %1 = stream.async.load %0[%c0] : !stream.resource<staging>{%size} -> f32
   // CHECK: return %[[RESULT]]
   return %1 : f32
+}
+
+// -----
+
+// Tests that we recurse into scf operations.
+
+// CHECK-LABEL: @scfFor
+// CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<staging>,
+// CHECK-SAME:  %[[SIZE:.+]]: index)
+func.func @scfFor(%operand: !stream.resource<staging>, %size: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  %c2 = arith.constant 2 : index
+  %c4 = arith.constant 4 : index
+  %zero = arith.constant 0.0 : f32
+
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK: %[[ZERO:.+]] = arith.constant 0.0
+  // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[C4]] step %[[C2]] iter_args(%[[ARG3:.+]] = %[[ZERO]])
+  %sum = scf.for %i = %c0 to %c4 step %c2 iter_args(%arg0 = %zero) -> f32 {
+  // CHECK: %[[RESULT:.+]] = stream.resource.load %[[OPERAND]][%[[ARG2]]] : !stream.resource<staging>{%[[SIZE]]} -> f32
+    %0 = stream.async.load %operand[%i] : !stream.resource<staging>{%size} -> f32
+  // CHECK: stream.resource.store %cst, %[[OPERAND]][%[[ARG2]]] : f32 -> !stream.resource<staging>{%[[SIZE]]}
+    %1 = stream.async.store %zero, %operand[%i] : f32 -> %operand as !stream.resource<staging>{%size}
+    %2 = arith.addf %0, %arg0 : f32
+    scf.yield %2 : f32
+  }
+
+  // CHECK: return %[[FOR]]
+  return %sum : f32
 }

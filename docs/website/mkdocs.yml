@@ -1,7 +1,8 @@
 site_name: IREE
-site_url: https://openxla.github.io/iree/
+site_url: https://iree.dev/
 repo_url: https://github.com/openxla/iree
 repo_name: openxla/iree
+edit_uri: blob/main/docs/website/docs/
 
 theme:
   name: material
@@ -9,6 +10,7 @@ theme:
   logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
+    edit: material/file-eye-outline
   font:
     text: Noto
     code: Noto Sans Mono
@@ -18,6 +20,7 @@ theme:
   custom_dir: overrides
 
   features:
+    - content.action.edit # Link to view/edit documentation source on GitHub
     - content.code.annotate # Allow inline annotations
     - content.code.copy # Enable copy button
     - content.tabs.link # Link content tabs across site (e.g. Windows/Linux)
@@ -52,7 +55,7 @@ extra:
   community_homepage: https://github.com/openxla/community
   community_site_name: OpenXLA
 
-  homepage: https://openxla.github.io/iree/
+  homepage: https://iree.dev/
 
   # TODO(scotttodd): join mkdocs-material insiders and remove notice?
   #   (we *can* remove the notice without joining)
@@ -124,10 +127,10 @@ nav:
       - "guides/index.md"
       - "ML frameworks":
           - "guides/ml-frameworks/index.md"
-          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
-          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
           - JAX: "guides/ml-frameworks/jax.md"
           - PyTorch: "guides/ml-frameworks/pytorch.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
       - "Deployment configurations":
           - "guides/deployment-configurations/index.md"
           - CPU: "guides/deployment-configurations/cpu.md"
@@ -136,8 +139,6 @@ nav:
           - GPU - CUDA: "guides/deployment-configurations/gpu-cuda.md"
           - GPU - ROCm: "guides/deployment-configurations/gpu-rocm.md"
           - GPU - Metal: "guides/deployment-configurations/gpu-metal.md"
-      - "Other topics":
-          - Developer tips and tricks: "guides/developer-tips.md"
   - "Reference":
       - "reference/index.md"
       - "API bindings":
@@ -151,8 +152,9 @@ nav:
               - Check: "reference/mlir-dialects/Check.md"
               - Flow: "reference/mlir-dialects/Flow.md"
               - HAL: "reference/mlir-dialects/HAL.md"
-              - HALInline: "reference/mlir-dialects/HALInline.md"
-              - HALLoader: "reference/mlir-dialects/HALLoader.md"
+              - HAL/Inline: "reference/mlir-dialects/HALInline.md"
+              - HAL/Loader: "reference/mlir-dialects/HALLoader.md"
+              - IO/Parameters: "reference/mlir-dialects/IOParameters.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
@@ -161,15 +163,56 @@ nav:
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
               - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
+              - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"
           - Optimization options: "reference/optimization-options.md"
           - Extensions: "reference/extensions.md"
+  - "Developers":
+      - "developers/index.md"
+      - "General development topics":
+          - "developers/general/contributing.md"
+          - "developers/general/developer-overview.md"
+          - "developers/general/developer-tips.md"
+          - "developers/general/release-management.md"
+          - "developers/general/testing-guide.md"
+      - "Building":
+          - "developers/building/bazel.md"
+          - "developers/building/emscripten.md"
+          - "developers/building/cmake-options.md"
+          - "developers/building/cmake-with-ccache.md"
+      - "Debugging":
+          - "developers/debugging/android-with-lldb.md"
+          - "developers/debugging/compile-time-regressions.md"
+          - "developers/debugging/gpu.md"
+          - "developers/debugging/integration-tests.md"
+          - "developers/debugging/releases.md"
+          - "developers/debugging/sanitizers.md"
+      - "Performance":
+          - "developers/performance/benchmarking.md"
+          - "developers/performance/benchmark-suites.md"
+          - "developers/performance/profiling.md"
+          - "developers/performance/profiling-cpu-events.md"
+          - "developers/performance/profiling-gpu-vulkan.md"
+          - "developers/performance/profiling-with-tracy.md"
+      - "Design docs":
+          - "developers/design-docs/cuda-backend.md"
+          - "developers/design-docs/design-roadmap.md"
+          - "developers/design-docs/function-abi.md"
+          - "developers/design-docs/invocation-execution-model.md"
+      - "Other topics":
+          - "developers/usage-best-practices.md"
+          - "developers/vulkan-environment-setup.md"
   - "Community":
       - "community/index.md"
       - "Blog":
           - "community/blog/index.md"
       - "community/tags.md"
+
+# https://www.mkdocs.org/user-guide/configuration/#hooks
+hooks:
+  - custom_edit_url.py
+
 plugins:
   # https://squidfunk.github.io/mkdocs-material/setup/setting-up-a-blog/
   - blog:
@@ -219,3 +262,7 @@ plugins:
         # Some blog post names/paths changed when setting up the blog plugin
         "community/blog/2021-07-19-tflite-tosa.md": "community/blog/posts/tflite-tosa.md"
         "community/blog/2021-10-13-mmt4d.md": "community/blog/posts/mmt4d.md"
+
+        # "Developers" section was added
+        "guides/developer-tips.md": "developers/general/developer-tips.md"
+        "developers/building/cmake-options-and-variables.md": "developers/building/cmake-options.md"

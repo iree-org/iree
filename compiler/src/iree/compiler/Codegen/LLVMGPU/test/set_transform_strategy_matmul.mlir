@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: -td-matmul-strategy-blk-sizes=256,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
 // RUN: -td-matmul-strategy-num-threads=32,4,1 \
@@ -13,7 +13,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -25,7 +25,7 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_2 %s
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -36,7 +36,7 @@
 // RUN: -td-matmul-strategy-pipeline-depth=3 \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
 
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target{test-lowering-configuration})))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
 // RUN: | FileCheck --check-prefix=SMALL %s
 
 hal.executable @matmul_1 {
@@ -67,22 +67,22 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_1
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.iree.match_callback failures(propagate) "matmul"
-// CHECK: transform.structured.tile_using_forall %{{.*}} num_threads [] tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}} tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // CHECK: transform.structured.tile_using_for %{{.*}}[0, 0, 16]
 // CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.hoist_pad %{{.}} by 1 loops
 // CHECK: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
 // CHECK: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
 // CHECK: transform.structured.vectorize %{{.*}} vector_sizes [32, 4]
@@ -112,7 +112,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:   transform.apply_patterns.memref.fold_memref_alias_ops
 // CHECK: } : !transform.any_op
 // CHECK: transform.memref.multibuffer %{{.*}} {factor = 3 : i64, skip_analysis}
-// CHECK: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
+// CHECK: transform.apply_patterns.vector.transfer_to_scf full_unroll = true
 // CHECK: transform.iree.create_async_groups %{{.*}} {use_mma_sync}
 // CHECK: transform.iree.pipeline_shared_memory_copies %{{.*}} {depth = 3 : i64, use_mma_sync}
 // CHECK: transform.apply_patterns.vector.lower_masks
@@ -127,10 +127,10 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // WITH_OPTIONS-LABEL: func @matmul_1
 
-// WITH_OPTIONS: transform.sequence  failures(propagate) {
+// WITH_OPTIONS: transform.named_sequence
 // WITH_OPTIONS: transform.iree.match_callback failures(propagate) "matmul"
 // Tile sizes are set by td-matmul-strategy-blk-size-XX.
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}} num_threads [] tile_sizes [256, 64](mapping = [#gpu.block<y>, #gpu.block<x>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}} tile_sizes [256, 64](mapping = [#gpu.block<y>, #gpu.block<x>])
 // WITH_OPTIONS: transform.structured.fuse_into_containing_op
 // WITH_OPTIONS: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // The tiling is affected by td-matmul-strategy-reduc-size: 8.
@@ -138,13 +138,13 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // WITH_OPTIONS: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // WITH_OPTIONS: transform.structured.hoist_pad %{{.}} by 1 loops
 // WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [64, 2] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [64, 2](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // WITH_OPTIONS:   transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // WITH_OPTIONS: transform.scf.take_assumed_branch %{{.*}} take_else_branch : (!transform.any_op) -> ()
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 1] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 1] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 1](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [4, 1](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [4, 4]
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [1, 4]
 // WITH_OPTIONS: transform.structured.vectorize %{{.*}} vector_sizes [32, 4]
@@ -181,7 +181,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // The multibuffer pass is only run when we set use-async-copies.
 // The factor should match td-matmul-strategy-pipeline-depth: 5.
 // WITH_OPTIONS: transform.memref.multibuffer %{{.*}} {factor = 5 : i64, skip_analysis}
-// WITH_OPTIONS: transform.apply_patterns.vector.transfer_to_scf max_transfer_rank = 1 full_unroll = true
+// WITH_OPTIONS: transform.apply_patterns.vector.transfer_to_scf full_unroll = true
 // The attribute should match td-matmul-use-mma-sync.
 // WITH_OPTIONS: transform.iree.create_async_groups %{{.*}} {use_mma_sync}
 // The depth should match td-matmul-strategy-pipeline-depth: 5.
@@ -233,19 +233,19 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_2
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 // CHECK: transform.iree.match_callback failures(propagate) "matmul"
-// CHECK: transform.structured.tile_using_forall %{{.*}} num_threads [] tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}} tile_sizes [128, 128](mapping = [#gpu.block<y>, #gpu.block<x>])
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // CHECK: transform.structured.tile_using_for %{{.*}}[0, 0, 16]
 // align1
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [8, 16](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // align2
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 64] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 64](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // align2
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 64] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 64](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // align1
 // CHECK: transform.structured.vectorize %{{.*}} vector_sizes [16, 1]
 // align2
@@ -287,7 +287,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // CHECK-LABEL: func @matmul_3
 
-// CHECK: transform.sequence  failures(propagate) {
+// CHECK: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @matmul_3
 
@@ -335,18 +335,18 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
-// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
-// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
-// CHECK:      %[[TILED_LHS:.+]], %{{.*}} = transform.structured.tile_using_forall %[[LHS_PAD]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[1]
+// CHECK:      %[[TILED_LHS:.+]], %{{.*}} = transform.structured.tile_using_forall %[[LHS_PAD]]   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:      transform.structured.match ops{["scf.if"]}
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
-// CHECK:      %[[TILED_RHS:.+]], %{{.*}} = transform.structured.tile_using_forall %[[RHS_PAD]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK:      %[[TILED_RHS:.+]], %{{.*}} = transform.structured.tile_using_forall %[[RHS_PAD]]   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
 // CHECK:      transform.structured.match ops{["scf.if"]}
 // CHECK:      transform.scf.take_assumed_branch %{{.*}} take_else_branch
-// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
@@ -409,16 +409,16 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
 // CHECK:      transform.iree.apply_cse
-// CHECK:      %[[RES_PAD:.+]] = get_producer_of_operand %{{.*}}[2]
+// CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
-// CHECK:      %[[LHS_PAD:.+]] = get_producer_of_operand %{{.*}}[0]
-// CHECK:      %[[RHS_PAD:.+]] = get_producer_of_operand %{{.*}}[1]
+// CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
+// CHECK:      %[[RHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[1]
 // CHECK:      %[[LHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[LHS_PAD]]
 // CHECK:      %[[RHS_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RHS_PAD]]
-// CHECK:      transform.structured.tile_using_forall %[[LHS_COPY]]   num_threads [32, 4] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK:      transform.structured.tile_using_forall %[[RHS_COPY]]   num_threads [4, 32] tile_sizes [](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
-// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
-// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2] tile_sizes [](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_using_forall %[[LHS_COPY]]   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK:      transform.structured.tile_using_forall %[[RHS_COPY]]   num_threads [4, 32](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
+// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
+// CHECK:      transform.structured.tile_using_forall %{{.*}}   num_threads [2, 2](mapping = [#gpu.warp<y>, #gpu.warp<x>])
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
@@ -427,7 +427,8 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul
 
-// WITH_OPTIONS-NOT: transform.sequence  failures(propagate) {
+// WITH_OPTIONS-NOT: transform.sequence
+// WITH_OPTIONS-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @aligned_matmul
 
@@ -472,7 +473,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // WITH_OPTIONS_3-LABEL: func @matmul_5_small
 
 // SMALL-LABEL: func @matmul_5_small
-// SMALL: transform.sequence
+// SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
 
@@ -507,6 +508,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
 // CHECK-LABEL: func @f16_matmul
 // CHECK-NOT: transform.sequence
+// CHECK-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @f16_matmul
 
@@ -542,18 +544,22 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 
 // SMALL-LABEL: func @int8_matmul
-// SMALL: transform.sequence
+// SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
 
 // CHECK-LABEL: func @int8_matmul
 // CHECK-NOT: transform.sequence
+// CHECK-NOT: transform.named_sequence
 
 // WITH_OPTIONS-LABEL: func @int8_matmul
 // WITH_OPTIONS-NOT: transform.sequence
+// WITH_OPTIONS-NOT: transform.named_sequence
 
 // WITH_OPTIONS_2-LABEL: func @int8_matmul
 // WITH_OPTIONS_2-NOT: transform.sequence
+// WITH_OPTIONS_2-NOT: transform.named_sequence
 
 // WITH_OPTIONS_3-LABEL: func @int8_matmul
 // WITH_OPTIONS_3-NOT: transform.sequence
+// WITH_OPTIONS_3-NOT: transform.named_sequence

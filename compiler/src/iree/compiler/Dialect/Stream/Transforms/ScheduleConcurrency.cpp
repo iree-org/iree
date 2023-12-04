@@ -250,7 +250,10 @@ public:
       for (auto [oldResult, newResult] :
            llvm::zip_equal(partitionBuilder.partition->outs,
                            partitionBuilder.concurrentOp.getResults())) {
-        oldResult.replaceAllUsesWith(newResult);
+        // Explicitly copy the Value since the original is marked as const.
+        Value toBeDeleted = oldResult;
+
+        toBeDeleted.replaceAllUsesWith(newResult);
         deadOps.insert(oldResult.getDefiningOp());
       }
       partitionBuilder.finish();

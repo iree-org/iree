@@ -21,11 +21,11 @@ iree_compiler_cc_library(
         "Patterns.h",
     ],
     deps = [
+        ":Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
-        "//compiler/src/iree/compiler/Dialect/HAL/Utils",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
@@ -35,5 +35,26 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "Utils",
+    srcs = [
+        "Utils.cpp",
+    ],
+    hdrs = [
+        "Utils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SCFDialect",
     ],
 )

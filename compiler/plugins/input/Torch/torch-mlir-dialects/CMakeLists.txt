@@ -1,10 +1,10 @@
-# Copyright 2023 Nod Labs, Inc
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(_TORCH_MLIR_DIALECTS_DIR "${TORCH_MLIR_ROOT_DIR}/externals/llvm-external-projects/torch-mlir-dialects")
+set(_TORCH_MLIR_DIALECTS_DIR "${TORCH_MLIR_ROOT_DIR}")
 list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS
     "${_TORCH_MLIR_DIALECTS_DIR}/include")
 

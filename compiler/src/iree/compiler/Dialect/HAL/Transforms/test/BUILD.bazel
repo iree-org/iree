@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
@@ -23,13 +23,13 @@ iree_lit_test_suite(
             "dump_executable_sources.mlir",
             "elide_redundant_commands.mlir",
             "fixup_legacy_sync.mlir",
-            "inline_device_switches.mlir",
             "materialize_dispatch_instrumentation.mlir",
             "materialize_interfaces.mlir",
             "materialize_resource_caches.mlir",
             "memoize_device_queries.mlir",
             "preprocess_executables.mlir",
             "resolve_export_ordinals.mlir",
+            "strip_executable_contents.mlir",
             "substitute_executables.mlir",
             "verify_target_environment.mlir",
         ],

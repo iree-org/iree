@@ -75,6 +75,7 @@ iree_runtime_cc_library(
     hdrs = ["context_util.h"],
     deps = [
         ":device_util",
+        ":parameter_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/base/internal:flags",
@@ -142,6 +143,28 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/tooling/testdata/npy",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "parameter_util",
+    srcs = ["parameter_util.c"],
+    hdrs = ["parameter_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/base/internal:path",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:parameter_index",
+        "//runtime/src/iree/io:parameter_index_provider",
+        "//runtime/src/iree/io:parameter_provider",
+        "//runtime/src/iree/io:scope_map",
+        "//runtime/src/iree/io/formats/gguf",
+        "//runtime/src/iree/io/formats/irpa",
+        "//runtime/src/iree/io/formats/safetensors",
+        "//runtime/src/iree/modules/io/parameters",
+        "//runtime/src/iree/vm",
     ],
 )
 
