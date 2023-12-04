@@ -280,7 +280,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   Location loc = op.getLoc();
   // TODO: Generalize to N-d argmax. Currently only support 2D reduction
   //       where reduction is on fastest dim.
-  const int kReductionDim = 1;
+  const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize = rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
@@ -289,7 +289,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
       loc, indexType, fn.name, ValueRange{input}, index,
       ValueRange{reductionDimSize, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*strided_outer_dims=*/rewriter.getIndexAttr(0));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }

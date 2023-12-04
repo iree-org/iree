@@ -485,12 +485,17 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
 }
 
 void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
-  tileAndBufferize(pm);
+  //   tileAndBufferize(pm);
+  tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   if (enableMicrokernels) {
     nestedModulePM.addPass(
         createGPULowerToUKernelsPass(false));
   }
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 }
