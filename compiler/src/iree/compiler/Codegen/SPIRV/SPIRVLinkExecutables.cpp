@@ -27,6 +27,19 @@ struct SPIRVLinkExecutablesPass final
     if (sourceExecutableOps.size() <= 1)
       return;
 
+    // Retain only non-external source executables. Linking right now happens as
+    // placing spirv.module ops into the same hal.executable.variant ops.
+    // External source executables won't have any spirv.modules inside.
+    int retainSize = 0;
+    for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
+      IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
+      if (llvm::all_of(executable.getOps<IREE::HAL::ExecutableVariantOp>(),
+                       [](auto op) { return !op.getObjects().has_value(); })) {
+        sourceExecutableOps[retainSize++] = executable;
+      }
+    }
+    sourceExecutableOps.resize(retainSize);
+
     // Guess a module name, if needed, to make the output files readable.
     std::string moduleName = guessModuleName(moduleOp, "spirv_module");
 

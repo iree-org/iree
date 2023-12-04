@@ -11,7 +11,6 @@
 #include <cstring>
 
 #include "iree/base/api.h"
-#include "iree/hal/drivers/vulkan/dynamic_symbol_tables.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/handle_util.h"
 #include "iree/hal/drivers/vulkan/native_pipeline_layout.h"
@@ -64,7 +63,7 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
     VkDeviceHandle* logical_device, VkPipelineCache pipeline_cache,
     const iree_hal_executable_params_t* executable_params,
     iree_hal_spirv_ExecutableDef_table_t executable_def,
-    VkShaderModule shader_module, iree_host_size_t pipeline_count,
+    VkShaderModule* shader_modules, iree_host_size_t pipeline_count,
     iree_hal_vulkan_entry_point_t* out_entry_points) {
   IREE_TRACE_SCOPE();
   uint8_t* scratch_memory = NULL;
@@ -102,6 +101,8 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
 
   flatbuffers_string_vec_t entry_points_vec =
       iree_hal_spirv_ExecutableDef_entry_points_get(executable_def);
+  flatbuffers_uint32_vec_t shader_module_indices_vec =
+      iree_hal_spirv_ExecutableDef_shader_module_indices_get(executable_def);
   flatbuffers_uint32_vec_t subgroup_sizes_vec =
       iree_hal_spirv_ExecutableDef_subgroup_sizes_get(executable_def);
   for (iree_host_size_t entry_ordinal = 0; entry_ordinal < pipeline_count;
@@ -130,7 +131,10 @@ static iree_status_t iree_hal_vulkan_create_pipelines(
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stage_create_info->flags = 0;
     stage_create_info->stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stage_create_info->module = shader_module;
+    uint32_t shader_module_index =
+        flatbuffers_uint32_vec_at(shader_module_indices_vec, entry_ordinal);
+    // We have verified that shader_module_index is within the range.
+    stage_create_info->module = shader_modules[shader_module_index];
     stage_create_info->pName =
         flatbuffers_string_vec_at(entry_points_vec, entry_ordinal);
     stage_create_info->pSpecializationInfo = &spec_info;
@@ -248,10 +252,46 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
     }
   }
 
-  if (flatbuffers_uint32_vec_len(
-          iree_hal_spirv_ExecutableDef_code_get(executable_def)) == 0) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "executable SPIR-V code is missing/empty");
+  iree_hal_spirv_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_spirv_ExecutableDef_shader_modules_get(executable_def);
+  size_t shader_module_count = flatbuffers_vec_len(shader_modules_vec);
+  if (shader_module_count == 0) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "executable provides no shader modules");
+  }
+  for (size_t i = 0; i < shader_module_count; ++i) {
+    iree_hal_spirv_ShaderModuleDef_table_t shader_module =
+        iree_hal_spirv_ShaderModuleDef_vec_at(shader_modules_vec, i);
+    size_t code_size = flatbuffers_uint32_vec_len(
+        iree_hal_spirv_ShaderModuleDef_code_get(shader_module));
+
+    if (code_size == 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "executable SPIR-V code in shader module #%zu is missing", i);
+    }
+  }
+
+  flatbuffers_uint32_vec_t shader_module_indices_vec =
+      iree_hal_spirv_ExecutableDef_shader_module_indices_get(executable_def);
+  size_t shader_module_index_count =
+      flatbuffers_vec_len(shader_module_indices_vec);
+  if (shader_module_index_count != expected_entry_point_count) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "executable has %" PRIhsz
+        " entry points but %zu shader module indices are defined",
+        expected_entry_point_count, shader_module_index_count);
+  }
+  for (size_t i = 0; i < shader_module_index_count; ++i) {
+    uint32_t index = flatbuffers_uint32_vec_at(shader_module_indices_vec, i);
+    if (index >= shader_module_count) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "executable entry point shader module index %u out of range; "
+          "executable only has %zu total shader modules",
+          index, shader_module_count);
+    }
   }
 
   return iree_ok_status();
@@ -284,6 +324,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
+  iree_allocator_t host_allocator = logical_device->host_allocator();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Verify and fetch the executable FlatBuffer wrapper.
@@ -295,17 +336,39 @@ iree_status_t iree_hal_vulkan_native_executable_create(
       iree_hal_spirv_ExecutableDef_as_root(
           executable_params->executable_data.data);
 
-  // Create the shader module.
-  flatbuffers_uint32_vec_t code_vec =
-      iree_hal_spirv_ExecutableDef_code_get(executable_def);
-  VkShaderModule shader_module = VK_NULL_HANDLE;
+  // Allocate space for Vulkan shader module handles.
+  iree_hal_spirv_ShaderModuleDef_vec_t shader_modules_vec =
+      iree_hal_spirv_ExecutableDef_shader_modules_get(executable_def);
+  size_t shader_module_count = flatbuffers_vec_len(shader_modules_vec);
+  iree_host_size_t total_size = shader_module_count * sizeof(VkShaderModule);
+  VkShaderModule* shader_modules = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_vulkan_create_shader_module(
-              logical_device,
-              iree_make_const_byte_span(
-                  code_vec,
-                  flatbuffers_uint32_vec_len(code_vec) * sizeof(uint32_t)),
-              &shader_module));
+      z0, iree_allocator_malloc(host_allocator, total_size,
+                                (void**)&shader_modules));
+
+  // Create all sharder modules.
+  // TODO: perform the shader module creation in multiple threaded manner.
+  iree_status_t status = iree_ok_status();
+  for (size_t i = 0; i < shader_module_count; ++i) {
+    iree_hal_spirv_ShaderModuleDef_table_t shader_module =
+        iree_hal_spirv_ShaderModuleDef_vec_at(shader_modules_vec, i);
+    flatbuffers_uint32_vec_t code_vec =
+        iree_hal_spirv_ShaderModuleDef_code_get(shader_module);
+    size_t code_size = flatbuffers_uint32_vec_len(code_vec) * sizeof(uint32_t);
+    status = iree_hal_vulkan_create_shader_module(
+        logical_device, iree_make_const_byte_span(code_vec, code_size),
+        &shader_modules[i]);
+    if (!iree_status_is_ok(status)) break;
+  }
+  if (!iree_status_is_ok(status)) {
+    // Error occurred. Destroy all shader module created thus far and return.
+    for (size_t i = 0; i < shader_module_count; ++i) {
+      // iree_allocator_malloc() zeros the allocation so we can check NULL here.
+      if (shader_modules[i] == NULL) break;
+      iree_hal_vulkan_destroy_shader_module(logical_device, shader_modules[i]);
+    }
+    return status;
+  }
 
   // Create pipelines for each entry point.
   flatbuffers_string_vec_t entry_points_vec =
@@ -314,11 +377,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
       flatbuffers_string_vec_len(entry_points_vec);
 
   iree_hal_vulkan_native_executable_t* executable = NULL;
-  iree_host_size_t total_size =
-      sizeof(*executable) +
-      entry_point_count * sizeof(*executable->entry_points);
-  iree_status_t status = iree_allocator_malloc(logical_device->host_allocator(),
-                                               total_size, (void**)&executable);
+  total_size = sizeof(*executable) +
+               entry_point_count * sizeof(*executable->entry_points);
+  status =
+      iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_vulkan_native_executable_vtable,
                                  &executable->resource);
@@ -330,9 +392,12 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_create_pipelines(
         logical_device, pipeline_cache, executable_params, executable_def,
-        shader_module, executable->entry_point_count, executable->entry_points);
+        shader_modules, executable->entry_point_count,
+        executable->entry_points);
   }
-  iree_hal_vulkan_destroy_shader_module(logical_device, shader_module);
+  for (size_t i = 0; i < shader_module_count; ++i) {
+    iree_hal_vulkan_destroy_shader_module(logical_device, shader_modules[i]);
+  }
 
   if (iree_status_is_ok(status)) {
     flatbuffers_string_vec_t entry_points_vec =
