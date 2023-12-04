@@ -148,6 +148,10 @@ bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return targetAttr && targetAttr.getBackend().getValue().starts_with("vmvx");
 }
 
+bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return targetAttr && targetAttr.getBackend().getValue().startswith("rocm");
+}
+
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName) {
   auto enabledUkernels = getConfigStringAttr(targetAttr, "ukernels");
