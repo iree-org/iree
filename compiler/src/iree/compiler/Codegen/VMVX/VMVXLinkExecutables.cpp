@@ -44,12 +44,15 @@ struct VMVXLinkExecutablesPass
 
     // Gather all unique executable targets - we may have multiple.
     auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
-    for (auto executableTargetAttr : executableTargetAttrs) {
+    for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
       // Add our VMVX hal.executable.variant with an empty module.
+      std::string linkedVariantName =
+          executableTargetAttrs.size() == 1
+              ? attr.getSymbolNameFragment()
+              : llvm::formatv("{0}_{1}", attr.getSymbolNameFragment(), index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), executableTargetAttr.getSymbolNameFragment(),
-              executableTargetAttr);
+              moduleOp.getLoc(), linkedVariantName, attr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
       auto linkedModuleOp = targetBuilder.create<ModuleOp>(moduleOp.getLoc());
 
@@ -58,12 +61,18 @@ struct VMVXLinkExecutablesPass
       nestedBuilder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(),
                                                "linked_module");
 
+      auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
+                              mlir::ModuleOp linkedInnerModule,
+                              DenseMap<StringRef, Operation *> &symbolMap) {
+        auto srcModule = sourceInnerModule.getOps<IREE::VM::ModuleOp>().begin();
+        auto dstModule = linkedInnerModule.getOps<IREE::VM::ModuleOp>().begin();
+        return mergeModuleInto(*srcModule, *dstModule, symbolMap);
+      };
+
       // Try linking together all executable variants for this target.
-      if (failed(linkExecutablesInto(
-              moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-              [](mlir::ModuleOp moduleOp) {
-                return *moduleOp.getOps<IREE::VM::ModuleOp>().begin();
-              }))) {
+      if (failed(linkExecutablesInto(moduleOp, sourceExecutableOps,
+                                     linkedExecutableOp, linkedTargetOp,
+                                     mergeModuleFn))) {
         return signalPassFailure();
       }
     }
