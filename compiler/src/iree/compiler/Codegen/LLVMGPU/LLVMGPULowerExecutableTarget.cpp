@@ -75,10 +75,11 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  bool enableMicrokernels = hasUkernel(variantOp.getTarget());
   OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
   switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
-    addGPUDefaultPassPipeline(pipeline);
+    addGPUDefaultPassPipeline(pipeline, enableMicrokernels);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
     addGPUSimpleDistributePassPipeline(pipeline);

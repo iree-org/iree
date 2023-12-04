@@ -165,7 +165,7 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   unsigned numParallelLoops = genericOp.getNumParallelLoops();
   // Currently only support 2D argmax to simplify problem.
   // TODO: Generalize ukernel to support n-D argmax.
-  if (numLoops != 2) {
+  if (numLoops > 2) {
     return failure();
   }
   // Argmax will require 1D reduction.
@@ -218,7 +218,8 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     }
     // TODO: Add dyn_cast and check CMPF-Predicate is OGT.
     // Check that in and out of cmpf are loop variables.
-    if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) || producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+    if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
+        producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
       return failure();
     }
   }

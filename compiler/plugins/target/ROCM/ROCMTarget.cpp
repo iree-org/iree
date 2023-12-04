@@ -46,7 +46,11 @@ struct ROCMOptions {
   std::string targetChip = "gfx908";
   bool linkBitcode = false;
   std::string bitcodeDirectory;
+<<<<<<< HEAD
   int wavesPerEu = 0;
+=======
+  std::string enableROCMUkernels = "none";
+>>>>>>> c940f9ea7 ([LLVMGPU] Add tiling and plumbing for argmax UKernel attributes.)
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
@@ -62,6 +66,11 @@ struct ROCMOptions {
                     llvm::cl::cat(category),
                     llvm::cl::desc("Optimization hint specifying minimum "
                                    "number of waves per execution unit"));
+    binder.opt<std::string>("iree-rocm-enable-ukernels", enableROCMUkernels,
+                            llvm::cl::cat(category),
+                            llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
+                                      "`default`, `none`, `all`, or a comma-separated list of "
+                                      "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
   }
 };
 } // namespace
@@ -405,6 +414,9 @@ private:
     };
     // Set target arch
     addConfig("target_arch", StringAttr::get(context, options.targetChip));
+
+    // Set Ukernels.
+    addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

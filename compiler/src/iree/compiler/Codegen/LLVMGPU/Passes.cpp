@@ -484,9 +484,13 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 }
 
-void addGPUDefaultPassPipeline(OpPassManager &pm) {
+void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
   tileAndBufferize(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(
+        createGPULowerToUKernelsPass(false));
+  }
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 }

@@ -59,6 +59,7 @@ struct TargetInfo {
   bool hasTF32TensorCore = false;
   bool hasWarpShuffle = false;
   bool hasMmaSync = false;
+  bool hasUkernels = false;
   // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
 };
@@ -198,6 +199,13 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
 
   // Assumes all gfx versions have warp shuffle.
   info.hasWarpShuffle = true;
+
+  // Checks if UKernels are enabled.
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    auto target = variantOp.getTarget();
+    info.hasUkernels = hasUkernel(target);
+  }
 
   // RDNA supports wave32 and wave64, GCN and CDNA only wave64.
   if (targetName.starts_with("gfx10") || targetName.starts_with("gfx11"))
@@ -1062,6 +1070,148 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
+static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
+  // Check for 2 results(value, index), and 1 input
+  if (genericOp.getNumDpsInits() != 2) {
+    return failure();
+  }
+  if (genericOp.getNumDpsInputs() != 1) {
+    return failure();
+  }
+
+  // If max value is being used, it is not a pure argmax.
+  if(!genericOp.getResults()[0].use_empty()) {
+    return failure();
+  }
+
+  // Check that the rank is at least 3 and all loops are parallel
+  unsigned numLoops = genericOp.getNumLoops();
+  unsigned numParallelLoops = genericOp.getNumParallelLoops();
+
+  // Argmax will require 1D reduction.
+  if (numParallelLoops != (numLoops - 1)) {
+    return failure();
+  }
+  // TODO: Add more checks on affine maps.
+
+  // Work back from linalg.yield and check body of genericOp.
+  // The genericOp should yield the result of an arith.select,
+  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  Value producerOutput;
+  Operation *producer;
+
+  // Producer of linalg.yield 1st arg is arith.maximumf
+  {
+    producerOutput = yieldOp->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return failure();
+    }
+    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
+      return failure();
+    }
+  }
+
+  // Producer of linalg.yield op 2nd arg is arith.select
+  // TODO: Add check that select is selecting between linalg.index and index of current max.
+  {
+    producerOutput = yieldOp->getOperand(1);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return failure();
+    }
+    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
+      return failure();
+    }
+  }
+
+  // Producer of arith.select op is arith.cmpf
+  {
+    producerOutput = producer->getOperand(0);
+    producer = producerOutput.getDefiningOp();
+    if (!producer || producer->getNumOperands() == 0) {
+      return failure();
+    }
+    if (!matchPattern(producer, m_Op<arith::CmpFOp>())) {
+      return failure();
+    }
+    // TODO: Add dyn_cast and check CMPF-Predicate is OGT.
+    // Check that in and out of cmpf are loop variables.
+    if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
+        producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+      return failure();
+    }
+  }
+
+  return success();
+}
+
+/// Set the configuration for argmax that can be mapped to argmax uKernel.
+/// Distribute all parallel dim across different wg, and only use single 
+/// subgroup per workgroup.
+static LogicalResult setArgmaxConfig(func::FuncOp entryPoint,
+                                            linalg::GenericOp op,
+                                            const TargetInfo &targetInfo) {
+  if (!targetInfo.hasWarpShuffle || !targetInfo.hasUkernels)
+    return failure();
+
+  if (failed(isArgmaxOp(op)))
+    return failure();
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+
+  // Currently Argmax UKernel only support 1 reduction dim.
+  if (reductionDims.size() != 1)
+    return failure();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  int64_t numDynamicReductionDims = 0;
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      numDynamicReductionDims++;
+    }
+    if (dim < numParallelDims) {
+      return failure();
+    }
+  }
+
+  // Distribution of multi-dim masked writes currently aren't fully supported.
+  if (numDynamicReductionDims > 1) {
+    return failure();
+  }
+
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+
+  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize number of elements,
+  // and then it does a single step butterfly warp reduce. Hence it expects wgSize to be
+  // workgroupSize, and reductionTileSize to be size of the reduction dim.
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+  reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+  std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          entryPoint, op, tileSizes,
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault,
+          workgroupSize))) {
+    return failure();
+  }
+  return success();
+}
+
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
 static LogicalResult
 setUKernelConfig(func::FuncOp entryPoint,
@@ -1255,6 +1405,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      return success();
+    }
+    else if (genericOp && succeeded(setArgmaxConfig(entryPointFn, genericOp, targetInfo))) {
       return success();
     }
   }

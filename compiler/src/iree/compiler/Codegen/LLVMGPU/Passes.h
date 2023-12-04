@@ -53,7 +53,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
 /// Default pass pipeline on GPU, currently used only for the ukernel path.
-void addGPUDefaultPassPipeline(OpPassManager &pm);
+void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels);
 
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm);
