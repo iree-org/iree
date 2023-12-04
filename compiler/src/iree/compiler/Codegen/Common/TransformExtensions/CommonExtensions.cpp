@@ -48,6 +48,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -926,15 +927,23 @@ static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
   for (auto &block : funcOp) {
     for (auto &op : block) {
       for (auto attr : op.getAttrs()) {
-        std::string name = attr.getName().str();
+        StringRef name = attr.getName().strref();
         if (name.find("__vector_layout_test_anchor_operand_") !=
             std::string::npos) {
-          int operandNum = std::stoi(name.substr(name.find_last_of("_") + 1));
+          int operandNum;
+          name.substr(name.find_last_of("_") + 1)
+              .getAsInteger(/*Radix=*/10, operandNum);
+          assert(operandNum < op.getNumOperands() &&
+                 "operand number out of range");
           analysis.setAnchor(op.getOperand(operandNum), attr.getValue());
         }
         if (name.find("__vector_layout_test_anchor_result_") !=
             std::string::npos) {
-          int resultNum = std::stoi(name.substr(name.find_last_of("_") + 1));
+          int resultNum;
+          name.substr(name.find_last_of("_") + 1)
+              .getAsInteger(/*Radix=*/10, resultNum);
+          assert(resultNum < op.getNumResults() &&
+                 "result number out of range");
           analysis.setAnchor(op.getResult(resultNum), attr.getValue());
         }
       }
@@ -957,9 +966,8 @@ static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
         llvm::raw_string_ostream s(layoutStr);
         s << layout;
         // Emit remark.
-        op->emitRemark("layout of result #" +
-                       std::to_string(result.getResultNumber()) + " is " +
-                       s.str());
+        op->emitRemark("layout of result #" + Twine(result.getResultNumber()) +
+                       " is " + s.str());
       }
     }
   });
@@ -972,8 +980,7 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
   setAnchorOpsFromAttributes(analysis, target);
-  LogicalResult result = analysis.run();
-  if (failed(result)) {
+  if (failed(analysis.run())) {
     target.emitError("layout analysis failed");
     return emitDefaultSilenceableFailure(target);
   }
