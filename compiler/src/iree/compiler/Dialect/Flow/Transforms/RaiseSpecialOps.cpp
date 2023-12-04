@@ -518,10 +518,75 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
   return source;
 }
 
-static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
-                                      tensor::InsertSliceOp sliceOp,
-                                      Value source) {
-  rewriter.setInsertionPoint(sliceOp);
+// This aims to match the exact same logical operation, but instead where the
+// final concatenation is actually represented as a concatenation.
+//
+//   %slice_0 = tensor.extract_slice %0[0, ..., 0] [..., 64] [1, ..., 1]
+//                           : tensor<...x128xf16> to tensor<...x64xf16>
+//   %slice_1 = tensor.extract_slice %0[0, ..., 64] [..., 64] [1, ..., 1]
+//                            : tensor<...x128xf16> to tensor<...x64xf16>
+//   %3 = linalg.generic {
+//         indexing_maps = [affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>,
+//                          affine_map<(d0, ..., dn-1) -> (d0, ..., dn-1)>],
+//         iterator_types = [n-1 x "parallel"]}
+//      ins(%slice_1 : tensor<...x64xf16>) outs(%2 : tensor<...x64xf16>) {
+//   ^bb0(%in: f16, %out: f16):
+//     %5 = arith.negf %in : f16
+//     linalg.yield %5 : f16
+//   } -> tensor<...x64xf16>
+//   %in_slice_0 = tensor.concat %3, %slice_0 : ... -> tensor<...x128xf16>
+//
+// With the exact same rewritten IR.
+static std::optional<Value> matchCatNegateAndSlice(tensor::ConcatOp concatOp) {
+  /// First match against the desired op chain.
+  ValueRange inputs = concatOp.getInputs();
+  if (inputs.size() != 2) {
+    return std::nullopt;
+  }
+
+  Value left = inputs[0];
+  Value right = inputs[1];
+  if (left.getType() != right.getType()) {
+    return std::nullopt;
+  }
+
+  // The concatenation must happen along the inner most dimension.
+  auto inputType = cast<RankedTensorType>(left.getType());
+  if (concatOp.getDim() != inputType.getRank() - 1) {
+    return std::nullopt;
+  }
+
+  /// TODO: This could be extended to other unary (or in general, elementwise
+  /// operations) if the need arises.
+  auto negate = left.getDefiningOp<linalg::GenericOp>();
+  if (!negate || !isUnaryNegate(negate)) {
+    return std::nullopt;
+  }
+
+  auto topHalf = right.getDefiningOp<tensor::ExtractSliceOp>();
+  if (!topHalf) {
+    return std::nullopt;
+  }
+
+  auto bottomHalf =
+      negate.getDpsInputs()[0].getDefiningOp<tensor::ExtractSliceOp>();
+  if (!bottomHalf) {
+    return std::nullopt;
+  }
+  Value source = topHalf.getSource();
+  if (source != bottomHalf.getSource()) {
+    return std::nullopt;
+  }
+
+  /// Require that the overall operation isn't changing the tensor shape.
+  if (source.getType() != concatOp.getType()) {
+    return std::nullopt;
+  }
+  return source;
+}
+
+static Value createCatNegateAndSlice(RewriterBase &rewriter, Value outTensor,
+                                     Value source) {
   Location loc = source.getLoc();
   /// The matcher checks that this cast is valid.
   auto sourceType = cast<RankedTensorType>(source.getType());
@@ -545,10 +610,8 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
                                                           source, reassoc);
 
-  Value outTensor =
-      sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
-  outTensor = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,
-                                                     outTensor, reassoc);
+  Value expandedOutTensor = rewriter.create<tensor::ExpandShapeOp>(
+      loc, expandedType, outTensor, reassoc);
 
   SmallVector<AffineMap> indexingMaps = {
       rewriter.getMultiDimIdentityMap(targetShape.size())};
@@ -583,14 +646,34 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
     b.create<linalg::YieldOp>(loc, select);
   };
 
-  Value result = rewriter
-                     .create<linalg::GenericOp>(
-                         loc, outTensor.getType(), ValueRange(), outTensor,
-                         indexingMaps, iteratorTypes, bodyBuilder)
-                     .getResult(0);
+  Value result =
+      rewriter
+          .create<linalg::GenericOp>(loc, expandedOutTensor.getType(),
+                                     ValueRange(), expandedOutTensor,
+                                     indexingMaps, iteratorTypes, bodyBuilder)
+          .getResult(0);
 
-  return rewriter.create<tensor::CollapseShapeOp>(loc, sliceOp.getType(),
+  return rewriter.create<tensor::CollapseShapeOp>(loc, outTensor.getType(),
                                                   result, reassoc);
+}
+
+static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
+                                      tensor::InsertSliceOp sliceOp,
+                                      Value source) {
+  rewriter.setInsertionPoint(sliceOp);
+  Value outTensor =
+      sliceOp.getDest().getDefiningOp<tensor::InsertSliceOp>().getDest();
+  return createCatNegateAndSlice(rewriter, outTensor, source);
+}
+
+static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
+                                      tensor::ConcatOp concatOp, Value source) {
+  rewriter.setInsertionPoint(concatOp);
+  Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
+  Value outTensor = rewriter.create<tensor::EmptyOp>(
+      source.getLoc(), tensor::getMixedSizes(rewriter, source.getLoc(), source),
+      elemType);
+  return createCatNegateAndSlice(rewriter, outTensor, source);
 }
 
 //===----------------------------------------------------------------------===//
@@ -658,8 +741,17 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       }
     });
 
-    SmallVector<std::pair<tensor::InsertSliceOp, Value>> catNegateAndSliceRoots;
+    SmallVector<std::pair<tensor::InsertSliceOp, Value>>
+        catAsInsertNegateAndSliceRoots;
     getOperation()->walk([&](tensor::InsertSliceOp op) {
+      if (std::optional<Value> catAsInsertNegateAndSliceRoot =
+              matchCatNegateAndSlice(op)) {
+        catAsInsertNegateAndSliceRoots.push_back(
+            std::make_pair(op, catAsInsertNegateAndSliceRoot.value()));
+      }
+    });
+    SmallVector<std::pair<tensor::ConcatOp, Value>> catNegateAndSliceRoots;
+    getOperation()->walk([&](tensor::ConcatOp op) {
       if (std::optional<Value> catNegateAndSliceRoot =
               matchCatNegateAndSlice(op)) {
         catNegateAndSliceRoots.push_back(
@@ -708,11 +800,18 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
           genericOp, ValueRange{fillInput}, ValueRange{init}, attrs);
     }
     for (std::pair<tensor::InsertSliceOp, Value> catNegateAndSlice :
-         catNegateAndSliceRoots) {
+         catAsInsertNegateAndSliceRoots) {
       auto sliceOp = catNegateAndSlice.first;
       Value res =
           rewriteCatNegateAndSlice(rewriter, sliceOp, catNegateAndSlice.second);
       rewriter.replaceOp(sliceOp, res);
+    }
+    for (std::pair<tensor::ConcatOp, Value> catNegateAndSlice :
+         catNegateAndSliceRoots) {
+      auto concatOp = catNegateAndSlice.first;
+      Value res = rewriteCatNegateAndSlice(rewriter, concatOp,
+                                           catNegateAndSlice.second);
+      rewriter.replaceOp(concatOp, res);
     }
   }
 };
