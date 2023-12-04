@@ -11,6 +11,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
@@ -310,6 +311,194 @@ struct ElideBranchOperandsPattern
   }
 };
 
+// Converts an scf.index_switch with a single case into an scf.if.
+//
+// Example:
+//  scf.index_switch %case : i32
+//  case 0 {
+//    %foo = ...
+//    scf.yield %foo : i32
+//  }
+//  default {
+//    %default = ...
+//    scf.yield %default : i32
+//  }
+// ->
+//  %case_0 = arith.cmpi eq, %case, %c0 : index
+//  scf.if %case_0 -> i32 {
+//    %foo = ...
+//    scf.yield %foo : i32
+//  } else {
+//    %default = ...
+//    scf.yield %default : i32
+//  }
+struct IndexSwitchToIfPattern : public OpRewritePattern<scf::IndexSwitchOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::IndexSwitchOp switchOp,
+                                PatternRewriter &rewriter) const override {
+    if (switchOp.getNumCases() != 1)
+      return failure();
+    Value caseValue = rewriter.create<arith::ConstantIndexOp>(
+        switchOp.getLoc(), switchOp.getCases().front());
+    Value isCaseValue = rewriter.createOrFold<arith::CmpIOp>(
+        switchOp.getLoc(), arith::CmpIPredicate::eq, switchOp.getArg(),
+        caseValue);
+    auto ifOp = rewriter.create<scf::IfOp>(
+        switchOp.getLoc(), switchOp.getResultTypes(), isCaseValue);
+    rewriter.inlineRegionBefore(switchOp.getCaseRegions().front(),
+                                ifOp.getThenRegion(),
+                                ifOp.getThenRegion().begin());
+    rewriter.inlineRegionBefore(switchOp.getDefaultRegion(),
+                                ifOp.getElseRegion(),
+                                ifOp.getElseRegion().begin());
+    rewriter.replaceOp(switchOp, ifOp);
+    return success();
+  }
+};
+
+// Combines adjacent and compatible scf.index_switch ops into one.
+// We sink any ops from the first switch into the second and erase the first.
+// Note that since the second may implicitly capture the results of the first
+// we have to handle mapping the scf.yield results to their new local values in
+// the second.
+//
+// Example:
+//  scf.index_switch %case
+//  case 0 {
+//    foo
+//    scf.yield
+//  }
+//  default {
+//    foo_default
+//    scf.yield
+//  }
+//  scf.index_switch %case
+//  case 0 {
+//    bar
+//    scf.yield
+//  }
+//  default {
+//    bar_default
+//    scf.yield
+//  }
+// ->
+//  scf.index_switch %case
+//  case 0 {
+//    foo
+//    bar
+//    scf.yield
+//  }
+//  default {
+//    foo_default
+//    bar_default
+//    scf.yield
+//  }
+struct MergeIndexSwitchPattern : public OpRewritePattern<scf::IndexSwitchOp> {
+  MergeIndexSwitchPattern(MLIRContext *context)
+      : OpRewritePattern(context, 1000) {}
+  LogicalResult matchAndRewrite(scf::IndexSwitchOp nextOp,
+                                PatternRewriter &rewriter) const override {
+    // Inspect the previous op to see if it's also a switch.
+    auto prevOp = dyn_cast_or_null<scf::IndexSwitchOp>(nextOp->getPrevNode());
+    if (!prevOp)
+      return failure();
+
+    // Require that the cases line up exactly. There's probably some merging
+    // we could do in other cases but it'd be best to leave other patterns to
+    // hoist/CSE cases/etc instead.
+    if (prevOp.getNumCases() != nextOp.getNumCases())
+      return rewriter.notifyMatchFailure(nextOp, "number of cases differ");
+    if (!llvm::equal(prevOp.getCases(), nextOp.getCases()))
+      return rewriter.notifyMatchFailure(nextOp, "case values differ");
+
+    // Create a new switch to replace nextOp that contains the same cases but
+    // combined results from both ops.
+    SmallVector<Type> newResultTypes;
+    llvm::append_range(newResultTypes, prevOp.getResultTypes());
+    llvm::append_range(newResultTypes, nextOp.getResultTypes());
+    auto newOp = rewriter.create<scf::IndexSwitchOp>(
+        rewriter.getFusedLoc({prevOp.getLoc(), nextOp.getLoc()}),
+        newResultTypes, prevOp.getArg(), prevOp.getCases(),
+        prevOp.getNumCases());
+    SmallVector<std::pair<Value, Value>> resultReplacements;
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(prevOp.getResults(),
+                         newOp.getResults().slice(0, prevOp.getNumResults()))) {
+      resultReplacements.push_back(std::make_pair(oldResult, newResult));
+    }
+    for (auto [oldResult, newResult] :
+         llvm::zip_equal(nextOp.getResults(),
+                         newOp.getResults().slice(prevOp.getNumResults(),
+                                                  nextOp.getNumResults()))) {
+      resultReplacements.push_back(std::make_pair(oldResult, newResult));
+    }
+
+    // NOTE: the results of prevOp may be implicitly captured by nextOp and we
+    // need to build a mapping of the prevOp results to their cloned values in
+    // nextOp once merged.
+
+    auto cloneRegions = [&](Region &regionA, Region &regionB, Region &target) {
+      SmallVector<Value> yieldValues;
+      IRMapping localMapping;
+      auto targetBuilder = OpBuilder::atBlockBegin(&target.emplaceBlock());
+
+      // Clone regionA into target and map any results from prevOp to the cloned
+      // values for the particular case.
+      auto yieldA = *regionA.getOps<scf::YieldOp>().begin();
+      for (auto &op : regionA.getOps()) {
+        if (op.hasTrait<OpTrait::IsTerminator>())
+          continue;
+        // Clone each op and map its original value to the new local value.
+        targetBuilder.clone(op, localMapping);
+      }
+      for (auto [yieldValue, resultValue] :
+           llvm::zip_equal(yieldA.getOperands(), prevOp.getResults())) {
+        // Track the new local values yielded by the region.
+        auto newValue = localMapping.lookupOrDefault(yieldValue);
+        yieldValues.push_back(newValue);
+        localMapping.map(resultValue, newValue);
+      }
+
+      // Clone regionB into target.
+      auto yieldB = *regionB.getOps<scf::YieldOp>().begin();
+      for (auto &op : regionB.getOps()) {
+        if (op.hasTrait<OpTrait::IsTerminator>())
+          continue;
+        // Clone each op and map its original value to the new local value.
+        targetBuilder.clone(op, localMapping);
+      }
+      for (auto yieldValue : yieldB.getOperands()) {
+        // Track the new local values yielded by the region, ensuring we check
+        // what the first region may have produced and been captured implicitly.
+        yieldValues.push_back(localMapping.lookupOrNull(yieldValue));
+      }
+
+      // Add the merged yield containing results from both regions.
+      targetBuilder.create<scf::YieldOp>(
+          targetBuilder.getFusedLoc(yieldA.getLoc(), yieldB.getLoc()),
+          yieldValues);
+    };
+
+    // Merge regions from both prevOp and nextOp into the newOp.
+    for (auto [prevRegion, nextRegion, newRegion] :
+         llvm::zip_equal(prevOp.getCaseRegions(), nextOp.getCaseRegions(),
+                         newOp.getCaseRegions())) {
+      cloneRegions(prevRegion, nextRegion, newRegion);
+    }
+    cloneRegions(prevOp.getDefaultRegion(), nextOp.getDefaultRegion(),
+                 newOp.getDefaultRegion());
+
+    // Update uses of the old results from both ops to the new ones.
+    for (auto [oldResult, newResult] : resultReplacements) {
+      rewriter.replaceAllUsesWith(oldResult, newResult);
+    }
+    rewriter.eraseOp(prevOp);
+    rewriter.eraseOp(nextOp);
+
+    return success();
+  }
+};
+
 } // namespace
 
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
@@ -319,6 +508,8 @@ void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
   // TODO(benvanik): same as branch folding but for calls.
   patterns.insert<FoldBlockArgumentsPattern, ElideBranchOperandsPattern>(
       context);
+
+  patterns.insert<IndexSwitchToIfPattern, MergeIndexSwitchPattern>(context);
 }
 
 } // namespace Util
