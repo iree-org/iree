@@ -48,6 +48,10 @@ std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 // linalg.matmul
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<Pass>
+createDecomposeConcatPass(bool enableConcatTransposition = false);
+
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 

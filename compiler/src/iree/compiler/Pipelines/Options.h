@@ -67,6 +67,9 @@ struct GlobalOptimizationOptions {
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
 
+  // Enables transposing all concatenations to the outer most dimension.
+  bool outerDimConcat = false;
+
   // Enables data tiling.
   bool dataTiling = true;
 
