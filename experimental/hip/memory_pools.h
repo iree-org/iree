@@ -58,7 +58,7 @@ iree_status_t iree_hal_hip_memory_pools_trim(
 
 // Asynchronously allocates a buffer from an appropriate pool.
 // The allocation will be stream-ordered on |stream|.
-iree_status_t iree_hal_hip_memory_pools_alloca(
+iree_status_t iree_hal_hip_memory_pools_allocate(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_allocator_pool_t pool, iree_hal_buffer_params_t params,
     iree_device_size_t allocation_size,
@@ -66,7 +66,7 @@ iree_status_t iree_hal_hip_memory_pools_alloca(
 
 // Asynchronously deallocates a buffer from its pool.
 // The deallocation will be stream-ordered on |stream|.
-iree_status_t iree_hal_hip_memory_pools_dealloca(
+iree_status_t iree_hal_hip_memory_pools_deallocate(
     iree_hal_hip_memory_pools_t* pools, hipStream_t stream,
     iree_hal_buffer_t* buffer);
 

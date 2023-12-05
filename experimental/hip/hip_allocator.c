@@ -14,17 +14,17 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
-// Nithin
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_HIP_ALLOCATOR_ID = "HIP unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_hip_allocator_t {
   iree_hal_resource_t resource;
-  iree_hal_hip_context_wrapper_t* context;
   hipDevice_t device;
   hipStream_t stream;
   iree_hal_hip_memory_pools_t* pools;
+  const iree_hal_hip_dynamic_symbols_t* symbols;
+  iree_allocator_t host_allocator;
   bool supports_concurrent_managed_access;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -39,11 +39,12 @@ static iree_hal_hip_allocator_t* iree_hal_hip_allocator_cast(
 }
 
 iree_status_t iree_hal_hip_allocator_create(
-    iree_hal_hip_context_wrapper_t* context, hipDevice_t device,
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols, hipDevice_t device,
     hipStream_t stream, iree_hal_hip_memory_pools_t* pools,
-    iree_hal_allocator_t** out_allocator) {
-  IREE_ASSERT_ARGUMENT(context);
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(pools);
+  IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // To support device-local + host-visible memory we need concurrent managed
@@ -53,10 +54,9 @@ iree_status_t iree_hal_hip_allocator_create(
   // page-locked memory. The compiler tries to avoid this for high-traffic
   // buffers except for readback staging buffers.
   int supports_concurrent_managed_access = 0;
-
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, IREE_HIP_RESULT_TO_STATUS(
-              context->syms,
+              hip_symbols,
               hipDeviceGetAttribute(&supports_concurrent_managed_access,
                                     hipDeviceAttributeConcurrentManagedAccess,
                                     device),
@@ -69,32 +69,31 @@ iree_status_t iree_hal_hip_allocator_create(
                 "device-local + host-visible memory)");
 
   iree_hal_hip_allocator_t* allocator = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      context->host_allocator, sizeof(*allocator), (void**)&allocator);
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
-                                 &allocator->resource);
-    allocator->context = context;
-    allocator->device = device;
-    allocator->stream = stream;
-    allocator->pools = pools;
-    allocator->supports_concurrent_managed_access =
-        supports_concurrent_managed_access != 0;
-    *out_allocator = (iree_hal_allocator_t*)allocator;
-  }
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*allocator),
+                                (void**)&allocator));
+  iree_hal_resource_initialize(&iree_hal_hip_allocator_vtable,
+                               &allocator->resource);
+  allocator->device = device;
+  allocator->stream = stream;
+  allocator->pools = pools;
+  allocator->symbols = hip_symbols;
+  allocator->host_allocator = host_allocator;
+  allocator->supports_concurrent_managed_access =
+      supports_concurrent_managed_access != 0;
+  *out_allocator = (iree_hal_allocator_t*)allocator;
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_hip_allocator_destroy(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_hip_allocator_t* allocator =
       iree_hal_hip_allocator_cast(base_allocator);
-  iree_allocator_t host_allocator = allocator->context->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_allocator_free(host_allocator, allocator);
+  iree_allocator_free(allocator->host_allocator, allocator);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -103,7 +102,7 @@ static iree_allocator_t iree_hal_hip_allocator_host_allocator(
     const iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_hip_allocator_t* allocator =
       (iree_hal_hip_allocator_t*)base_allocator;
-  return allocator->context->host_allocator;
+  return allocator->host_allocator;
 }
 
 static iree_status_t iree_hal_hip_allocator_trim(
@@ -259,25 +258,25 @@ iree_hal_hip_allocator_query_buffer_compatibility(
   return compatibility;
 }
 
-static void iree_hal_hip_buffer_free(iree_hal_hip_context_wrapper_t* context,
-                                     iree_hal_hip_buffer_type_t buffer_type,
-                                     hipDeviceptr_t device_ptr,
-                                     void* host_ptr) {
+static void iree_hal_hip_buffer_free(
+    const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_buffer_type_t buffer_type, hipDeviceptr_t device_ptr,
+    void* host_ptr) {
   IREE_TRACE_ZONE_BEGIN(z0);
   switch (buffer_type) {
     case IREE_HAL_HIP_BUFFER_TYPE_DEVICE: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hipFree");
-      IREE_HIP_IGNORE_ERROR(context->syms, hipFree(device_ptr));
+      IREE_HIP_IGNORE_ERROR(hip_symbols, hipFree(device_ptr));
       break;
     }
     case IREE_HAL_HIP_BUFFER_TYPE_HOST: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hipFreeHost");
-      IREE_HIP_IGNORE_ERROR(context->syms, hipFreeHost(host_ptr));
+      IREE_HIP_IGNORE_ERROR(hip_symbols, hipFreeHost(host_ptr));
       break;
     }
     case IREE_HAL_HIP_BUFFER_TYPE_HOST_REGISTERED: {
       IREE_TRACE_ZONE_APPEND_TEXT(z0, "hipHostUnregister");
-      IREE_HIP_IGNORE_ERROR(context->syms, hipHostUnregister(host_ptr));
+      IREE_HIP_IGNORE_ERROR(hip_symbols, hipHostUnregister(host_ptr));
       break;
     }
     case IREE_HAL_HIP_BUFFER_TYPE_ASYNC: {
@@ -341,13 +340,13 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
       status = IREE_HIP_RESULT_TO_STATUS(
-          allocator->context->syms,
+          allocator->symbols,
           hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
       if (iree_status_is_ok(status) &&
           allocator->supports_concurrent_managed_access) {
         // Prefetch the buffer on the GPU device.
         status = IREE_HIP_RESULT_TO_STATUS(
-            allocator->context->syms,
+            allocator->symbols,
             hipMemPrefetchAsync(device_ptr, allocation_size, allocator->device,
                                 allocator->stream));
       }
@@ -356,7 +355,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       // Device only.
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
       status = IREE_HIP_RESULT_TO_STATUS(
-          allocator->context->syms, hipMalloc(&device_ptr, allocation_size));
+          allocator->symbols, hipMalloc(&device_ptr, allocation_size));
     }
   } else {
     buffer_type = IREE_HAL_HIP_BUFFER_TYPE_HOST;
@@ -366,11 +365,10 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       flags |= hipHostMallocWriteCombined;
     }
     status = IREE_HIP_RESULT_TO_STATUS(
-        allocator->context->syms,
-        hipMemAllocHost(&host_ptr, allocation_size, flags));
+        allocator->symbols, hipMemAllocHost(&host_ptr, allocation_size, flags));
     if (iree_status_is_ok(status)) {
       status = IREE_HIP_RESULT_TO_STATUS(
-          allocator->context->syms,
+          allocator->symbols,
           hipHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
   }
@@ -396,7 +394,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     *out_buffer = buffer;
   } else {
     if (!buffer && (device_ptr || host_ptr)) {
-      iree_hal_hip_buffer_free(allocator->context, buffer_type, device_ptr,
+      iree_hal_hip_buffer_free(allocator->symbols, buffer_type, device_ptr,
                                host_ptr);
     } else {
       iree_hal_buffer_release(buffer);
@@ -414,7 +412,7 @@ static void iree_hal_hip_allocator_deallocate_buffer(
   const iree_hal_hip_buffer_type_t buffer_type =
       iree_hal_hip_buffer_type(base_buffer);
 
-  iree_hal_hip_buffer_free(allocator->context, buffer_type,
+  iree_hal_hip_buffer_free(allocator->symbols, buffer_type,
                            iree_hal_hip_buffer_device_pointer(base_buffer),
                            iree_hal_hip_buffer_host_pointer(base_buffer));
 
@@ -492,12 +490,12 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
       host_ptr = external_buffer->handle.host_allocation.ptr;
       uint32_t register_flags = hipHostRegisterMapped;
       status = IREE_HIP_RESULT_TO_STATUS(
-          allocator->context->syms,
+          allocator->symbols,
           hipHostRegister(host_ptr, external_buffer->size, register_flags),
           "hipHostRegister");
       if (iree_status_is_ok(status)) {
         status = IREE_HIP_RESULT_TO_STATUS(
-            allocator->context->syms,
+            allocator->symbols,
             hipHostGetDevicePointer(&device_ptr, host_ptr, 0),
             "hipHostGetDevicePointer");
       }
@@ -533,7 +531,7 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
     *out_buffer = buffer;
   } else {
     if (!buffer && (device_ptr || host_ptr)) {
-      iree_hal_hip_buffer_free(allocator->context, buffer_type, device_ptr,
+      iree_hal_hip_buffer_free(allocator->symbols, buffer_type, device_ptr,
                                host_ptr);
     } else {
       iree_hal_buffer_release(buffer);
