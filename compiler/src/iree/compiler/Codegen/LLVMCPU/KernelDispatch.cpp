@@ -812,10 +812,8 @@ static LogicalResult setMatmulPadRootConfig(func::FuncOp entryPointFn,
   reductionTileSizes.push_back(
       getMaxVectorTileSize(0, K, vecTileSizes.back(), vectorSize));
 
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(distTileSizes.begin(), distTileSizes.end());
-  tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  TileSizesListType tileSizes = {SmallVector<int64_t>(distTileSizes),
+                                 parallelTileSizes, reductionTileSizes};
   // No need for tiling inner parallel dims.
   tileSizes.emplace_back(numTilingDims, 0);
 
@@ -1270,9 +1268,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   }
 
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
-  TileSizesListType tileSizesList = {distTileSizes};
-  tileSizesList.push_back(vecTileSizes);
-
+  TileSizesListType tileSizesList = {distTileSizes, vecTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
       DispatchLoweringPassPipeline::CPUDataTiling);
@@ -1300,9 +1296,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
   }
 
-  TileSizesListType tileSizesList = {distTileSizes};
-  tileSizesList.push_back(tileSizes);
-
+  TileSizesListType tileSizesList = {distTileSizes, tileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizesList,
       DispatchLoweringPassPipeline::CPUDataTiling);
@@ -1438,10 +1432,8 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
                        << reductionTileSizes << "\n");
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
+                                 reductionTileSizes};
   // No need for tiling inner parallel dims.
   tileSizes.emplace_back(numLoops, 0);
 
@@ -1538,9 +1530,7 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   setX86VectorTileSizes(genericOp, numLoops, distTileSizes, minTileSizes,
                         maxTileSizes, vecPreProcStrategy, parallelTileSizes);
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  tileSizes.push_back(parallelTileSizes);
+  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes};
   // No need for tiling reduction dims and inner parallel dims.
   int64_t numTilingDims = parallelTileSizes.size();
   tileSizes.emplace_back(numTilingDims, 0);
@@ -1621,15 +1611,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   }
 
   // Setting reduction tile sizes is a workaround to kick in peeling transform.
-  // The tiling won't happen because the sizes are zeros.
+  // The tiling won't happen because the sizes are zeros. Also, no need for
+  // further tiling inner parallel dims, so the 4-th list is also zeros.
   SmallVector<int64_t> zeros(numLoops, 0);
-
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  tileSizes.push_back(vecTileSizes);
-  tileSizes.push_back(zeros);
-  // No need for further tiling inner parallel dims.
-  tileSizes.push_back(zeros);
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes, zeros, zeros};
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for element-wise op: " << tileSizes
                        << "\n");
@@ -1752,10 +1737,8 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
   setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  tileSizes.push_back(parallelTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
+                                 reductionTileSizes};
   // No need for tiling inner parallel dims.
   int64_t numTilingDims = parallelTileSizes.size();
   tileSizes.emplace_back(numTilingDims, 0);
@@ -1873,20 +1856,11 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   SmallVector<unsigned> partitionableLoops =
       cast<PartitionableLoopsInterface>(padOp.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> distributedTileSizes =
-      getDefaultDistributedLevelTileSizes(partitionableLoops, lbs, ubs,
-                                          minTileSizes, maxTileSizes);
-  TileSizesListType tileSizes;
-  // Distribution tiling
-  tileSizes.emplace_back(std::move(distributedTileSizes));
-  // Tiling for vectorization.
-  tileSizes.emplace_back(std::move(vectorTileSizes));
-  // No further tiling.
-  int64_t numTilingDims = vectorTileSizes.size();
-  SmallVector<int64_t> zeros(numTilingDims, 0);
-  tileSizes.push_back(zeros);
-  tileSizes.push_back(zeros);
-
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
+  // No further tiling for reduction and inner parallel loops.
+  SmallVector<int64_t> zeros(vectorTileSizes.size(), 0);
+  TileSizesListType tileSizes = {distTileSizes, vectorTileSizes, zeros, zeros};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, tileSizes,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
