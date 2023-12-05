@@ -96,7 +96,9 @@ bool isBatchMatmulEncodingUser(EncodingUser user) {
   return user == EncodingUser::BATCH_MATMUL;
 }
 
-bool getIntOrZero(IntegerAttr a) { return a == IntegerAttr() ? 0 : a.getInt(); }
+int64_t getIntOrZero(IntegerAttr a) {
+  return a == IntegerAttr() ? 0 : a.getInt();
+}
 
 bool isVecmatEncoding(EncodingAttr encoding) {
   return encoding.getUser().getValue() == EncodingUser::MATMUL &&

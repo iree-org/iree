@@ -84,7 +84,7 @@ RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
 RankedTensorType dropEncoding(RankedTensorType type);
 
 /// Returns the integer contained in an IntegerAttr, or zero if it has none.
-bool getIntOrZero(IntegerAttr a);
+int64_t getIntOrZero(IntegerAttr a);
 
 /// Returns true if encoding user is one of matmul encodings.
 bool isMatmulEncodingUser(IREE::LinalgExt::EncodingUser user);
