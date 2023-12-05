@@ -104,7 +104,8 @@ util.initializer {
 // CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:        = arith.constant 1
 //      CHECK:      hal.executable.export public @dispatch_0 ordinal(0)
-// CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
+//      CHECK:        hal.return %c1, %c1, %c1
+//      CHECK:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:        = arith.constant 2
 //      CHECK:      hal.executable.export public @dispatch_1 ordinal(1)
 //      CHECK:      hal.executable.export public @dispatch_2 ordinal(2)

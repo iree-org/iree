@@ -55,8 +55,7 @@ struct LLVMCPULinkExecutablesPass
       // Try linking together all executables in moduleOp.
       if (failed(linkExecutablesInto(
               moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-              [](mlir::ModuleOp moduleOp) { return moduleOp; },
-              targetBuilder))) {
+              [](mlir::ModuleOp moduleOp) { return moduleOp; }))) {
         return signalPassFailure();
       }
     }
