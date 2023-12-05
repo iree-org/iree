@@ -44,7 +44,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
 void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
-void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm,
+                                          StringRef entryPoint);
 
 /// Pass pipeline to lower winograd ops. This pipeline follows the
 /// SPIRVBaseVectorize pipeline with the following exception:

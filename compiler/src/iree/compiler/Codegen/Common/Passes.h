@@ -259,7 +259,8 @@ createTileAndDistributeToWorkgroupsPass(
 
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
-std::unique_ptr<Pass> createTransformDialectInterpreterPass();
+std::unique_ptr<Pass>
+createTransformDialectInterpreterPass(StringRef entryPoint = "");
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();

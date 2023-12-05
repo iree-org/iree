@@ -34,6 +34,14 @@ llvm::cl::opt<std::string> clCodegenTransformDialectStrategyName(
         "library of transform specs (@library_call)"),
     llvm::cl::init(""));
 
+llvm::cl::opt<std::string> clCodegenTransformDialectConfigurationName(
+    "iree-codegen-use-transform-dialect-configuration",
+    llvm::cl::desc(
+        "Broadcasts the given transform dialect configuration strategy to all "
+        "dispatches. The specification is a symbol reference to load from a"
+        "library of transform specs (@library_call)"),
+    llvm::cl::init(""));
+
 llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
     "iree-codegen-transform-dialect-library",
     llvm::cl::desc(
@@ -44,6 +52,27 @@ llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
 namespace {
 
 static const char kTranslationInfoAttrName[] = "translation_info";
+
+static LogicalResult
+runTransformConfigurationStrategy(Operation *payloadRoot,
+                                  StringRef entryPointName,
+                                  ModuleOp &transformLibrary) {
+  /// If we have a symbol, verify the existence of the symbol within the
+  /// transform library.
+  Operation *entryPoint = transform::detail::findTransformEntryPoint(
+      payloadRoot, transformLibrary, entryPointName);
+  if (!entryPoint) {
+    return failure();
+  }
+
+  transform::TransformOptions options;
+  if (failed(transform::applyTransformNamedSequence(
+          payloadRoot, entryPoint, transformLibrary,
+          options.enableExpensiveChecks(true)))) {
+    return failure();
+  }
+  return success();
+}
 
 struct MaterializeUserConfigsPass
     : public MaterializeUserConfigsBase<MaterializeUserConfigsPass> {
@@ -58,9 +87,15 @@ struct MaterializeUserConfigsPass
         getAllEntryPoints(moduleOp);
     MLIRContext *context = moduleOp.getContext();
 
+    bool hasTransformLibrary =
+        !clCodegenTransformDialectLibraryFileName.empty();
+    bool hasTransformStrategy = !clCodegenTransformDialectStrategyName.empty();
+    bool hasTransformConfig =
+        !clCodegenTransformDialectConfigurationName.empty();
+
     LDBG("MaterializeUserConfigsPass on variant: " << variantOp);
     std::optional<ModuleOp> transformLibrary = std::nullopt;
-    if (!clCodegenTransformDialectLibraryFileName.empty()) {
+    if (hasTransformLibrary) {
       auto dialect =
           context->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
       auto maybeTransformLibrary = dialect->getOrLoadTransformLibraryModule(
@@ -75,16 +110,31 @@ struct MaterializeUserConfigsPass
            << clCodegenTransformDialectLibraryFileName);
     }
 
+    // Run the user specified transform configuration strategy if specified.
+    if (hasTransformConfig) {
+      if (!transformLibrary || !(*transformLibrary)) {
+        variantOp.emitError() << "transform configuration strategy requires a "
+                                 "transform library module";
+        return signalPassFailure();
+      }
+      if (failed(runTransformConfigurationStrategy(
+              variantOp, clCodegenTransformDialectConfigurationName,
+              *transformLibrary))) {
+        variantOp.emitError()
+            << "transform configuration strategy failed to apply";
+        return signalPassFailure();
+      }
+    }
+
     IREE::Codegen::DispatchLoweringPassPipeline tdPipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
     std::optional<IREE::Codegen::TranslationInfoAttr> clTranslationInfo;
     // Here we always set the pipeline strategy to transform dialect if the
     // flag is non-empty to ensure we pick the right lowering pipeline in the
     // event a strategy symbol is defined.
-    if (!clCodegenTransformDialectLibraryFileName.empty() ||
-        !clCodegenTransformDialectStrategyName.empty()) {
+    if ((hasTransformLibrary && !hasTransformConfig) || hasTransformStrategy) {
       StringRef strategyName =
-          (clCodegenTransformDialectStrategyName.empty())
+          (!hasTransformStrategy)
               ? StringRef(
                     transform::TransformDialect::kTransformEntryPointSymbolName)
               : clCodegenTransformDialectStrategyName;
