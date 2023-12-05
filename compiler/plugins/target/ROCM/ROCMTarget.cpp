@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
@@ -318,6 +319,14 @@ public:
     iree_compiler::FlatbufferBuilder builder;
     iree_hal_rocm_ExecutableDef_start_as_root(builder);
 
+    // Link user modules and libdevice (if required).
+    // Note that linking order matters:
+    llvm::Linker linker(*llvmModule);
+    if (failed(linkCmdlineBitcodeFiles(variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
+                                      *targetMachine, llvmModule->getContext()))) {
+      return failure();
+    }
+
     // Link module to Device Library
     if (options.linkBitcode) {
       if (options.bitcodeDirectory.empty()) {
@@ -415,8 +424,11 @@ private:
     // Set target arch
     addConfig("target_arch", StringAttr::get(context, options.targetChip));
 
-    // Set Ukernels.
-    addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
+    // Set Ukernels if it is a architecture that we have build ukernels for.
+    // TODO: Build for variety of architectures.
+    if (clROCMTargetChip == "gfx940" || clROCMTargetChip == "gfx1100") {
+      addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
+    }
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

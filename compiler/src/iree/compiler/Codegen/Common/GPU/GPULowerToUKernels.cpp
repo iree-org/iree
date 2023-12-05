@@ -101,11 +101,11 @@ struct FnNameAndDefAttrs {
 /// Returns the function name and attributes to use for a ukernel with given
 /// `ukernelName` on the target described by `targetAttr`.
 static FnNameAndDefAttrs
-getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
+getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID, RewriterBase &rewriter,
                      IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
-    result.name = std::string("rocm.") + ukernelName;
+    result.name = std::string("rocm_") + ukernelName + "_" + typeSuffixID;
     // TODO(#12327): Based on description in the issue, add an attribute
     // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
     // backend (obviously), but is enough to unblock while the proper fix
@@ -257,15 +257,15 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
     return failure();
   }
 
-  uint32_t flags = 0;
+  std::string typeSuffixID = "";
   if (inputElemType.isF16() && indexElemType.isInteger(32)) {
-    flags = IREE_UK_FLAG_ARGMAX_TYPE_F16I32;
+    typeSuffixID = "F16I32";
   } else if (inputElemType.isF16() && indexElemType.isInteger(64)) {
-    flags = IREE_UK_FLAG_ARGMAX_TYPE_F16I64;
+    typeSuffixID = "F16I64";
   } else if (inputElemType.isF32() && indexElemType.isInteger(32)) {
-    flags = IREE_UK_FLAG_ARGMAX_TYPE_F32I32;
+    typeSuffixID = "F32I32";
   } else if (inputElemType.isF32() && indexElemType.isInteger(64)) {
-    flags = IREE_UK_FLAG_ARGMAX_TYPE_F32I64;
+    typeSuffixID = "F32I64";
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
@@ -282,12 +282,10 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   //       where reduction is on fastest dim.
   const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize = rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
-  Value flagsVal = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(flags));
-  auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  auto fn = getFnNameAndDefAttrs(ukernelName, typeSuffixID, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, indexType, fn.name, ValueRange{input}, index,
-      ValueRange{reductionDimSize, flagsVal},
+      ValueRange{reductionDimSize},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(0));
   return cast<IREE::Codegen::UKernelOpInterface>(

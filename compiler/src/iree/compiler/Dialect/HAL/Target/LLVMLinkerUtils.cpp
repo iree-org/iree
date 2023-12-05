@@ -147,6 +147,10 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
                                   << path << "`: " << ec.message();
     }
     auto setAlwaysInline = [&](llvm::Module &module) {
+      // ROCM/HIP builtin functions are non-inlinable.
+      if (targetMachine.getTargetTriple().isAMDGCN() ||
+          targetMachine.getTargetTriple().isAMDGPU())
+        return;
       for (auto &func : module.getFunctionList()) {
         func.addFnAttr(llvm::Attribute::AlwaysInline);
       }
