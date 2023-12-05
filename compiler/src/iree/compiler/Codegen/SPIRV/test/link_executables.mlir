@@ -236,13 +236,19 @@ hal.executable private @dispatch_3 {
     }
   }
 }
-func.func @two_target_environments() -> () {
+func.func @two_target_environments_1() -> () {
   %device = hal.ex.shared_device : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@spirv::@dispatch_2) workgroups([%c1, %c1, %c1])
+  return
+}
+func.func @two_target_environments_2() -> () {
+  %device = hal.ex.shared_device : !hal.device
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
+  %c1 = arith.constant 1 : index
+  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_3::@spirv::@dispatch_3) workgroups([%c1, %c1, %c1])
   return
 }
@@ -297,8 +303,16 @@ func.func @two_target_environments() -> () {
 //      CHECK:   }
 //      CHECK: }
 
-//      CHECK: func.func @two_target_environments()
+// Check usages are updated properly. Note that for one executable, we only
+// ever load one variants out of it; we cannot invoke entry points from
+// different variants of the same executable in the same command buffer.
+// So here we have two separate functions with two separate command buffers
+// for testing purposes.
+
+//      CHECK: func.func @two_target_environments_1()
 //      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv::@vulkan_spirv_fb_0::@dispatch_0)
-//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv::@vulkan_spirv_fb_1::@dispatch_1)
 //      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv::@vulkan_spirv_fb_0::@dispatch_2)
+
+//      CHECK: func.func @two_target_environments_2()
+//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv::@vulkan_spirv_fb_1::@dispatch_1)
 //      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv::@vulkan_spirv_fb_1::@dispatch_3)
