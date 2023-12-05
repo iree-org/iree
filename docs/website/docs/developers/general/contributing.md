@@ -6,11 +6,13 @@ icon: octicons/code-review-16
 
 We'd love to accept your patches and contributions to this project.
 
-Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
-reach out on any of our other
-[communication channels](../../index.md#communication-channels) before doing
-substantial work; this will ensure that others don't duplicate the work and
-that there's a chance to discuss any design issues.
+!!! note "Note - coordinating efforts"
+
+    Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
+    reach out on any of our other
+    [communication channels](../../index.md#communication-channels) before doing
+    substantial work; this will ensure that others don't duplicate the work and
+    that there's a chance to discuss any design issues.
 
 ## Developer policies
 
