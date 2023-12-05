@@ -17,6 +17,29 @@ extern "C" {
 #endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
+// iree_hal_hip_device_t
+//===----------------------------------------------------------------------===//
+
+// Parameters defining a hipMemPool_t.
+typedef struct iree_hal_hip_memory_pool_params_t {
+  // Minimum number of bytes to keep in the pool when trimming with
+  // iree_hal_device_trim.
+  uint64_t minimum_capacity;
+  // Soft maximum number of bytes to keep in the pool.
+  // When more than this is allocated the extra will be freed at the next
+  // device synchronization in order to remain under the threshold.
+  uint64_t release_threshold;
+} iree_hal_hip_memory_pool_params_t;
+
+// Parameters for each hipMemPool_t used for queue-ordered allocations.
+typedef struct iree_hal_hip_memory_pooling_params_t {
+  // Used exclusively for DEVICE_LOCAL allocations.
+  iree_hal_hip_memory_pool_params_t device_local;
+  // Used for any host-visible/host-local memory types.
+  iree_hal_hip_memory_pool_params_t other;
+} iree_hal_hip_memory_pooling_params_t;
+
+//===----------------------------------------------------------------------===//
 // iree_hal_hip_driver_t
 //===----------------------------------------------------------------------===//
 

@@ -25,7 +25,13 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "hip_allocator.c"
+    "hip_allocator.h"
+    "hip_buffer.c"
+    "hip_buffer.h"
     "hip_driver.c"
+    "memory_pools.c"
+    "memory_pools.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -47,8 +53,8 @@ iree_cc_library(
   TEXTUAL_HDRS
     "dynamic_symbol_tables.h"
   SRCS
-    "hip_headers.h"
     "dynamic_symbols.c"
+    "hip_headers.h"
     "status_util.c"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
