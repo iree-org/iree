@@ -97,6 +97,16 @@ def OptimizeNumerics :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
+def PropagateLinalgTranspose :
+    InterfacePass<"iree-global-opt-propagate-linalg-transpose", "mlir::FunctionOpInterface"> {
+  let summary = "Propagates linalg.transpose through a restricted set of ops";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createPropagateLinalgTransposePass()";
+  let options = [
+    Option<"enableAggressivePropagation", "enable-aggressive-propagation", "bool",
+           /*default=*/"false", "Enable aggressive propagation to named ops">,
+  ];
+}
+
 def RaiseSpecialOps :
     Pass<"iree-global-opt-raise-special-ops", ""> {
   let summary = "raise special ops like softmax to the high level linalg.ext representation";

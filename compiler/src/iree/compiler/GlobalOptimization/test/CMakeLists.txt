@@ -26,6 +26,7 @@ iree_lit_test_suite(
     "lift_generic_to_transpose_batch_matmul.mlir"
     "materialize_homogeneous_encodings.mlir"
     "optimize_numerics.mlir"
+    "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
     "set_encoding.mlir"

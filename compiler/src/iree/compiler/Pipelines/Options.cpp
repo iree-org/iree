@@ -99,15 +99,19 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
                      "unconditionally before main global optimizations."),
       llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-enable-aggressive-transpose-propagation",
+      aggressiveTransposePropagation,
+      llvm::cl::desc(
+          "Enables aggressive propagation of transposes to named ops"),
+      llvm::cl::cat(category));
   binder.opt<bool>("iree-opt-enable-outer-dim-concat", outerDimConcat,
                    llvm::cl::desc("Enables transposing all concatenations to "
                                   "the outer most dimension."),
                    llvm::cl::cat(category));
-
   binder.opt<bool>("iree-opt-data-tiling", dataTiling,
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
-
   binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
