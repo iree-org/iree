@@ -224,6 +224,7 @@ void GenericVectorizationPass::runOnOperation() {
                               linalg::LinalgCopyVTWForwardingPattern>(
         funcOp.getContext(), /*benefit=*/2);
   }
+
   if (enableCleanup) {
     vector::TransferReadOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                         funcOp.getContext());
