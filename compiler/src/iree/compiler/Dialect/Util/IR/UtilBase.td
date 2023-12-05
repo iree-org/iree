@@ -103,4 +103,9 @@ def Util_Unsafe : NativeOpTrait<"IREE::Util::Unsafe">;
 // These ops are removed by the --iree-util-strip-debug-ops pass.
 def Util_DebugOnly : NativeOpTrait<"IREE::Util::DebugOnly">;
 
+// Denotes an op that represents an object-like declaration (class/table/etc).
+// Must be a symbol table (containing members) and isolated from above
+// (instantiatable and only referenced by symbols instead of SSA values).
+def Util_ObjectLike : NativeOpTrait<"IREE::Util::ObjectLike">;
+
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE
