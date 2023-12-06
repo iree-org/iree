@@ -230,8 +230,8 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     if (hasAnySVEFeature(targetAttr)) {
       return VectorPreProcStrategy::Masking;
     }
-    if ((linalg::isElementwise(linalgOp) || isFullyDynamicOp(linalgOp)) &&
-        enableVectorPeeling) {
+
+    if (enableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -843,11 +843,12 @@ static LogicalResult setMatmulNoPadRootConfig(
   const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<bool> parallelScalableFlags;
+  bool allowIncompleteTile =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
+      vecPreProcStrategy == VectorPreProcStrategy::Masking;
+
   for (auto [index, tileSize] : llvm::enumerate(vecTileSizes)) {
     int64_t sz = tileSize;
-    bool allowIncompleteTile =
-        vecPreProcStrategy == VectorPreProcStrategy::Peeling ||
-        vecPreProcStrategy == VectorPreProcStrategy::Masking;
     // The backend struggles to legalize non-power-of-two scalable vectors.
     bool enforcePowerOfTwo = vecScalableDims[index];
 
@@ -903,7 +904,7 @@ static LogicalResult setMatmulNoPadRootConfig(
   newScalableTileFlags.emplace_back(numTilingDims, false);
 
   LLVM_DEBUG(
-      KD_DBGS() << "Final tile sizes for no-padding contraction: "
+      KD_DBGS() << "Final tile sizes for non-padding contraction: "
                 << newTileSizes << "\n"
                 << "Final tile scalable flags for no-padding contraction: "
                 << newScalableTileFlags << "\n");
@@ -924,11 +925,14 @@ static void getDefaultMatmulVectorSizes(
     return;
   }
 
-  // Specialisation for SVE.
-  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr)) {
-    // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
+  if (isAArch64(targetAttr)) {
     sizes.append({8, 16, 1});
-    scalableSizeFlags.append({false, true, false});
+
+    // Specialisation for SVE.
+    if (hasAnySVEFeature(targetAttr)) {
+      // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
+      scalableSizeFlags.append({false, true, false});
+    }
     return;
   }
 
@@ -954,19 +958,8 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
                                                   bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   SmallVector<bool> matmulScalableFlags;
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
-  // Compute vector tile sizes using heuristics.
-  // TODO: if (isX86(targetAttr) || isRISCV(targetAttr)) {
-
-  // FIXME: Introduce a more structured way to specialise for SVE
-  if (isAArch64(targetAttr) && !hasAnySVEFeature(targetAttr)) {
-    if (isQuantized) {
-      matmulTileSizes = {vectorSize, vectorSize * 4, vectorSize};
-    } else {
-      matmulTileSizes = {5 * vectorSize, vectorSize, vectorSize * 16};
-    }
-  }
+  // TODO: Compute vector tile sizes using heuristics.
 
   // Get default hard-coded tile sizes if we couldn't compute anything better.
   if (matmulTileSizes.empty()) {
