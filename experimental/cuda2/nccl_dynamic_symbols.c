@@ -74,11 +74,12 @@ static iree_status_t iree_hal_cuda2_nccl_check_version(
     minor = (nccl_version % 10000) / 100;
   }
   patch = nccl_version % 100;
-  if (major != NCCL_MAJOR || minor != NCCL_MINOR || patch != NCCL_PATCH) {
+  int required_minimum_version = NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, 0);
+  if (major != NCCL_MAJOR || nccl_version < required_minimum_version) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL version is %d.%d.%d, but %d.%d.%d is required", major, minor,
-        patch, NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
+        "NCCL version is %d.%d.%d, but >=%d.%d and <%d is required", major,
+        minor, patch, NCCL_MAJOR, NCCL_MINOR, NCCL_MAJOR + 1);
   }
 
   return iree_ok_status();
@@ -106,9 +107,10 @@ iree_status_t iree_hal_cuda2_nccl_dynamic_symbols_initialize(
     iree_status_ignore(status);
     status = iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL runtime library 'libnccl.so'/'nccl.dll' (version %d.%d.%d) not "
-        "available; please ensure installed and in dynamic library search path",
-        NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
+        "NCCL runtime library version %d.%d and greater not available; "
+        "ensure installed and the shared library (nccl.dll/libnccl.so) "
+        "is on your PATH/LD_LIBRARY_PATH.",
+        NCCL_MAJOR, NCCL_MINOR);
   }
 
   if (iree_status_is_ok(status)) {
