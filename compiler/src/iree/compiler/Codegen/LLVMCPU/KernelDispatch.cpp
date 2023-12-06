@@ -927,12 +927,18 @@ static LogicalResult setMatmulNoPadRootConfig(
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
 /// should be introduced in this utility.
-static void getDefaultMatmulVectorSizes(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &sizes,
-    SmallVectorImpl<bool> &scalableSizeFlags, int64_t vectorSize) {
+static void
+getDefaultMatmulVectorSizes(linalg::LinalgOp op,
+                            SmallVectorImpl<int64_t> &sizes,
+                            SmallVectorImpl<bool> &scalableSizeFlags,
+                            int64_t vectorSize, bool isQuantized) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({8, 32, 16});
+    if (isQuantized) {
+      sizes.append({4, 64, 1});
+    } else {
+      sizes.append({8, 32, 1});
+    }
     return;
   }
 
@@ -975,7 +981,7 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
   // Get default hard-coded tile sizes if we couldn't compute anything better.
   if (matmulTileSizes.empty()) {
     getDefaultMatmulVectorSizes(op, matmulTileSizes, matmulScalableFlags,
-                                vectorSize);
+                                vectorSize, isQuantized);
   }
   // Pad the scalable flags with false to match the tile sizes.
   matmulScalableFlags.resize(matmulTileSizes.size());
