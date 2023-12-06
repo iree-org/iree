@@ -8999,7 +8999,10 @@ possibly lazy-initialized pipeline layout.</p>
               `count` `` custom&lt;WorkgroupCountRegion&gt;($workgroup_count)
               `layout` `(` $layout `)`
               (`bindings` `(` $bindings^ `)`)?
-              `objects` `(` $objects `)`
+              `objects` `(` `{` custom&lt;TargetConditionObjects&gt;($targets,
+              $target_ordinals,
+              $target_objects,
+              $target_regions) `}` `)`
               attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches some number of workgroups across a 3-dimensional grid using a
@@ -9058,6 +9061,12 @@ argument by writing the argument operand's SSA value instead of its type:
 E.g., in the above example, <code>-&gt; %0</code> would tie the first argument to the
 result. In that case, there would be no separate block argument for the
 result.</p>
+<p>Objects for multiple targets can be specified and the ones used are selected
+based on their target and an optional condition region that returns true if
+the variant is valid for use on the provided runtime <code>!hal.device</code>. If no
+variants within an executable are valid then loading will fail at runtime.
+If multiple variants are valid the first valid one found will be loaded and
+used for execution.</p>
 <p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, IsolatedFromAbove</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
 <p>Effects: MemoryEffects::Effect{}</p>
@@ -9066,7 +9075,9 @@ result.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>export</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>layout</code></td><td>::mlir::iree_compiler::IREE::HAL::PipelineLayoutAttr</td><td>executable entry point layout specification</td></tr>
-<tr><td><code>objects</code></td><td>::mlir::iree_compiler::IREE::HAL::ExecutableObjectsAttr</td><td>target-specific object file references</td></tr>
+<tr><td><code>targets</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
+<tr><td><code>target_ordinals</code></td><td>::mlir::ArrayAttr</td><td>Array of index ordinal attributes</td></tr>
+<tr><td><code>target_objects</code></td><td>::mlir::ArrayAttr</td><td>array attribute</td></tr>
 <tr><td><code>workgroup_size</code></td><td>::mlir::ArrayAttr</td><td>index array attribute</td></tr>
 <tr><td><code>subgroup_size</code></td><td>::mlir::IntegerAttr</td><td>size_t</td></tr>
 <tr><td><code>workgroup_local_memory</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
