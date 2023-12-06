@@ -1033,7 +1033,7 @@ getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
             : std::min(inputTileSizes[i], inputShape[i]);
   }
 
-  // TODO: Disable caching for reduction dim for now.
+  // TODO: Enable caching for reduction dims.
   outputTileSizes.back() = 0;
 
   return outputTileSizes;
