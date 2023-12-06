@@ -70,6 +70,12 @@ def SPIRVInitialVectorLowering : Pass<
   let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
 }
 
+def SPIRVLinkExecutables :
+    Pass<"iree-spirv-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links SPIR-V HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createSPIRVLinkExecutablesPass()";
+}
+
 def SPIRVLowerExecutableTarget :
     Pass<"iree-spirv-lower-executable-target-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {

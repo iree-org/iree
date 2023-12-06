@@ -2099,7 +2099,7 @@ struct DeduplicateAsyncDispatchEntryRefs final
 
 void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                   MLIRContext *context) {
-  // TODO(benvanik):maybe tied type/lifetime updates?
+  // TODO(benvanik): maybe tied type/lifetime updates?
   results.insert<ElideUnusedOp<AsyncDispatchOp>>(context);
   results.insert<DeduplicateAsyncDispatchEntryRefs>(context);
 }

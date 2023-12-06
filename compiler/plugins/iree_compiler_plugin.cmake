@@ -24,6 +24,10 @@ if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/MetalSPIRV target/MetalSPIRV)
 endif()
 
+if(IREE_TARGET_BACKEND_ROCM)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/ROCM target/ROCM)
+endif()
+
 if(IREE_TARGET_BACKEND_WEBGPU)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPU target/WebGPU)
 endif()

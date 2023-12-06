@@ -110,58 +110,6 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_nondt_f16_f16_small
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f16"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-enable-ukernels=none"
-  LABELS
-    "noriscv"
-    "nowasm"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "arm_64:sve:+sve"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_nondt_f16_f16_large
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f16"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-enable-ukernels=none"
-  LABELS
-    "noriscv"
-    "nowasm"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "arm_64:sve:+sve"
-)
-
-iree_generated_trace_runner_test(
-  NAME
     e2e_matmul_nondt_f16_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"

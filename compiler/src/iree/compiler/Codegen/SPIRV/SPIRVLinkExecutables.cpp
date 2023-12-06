@@ -1,51 +1,50 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
-#include "iree/compiler/Codegen/VMVX/PassDetail.h"
-#include "iree/compiler/Codegen/VMVX/Passes.h"
-#include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
-struct VMVXLinkExecutablesPass
-    : public VMVXLinkExecutablesBase<VMVXLinkExecutablesPass> {
-  VMVXLinkExecutablesPass() = default;
+struct SPIRVLinkExecutablesPass final
+    : SPIRVLinkExecutablesBase<SPIRVLinkExecutablesPass> {
   void runOnOperation() override {
-    auto moduleOp = getOperation();
-    auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
+    mlir::ModuleOp moduleOp = getOperation();
+    OpBuilder moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
-    auto sourceExecutableOps =
+    SmallVector<IREE::HAL::ExecutableOp, 8> sourceExecutableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1)
       return;
 
     // Guess a module name, if needed, to make the output files readable.
-    auto moduleName = guessModuleName(moduleOp, "vmvx_module");
+    std::string moduleName = guessModuleName(moduleOp, "spirv_module");
 
     // Create our new "linked" hal.executable.
     std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "vmvx");
+        llvm::formatv("{0}_linked_{1}", moduleName, "spirv");
     auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
         sourceExecutableOps.front().getVisibility());
-    auto executableBuilder =
+    OpBuilder executableBuilder =
         OpBuilder::atBlockBegin(&linkedExecutableOp.getBlock());
 
     // Gather all unique executable targets - we may have multiple.
-    auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs =
+        gatherExecutableTargets(sourceExecutableOps);
     for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
-      // Add our VMVX hal.executable.variant with an empty module.
+      // Add our hal.executable.variant with an empty module.
       std::string linkedVariantName =
           executableTargetAttrs.size() == 1
               ? attr.getSymbolNameFragment()
@@ -54,22 +53,27 @@ struct VMVXLinkExecutablesPass
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
               moduleOp.getLoc(), linkedVariantName, attr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
-      auto linkedModuleOp = targetBuilder.create<ModuleOp>(moduleOp.getLoc());
-
-      // Add an empty vm.module to that module as our vm.funcs must live in it.
-      auto nestedBuilder = OpBuilder::atBlockBegin(linkedModuleOp.getBody());
-      nestedBuilder.create<IREE::VM::ModuleOp>(moduleOp.getLoc(),
-                                               "linked_module");
+      targetBuilder.create<mlir::ModuleOp>(moduleOp.getLoc());
 
       auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
                               mlir::ModuleOp linkedInnerModule,
                               DenseMap<StringRef, Operation *> &symbolMap) {
-        auto srcModule = sourceInnerModule.getOps<IREE::VM::ModuleOp>().begin();
-        auto dstModule = linkedInnerModule.getOps<IREE::VM::ModuleOp>().begin();
-        return mergeModuleInto(*srcModule, *dstModule, symbolMap);
+        // spirv.module is isolated from above. It does not define symbols or
+        // reference outside symbols too. So we can just simply move it to the
+        // linked inner module.
+        auto srcModules = sourceInnerModule.getOps<spirv::ModuleOp>();
+        assert(std::distance(srcModules.begin(), srcModules.end()) == 1);
+        Operation *srcModule = *srcModules.begin();
+        Block &targetBlock = *linkedInnerModule->getRegion(0).begin();
+        if (!targetBlock.empty()) {
+          srcModule->moveAfter(&targetBlock.back());
+        } else {
+          srcModule->moveBefore(&targetBlock, targetBlock.end());
+        }
+        return success();
       };
 
-      // Try linking together all executable variants for this target.
+      // Try linking together all executables in moduleOp.
       if (failed(linkExecutablesInto(moduleOp, sourceExecutableOps,
                                      linkedExecutableOp, linkedTargetOp,
                                      mergeModuleFn))) {
@@ -81,9 +85,9 @@ struct VMVXLinkExecutablesPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createVMVXLinkExecutablesPass() {
-  return std::make_unique<VMVXLinkExecutablesPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSPIRVLinkExecutablesPass() {
+  return std::make_unique<SPIRVLinkExecutablesPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
