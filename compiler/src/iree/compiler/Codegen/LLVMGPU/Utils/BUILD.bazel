@@ -18,6 +18,7 @@ iree_compiler_cc_library(
     name = "Utils",
     srcs = [
         "LLVMGPULayoutAnalysisAndDistribution.cpp",
+        "LLVMGPUOptimizeSharedMemoryReadsWrites.cpp",
         "LLVMGPUUtils.cpp",
     ],
     hdrs = [
@@ -27,6 +28,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -35,6 +37,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:NVGPUDialect",
+        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:VectorDialect",
     ],
 )

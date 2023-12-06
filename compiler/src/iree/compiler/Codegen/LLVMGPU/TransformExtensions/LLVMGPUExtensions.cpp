@@ -17,6 +17,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -56,6 +57,7 @@ iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.
   declareGeneratedDialect<gpu::GPUDialect>();
   declareGeneratedDialect<nvgpu::NVGPUDialect>();
+  declareGeneratedDialect<amdgpu::AMDGPUDialect>();
 
   registerTransformOps<
 #define GET_OP_LIST
@@ -1490,6 +1492,21 @@ transform_dialect::PackSharedMemoryAllocOp::applyToOne(
 }
 
 void transform_dialect::PackSharedMemoryAllocOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::OptimizeSharedMemoryReadsAndWritesOp::applyToOne(
+    transform::TransformRewriter &rewriter, ::func::FuncOp funcOp,
+    ::mlir::transform::ApplyToEachResultList &results,
+    ::mlir::transform::TransformState &state) {
+  optimizeSharedMemoryReadsAndWrites(funcOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::OptimizeSharedMemoryReadsAndWritesOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

@@ -17,9 +17,11 @@ iree_cc_library(
     "LLVMGPUUtils.h"
   SRCS
     "LLVMGPULayoutAnalysisAndDistribution.cpp"
+    "LLVMGPUOptimizeSharedMemoryReadsWrites.cpp"
     "LLVMGPUUtils.cpp"
   DEPS
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRArithDialect
     MLIRFuncDialect
@@ -28,6 +30,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRNVGPUDialect
+    MLIRSupport
     MLIRVectorDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

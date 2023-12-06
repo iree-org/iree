@@ -33,6 +33,8 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp);
 /// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(func::FuncOp funcOp);
 
+void optimizeSharedMemoryReadsAndWrites(func::FuncOp funcOp);
+
 } // namespace iree_compiler
 } // namespace mlir
 
