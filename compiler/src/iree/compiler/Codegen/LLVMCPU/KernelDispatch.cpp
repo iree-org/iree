@@ -231,7 +231,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    return VectorPreProcStrategy::Peeling;
+    if (enableVectorPeeling) {
+      return VectorPreProcStrategy::Peeling;
+    }
   }
 
   return VectorPreProcStrategy::None;
@@ -923,10 +925,10 @@ static void getDefaultMatmulVectorSizes(
     return;
   }
 
-  // Specialisation for SVE.
   if (isAArch64(targetAttr)) {
     sizes.append({8, 16, 1});
 
+    // Specialisation for SVE.
     if (hasAnySVEFeature(targetAttr)) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
