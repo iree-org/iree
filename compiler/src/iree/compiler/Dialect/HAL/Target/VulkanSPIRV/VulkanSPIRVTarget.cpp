@@ -255,21 +255,22 @@ public:
       };
     }
 
-    // Encode all executable top fields into the FlatBuffer object.
+    // Add top-level executable fields following their order of definition.
     auto entryPointsRef = builder.createStringVec(entryPointNames);
     flatbuffers_int32_vec_ref_t subgroupSizesRef =
         hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
-
+    flatbuffers_int32_vec_ref_t shaderModuleIndicesRef =
+        builder.createInt32Vec(shaderModuleIndices);
     iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
     if (subgroupSizesRef) {
       iree_hal_spirv_ExecutableDef_subgroup_sizes_add(builder,
                                                       subgroupSizesRef);
     }
+    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+        builder, shaderModuleIndicesRef);
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
     iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
-    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
-        builder, builder.createInt32Vec(shaderModuleIndices));
     if (!sourceLocationRefs.empty()) {
       auto sourceLocationsRef =
           builder.createOffsetVecDestructive(sourceLocationRefs);
@@ -310,6 +311,8 @@ public:
     for (auto exportOp : variantOp.getExportOps()) {
       entryPointNames.emplace_back(exportOp.getSymName());
     }
+    // We only have one object file for now. So all entry points have shader
+    // module index 0.
     SmallVector<uint32_t, 8> shaderModuleIndices(entryPointNames.size(), 0);
 
     // Load .spv object file.
@@ -336,15 +339,16 @@ public:
     SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
     shaderModuleRefs.push_back(
         iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
+
+    // Add top-level executable fields following their order of definition.
+    auto entryPointsRef = builder.createStringVec(entryPointNames);
+    auto shaderModuleIndicesRef = builder.createInt32Vec(shaderModuleIndices);
+    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+        builder, shaderModuleIndicesRef);
     auto shaderModulesRef =
         builder.createOffsetVecDestructive(shaderModuleRefs);
     iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
-
-    auto entryPointsRef = builder.createStringVec(entryPointNames);
-    iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
-
-    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
-        builder, builder.createInt32Vec(shaderModuleIndices));
 
     iree_hal_spirv_ExecutableDef_end_as_root(builder);
 

@@ -264,7 +264,6 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
         iree_hal_spirv_ShaderModuleDef_vec_at(shader_modules_vec, i);
     size_t code_size = flatbuffers_uint32_vec_len(
         iree_hal_spirv_ShaderModuleDef_code_get(shader_module));
-
     if (code_size == 0) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -340,10 +339,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   iree_hal_spirv_ShaderModuleDef_vec_t shader_modules_vec =
       iree_hal_spirv_ExecutableDef_shader_modules_get(executable_def);
   size_t shader_module_count = flatbuffers_vec_len(shader_modules_vec);
-  iree_host_size_t total_size = shader_module_count * sizeof(VkShaderModule);
   VkShaderModule* shader_modules = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, total_size,
+      z0, iree_allocator_malloc(host_allocator,
+                                shader_module_count * sizeof(VkShaderModule),
                                 (void**)&shader_modules));
 
   // Create all sharder modules.
@@ -360,15 +359,6 @@ iree_status_t iree_hal_vulkan_native_executable_create(
         &shader_modules[i]);
     if (!iree_status_is_ok(status)) break;
   }
-  if (!iree_status_is_ok(status)) {
-    // Error occurred. Destroy all shader module created thus far and return.
-    for (size_t i = 0; i < shader_module_count; ++i) {
-      // iree_allocator_malloc() zeros the allocation so we can check NULL here.
-      if (shader_modules[i] == VK_NULL_HANDLE) break;
-      iree_hal_vulkan_destroy_shader_module(logical_device, shader_modules[i]);
-    }
-    return status;
-  }
 
   // Create pipelines for each entry point.
   flatbuffers_string_vec_t entry_points_vec =
@@ -377,10 +367,13 @@ iree_status_t iree_hal_vulkan_native_executable_create(
       flatbuffers_string_vec_len(entry_points_vec);
 
   iree_hal_vulkan_native_executable_t* executable = NULL;
-  total_size = sizeof(*executable) +
-               entry_point_count * sizeof(*executable->entry_points);
-  status =
-      iree_allocator_malloc(host_allocator, total_size, (void**)&executable);
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(
+        host_allocator,
+        sizeof(*executable) +
+            entry_point_count * sizeof(*executable->entry_points),
+        (void**)&executable);
+  }
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_vulkan_native_executable_vtable,
                                  &executable->resource);
@@ -395,6 +388,8 @@ iree_status_t iree_hal_vulkan_native_executable_create(
         shader_modules, executable->entry_point_count,
         executable->entry_points);
   }
+  // Pipelines are created and we don't need the shader modules anymore.
+  // Note that if error happens before, we also destroy the shader modules here.
   for (size_t i = 0; i < shader_module_count; ++i) {
     iree_hal_vulkan_destroy_shader_module(logical_device, shader_modules[i]);
   }
