@@ -807,7 +807,7 @@ def HAL_ExecutableTargetAttr :
   let extraClassDeclaration = [{
     // Returns a symbol-compatible name that pseudo-uniquely identifies this
     // target. Callers must perform deduplication when required.
-    std::string getSymbolNameFragment();
+    std::string getSymbolNameFragment() const;
 
     // Returns a hal.match.* expression tree that specifically matches a
     // device that can load an executable of this target.
