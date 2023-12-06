@@ -178,8 +178,8 @@ public:
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
-  // If the plugin contributes HAL target backends, then it must return a
-  // pointer to the plugin session-owned registry here. Otherwise, nullptr.
+  // Populates new HAL target backends, if any, into the given list.
+  // Targets will be merged into the plugin session-owned registry.
   virtual void
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
 

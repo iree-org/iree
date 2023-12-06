@@ -197,7 +197,7 @@ cmake --build .
     $ IREE_PY_RUNTIME=tracy iree-run-module ...
     ```
 
-    See [this section](../../../reference/bindings/python#profiling) in the
+    See [this section](../../reference/bindings/python.md#profiling) in the
     Python bindings documentation for more details.
 
 ### Additional steps for Sampling
