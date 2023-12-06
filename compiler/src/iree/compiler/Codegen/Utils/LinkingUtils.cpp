@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeUtilities.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -63,7 +64,7 @@ renameWithDisambiguatedName(Operation *op, Operation *moduleOp,
 //
 // Fails if a public symbol in |sourceModuleOp| conflicts with another public
 // symbol tracked in |targetSymbolMap|.
-static LogicalResult
+LogicalResult
 mergeModuleInto(Operation *sourceModuleOp, Operation *targetModuleOp,
                 DenseMap<StringRef, Operation *> &targetSymbolMap) {
   auto &sourceBlock = sourceModuleOp->getRegion(0).front();
@@ -187,10 +188,13 @@ replaceEntryPointUses(mlir::ModuleOp moduleOp,
 
 LogicalResult linkExecutablesInto(
     mlir::ModuleOp moduleOp,
-    ArrayRef<IREE::HAL::ExecutableOp> sourceExecutableOps,
+    SmallVectorImpl<IREE::HAL::ExecutableOp> &sourceExecutableOps,
     IREE::HAL::ExecutableOp linkedExecutableOp,
     IREE::HAL::ExecutableVariantOp linkedTargetOp,
-    std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn) {
+    std::function<LogicalResult(mlir::ModuleOp sourceInnerModule,
+                                mlir::ModuleOp linkedInnerModule,
+                                DenseMap<StringRef, Operation *> &symbolMap)>
+        mergeInnerModuleFn) {
   MLIRContext *context = linkedTargetOp.getContext();
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
@@ -198,7 +202,6 @@ LogicalResult linkExecutablesInto(
 
   auto linkedTargetBuilder =
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
-  auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
   // Aggregation of all external objects specified on variants used.
   SetVector<Attribute> objectAttrs;
@@ -239,6 +242,7 @@ LogicalResult linkExecutablesInto(
       for (auto constantBlockOp :
            llvm::make_early_inc_range(variantOp.getConstantBlockOps())) {
         constantBlockOp->moveBefore(&*linkedTargetBuilder.getInsertionPoint());
+        // linkedTargetBuilder.clone(constantBlockOp);
       }
 
       // Clone export ops and queue remapping ordinals and updating
@@ -262,19 +266,29 @@ LogicalResult linkExecutablesInto(
       }
 
       // Merge the existing module into the new linked module op.
-      auto sourceModuleOp = getInnerModuleFn(variantOp.getInnerModule());
-      if (failed(mergeModuleInto(sourceModuleOp, linkedModuleOp,
-                                 targetSymbolMap))) {
+      if (failed(mergeInnerModuleFn(variantOp.getInnerModule(),
+                                    linkedTargetOp.getInnerModule(),
+                                    targetSymbolMap))) {
         return failure();
       }
 
       variantOp.erase();
     }
+  }
 
-    if (sourceExecutableOp.getOps<IREE::HAL::ExecutableVariantOp>().empty()) {
-      sourceExecutableOp.erase();
+  // Retain only non-empty source executables. This is necessary to make sure
+  // when we scan the source executable list multiple times, we don't access
+  // destroyed ones so to avoid data structure corruption.
+  int retainSize = 0;
+  for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
+    IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
+    if (executable.getOps<IREE::HAL::ExecutableVariantOp>().empty()) {
+      executable.erase();
+    } else {
+      sourceExecutableOps[retainSize++] = executable;
     }
   }
+  sourceExecutableOps.resize(retainSize);
 
   // Attach object files from source variants.
   if (!objectAttrs.empty()) {

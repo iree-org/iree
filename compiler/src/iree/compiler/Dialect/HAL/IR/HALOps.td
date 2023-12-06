@@ -1930,6 +1930,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
     Symbol,
     SymbolTable,
+    Util_ObjectLike,
   ]> {
   let summary = [{target-specific executable module}];
   let description = [{

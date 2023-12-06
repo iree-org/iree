@@ -446,8 +446,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
-  auto role = encoding.getRole().getValue();
-  return getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
+  auto rank = tensorType.getRank();
+  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }
 
 static MaterializeEncodingFn
