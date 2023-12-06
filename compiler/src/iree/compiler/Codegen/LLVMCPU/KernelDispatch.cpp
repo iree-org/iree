@@ -1590,39 +1590,12 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   distConfig.allowIncompleteTile = true;
   distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize);
+  // Explicitly call reduceDistributionWorkgroups because elementwise generic op
+  // is usaully cheap; we want to reduce the number of workgroups as much as
+  // possible.
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
-
-  // TODO(dcaballe): The logic below is disconnected from the main tile size
-  // selection logic in getMaxTileSize. We should either port it there or remove
-  // it.
-  // Adjust the number of workload per workgroup to at least 4096. This
-  // prevents the runtime overheads domiating the execution time. The number is
-  // derived from experimients. We should be able to make it related to target.
-  constexpr int64_t kMinimumWorkload = 4096;
-  auto shape = genericOp.getStaticLoopRanges();
-  int64_t numWorkload = 1;
-  for (const auto &[index, size] : llvm::enumerate(shape)) {
-    if (ShapedType::isDynamic(size)) {
-      numWorkload = ShapedType::kDynamic;
-      break;
-    }
-    numWorkload *= distTileSizes[index] ? distTileSizes[index] : size;
-  }
-  for (unsigned currDim = 0;
-       numWorkload < kMinimumWorkload && currDim < numLoops;) {
-    int64_t currSize = distTileSizes[currDim];
-    if (currSize == shape[currDim] || currSize == 0 ||
-        ShapedType::isDynamic(shape[currDim]) ||
-        ShapedType::isDynamic(numWorkload)) {
-      currDim++;
-      continue;
-    }
-    int64_t newSize = std::min<int64_t>(currSize * 2, shape[currDim]);
-    numWorkload = numWorkload / currSize * newSize;
-    distTileSizes[currDim] = newSize;
-  }
+  reduceDistributionWorkgroups(genericOp.getStaticLoopRanges(), distTileSizes);
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
   LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "

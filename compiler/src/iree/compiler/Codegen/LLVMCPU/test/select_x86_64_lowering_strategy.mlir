@@ -930,7 +930,7 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 96], [16, 16], [0, 0], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 32], [16, 16], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @generic_static
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1653,8 +1653,8 @@ hal.executable private @unpack_generic_pack  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 64], [1, 4], [0, 0], [0, 0]]>
-//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [16, 4], [0, 0], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG1:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 256], [1, 4], [0, 0], [0, 0]]>
+//  CHECK-DAG: #[[CONFIG2:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 256], [16, 4], [0, 0], [0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.export public @unpack_generic_pack
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1974,6 +1974,47 @@ hal.executable private @no_compute_ops {
 //      CHECK: hal.executable private @no_compute_ops
 //      CHECK:   hal.executable.export public @test
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
+
+// -----
+
+hal.executable private @offsetted_memcpy {
+  hal.executable.variant public @embedded_elf_x86_64 target(<
+      "llvm-cpu", "embedded-elf-x86_64",
+      {cpu = "generic", cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+       native_vector_size = 64 : index, target_triple = "x86_64-unknown-unknown-eabi-elf"}>) {
+    hal.executable.export public @offsetted_memcpy ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @offsetted_memcpy() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x353x257x3xf32>
+        memref.assume_alignment %0, 64 : memref<1x353x257x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<1x355x259x3xf32>
+        memref.assume_alignment %1, 64 : memref<1x355x259x3xf32>
+        %subview = memref.subview %1[0, 1, 1, 0] [1, 353, 257, 3] [1, 1, 1, 1] : memref<1x355x259x3xf32> to memref<1x353x257x3xf32, strided<[275835, 777, 3, 1], offset: 780>>
+        linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+          ins(%0 : memref<1x353x257x3xf32>)
+          outs(%subview : memref<1x353x257x3xf32, strided<[275835, 777, 3, 1], offset: 780>>) {
+        ^bb0(%in: f32, %out: f32):
+          linalg.yield %in : f32
+        }
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 30, 257, 3], [1, 1, 1, 16], [0, 0, 0, 0], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
+//  CHECK-NOT:   lowering_config
+//      CHECK: hal.executable.export public @offsetted_memcpy
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.generic
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
