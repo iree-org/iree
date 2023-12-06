@@ -266,7 +266,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d2483ac643184a16942489d8f709ef3714543ae795fa9ae8fd2e4d8bf68a24a0 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
             ./build_tools/bazel/build_core.sh
 
   test_all:
@@ -295,7 +295,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
-            gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819 \
+            gcr.io/iree-oss/base@sha256:796fb81a11ff7e7d057c93de468b74e48b6a9641aa19b7f7673c2772e8ea3b33 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
@@ -510,7 +510,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VMVX_DISABLE=0 \
-            gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2 \
+            gcr.io/iree-oss/frontends@sha256:b654dffe5b69d35f3182ffe1a41be98e3f32bc7843b6f10829a8eb2aa6a345ee \
             build_tools/cmake/run_tf_tests.sh \
             "${BUILD_DIR}"
 
@@ -639,7 +639,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=swiftshader-bleeding-edge@sha256:c22afc61198e14a98e06e5261149de74c629acd2bc61b82e57ec90e5461b69be" \
-            gcr.io/iree-oss/swiftshader-bleeding-edge@sha256:d2483ac643184a16942489d8f709ef3714543ae795fa9ae8fd2e4d8bf68a24a0 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
             ./build_tools/cmake/build_and_test_asan.sh
 
   tsan:

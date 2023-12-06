@@ -91,8 +91,8 @@ The [shark-infra](https://github.com/shark-infra) org maintains forks of
 key repositories for which we may need to carry local patches. Anyone who
 contributes to the project can request access to create patch branches here.
 
-* https://github.com/shark-infra/llvm-project (`main` branch)
-* https://github.com/shark-infra/stablehlo (`main` branch)
+* <https://github.com/shark-infra/llvm-project> (`main` branch)
+* <https://github.com/shark-infra/stablehlo> (`main` branch)
 
 The [fork-roller](https://github.com/shark-infra/fork-roller) repository has an
 action named [Advance Upstream Forks](https://github.com/shark-infra/fork-roller/blob/main/.github/workflows/advance_forks.yml)
@@ -186,6 +186,7 @@ python compiler/src/iree/compiler/API/generate_exports.py
 ```
 
 Missing symbols would usually cause the following kind of errors in python builf kind of error:
+
 ```
 ImportError: /work/full-build-dir/compiler/bindings/python/iree/compiler/_mlir_libs/_mlir.cpython-37m-x86_64-linux-gnu.so: undefined symbol: mlirLocationFromAttribute
 ```
@@ -246,8 +247,8 @@ under docker, we can find the hash from CI log.
 An example from a log:
 
 ```
-[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2 build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
-Unable to find image 'gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2' locally
+[18:30:23 UTC] docker run --volume=/tmpfs/src/github/iree:/tmpfs/src/github/iree --workdir=/tmpfs/src/github/iree --rm --user=1003:1004 --volume=/tmpfs/fake_etc/group:/etc/group:ro --volume=/tmpfs/fake_etc/passwd:/etc/passwd:ro --volume=/tmpfs/fake_home:/home/kbuilder --volume=/home/kbuilder/.config/gcloud:/home/kbuilder/.config/gcloud:ro gcr.io/iree-oss/frontends@sha256:b654dffe5b69d35f3182ffe1a41be98e3f32bc7843b6f10829a8eb2aa6a345ee build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
+Unable to find image 'gcr.io/iree-oss/frontends@sha256:b654dffe5b69d35f3182ffe1a41be98e3f32bc7843b6f10829a8eb2aa6a345ee' locally
 sha256:aeb8de9fb7af3913d385ec6b274320197d61aa7bc51a6e8bc0deba644da3e405: Pulling from iree-oss/frontends-swiftshader
 ```
 
@@ -255,7 +256,7 @@ You can find the hash tag from log and run the below command. It makes sure that
 you have the enviroment as same as CI bot and requires less local setup.
 
 ```
-docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends-swiftshader@sha256:1d2424dc512545a32b68e3f6b839541832fa24b5fce78cb253b3a4cd4592d9b2
+docker run --interactive --tty --rm --volume=$PWD:/src/iree --workdir=/src/iree gcr.io/iree-oss/frontends@sha256:b654dffe5b69d35f3182ffe1a41be98e3f32bc7843b6f10829a8eb2aa6a345ee
 ```
 
 To repro failures in `iree/e2e/`:
