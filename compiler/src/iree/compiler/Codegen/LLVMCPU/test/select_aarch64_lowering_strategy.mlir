@@ -8,15 +8,15 @@
     #hal.descriptor_set.binding<3, storage_buffer>
   ]>
 ]>
-hal.executable private @matmul_tensors  {
+hal.executable private @matmul_tensors_default  {
   hal.executable.variant @llvm target(<"llvm-cpu", "embedded-elf-arm_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-elf"
   }>) {
-    hal.executable.export @matmul_tensors layout(#pipeline_layout)
+    hal.executable.export @matmul_tensors_default layout(#pipeline_layout)
     builtin.module {
-      func.func @matmul_tensors() {
+      func.func @matmul_tensors_default() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
         %M = hal.interface.constant.load[0] : index
@@ -45,7 +45,7 @@ hal.executable private @matmul_tensors  {
   }
 }
 
-// CHECK-LABEL: @matmul_tensors
+// CHECK-LABEL: @matmul_tensors_default
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [8, 16, 0], [0, 0, 1], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //       CHECK: hal.executable.export public @matmul_tensors
