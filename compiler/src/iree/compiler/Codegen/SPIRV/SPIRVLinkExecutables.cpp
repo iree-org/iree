@@ -33,8 +33,8 @@ struct SPIRVLinkExecutablesPass final
     int retainSize = 0;
     for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
       IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
-      if (llvm::all_of(executable.getOps<IREE::HAL::ExecutableVariantOp>(),
-                       [](auto op) { return !op.getObjects().has_value(); })) {
+      if (llvm::none_of(executable.getOps<IREE::HAL::ExecutableVariantOp>(),
+                        [](auto op) { return op.getObjects().has_value(); })) {
         sourceExecutableOps[retainSize++] = executable;
       }
     }
