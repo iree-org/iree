@@ -52,7 +52,8 @@ py_binary(
 ) for (lhs_rhs_type, acc_type) in [
     ("i8", "i32"),
     ("f32", "f32"),
-    ("f16", "f16"),
+    # TODO(#15800): enable fp16 tests after the compilation time issue is fixed.
+    # ("f16", "f16"),
     ("f16", "f32"),
     # TODO(#15258): enable bf16 tests when that bug is fixed.
     # ("bf16", "bf16"),
