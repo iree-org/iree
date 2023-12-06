@@ -493,6 +493,7 @@ def HAL_BufferType : AnyTypeOf<[
 ]>;
 
 def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
+def HAL_OrdinalArrayAttr : TypedArrayAttrBase<HAL_OrdinalAttr, "Array of index ordinal attributes">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 

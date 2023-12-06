@@ -362,6 +362,13 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     E.g., in the above example, `-> %0` would tie the first argument to the
     result. In that case, there would be no separate block argument for the
     result.
+
+    Objects for multiple targets can be specified and the ones used are selected
+    based on their target and an optional condition region that returns true if
+    the variant is valid for use on the provided runtime `!hal.device`. If no
+    variants within an executable are valid then loading will fail at runtime.
+    If multiple variants are valid the first valid one found will be loaded and
+    used for execution.
   }];
 
   let arguments = (ins
@@ -371,7 +378,9 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     HAL_ShapeDynamicDims:$argument_dims,
     HAL_ShapeDynamicDims:$result_dims,
     HAL_PipelineLayoutAttr:$layout,
-    HAL_ExecutableObjectsAttr:$objects,
+    ArrayAttr:$targets,
+    HAL_OrdinalArrayAttr:$target_ordinals,
+    ArrayAttr:$target_objects,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
@@ -383,7 +392,8 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   );
 
   let regions = (region
-    AnyRegion:$workgroup_count
+    AnyRegion:$workgroup_count,
+    VariadicRegion<AnyRegion>:$target_regions
   );
 
   let assemblyFormat = [{
@@ -397,7 +407,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     `layout` `(` $layout `)`
     (`bindings` `(` $bindings^ `)`)?
-    `objects` `(` $objects `)`
+    `objects` `(` `{` custom<TargetConditionObjects>($targets,
+                                                     $target_ordinals,
+                                                     $target_objects,
+                                                     $target_regions) `}` `)`
     attr-dict-with-keyword
   }];
 
@@ -408,6 +421,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
+      "IREE::HAL::ExecutableObjectsAttr":$targetObjects,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -428,6 +442,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     }
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
+
+    IREE::HAL::ExecutableObjectsAttr getObjectsAttr() {
+      return IREE::HAL::ExecutableObjectsAttr::get(getContext(), getTargets(), getTargetObjects());
     }
   }];
 

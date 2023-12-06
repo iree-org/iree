@@ -199,6 +199,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   // Module pass to outline dispatch regions (and similar ops) into their own
   // functions wrapped in executables.
+  passManager.addPass(IREE::Flow::createOutlineDispatchExternsPass());
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Annotate executables based on their contents.
