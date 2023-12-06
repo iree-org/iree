@@ -1386,31 +1386,6 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-static void setX86VectorTileSizes(linalg::GenericOp genericOp,
-                                  unsigned numLoops,
-                                  ArrayRef<int64_t> distTileSizes,
-                                  ArrayRef<int64_t> minTileSizes,
-                                  ArrayRef<int64_t> maxTileSizes,
-                                  VectorPreProcStrategy vecPreProcStrategy,
-                                  SmallVectorImpl<int64_t> &vecTileSizes) {
-  vecTileSizes.append(numLoops, 0);
-  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
-  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
-    if (distTileSizes[loopNum]) {
-      vecTileSizes[loopNum] = getMaxVectorTileSize(
-          0, distTileSizes[loopNum], minTileSizes[loopNum],
-          minTileSizes[loopNum], /*allowIncompleteTile=*/false,
-          /*enforcePowerOfTwo=*/vecPreProcStrategy ==
-              VectorPreProcStrategy::Masking);
-    } else {
-      // If the distribution tile size is zero, and static loop range is 0 as
-      // well, set the tile sizes here to zero as well.
-      vecTileSizes[loopNum] =
-          staticLoopRanges[loopNum] == 1 ? 0 : minTileSizes[loopNum];
-    }
-  }
-}
-
 /// Returns true if the operation is a GenericOp implementing a supported
 /// transposition.
 static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
@@ -1480,14 +1455,14 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
                        << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes;
+  SmallVector<int64_t> parallelTileSizes = minTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes, minTileSizes,
-                        maxTileSizes, vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
-  setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
-                                 parallelTileSizes, reductionTileSizes);
+  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
+    setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
+                                   parallelTileSizes, reductionTileSizes);
+  }
 
   LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
                        << parallelTileSizes << "\n");
@@ -1500,15 +1475,10 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
   tileSizes.emplace_back(numLoops, 0);
 
   // For non-tensor based ops use the Buffer ops pipeline.
-  DispatchLoweringPassPipeline passPipeline;
-  if (genericOp.hasTensorSemantics()) {
-    passPipeline =
-        vecPreProcStrategy == VectorPreProcStrategy::Peeling
-            ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
-            : DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  } else {
-    passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  }
+  DispatchLoweringPassPipeline passPipeline =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
+          : DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
                                                tileSizes, passPipeline);
@@ -1588,9 +1558,7 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
                        << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes, minTileSizes,
-                        maxTileSizes, vecPreProcStrategy, parallelTileSizes);
+  SmallVector<int64_t> parallelTileSizes = minTileSizes;
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes};
   // No need for tiling reduction dims and inner parallel dims.
@@ -1598,13 +1566,9 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   tileSizes.emplace_back(numTilingDims, 0);
   tileSizes.emplace_back(numTilingDims, 0);
 
-  // For non-tensor based ops use the Buffer ops pipeline.
-  auto passPipeline =
-      genericOp.hasTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 /// Sets elementwise dispatches to use peeling approach. It scales the number of
@@ -1672,9 +1636,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
 
-  // Setting reduction tile sizes is a workaround to kick in peeling transform.
-  // The tiling won't happen because the sizes are zeros. Also, no need for
-  // further tiling inner parallel dims, so the 4-th list is also zeros.
+  // No need for tiling reduction dims and inner parallel dims.
   SmallVector<int64_t> zeros(numLoops, 0);
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes, zeros, zeros};
 
