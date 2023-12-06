@@ -71,14 +71,20 @@ function(iree_check_test)
   endif()
 
   # Exclude based on input type availability.
-  if("${_RULE_INPUT_TYPE}" STREQUAL "stablehlo" AND NOT IREE_INPUT_STABLEHLO)
-    return()
-  endif()
-  if("${_RULE_INPUT_TYPE}" STREQUAL "tosa" AND NOT IREE_INPUT_TOSA)
-    return()
-  endif()
-  if("${_RULE_INPUT_TYPE}" STREQUAL "torch" AND NOT IREE_INPUT_TORCH)
-    return()
+  # Note: we can only reliably check for this when builting the compiler host
+  # tools from source. If the tools are already built, we assume that all input
+  # dialects are enabled. We could query the tools in the binary directory for
+  # support dynamically if optionality would be useful.
+  if(NOT IREE_HOST_BIN_DIR)
+    if("${_RULE_INPUT_TYPE}" STREQUAL "stablehlo" AND NOT IREE_INPUT_STABLEHLO)
+      return()
+    endif()
+    if("${_RULE_INPUT_TYPE}" STREQUAL "tosa" AND NOT IREE_INPUT_TOSA)
+      return()
+    endif()
+    if("${_RULE_INPUT_TYPE}" STREQUAL "torch" AND NOT IREE_INPUT_TORCH)
+      return()
+    endif()
   endif()
 
   iree_package_name(_PACKAGE_NAME)
@@ -103,7 +109,7 @@ function(iree_check_test)
   if (_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
-  
+
   iree_bytecode_module(
     NAME
       "${_MODULE_NAME}"
