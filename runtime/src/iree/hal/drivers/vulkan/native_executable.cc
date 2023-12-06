@@ -364,7 +364,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
     // Error occurred. Destroy all shader module created thus far and return.
     for (size_t i = 0; i < shader_module_count; ++i) {
       // iree_allocator_malloc() zeros the allocation so we can check NULL here.
-      if (shader_modules[i] == NULL) break;
+      if (shader_modules[i] == VK_NULL_HANDLE) break;
       iree_hal_vulkan_destroy_shader_module(logical_device, shader_modules[i]);
     }
     return status;
