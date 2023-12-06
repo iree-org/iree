@@ -3806,20 +3806,54 @@ operations and data.</p>
 </ul>
 <h4 id="plugins">Plugins<a class="headerlink" href="#plugins" title="Permanent link">link</a></h4>
 <p>A <em>plugin</em> extends the compiler with some combination of target backends,
-options, passes, or pipelines.</p>
+options, passes, or pipelines. For documentation on compiler plugins, see
+<a href="https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md"><code>compiler/PluginAPI/README.md</code></a>.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">link</a></h3>
 <div class="admonition info">
 <p>This snippet shows the general layout of the API. For working examples, see
-the samples below.</p>
+the <a href="#samples">samples below</a>.</p>
 </div>
-<div class="highlight"><pre><span></span><code><span class="c"># CMakeLists.txt</span>
-<span class="nb">set</span><span class="p">(</span><span class="s">_IREE_COMPILER_API</span><span class="w"> </span><span class="s2">&quot;${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler&quot;</span><span class="p">)</span>
+<p>To build a custom tool using the compiler API:</p>
+<!-- TODO(scotttodd): snippet that links to a working in-tree sample instead -->
+
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">CMakeLists.txt</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
+<span class="normal">2</span>
+<span class="normal">3</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nb">set</span><span class="p">(</span><span class="s">_IREE_COMPILER_API</span><span class="w"> </span><span class="s2">&quot;${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler&quot;</span><span class="p">)</span>
 <span class="nb">target_include_directories</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">SYSTEM</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="o">${</span><span class="nv">_IREE_COMPILER_API</span><span class="o">}</span><span class="p">)</span>
 <span class="nb">target_link_libraries</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">iree_compiler_bindings_c_loader</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1">// iree_compiler_demo.c</span>
-
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iree/compiler/embedding_api.h&gt;</span>
+</code></pre></div></td></tr></table></div>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">iree_compiler_demo.c</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iree/compiler/embedding_api.h&gt;</span>
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iree/compiler/loader.h&gt;</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
@@ -3851,7 +3885,7 @@ the samples below.</p>
 <span class="w">  </span><span class="n">ireeCompilerSessionDestroy</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
 <span class="w">  </span><span class="n">ireeCompilerGlobalShutdown</span><span class="p">();</span>
 <span class="p">}</span>
-</code></pre></div>
+</code></pre></div></td></tr></table></div>
 <h4 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">link</a></h4>
 <table>
 <thead>
@@ -3868,14 +3902,24 @@ the samples below.</p>
 <td>Compiler application template</td>
 </tr>
 <tr>
-<td><a href="https://github.com/openxla/openxla-pjrt-plugin/">openxla/openxla-pjrt-plugin</a></td>
-<td><a href="https://github.com/openxla/openxla-pjrt-plugin/blob/main/iree/integrations/pjrt/common/iree_compiler.cc"><code>iree_compiler.cc</code></a></td>
+<td><a href="https://github.com/openxla/iree/">openxla/iree</a></td>
+<td><a href="https://github.com/openxla/iree/blob/main/integrations/pjrt/src/iree_pjrt/common/iree_compiler.cc"><code>integrations/pjrt/.../iree_compiler.cc</code></a></td>
 <td>JIT for TensorFlow + JAX to IREE</td>
 </tr>
 <tr>
 <td><a href="https://github.com/openxla/iree/">openxla/iree</a></td>
+<td><a href="https://github.com/openxla/iree/tree/main/compiler/plugins"><code>compiler/plugins</code></a></td>
+<td>In-tree supported compiler plugins</td>
+</tr>
+<tr>
+<td><a href="https://github.com/openxla/iree/">openxla/iree</a></td>
 <td><a href="https://github.com/openxla/iree/tree/main/samples/compiler_plugins"><code>samples/compiler_plugins/</code></a></td>
-<td>In-tree demos of compiler plugins</td>
+<td>In-tree sample compiler plugins</td>
+</tr>
+<tr>
+<td><a href="https://github.com/nod-ai/iree-amd-aie/">nod-ai/iree-amd-aie</a></td>
+<td><a href="https://github.com/nod-ai/iree-amd-aie/tree/main/compiler/plugins/target/AMD-AIE/iree-amd-aie"><code>plugins/.../iree-amd-aie</code></a></td>
+<td>Early-phase plugins for interfacing with AMD AIE accelerators</td>
 </tr>
 </tbody>
 </table>
@@ -4131,60 +4175,814 @@ hardware devices like CPUs, GPUs and other accelerators.</p>
 </ul>
 <h3 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">link</a></h3>
 <div class="admonition info">
-<p>This snippet shows the general layout of the API. For working examples, see
-the samples below.</p>
+<p>For other examples, see the <a href="#samples_1">samples below</a>.</p>
 </div>
-<div class="highlight"><pre><span></span><code><span class="c"># CMakeLists.txt</span>
-<span class="nb">target_include_directories</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">SYSTEM</span><span class="w"> </span><span class="s">PRIVATE</span><span class="w"> </span><span class="o">${</span><span class="nv">_IREE_RUNTIME_ROOT</span><span class="o">}</span><span class="p">)</span>
-<span class="nb">target_link_libraries</span><span class="p">(</span><span class="o">${</span><span class="nv">_NAME</span><span class="o">}</span><span class="w"> </span><span class="s">iree_runtime_runtime</span><span class="p">)</span>
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1">// iree_runtime_demo.c</span>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">hello_world_terse.c</label><label for="__tabbed_2_2">hello_world_explained.c</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_terse.c"><code>runtime/src/iree/runtime/demo/hello_world_terse.c</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">runtime/src/iree/runtime/demo/hello_world_terse.c</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  1</span>
+<span class="normal">  2</span>
+<span class="normal">  3</span>
+<span class="normal">  4</span>
+<span class="normal">  5</span>
+<span class="normal">  6</span>
+<span class="normal">  7</span>
+<span class="normal">  8</span>
+<span class="normal">  9</span>
+<span class="normal"> 10</span>
+<span class="normal"> 11</span>
+<span class="normal"> 12</span>
+<span class="normal"> 13</span>
+<span class="normal"> 14</span>
+<span class="normal"> 15</span>
+<span class="normal"> 16</span>
+<span class="normal"> 17</span>
+<span class="normal"> 18</span>
+<span class="normal"> 19</span>
+<span class="normal"> 20</span>
+<span class="normal"> 21</span>
+<span class="normal"> 22</span>
+<span class="normal"> 23</span>
+<span class="normal"> 24</span>
+<span class="normal"> 25</span>
+<span class="normal"> 26</span>
+<span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iree/runtime/api.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/api.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/testdata/simple_mul_module_c.h&quot;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">);</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">);</span>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 1. Entry point / shared iree_runtime_instance_t setup</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="c1">// Setup the shared runtime instance.</span>
+<span class="w">  </span><span class="c1">// Create and configure the instance shared across all sessions.</span>
 <span class="w">  </span><span class="n">iree_runtime_instance_options_t</span><span class="w"> </span><span class="n">instance_options</span><span class="p">;</span>
 <span class="w">  </span><span class="n">iree_runtime_instance_options_initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">);</span>
 <span class="w">  </span><span class="n">iree_runtime_instance_options_use_all_available_drivers</span><span class="p">(</span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">);</span>
 <span class="w">  </span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="w">  </span><span class="n">iree_runtime_instance_create</span><span class="p">(</span>
-<span class="w">      </span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">);</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_instance_create</span><span class="p">(</span>
+<span class="w">      </span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">));</span>
 
-<span class="w">  </span><span class="c1">// Create the HAL device used to run the workloads.</span>
+<span class="w">  </span><span class="c1">// All sessions should share the same instance.</span>
+<span class="w">  </span><span class="n">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">iree_runtime_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 2. Load modules and initialize state in iree_runtime_session_t</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// TODO(#5724): move device selection into the compiled modules.</span>
 <span class="w">  </span><span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="w">  </span><span class="n">iree_runtime_instance_try_create_default_device</span><span class="p">(</span>
-<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">);</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_instance_try_create_default_device</span><span class="p">(</span>
+<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
 
-<span class="w">  </span><span class="c1">// Create a session to hold the module state.</span>
+<span class="w">  </span><span class="c1">// Create one session per loaded module to hold the module state.</span>
 <span class="w">  </span><span class="n">iree_runtime_session_options_t</span><span class="w"> </span><span class="n">session_options</span><span class="p">;</span>
 <span class="w">  </span><span class="n">iree_runtime_session_options_initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">session_options</span><span class="p">);</span>
 <span class="w">  </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
-<span class="w">  </span><span class="n">iree_runtime_session_create_with_device</span><span class="p">(</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_session_create_with_device</span><span class="p">(</span>
+<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">session_options</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span>
+<span class="w">      </span><span class="n">iree_runtime_instance_host_allocator</span><span class="p">(</span><span class="n">instance</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">session</span><span class="p">));</span>
+<span class="w">  </span><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Load your user module into the session (from memory, from file, etc).</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">iree_file_toc_t</span><span class="o">*</span><span class="w"> </span><span class="n">module_file</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">iree_runtime_testdata_simple_mul_module_create</span><span class="p">();</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_session_append_bytecode_module_from_memory</span><span class="p">(</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">),</span>
+<span class="w">      </span><span class="n">iree_allocator_null</span><span class="p">()));</span>
+
+<span class="w">  </span><span class="c1">// Run your functions; you should reuse the session to make multiple calls.</span>
+<span class="w">  </span><span class="n">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">iree_runtime_session_release</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 3. Call a function within a module with buffer views</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+
+<span class="c1">// func.func @simple_mul(%arg0: tensor&lt;4xf32&gt;, %arg1: tensor&lt;4xf32&gt;) -&gt;</span>
+<span class="c1">// tensor&lt;4xf32&gt;</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">iree_runtime_call_t</span><span class="w"> </span><span class="n">call</span><span class="p">;</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_initialize_by_name</span><span class="p">(</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;module.simple_mul&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
+
+<span class="w">  </span><span class="c1">// %arg0: tensor&lt;4xf32&gt;</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">iree_hal_dim_t</span><span class="w"> </span><span class="n">arg0_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">};</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">arg0_data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">1.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.3f</span><span class="p">};</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_buffer_view_allocate_buffer_copy</span><span class="p">(</span>
+<span class="w">      </span><span class="n">iree_runtime_session_device</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
+<span class="w">      </span><span class="n">iree_runtime_session_device_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
+<span class="w">      </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">arg0_shape</span><span class="p">),</span><span class="w"> </span><span class="n">arg0_shape</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_ELEMENT_TYPE_FLOAT_32</span><span class="p">,</span>
+<span class="w">      </span><span class="n">IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR</span><span class="p">,</span>
+<span class="w">      </span><span class="p">(</span><span class="n">iree_hal_buffer_params_t</span><span class="p">){</span>
+<span class="w">          </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL</span><span class="p">,</span>
+<span class="w">          </span><span class="p">.</span><span class="n">access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_ACCESS_ALL</span><span class="p">,</span>
+<span class="w">          </span><span class="p">.</span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_BUFFER_USAGE_DEFAULT</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">arg0_data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">arg0_data</span><span class="p">)),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">arg0</span><span class="p">));</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">      </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span>
+<span class="w">      </span><span class="n">iree_runtime_session_host_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">)));</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_inputs_push_back_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="n">arg0</span><span class="p">));</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// %arg1: tensor&lt;4xf32&gt;</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">iree_hal_dim_t</span><span class="w"> </span><span class="n">arg1_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">};</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">arg1_data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">10.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">100.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1000.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">10000.0f</span><span class="p">};</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_buffer_view_allocate_buffer_copy</span><span class="p">(</span>
+<span class="w">      </span><span class="n">iree_runtime_session_device</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
+<span class="w">      </span><span class="n">iree_runtime_session_device_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">),</span>
+<span class="w">      </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">arg1_shape</span><span class="p">),</span><span class="w"> </span><span class="n">arg1_shape</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_HAL_ELEMENT_TYPE_FLOAT_32</span><span class="p">,</span>
+<span class="w">      </span><span class="n">IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR</span><span class="p">,</span>
+<span class="w">      </span><span class="p">(</span><span class="n">iree_hal_buffer_params_t</span><span class="p">){</span>
+<span class="w">          </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL</span><span class="p">,</span>
+<span class="w">          </span><span class="p">.</span><span class="n">access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_ACCESS_ALL</span><span class="p">,</span>
+<span class="w">          </span><span class="p">.</span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_BUFFER_USAGE_DEFAULT</span><span class="p">,</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">arg1_data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">arg1_data</span><span class="p">)),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">arg1</span><span class="p">));</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">      </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">arg1</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span>
+<span class="w">      </span><span class="n">iree_runtime_session_host_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">)));</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_inputs_push_back_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="n">arg1</span><span class="p">));</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg1</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_invoke</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="cm">/*flags=*/</span><span class="mi">0</span><span class="p">));</span>
+
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// -&gt; tensor&lt;4xf32&gt;</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">ret0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_call_outputs_pop_front_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ret0</span><span class="p">));</span>
+<span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">      </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">ret0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span>
+<span class="w">      </span><span class="n">iree_runtime_session_host_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">)));</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">ret0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">iree_runtime_call_deinitialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+</div>
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_explained.c"><code>runtime/src/iree/runtime/demo/hello_world_explained.c</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">runtime/src/iree/runtime/demo/hello_world_explained.c</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">  1</span>
+<span class="normal">  2</span>
+<span class="normal">  3</span>
+<span class="normal">  4</span>
+<span class="normal">  5</span>
+<span class="normal">  6</span>
+<span class="normal">  7</span>
+<span class="normal">  8</span>
+<span class="normal">  9</span>
+<span class="normal"> 10</span>
+<span class="normal"> 11</span>
+<span class="normal"> 12</span>
+<span class="normal"> 13</span>
+<span class="normal"> 14</span>
+<span class="normal"> 15</span>
+<span class="normal"> 16</span>
+<span class="normal"> 17</span>
+<span class="normal"> 18</span>
+<span class="normal"> 19</span>
+<span class="normal"> 20</span>
+<span class="normal"> 21</span>
+<span class="normal"> 22</span>
+<span class="normal"> 23</span>
+<span class="normal"> 24</span>
+<span class="normal"> 25</span>
+<span class="normal"> 26</span>
+<span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span>
+<span class="normal">131</span>
+<span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span>
+<span class="normal">139</span>
+<span class="normal">140</span>
+<span class="normal">141</span>
+<span class="normal">142</span>
+<span class="normal">143</span>
+<span class="normal">144</span>
+<span class="normal">145</span>
+<span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span>
+<span class="normal">207</span>
+<span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span>
+<span class="normal">224</span>
+<span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span>
+<span class="normal">254</span>
+<span class="normal">255</span>
+<span class="normal">256</span>
+<span class="normal">257</span>
+<span class="normal">258</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span>
+<span class="normal">263</span>
+<span class="normal">264</span>
+<span class="normal">265</span>
+<span class="normal">266</span>
+<span class="normal">267</span>
+<span class="normal">268</span>
+<span class="normal">269</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/api.h&quot;</span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">iree_runtime_demo_main</span><span class="p">(</span><span class="kt">void</span><span class="p">);</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">);</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">);</span>
+
+<span class="cp">#if defined(IREE_RUNTIME_DEMO_LOAD_FILE_FROM_COMMAND_LINE_ARG)</span>
+
+<span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">demo_file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+
+<span class="c1">// Takes the first argument on the command line as a file path and loads it.</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">argc</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;usage: session_demo module_file.vmfb</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="n">demo_file_path</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_demo_main</span><span class="p">();</span>
+<span class="p">}</span>
+
+<span class="c1">// Loads a compiled IREE module from the file system.</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_load_module</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_session_append_bytecode_module_from_file</span><span class="p">(</span><span class="n">session</span><span class="p">,</span>
+<span class="w">                                                               </span><span class="n">demo_file_path</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="cp">#elif defined(IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA)</span>
+
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/testdata/simple_mul_module_c.h&quot;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_demo_main</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
+
+<span class="c1">// Loads the bytecode module directly from memory.</span>
+<span class="c1">//</span>
+<span class="c1">// Embedding the compiled output into your binary is not always possible (or</span>
+<span class="c1">// recommended) but is a fairly painless way to get things working on a variety</span>
+<span class="c1">// of targets without worrying about how to deploy files or pass flags.</span>
+<span class="c1">//</span>
+<span class="c1">// In cases like this the module file is in .rodata and does not need to be</span>
+<span class="c1">// freed; if the memory needs to be released when the module is unloaded then a</span>
+<span class="c1">// custom allocator can be provided to get a callback instead.</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_load_module</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">iree_file_toc_t</span><span class="o">*</span><span class="w"> </span><span class="n">module_file</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">iree_runtime_testdata_simple_mul_module_create</span><span class="p">();</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_session_append_bytecode_module_from_memory</span><span class="p">(</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">),</span>
+<span class="w">      </span><span class="n">iree_allocator_null</span><span class="p">());</span>
+<span class="p">}</span>
+
+<span class="cp">#else</span>
+<span class="cp">#error &quot;must specify a way to load the module data&quot;</span>
+<span class="cp">#endif  </span><span class="c1">// IREE_RUNTIME_DEMO_LOAD_FILE_FROM_*</span>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 1. Entry point / shared iree_runtime_instance_t setup</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// Applications should create and share a single instance across all sessions.</span>
+
+<span class="c1">// This would live in your application startup/shutdown code or scoped to the</span>
+<span class="c1">// usage of IREE. Creating and destroying instances is expensive and should be</span>
+<span class="c1">// avoided.</span>
+<span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">iree_runtime_demo_main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Set up the shared runtime instance.</span>
+<span class="w">  </span><span class="c1">// An application should usually only have one of these and share it across</span>
+<span class="w">  </span><span class="c1">// all of the sessions it has. The instance is thread-safe, while the</span>
+<span class="w">  </span><span class="c1">// sessions are only thread-compatible (you need to lock if its required).</span>
+<span class="w">  </span><span class="n">iree_runtime_instance_options_t</span><span class="w"> </span><span class="n">instance_options</span><span class="p">;</span>
+<span class="w">  </span><span class="n">iree_runtime_instance_options_initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_runtime_instance_options_use_all_available_drivers</span><span class="p">(</span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="n">iree_status_t</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_instance_create</span><span class="p">(</span>
+<span class="w">      </span><span class="o">&amp;</span><span class="n">instance_options</span><span class="p">,</span><span class="w"> </span><span class="n">iree_allocator_system</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">instance</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Run the demo.</span>
+<span class="w">  </span><span class="c1">// A real application would load its models (at startup, on-demand, etc) and</span>
+<span class="w">  </span><span class="c1">// retain them somewhere to be reused. Startup time and likelihood of failure</span>
+<span class="w">  </span><span class="c1">// varies across different HAL backends; the synchronous CPU backend is nearly</span>
+<span class="w">  </span><span class="c1">// instantaneous and will never fail (unless out of memory) while the Vulkan</span>
+<span class="w">  </span><span class="c1">// backend may take significantly longer and fail if there are not supported</span>
+<span class="w">  </span><span class="c1">// devices.</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Release the shared instance - it will be deallocated when all sessions</span>
+<span class="w">  </span><span class="c1">// using it have been released (here it is deallocated immediately).</span>
+<span class="w">  </span><span class="n">iree_runtime_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="p">)</span><span class="n">iree_status_code</span><span class="p">(</span><span class="n">status</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Dump nice status messages to stderr on failure.</span>
+<span class="w">    </span><span class="c1">// An application can route these through its own logging infrastructure as</span>
+<span class="w">    </span><span class="c1">// needed. Note that the status is a handle and must be freed!</span>
+<span class="w">    </span><span class="n">iree_status_fprint</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">);</span>
+<span class="w">    </span><span class="n">iree_status_ignore</span><span class="p">(</span><span class="n">status</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 2. Load modules and initialize state in iree_runtime_session_t</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// Each instantiation of a module will live in its own session. Module state</span>
+<span class="c1">// like variables will be retained across calls within the same session.</span>
+
+<span class="c1">// Loads the demo module and uses it to perform some math.</span>
+<span class="c1">// In a real application you&#39;d want to hang on to the iree_runtime_session_t</span>
+<span class="c1">// and reuse it for future calls - especially if it holds state internally.</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// TODO(#5724): move device selection into the compiled modules.</span>
+<span class="w">  </span><span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_runtime_instance_try_create_default_device</span><span class="p">(</span>
+<span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;local-task&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">device</span><span class="p">));</span>
+
+<span class="w">  </span><span class="c1">// Set up the session to run the demo module.</span>
+<span class="w">  </span><span class="c1">// Sessions are like OS processes and are used to isolate modules from each</span>
+<span class="w">  </span><span class="c1">// other and hold runtime state such as the variables used within the module.</span>
+<span class="w">  </span><span class="c1">// The same module loaded into two sessions will see their own private state.</span>
+<span class="w">  </span><span class="n">iree_runtime_session_options_t</span><span class="w"> </span><span class="n">session_options</span><span class="p">;</span>
+<span class="w">  </span><span class="n">iree_runtime_session_options_initialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">session_options</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="n">iree_status_t</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_session_create_with_device</span><span class="p">(</span>
 <span class="w">      </span><span class="n">instance</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">session_options</span><span class="p">,</span><span class="w"> </span><span class="n">device</span><span class="p">,</span>
 <span class="w">      </span><span class="n">iree_runtime_instance_host_allocator</span><span class="p">(</span><span class="n">instance</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
 
-<span class="w">  </span><span class="c1">// Load the compiled user module from a file.</span>
-<span class="w">  </span><span class="n">iree_runtime_session_append_bytecode_module_from_file</span><span class="p">(</span>
-<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;program.vmfb&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Load the compiled user module in a demo-specific way.</span>
+<span class="w">  </span><span class="c1">// Applications could specify files, embed the outputs directly in their</span>
+<span class="w">  </span><span class="c1">// binaries, fetch them over the network, etc.</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_demo_load_module</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
 
 <span class="w">  </span><span class="c1">// Build and issue the call.</span>
-<span class="w">  </span><span class="n">iree_runtime_call_t</span><span class="w"> </span><span class="n">call</span><span class="p">;</span>
-<span class="w">  </span><span class="n">iree_runtime_call_initialize_by_name</span><span class="p">(</span>
-<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;module.entry_function_name&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">);</span>
-<span class="w">  </span><span class="c1">// iree_runtime_call_inputs_push_back_buffer_view(...);</span>
-<span class="w">  </span><span class="n">iree_runtime_call_invoke</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="cm">/*flags=*/</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
 
-<span class="w">  </span><span class="c1">// Retrieve the function outputs and clean up the call.</span>
-<span class="w">  </span><span class="c1">// iree_runtime_call_outputs_pop_front_buffer_view(...);</span>
-<span class="w">  </span><span class="n">iree_runtime_call_deinitialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">);</span>
-
-<span class="w">  </span><span class="c1">// Cleanup state.</span>
+<span class="w">  </span><span class="c1">// Release the session and free all resources.</span>
 <span class="w">  </span><span class="n">iree_runtime_session_release</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
-<span class="w">  </span><span class="n">iree_hal_device_release</span><span class="p">(</span><span class="n">device</span><span class="p">);</span>
-<span class="w">  </span><span class="n">iree_runtime_instance_release</span><span class="p">(</span><span class="n">instance</span><span class="p">);</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">status</span><span class="p">;</span>
 <span class="p">}</span>
-</code></pre></div>
+
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// 3. Call a function within a module with buffer views</span>
+<span class="c1">//===----------------------------------------------------------------------===//</span>
+<span class="c1">// The inputs and outputs of a call are reusable across calls (and possibly</span>
+<span class="c1">// across sessions depending on device compatibility) and can be setup by the</span>
+<span class="c1">// application as needed. For example, an application could perform</span>
+<span class="c1">// multi-threaded buffer view creation and then issue the call from a single</span>
+<span class="c1">// thread when all inputs are ready. This simple demo just allocates them</span>
+<span class="c1">// per-call and throws them away.</span>
+
+<span class="c1">// Sets up and calls the simple_mul function and dumps the results:</span>
+<span class="c1">// func.func @simple_mul(%arg0: tensor&lt;4xf32&gt;, %arg1: tensor&lt;4xf32&gt;) -&gt;</span>
+<span class="c1">// tensor&lt;4xf32&gt;</span>
+<span class="c1">//</span>
+<span class="c1">// NOTE: this is a demo and as such this performs no memoization; a real</span>
+<span class="c1">// application could reuse a lot of these structures and cache lookups of</span>
+<span class="c1">// iree_vm_function_t to reduce the amount of per-call overhead.</span>
+<span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span>
+<span class="w">    </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Initialize the call to the function.</span>
+<span class="w">  </span><span class="n">iree_runtime_call_t</span><span class="w"> </span><span class="n">call</span><span class="p">;</span>
+<span class="w">  </span><span class="n">IREE_RETURN_IF_ERROR</span><span class="p">(</span><span class="n">iree_runtime_call_initialize_by_name</span><span class="p">(</span>
+<span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_cstring_view</span><span class="p">(</span><span class="s">&quot;module.simple_mul&quot;</span><span class="p">),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">call</span><span class="p">));</span>
+
+<span class="w">  </span><span class="c1">// Append the function inputs with the HAL device allocator in use by the</span>
+<span class="w">  </span><span class="c1">// session. The buffers will be usable within the session and _may_ be usable</span>
+<span class="w">  </span><span class="c1">// in other sessions depending on whether they share a compatible device.</span>
+<span class="w">  </span><span class="n">iree_hal_device_t</span><span class="o">*</span><span class="w"> </span><span class="n">device</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_session_device</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_hal_allocator_t</span><span class="o">*</span><span class="w"> </span><span class="n">device_allocator</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">iree_runtime_session_device_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_allocator_t</span><span class="w"> </span><span class="n">host_allocator</span><span class="w"> </span><span class="o">=</span>
+<span class="w">      </span><span class="n">iree_runtime_session_host_allocator</span><span class="p">(</span><span class="n">session</span><span class="p">);</span>
+<span class="w">  </span><span class="n">iree_status_t</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_ok_status</span><span class="p">();</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// %arg0: tensor&lt;4xf32&gt;</span>
+<span class="w">    </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">iree_hal_dim_t</span><span class="w"> </span><span class="n">arg0_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">};</span>
+<span class="w">      </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">arg0_data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">1.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.1f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.2f</span><span class="p">,</span><span class="w"> </span><span class="mf">1.3f</span><span class="p">};</span>
+<span class="w">      </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_hal_buffer_view_allocate_buffer_copy</span><span class="p">(</span>
+<span class="w">          </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">device_allocator</span><span class="p">,</span>
+<span class="w">          </span><span class="c1">// Shape rank and dimensions:</span>
+<span class="w">          </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">arg0_shape</span><span class="p">),</span><span class="w"> </span><span class="n">arg0_shape</span><span class="p">,</span>
+<span class="w">          </span><span class="c1">// Element type:</span>
+<span class="w">          </span><span class="n">IREE_HAL_ELEMENT_TYPE_FLOAT_32</span><span class="p">,</span>
+<span class="w">          </span><span class="c1">// Encoding type:</span>
+<span class="w">          </span><span class="n">IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR</span><span class="p">,</span>
+<span class="w">          </span><span class="p">(</span><span class="n">iree_hal_buffer_params_t</span><span class="p">){</span>
+<span class="w">              </span><span class="c1">// Where to allocate (host or device):</span>
+<span class="w">              </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL</span><span class="p">,</span>
+<span class="w">              </span><span class="c1">// Access to allow to this memory:</span>
+<span class="w">              </span><span class="p">.</span><span class="n">access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_ACCESS_ALL</span><span class="p">,</span>
+<span class="w">              </span><span class="c1">// Intended usage of the buffer (transfers, dispatches, etc):</span>
+<span class="w">              </span><span class="p">.</span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_BUFFER_USAGE_DEFAULT</span><span class="p">,</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="c1">// The actual heap buffer to wrap or clone and its allocator:</span>
+<span class="w">          </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">arg0_data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">arg0_data</span><span class="p">)),</span>
+<span class="w">          </span><span class="c1">// Buffer view + storage are returned and owned by the caller:</span>
+<span class="w">          </span><span class="o">&amp;</span><span class="n">arg0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">IREE_IGNORE_ERROR</span><span class="p">(</span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">          </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">));</span>
+<span class="w">      </span><span class="c1">// Add to the call inputs list (which retains the buffer view).</span>
+<span class="w">      </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_call_inputs_push_back_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="n">arg0</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="c1">// Since the call retains the buffer view we can release it here.</span>
+<span class="w">    </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg0</span><span class="p">);</span>
+
+<span class="w">    </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> * </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// %arg1: tensor&lt;4xf32&gt;</span>
+<span class="w">    </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">arg1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">iree_hal_dim_t</span><span class="w"> </span><span class="n">arg1_shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">};</span>
+<span class="w">      </span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">float</span><span class="w"> </span><span class="n">arg1_data</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">10.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">100.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">1000.0f</span><span class="p">,</span><span class="w"> </span><span class="mf">10000.0f</span><span class="p">};</span>
+<span class="w">      </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_hal_buffer_view_allocate_buffer_copy</span><span class="p">(</span>
+<span class="w">          </span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="n">device_allocator</span><span class="p">,</span><span class="w"> </span><span class="n">IREE_ARRAYSIZE</span><span class="p">(</span><span class="n">arg1_shape</span><span class="p">),</span><span class="w"> </span><span class="n">arg1_shape</span><span class="p">,</span>
+<span class="w">          </span><span class="n">IREE_HAL_ELEMENT_TYPE_FLOAT_32</span><span class="p">,</span>
+<span class="w">          </span><span class="n">IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR</span><span class="p">,</span>
+<span class="w">          </span><span class="p">(</span><span class="n">iree_hal_buffer_params_t</span><span class="p">){</span>
+<span class="w">              </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL</span><span class="p">,</span>
+<span class="w">              </span><span class="p">.</span><span class="n">access</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_MEMORY_ACCESS_ALL</span><span class="p">,</span>
+<span class="w">              </span><span class="p">.</span><span class="n">usage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IREE_HAL_BUFFER_USAGE_DEFAULT</span><span class="p">,</span>
+<span class="w">          </span><span class="p">},</span>
+<span class="w">          </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">arg1_data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">arg1_data</span><span class="p">)),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">arg1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="n">IREE_IGNORE_ERROR</span><span class="p">(</span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">          </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">arg1</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">));</span>
+<span class="w">      </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_call_inputs_push_back_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="n">arg1</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">    </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">arg1</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Synchronously perform the call.</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_call_invoke</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="cm">/*flags=*/</span><span class="mi">0</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;</span><span class="se">\n</span><span class="s"> = </span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Dump the function outputs.</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_t</span><span class="o">*</span><span class="w"> </span><span class="n">ret0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Try to get the first call result as a buffer view.</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_runtime_call_outputs_pop_front_buffer_view</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ret0</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">iree_status_is_ok</span><span class="p">(</span><span class="n">status</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// This prints the buffer view out but an application could read its</span>
+<span class="w">    </span><span class="c1">// contents, pass it to another call, etc.</span>
+<span class="w">    </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">iree_hal_buffer_view_fprint</span><span class="p">(</span>
+<span class="w">        </span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="n">ret0</span><span class="p">,</span><span class="w"> </span><span class="cm">/*max_element_count=*/</span><span class="mi">4096</span><span class="p">,</span><span class="w"> </span><span class="n">host_allocator</span><span class="p">);</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="w">  </span><span class="n">iree_hal_buffer_view_release</span><span class="p">(</span><span class="n">ret0</span><span class="p">);</span>
+
+<span class="w">  </span><span class="n">iree_runtime_call_deinitialize</span><span class="p">(</span><span class="o">&amp;</span><span class="n">call</span><span class="p">);</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">status</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+</div>
+</div>
+</div>
 <h4 id="samples_1">Samples<a class="headerlink" href="#samples_1" title="Permanent link">link</a></h4>
 <table>
 <thead>
