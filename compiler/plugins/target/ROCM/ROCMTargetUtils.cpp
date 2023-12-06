@@ -4,7 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/ROCM/ROCMTarget.h"
+#include "./ROCMTargetUtils.h"
+
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -25,8 +26,8 @@ namespace IREE {
 namespace HAL {
 
 //===========Link LLVM Module to ROCDL Start===================/
-// Inspiration of code from this section comes from TF Kernel Gen Project
-// https://github.com/tensorflow/tensorflow/blob/master/tensorflow/compiler/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.cc
+// Inspiration of code from this section comes from XLA Kernel Gen Project
+// https://github.com/openxla/xla/blob/main/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.cc
 
 bool couldNeedDeviceBitcode(const llvm::Module &module) {
   for (const llvm::Function &function : module.functions()) {
@@ -188,7 +189,7 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // Link object file using lld lnker to generate code object
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
-// https://github.com/ROCmSoftwarePlatform/llvm-project-mlir/blob/miopen-dialect/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp
+// https://github.com/ROCmSoftwarePlatform/rocMLIR/blob/0ec7b2176308229ac05f1594f5b5019d58cd9e15/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp
 std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   // Save the ISA binary to a temp file.
   int tempIsaBinaryFd = -1;

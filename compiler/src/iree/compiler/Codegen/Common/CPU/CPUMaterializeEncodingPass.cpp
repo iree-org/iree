@@ -53,6 +53,23 @@ enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
   };
 }
 
+// Enumerate tile sizes to choose from on riscv32.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+static SmallVector<TileMxNxK>
+enumerateMatmulTileRiscv32(EncodingUser user, ExecutableTargetAttr target) {
+  if (hasUkernel(target)) {
+    return {
+        TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
+        TileMxNxK{4, 8, 4}, // Truncation of the above.
+        TileMxNxK{2, 8, 4}, // Truncation of the above.
+        TileMxNxK{1, 8, 4}, // Truncation of the above.
+    };
+  }
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
+}
+
 // Enumerate tile sizes to choose from on arm64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
@@ -83,19 +100,22 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    // Note: 16-bit floating point types currently use the same tile size as
-    // f32. This makes sense when either (1) the accumulator is f32, or (2)
-    // the arithmetic will have to expand f16 to f32 in registers. We may
-    // reconsider when taking advantage of native f16/bf16 arithmetic when the
-    // accumulator itself is f16/bf16, as we could typically have a 2x wider
-    // tile in that case. However, on current CPUs, the existing tiles seem
-    // wide enough already to approach peak performance.
-    return {
-        TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
-        TileMxNxK{4, 8, 1}, // Truncation of the above.
-        TileMxNxK{2, 8, 1}, // Truncation of the above.
-        TileMxNxK{1, 8, 1}, // Truncation of the above.
-    };
+    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
+        (lhs.isF32() && rhs.isF32())) {
+      // Note: 16-bit floating point types currently use the same tile size as
+      // f32. This makes sense when either (1) the accumulator is f32, or (2)
+      // the arithmetic will have to expand f16 to f32 in registers. We may
+      // reconsider when taking advantage of native f16/bf16 arithmetic when the
+      // accumulator itself is f16/bf16, as we could typically have a 2x wider
+      // tile in that case. However, on current CPUs, the existing tiles seem
+      // wide enough already to approach peak performance.
+      return {
+          TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
+          TileMxNxK{4, 8, 1}, // Truncation of the above.
+          TileMxNxK{2, 8, 1}, // Truncation of the above.
+          TileMxNxK{1, 8, 1}, // Truncation of the above.
+      };
+    }
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
@@ -155,39 +175,52 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
         };
       }
     }
-    // Note: 16-bit floating point types currently use the same tile size as
-    // f32. This makes sense when either (1) the accumulator is f32, or (2)
-    // the arithmetic will have to expand f16 to f32 in registers. We may
-    // reconsider when taking advantage of native f16/bf16 arithmetic when the
-    // accumulator itself is f16/bf16.
-    if (hasFeature(target, "+avx512f")) {
+    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
+        (lhs.isF32() && rhs.isF32())) {
+      // Note: 16-bit floating point types currently use the same tile size as
+      // f32. This makes sense when either (1) the accumulator is f32, or (2)
+      // the arithmetic will have to expand f16 to f32 in registers. We may
+      // reconsider when taking advantage of native f16/bf16 arithmetic when the
+      // accumulator itself is f16/bf16.
+      if (hasFeature(target, "+avx512f")) {
+        if (hasUkernel(target)) {
+          return {
+              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+              TileMxNxK{8, 16, 1},  // Truncation of the above.
+              TileMxNxK{4, 16, 1},  // Truncation of the above.
+              TileMxNxK{2, 16, 1},  // Truncation of the above.
+              TileMxNxK{1, 16, 1},  // Truncation of the above.
+          };
+        } else {
+          return {
+              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+              TileMxNxK{8, 32, 1},  // Use same number of accumulators.
+              TileMxNxK{4, 64, 1},  // Use same number of accumulators.
+              TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
+              TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
+          };
+        }
+      }
+      if (hasFeature(target, "+avx")) {
+        // Note: for good performance, most +avx users will also want to add
+        // +fma, but that's a local instruction selection detail and the tile
+        // layout is unaffected, as there are enough registers even with the
+        // need for intermediate product registers when +fma is not used.
+        return {
+            TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
+            TileMxNxK{4, 8, 1}, // Truncation of the above.
+            TileMxNxK{2, 8, 1}, // Truncation of the above.
+            TileMxNxK{1, 8, 1}, // Truncation of the above.
+        };
+      }
+      // SSE fallback.
       return {
-          TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-          TileMxNxK{8, 16, 1},  // Truncation of the above.
-          TileMxNxK{4, 16, 1},  // Truncation of the above.
-          TileMxNxK{2, 16, 1},  // Truncation of the above.
-          TileMxNxK{1, 16, 1},  // Truncation of the above.
+          TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
+          TileMxNxK{4, 4, 1}, // Truncation of the above.
+          TileMxNxK{2, 4, 1}, // Truncation of the above.
+          TileMxNxK{1, 4, 1}, // Truncation of the above.
       };
     }
-    if (hasFeature(target, "+avx")) {
-      // Note: for good performance, most +avx users will also want to add
-      // +fma, but that's a local instruction selection detail and the tile
-      // layout is unaffected, as there are enough registers even with the
-      // need for intermediate product registers when +fma is not used.
-      return {
-          TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
-          TileMxNxK{4, 8, 1}, // Truncation of the above.
-          TileMxNxK{2, 8, 1}, // Truncation of the above.
-          TileMxNxK{1, 8, 1}, // Truncation of the above.
-      };
-    }
-    // SSE fallback.
-    return {
-        TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
-        TileMxNxK{4, 4, 1}, // Truncation of the above.
-        TileMxNxK{2, 4, 1}, // Truncation of the above.
-        TileMxNxK{1, 4, 1}, // Truncation of the above.
-    };
   }
 
   if (out.isSignlessInteger(32) &&
@@ -328,6 +361,9 @@ SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
   if (isX86_64(target)) {
     return enumerateMatmulTileX86_64(user, elementTypes, target);
   }
+  if (isRISCV32(target)) {
+    return enumerateMatmulTileRiscv32(user, target);
+  }
   return {};
 }
 
@@ -410,8 +446,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
-  auto role = encoding.getRole().getValue();
-  return getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
+  auto rank = tensorType.getRank();
+  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }
 
 static MaterializeEncodingFn

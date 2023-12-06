@@ -12,7 +12,7 @@ func.func @resolve_subview_memref(%arg0: memref<384x128xf32>, %arg1 : index, %ar
 // CHECK-DAG:   %[[C128:.+]] = arith.constant 128 : index
 // CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[BASE_BUFFER:.+]], %[[BASE_OFFSET:.+]], %[[BASE_SIZES:.+]]:2, %[[BASE_STRIDES:.+]]:2 = memref.extract_strided_metadata %arg0
-//     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2] 
+//     CHECK:   %[[SUB_OFFSET:.+]] = affine.apply #[[MAP]]()[%arg1, %arg2]
 //     CHECK:   return %[[BASE_BUFFER]], %[[SUB_OFFSET]], %[[C64]], %[[C64]], %[[C128]], %[[C1]]
 
 // -----

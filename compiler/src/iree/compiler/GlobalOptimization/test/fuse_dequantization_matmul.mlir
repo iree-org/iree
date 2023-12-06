@@ -7,11 +7,11 @@ module {
     %1 = tensor.empty() : tensor<11008x32x128xf32>
     %2 = linalg.fill ins(%cst : f32) outs(%0 : tensor<11008xf32>) -> tensor<11008xf32>
     %3 = linalg.generic {
-        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
-                         affine_map<(d0, d1, d2) -> (d0, d1)>, 
-                         affine_map<(d0, d1, d2) -> (d0, d1)>, 
-                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>], 
-        iterator_types = ["parallel", "parallel", "parallel"]} 
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+        iterator_types = ["parallel", "parallel", "parallel"]}
         ins(%arg0, %arg2, %arg3 : tensor<11008x32x128xi4>, tensor<11008x32xf32>, tensor<11008x32xf32>) outs(%1 : tensor<11008x32x128xf32>) {
     ^bb0(%in: i4, %in_0: f32, %in_1: f32, %out: f32):
       %5 = arith.extui %in : i4 to i32
@@ -21,10 +21,10 @@ module {
       linalg.yield %8 : f32
     } -> tensor<11008x32x128xf32>
     %4 = linalg.generic {
-        indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, 
-                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
-                         affine_map<(d0, d1, d2) -> (d0)>], 
-        iterator_types = ["parallel", "reduction", "reduction"]} 
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0)>],
+        iterator_types = ["parallel", "reduction", "reduction"]}
         ins(%arg1, %3 : tensor<32x128xf32>, tensor<11008x32x128xf32>) outs(%2 : tensor<11008xf32>) {
     ^bb0(%in: f32, %in_0: f32, %out: f32):
       %5 = arith.mulf %in, %in_0 : f32

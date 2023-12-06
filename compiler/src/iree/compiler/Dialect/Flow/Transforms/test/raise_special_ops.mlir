@@ -87,7 +87,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
   } -> tensor<10x4096x4096xf16>
   %229 = tensor.empty() : tensor<10x4096xf16>
   %230 = linalg.fill ins(%cst_121 : f16) outs(%229 : tensor<10x4096xf16>) -> tensor<10x4096xf16>
-  %231 = linalg.generic 
+  %231 = linalg.generic
   {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
   iterator_types = ["parallel", "parallel", "reduction"]}
   ins(%228 : tensor<10x4096x4096xf16>) outs(%230 : tensor<10x4096xf16>) {
@@ -95,7 +95,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
     %5290 = arith.addf %in, %out : f16
     linalg.yield %5290 : f16
   } -> tensor<10x4096xf16>
-  %232 = linalg.generic 
+  %232 = linalg.generic
   {indexing_maps = [
     affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
     affine_map<(d0, d1, d2) -> (d0, d1)>,

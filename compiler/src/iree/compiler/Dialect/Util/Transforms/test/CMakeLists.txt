@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "annotate_op_ordinals.mlir"
-    "block_patterns.mlir"
     "combine_initializers.mlir"
     "demote_f32_to_f16.mlir"
     "demote_f64_to_f32.mlir"
@@ -28,6 +27,7 @@ iree_lit_test_suite(
     "import_resources.mlir"
     "ipo.mlir"
     "outline_constants.mlir"
+    "patterns.mlir"
     "promote_bf16_to_f32.mlir"
     "promote_f16_to_f32.mlir"
     "propagate_subranges.mlir"

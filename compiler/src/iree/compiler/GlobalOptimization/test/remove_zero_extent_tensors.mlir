@@ -24,7 +24,7 @@ func.func @zero_sized_tensor_insert(%arg0 : tensor<?x?xf32>, %arg1 : tensor<0x?x
   return %1 : tensor<?x?xf32>
 }
 // CHECK: func @zero_sized_tensor_insert(%[[ARG0:.+]]: tensor<?x?xf32>
-// CHECK:   return %[[ARG0]] 
+// CHECK:   return %[[ARG0]]
 
 // -----
 

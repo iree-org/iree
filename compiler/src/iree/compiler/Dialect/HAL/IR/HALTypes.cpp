@@ -508,7 +508,7 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-std::string ExecutableTargetAttr::getSymbolNameFragment() {
+std::string ExecutableTargetAttr::getSymbolNameFragment() const {
   return sanitizeSymbolName(getFormat().getValue().lower());
 }
 

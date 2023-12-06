@@ -231,3 +231,17 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_slow_memcpy
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<2x3xi32>>, %arg1: !flow.dispatch.tensor<readwrite:tensor<3x9xi32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xi32>> -> tensor<2x3xi32>
+      flow.dispatch.tensor.store %0, %arg1, offsets = [0, 1], sizes = [2, 3], strides = [1, 1] : tensor<2x3xi32> -> !flow.dispatch.tensor<readwrite:tensor<3x9xi32>>
+      return
+    }
+  }
+}

@@ -19,8 +19,8 @@ iree_bitcode_library(
   ARCH
     wasm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -39,8 +39,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -58,8 +58,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -77,8 +77,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -96,8 +96,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -115,8 +115,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
@@ -134,8 +134,8 @@ iree_bitcode_library(
   ARCH
     arm_64
   INTERNAL_HDRS
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${CMAKE_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
