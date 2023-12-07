@@ -100,8 +100,7 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
-        (lhs.isF32() && rhs.isF32())) {
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
       // Note: 16-bit floating point types currently use the same tile size as
       // f32. This makes sense when either (1) the accumulator is f32, or (2)
       // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -175,8 +174,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
         };
       }
     }
-    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
-        (lhs.isF32() && rhs.isF32())) {
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
       // Note: 16-bit floating point types currently use the same tile size as
       // f32. This makes sense when either (1) the accumulator is f32, or (2)
       // the arithmetic will have to expand f16 to f32 in registers. We may
