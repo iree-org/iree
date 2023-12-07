@@ -1904,23 +1904,20 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   SmallVector<int64_t> lbs, ubs;
   getRangeBounds(cast<TilingInterface>(padOp.getOperation()), lbs, ubs);
 
-  SmallVector<int64_t> minTileSizes(lbs.size(), 1);
-  SmallVector<int64_t> maxTileSizes(ubs.size(), defaultDistTileSize);
-  SmallVector<int64_t> vectorTileSizes(lbs.size(), 1);
-
   unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
       padOp.getResultType().getElementType());
   int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
-  vectorTileSizes.back() = (ShapedType::isDynamic(ubs.back())
-                                ? 1
-                                : std::min(typeVectorSize, ubs.back()));
-  minTileSizes.back() = vectorTileSizes.back();
+  SmallVector<int64_t> vectorTileSizes(lbs.size(), 1);
+  if (!ShapedType::isDynamic(ubs.back())) {
+    vectorTileSizes.back() = std::min(typeVectorSize, ubs.back());
+  }
 
   SmallVector<unsigned> partitionableLoops =
       cast<PartitionableLoopsInterface>(padOp.getOperation())
           .getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-      partitionableLoops, lbs, ubs, minTileSizes, maxTileSizes);
+  SmallVector<int64_t> distTileSizes = getDefaultDistributionTileSizes(
+      entryPointFn, cast<TilingInterface>(padOp.getOperation()),
+      /*allowIncompleteTile=*/false, vectorTileSizes);
   // No further tiling for reduction and inner parallel loops.
   SmallVector<int64_t> zeros(vectorTileSizes.size(), 0);
   TileSizesListType tileSizes = {distTileSizes, vectorTileSizes, zeros, zeros};
