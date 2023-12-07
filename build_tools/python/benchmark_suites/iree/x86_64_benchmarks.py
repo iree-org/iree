@@ -25,7 +25,7 @@ class Linux_x86_64_Benchmarks(object):
 
     CASCADELAKE_NO_DT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_NO_DT,
-        tags=["experimental-flags", "no-data-tiling"],
+        tags=["experimental-flags", "no-dt"],
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
@@ -34,7 +34,7 @@ class Linux_x86_64_Benchmarks(object):
     )
     CASCADELAKE_DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_DT_UK,
-        tags=["data-tiling", "ukernel"],
+        tags=["default-flags", "dt-uk"],
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",

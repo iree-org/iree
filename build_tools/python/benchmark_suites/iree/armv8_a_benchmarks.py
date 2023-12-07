@@ -34,7 +34,7 @@ class Android_ARMv8_A_Benchmarks(object):
 
     NO_DT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_NO_DT,
-        tags=["experimental-flags", "no-data-tiling"],
+        tags=["experimental-flags", "no-dt"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
@@ -43,7 +43,7 @@ class Android_ARMv8_A_Benchmarks(object):
     )
     DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DT_UK,
-        tags=["data-tiling", "ukernel"],
+        tags=["default-flags", "dt-uk"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling",
