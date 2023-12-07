@@ -14,10 +14,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static void generatePrefix(llvm::raw_ostream &os,
                            const std::string &library_name,
@@ -107,7 +104,4 @@ bool outputStaticLibrary(const std::string &library_name,
                                          header_file_path.c_str());
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

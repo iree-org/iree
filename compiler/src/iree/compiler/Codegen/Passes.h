@@ -7,13 +7,11 @@
 #ifndef IREE_COMPILER_CODEGEN_PASSES_H_
 #define IREE_COMPILER_CODEGEN_PASSES_H_
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Registers all conversion passes in this directory.
 void registerCodegenPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_PASSES_H_

@@ -10,8 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -51,5 +50,4 @@ std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass() {
   return std::make_unique<TestExecutablePreprocessingPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

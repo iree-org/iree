@@ -9,8 +9,7 @@
 
 #include "iree/compiler/Utils/OptionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
@@ -153,7 +152,6 @@ struct PreprocessingOptions {
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_PIPELINES_OPTIONS_H_

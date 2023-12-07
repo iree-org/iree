@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-stream-materialize-copy-on-write"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -72,28 +69,27 @@ static bool isSafeToElideCOW(Value operand, IREE::Stream::ResourceType type) {
 
 // Materializes a copy for a mutated |operand| on |affinity| if required.
 // If it's determined that eliding the copy is safe it will be omitted.
-// Returns true if the copy was required and materialized.
-static bool materializeOperandCOW(Location loc, OpOperand &operand,
-                                  IREE::Stream::AffinityAttr affinity,
-                                  OpBuilder &builder) {
+// Returns a clone operation result if the copy was required and materialized,
+// and nullptr otherwise.
+static Value materializeOperandCOW(Location loc, OpOperand &operand,
+                                   IREE::Stream::AffinityAttr affinity,
+                                   OpBuilder &builder) {
   // If we can safely elide the copy early we do so here to avoid adding too
   // much IR. Anything that requires wider analysis (CFG, across functions, etc)
   // has to wait until a subsequent pass.
   auto resourceType =
-      llvm::dyn_cast<IREE::Stream::ResourceType>(operand.get().getType());
+      dyn_cast<IREE::Stream::ResourceType>(operand.get().getType());
   if (!resourceType)
-    return false;
+    return nullptr;
   if (isSafeToElideCOW(operand.get(), resourceType))
-    return false;
+    return nullptr;
 
   // Materialize a clone operation just for the operand provided.
   auto sizeAwareType =
       llvm::cast<IREE::Util::SizeAwareTypeInterface>(resourceType);
   auto size = sizeAwareType.queryValueSize(loc, operand.get(), builder);
-  auto cloneOp = builder.create<IREE::Stream::AsyncCloneOp>(
+  return builder.create<IREE::Stream::AsyncCloneOp>(
       loc, resourceType, operand.get(), size, size, affinity);
-  operand.set(cloneOp.getResult());
-  return true;
 }
 
 // Materializes a copy for each mutated operand on |tiedOp| as required.
@@ -116,10 +112,24 @@ static bool materializeTiedOpCOW(IREE::Util::TiedOpInterface tiedOp) {
     int64_t operandIdx = tiedOperandIndices[i];
     if (operandIdx == IREE::Util::TiedOpInterface::kUntiedIndex)
       continue;
-    auto &operand = tiedOp->getOpOperand(operandIdx);
-    didChange =
-        materializeOperandCOW(tiedOp.getLoc(), operand, affinity, builder) ||
-        didChange;
+    auto &tiedOperand = tiedOp->getOpOperand(operandIdx);
+
+    // If copy was required and materialized, we should forward it to all
+    // operands that use the same value.
+    if (auto clone = materializeOperandCOW(tiedOp.getLoc(), tiedOperand,
+                                           affinity, builder)) {
+      Value original = tiedOperand.get();
+      tiedOperand.set(clone);
+      didChange = true;
+
+      // TODO(#11249): Support in-place collective operations.
+      if (!isa<IREE::Stream::AsyncCollectiveOp>(tiedOp)) {
+        for (auto &operand : tiedOp->getOpOperands()) {
+          if (operand.get() == original)
+            operand.set(clone);
+        }
+      }
+    }
   }
 
   return didChange;
@@ -197,7 +207,4 @@ std::unique_ptr<OperationPass<>> createMaterializeCopyOnWritePass() {
   return std::make_unique<MaterializeCopyOnWritePass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

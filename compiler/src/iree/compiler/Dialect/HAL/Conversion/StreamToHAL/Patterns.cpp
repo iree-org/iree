@@ -20,8 +20,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -1327,5 +1326,4 @@ void populateStreamToHALPatterns(MLIRContext *context,
   patterns.insert<ElideYieldOpPattern>(mapping, typeConverter, context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -18,9 +18,10 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-peel"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
+
 // Gathers tiled loops that aren't distribution loops from previous tiling
 // stages.
 void collectLoopsToPeel(Operation *op,
@@ -89,10 +90,11 @@ void LLVMCPUPeelPass::runOnOperation() {
     return signalPassFailure();
   }
 }
+
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass() {
   return std::make_unique<LLVMCPUPeelPass>();
 }
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler

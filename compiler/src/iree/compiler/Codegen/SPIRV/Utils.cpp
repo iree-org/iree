@@ -18,8 +18,7 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
@@ -116,5 +115,4 @@ template SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
     OpBuilder &builder, Location loc, unsigned numDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

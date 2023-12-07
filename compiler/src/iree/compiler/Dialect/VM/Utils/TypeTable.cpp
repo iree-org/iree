@@ -6,10 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Finds all types in the module and builds a type table mapping the index in
 // the vector to the type represented by the type ordinal.
@@ -59,7 +56,4 @@ std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   return table;
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

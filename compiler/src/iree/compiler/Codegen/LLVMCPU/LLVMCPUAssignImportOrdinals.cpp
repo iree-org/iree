@@ -10,8 +10,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -85,5 +84,4 @@ createLLVMCPUAssignImportOrdinalsPass() {
   return std::make_unique<LLVMCPUAssignImportOrdinalsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

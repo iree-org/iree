@@ -16,8 +16,8 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 // These must match what the runtime uses.
@@ -180,5 +180,4 @@ createWGSLReplacePushConstantsPass() {
   return std::make_unique<WGSLReplacePushConstantsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

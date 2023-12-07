@@ -10,8 +10,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/SymbolTable.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Interface for encoding of VM operations within functions.
 // This base manages source map construction and vm.func walking while
@@ -79,7 +78,6 @@ public:
   virtual LogicalResult encodeResults(Operation::result_range values) = 0;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMFUNCENCODER_H_

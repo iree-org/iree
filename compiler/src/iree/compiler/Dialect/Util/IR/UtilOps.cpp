@@ -22,8 +22,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Experimental
@@ -863,8 +862,9 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
   }
 }
 
-namespace IREE {
-namespace Util {
+} // namespace mlir::iree_compiler
+
+namespace mlir ::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // util.optimization_barrier
@@ -1506,10 +1506,7 @@ void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
   getLengthMutable().assign(operand.length);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"

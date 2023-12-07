@@ -12,8 +12,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Definitions and Utilities
@@ -130,7 +129,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass();
 /// Register Common GPU passes.
 void registerCodegenCommonGPUPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_

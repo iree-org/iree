@@ -22,10 +22,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.cpp.inc" // IWYU pragma: keep
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 //===----------------------------------------------------------------------===//
 // TargetEnv
@@ -286,7 +283,7 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
   return TargetEnvAttr::get(versionAttr, revisionAttr, extensionsAttr, vendorID,
                             deviceType, deviceID, capabilities);
 }
-} // anonymous namespace
+} // namespace
 
 Attribute VulkanDialect::parseAttribute(DialectAsmParser &parser,
                                         Type type) const {
@@ -335,7 +332,7 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
   }
   printer << ", " << targetEnv.getCapabilitiesAttr() << ">";
 }
-} // anonymous namespace
+} // namespace
 
 void VulkanDialect::printAttribute(Attribute attr,
                                    DialectAsmPrinter &printer) const {
@@ -359,7 +356,4 @@ void VulkanDialect::registerAttributes() {
                 >();
 }
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan

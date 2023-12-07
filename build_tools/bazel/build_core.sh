@@ -14,11 +14,11 @@
 # IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 0
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
 #   See https://bazel.build/reference/command-line-reference.html#flag--build_tag_filters)
-#   Default: "-nokokoro"
+#   Default: "-nodocker"
 # TEST_TAG_FILTERS: Passed to bazel to filter targets to test. Note that test
 #   targets excluded this way will also not be built.
 #   See https://bazel.build/reference/command-line-reference.html#flag--test_tag_filters)
-#   Default: If IREE_VULKAN_DISABLE=1, "-nokokoro,-driver=vulkan". Else "-nokokoro".
+#   Default: If IREE_VULKAN_DISABLE=1, "-nodocker,-driver=vulkan". Else "-nodocker".
 
 set -xeuo pipefail
 
@@ -57,8 +57,8 @@ if ! [[ -n IREE_LLVM_EMBEDDED_LINKER_PATH ]]; then
   test_env_args+=(--action_env=IREE_LLVM_EMBEDDED_LINKER_PATH="${IREE_LLVM_EMBEDDED_LINKER_PATH}")
 fi
 
-declare -a default_build_tag_filters=("-nokokoro")
-declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
+declare -a default_build_tag_filters=("-nodocker")
+declare -a default_test_tag_filters=("-nodocker" "-driver=metal")
 
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 # We test on SwiftShader, which does not support this extension.
@@ -87,14 +87,17 @@ if ! [[ -v TEST_TAG_FILTERS ]]; then
 fi
 
 # Build and test everything in the main workspace (not integrations).
+#
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
 # We use `bazel query //...` piped to `bazel test` rather than the simpler
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
-# want them built by CI unless they are excluded with "nokokoro".
+# want them built by CI unless they are excluded with tags.
+#
 # Explicitly list bazelrc so that builds are reproducible and get cache hits
 # when this script is invoked locally.
+#
 # xargs is set to high arg limits to avoid multiple Bazel invocations and will
 # hard fail if the limits are exceeded.
 # See https://github.com/bazelbuild/bazel/issues/12479

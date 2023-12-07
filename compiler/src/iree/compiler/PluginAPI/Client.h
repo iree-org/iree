@@ -23,13 +23,13 @@ class ModuleOp;
 class OpPassManager;
 } // namespace mlir
 
-namespace mlir::iree_compiler {
-
-namespace IREE::HAL {
 // Forward declared only from Dialect/HAL/Target/TargetRegistry.h so as to avoid
 // bringing full dependencies into the plugin API.
+namespace mlir::iree_compiler::IREE::HAL {
 class TargetBackendList;
-} // namespace IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL
+
+namespace mlir::iree_compiler {
 
 class AbstractPluginSession;
 class PluginRegistrar;
@@ -178,8 +178,8 @@ public:
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
-  // If the plugin contributes HAL target backends, then it must return a
-  // pointer to the plugin session-owned registry here. Otherwise, nullptr.
+  // Populates new HAL target backends, if any, into the given list.
+  // Targets will be merged into the plugin session-owned registry.
   virtual void
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
 

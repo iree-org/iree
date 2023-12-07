@@ -15,9 +15,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 // We have a layer of indirection around the GlobalOptimizationOptions because
 // we also need a reference to the const-eval builder, which is injected
@@ -105,8 +103,6 @@ std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
 
 void registerGlobalOptimizationPipeline();
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES_H_

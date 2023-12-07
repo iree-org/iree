@@ -13,9 +13,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
@@ -28,6 +26,11 @@ static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
     "iree-global-opt-enable-fuse-silu-horizontal-matmul",
     llvm::cl::desc(
         "Enables fusing specifically structured matmuls (experimental)."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableExpandVectors(
+    "iree-global-opt-enable-expand-vectors",
+    llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
     llvm::cl::init(false));
 
 void buildGlobalOptExprHoistingPassPipeline(
@@ -102,7 +105,9 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-    mainPassManager.addPass(createExpandVectorsPass());
+    if (clEnableExpandVectors) {
+      mainPassManager.addPass(createExpandVectorsPass());
+    }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
@@ -183,6 +188,4 @@ void registerGlobalOptimizationPipeline() {
           });
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

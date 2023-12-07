@@ -50,10 +50,7 @@ static llvm::cl::opt<bool>
                     llvm::cl::desc("Emulate all memset types with dispatches."),
                     llvm::cl::init(false));
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Type utilities
@@ -404,7 +401,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass() {
   return std::make_unique<MaterializeBuiltinsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

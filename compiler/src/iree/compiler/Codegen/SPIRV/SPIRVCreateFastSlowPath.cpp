@@ -31,8 +31,7 @@
 
 #define DEBUG_TYPE "iree-spirv-create-fast-slow-path"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns true if the the given `attrOrValue` is a constant zero.
 static bool isZero(OpFoldResult attrOrValue) {
@@ -160,5 +159,4 @@ createSPIRVCreateFastSlowPathPass() {
   return std::make_unique<SPIRVCreateFastSlowPathPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

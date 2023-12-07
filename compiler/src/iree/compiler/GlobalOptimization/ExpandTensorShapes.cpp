@@ -29,9 +29,7 @@
 
 #define DEBUG_TYPE "iree-flow-expand-tensor-shapes"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 namespace {
 
 // TODO(benvanik): factor out into a generic util pass base that lets us share
@@ -635,6 +633,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass() {
   return std::make_unique<ExpandTensorShapesPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

@@ -18,8 +18,8 @@
 
 #define DEBUG_TYPE "iree-spirv-map-memref-storage-class"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 std::optional<spirv::StorageClass>
@@ -111,5 +111,4 @@ createSPIRVMapMemRefStorageClassPass() {
   return std::make_unique<SPIRVMapMemRefStorageClassPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

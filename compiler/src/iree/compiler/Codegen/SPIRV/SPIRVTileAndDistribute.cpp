@@ -47,8 +47,7 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Invocation tiling patterns
@@ -224,5 +223,4 @@ createSPIRVTileAndDistributePass() {
   return std::make_unique<SPIRVTileAndDistributePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

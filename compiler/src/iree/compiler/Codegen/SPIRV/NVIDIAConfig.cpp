@@ -28,9 +28,7 @@ constexpr unsigned NVIDIANumSubgroupsPerWorkgroup = 4;
 // The number of tiles along M and N dimensions per workgroup.
 constexpr unsigned NVIDIANumMNTilesPerSubgroup = 4;
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            const spirv::TargetEnv &targetEnv) {
@@ -95,6 +93,4 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

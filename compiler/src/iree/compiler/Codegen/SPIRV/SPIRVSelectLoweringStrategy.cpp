@@ -27,8 +27,7 @@
 
 #define DEBUG_TYPE "iree-spirv-select-lowering-strategy-pass"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -148,5 +147,4 @@ createSPIRVSelectLoweringStrategyPass() {
   return std::make_unique<SPIRVSelectLoweringStrategyPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

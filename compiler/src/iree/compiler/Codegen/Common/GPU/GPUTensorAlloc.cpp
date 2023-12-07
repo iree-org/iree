@@ -18,8 +18,7 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensor-alloc"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // For optimal performance we always want to copy 128 bits
 static constexpr int copyVectorNumBits = 128;
@@ -228,5 +227,4 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern) {
   return std::make_unique<GPUTensorAllocPass>(promoteSharedMemPattern);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

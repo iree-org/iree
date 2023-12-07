@@ -16,10 +16,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 class StripAndSplatConstantsPass
     : public StripAndSplatConstantsBase<StripAndSplatConstantsPass> {
@@ -58,7 +55,4 @@ createStripAndSplatConstantsPass() {
   return std::make_unique<StripAndSplatConstantsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

@@ -26,10 +26,7 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // !util.buffer
@@ -769,10 +766,7 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
   return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 //===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
@@ -783,10 +777,7 @@ SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // At the end so it can use functions above:
 #include "iree/compiler/Dialect/Util/IR/UtilOpInterfaces.cpp.inc"
@@ -799,7 +790,4 @@ void UtilDialect::registerTypes() {
       >();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

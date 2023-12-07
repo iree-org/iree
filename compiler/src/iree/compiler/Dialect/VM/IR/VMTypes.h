@@ -22,10 +22,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 namespace detail {
 struct ListTypeStorage;
@@ -106,9 +103,6 @@ public:
   Type getObjectType();
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMTYPES_H_

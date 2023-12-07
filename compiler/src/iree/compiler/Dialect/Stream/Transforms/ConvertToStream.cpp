@@ -33,10 +33,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 // Builds a stream.tensor.import op that imports an external tensor value into
@@ -275,7 +272,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass() {
   return std::make_unique<ConvertToStreamPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

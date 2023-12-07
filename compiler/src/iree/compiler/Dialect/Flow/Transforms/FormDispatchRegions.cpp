@@ -41,11 +41,11 @@
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
-namespace mlir {
-
 //===----------------------------------------------------------------------===//
 // Definition of TensorDimTrackingRewriter
 //===----------------------------------------------------------------------===//
+
+namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
@@ -70,9 +70,9 @@ void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
     dimOps.insert(op);
 }
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+} // namespace mlir
+
+namespace mlir::iree_compiler::IREE::Flow {
 
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
@@ -929,7 +929,4 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
   return std::make_unique<FormDispatchRegionsPass>(options);
 }
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

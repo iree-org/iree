@@ -11,8 +11,7 @@
 
 using namespace mlir::linalg;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns true if `map` is a tranpose. A transpose map is a projected
 /// permutation with or without zeros in results where there exist at least two
@@ -125,5 +124,4 @@ void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   dynamicTrait = computeDynamicInfo(linalgOp);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

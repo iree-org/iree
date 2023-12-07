@@ -20,10 +20,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===========Link LLVM Module to ROCDL Start===================/
 // Inspiration of code from this section comes from XLA Kernel Gen Project
@@ -258,7 +255,4 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
 }
 //==============Create HSACO End=============//
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

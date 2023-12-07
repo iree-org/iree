@@ -7,6 +7,7 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
 #include <optional>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
@@ -18,9 +19,9 @@ class CastOpInterface;
 class OpBuilder;
 class Location;
 class NamedAttribute;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 /// Returns a CastOpInterface op, if the producer is a CastOpInterface op, or a
 /// linalg::GenericOp that performs only a CastOpInterface on its input.
@@ -53,8 +54,6 @@ FailureOr<IREE::Flow::DispatchRegionOp>
 wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
                                    SmallVector<Operation *> ops);
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

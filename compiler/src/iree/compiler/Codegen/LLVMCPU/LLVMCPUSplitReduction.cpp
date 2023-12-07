@@ -21,8 +21,8 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-split-reduction"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 /// Make sure that
@@ -214,6 +214,7 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
     }
   }
 }
+
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -221,5 +222,5 @@ createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);
 }
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler

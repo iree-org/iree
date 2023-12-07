@@ -9,10 +9,7 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 class CheckDialect : public Dialect {
 public:
@@ -20,9 +17,6 @@ public:
   static StringRef getDialectNamespace() { return "check"; }
 };
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check
 
 #endif // IREE_COMPILER_MODULES_CHECK_IR_CHECK_DIALECT_H_

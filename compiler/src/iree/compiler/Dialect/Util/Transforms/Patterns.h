@@ -9,19 +9,13 @@
 
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Populates |patterns| with some risky/IREE-specific canonicalization patterns.
 // Some of these apply to other dialects (such as std/builtin) and could be
 // upstreamed after some more exhaustive investigation.
 void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns);
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PATTERNS_H_

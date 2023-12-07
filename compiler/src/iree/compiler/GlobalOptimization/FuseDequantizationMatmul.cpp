@@ -22,9 +22,7 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -856,6 +854,4 @@ createFuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
       enableQuantizedMatmulReassociation);
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

@@ -25,10 +25,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static std::string getAttrStr(Attribute attr) {
   if (!attr)
@@ -400,7 +397,4 @@ static PassRegistration<MaterializeDispatchInstrumentationPass> pass([] {
   return std::make_unique<MaterializeDispatchInstrumentationPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

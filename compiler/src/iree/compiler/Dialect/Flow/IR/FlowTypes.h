@@ -24,10 +24,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowEnums.h.inc" // IWYU pragma: export
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOpInterfaces.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/Flow/IR/FlowTypeInterfaces.h.inc" // IWYU pragma: export
@@ -163,10 +160,7 @@ struct DispatchTensorTypeStorage : public TypeStorage {
 
 } // namespace detail
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES

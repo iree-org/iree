@@ -7,8 +7,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using IREE::LinalgExt::EncodingAttr;
 using IREE::LinalgExt::EncodingRole;
@@ -96,20 +95,68 @@ bool isBatchMatmulEncodingUser(EncodingUser user) {
   return user == EncodingUser::BATCH_MATMUL;
 }
 
-MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingUser user,
-                                                 EncodingRole role,
+int64_t getIntOrZero(IntegerAttr a) {
+  return a == IntegerAttr() ? 0 : a.getInt();
+}
+
+bool isVecmatEncoding(EncodingAttr encoding) {
+  return encoding.getUser().getValue() == EncodingUser::MATMUL &&
+         getIntOrZero(encoding.getMatmulNarrow_M()) == 1;
+}
+
+bool isMatvecEncoding(EncodingAttr encoding) {
+  return encoding.getUser().getValue() == EncodingUser::MATMUL &&
+         getIntOrZero(encoding.getMatmulNarrow_N()) == 1;
+}
+
+bool isBatchVecmatEncoding(EncodingAttr encoding) {
+  return encoding.getUser().getValue() == EncodingUser::BATCH_MATMUL &&
+         getIntOrZero(encoding.getMatmulNarrow_M()) == 1;
+}
+
+bool isBatchMatvecEncoding(EncodingAttr encoding) {
+  return encoding.getUser().getValue() == EncodingUser::BATCH_MATMUL &&
+         getIntOrZero(encoding.getMatmulNarrow_N()) == 1;
+}
+
+bool isVectorEncoding(int64_t rank, EncodingUser user) {
+  return rank == 1 || (isBatchMatmulEncodingUser(user) && rank == 2);
+}
+
+MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
+                                                 int64_t rank,
                                                  TileMxNxK tileMxNxK) {
+  EncodingUser user = encoding.getUser().getValue();
+  EncodingRole role = encoding.getRole().getValue();
+  bool isVector = isVectorEncoding(rank, user);
+  bool isVecmatVector = (isVector && (isVecmatEncoding(encoding) ||
+                                      isBatchVecmatEncoding(encoding)));
+  bool isMatvecVector = (isVector && (isMatvecEncoding(encoding) ||
+                                      isBatchMatvecEncoding(encoding)));
   // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
   int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
 
   MaterializeEncodingInfo encodingInfo;
-  encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};
+  if (isVector) {
+    encodingInfo.innerDimsPos = {matmulDimBase};
+  } else {
+    encodingInfo.innerDimsPos = {matmulDimBase, matmulDimBase + 1};
+  }
+
   switch (role) {
   case (EncodingRole::LHS): {
+    if (isVecmatVector) {
+      encodingInfo.innerTileSizes = {tileMxNxK.K};
+      break;
+    }
     encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.K};
     break;
   }
   case (EncodingRole::RHS): {
+    if (isMatvecVector) {
+      encodingInfo.innerTileSizes = {tileMxNxK.K};
+      break;
+    }
     encodingInfo.innerTileSizes = {tileMxNxK.N, tileMxNxK.K};
     encodingInfo.innerDimsPos = {matmulDimBase + 1, matmulDimBase};
     encodingInfo.outerDimsPerm =
@@ -119,6 +166,14 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingUser user,
     break;
   }
   case (EncodingRole::RESULT): {
+    if (isVecmatVector) {
+      encodingInfo.innerTileSizes = {tileMxNxK.N};
+      break;
+    }
+    if (isMatvecVector) {
+      encodingInfo.innerTileSizes = {tileMxNxK.M};
+      break;
+    }
     encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.N};
     break;
   }
@@ -130,5 +185,4 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingUser user,
   return encodingInfo;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

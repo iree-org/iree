@@ -18,10 +18,7 @@
 
 #define DEBUG_TYPE "iree-flow-form-scalar-dispatches"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -277,7 +274,4 @@ createFormScalarDispatchesPass() {
   return std::make_unique<FormScalarDispatchesPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

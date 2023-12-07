@@ -13,8 +13,7 @@ IREE_DEFINE_COMPILER_OPTION_FLAGS(
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::SchedulingOptions);
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::PreprocessingOptions);
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void BindingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
@@ -190,5 +189,4 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

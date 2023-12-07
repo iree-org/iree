@@ -10,10 +10,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/IR/Module.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Links LLVM module to ROC Device Library Bit Code
 void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
@@ -22,9 +19,6 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // Compiles ISAToHsaco Code
 std::string createHsaco(Location loc, const std::string isa, StringRef name);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_ROCM_ROCMTARGETUTILS_H_

@@ -15,8 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Removes push constants by replacing hal.interface.constant.loads with
 // hal.interface.binding.subspan + flow.dispatch.tensor.load.
@@ -29,7 +28,6 @@ createWGSLReplacePushConstantsPass();
 
 void registerCodegenWGSLPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_WGSL_PASSES_H_

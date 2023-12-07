@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-tools"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static StringRef fixupArg(StringRef arg) {
   // HACK: pass pipeline parsing doesn't handle strings with spaces and the only
@@ -317,7 +314,4 @@ static PassRegistration<PreprocessExecutablesPass> pass([] {
   return std::make_unique<PreprocessExecutablesPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

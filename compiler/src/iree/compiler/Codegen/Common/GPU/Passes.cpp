@@ -7,8 +7,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 #define GEN_PASS_REGISTRATION
@@ -19,5 +18,4 @@ void registerCodegenCommonGPUPasses() {
   // Generated.
   registerPasses();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

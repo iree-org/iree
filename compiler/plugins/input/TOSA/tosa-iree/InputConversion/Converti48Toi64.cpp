@@ -19,8 +19,7 @@
 
 using namespace mlir;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class Converti48Toi64Pass : public Converti48Toi64Base<Converti48Toi64Pass> {
 public:
@@ -184,5 +183,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createConverti48Toi64() {
   return std::make_unique<Converti48Toi64Pass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

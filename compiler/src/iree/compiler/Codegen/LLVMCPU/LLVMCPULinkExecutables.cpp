@@ -11,8 +11,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -43,19 +42,28 @@ struct LLVMCPULinkExecutablesPass
 
     // Gather all unique executable targets - we may have multiple.
     auto executableTargetAttrs = gatherExecutableTargets(sourceExecutableOps);
-    for (auto executableTargetAttr : executableTargetAttrs) {
+    for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
       // Add our hal.executable.variant with an empty module.
+      std::string linkedVariantName =
+          executableTargetAttrs.size() == 1
+              ? attr.getSymbolNameFragment()
+              : llvm::formatv("{0}_{1}", attr.getSymbolNameFragment(), index);
       auto linkedTargetOp =
           executableBuilder.create<IREE::HAL::ExecutableVariantOp>(
-              moduleOp.getLoc(), executableTargetAttr.getSymbolNameFragment(),
-              executableTargetAttr);
+              moduleOp.getLoc(), linkedVariantName, attr);
       auto targetBuilder = OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
       targetBuilder.create<mlir::ModuleOp>(moduleOp.getLoc());
 
+      auto mergeModuleFn = [](mlir::ModuleOp sourceInnerModule,
+                              mlir::ModuleOp linkedInnerModule,
+                              DenseMap<StringRef, Operation *> &symbolMap) {
+        return mergeModuleInto(sourceInnerModule, linkedInnerModule, symbolMap);
+      };
+
       // Try linking together all executables in moduleOp.
-      if (failed(linkExecutablesInto(
-              moduleOp, sourceExecutableOps, linkedExecutableOp, linkedTargetOp,
-              [](mlir::ModuleOp moduleOp) { return moduleOp; }))) {
+      if (failed(linkExecutablesInto(moduleOp, sourceExecutableOps,
+                                     linkedExecutableOp, linkedTargetOp,
+                                     mergeModuleFn))) {
         return signalPassFailure();
       }
     }
@@ -69,5 +77,4 @@ createLLVMCPULinkExecutablesPass() {
   return std::make_unique<LLVMCPULinkExecutablesPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

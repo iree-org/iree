@@ -13,12 +13,11 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 
-namespace mlir {
-namespace bufferization {
+namespace mlir::bufferization {
 struct OneShotBufferizationOptions;
-} // namespace bufferization
+} // namespace mlir::bufferization
 
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Eliminates tensor.empty ops to avoid buffer allocations.
 LogicalResult eliminateEmptyTensors(
@@ -58,7 +57,6 @@ void populateIREEResolveExtractStridedMetadataPatterns(
 /// for maximumf/minimumf ops, e.g. LLVM NVIDIA-PTX.
 void populateReplaceSlowMinMaxOpsPatterns(RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_

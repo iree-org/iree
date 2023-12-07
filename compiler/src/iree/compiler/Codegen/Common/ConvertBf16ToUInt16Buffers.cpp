@@ -35,8 +35,8 @@
 
 #define DEBUG_TYPE "iree-spirv-emulate-bf16"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 class Bf16EmulationConverter : public TypeConverter {
@@ -296,5 +296,4 @@ createConvertBf16ToUInt16BuffersPass() {
   return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-stream-schedule-allocation"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -1873,7 +1870,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createScheduleAllocationPass() {
   return std::make_unique<ScheduleAllocationPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

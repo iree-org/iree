@@ -13,8 +13,7 @@
 
 #define DEBUG_TYPE "iree-codegen-rematerialize-parallel-ops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -84,5 +83,4 @@ createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

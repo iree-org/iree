@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-util-fuse-globals"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 struct Global {
@@ -297,7 +294,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass() {
   return std::make_unique<FuseGlobalsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

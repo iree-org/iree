@@ -31,10 +31,7 @@
 
 #define DEBUG_TYPE "iree-stream-propagate-timepoints"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 // TODO(benvanik): factor out into a generic util pass base that lets us share
@@ -679,7 +676,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass() {
   return std::make_unique<PropagateTimepointsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

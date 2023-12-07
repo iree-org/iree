@@ -11,8 +11,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Operation.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Finds the first file location in |baseLoc|, if one exists.
 // This will traverse FusedLoc, CallSiteLoc, and NameLoc locations as needed.
@@ -39,7 +38,6 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     Operation *targetOp,
                                     OpBuilder &targetBuilder);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_MODULEUTILS_H_

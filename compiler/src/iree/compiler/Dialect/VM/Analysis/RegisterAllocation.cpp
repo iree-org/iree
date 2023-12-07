@@ -20,8 +20,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dominance.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static Attribute getStrArrayAttr(Builder &builder,
                                  ArrayRef<std::string> values) {
@@ -602,5 +601,4 @@ RegisterAllocation::remapSuccessorRegisters(Location loc, Block *targetBlock,
   return feedbackArcSet.acyclicEdges;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

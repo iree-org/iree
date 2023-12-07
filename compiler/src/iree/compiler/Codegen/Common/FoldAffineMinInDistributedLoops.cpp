@@ -33,8 +33,7 @@
 
 #define DEBUG_TYPE "iree-codegen-fold-affinemin-in-distributed-loops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 #ifndef NDEBUG
 inline raw_ostream &operator<<(raw_ostream &os,
@@ -186,5 +185,4 @@ createFoldAffineMinInDistributedLoopsPass() {
   return std::make_unique<FoldAffineMinInDistributedLoopsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

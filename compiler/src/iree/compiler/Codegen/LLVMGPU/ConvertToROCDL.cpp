@@ -34,8 +34,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static llvm::cl::opt<int>
     clROCMIndexingBits("iree-rocm-index-bits",
@@ -83,9 +82,11 @@ struct ReplaceGPUBarrierWithLDSBarrier
   }
 };
 
-void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
+static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
   patterns.add<ReplaceGPUBarrierWithLDSBarrier>(patterns.getContext());
 }
+
+} // namespace
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding ROCDL equivalent.
@@ -202,11 +203,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   }
 };
 
-} // anonymous namespace
-
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass() {
   return std::make_unique<ConvertToROCDLPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -11,8 +11,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Types.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns true if the given |bitWidth|, if appearing at runtime-kernel
 /// interface, is less than a byte that should be tightly packed together.
@@ -46,7 +45,6 @@ Value calculateStorageElementOffsetInBytes(Location loc,
                                            Value linearizedIndex,
                                            OpBuilder &builder);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_TYPEUTILS_H_

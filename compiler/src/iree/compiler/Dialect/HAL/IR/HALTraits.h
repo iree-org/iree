@@ -9,20 +9,14 @@
 
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace OpTrait {
-namespace IREE {
-namespace HAL {
+namespace mlir::OpTrait::IREE::HAL {
 
 template <typename ConcreteType>
-class DeviceQuery : public OpTrait::TraitBase<ConcreteType, DeviceQuery> {
+class DeviceQuery : public mlir::OpTrait::TraitBase<ConcreteType, DeviceQuery> {
 public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace OpTrait
-} // namespace mlir
+} // namespace mlir::OpTrait::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_IR_HALTRAITS_H_

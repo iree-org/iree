@@ -38,8 +38,7 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Tiling and fusion utilities
@@ -381,5 +380,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass() {
   return std::make_unique<SPIRVTilePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

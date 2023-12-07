@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-util-ipo"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 struct LocAttr {
@@ -627,7 +624,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass() {
 
 static PassRegistration<IPOPass> pass;
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

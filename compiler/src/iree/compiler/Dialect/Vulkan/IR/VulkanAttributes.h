@@ -14,10 +14,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc" // IWYU pragma: export
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 namespace detail {
 struct TargetEnvAttributeStorage;
@@ -85,9 +82,6 @@ public:
                               CapabilitiesAttr capabilities);
 };
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan
 
 #endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_

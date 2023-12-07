@@ -15,10 +15,7 @@
 #include "mlir/IR/RegionGraphTraits.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -64,6 +61,10 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
 // TODO(#3996): add symbol ref comparison (add to IRMapping).
 static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
+  IRMapping mapping;
+  return isStructurallyEquivalentTo(lhs, rhs, mapping);
+}
+static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs) {
   IRMapping mapping;
   return isStructurallyEquivalentTo(lhs, rhs, mapping);
 }
@@ -195,30 +196,138 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   return true;
 }
 
+// Utilities to make SymbolRefAttr easier to construct.
+static SymbolRefAttr nestSymbolRef(SymbolRefAttr baseRefAttr,
+                                   FlatSymbolRefAttr leafRefAttr) {
+  if (!baseRefAttr)
+    return leafRefAttr;
+  SmallVector<FlatSymbolRefAttr> nestedRefAttrs;
+  llvm::append_range(nestedRefAttrs, baseRefAttr.getNestedReferences());
+  nestedRefAttrs.push_back(leafRefAttr);
+  return SymbolRefAttr::get(baseRefAttr.getContext(),
+                            baseRefAttr.getRootReference(), nestedRefAttrs);
+}
+static SymbolRefAttr nestSymbolRef(SymbolRefAttr baseRefAttr,
+                                   SymbolOpInterface leafOp) {
+  return nestSymbolRef(baseRefAttr, FlatSymbolRefAttr::get(leafOp));
+}
+static SymbolRefAttr nestSymbolRef(SymbolOpInterface baseOp,
+                                   FlatSymbolRefAttr leafRefAttr) {
+  return nestSymbolRef(SymbolRefAttr::get(baseOp), leafRefAttr);
+}
+static SymbolRefAttr nestSymbolRef(SymbolOpInterface baseOp,
+                                   SymbolOpInterface leafOp) {
+  return nestSymbolRef(SymbolRefAttr::get(baseOp),
+                       FlatSymbolRefAttr::get(leafOp));
+}
+
+// Recursively gathers symbol->symbol replacements from the old object table
+// regions to the new object table regions into |symbolReplacements|.
+static void gatherReplacements(
+    SymbolRefAttr oldSymbolRefAttr, MutableArrayRef<Region> oldRegions,
+    SymbolRefAttr newSymbolRefAttr, MutableArrayRef<Region> newRegions,
+    DenseMap<Attribute, SymbolRefAttr> &symbolReplacements) {
+  for (auto [nestedOldRegion, nestedNewRegion] :
+       llvm::zip_equal(oldRegions, newRegions)) {
+    for (auto [oldNestedSymbolOp, newNestedSymbolOp] :
+         llvm::zip_equal(nestedOldRegion.getOps<SymbolOpInterface>(),
+                         nestedNewRegion.getOps<SymbolOpInterface>())) {
+      if (!oldNestedSymbolOp.isPublic())
+        continue; // ignore private symbols
+      auto oldNestedSymbolRefAttr =
+          nestSymbolRef(oldSymbolRefAttr, oldNestedSymbolOp);
+      auto newNestedSymbolRefAttr =
+          nestSymbolRef(newSymbolRefAttr, newNestedSymbolOp);
+      symbolReplacements[oldNestedSymbolRefAttr] = newNestedSymbolRefAttr;
+      gatherReplacements(oldNestedSymbolRefAttr,
+                         oldNestedSymbolOp->getRegions(),
+                         newNestedSymbolRefAttr,
+                         newNestedSymbolOp->getRegions(), symbolReplacements);
+    }
+  }
+}
+
 // Replaces each usage of an entry point with its original symbol name with a
 // new symbol name.
-void replaceEntryPointUses(
-    mlir::ModuleOp moduleOp,
-    const DenseMap<Attribute, SymbolRefAttr> &replacements) {
-  for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-    funcLikeOp->walk([&](DispatchOp dispatchOp) {
-      bool didChange = false;
-      SmallVector<Attribute> newAttrs;
-      for (auto oldAttr : dispatchOp.getEntryPoints()) {
-        auto it = replacements.find(oldAttr);
-        if (it != replacements.end()) {
-          didChange = true;
-          newAttrs.push_back(it->second);
-        } else {
-          newAttrs.push_back(oldAttr);
-        }
-      }
-      if (didChange) {
-        dispatchOp.setEntryPointsAttr(
-            ArrayAttr::get(moduleOp.getContext(), newAttrs));
-      }
-    });
+static void
+replaceSymbolRefs(Operation *scopeOp,
+                  const DenseMap<Attribute, SymbolRefAttr> &replacements) {
+  AttrTypeReplacer replacer;
+  replacer.addReplacement([&](SymbolRefAttr oldAttr) {
+    auto it = replacements.find(oldAttr);
+    return std::make_pair(it == replacements.end() ? oldAttr : it->second,
+                          WalkResult::skip());
+  });
+  for (auto &region : scopeOp->getRegions()) {
+    for (auto funcOp : region.getOps<FunctionOpInterface>()) {
+      funcOp->walk([&](Operation *op) {
+        replacer.replaceElementsIn(op);
+        return WalkResult::advance();
+      });
+    }
   }
+}
+
+// Returns the total number of objects deduplicated, if any.
+// The provided |objects| array may have dead ops upon return.
+static int deduplicateObjects(Operation *scopeOp,
+                              ArrayRef<Operation *> objectOps) {
+  // Bucket based on the hash of the names of at most the first 5 ops.
+  // 5 was randomly chosen to be small enough to not increase overhead much,
+  // but giving at least enough of a sample that there is some bucketing. This
+  // was not empirically determined.
+  llvm::MapVector<uint32_t, SmallVector<Operation *>> objectMap;
+  for (auto objectOp : objectOps) {
+    int count = 0;
+    llvm::hash_code hash(1);
+    objectOp->walk([&](Operation *it) {
+      hash = llvm::hash_combine(hash, it->getName());
+      return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
+    });
+    objectMap[hash_value(hash)].push_back(objectOp);
+  }
+
+  // For each object find the first object which it is equivalent to and record
+  // the replacement.
+  SmallVector<Operation *> deadOps;
+  DenseMap<Attribute, SymbolRefAttr> symbolReplacements;
+  for (auto &[key, objectOps] : objectMap) {
+    (void)key;
+    for (int i = objectOps.size() - 1; i >= 0; --i) {
+      auto duplicateOp = cast<SymbolOpInterface>(objectOps[i]);
+      for (int j = 0; j < i; ++j) {
+        auto referenceOp = cast<SymbolOpInterface>(objectOps[j]);
+
+        // Compare this potentially duplicate object to the reference one.
+        if (!isStructurallyEquivalentTo(*duplicateOp, *referenceOp)) {
+          continue;
+        }
+
+        // Found an equivalent object! Record it and move on to the next.
+        deadOps.push_back(duplicateOp);
+
+        // Record symbol reference replacements within nested objects.
+        gatherReplacements(SymbolRefAttr::get(duplicateOp),
+                           duplicateOp->getRegions(),
+                           SymbolRefAttr::get(referenceOp),
+                           referenceOp->getRegions(), symbolReplacements);
+
+        break;
+      }
+    }
+  }
+
+  // Replace all symbol references within the scope.
+  replaceSymbolRefs(scopeOp, symbolReplacements);
+
+  // Remove the duplicate objects now that they are no longer referenced.
+  // We could rely on SymbolDCE for this but that makes looking at IR dumps
+  // harder as after this pass runs and until SymbolDCE runs there are lots of
+  // dead objects in the output.
+  for (auto *op : deadOps)
+    op->erase();
+
+  return deadOps.size();
 }
 
 } // namespace
@@ -231,92 +340,34 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-
-    // Bucket based on the hash of the names of at most the first 5 ops.
-    // 5 was randomly chosen to be small enough to not increase overhead much,
-    // but giving at least enough of a sample that there is some bucketing. This
-    // was not empiraclly deetermined.
-    llvm::MapVector<uint32_t, SmallVector<ExecutableOp, 3>> executableOpsMap;
-    totalExecutables = 0;
-    for (auto op : moduleOp.getOps<ExecutableOp>()) {
-      int count = 0;
-      llvm::hash_code hash(1);
-      op.walk([&](Operation *it) {
-        hash = llvm::hash_combine(hash, it->getName());
-        return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
-      });
-      executableOpsMap[hash_value(hash)].push_back(op);
-      ++totalExecutables;
+    SmallVector<Operation *> allObjects;
+    for (auto &op : moduleOp.getOps()) {
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>())
+        allObjects.push_back(&op);
     }
-
-    auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
-    SmallVector<ExecutableOp, 3> duplicateExecutableOps;
-    DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;
-
-    // For each executable, find the first executable which it is equivalent to.
-    for (auto &[key, executableOps] : executableOpsMap) {
-      (void)key;
-      for (int i = executableOps.size() - 1; i >= 0; --i) {
-        auto duplicateExecutableOp = executableOps[i];
-
-        for (int j = 0; j < i; ++j) {
-          auto referenceExecutableOp = executableOps[j];
-          if (!isStructurallyEquivalentTo(duplicateExecutableOp.getBody(),
-                                          referenceExecutableOp.getBody())) {
-            continue;
-          }
-
-          // Found an equivalent executable! Record it and move on to the next.
-          duplicateExecutableOps.push_back(duplicateExecutableOp);
-
-          // Record entry point reference replacements.
-          for (auto [oldExportOp, newExportOp] :
-               llvm::zip_equal(duplicateExecutableOp.getBlock()
-                                   .getOps<ExecutableExportOp>(),
-                               referenceExecutableOp.getBlock()
-                                   .getOps<ExecutableExportOp>())) {
-            auto oldSymbolRefAttr = SymbolRefAttr::get(
-                builder.getContext(), duplicateExecutableOp.getName(),
-                {SymbolRefAttr::get(builder.getContext(),
-                                    oldExportOp.getSymName())});
-            auto newSymbolRefAttr = SymbolRefAttr::get(
-                builder.getContext(), referenceExecutableOp.getName(),
-                {SymbolRefAttr::get(builder.getContext(),
-                                    newExportOp.getSymName())});
-            entryPointRefReplacements[oldSymbolRefAttr] = newSymbolRefAttr;
-          }
-
-          break;
-        }
-      }
-    }
-
-    executablesDeduplicated = duplicateExecutableOps.size();
-    remainingExecutables = totalExecutables - executablesDeduplicated;
-
-    replaceEntryPointUses(moduleOp, entryPointRefReplacements);
-
-    // Remove the duplicate executables now that they are no longer referenced.
-    //
-    // Note: removing executables can leave gaps in numbering if they were
-    // originally numbered. While we could renumber them, we choose to keep
-    // original names (numbers and all) to make it easier to track executables
-    // through this pass.
-    for (auto executableOp : duplicateExecutableOps) {
-      executableOp.erase();
-    }
+    if (allObjects.empty())
+      return;
+    totalObjects = allObjects.size();
+    objectsDeduplicated = deduplicateObjects(moduleOp, allObjects);
+    remainingObjects = totalObjects - objectsDeduplicated;
   }
 
 private:
-  Statistic totalExecutables{
-      this, "total executable(s)",
-      "Number of flow.executable ops before deduplication"};
-  Statistic executablesDeduplicated{
-      this, "duplicate executable(s)",
-      "Number of flow.executable ops removed as duplicates"};
-  Statistic remainingExecutables{
-      this, "unique executable(s)",
-      "Number of flow.executable ops remaining after deduplication"};
+  Statistic totalObjects{
+      this,
+      "total object(s)",
+      "Number of object ops before deduplication",
+  };
+  Statistic objectsDeduplicated{
+      this,
+      "duplicate object(s)",
+      "Number of object ops removed as duplicates",
+  };
+  Statistic remainingObjects{
+      this,
+      "unique object(s)",
+      "Number of object ops remaining after deduplication",
+  };
 };
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -324,7 +375,4 @@ createDeduplicateExecutablesPass() {
   return std::make_unique<DeduplicateExecutablesPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

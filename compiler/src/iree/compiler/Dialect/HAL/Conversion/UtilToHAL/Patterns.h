@@ -11,8 +11,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Appends all patterns for lowering IREE ops to HAL buffer ops and sets their
 // legality.
@@ -21,7 +20,6 @@ void populateUtilToHALPatterns(MLIRContext *context,
                                TypeConverter &typeConverter,
                                RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_UTILTOHAL_PATTERNS_H_

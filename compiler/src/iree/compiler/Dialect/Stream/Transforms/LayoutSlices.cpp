@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-stream-layout-slices"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 using Slice = IREE::Stream::ResourcePackOp::Slice;
@@ -297,7 +294,4 @@ std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass() {
   return std::make_unique<LayoutSlicesPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

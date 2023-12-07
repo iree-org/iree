@@ -27,13 +27,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-
-constexpr StringLiteral kCudaTarget = "cuda";
-constexpr StringLiteral kRocmTarget = "rocm";
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -52,10 +46,10 @@ llvm::cl::opt<bool>
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
                     llvm::cl::init(false));
 
-} // namespace iree_compiler
-} // namespace mlir
-
 namespace {
+
+constexpr StringLiteral kCudaTarget = "cuda";
+constexpr StringLiteral kRocmTarget = "rocm";
 
 /// Structure to represent target features.
 struct TargetInfo {
@@ -76,6 +70,7 @@ struct TileWorkgroupSizePair {
 
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
+
 } // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -1245,9 +1240,6 @@ static void propagateLoweringConfig(Operation *rootOperation,
   }
 }
 
-namespace mlir {
-namespace iree_compiler {
-
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
@@ -1314,5 +1306,4 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

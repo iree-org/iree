@@ -27,8 +27,7 @@
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
@@ -915,5 +914,4 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
   return false;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

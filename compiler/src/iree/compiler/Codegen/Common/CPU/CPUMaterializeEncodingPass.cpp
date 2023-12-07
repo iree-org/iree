@@ -25,8 +25,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
@@ -100,8 +99,7 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
-        (lhs.isF32() && rhs.isF32())) {
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
       // Note: 16-bit floating point types currently use the same tile size as
       // f32. This makes sense when either (1) the accumulator is f32, or (2)
       // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -175,8 +173,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
         };
       }
     }
-    if ((lhs.isBF16() && rhs.isBF16()) || (lhs.isF16() && rhs.isF16()) ||
-        (lhs.isF32() && rhs.isF32())) {
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
       // Note: 16-bit floating point types currently use the same tile size as
       // f32. This makes sense when either (1) the accumulator is f32, or (2)
       // the arithmetic will have to expand f16 to f32 in registers. We may
@@ -446,8 +443,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
-  auto role = encoding.getRole().getValue();
-  return getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
+  auto rank = tensorType.getRank();
+  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }
 
 static MaterializeEncodingFn
@@ -577,5 +574,4 @@ createCPUMaterializeUpperBoundTileSizePass(
   return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttrs);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

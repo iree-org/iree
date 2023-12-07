@@ -17,9 +17,10 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-tensor-pad"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
+
 class LLVMCPUTensorPadPass : public LLVMCPUTensorPadBase<LLVMCPUTensorPadPass> {
 private:
   LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims;
@@ -125,11 +126,11 @@ void LLVMCPUTensorPadPass::runOnOperation() {
     }
   }
 }
+
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTensorPadPass(LLVMCPUTensorPadOption option) {
   return std::make_unique<LLVMCPUTensorPadPass>(option);
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

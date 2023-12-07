@@ -20,10 +20,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // TODO(benvanik): remove this and replace with the pass pipeline options.
 // Controls executable translation targets.
@@ -327,9 +324,6 @@ void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
                            data.size() * sizeof(T)));
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETBACKEND_H_

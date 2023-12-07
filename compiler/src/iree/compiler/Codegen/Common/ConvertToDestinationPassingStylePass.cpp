@@ -46,8 +46,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 class ConvertToDestinationPassingStylePass
@@ -668,5 +667,4 @@ createConvertToDestinationPassingStylePass(
       useWARForCooperativeMatrixCodegen);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

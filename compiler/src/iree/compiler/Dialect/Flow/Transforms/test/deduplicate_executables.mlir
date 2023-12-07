@@ -375,3 +375,55 @@ flow.executable @block_successors_ex_with_swapped_cond_br {
     }
   }
 }
+
+// -----
+
+// CHECK: hal.executable private @ex0
+hal.executable private @ex0 {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
+    hal.executable.condition(%device: !hal.device) -> i1 {
+      %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
+      hal.return %selected : i1
+    }
+    hal.executable.export public @dispatch ordinal(0)
+        layout(#hal.pipeline.layout<push_constants = 0, sets = [
+          <0, bindings = [
+              <0, storage_buffer, ReadOnly>,
+              <1, storage_buffer>
+          ]>
+        ]>) {
+    ^bb0(%device: !hal.device, %workload: index):
+      hal.return %workload, %workload, %workload : index, index, index
+    }
+  }
+}
+// CHECK-NOT: hal.executable private @ex1
+hal.executable private @ex1 {
+  hal.executable.variant public @variant target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">) {
+    hal.executable.condition(%device: !hal.device) -> i1 {
+      %ok, %selected = hal.device.query<%device : !hal.device> key("some" :: "feature") : i1, i1
+      hal.return %selected : i1
+    }
+    hal.executable.export public @dispatch ordinal(0)
+        layout(#hal.pipeline.layout<push_constants = 0, sets = [
+          <0, bindings = [
+              <0, storage_buffer, ReadOnly>,
+              <1, storage_buffer>
+          ]>
+        ]>) {
+    ^bb0(%device: !hal.device, %workload: index):
+      hal.return %workload, %workload, %workload : index, index, index
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @dispatch_variants
+func.func @dispatch_variants(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: %[[C4:.*]] = arith.constant 4
+  %c4 = arith.constant 4 : index
+  // CHECK:      {{.*}} = flow.dispatch @ex0::@variant::@dispatch[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @ex0::@variant::@dispatch[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @ex0::@variant::@dispatch[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %1 = flow.dispatch @ex1::@variant::@dispatch[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  return %1 : tensor<4xf32>
+}

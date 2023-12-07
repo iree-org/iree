@@ -13,9 +13,7 @@
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 /// Adds a set of passes to the given pass manager that run preprocessing
 /// passes specified in textual pass-pipeline format using
@@ -29,8 +27,6 @@ void buildPreprocessingPassPipeline(
 
 void registerPreprocessingPasses();
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing
 
 #endif // IREE_COMPILER_PREPROCESSING_PASSES_H_

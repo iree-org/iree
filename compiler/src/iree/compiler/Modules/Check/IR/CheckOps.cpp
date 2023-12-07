@@ -12,10 +12,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 namespace {
 template <typename SrcOp, typename DstOp>
@@ -42,10 +39,7 @@ void ExpectAlmostEqConstOp::getCanonicalizationPatterns(
           context);
 }
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Modules/Check/IR/CheckOps.cpp.inc"

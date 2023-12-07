@@ -12,8 +12,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 struct GPUMultiBufferingPass
@@ -79,5 +78,4 @@ createGPUMultiBuffering(unsigned numBuffers) {
   return std::make_unique<GPUMultiBufferingPass>(numBuffers);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

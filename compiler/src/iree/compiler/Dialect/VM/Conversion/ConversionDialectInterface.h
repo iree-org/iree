@@ -13,8 +13,7 @@
 #include "mlir/IR/DialectInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // An interface for dialects to expose VM conversion functionality.
 // The VM conversion pass will query used dialects via this interface to find
@@ -63,7 +62,6 @@ private:
   mutable OwningOpRef<mlir::ModuleOp> importModuleRef;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONDIALECTINTERFACE_H_

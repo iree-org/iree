@@ -20,10 +20,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 static llvm::cl::opt<Favor> clPartitioningFavor(
     "iree-stream-partitioning-favor",
@@ -494,7 +491,4 @@ void StreamDialect::registerTypes() {
       >();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

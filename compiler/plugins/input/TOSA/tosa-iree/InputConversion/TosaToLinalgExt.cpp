@@ -25,8 +25,7 @@
 using namespace mlir;
 using namespace mlir::tosa;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Converts tosa.scatter to the iree_linalg_ext.scatter operation. As the
 // LinalgExt version is not batched therefore we materialize the batch index
@@ -174,5 +173,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt() {
   return std::make_unique<TosaToLinalgExtPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -26,10 +26,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 static llvm::cl::opt<bool> clZeroFillElidedAttrs(
     "iree-util-zero-fill-elided-attrs",
@@ -923,7 +920,4 @@ void UtilDialect::registerAttributes() {
                               SerializableStringAttrModel>(context);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

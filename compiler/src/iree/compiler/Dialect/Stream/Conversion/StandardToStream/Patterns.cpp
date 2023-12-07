@@ -14,8 +14,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
@@ -43,5 +42,4 @@ void populateStandardToStreamConversionPatterns(
                                              typeConverter, patterns);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -229,6 +229,12 @@ def InterchangeTransposeGenericOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeTransposeGenericOpsPass()";
 }
 
+def OutlineDispatchExterns :
+    Pass<"iree-flow-outline-dispatch-externs", "mlir::ModuleOp"> {
+  let summary = "Outlines external dispatches into executables";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchExternsPass()";
+}
+
 def OutlineDispatchRegions :
     Pass<"iree-flow-outline-dispatch-regions", "mlir::ModuleOp"> {
   let summary = "Outlines dispatch regions into executables";

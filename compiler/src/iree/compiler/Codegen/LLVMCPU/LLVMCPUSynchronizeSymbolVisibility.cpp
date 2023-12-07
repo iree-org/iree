@@ -9,8 +9,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -53,5 +52,4 @@ createLLVMCPUSynchronizeSymbolVisibilityPass() {
   return std::make_unique<LLVMCPUSynchronizeSymbolVisibilityPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

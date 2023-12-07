@@ -13,9 +13,7 @@
 
 #include "stablehlo-iree/Conversion/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace stablehlo {
+namespace mlir::iree_compiler::stablehlo {
 
 namespace {
 
@@ -158,9 +156,7 @@ struct StableHLOSession
 
 } // namespace
 
-} // namespace stablehlo
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::stablehlo
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     ::mlir::iree_compiler::stablehlo::StableHLOOptions);

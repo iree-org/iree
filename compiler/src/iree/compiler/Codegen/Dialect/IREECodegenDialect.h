@@ -21,12 +21,10 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void registerUKernelBufferizationInterface(DialectRegistry &registry);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_IREECODEGEN_DIALECT_H_

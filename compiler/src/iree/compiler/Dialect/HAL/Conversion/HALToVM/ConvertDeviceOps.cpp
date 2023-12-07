@@ -9,8 +9,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Rewrites a hal.device.query of an i1/i16/i32 value to a hal.device.query of
 // i64 with a truncation on the result.
@@ -139,5 +138,4 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.flush");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

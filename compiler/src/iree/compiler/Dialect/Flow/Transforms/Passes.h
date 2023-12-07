@@ -16,10 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -153,6 +150,10 @@ createDispatchWithTransformDialect(
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 
+// Outlines external dispatches into executables.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineDispatchExternsPass();
+
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
@@ -217,9 +218,6 @@ createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
 
 void registerFlowPasses();
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_

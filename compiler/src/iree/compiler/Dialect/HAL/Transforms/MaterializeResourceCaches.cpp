@@ -20,10 +20,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 class MaterializeResourceCachesPass
     : public PassWrapper<MaterializeResourceCachesPass,
@@ -392,7 +389,4 @@ static PassRegistration<MaterializeResourceCachesPass> pass([] {
   return std::make_unique<MaterializeResourceCachesPass>(options);
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

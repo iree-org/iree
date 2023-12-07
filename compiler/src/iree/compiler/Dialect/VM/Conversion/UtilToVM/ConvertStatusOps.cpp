@@ -8,8 +8,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class StatusCheckOkOpConversion
     : public OpConversionPattern<IREE::Util::StatusCheckOkOp> {
@@ -35,5 +34,4 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
   patterns.insert<StatusCheckOkOpConversion>(context, typeConverter);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

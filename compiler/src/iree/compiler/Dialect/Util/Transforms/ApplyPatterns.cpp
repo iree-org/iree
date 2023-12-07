@@ -16,10 +16,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 class ApplyPatternsPass : public ApplyPatternsBase<ApplyPatternsPass> {
 public:
@@ -54,7 +51,4 @@ std::unique_ptr<OperationPass<void>> createApplyPatternsPass() {
   return std::make_unique<ApplyPatternsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

@@ -18,10 +18,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct DescriptorState {
@@ -296,7 +293,4 @@ std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass() {
 
 static PassRegistration<ElideRedundantCommandsPass> pass;
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

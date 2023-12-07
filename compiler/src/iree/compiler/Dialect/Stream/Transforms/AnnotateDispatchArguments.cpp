@@ -28,10 +28,7 @@
 
 #define DEBUG_TYPE "iree-stream-annotate-dispatch-arguments"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -575,7 +572,4 @@ createAnnotateDispatchArgumentsPass() {
   return std::make_unique<AnnotateDispatchArgumentsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

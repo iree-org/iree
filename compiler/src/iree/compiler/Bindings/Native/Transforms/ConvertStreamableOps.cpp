@@ -17,10 +17,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 static constexpr int64_t kUnspecifiedDim = -1;
 static constexpr int64_t kTiedDim = -2;
@@ -380,7 +377,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertStreamableOpsPass() {
 
 static PassRegistration<ConvertStreamableOpsPass> pass;
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI
