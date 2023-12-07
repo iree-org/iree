@@ -381,9 +381,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamic &&
-                      sizeN != ShapedType::kDynamic &&
-                      sizeK != ShapedType::kDynamic;
+  bool isStaticSize = !ShapedType::isDynamic(sizeM) &&
+                      !ShapedType::isDynamic(sizeN) &&
+                      !ShapedType::isDynamic(sizeK);
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {

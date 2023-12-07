@@ -109,7 +109,7 @@ extractDynamicEinsumSizes(OpBuilder &b, Location loc, Value lhs, Value rhs,
       auto dimIndPos = dimIndIt - lhsLoopVec.begin();
       auto lhsShape =
           llvm::dyn_cast<RankedTensorType>(lhs.getType()).getShape();
-      if (lhsShape[dimIndPos] != ShapedType::kDynamic)
+      if (!ShapedType::isDynamic(lhsShape[dimIndPos]))
         continue;
       dimSize = b.create<tensor::DimOp>(loc, lhs, dimIndPos);
     } else {
@@ -118,7 +118,7 @@ extractDynamicEinsumSizes(OpBuilder &b, Location loc, Value lhs, Value rhs,
       auto dimIndPos = dimIndIt - rhsLoopVec.begin();
       auto rhsShape =
           llvm::dyn_cast<RankedTensorType>(rhs.getType()).getShape();
-      if (rhsShape[dimIndPos] != ShapedType::kDynamic)
+      if (!ShapedType::isDynamic(rhsShape[dimIndPos]))
         continue;
       dimSize = b.create<tensor::DimOp>(loc, rhs, dimIndPos);
     }
@@ -1154,7 +1154,7 @@ struct ReshapeOpConverter final
           if (resultType.isDynamicDim(idx))
             continue;
           for (auto targetDim : dims) {
-            if (shape[targetDim] == ShapedType::kDynamic)
+            if (ShapedType::isDynamic(shape[targetDim]))
               shape[targetDim] = 1;
           }
         }

@@ -741,7 +741,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
   unsigned dynamicIdx = 0;
   for (unsigned i = 0; i < type.getRank(); ++i) {
     int64_t dim = type.getDimSize(i);
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       dims.push_back(dynamicDims[dynamicIdx++]);
     } else {
       dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));

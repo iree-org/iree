@@ -33,7 +33,7 @@ namespace {
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
-    if (size == mlir::ShapedType::kDynamic)
+    if (ShapedType::isDynamic(size))
       return INT64_MAX;
     product *= size;
   }

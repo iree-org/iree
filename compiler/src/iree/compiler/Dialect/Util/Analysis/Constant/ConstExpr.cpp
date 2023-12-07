@@ -330,7 +330,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       for (int64_t dim : type.getShape()) {
         // Conservatively treat dynamic values as 1, to find a lower bound on
         // input size.
-        if (dim != ShapedType::kDynamic) {
+        if (!ShapedType::isDynamic(dim)) {
           elementCount *= dim;
         }
       }
@@ -343,7 +343,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
   if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
     int64_t elementCount = 1;
     for (int64_t dim : type.getShape()) {
-      if (dim == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(dim)) {
         // Dynamic values can lead to an unbounded increase in size, treat this
         // as a significant increase.
         return true;

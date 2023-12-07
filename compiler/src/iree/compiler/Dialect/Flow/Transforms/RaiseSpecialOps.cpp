@@ -186,8 +186,8 @@ raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
       // on the `source` tensor. This is not same as raising the whole
       // operation to an extract_slice, as there can be permutations and
       // projections involved.
-      if (sourceShape[idx] == ShapedType::kDynamic ||
-          resultShape[indexOp.getDim()] == ShapedType::kDynamic ||
+      if (ShapedType::isDynamic(sourceShape[idx]) ||
+          ShapedType::isDynamic(resultShape[indexOp.getDim()]) ||
           sourceShape[idx] != resultShape[indexOp.getDim()]) {
         return failure();
       }
@@ -286,7 +286,7 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
         expr == outputIndexingMap.getResult(currOutDim)) {
       offsets.push_back(zero);
       // Get the dim size from the output tensor.
-      if (outShape[currOutDim] == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(outShape[currOutDim])) {
         auto dim = rewriter.create<tensor::DimOp>(linalgOp.getLoc(), output,
                                                   currOutDim);
         sizes.push_back(dim.getResult());
@@ -538,8 +538,8 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   /// divisible by 2.
   int64_t sliceSize = targetShape.back();
   targetShape[targetShape.size() - 1] = 2;
-  targetShape.push_back(sliceSize == ShapedType::kDynamic ? sliceSize
-                                                          : sliceSize / 2);
+  targetShape.push_back(ShapedType::isDynamic(sliceSize) ? sliceSize
+                                                         : sliceSize / 2);
   Type expandedType =
       RankedTensorType::get(targetShape, sourceType.getElementType());
   Value expanded = rewriter.create<tensor::ExpandShapeOp>(loc, expandedType,

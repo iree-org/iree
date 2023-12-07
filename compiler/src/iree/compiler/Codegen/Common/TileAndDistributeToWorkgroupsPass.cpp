@@ -157,7 +157,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
 
         int64_t staticLoopRange = std::get<1>(p);
         OpFoldResult workload =
-            (staticLoopRange == ShapedType::kDynamic
+            (ShapedType::isDynamic(staticLoopRange)
                  ? OpFoldResult(std::get<0>(p))
                  : OpFoldResult(rewriter.getIndexAttr(staticLoopRange)));
         AffineExpr s0, s1;

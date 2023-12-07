@@ -72,17 +72,17 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     // cases, the dynamic offset/size value is obtained by computing from
     // another tensor which lives on the device. To avoid host-round tripping
     // enforce that offset/size is also static.
-    if (staticSize == ShapedType::kDynamic)
+    if (ShapedType::isDynamic(staticSize))
       return false;
-    if (staticOffset == ShapedType::kDynamic)
+    if (ShapedType::isDynamic(staticOffset))
       return false;
 
     if (fullSlices == false) {
       if (staticSize != 1)
         return false;
     } else {
-      if (!(staticOffset == 0 && staticSize != ShapedType::kDynamic &&
-            baseShape[dim - 1] != ShapedType::kDynamic &&
+      if (!(staticOffset == 0 && !ShapedType::isDynamic(staticSize) &&
+            !ShapedType::isDynamic(baseShape[dim - 1]) &&
             staticSize == baseShape[dim - 1])) {
         fullSlices = false;
       }

@@ -387,7 +387,7 @@ static void reduceDistributionWorkgroups(
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
     int64_t currSize = distributedTileSizes[index];
-    if (workload[index] == ShapedType::kDynamic ||
+    if (ShapedType::isDynamic(workload[index]) ||
         (maxTileSizes && currSize >= maxTileSizes.value()[index]) ||
         currSize >= workload[index]) {
       currDim--;
@@ -515,7 +515,7 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
 static int64_t getMaxDistributionTileSize(int64_t lb, int64_t ub,
                                           int64_t maxSize, int64_t vectorSize,
                                           bool allowIncompleteTile = false) {
-  if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
+  if (ShapedType::isDynamic(ub) || ShapedType::isDynamic(lb)) {
     return maxSize;
   }
   int64_t numIters = ub - lb;
@@ -561,7 +561,7 @@ static int64_t getMaxVectorTileSize(int64_t lb, int64_t ub, int64_t maxSize,
                                     int64_t vectorSize,
                                     bool allowIncompleteTile = false,
                                     bool enforcePowerOfTwo = false) {
-  if (ub == ShapedType::kDynamic || lb == ShapedType::kDynamic) {
+  if (ShapedType::isDynamic(ub) || ShapedType::isDynamic(lb)) {
     return roundUpToPow2(maxSize, enforcePowerOfTwo);
   }
   int64_t numIters = ub - lb;
@@ -1640,7 +1640,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   auto shape = genericOp.getStaticLoopRanges();
   int64_t numWorkload = 1;
   for (const auto &[index, size] : llvm::enumerate(shape)) {
-    if (size == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(size)) {
       numWorkload = ShapedType::kDynamic;
       break;
     }
@@ -1650,8 +1650,8 @@ static LogicalResult setElementwiseGenericOpRootConfig(
        numWorkload < kMinimumWorkload && currDim < numLoops;) {
     int64_t currSize = distTileSizes[currDim];
     if (currSize == shape[currDim] || currSize == 0 ||
-        shape[currDim] == ShapedType::kDynamic ||
-        numWorkload == ShapedType::kDynamic) {
+        ShapedType::isDynamic(shape[currDim]) ||
+        ShapedType::isDynamic(numWorkload)) {
       currDim++;
       continue;
     }
@@ -1911,7 +1911,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
       padOp.getResultType().getElementType());
   int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
-  vectorTileSizes.back() = (ubs.back() == ShapedType::kDynamic
+  vectorTileSizes.back() = (ShapedType::isDynamic(ubs.back())
                                 ? 1
                                 : std::min(typeVectorSize, ubs.back()));
   minTileSizes.back() = vectorTileSizes.back();

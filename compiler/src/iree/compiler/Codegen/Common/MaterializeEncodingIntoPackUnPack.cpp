@@ -70,7 +70,7 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
 
   SmallVector<OpFoldResult> result(staticTileSizes.size());
   for (size_t i = 0; i < result.size(); ++i) {
-    if (staticTileSizes[i] == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(staticTileSizes[i])) {
       result[i] = innerTileSizeValues[i];
     } else if (tensorType.isDynamicDim(i)) {
       result[i] =

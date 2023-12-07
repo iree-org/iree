@@ -122,8 +122,8 @@ public:
 
       int64_t batch = valueTy.getShape().front();
       int64_t rows = collapseShape.front();
-      bool batchDyn = batch == ShapedType::kDynamic;
-      bool rowsDyn = rows == ShapedType::kDynamic;
+      bool batchDyn = ShapedType::isDynamic(batch);
+      bool rowsDyn = ShapedType::isDynamic(rows);
       collapseShape[0] =
           (batchDyn || rowsDyn) ? ShapedType::kDynamic : batch * rows;
 

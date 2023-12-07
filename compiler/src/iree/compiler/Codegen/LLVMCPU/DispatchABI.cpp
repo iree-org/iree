@@ -815,7 +815,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       desc.setConstantStride(builder, loc, rank - 1, 1);
       OpFoldResult currentStride = builder.getIndexAttr(1);
       for (int i = rank - 1; i > 0; --i) {
-        if (strides[i - 1] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(strides[i - 1])) {
           auto dim = desc.size(builder, loc, i);
           Value currentStrideVal;
           if (std::optional<int64_t> currentStrideInt =
