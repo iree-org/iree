@@ -6,11 +6,13 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -86,6 +88,7 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
+  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32()) &&
         hasFeature(target, "+bf16")) {
@@ -96,19 +99,28 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
-      // Note: 16-bit floating point types currently use the same tile size as
-      // f32. This makes sense when either (1) the accumulator is f32, or (2)
-      // the arithmetic will have to expand f16 to f32 in registers. We may
-      // reconsider when taking advantage of native f16/bf16 arithmetic when the
-      // accumulator itself is f16/bf16, as we could typically have a 2x wider
-      // tile in that case. However, on current CPUs, the existing tiles seem
-      // wide enough already to approach peak performance.
+
+    // Note: 16-bit floating point types currently use the same tile size as
+    // f32. This makes sense when either (1) the accumulator is f32, or (2)
+    // the arithmetic will have to expand f16 to f32 in registers. We may
+    // reconsider when taking advantage of native f16/bf16 arithmetic when the
+    // accumulator itself is f16/bf16, as we could typically have a 2x wider
+    // tile in that case. However, on current CPUs, the existing tiles seem
+    // wide enough already to approach peak performance.
+    if (hasUkernel(target) && ukType != IREE_UK_FLAG_MMT4D_TYPE_NONE) {
       return {
           TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
           TileMxNxK{4, 8, 1}, // Truncation of the above.
           TileMxNxK{2, 8, 1}, // Truncation of the above.
           TileMxNxK{1, 8, 1}, // Truncation of the above.
+      };
+    } else {
+      // Use larger tile sizes for data-tiling only codegen.
+      return {
+          TileMxNxK{8, 8, 1},  // Aim to use FMLA or FMLAL.
+          TileMxNxK{4, 16, 1}, // Use same number of accumulators.
+          TileMxNxK{2, 32, 1}, // Use same number of accumulators.
+          TileMxNxK{1, 64, 1}, // Use same number of accumulators
       };
     }
   }
@@ -153,6 +165,7 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
+  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
       if (hasFeature(target, "+avx512bf16")) {
@@ -165,51 +178,51 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
         };
       }
     }
-    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
-      // Note: 16-bit floating point types currently use the same tile size as
-      // f32. This makes sense when either (1) the accumulator is f32, or (2)
-      // the arithmetic will have to expand f16 to f32 in registers. We may
-      // reconsider when taking advantage of native f16/bf16 arithmetic when the
-      // accumulator itself is f16/bf16.
-      if (hasFeature(target, "+avx512f")) {
-        if (hasUkernel(target)) {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 16, 1},  // Truncation of the above.
-              TileMxNxK{4, 16, 1},  // Truncation of the above.
-              TileMxNxK{2, 16, 1},  // Truncation of the above.
-              TileMxNxK{1, 16, 1},  // Truncation of the above.
-          };
-        } else {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 32, 1},  // Use same number of accumulators.
-              TileMxNxK{4, 64, 1},  // Use same number of accumulators.
-              TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
-              TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
-          };
-        }
-      }
-      if (hasFeature(target, "+avx")) {
-        // Note: for good performance, most +avx users will also want to add
-        // +fma, but that's a local instruction selection detail and the tile
-        // layout is unaffected, as there are enough registers even with the
-        // need for intermediate product registers when +fma is not used.
+
+    // Note: 16-bit floating point types currently use the same tile size as
+    // f32. This makes sense when either (1) the accumulator is f32, or (2)
+    // the arithmetic will have to expand f16 to f32 in registers. We may
+    // reconsider when taking advantage of native f16/bf16 arithmetic when the
+    // accumulator itself is f16/bf16.
+    if (hasFeature(target, "+avx512f")) {
+      if (hasUkernel(target) && ukType != IREE_UK_FLAG_MMT4D_TYPE_NONE) {
         return {
-            TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
-            TileMxNxK{4, 8, 1}, // Truncation of the above.
-            TileMxNxK{2, 8, 1}, // Truncation of the above.
-            TileMxNxK{1, 8, 1}, // Truncation of the above.
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 16, 1},  // Truncation of the above.
+            TileMxNxK{4, 16, 1},  // Truncation of the above.
+            TileMxNxK{2, 16, 1},  // Truncation of the above.
+            TileMxNxK{1, 16, 1},  // Truncation of the above.
+        };
+      } else {
+        // Use larger tile sizes for data-tiling only codegen.
+        return {
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 32, 1},  // Use same number of accumulators.
+            TileMxNxK{4, 64, 1},  // Use same number of accumulators.
+            TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
+            TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
         };
       }
-      // SSE fallback.
+    }
+    if (hasFeature(target, "+avx")) {
+      // Note: for good performance, most +avx users will also want to add
+      // +fma, but that's a local instruction selection detail and the tile
+      // layout is unaffected, as there are enough registers even with the
+      // need for intermediate product registers when +fma is not used.
       return {
-          TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
-          TileMxNxK{4, 4, 1}, // Truncation of the above.
-          TileMxNxK{2, 4, 1}, // Truncation of the above.
-          TileMxNxK{1, 4, 1}, // Truncation of the above.
+          TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
+          TileMxNxK{4, 8, 1}, // Truncation of the above.
+          TileMxNxK{2, 8, 1}, // Truncation of the above.
+          TileMxNxK{1, 8, 1}, // Truncation of the above.
       };
     }
+    // SSE fallback.
+    return {
+        TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
+        TileMxNxK{4, 4, 1}, // Truncation of the above.
+        TileMxNxK{2, 4, 1}, // Truncation of the above.
+        TileMxNxK{1, 4, 1}, // Truncation of the above.
+    };
   }
 
   if (out.isSignlessInteger(32) &&
