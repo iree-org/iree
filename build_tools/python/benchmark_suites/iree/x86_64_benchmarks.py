@@ -23,18 +23,21 @@ class Linux_x86_64_Benchmarks(object):
         target_abi=iree_definitions.TargetABI.LINUX_GNU,
     )
 
-    CASCADELAKE_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+    CASCADELAKE_DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE,
-        tags=["default-flags"],
-        compile_targets=[CASCADELAKE_CPU_TARGET],
-    )
-    CASCADELAKE_DATA_TILING_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
-        id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_DATA_TILING,
-        tags=["experimental-flags", "data-tiling", "ukernel"],
+        tags=["dt-uk-config"],
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
-            "--iree-opt-data-tiling",
             "--iree-llvmcpu-enable-ukernels=all",
+        ],
+    )
+    CASCADELAKE_NON_DT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+        id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_DATA_TILING,
+        tags=["non-dt-config"],
+        compile_targets=[CASCADELAKE_CPU_TARGET],
+        extra_flags=[
+            "--iree-opt-data-tiling=false",
+            "--iree-llvmcpu-enable-ukernels=none",
         ],
     )
 
@@ -90,27 +93,32 @@ class Linux_x86_64_Benchmarks(object):
         )
 
         # The X86_64 tag is required to put them into the X86_64 benchmark preset.
-        default_run_configs = self._generate(
+        dt_uk_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG,
-            self.CASCADELAKE_COMPILE_CONFIG,
+            self.CASCADELAKE_DT_UK_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64],
         )
-        experimental_run_configs = self._generate(
-            model_groups.X86_64_BENCHMARK_CONFIG_EXPERIMENTAL,
-            self.CASCADELAKE_DATA_TILING_COMPILE_CONFIG,
+        non_dt_run_configs = self._generate(
+            model_groups.X86_64_BENCHMARK_CONFIG,
+            self.CASCADELAKE_NON_DT_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64],
         )
-
-        large_run_configs = self._generate(
+        dt_uk_large_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG_LONG,
-            self.CASCADELAKE_COMPILE_CONFIG,
+            self.CASCADELAKE_DT_UK_COMPILE_CONFIG,
+            cascadelake_devices,
+            presets=[benchmark_presets.X86_64_LARGE],
+        )
+        non_dt_large_run_configs = self._generate(
+            model_groups.X86_64_BENCHMARK_CONFIG_LONG,
+            self.CASCADELAKE_NON_DT_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64_LARGE],
         )
 
-        return default_run_configs + experimental_run_configs + large_run_configs
+        return dt_uk_run_configs + non_dt_run_configs + dt_uk_large_run_configs + non_dt_large_run_configs
 
 
 def generate() -> List[iree_definitions.E2EModelRunConfig]:

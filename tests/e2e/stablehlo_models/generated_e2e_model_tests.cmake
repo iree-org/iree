@@ -10,7 +10,7 @@ iree_benchmark_suite_module_test(
   EXPECTED_OUTPUT "mobilenet_v1_fp32_expected_output.txt"
   MODULES
     "riscv_64-Linux=iree_module_MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-    "x86_64-Linux=iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "x86_64-Linux=iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__dt-uk-config_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
     "--device_allocator=caching"
@@ -22,7 +22,7 @@ iree_benchmark_suite_module_test(
   DRIVER "local-sync"
   EXPECTED_OUTPUT "efficientnet_int8_expected_output.txt"
   MODULES
-    "x86_64-Linux=iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "x86_64-Linux=iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__dt-uk-config_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
     "--device_allocator=caching"
@@ -35,7 +35,7 @@ iree_benchmark_suite_module_test(
   EXPECTED_OUTPUT "https://storage.googleapis.com/iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy"
   MODULES
     "arm_64-Android=iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_/module.vmfb"
-    "x86_64-Linux=iree_module_DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "x86_64-Linux=iree_module_DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__dt-uk-config_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
     "--device_allocator=caching"
@@ -50,7 +50,7 @@ iree_benchmark_suite_module_test(
   MODULES
     "riscv_32-Linux=iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
     "riscv_64-Linux=iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-    "x86_64-Linux=iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "x86_64-Linux=iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__dt-uk-config_/module.vmfb"
   RUNNER_ARGS
     "--function=main"
     "--device_allocator=caching"
