@@ -131,6 +131,9 @@ def _find_comparable_benchmark_results(
         base_benchmarks = query_base_benchmark_results(
             commit=base_commit, verbose=verbose
         )
+        # Skip empty benchmark results.
+        if len(base_benchmarks) == 0:
+            continue
         base_benchmark_keys = set(base_benchmarks.keys())
         if required_benchmark_keys <= base_benchmark_keys:
             return ComparableBenchmarkResults(
@@ -314,6 +317,14 @@ def main(args):
             required_benchmark_keys=required_benchmark_keys,
             verbose=args.verbose,
         )
+        # If we can't find a fully matched results to compare, try to compare
+        # with partial results.
+        if comparable_results is None:
+            comparable_results = _find_comparable_benchmark_results(
+                start_commit=pr_base_commit,
+                required_benchmark_keys=set(),
+                verbose=args.verbose,
+            )
 
     if comparable_results is None:
         comparable_commit = None
@@ -321,7 +332,9 @@ def main(args):
         comparable_commit = comparable_results.commit_sha
         # Update the execution benchmarks with base numbers.
         for bench in execution_benchmarks:
-            base_benchmark = comparable_results.benchmark_results[bench]
+            base_benchmark = comparable_results.benchmark_results.get(bench)
+            if base_benchmark is None:
+                continue
             if base_benchmark["sampleUnit"] != "ns":
                 raise ValueError("Only support nanoseconds for latency sample.")
             execution_benchmarks[bench].base_mean_time = base_benchmark["sample"]
@@ -330,9 +343,11 @@ def main(args):
         for target_id, metrics in compilation_metrics.items():
             updated_metrics = metrics
             for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
-                base_benchmark = comparable_results.benchmark_results[
+                base_benchmark = comparable_results.benchmark_results.get(
                     mapper.get_series_id(target_id)
-                ]
+                )
+                if base_benchmark is None:
+                    continue
                 if base_benchmark["sampleUnit"] != mapper.get_unit():
                     raise ValueError("Unit of the queried sample is mismatched.")
                 updated_metrics = mapper.update_base_value(
