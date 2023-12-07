@@ -52,7 +52,6 @@ IMAGES_TO_DEPENDENCIES = {
     "riscv-toolchain-builder": [],
     "gradle-android": ["base"],
     "frontends": ["android"],
-    "shark": [],
     "swiftshader": ["base"],
     "samples": ["swiftshader"],
     "frontends-swiftshader": ["frontends", "swiftshader"],
