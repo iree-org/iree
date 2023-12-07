@@ -19,6 +19,12 @@ namespace mlir::iree_compiler {
 /// to the end of the function is the root op.
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
+// Finds the MMT4D ukernel type listed in:
+// runtime/src/iree/builtins/ukernel/exported_bits.h
+// Returns IREE_UK_FLAG_MMT4D_TYPE_NONE if not found.
+uint32_t findMmt4dUkernelType(Type lhsElemType, Type rhsElemType,
+                              Type outElemType);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_
