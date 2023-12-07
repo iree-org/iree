@@ -37,6 +37,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tags=["experimental-flags", "no-data-tiling"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
+            "--iree-opt-data-tiling=false",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )
