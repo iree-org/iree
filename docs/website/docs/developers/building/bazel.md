@@ -140,16 +140,36 @@ python3 configure_bazel.py
 
 ### Build
 
-Run all core tests:
+Run all tests:
 
 ```shell
 bazel test -k //...
 ```
 
+Run all tests _except_ those that require CUDA:
+
+```shell
+bazel test -k //... \
+    --iree_drivers=local-sync,local-task,vulkan \
+    --test_tag_filters="-driver=cuda,-target=cuda" \
+    --build_tag_filters="-driver=cuda,-target=cuda"
+```
+
+Run all tests _except_ those that require a GPU (any API):
+
+```shell
+bazel test -k //... \
+    --iree_drivers=local-sync,local-task,vulkan \
+    --test_tag_filters="-driver=vulkan,-driver=metal,-driver=cuda,-target=cuda" \
+    --build_tag_filters="-driver=cuda,-target=cuda"
+```
+
 !!! tip
 
-    You can add flags like `--test_env=IREE_VULKAN_DISABLE=1` to your test
-    command to change how/which tests run.
+    See the
+    [`build_tools/bazel/build_core.sh`](https://github.com/openxla/iree/blob/main/build_tools/bazel/build_core.sh)
+    script for examples of other flags and environment variables that can be
+    used to configure what Bazel runs.
 
 In general, build artifacts will be under the `bazel-bin` directory at the top
 level.

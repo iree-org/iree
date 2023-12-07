@@ -34,8 +34,8 @@ declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
   # For example:
-  #   ^nokokoro$
-  ^nokokoro$
+  #   ^nodocker$
+  ^nodocker$
 
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.

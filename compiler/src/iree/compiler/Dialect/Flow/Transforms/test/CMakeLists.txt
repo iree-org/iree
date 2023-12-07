@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "insert_dispatch_debug_markers.mlir"
     "interchange_generic_ops.mlir"
     "interchange_transpose_generic_ops.mlir"
+    "outline_dispatch_externs.mlir"
     "outline_dispatch_regions.mlir"
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"

@@ -96,7 +96,7 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     # Exclude specific labels.
     # Put the whole label with anchors for exact matches.
     ^noasan$
-    ^nokokoro$
+    ^nodocker$
 
     # Exclude all tests in a directory.
     # Put the whole directory with anchors for exact matches.

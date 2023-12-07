@@ -82,8 +82,7 @@ function docker_run() {
     #   2. This allows us to control the device the home directory is in. Bazel
     #      tends to be IO bound at even moderate levels of CPU parallelism and
     #      the difference between a persistent SSD and a local scratch SSD can
-    #      be huge. In particular, Kokoro has the home directory on the former
-    #      and the work directory on the latter.
+    #      be huge.
     local fake_home_dir="${DOCKER_HOST_TMPDIR}/fake_home"
     mkdir -p "${fake_home_dir}"
 

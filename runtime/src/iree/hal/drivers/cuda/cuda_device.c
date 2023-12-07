@@ -357,10 +357,10 @@ static iree_status_t iree_hal_cuda_device_create_channel(
   if (!device->context_wrapper.syms->nccl_library) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL runtime library (%d.%d.%d) not available; ensure installed and "
-        "the shared library is on your PATH/LD_LIBRARY_PATH "
-        "(nccl.dll/libnccl.so)",
-        NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
+        "NCCL runtime library version %d.%d and greater not available; "
+        "ensure installed and the shared library (nccl.dll/libnccl.so) "
+        "is on your PATH/LD_LIBRARY_PATH.",
+        NCCL_MAJOR, NCCL_MINOR);
   }
 
   // Today we only allow a single logical device per channel.

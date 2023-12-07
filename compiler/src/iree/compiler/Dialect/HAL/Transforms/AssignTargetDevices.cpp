@@ -76,6 +76,7 @@ public:
       return;
     }
 
+    llvm::SmallDenseSet<Attribute> targetAttrSet;
     SmallVector<Attribute> targetAttrs;
     for (const auto &targetName : targets) {
       auto targetBackend = targetRegistry.getTargetBackend(targetName);
@@ -99,7 +100,10 @@ public:
       // Ask the target backend for its default device specification attribute.
       auto targetAttr =
           targetBackend->getDefaultDeviceTarget(moduleOp.getContext());
-      targetAttrs.push_back(targetAttr);
+      if (!targetAttrSet.contains(targetAttr)) {
+        targetAttrSet.insert(targetAttr);
+        targetAttrs.push_back(targetAttr);
+      }
     }
 
     moduleOp->setAttr("hal.device.targets",

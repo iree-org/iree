@@ -194,6 +194,85 @@ static void printTargetConditionRegion(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
+static ParseResult parseTargetConditionObjects(
+    OpAsmParser &parser, ArrayAttr &targetsAttr, ArrayAttr &targetOrdinalsAttr,
+    ArrayAttr &targetObjectsAttr,
+    SmallVector<std::unique_ptr<Region>, 2> &targetRegions) {
+  SmallVector<Attribute> targetsAttrs;
+  SmallVector<Attribute> targetOrdinalsAttrs;
+  SmallVector<Attribute> targetObjectsAttrs;
+  do {
+    // #hal.executable.target<...>
+    Attribute targetAttr;
+    if (failed(parser.parseAttribute(targetAttr)))
+      return failure();
+    targetsAttrs.push_back(targetAttr);
+
+    // if(...) -> i1 { ... }
+    auto region = std::make_unique<Region>();
+    if (succeeded(parser.parseOptionalKeyword("if"))) {
+      if (failed(parseTargetConditionRegion(parser, *region)))
+        return failure();
+    }
+    targetRegions.push_back(std::move(region));
+
+    // ordinal(#)
+    Attribute targetOrdinalAttr;
+    if (failed(parser.parseKeyword("ordinal")) ||
+        failed(parser.parseLParen()) ||
+        failed(parser.parseAttribute(targetOrdinalAttr,
+                                     IndexType::get(parser.getContext()))) ||
+        failed(parser.parseRParen()))
+      return failure();
+    targetOrdinalsAttrs.push_back(targetOrdinalAttr);
+
+    // = [#hal.executable.object<...>, ...]
+    ArrayAttr targetObjectsAttr;
+    if (failed(parser.parseEqual()) ||
+        failed(parser.parseAttribute(targetObjectsAttr)))
+      return failure();
+    targetObjectsAttrs.push_back(targetObjectsAttr);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetsAttr = ArrayAttr::get(parser.getContext(), targetsAttrs);
+  targetOrdinalsAttr = ArrayAttr::get(parser.getContext(), targetOrdinalsAttrs);
+  targetObjectsAttr = ArrayAttr::get(parser.getContext(), targetObjectsAttrs);
+  return success();
+}
+
+static void printTargetConditionObjects(OpAsmPrinter &p, Operation *op,
+                                        ArrayAttr targetsAttr,
+                                        ArrayAttr targetOrdinalsAttr,
+                                        ArrayAttr targetObjectsAttr,
+                                        MutableArrayRef<Region> targetRegions) {
+  p.increaseIndent();
+  p.printNewline();
+
+  llvm::interleave(
+      llvm::zip_equal(targetsAttr, targetOrdinalsAttr, targetObjectsAttr,
+                      targetRegions),
+      [&](auto it) {
+        auto &[targetAttr, targetOrdinalAttr, targetObjectsAttr, targetRegion] =
+            it;
+        p.printAttribute(targetAttr);
+        if (!targetRegion.empty()) {
+          p << " if";
+          printTargetConditionRegion(p, op, targetRegion);
+        }
+        p << " ordinal(";
+        p.printAttributeWithoutType(targetOrdinalAttr);
+        p << ")";
+        p << " = ";
+        p.printAttribute(targetObjectsAttr);
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+
+  p.decreaseIndent();
+  p.printNewline();
+}
+
 //===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
@@ -467,6 +546,7 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
                              ValueRange resultDims, ValueRange arguments,
                              ValueRange argumentDims,
                              ArrayRef<int64_t> tiedOperands,
+                             IREE::HAL::ExecutableObjectsAttr targetObjects,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(workload);
@@ -477,6 +557,8 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
+  state.addAttribute("targets", targetObjects.getTargets());
+  state.addAttribute("target_objects", targetObjects.getTargetObjects());
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
                      builder.getDenseI32ArrayAttr({
@@ -488,6 +570,10 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
 
   // NOTE: workgroup count region is empty; callers are expected to populate it.
   state.addRegion();
+
+  // Add one empty region per target.
+  for (size_t i = 0; i < targetObjects.getTargets().size(); ++i)
+    state.addRegion();
 }
 
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
@@ -567,6 +653,19 @@ LogicalResult DispatchExternOp::verify() {
   if (failed(
           verifyWorkgroupCountRegion(op, getWorkload(), getWorkgroupCount()))) {
     return failure();
+  }
+
+  if (getTargets().size() != getTargetObjects().size()) {
+    return op->emitOpError() << "target and objects arrays must match";
+  }
+  if (getTargets().size() != getTargetRegions().size()) {
+    return op->emitOpError()
+           << "target and condition regions must match (but they may be empty)";
+  }
+  for (auto &targetRegion : getTargetRegions()) {
+    if (failed(verifyTargetConditionRegion(op, targetRegion))) {
+      return failure();
+    }
   }
 
   return success();

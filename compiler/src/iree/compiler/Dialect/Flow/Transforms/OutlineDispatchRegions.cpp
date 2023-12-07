@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -155,75 +154,6 @@ static LogicalResult outlineDispatchWorkgroupsOp(
                                                executableOp, exportOp);
 }
 
-//===----------------------------------------------------------------------===//
-// hal.dispatch.extern
-//===----------------------------------------------------------------------===//
-
-// Converts a dispatch region op into a dispatch op to the outlined region.
-static LogicalResult
-convertDispatchExternToDispatchOp(IREE::HAL::DispatchExternOp dispatchExternOp,
-                                  IREE::Flow::ExecutableOp executableOp,
-                                  IREE::Flow::ExecutableExportOp exportOp) {
-  // Insert at the same place as the original region.
-  OpBuilder builder(dispatchExternOp);
-
-  // Create the dispatch op to the executable function.
-  // Note that we copy the tied operand indices from the workgroups op - it
-  // lines up 1:1 with the dispatch once we've outlined things.
-  auto dispatchOp = builder.create<IREE::Flow::DispatchOp>(
-      dispatchExternOp.getLoc(), exportOp, dispatchExternOp.getWorkload(),
-      dispatchExternOp.getResultTypes(), dispatchExternOp.getResultDims(),
-      dispatchExternOp.getArguments(), dispatchExternOp.getArgumentDims(),
-      dispatchExternOp.getTiedOperandsAttr());
-  dispatchOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
-  if (auto bindingsAttr = dispatchExternOp.getBindingsAttr()) {
-    dispatchOp->setAttr("hal.interface.bindings", bindingsAttr);
-  }
-
-  // Replace uses of the existing results with the new results.
-  for (int i = 0; i < dispatchExternOp.getNumResults(); ++i) {
-    dispatchExternOp.getResult(i).replaceAllUsesWith(dispatchOp.getResult(i));
-  }
-
-  return success();
-}
-
-// Outlines a dispatch region into a flow.executable and replaces the region op
-// with a dispatch to that outlined executable.
-static LogicalResult
-outlineDispatchExternOp(std::string name,
-                        IREE::HAL::DispatchExternOp dispatchExternOp) {
-  // Create the executable that will contain the outlined region.
-  // NOTE: this will get uniquified if we have multiple in the same block.
-  auto parentFuncOp = dispatchExternOp->getParentOfType<FunctionOpInterface>();
-  auto parentModuleOp = parentFuncOp->getParentOfType<mlir::ModuleOp>();
-  OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
-  auto executableOp = parentModuleBuilder.create<IREE::Flow::ExecutableOp>(
-      dispatchExternOp.getLoc(), name);
-  executableOp.getOperation()->moveBefore(parentFuncOp);
-  executableOp.setPrivate();
-  executableOp->setAttr("hal.executable.objects",
-                        dispatchExternOp.getObjectsAttr());
-
-  // Add an export pointing at the entry point function.
-  OpBuilder builder(executableOp.getBody());
-  auto exportOp = builder.create<IREE::Flow::ExecutableExportOp>(
-      dispatchExternOp.getLoc(), dispatchExternOp.getExport(),
-      FlatSymbolRefAttr::get(builder.getContext(),
-                             dispatchExternOp.getExport()));
-  exportOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
-  exportOp->setAttr("hal.interface.layout", dispatchExternOp.getLayoutAttr());
-
-  // Move over the workgroup count region, if present.
-  if (!dispatchExternOp.getWorkgroupCount().empty()) {
-    exportOp.getWorkgroupCount().takeBody(dispatchExternOp.getWorkgroupCount());
-  }
-
-  // Finally convert the dispatch region into a dispatch to the outlined func.
-  return convertDispatchExternToDispatchOp(dispatchExternOp, executableOp,
-                                           exportOp);
-}
-
 } // namespace
 
 class OutlineDispatchRegionsPass
@@ -269,16 +199,6 @@ public:
                   deadOps.push_back(op);
                   return WalkResult::advance();
                 })
-            .Case<IREE::HAL::DispatchExternOp>([&](auto dispatchExternOp) {
-              if (failed(outlineDispatchExternOp(
-                      (namePrefix + "_dispatch_" + llvm::Twine(deadOps.size()))
-                          .str(),
-                      dispatchExternOp))) {
-                return WalkResult::interrupt();
-              }
-              deadOps.push_back(op);
-              return WalkResult::advance();
-            })
             .Default(WalkResult::advance());
       };
       if (funcOp.walk(outlineOps).wasInterrupted())
