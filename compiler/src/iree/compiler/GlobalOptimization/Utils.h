@@ -9,6 +9,8 @@
 #include <optional>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 namespace mlir {
 class Type;
@@ -46,6 +48,11 @@ Value createGenericElementwiseCastOp(
     OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
     ArrayRef<NamedAttribute> attrs,
     std::optional<IREE::LinalgExt::EncodingAttr> encoding = std::nullopt);
+
+/// Creates a dispatch region out of a sequence of consecutive ops.
+FailureOr<IREE::Flow::DispatchRegionOp>
+wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
+                                   SmallVector<Operation *> ops);
 
 } // namespace mlir::iree_compiler::GlobalOptimization
 

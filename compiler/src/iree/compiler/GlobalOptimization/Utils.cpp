@@ -5,6 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -95,6 +97,21 @@ Value createGenericElementwiseCastOp(
           },
           attrs)
       .getResult(0);
+}
+
+FailureOr<IREE::Flow::DispatchRegionOp>
+wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
+                                   SmallVector<Operation *> ops) {
+  FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
+      IREE::Flow::wrapOpInDispatchRegion(rewriter, ops.back());
+  if (failed(maybeRegionOp)) {
+    return failure();
+  }
+  IREE::Flow::DispatchRegionOp regionOp = maybeRegionOp.value();
+
+  SmallVector<Operation *> precedingOps(ops.begin(), ops.end() - 1);
+  return IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
+                                                        regionOp);
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

@@ -47,6 +47,7 @@ iree_cc_library(
     "ExpandTensorShapes.cpp"
     "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
+    "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"
     "LiftGenericToTransposeBatchMatmul.cpp"
