@@ -79,7 +79,7 @@ py_binary(
     ],
     target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
     trace_runner = "//tools:iree-e2e-matmul-test",
-) for (dtype) in [
+) for dtype in [
     "f32",
     # "f64" (also supported for ArmSME, but not by the test generator)
 ] for size in [
