@@ -78,8 +78,8 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
   # Respect the user setting, but default to as many jobs as we have cores.
   export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-  # Respect the user setting, but default to turning on Vulkan.
-  export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+  # Respect the user setting, but default to turning off Vulkan.
+  export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
   # Respect the user setting, but default to turning off Metal.
   export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
   # Respect the user setting, but default to turning off CUDA.
@@ -110,8 +110,9 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     #   ^bindings/
   )
 
-  # IREE_VULKAN_DISABLE is handled separately as we run Vulkan and non-Vulkan
-  # tests in separate ctest commands anyway.
+  if (( IREE_VULKAN_DISABLE == 1 )); then
+    label_exclude_args+=("^driver=vulkan$")
+  fi
   if (( IREE_CUDA_DISABLE == 1 )); then
     label_exclude_args+=("^driver=cuda$")
   fi
@@ -124,35 +125,19 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
 
   label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
-  vulkan_label_regex='^driver=vulkan$'
-
   pushd ${BUILD_DIR?}
 
-  echo "*** Running main project ctests that do not use the Vulkan driver (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) *******"
+  echo "*** Running main project ctests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) *******"
   echo "------------------"
   ctest \
     --timeout 900 \
     --output-on-failure \
     --no-tests=error \
-    --label-exclude "${label_exclude_regex}|${vulkan_label_regex}"
+    --label-exclude "${label_exclude_regex}"
 
   echo "*** Running llvm-external-projects tests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
   echo "------------------"
   cmake --build . --target check-iree-dialects -- -k 0
-
-  if (( IREE_VULKAN_DISABLE == 0 )); then
-    echo "*** Running ctests that use the Vulkan driver, with LSAN disabled (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-    echo "------------------"
-    # Disable LeakSanitizer (LSAN) because of a history of issues with Swiftshader
-    # (#5716, #8489, #11203).
-    ASAN_OPTIONS=detect_leaks=0 \
-      ctest \
-        --timeout 900 \
-        --output-on-failure \
-        --no-tests=error \
-        --label-regex "${vulkan_label_regex}" \
-        --label-exclude "${label_exclude_regex}"
-  fi
 
   popd
 done

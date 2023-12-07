@@ -335,6 +335,7 @@ jobs:
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
+              --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
@@ -383,6 +384,7 @@ jobs:
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
+              --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
@@ -539,6 +541,7 @@ jobs:
       - name: "Running TF integrations tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env IREE_VULKAN_DISABLE=0 \
             --env IREE_LLVM_CPU_DISABLE=1 \
             --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
             --gpus all \
