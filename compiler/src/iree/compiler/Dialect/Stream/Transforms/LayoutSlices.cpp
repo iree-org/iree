@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -17,7 +16,6 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -28,6 +26,10 @@
 #define DEBUG_TYPE "iree-stream-layout-slices"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_LAYOUTSLICESPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 using Slice = IREE::Stream::ResourcePackOp::Slice;
@@ -213,18 +215,11 @@ packDynamicSlicesConservatively(IREE::Stream::ResourcePackOp packOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-layout-slices
+// --iree-stream-layout-slices
 //===----------------------------------------------------------------------===//
 
-class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct LayoutSlicesPass
+    : public IREE::Stream::impl::LayoutSlicesPassBase<LayoutSlicesPass> {
   void runOnOperation() override {
     auto parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
@@ -289,9 +284,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass() {
-  return std::make_unique<LayoutSlicesPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream

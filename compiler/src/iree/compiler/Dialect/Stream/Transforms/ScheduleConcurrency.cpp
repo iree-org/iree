@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -28,6 +27,10 @@
 #define DEBUG_TYPE "iree-stream-schedule-concurrency"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_SCHEDULECONCURRENCYPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 // TODO(benvanik): deduplicate this with ScheduleExecution - almost all of this
@@ -171,14 +174,13 @@ struct WavePartitionBuilder {
   IRMapping mapping;
 };
 
-class ScheduleConcurrencyPass
-    : public ScheduleConcurrencyBase<ScheduleConcurrencyPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// --iree-stream-schedule-concurrency
+//===----------------------------------------------------------------------===//
 
+struct ScheduleConcurrencyPass
+    : public IREE::Stream::impl::ScheduleConcurrencyPassBase<
+          ScheduleConcurrencyPass> {
   void runOnOperation() override {
     auto parentOp = getOperation();
     if (!parentOp.getCallableRegion() ||
@@ -273,10 +275,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<CallableOpInterface>>
-createScheduleConcurrencyPass() {
-  return std::make_unique<ScheduleConcurrencyPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream

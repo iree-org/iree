@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -51,6 +50,11 @@ static llvm::cl::opt<bool>
                     llvm::cl::init(false));
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_MATERIALIZEBUILTINSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
+namespace {
 
 //===----------------------------------------------------------------------===//
 // Type utilities
@@ -341,27 +345,12 @@ static LogicalResult processFillOp(IREE::Stream::AsyncFillOp fillOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-materialize-builtins
+// --iree-stream-materialize-builtins
 //===----------------------------------------------------------------------===//
 
-class MaterializeBuiltinsPass
-    : public MaterializeBuiltinsBase<MaterializeBuiltinsPass> {
-public:
-  MaterializeBuiltinsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // We need to include all dialects that the builtin modules use.
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::linalg::LinalgDialect>();
-    registry.insert<mlir::memref::MemRefDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<mlir::vector::VectorDialect>();
-    registry.insert<IREE::Flow::FlowDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct MaterializeBuiltinsPass
+    : public IREE::Stream::impl::MaterializeBuiltinsPassBase<
+          MaterializeBuiltinsPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
@@ -397,8 +386,6 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass() {
-  return std::make_unique<MaterializeBuiltinsPass>();
-}
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Stream

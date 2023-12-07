@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -32,6 +31,10 @@
 #define DEBUG_TYPE "iree-stream-propagate-timepoints"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_PROPAGATETIMEPOINTSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 // TODO(benvanik): factor out into a generic util pass base that lets us share
@@ -628,7 +631,7 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-propagate-timepoints
+// --iree-stream-propagate-timepoints
 //===----------------------------------------------------------------------===//
 
 // This does a relatively mechanical transformation of a module to expand all
@@ -641,18 +644,9 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
 // fusion/folding and IPO and as such performs all transformations locally. For
 // example, calls are always updated to take/return timepoints and results are
 // always awaited, with the elision/deduplication/etc left until cleanup.
-class PropagateTimepointsPass
-    : public PropagateTimepointsBase<PropagateTimepointsPass> {
-public:
-  PropagateTimepointsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::cf::ControlFlowDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct PropagateTimepointsPass
+    : public IREE::Stream::impl::PropagateTimepointsPassBase<
+          PropagateTimepointsPass> {
   void runOnOperation() override {
     auto rootOp = getOperation();
 
@@ -671,9 +665,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass() {
-  return std::make_unique<PropagateTimepointsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream
