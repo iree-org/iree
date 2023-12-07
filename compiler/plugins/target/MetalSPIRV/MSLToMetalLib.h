@@ -11,10 +11,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/MemoryBuffer.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Invokes system commands to compile the given |mslCode| into a Metal library
 // and returns the library binary code. |fileName| will be used as a hint for
@@ -23,9 +20,6 @@ std::unique_ptr<llvm::MemoryBuffer>
 compileMSLToMetalLib(MetalTargetPlatform targetPlatform,
                      llvm::StringRef mslCode, llvm::StringRef fileName);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_MSLTOMETALLIB_H_

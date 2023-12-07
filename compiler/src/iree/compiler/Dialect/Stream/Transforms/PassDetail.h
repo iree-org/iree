@@ -9,10 +9,7 @@
 
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 // TODO(benvanik): find a way to share this with IREEVM.h w/o circular deps.
 // Defines the output format of a dump pass.
@@ -32,9 +29,6 @@ enum class DumpOutputFormat {
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc" // IWYU pragma: keep
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASS_DETAIL_H_

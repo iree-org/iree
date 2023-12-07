@@ -25,10 +25,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // util.cast
@@ -926,7 +923,4 @@ OpFoldResult BufferLoadOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

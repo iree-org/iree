@@ -9,13 +9,11 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Register all interfaces needed for hoisting constant expressions.
 void registerHoistableTypeInterfaces(DialectRegistry &registry);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_INTERFACES_HOISTABLETYPEINTERFACE_H_

@@ -12,8 +12,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 class GPUCheckResourceUsagePass final
@@ -126,5 +125,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
                                                      getIndexBitwidth);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

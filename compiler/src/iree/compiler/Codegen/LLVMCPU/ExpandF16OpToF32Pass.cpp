@@ -12,8 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -71,5 +70,4 @@ std::unique_ptr<Pass> createExpandF16OpToF32Pass() {
   return std::make_unique<ExpandF16OpToF32Pass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

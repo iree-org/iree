@@ -25,10 +25,7 @@
 #include "mlir/Target/SPIRV/Serialization.h"
 #include "spirv-tools/libspirv.hpp"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
@@ -303,10 +300,7 @@ struct WebGPUSession
 
 } // namespace
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::IREE::HAL::WebGPUOptions);

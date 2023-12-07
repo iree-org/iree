@@ -24,8 +24,7 @@ static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
                    "Not for production use."),
     llvm::cl::init(false));
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
@@ -107,5 +106,4 @@ createLLVMCPUMmt4dVectorLoweringPass() {
   return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

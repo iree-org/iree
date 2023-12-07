@@ -19,10 +19,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMVX {
+namespace mlir::iree_compiler::IREE::VMVX {
 
 static const char *kConstantBlockGlobalPrefix = "__constant_";
 static const char *kConstantBlockSetterName = "__set_constants";
@@ -136,7 +133,4 @@ createMaterializeConstantsPass() {
   return std::make_unique<MaterializeConstantsPass>();
 }
 
-} // namespace VMVX
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VMVX

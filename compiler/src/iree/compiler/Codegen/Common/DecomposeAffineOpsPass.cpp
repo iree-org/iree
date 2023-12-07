@@ -8,8 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -32,5 +31,4 @@ void DecomposeAffineOpsPass::runOnOperation() {
 std::unique_ptr<Pass> createDecomposeAffineOpsPass() {
   return std::make_unique<DecomposeAffineOpsPass>();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

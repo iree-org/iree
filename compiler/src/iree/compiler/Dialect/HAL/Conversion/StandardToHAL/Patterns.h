@@ -10,8 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Populates conversion patterns for std->HAL.
 void populateStandardToHALPatterns(MLIRContext *context,
@@ -19,7 +18,6 @@ void populateStandardToHALPatterns(MLIRContext *context,
                                    TypeConverter &typeConverter,
                                    RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_STANDARDTOHAL_PATTERNS_H_

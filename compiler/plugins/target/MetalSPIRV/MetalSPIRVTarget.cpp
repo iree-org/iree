@@ -26,10 +26,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 struct MetalSPIRVOptions {
@@ -328,10 +325,7 @@ struct MetalSPIRVSession
   }
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 extern "C" bool iree_register_compiler_plugin_hal_target_metal_spirv(
     mlir::iree_compiler::PluginRegistrar *registrar) {

@@ -20,10 +20,7 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -83,7 +80,4 @@ Operation *FlowDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

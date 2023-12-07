@@ -13,8 +13,7 @@
 
 #include "tosa-iree/InputConversion/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -70,8 +69,7 @@ struct TOSASession
 
 } // namespace
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 extern "C" bool iree_register_compiler_plugin_input_tosa(
     mlir::iree_compiler::PluginRegistrar *registrar) {

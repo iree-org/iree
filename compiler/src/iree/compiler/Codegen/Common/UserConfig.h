@@ -6,12 +6,10 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Sets compilation configuration annotated in the incoming IR.
 LogicalResult setUserConfig(func::FuncOp entryPointFn, Operation *computeOp,
                             IREE::Codegen::CompilationInfoAttr compilationInfo);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,16 +10,14 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Populates conversion patterns from the std dialect to the VMVX dialect.
 void populateStandardToVMVXPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
                                     TypeConverter &typeConverter);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VMVX_CONVERSION_STANDARDTOVMVX_CONVERTSTANDARDTOVMVX_H_
        // // NOLINT

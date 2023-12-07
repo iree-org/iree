@@ -60,8 +60,7 @@
 
 #define DEBUG_TYPE "iree-flatten-memref-subspan"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -909,5 +908,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass() {
   return std::make_unique<FlattenMemRefSubspanPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

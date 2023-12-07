@@ -10,9 +10,7 @@
 #include "iree/compiler/Codegen/WGSL/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-
+namespace mlir::iree_compiler {
 //===---------------------------------------------------------------------===//
 // Register WGSL Passes
 //===---------------------------------------------------------------------===//
@@ -27,5 +25,4 @@ void registerCodegenWGSLPasses() {
   registerPasses();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

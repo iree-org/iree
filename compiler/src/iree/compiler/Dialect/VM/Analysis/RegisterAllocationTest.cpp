@@ -9,8 +9,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler::IREE::VM {
 
 class RegisterAllocationTestPass
     : public PassWrapper<RegisterAllocationTestPass,
@@ -31,16 +30,11 @@ public:
   }
 };
 
-namespace IREE {
-namespace VM {
 std::unique_ptr<OperationPass<IREE::VM::FuncOp>>
 createRegisterAllocationTestPass() {
   return std::make_unique<RegisterAllocationTestPass>();
 }
-} // namespace VM
-} // namespace IREE
 
 static PassRegistration<RegisterAllocationTestPass> pass;
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

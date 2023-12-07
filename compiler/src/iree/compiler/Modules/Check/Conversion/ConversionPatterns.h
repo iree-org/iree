@@ -10,10 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 // Populates conversion patterns from the Check dialect to the VM dialect.
 void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
@@ -26,9 +23,6 @@ void populateCheckToHALPatterns(MLIRContext *context,
                                 RewritePatternSet &patterns,
                                 TypeConverter &typeConverter);
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check
 
 #endif // IREE_COMPILER_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_

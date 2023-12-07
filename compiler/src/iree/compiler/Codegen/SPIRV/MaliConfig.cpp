@@ -17,9 +17,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
                                          spirv::ResourceLimitsAttr limits) {
@@ -68,6 +66,4 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

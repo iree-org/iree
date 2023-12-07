@@ -6,10 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LinkerTool.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // TODO(benvanik): add other platforms:
 // createMacLinkerTool using ld64.lld
@@ -47,7 +44,4 @@ LinkerTool::getForTarget(const llvm::Triple &targetTriple,
   return createUnixLinkerTool(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

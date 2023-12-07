@@ -12,10 +12,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 struct TypeDef {
   Type type;
@@ -26,9 +23,6 @@ struct TypeDef {
 // the vector to the type represented by the type ordinal.
 std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp);
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_UTILS_TYPETABLE_H_

@@ -7,12 +7,10 @@
 #ifndef IREE_COMPILER_TOOLS_IREE_COMPILE_LIB_H
 #define IREE_COMPILER_TOOLS_IREE_COMPILE_LIB_H
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 int runIreecMain(int argc, char **argv);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_TOOLS_IREE_COMPILE_LIB_H

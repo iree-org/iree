@@ -9,10 +9,7 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 class VulkanDialect : public Dialect {
 public:
@@ -35,9 +32,6 @@ private:
   void registerAttributes();
 };
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan
 
 #endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANDIALECT_H_

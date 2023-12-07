@@ -12,8 +12,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Generic patterns that can either be greedy rewrite patterns or conversion
@@ -75,7 +74,6 @@ static void insertConversionPattern(RewritePatternSet &patterns,
   patterns.insert<Pattern>(context, f, benefit);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_PATTERNUTILS_H_

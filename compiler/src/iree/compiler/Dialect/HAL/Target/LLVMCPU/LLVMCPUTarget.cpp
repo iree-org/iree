@@ -65,10 +65,7 @@ static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
 // not provided.
 constexpr unsigned defaultNativeVectorWidth = 16;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
@@ -1066,7 +1063,4 @@ void registerLLVMCPUTargetBackends(
   static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

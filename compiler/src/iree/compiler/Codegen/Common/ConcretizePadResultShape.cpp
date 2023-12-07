@@ -22,8 +22,7 @@
 
 #define DEBUG_TYPE "iree-codegen-concretize-pad-result-shape"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Gets the given `attrOrValue` as an index value by creating constant ops
 /// for attributes.
@@ -180,5 +179,4 @@ void populateConcretizePadResultShapePatterns(RewritePatternSet &patterns,
   patterns.add<ConcretizePadResultShape>(context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

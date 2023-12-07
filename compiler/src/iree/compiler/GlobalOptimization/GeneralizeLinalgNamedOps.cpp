@@ -18,9 +18,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 struct GeneralizeLinalgNamedOpsPass
@@ -66,6 +64,4 @@ createGeneralizeLinalgNamedOpsPass() {
   return std::make_unique<GeneralizeLinalgNamedOpsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

@@ -10,9 +10,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 
@@ -92,6 +90,4 @@ createMakeSingleDispatchForFunctionPass() {
   return std::make_unique<MakeSingleDispatchForFunctionPass>();
 }
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing

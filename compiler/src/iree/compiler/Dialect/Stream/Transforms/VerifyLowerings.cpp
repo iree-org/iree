@@ -21,10 +21,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Base pass utility
@@ -428,7 +425,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyLoweringToCmdPass() {
   return std::make_unique<VerifyLoweringToCmdPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -9,10 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -45,7 +42,4 @@ std::unique_ptr<Pass> createCleanupTensorShapesPass() {
   return std::make_unique<CleanupTensorShapesPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -9,8 +9,7 @@
 
 #include "iree-dialects/Transforms/TransformMatchers.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Structure to hold the parameters that control the reduction strategy.
 struct AbstractReductionStrategy {
@@ -27,7 +26,6 @@ struct AbstractReductionStrategy {
   SmallVector<int64_t> workgroupTileSizes;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_ABSTRACT_REDUCTION_STRATEGY_H_

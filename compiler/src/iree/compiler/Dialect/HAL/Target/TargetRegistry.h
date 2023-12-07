@@ -16,10 +16,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 using CreateTargetBackendFn = std::function<std::shared_ptr<TargetBackend>()>;
 
@@ -97,9 +94,6 @@ gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp);
 // Returns a sorted uniqued set of target backends used in the entire module.
 SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_

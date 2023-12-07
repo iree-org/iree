@@ -33,10 +33,7 @@
 
 #define DEBUG_TYPE "iree-stream-elide-timepoints"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -947,7 +944,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideTimepointsPass() {
   return std::make_unique<ElideTimepointsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

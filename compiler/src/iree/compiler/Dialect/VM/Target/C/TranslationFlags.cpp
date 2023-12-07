@@ -8,10 +8,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 static llvm::cl::opt<COutputFormat> outputFormatFlag{
     "iree-vm-c-module-output-format",
@@ -44,7 +41,4 @@ CTargetOptions getCTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

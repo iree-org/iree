@@ -25,8 +25,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
@@ -575,5 +574,4 @@ createCPUMaterializeUpperBoundTileSizePass(
   return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttrs);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

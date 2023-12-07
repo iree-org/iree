@@ -24,8 +24,7 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<std::string> clCodegenTransformDialectStrategyName(
     "iree-codegen-use-transform-dialect-strategy",
@@ -215,5 +214,4 @@ createMaterializeUserConfigsPass() {
   return std::make_unique<MaterializeUserConfigsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

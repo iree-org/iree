@@ -18,10 +18,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Loader {
 
 //===----------------------------------------------------------------------===//
@@ -200,10 +197,7 @@ void ExecutableDispatchOp::getCanonicalizationPatterns(
 }
 
 } // namespace Loader
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

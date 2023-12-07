@@ -14,10 +14,7 @@
 
 #define DEBUG_TYPE "iree-hal-binding-layout-analysis"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 void PipelineLayout::print(llvm::raw_ostream &os) const {
   os << "PipelineLayout:\n";
@@ -220,7 +217,4 @@ const PipelineLayout &BindingLayoutAnalysis::getPipelineLayout(
   return it->second;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

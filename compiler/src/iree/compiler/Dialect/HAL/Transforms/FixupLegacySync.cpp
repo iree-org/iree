@@ -14,10 +14,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Marks a command buffer as being executable inline during recording.
 // This is only possible because we generate our command buffer code without
@@ -191,7 +188,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFixupLegacySyncPass() {
 
 static PassRegistration<FixupLegacySyncPass> pass;
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -18,8 +18,7 @@
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -321,5 +320,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

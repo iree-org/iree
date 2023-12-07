@@ -12,9 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 /// Check if a `t` is a `tensor` with zero extents.
 static std::optional<RankedTensorType> isZeroExtent(Type t) {
@@ -108,6 +106,4 @@ createRemoveZeroExtentTensorsPass() {
   return std::make_unique<RemoveZeroExtentTensorsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

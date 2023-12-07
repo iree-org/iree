@@ -10,8 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 ConvertedTensor consumeTensorOperand(Location loc, Value operand,
                                      OpBuilder &builder) {
@@ -43,5 +42,4 @@ ConvertedTensor consumeTensorOperand(Location loc, Value operand,
   return ConvertedTensor();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

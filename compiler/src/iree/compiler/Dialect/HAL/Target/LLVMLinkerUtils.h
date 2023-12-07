@@ -12,10 +12,7 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Target/TargetMachine.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Returns true if there are any external symbols in |module| with |prefix|.
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix);
@@ -56,9 +53,6 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
                                       llvm::TargetMachine &targetMachine,
                                       llvm::LLVMContext &context);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif //  IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_

@@ -20,9 +20,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 class MaterializeHomogeneousEncodingsPass
     : public MaterializeHomogeneousEncodingsBase<
@@ -85,6 +83,4 @@ createMaterializeHomogeneousEncodingsPass() {
   return std::make_unique<MaterializeHomogeneousEncodingsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

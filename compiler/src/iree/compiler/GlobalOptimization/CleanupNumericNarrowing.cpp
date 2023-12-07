@@ -8,9 +8,7 @@
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -30,6 +28,4 @@ std::unique_ptr<Pass> createCleanupNumericNarrowingPass() {
   return std::make_unique<CleanupNumericNarrowingPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

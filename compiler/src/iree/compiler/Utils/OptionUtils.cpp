@@ -8,8 +8,7 @@
 
 #include "llvm/Support/ManagedStatic.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void OptionsBinder::addGlobalOption(std::unique_ptr<llvm::cl::Option> option) {
   static llvm::ManagedStatic<std::vector<std::unique_ptr<llvm::cl::Option>>>
@@ -92,10 +91,7 @@ OptionsBinder::printArguments(bool nonDefaultOnly) {
   return values;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
-
-// Parses a byte size in |value| and returns the value in |out_size|.
+} // namespace mlir::iree_compiler
 //
 // Examples:
 //   1073741824 => 1073741824

@@ -14,10 +14,7 @@
 
 #define DEBUG_TYPE "llvm-linker"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Unix linker (ld-like); for ELF files.
 class UnixLinkerTool : public LinkerTool {
@@ -149,7 +146,4 @@ createUnixLinkerTool(const llvm::Triple &targetTriple,
   return std::make_unique<UnixLinkerTool>(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

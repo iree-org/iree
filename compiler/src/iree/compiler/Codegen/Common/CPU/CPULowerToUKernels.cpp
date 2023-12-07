@@ -25,8 +25,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Returns the CastOpInterface op of the body, if
 //   - the `genericOp` is element-wise with identity maps, and
@@ -626,5 +625,4 @@ createCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
   return std::make_unique<CPULowerToUKernelsPass>(skipIntermediateRoundings);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

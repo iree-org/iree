@@ -35,13 +35,14 @@
 
 #define DEBUG_TYPE "iree-spirv-emulate-i64"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 //===----------------------------------------------------------------------===//
 // Conversion patterns
 //===----------------------------------------------------------------------===//
+
 struct ConvertHalInterfaceBindingSubspan final
     : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -232,5 +233,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass() {
   return std::make_unique<SPIRVEmulateI64Pass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -9,13 +9,11 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Register all codegen related interfaces.
 void registerCodegenInterfaces(DialectRegistry &registry);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_INTERFACES_INTERFACES_H_

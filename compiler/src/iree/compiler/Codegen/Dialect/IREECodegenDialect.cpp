@@ -12,10 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Codegen {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 struct IREECodegenDialectOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
@@ -48,7 +45,4 @@ void IREECodegenDialect::initialize() {
       >();
 }
 
-} // namespace Codegen
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Codegen

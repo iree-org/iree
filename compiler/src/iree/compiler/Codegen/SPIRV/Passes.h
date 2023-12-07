@@ -15,8 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Pass pipeline to lower IREE HAL executables without any tiling and
 /// distribution.
@@ -186,7 +185,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 
 void registerCodegenSPIRVPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_

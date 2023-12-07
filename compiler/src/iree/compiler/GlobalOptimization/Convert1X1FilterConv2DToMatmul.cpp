@@ -12,9 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -183,6 +181,4 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass() {
   return std::make_unique<Convert1X1FilterConv2DToMatmulPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

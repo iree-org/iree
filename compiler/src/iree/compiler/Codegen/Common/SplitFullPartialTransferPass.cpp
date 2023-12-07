@@ -14,8 +14,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 struct SplitFullPartialTransferPass
@@ -56,5 +56,4 @@ createSplitFullPartialTransferPass(StringRef option) {
   return std::make_unique<SplitFullPartialTransferPass>(option);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,18 +10,12 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMTargetOptions.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Registers the LLVM CPU target backends.
 void registerLLVMCPUTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_

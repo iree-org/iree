@@ -11,10 +11,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Data structures
@@ -128,9 +125,6 @@ PartitionSet
 partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
                                     Block *block);
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_ANALYSIS_PARTITIONING_H_

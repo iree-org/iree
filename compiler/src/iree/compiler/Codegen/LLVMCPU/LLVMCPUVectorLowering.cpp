@@ -16,8 +16,7 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-vector-lowering"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool has16x16Transpose(func::FuncOp funcOp) {
   bool res = false;
@@ -192,5 +191,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options) {
   return std::make_unique<LLVMCPUVectorLoweringPass>(options);
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

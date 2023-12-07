@@ -11,8 +11,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Populates conversion patterns that perform flow->stream conversion.
 // These patterns ensure that nested types are run through the provided
@@ -25,7 +24,6 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_FLOWTOSTREAM_PATTERNS_H_

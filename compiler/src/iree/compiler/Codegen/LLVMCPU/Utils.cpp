@@ -14,8 +14,7 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-utils"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto intrinsicsAttr =
@@ -86,5 +85,4 @@ void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

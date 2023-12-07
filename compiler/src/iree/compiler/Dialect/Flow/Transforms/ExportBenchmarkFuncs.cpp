@@ -21,10 +21,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 // Creates a util.global with a primitive value of |type| initialized to zeros.
 // Supports: ints, floats, vectors, and tensors.
@@ -296,7 +293,4 @@ createExportBenchmarkFuncsPass() {
   return std::make_unique<ExportBenchmarkFuncsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

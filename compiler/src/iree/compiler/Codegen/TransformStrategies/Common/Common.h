@@ -14,8 +14,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Base quantities generally useful for all CPU and GPU strategies.
@@ -245,7 +244,6 @@ buildReductionStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
 /// Build transform IR that applies memory optimizations.
 Value buildMemoryOptimizations(ImplicitLocOpBuilder &b, Value funcH);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_COMMON_H_

@@ -16,8 +16,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct MetalShader {
   std::string source;
@@ -36,7 +35,6 @@ crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
                        llvm::ArrayRef<uint32_t> spvBinary,
                        StringRef entryPoint);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_METALSPIRV_SPIRVTOMSL_H_

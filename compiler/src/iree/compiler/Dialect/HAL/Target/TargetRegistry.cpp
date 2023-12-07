@@ -8,10 +8,7 @@
 
 #include <algorithm>
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Returns the static registry of translator names to translation functions.
 static TargetBackendRegistry &getMutableTargetRegistry() {
@@ -132,7 +129,4 @@ SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
   return targetNames;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

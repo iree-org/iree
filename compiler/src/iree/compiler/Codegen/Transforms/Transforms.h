@@ -21,8 +21,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Get the `offsets`, `sizes` and `strides` for a `storeOp` (or `loadOp`). This
 /// method clones the operations that generate the `Value`s used for
@@ -148,7 +147,6 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

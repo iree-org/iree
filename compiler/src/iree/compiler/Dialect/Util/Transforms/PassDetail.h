@@ -11,17 +11,11 @@
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h.inc" // IWYU pragma: keep
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_UTIL_TRANSFORMS_PASS_DETAIL_H_

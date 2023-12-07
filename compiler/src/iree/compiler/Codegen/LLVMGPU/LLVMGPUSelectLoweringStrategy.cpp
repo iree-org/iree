@@ -25,8 +25,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Selects a lowering strategy for taking a hal.executable.variant operation
@@ -127,5 +126,4 @@ createLLVMGPUSelectLoweringStrategyPass() {
   return std::make_unique<LLVMGPUSelectLoweringStrategyPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

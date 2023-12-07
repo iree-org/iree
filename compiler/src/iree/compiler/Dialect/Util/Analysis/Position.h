@@ -16,8 +16,7 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Represents a position in the IR.
 // This may directly reference an MLIR instance such as a Value or Operation or
@@ -136,8 +135,7 @@ static inline auto getArgumentPositions(Block &block) {
 // positions are references to the combined results of the region.
 SmallVector<Position> getReturnedValuePositions(Region &region);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 namespace llvm {
 

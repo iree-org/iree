@@ -9,11 +9,9 @@
 
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_

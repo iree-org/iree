@@ -34,10 +34,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Op utilities used within the Flow dialect
@@ -1899,7 +1896,7 @@ void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-    mlir::RewritePatternSet &patterns, MLIRContext *context) {
+    RewritePatternSet &patterns, MLIRContext *context) {
   patterns
       .insert<FoldTensorLoadWithExtractSlice, FoldInsertSliceWithTensorStoreOp>(
           context);
@@ -2077,10 +2074,7 @@ void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
         recv, builder.getIndexArrayAttr({0}));
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

@@ -23,8 +23,8 @@
 
 #define DEBUG_TYPE "iree-spirv-distribute"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
@@ -89,5 +89,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVDistributePass() {
   return std::make_unique<SPIRVDistributePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

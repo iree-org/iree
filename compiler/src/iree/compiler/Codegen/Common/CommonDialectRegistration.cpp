@@ -50,8 +50,7 @@
 #include "mlir/Dialect/Vector/Transforms/SubsetOpInterfaceImpl.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void registerTransformDialectTranslationDependentDialects(
     DialectRegistry &registry) {
@@ -110,5 +109,4 @@ void registerTransformDialectTranslationDependentDialects(
   vector::registerTransformDialectExtension(registry);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

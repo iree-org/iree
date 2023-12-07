@@ -42,8 +42,7 @@ using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Utility functions.
@@ -654,5 +653,4 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

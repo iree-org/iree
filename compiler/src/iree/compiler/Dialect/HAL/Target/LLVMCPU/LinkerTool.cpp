@@ -13,10 +13,7 @@
 
 #define DEBUG_TYPE "iree-tools"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // static
 Artifact Artifact::fromFile(StringRef path) { return {path.str(), nullptr}; }
@@ -140,7 +137,4 @@ LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
   return failure();
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -16,9 +16,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace DFX {
+namespace mlir::iree_compiler::DFX {
 
 // Fixed point iteration solver ("monotone framework").
 // http://symbolaris.com/course/Compilers11/27-monframework.pdf
@@ -309,8 +307,6 @@ protected:
   SmallVector<DependenceVector *, 16> dependenceStack;
 };
 
-} // namespace DFX
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::DFX
 
 #endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_SOLVER_H_

@@ -21,10 +21,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Pass declaration.
 /// Interpreter pass that applies transform dialect ops for dispatch region
@@ -77,7 +74,4 @@ createDispatchWithTransformDialect(StringRef transformFileName,
       transformFileName, debugPayloadRootTag, debugTransformRootTag);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -35,8 +35,7 @@
 constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Utility Functions
@@ -1112,5 +1111,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore() {
   return std::make_unique<SPIRVVectorizeLoadStorePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

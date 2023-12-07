@@ -18,8 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool isDivisible(Value v, int64_t dividend);
 
@@ -221,5 +220,4 @@ static PassRegistration<AffineMinDistributedSCFCanonicalizationPass> pass([] {
   return std::make_unique<AffineMinDistributedSCFCanonicalizationPass>();
 });
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

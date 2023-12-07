@@ -7,11 +7,9 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
                                Type accETy, ArrayRef<bool> is_reduction);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

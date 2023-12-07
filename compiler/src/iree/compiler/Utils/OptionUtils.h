@@ -13,8 +13,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Base class that can bind named options to fields of structs.
 //
@@ -235,8 +234,7 @@ public:
     return singleton;                                                          \
   }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 namespace llvm {
 namespace cl {

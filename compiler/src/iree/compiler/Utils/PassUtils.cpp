@@ -10,8 +10,7 @@
 
 #define DEBUG_TYPE "iree-utils"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void signalFixedPointModified(Operation *rootOp) {
   MLIRContext *context = rootOp->getContext();
@@ -25,5 +24,4 @@ void signalFixedPointModified(Operation *rootOp) {
   rootOp->setAttr("iree.fixedpoint.modified", UnitAttr::get(context));
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

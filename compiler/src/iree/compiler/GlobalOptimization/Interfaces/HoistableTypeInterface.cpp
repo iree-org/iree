@@ -11,8 +11,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static Value bitcastToStaticTypeImpl(OpBuilder &b, Location loc,
                                      RankedTensorType targetType,
@@ -97,5 +96,4 @@ void registerHoistableTypeInterfaces(DialectRegistry &registry) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

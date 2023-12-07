@@ -13,9 +13,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct PadConfig {};
 
@@ -56,8 +54,6 @@ public:
   bool useAsyncCopies = false;
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_PAD_STRATEGY_H_

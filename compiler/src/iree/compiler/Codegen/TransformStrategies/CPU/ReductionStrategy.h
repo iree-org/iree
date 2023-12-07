@@ -9,9 +9,7 @@
 
 #include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace cpu {
+namespace mlir::iree_compiler::cpu {
 
 struct CPUModel;
 
@@ -54,8 +52,6 @@ private:
 void buildReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
                             const ReductionStrategy &strategy);
 
-} // namespace cpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::cpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_REDUCTION_STRATEGY_H_

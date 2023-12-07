@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 
 namespace mlir {
+
 class DialectRegistry;
 
 namespace func {
@@ -28,29 +29,27 @@ struct TileSizesSpec;
 struct NumThreadsSpec;
 class TransformTypeInterface;
 } // namespace transform
+
 } // namespace mlir
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensionsOps.h.inc"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Registers common transformations that require IREE-specific information
 /// into the transform dialect.
 void registerTransformDialectCommonExtension(DialectRegistry &registry);
 
-namespace IREE {
-namespace transform_dialect {
+namespace IREE::transform_dialect {
 /// Hook to register common transformations to the transform dialect.
 class CommonExtensions
     : public transform::TransformDialectExtension<CommonExtensions> {
 public:
   CommonExtensions();
 };
-} // namespace transform_dialect
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace IREE::transform_dialect
+
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_TRANSFORMEXTENSIONS_COMMONEXTENSIONS_H_

@@ -29,10 +29,7 @@
 
 #define DEBUG_TYPE "iree-stream-elide-async-copies"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -528,7 +525,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideAsyncCopiesPass() {
   return std::make_unique<ElideAsyncCopiesPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

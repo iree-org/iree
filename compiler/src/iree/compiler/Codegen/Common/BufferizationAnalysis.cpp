@@ -32,8 +32,7 @@
 
 #define DEBUG_TYPE "iree-codegen-bufferization-analysis"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Analysis to compute equivalence sets.
@@ -636,5 +635,4 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

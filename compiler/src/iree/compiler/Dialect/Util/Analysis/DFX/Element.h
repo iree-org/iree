@@ -13,9 +13,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace DFX {
+namespace mlir::iree_compiler::DFX {
 
 class Solver;
 
@@ -185,8 +183,6 @@ struct ValueElement : public AbstractElement {
   virtual ChangeStatus updateValue(Value value, Solver &solver) = 0;
 };
 
-} // namespace DFX
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::DFX
 
 #endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_ELEMENT_H_

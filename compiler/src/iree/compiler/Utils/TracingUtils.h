@@ -12,8 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassInstrumentation.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Instruments passes using IREE's runtime tracing support.
 //
@@ -72,7 +71,6 @@ createTraceFrameMarkEndPass(llvm::StringRef name = "");
 #define IREE_TRACE_ADD_END_FRAME_PASS(passManager, frameName)
 #endif // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_TRACINGUTILS_H_

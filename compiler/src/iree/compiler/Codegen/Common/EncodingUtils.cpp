@@ -7,8 +7,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using IREE::LinalgExt::EncodingAttr;
 using IREE::LinalgExt::EncodingRole;
@@ -186,5 +185,4 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
   return encodingInfo;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

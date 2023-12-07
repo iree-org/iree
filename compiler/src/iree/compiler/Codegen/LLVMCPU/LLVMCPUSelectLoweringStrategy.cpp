@@ -27,8 +27,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Selects the lowering strategy for a hal.executable.variant operation.
@@ -125,5 +124,4 @@ createLLVMCPUSelectLoweringStrategyPass() {
   return std::make_unique<LLVMCPUSelectLoweringStrategyPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

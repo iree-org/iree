@@ -3,11 +3,10 @@
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 #define GEN_PASS_REGISTRATION
@@ -16,6 +15,4 @@ namespace {
 
 void registerCommonPreprocessingPasses() { registerPasses(); }
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing

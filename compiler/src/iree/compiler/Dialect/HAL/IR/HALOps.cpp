@@ -20,10 +20,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // custom<DescriptorType>($descriptor_type)
@@ -1611,10 +1608,7 @@ void FenceAwaitOp::getAsmResultNames(
   setNameFn(getStatus(), "status");
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

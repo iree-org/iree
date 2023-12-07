@@ -11,14 +11,8 @@
 // Order matters:
 #include "iree/compiler/Dialect/VMVX/IR/VMVXEnums.cpp.inc"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMVX {
+namespace mlir::iree_compiler::IREE::VMVX {
 
 #include "iree/compiler/Dialect/VMVX/IR/VMVXOpInterfaces.cpp.inc"
 
-} // namespace VMVX
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VMVX

@@ -16,10 +16,9 @@ namespace mlir {
 class OpBuilder;
 class Type;
 class Value;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
@@ -71,9 +70,6 @@ std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysisPass();
 // Register all Passes
 void registerTransformPasses();
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_

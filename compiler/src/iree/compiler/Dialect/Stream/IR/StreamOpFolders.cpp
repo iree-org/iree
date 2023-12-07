@@ -33,10 +33,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Utilities shared across patterns
@@ -3389,7 +3386,4 @@ OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -25,9 +25,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -213,6 +211,4 @@ std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass() {
   return std::make_unique<DetachElementwiseFromNamedOpsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

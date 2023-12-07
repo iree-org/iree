@@ -12,8 +12,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 struct LowerUKernelOpsToCallsPass
@@ -58,5 +57,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass() {
   return std::make_unique<LowerUKernelOpsToCallsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

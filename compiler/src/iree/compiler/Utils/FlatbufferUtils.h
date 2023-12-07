@@ -29,8 +29,7 @@
 #include "iree/base/internal/flatcc/parsing.h"
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // RAII wrapper for flatcc_builder_t; pass to functions requiring a builder.
 //
@@ -185,7 +184,6 @@ private:
   uint64_t pos = 0;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_FLATBUFFERUTILS_H_

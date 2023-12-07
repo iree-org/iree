@@ -37,8 +37,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #endif // IREE_HAVE_C_OUTPUT_FORMAT
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Registers IREE passes with the global registry.
 inline void registerAllIreePasses() {
@@ -51,6 +50,7 @@ inline void registerAllIreePasses() {
   registerCommonInputConversionPasses();
   ConstEval::registerConstEvalPasses();
   GlobalOptimization::registerGlobalOptimizationPipeline();
+  Preprocessing::registerPreprocessingPasses();
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();
@@ -62,7 +62,6 @@ inline void registerAllIreePasses() {
   IREE::VM::registerVMAnalysisTestPasses();
   IREE::VM::registerVMTestPasses();
   IREE::VMVX::registerVMVXPasses();
-  IREE::registerPreprocessingPasses();
   registerIREEVMTransformPassPipeline();
 
   // We have some dangling passes that don't use explicit
@@ -74,7 +73,6 @@ inline void registerAllIreePasses() {
 #endif // IREE_HAVE_C_OUTPUT_FORMAT
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_TOOLS_INIT_IREE_PASSES_H_

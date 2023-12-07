@@ -10,10 +10,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // Repeats dispatches a specified number of times.
@@ -79,7 +76,4 @@ static PassRegistration<BenchmarkBatchDispatchesPass> pass([] {
   return std::make_unique<BenchmarkBatchDispatchesPass>(2);
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

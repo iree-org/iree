@@ -18,8 +18,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Marker to denote that a linalg operation has been partitioned to
 /// workgroups and tiled along reduction dimennsions.
@@ -59,7 +58,6 @@ bool hasMarker(Operation *, ArrayRef<StringRef> markers = {});
 /// Sets a given marker on an operation.
 void setMarker(Operation *, StringRef);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_CODEGENUTILS_MARKERUTILS_H_

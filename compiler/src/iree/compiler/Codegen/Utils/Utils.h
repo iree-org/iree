@@ -21,8 +21,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
 
@@ -212,7 +211,6 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

@@ -12,12 +12,10 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 namespace {
+
 /// Gets the corresponding SPIR-V version for the ggiven Vulkan target
 /// environment.
 spirv::Version convertVersion(Vulkan::TargetEnvAttr vkTargetEnv) {
@@ -189,7 +187,8 @@ convertResourceLimits(Vulkan::TargetEnvAttr vkTargetEnv) {
       vkCapabilities.getMinSubgroupSize(), vkCapabilities.getMaxSubgroupSize(),
       ArrayAttr::get(context, khrCoopAttrs), ArrayAttr{});
 }
-} // anonymous namespace
+
+} // namespace
 
 Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
                                             llvm::StringRef triple) {
@@ -214,7 +213,4 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
       vkTargetEnv.getDeviceType(), vkTargetEnv.getDeviceID());
 }
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan

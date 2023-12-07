@@ -9,10 +9,7 @@
 
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace OpTrait {
-namespace IREE {
-namespace VM {
+namespace mlir::OpTrait::IREE::VM {
 
 template <typename ConcreteType>
 class DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
@@ -71,9 +68,6 @@ public:
   }
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace OpTrait
-} // namespace mlir
+} // namespace mlir::OpTrait::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMTRAITS_H_

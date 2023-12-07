@@ -18,8 +18,7 @@
 #include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Traversal control
@@ -340,7 +339,6 @@ private:
   ModuleAnalysisManager analysisManager;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_UTIL_ANALYSIS_EXPLORER_H_

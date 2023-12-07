@@ -31,8 +31,7 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensor-tile"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class TileConsumerAndFuseInputProducer final
     : public OpInterfaceRewritePattern<TilingInterface> {
@@ -384,5 +383,4 @@ createGPUTensorTile(bool distributeToWarp) {
   return std::make_unique<GPUTensorTilePass>(distributeToWarp);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

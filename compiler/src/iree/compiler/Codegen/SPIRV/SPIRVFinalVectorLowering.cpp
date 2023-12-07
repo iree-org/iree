@@ -28,8 +28,8 @@
 
 #define DEBUG_TYPE "iree-spirv-final-vector-lowering"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
@@ -113,5 +113,4 @@ createSPIRVFinalVectorLoweringPass() {
   return std::make_unique<SPIRVFinalVectorLoweringPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

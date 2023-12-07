@@ -18,8 +18,7 @@
 
 #define DEBUG_TYPE "iree-llvmgpu-tensor-pad"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -227,5 +226,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass() {
   return std::make_unique<LLVMGPUTensorPadPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

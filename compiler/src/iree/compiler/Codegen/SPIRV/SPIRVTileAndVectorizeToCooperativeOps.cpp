@@ -48,8 +48,8 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
@@ -471,5 +471,4 @@ createSPIRVVectorizeToCooperativeOpsPass() {
   return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

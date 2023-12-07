@@ -27,8 +27,7 @@
 
 #define DEBUG_TYPE "iree-codegen-utils"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Utility functions to get entry points
@@ -989,5 +988,4 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

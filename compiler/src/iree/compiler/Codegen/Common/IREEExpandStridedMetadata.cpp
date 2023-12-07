@@ -16,8 +16,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Helper struct to return the offset, sizes and strides
@@ -276,5 +275,4 @@ std::unique_ptr<Pass> createIREEExpandStridedMetadataPass() {
   return std::make_unique<IREEExpandStridedMetadataPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
