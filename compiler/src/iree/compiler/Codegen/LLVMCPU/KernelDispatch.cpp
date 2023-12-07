@@ -947,7 +947,9 @@ static void getDefaultMatmulVectorSizes(
   return;
 }
 
-static FailureOr<Type> nonWideningMatmulElementType(linalg::LinalgOp op) {
+/// Checks if the input and output types of a linalg op are the same, and if so
+/// returns the type. Otherwise, returns failure.
+static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   SmallVector<Type, 3> inputAndOutputElementTypes;
   for (Value v :
        llvm::concat<Value>(op.getRegionInputArgs(), op.getRegionOutputArgs())) {
@@ -959,11 +961,19 @@ static FailureOr<Type> nonWideningMatmulElementType(linalg::LinalgOp op) {
   return inputAndOutputElementTypes[0];
 }
 
+/// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
+/// tile sizes picked here must exactly match the SME hardware virtual tiles, as
+/// there is currently no support for lowering non-standard shapes.
 static void
 getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
-  auto elementType = nonWideningMatmulElementType(op);
+  // Double check the operation is one that is supported for lowering to ArmSME.
+  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(
+          op))
+    return;
+
+  auto elementType = nonWideningLinalgElementType(op);
   if (failed(elementType))
     return;
 
@@ -988,7 +998,7 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
                                                   bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   SmallVector<bool> matmulScalableFlags;
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // TODO: Compute vector tile sizes using heuristics.
 

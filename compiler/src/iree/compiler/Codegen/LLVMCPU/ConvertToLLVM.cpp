@@ -925,9 +925,6 @@ struct LinkArmSMERoutinesIfNeeded : public OpRewritePattern<LLVM::LLVMFuncOp> {
     auto variantOp =
         llvmFuncOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
 
-    if (variantOp.getObjectsAttr())
-      return failure();
-
     static auto sme_compiler_rt_lib =
         std::getenv("IREE_ARM_SME_COMPILER_RT_BUILTINS_STATIC_LIB");
 
@@ -935,9 +932,26 @@ struct LinkArmSMERoutinesIfNeeded : public OpRewritePattern<LLVM::LLVMFuncOp> {
       return llvmFuncOp.emitError(
           "IREE_ARM_SME_COMPILER_RT_BUILTINS_STATIC_LIB must be set!");
 
-    Attribute objectAttr = rewriter.getAttr<IREE::HAL::ExecutableObjectAttr>(
-        rewriter.getStringAttr(sme_compiler_rt_lib), DenseIntElementsAttr{});
-    variantOp.setObjectsAttr(rewriter.getArrayAttr(objectAttr));
+    auto objectsAttr = variantOp.getObjectsAttr();
+    if (objectsAttr) {
+      for (auto objectAttr :
+           objectsAttr.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
+        if (objectAttr.getPath() == sme_compiler_rt_lib)
+          return failure(); // ArmSME rountines already linked.
+      }
+    }
+
+    SmallVector<Attribute> linkedObjects;
+    if (objectsAttr)
+      linkedObjects.append(objectsAttr.begin(), objectsAttr.end());
+
+    // Add ArmSME rountines to linked objects.
+    Attribute armSMEBuiltinsObj =
+        rewriter.getAttr<IREE::HAL::ExecutableObjectAttr>(
+            rewriter.getStringAttr(sme_compiler_rt_lib),
+            DenseIntElementsAttr{});
+    linkedObjects.push_back(armSMEBuiltinsObj);
+    variantOp.setObjectsAttr(rewriter.getArrayAttr(linkedObjects));
 
     return success();
   }
