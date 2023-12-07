@@ -312,6 +312,9 @@ def main(args):
             for mapper in benchmark_presentation.COMPILATION_METRICS_TO_TABLE_MAPPERS:
                 required_benchmark_keys.add(mapper.get_series_id(target_id))
 
+        # Try to fine the superset results first to make sure we won't compare
+        # to partially uploaded results (as the current uploading process is not
+        # transactional).
         comparable_results = _find_comparable_benchmark_results(
             start_commit=pr_base_commit,
             required_benchmark_keys=required_benchmark_keys,
