@@ -53,6 +53,8 @@ public:
 
   using Base::Base;
 
+  static constexpr StringLiteral name = "flow.dispatch_tensor";
+
   /// Get or create a new DispatchTensorType of the provided shape and
   /// element type. Assumes the arguments define a well-formed
   /// DispatchTensorType.

@@ -28,6 +28,8 @@ class TargetEnvAttr
 public:
   using Base::Base;
 
+  static constexpr StringLiteral name = "vk.target_env";
+
   /// Gets a TargetEnvAttr instance.
   // TODO(antiagainst): support other physical device core properties, physical
   // device core features and per-extension features.
