@@ -6,10 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 #define GEN_PASS_REGISTRATION
@@ -21,7 +18,4 @@ void registerTransformPasses() {
   registerPasses();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

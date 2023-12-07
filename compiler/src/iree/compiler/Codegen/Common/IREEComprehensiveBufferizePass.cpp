@@ -42,8 +42,7 @@ using mlir::bufferization::BufferizationOptions;
 using mlir::bufferization::OneShotAnalysisState;
 using mlir::bufferization::OneShotBufferizationOptions;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 class EliminateEmptyTensorsPass
@@ -258,5 +257,4 @@ void addIREEComprehensiveBufferizePasses(
   addIREEPostBufferizationPasses(passManager);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

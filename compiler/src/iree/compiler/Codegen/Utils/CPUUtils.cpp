@@ -16,8 +16,7 @@
 #define DEBUG_TYPE "iree-codegen-cpu-utils"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
@@ -64,5 +63,4 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   return rootOperation;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

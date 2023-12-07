@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-stream-specialize-dispatches"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -374,7 +371,4 @@ createSpecializeDispatchesPass() {
   return std::make_unique<SpecializeDispatchesPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

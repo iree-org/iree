@@ -14,8 +14,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
@@ -62,5 +62,4 @@ void populateStandardConstantToStreamPatterns(
   patterns.insert<ConvertTensorConstantOp>(typeConverter, context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

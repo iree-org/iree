@@ -11,8 +11,7 @@
 #include "tosa-iree/InputConversion/PassDetail.h"
 #include "tosa-iree/InputConversion/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct VerifyCompilerTOSAInputLegalityPass
     : public VerifyCompilerTOSAInputLegalityBase<
@@ -69,5 +68,4 @@ createVerifyCompilerTOSAInputLegality() {
   return std::make_unique<VerifyCompilerTOSAInputLegalityPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

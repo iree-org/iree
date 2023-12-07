@@ -13,8 +13,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -277,5 +276,4 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
   populateHALToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

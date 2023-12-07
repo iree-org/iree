@@ -18,10 +18,7 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 #include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc" // IWYU pragma: keep
 
@@ -301,7 +298,4 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

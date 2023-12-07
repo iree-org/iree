@@ -20,8 +20,7 @@
 
 #define DEBUG_TYPE "iree-codegen-vector-reduction-to-gpu"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
   LLVM_DEBUG({
@@ -310,7 +309,7 @@ private:
   std::function<int(func::FuncOp)> getWarpSize;
 };
 
-} // anonymous namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
@@ -320,5 +319,4 @@ createConvertVectorReductionToGPUPass(
                                                     getWarpSize);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

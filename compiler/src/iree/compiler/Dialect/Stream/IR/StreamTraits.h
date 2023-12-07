@@ -9,10 +9,7 @@
 
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace OpTrait {
-namespace IREE {
-namespace Stream {
+namespace mlir ::OpTrait::IREE::Stream {
 
 template <typename ConcreteType>
 class TensorPhaseOp : public OpTrait::TraitBase<ConcreteType, TensorPhaseOp> {
@@ -32,9 +29,6 @@ public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
-} // namespace Stream
-} // namespace IREE
-} // namespace OpTrait
-} // namespace mlir
+} // namespace mlir::OpTrait::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMTRAITS_H_

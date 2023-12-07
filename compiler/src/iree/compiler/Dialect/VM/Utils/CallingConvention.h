@@ -9,10 +9,7 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Generates a string encoding the function type for defining the
 // FunctionSignatureDef::calling_convention field for import functions.
@@ -27,9 +24,6 @@ makeImportCallingConventionString(IREE::VM::ImportOp importOp);
 // FunctionSignatureDef::calling_convention field for internal/export functions.
 std::optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp);
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_UTILS_CALLINGCONVENTION_H_

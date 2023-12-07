@@ -32,10 +32,7 @@
 
 #define DEBUG_TYPE "iree-stream-schedule-execution"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 // Incremental builder for a partitioned region of executable work.
@@ -366,7 +363,4 @@ createScheduleExecutionPass() {
   return std::make_unique<ScheduleExecutionPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 class AllocatorAllocateOpConversion
@@ -109,5 +109,4 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                                importSymbols);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

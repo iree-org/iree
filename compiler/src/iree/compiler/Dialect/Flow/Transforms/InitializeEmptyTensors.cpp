@@ -13,10 +13,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Returns a zero value attribute based on the `elementType`.
 /// Returns failure, when the type is not handled.
@@ -115,7 +112,4 @@ std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill) {
   return std::make_unique<InitializeEmptyTensorsPass>(zeroFill);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

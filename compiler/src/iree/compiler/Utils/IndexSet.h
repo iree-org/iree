@@ -11,8 +11,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Simple cache for generated index values.
 // Always inserts at the location specified by the builder when constructed.
@@ -47,7 +46,6 @@ private:
   DenseMap<int64_t, Value> memoizedIndices;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_INDEXSET_H_

@@ -28,8 +28,7 @@
 
 #define DEBUG_TYPE "tile-dispatch-using-interface"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Method to check if a value is zero
 static bool isZero(Value val) {
@@ -625,5 +624,4 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
                   SwapExtractSliceWithTensorEmpty>(context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

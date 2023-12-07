@@ -21,8 +21,7 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// By default don't do any pipelining.
 constexpr unsigned defaultSimtSoftwarePipelineDepth = 1;
@@ -118,7 +117,6 @@ getMatmulBMNKIndex(linalg::LinalgOp op, int *lastParallelDim = nullptr);
 /// These attributes are used to drive the CodeGen pipeline.
 LogicalResult initSPIRVLaunchConfig(ModuleOp moduleOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_SPIRV_KERNELCONFIG_H_

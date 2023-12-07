@@ -11,13 +11,11 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/InputConversion/Common/Passes.h.inc"
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSDETAIL_H_

@@ -8,10 +8,7 @@
 
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 class DropExcludedExportsPass
     : public PassWrapper<DropExcludedExportsPass,
@@ -48,7 +45,4 @@ createDropExcludedExportsPass() {
 
 static PassRegistration<DropExcludedExportsPass> pass;
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

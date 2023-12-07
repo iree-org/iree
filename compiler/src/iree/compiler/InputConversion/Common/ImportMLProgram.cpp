@@ -23,8 +23,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -269,5 +268,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass() {
   return std::make_unique<ImportMLProgramPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

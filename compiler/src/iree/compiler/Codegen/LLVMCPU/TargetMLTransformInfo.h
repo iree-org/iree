@@ -11,8 +11,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Holds target specific information to specialize ML transformations.
 // TODO(dcaballe): Move to a Concept-Model implementation when it's worth it.
@@ -25,7 +24,6 @@ struct TargetMLTransformInfo {
   getTargetMLTransformInfo(IREE::HAL::ExecutableTargetAttr targetAttr);
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_TARGETMLTRANSFORMINFO_H_

@@ -19,8 +19,7 @@
 
 #define DEBUG_TYPE "iree-tools"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 std::string escapeCommandLineComponent(const std::string &component) {
 #if defined(_WIN32)
@@ -279,5 +278,4 @@ std::string findPlatformLibDirectory(StringRef platformName) {
   return pathStr;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

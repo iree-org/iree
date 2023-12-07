@@ -12,10 +12,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.
 static SmallVector<Value>
@@ -186,7 +183,4 @@ convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
   return success();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

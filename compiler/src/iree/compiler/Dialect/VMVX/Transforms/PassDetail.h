@@ -11,17 +11,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VMVX {
+namespace mlir::iree_compiler::IREE::VMVX {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h.inc"
 
-} // namespace VMVX
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VMVX
 
 #endif // IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASS_DETAIL_H_

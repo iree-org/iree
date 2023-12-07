@@ -15,8 +15,7 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-tile-reduction"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -89,5 +88,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass() {
   return std::make_unique<GPUTileReductionPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

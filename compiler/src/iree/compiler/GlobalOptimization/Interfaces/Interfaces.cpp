@@ -7,12 +7,10 @@
 #include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
 #include "iree/compiler/GlobalOptimization/Interfaces/HoistableTypeInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void registerGlobalOptimizationInterfaces(DialectRegistry &registry) {
   registerHoistableTypeInterfaces(registry);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

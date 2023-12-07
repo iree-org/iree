@@ -11,8 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Container of information needed to materialize the pack operation.
 struct MaterializeEncodingInfo {
@@ -128,6 +127,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 void populateMaterializeUpperBoundTileSizePatterns(
     RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
+
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_

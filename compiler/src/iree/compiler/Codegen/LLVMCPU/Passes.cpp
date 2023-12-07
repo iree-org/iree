@@ -24,8 +24,7 @@
 
 #define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
@@ -773,5 +772,4 @@ void registerCodegenLLVMCPUPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

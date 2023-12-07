@@ -25,10 +25,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static llvm::cl::opt<bool> clEnableMicrokernels(
     "iree-vmvx-enable-microkernels",
@@ -225,7 +222,4 @@ void registerVMVXTargetBackends() {
   });
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

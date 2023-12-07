@@ -13,10 +13,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Encodes a type (or a tuple of nested types) to a calling convention string.
 //
@@ -145,7 +142,4 @@ makeCallingConventionString(IREE::VM::FuncOp funcOp) {
   return std::string(s.data(), s.size());
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

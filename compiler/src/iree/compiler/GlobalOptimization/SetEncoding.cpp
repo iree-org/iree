@@ -37,9 +37,7 @@
 
 #include "llvm/Support/Debug.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -416,6 +414,4 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

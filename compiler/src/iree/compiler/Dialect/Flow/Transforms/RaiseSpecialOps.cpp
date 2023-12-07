@@ -21,10 +21,7 @@
 using namespace mlir;
 using transform_ext::StructuredOpMatcher;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -726,7 +723,4 @@ std::unique_ptr<Pass> createRaiseSpecialOps() {
   return std::make_unique<RaiseSpecialOpsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

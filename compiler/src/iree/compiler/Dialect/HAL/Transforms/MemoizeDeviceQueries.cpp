@@ -17,10 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // NOTE: this implementation is just for a single active device. As we start to
 // support multiple devices we'll need to change this to be per-device.
@@ -127,7 +124,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass() {
 
 static PassRegistration<MemoizeDeviceQueriesPass> pass;
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -18,10 +18,7 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::IREE::HAL::TargetOptions);
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 void TargetOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory halTargetOptionsCategory(
@@ -110,7 +107,4 @@ void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,
   file->keep();
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -13,8 +13,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // A conversion target for the HAL dialect that ensures that tensor types are
 // fully removed. Conversions targeting the HAL dialect should always use this.
@@ -23,7 +22,6 @@ public:
   HALConversionTarget(MLIRContext *context, TypeConverter &typeConverter);
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONTARGET_H_

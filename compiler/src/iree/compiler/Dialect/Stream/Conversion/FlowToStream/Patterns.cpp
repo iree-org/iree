@@ -16,8 +16,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -888,5 +887,4 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   populateFlowToStreamConversionPatterns(context, typeConverter, patterns);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

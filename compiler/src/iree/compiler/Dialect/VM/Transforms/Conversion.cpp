@@ -29,10 +29,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 namespace {
 
 // TODO#(11786): The expansions of integer min and max ops were removed in
@@ -194,7 +191,4 @@ static PassRegistration<ConversionPass> pass(
       return std::make_unique<ConversionPass>(options);
     });
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

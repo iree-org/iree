@@ -38,8 +38,7 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 constexpr int kMaxVectorNumBits = 128;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
 // Reduction tiling patterns
@@ -370,5 +369,4 @@ createSPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel) {
                                                    skipThreadLevel);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -27,8 +27,7 @@
 using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
 using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
@@ -168,5 +167,4 @@ createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType) {
   return std::make_unique<LLVMGPUTensorCoreVectorizationPass>(tensorCoreType);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -16,10 +16,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
@@ -512,7 +509,4 @@ void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
   patterns.insert<IndexSwitchToIfPattern, MergeIndexSwitchPattern>(context);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

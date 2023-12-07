@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-stream-fuse-dispatch-bindings"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -468,7 +465,4 @@ createFuseDispatchBindingsPass() {
   return std::make_unique<FuseDispatchBindingsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

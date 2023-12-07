@@ -17,8 +17,7 @@
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Filters out dimensions in `parallelLoops` that have unit range in
 /// `loopRanges`.
@@ -265,5 +264,4 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

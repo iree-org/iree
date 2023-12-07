@@ -31,10 +31,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
@@ -370,7 +367,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
   return std::make_unique<DemoteF64ToF32Pass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

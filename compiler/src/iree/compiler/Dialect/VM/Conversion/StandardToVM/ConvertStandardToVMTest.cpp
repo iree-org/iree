@@ -13,10 +13,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-
-namespace {
+namespace mlir::iree_compiler::IREE::VM {
 
 // A pass converting MLIR Standard operations into the IREE VM dialect.
 // Used only for testing as in the common case we only rely on rewrite patterns.
@@ -65,18 +62,11 @@ public:
   }
 };
 
-} // namespace
-
-namespace IREE {
-namespace VM {
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createConvertStandardToVMTestPass() {
   return std::make_unique<ConvertStandardToVMTestPass>();
 }
-} // namespace VM
-} // namespace IREE
 
 static PassRegistration<ConvertStandardToVMTestPass> pass;
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

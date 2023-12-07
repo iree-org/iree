@@ -16,10 +16,7 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 namespace {
 class CheckToVmConversionInterface : public VMConversionDialectInterface {
@@ -68,7 +65,4 @@ CheckDialect::CheckDialect(MLIRContext *context)
       >();
 }
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check

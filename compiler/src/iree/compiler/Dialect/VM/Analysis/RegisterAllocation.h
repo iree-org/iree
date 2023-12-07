@@ -13,8 +13,7 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "mlir/IR/Operation.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Represents a register value at a particular usage.
 //
@@ -217,8 +216,7 @@ private:
   llvm::DenseMap<Value, Register> map_;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 namespace llvm {
 template <>

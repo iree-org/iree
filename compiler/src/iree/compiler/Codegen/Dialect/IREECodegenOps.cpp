@@ -21,11 +21,3 @@
 #define GET_OP_CLASSES
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
-
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Codegen {} // namespace Codegen
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir

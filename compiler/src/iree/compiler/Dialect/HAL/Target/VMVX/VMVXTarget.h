@@ -9,17 +9,11 @@
 
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Registers the VMVX backends.
 void registerVMVXTargetBackends();
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_VMVX_VMVXTARGET_H_

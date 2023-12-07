@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-stream-refine-usage"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -485,7 +482,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass() {
   return std::make_unique<RefineUsagePass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

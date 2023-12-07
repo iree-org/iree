@@ -26,9 +26,7 @@
 #define DEBUG_TYPE "iree-const-eval"
 using llvm::dbgs;
 
-namespace mlir {
-namespace iree_compiler {
-namespace ConstEval {
+namespace mlir::iree_compiler::ConstEval {
 
 static llvm::cl::opt<std::string> clJitTargetBackend(
     "iree-consteval-jit-target-backend",
@@ -579,6 +577,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass() {
       IREE::HAL::TargetBackendRegistry::getGlobal());
 }
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval

@@ -9,16 +9,12 @@
 
 namespace mlir {
 class DialectRegistry;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 void registerUtilExternalModels(DialectRegistry &registry);
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILEXTERNALMODELS_H_

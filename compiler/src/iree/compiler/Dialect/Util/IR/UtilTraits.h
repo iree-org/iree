@@ -10,10 +10,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/SymbolTable.h"
 
-namespace mlir {
-namespace OpTrait {
-namespace IREE {
-namespace Util {
+namespace mlir::OpTrait::IREE::Util {
 
 template <typename ConcreteType>
 struct YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
@@ -56,9 +53,6 @@ struct ObjectLike : public OpTrait::TraitBase<ConcreteType, ObjectLike> {
   }
 };
 
-} // namespace Util
-} // namespace IREE
-} // namespace OpTrait
-} // namespace mlir
+} // namespace mlir::OpTrait::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILTRAITS_H_

@@ -22,8 +22,7 @@ static llvm::cl::opt<bool> clVerboseDebugInfo(
     llvm::cl::desc("Emit verbose debug information in LLVM IR."),
     llvm::cl::init(false));
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -1443,5 +1442,4 @@ Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

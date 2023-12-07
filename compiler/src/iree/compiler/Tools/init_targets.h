@@ -7,8 +7,7 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_TARGETS_H_
 #define IREE_COMPILER_TOOLS_INIT_TARGETS_H_
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // This function should be called before creating any MLIRContext if one
 // expects all the possible target backends to be available. Custom tools can
@@ -16,7 +15,6 @@ namespace iree_compiler {
 // need.
 void registerHALTargetBackends();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_TOOLS_INIT_TARGETS_H_

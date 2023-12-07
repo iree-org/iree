@@ -12,10 +12,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/DebugDatabaseBuilder.h"
 #include "mlir/IR/SymbolTable.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 struct EncodedBytecodeFunction {
   // Encoded bytecode data for the function body including padding.
@@ -52,9 +49,6 @@ public:
   ~BytecodeEncoder() = default;
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEENCODER_H_

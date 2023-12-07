@@ -16,8 +16,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Parser/Parser.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h.
 // There may be some special insertion order arrangement required based on the
@@ -214,5 +213,4 @@ rewriteAttrToOperands(Location loc, Attribute attrValue, Type inputType,
 
 } // namespace detail
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

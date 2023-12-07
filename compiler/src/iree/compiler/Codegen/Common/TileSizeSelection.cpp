@@ -8,8 +8,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
     : loweringConfig(lc) {
@@ -122,5 +121,4 @@ unsigned TilingConfig::getActualLevel(TilingLevel level) {
   return actualLevel;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

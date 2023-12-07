@@ -15,15 +15,13 @@ class LogicalResult;
 class OpBuilder;
 class RewriterBase;
 class Value;
-
 namespace tensor {
 class ExtractSliceOp;
 class InsertSliceOp;
 } // namespace tensor
+} // namespace mlir
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Rewrite the given InsertSliceOp into a Flow::TensorUpdateOp.
 LogicalResult
@@ -35,9 +33,6 @@ LogicalResult
 convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
                                    tensor::ExtractSliceOp sliceOp);
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_

@@ -35,8 +35,7 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-llvmgpu-tile-and-distribute"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
@@ -330,5 +329,4 @@ createLLVMGPUTileAndDistribute(bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

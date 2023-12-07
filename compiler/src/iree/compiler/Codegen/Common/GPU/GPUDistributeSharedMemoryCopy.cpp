@@ -50,8 +50,7 @@ void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
 static const llvm::StringRef kCopyToDistribute = "copy_to_distribute";
 static const llvm::StringRef kCopyDistributed = "copy_distributed";
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // For optimal performance we always want to copy 128 bits
 static constexpr int copyVectorNumBits = 128;
@@ -481,5 +480,4 @@ createGPUDistributeSharedMemoryCopy() {
   return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

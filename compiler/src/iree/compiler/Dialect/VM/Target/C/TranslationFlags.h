@@ -9,18 +9,12 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Returns a CTargetOptions struct initialized with the
 // --iree-vm-c-* flags.
 CTargetOptions getCTargetOptionsFromFlags();
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_TARGET_C_TRANSLATIONFLAGS_H_

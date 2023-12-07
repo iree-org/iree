@@ -18,8 +18,7 @@
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 #endif // IREE_HAVE_VULKANSPIRV_TARGET
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // This function should be called before creating any MLIRContext if one
 // expects all the possible target backends to be available. Custom tools can
@@ -44,5 +43,4 @@ void registerHALTargetBackends() {
   (void)init_once;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

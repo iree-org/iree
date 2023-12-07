@@ -19,10 +19,7 @@
 
 #define DEBUG_TYPE "iree-util-simplify-global-accesses"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Builds symbol ref set for all immutable globals in |moduleOp|.
 static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
@@ -318,7 +315,4 @@ std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

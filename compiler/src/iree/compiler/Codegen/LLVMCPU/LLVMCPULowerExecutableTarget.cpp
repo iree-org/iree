@@ -28,8 +28,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Lowers an hal.executable.variant operation to scalar/native-vector
@@ -228,5 +227,4 @@ createLLVMCPULowerExecutableTargetPass() {
   return std::make_unique<LLVMCPULowerExecutableTargetPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

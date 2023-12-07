@@ -20,10 +20,7 @@ using llvm::dbgs;
 
 using namespace mlir::iree_compiler::IREE::Util;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // ConstExprAnalysis
@@ -432,10 +429,7 @@ void ConstExprHoistingPolicy::dumpDotGraph() const {
   printDotGraph(llvm::errs());
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 namespace llvm {
 template <>

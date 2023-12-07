@@ -20,8 +20,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -144,5 +143,4 @@ void populateHALLoaderToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal_loader.executable.dispatch");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -7,6 +7,7 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
 #include <optional>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 namespace mlir {
@@ -16,9 +17,9 @@ class CastOpInterface;
 class OpBuilder;
 class Location;
 class NamedAttribute;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 /// Returns a CastOpInterface op, if the producer is a CastOpInterface op, or a
 /// linalg::GenericOp that performs only a CastOpInterface on its input.
@@ -46,8 +47,6 @@ Value createGenericElementwiseCastOp(
     ArrayRef<NamedAttribute> attrs,
     std::optional<IREE::LinalgExt::EncodingAttr> encoding = std::nullopt);
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

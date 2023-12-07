@@ -18,9 +18,7 @@
 
 using llvm::SmallPtrSet;
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -135,6 +133,4 @@ std::unique_ptr<Pass> createInferNumericNarrowingPass() {
   return std::make_unique<InferNumericNarrowingPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

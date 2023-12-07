@@ -16,10 +16,10 @@ class OpBuilder;
 class Operation;
 class RewriterBase;
 class Value;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
+
 class DispatchRegionOp;
 
 /// Check if an operation is not null and is not nested within
@@ -107,9 +107,6 @@ SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp);
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_

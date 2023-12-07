@@ -19,8 +19,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Function to register all dependent dialects for Transform Dialect based
 /// passes.
@@ -302,7 +301,6 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_

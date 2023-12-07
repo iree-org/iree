@@ -11,8 +11,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -63,5 +62,4 @@ void registerCodegenCommonCPUPasses() {
   // Generated.
   registerPasses();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

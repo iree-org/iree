@@ -17,10 +17,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 static std::optional<int64_t> matchConstant(Value value) {
@@ -139,7 +136,4 @@ createVerifyAsyncAccessRangesPass() {
   return std::make_unique<VerifyAsyncAccessRangesPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -43,8 +43,7 @@
 
 #define DEBUG_TYPE "iree-codegen-tile-and-distribute-to-workgroups"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Method to return the configuration to use for first-level tile and
 /// distribute. Returns the
@@ -440,5 +439,4 @@ createTileAndDistributeToWorkgroupsPass(
       maxWorkgroupParallelDims, distributionMethod);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

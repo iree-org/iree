@@ -8,8 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager) {
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -34,5 +33,4 @@ void registerCodegenCommonPasses() {
   // Generated.
   registerPasses();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

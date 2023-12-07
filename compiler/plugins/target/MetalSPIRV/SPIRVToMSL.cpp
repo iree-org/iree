@@ -20,8 +20,7 @@
 /// Note that this MUST be kept consistent with the Metal HAL driver.
 #define IREE_HAL_METAL_PUSH_CONSTANT_BUFFER_INDEX 3
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 class SPIRVToMSLCompiler : public SPIRV_CROSS_NAMESPACE::CompilerMSL {
@@ -182,5 +181,4 @@ crossCompileSPIRVToMSL(IREE::HAL::MetalTargetPlatform targetPlatform,
                         spirvEntryPoint.name);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

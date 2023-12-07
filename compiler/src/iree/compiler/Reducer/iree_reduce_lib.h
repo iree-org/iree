@@ -12,10 +12,10 @@
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
-
 class Operation;
+} // namespace mlir
 
-namespace iree_compiler::Reducer {
+namespace mlir::iree_compiler::Reducer {
 
 struct ReducerConfig {
   ReducerConfig() = delete;
@@ -32,7 +32,6 @@ struct ReducerConfig {
 Operation *ireeRunReducingStrategies(OwningOpRef<Operation *> module,
                                      ReducerConfig &config);
 
-} // namespace iree_compiler::Reducer
-} // namespace mlir
+} // namespace mlir::iree_compiler::Reducer
 
 #endif // IREE_COMPILER_TOOLS_IREE_REDUCER_LIB_H

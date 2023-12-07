@@ -14,10 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 // Converts check ops to vm.call ops with handling for when the check module is
 // not compiled in (we just ignore them). This allows us to run benchmarks on
@@ -148,7 +145,4 @@ void populateCheckToHALPatterns(MLIRContext *context,
                                                            typeConverter);
 }
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check

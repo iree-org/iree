@@ -14,10 +14,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Creates target machine form target options.
 std::unique_ptr<llvm::TargetMachine>
@@ -34,9 +31,6 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
                                    llvm::CodeGenFileType fileType,
                                    std::string *objData);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMIRPASSES_H_

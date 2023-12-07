@@ -25,10 +25,7 @@
 
 #define DEBUG_TYPE "iree-stream-fold-uniform-operands"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -312,7 +309,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldUniformOperandsPass() {
   return std::make_unique<FoldUniformOperandsPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

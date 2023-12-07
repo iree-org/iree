@@ -11,8 +11,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -51,7 +50,6 @@ createVerifyCompilerTOSAInputLegality();
 
 void registerTOSAConversionPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // TOSA_IREE_INPUTCONVERSION_PASSES_H_

@@ -24,8 +24,7 @@
 //   https://reviews.llvm.org/D117021
 // Once it lands, this pattern can be replaced.
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Gets the given `attrOrValue` as an index value by creating constant ops
 /// for attributes.
@@ -260,5 +259,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass() {
   return std::make_unique<TensorToVectorVectorizePadPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

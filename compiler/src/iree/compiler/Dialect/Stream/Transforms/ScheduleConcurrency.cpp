@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-stream-schedule-concurrency"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 namespace {
 
 // TODO(benvanik): deduplicate this with ScheduleExecution - almost all of this
@@ -282,7 +279,4 @@ createScheduleConcurrencyPass() {
   return std::make_unique<ScheduleConcurrencyPass>();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

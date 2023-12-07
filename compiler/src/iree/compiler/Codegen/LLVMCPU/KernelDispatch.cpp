@@ -35,8 +35,7 @@
 #define DEBUG_TYPE "kernel-dispatch"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// NOTE: None of these flags are supported in any form long term. This are
 /// temporary hooks added for development purposes. They could be
@@ -2390,5 +2389,4 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,8 +10,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Appends IREE special hint ops to VM dialect patterns.
 void populateUtilToVMPatterns(MLIRContext *context,
@@ -19,7 +18,6 @@ void populateUtilToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_UTILTOVM_CONVERTUTILTOVM_H_

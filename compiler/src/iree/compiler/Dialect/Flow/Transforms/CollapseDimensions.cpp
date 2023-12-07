@@ -33,10 +33,7 @@
 
 #define DEBUG_TYPE "iree-flow-collapse-dimensions"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 /// Pass declaration.
@@ -486,7 +483,4 @@ createCollapseDimensionsPass() {
   return std::make_unique<CollapseDimensionsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -41,8 +41,7 @@
 
 #define DEBUG_TYPE "iree-codegen-workgroup-specialization"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
     "iree-codegen-enable-workgroup-specialization",
@@ -172,5 +171,4 @@ createWorkgroupSpecializationPass() {
   return std::make_unique<WorkgroupSpecializationPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

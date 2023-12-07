@@ -10,10 +10,7 @@
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::IREE::VM::TargetOptions);
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 void TargetOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory vmTargetOptionsCategory(
@@ -39,7 +36,4 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(vmTargetOptionsCategory));
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

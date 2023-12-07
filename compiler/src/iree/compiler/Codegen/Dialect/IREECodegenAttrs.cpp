@@ -21,8 +21,7 @@ static const char kConfigAttrName[] = "lowering_config";
 static const char kTranslationInfoAttrName[] = "translation_info";
 static const char kCompilationInfoAttrName[] = "compilation_info";
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns an `ArrayAttr` where each element is an `IntegerAttr` of 64-bit
 /// integer type whose values is obtained from `values`.
@@ -34,8 +33,9 @@ static ArrayAttr getIndexArrayAttr(MLIRContext *context,
       }));
 }
 
-namespace IREE {
-namespace Codegen {
+} // namespace mlir::iree_compiler
+
+namespace mlir::iree_compiler::IREE::Codegen {
 
 //===----------------------------------------------------------------------===//
 // iree_codegen.export_config
@@ -319,8 +319,9 @@ void IREECodegenDialect::initializeCodegenAttrs() {
       >();
 }
 
-} // namespace Codegen
-} // namespace IREE
+} // namespace mlir::iree_compiler::IREE::Codegen
+
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
@@ -471,5 +472,4 @@ void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

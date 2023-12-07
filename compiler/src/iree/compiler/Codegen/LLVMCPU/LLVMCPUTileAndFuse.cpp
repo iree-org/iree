@@ -23,8 +23,7 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-tile-and-fuse"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -292,5 +291,4 @@ createLLVMCPUTileAndFusePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTileAndFusePass>(tilingLevel);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

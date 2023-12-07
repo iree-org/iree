@@ -12,8 +12,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
@@ -54,5 +53,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass() {
   return std::make_unique<MemrefCopyToLinalgPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

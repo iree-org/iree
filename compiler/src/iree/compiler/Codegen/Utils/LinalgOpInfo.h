@@ -10,13 +10,11 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-namespace mlir {
-
-namespace linalg {
+namespace mlir::linalg {
 class LinalgOp;
-}
+} // namespace mlir::linalg
 
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns true if a map represents the appropriate transpose. Pass this into
 /// the LinalgOpInfo for additional transpose granularity.
@@ -46,7 +44,6 @@ private:
   SmallVector<OpOperand *> transposeOperands;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_LINALGOPINFO_H_

@@ -11,9 +11,7 @@
 
 #define DEBUG_TYPE "iree-preprocessing-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 
@@ -73,6 +71,4 @@ void buildPreprocessingPassPipeline(
 
 void registerPreprocessingPasses() { registerCommonPreprocessingPasses(); }
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing

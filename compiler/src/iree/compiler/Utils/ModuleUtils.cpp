@@ -15,8 +15,7 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
   if (auto loc = llvm::dyn_cast<FileLineColLoc>(baseLoc)) {
@@ -172,5 +171,4 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
   return mergeModuleInto(*sourceModuleRef, targetOp, targetBuilder);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

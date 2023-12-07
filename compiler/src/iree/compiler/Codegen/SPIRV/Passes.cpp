@@ -41,8 +41,7 @@
 
 #define DEBUG_TYPE "iree-spirv-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static llvm::cl::opt<int> clSPIRVIndexingBits(
     "iree-spirv-index-bits",
@@ -707,5 +706,4 @@ void registerCodegenSPIRVPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -17,10 +17,7 @@
 
 #define DEBUG_TYPE "iree-msl-to-metal-lib"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 /// Returns the command to compile the given MSL source file into Metal library.
 static std::string getMetalCompileCommand(MetalTargetPlatform platform,
@@ -95,7 +92,4 @@ compileMSLToMetalLib(MetalTargetPlatform targetPlatform, StringRef mslCode,
   return std::move(*fileOrErr);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -20,8 +20,7 @@
 #define DEBUG_TYPE "iree-codegen-hoist-unrolled-vector"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns all the users of `srcTensor` if they are artifacts from vector
 /// unrolling. It is true only if
@@ -238,5 +237,4 @@ createHoistUnrolledVectorExtractInsertSlicePass() {
   return std::make_unique<HoistUnrolledVectorExtractInsertSlicePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

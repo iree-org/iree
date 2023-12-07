@@ -12,8 +12,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct VMAnalysis {
 public:
@@ -79,7 +78,6 @@ private:
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_VMANALYSIS_H_

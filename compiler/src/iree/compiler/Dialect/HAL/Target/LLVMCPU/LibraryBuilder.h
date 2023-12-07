@@ -15,10 +15,7 @@
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Defines an `iree_hal_executable_library_v0_t` and builds the runtime metadata
 // structures and query functions.
@@ -162,9 +159,6 @@ private:
   size_t constantCount = 0;
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LIBRARYBUILDER_H_

@@ -13,10 +13,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 //===----------------------------------------------------------------------===//
 // Test passes
@@ -36,9 +33,6 @@ inline void registerVMAnalysisTestPasses() {
   createRegisterAllocationTestPass();
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_ANALYSIS_TESTPASSES_H_

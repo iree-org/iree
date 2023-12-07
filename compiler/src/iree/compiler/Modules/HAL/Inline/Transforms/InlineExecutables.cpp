@@ -22,10 +22,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Inline {
 
 class InlineExecutablesPass
@@ -430,7 +427,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createInlineExecutablesPass() {
 }
 
 } // namespace Inline
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

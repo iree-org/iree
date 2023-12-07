@@ -12,8 +12,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 bool needToPackSubByteElementBitWidth(unsigned bitWidth) {
   // Require the original bit width to be some power of two for now to avoid
@@ -114,5 +113,4 @@ Value calculateStorageElementOffsetInBytes(Location loc,
                                              elementBytes);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,10 +10,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Loader {
 
 class HALLoaderDialect : public Dialect {
@@ -23,9 +20,6 @@ public:
 };
 
 } // namespace Loader
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_MODULES_HAL_LOADER_IR_HALLOADERDIALECT_H_

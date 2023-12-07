@@ -13,9 +13,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 /// Creates a pass to convert linalg convolution ops into linalg.matmul ops
 /// using im2col tranformation.
@@ -34,8 +32,6 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
 void registerCommonPreprocessingPasses();
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing
 
-#endif // IREE_COMPILER_PREPROCESSING_COMMON_PASSES_H_W_TRANSFORMS_PASSES_H_
+#endif // IREE_COMPILER_PREPROCESSING_COMMON_PASSES_H_
