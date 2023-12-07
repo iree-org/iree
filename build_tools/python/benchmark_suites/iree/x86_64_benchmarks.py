@@ -118,7 +118,12 @@ class Linux_x86_64_Benchmarks(object):
             presets=[benchmark_presets.X86_64_LARGE],
         )
 
-        return dt_uk_run_configs + non_dt_run_configs + dt_uk_large_run_configs + non_dt_large_run_configs
+        return (
+            dt_uk_run_configs
+            + non_dt_run_configs
+            + dt_uk_large_run_configs
+            + non_dt_large_run_configs
+        )
 
 
 def generate() -> List[iree_definitions.E2EModelRunConfig]:
