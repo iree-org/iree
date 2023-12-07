@@ -267,7 +267,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
-            ./build_tools/bazel/build_core.sh
+            ./build_tools/bazel/build_test_all.sh
 
   test_all:
     needs: [setup, build_all]
