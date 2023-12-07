@@ -218,10 +218,10 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     }
     // TODO: Add dyn_cast and check CMPF-Predicate is OGT.
     // Check that in and out of cmpf are loop variables.
-    if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
-        producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return failure();
-    }
+    // if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
+    // producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+    //   return failure();
+    // }
   }
 
   return success();
@@ -244,7 +244,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   auto inputType = llvm::cast<ShapedType>(input.getType());
   Type inputElemType = inputType.getElementType();
   // Only support f16 and f32 values.
-  if (!!inputElemType.isF16() && !inputElemType.isF32()) {
+  if (!inputElemType.isF16() && !inputElemType.isF32()) {
     return failure();
   }
 
@@ -317,6 +317,8 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
     }
+    // llvm::outs()<<"SUCCESS, from:" <<op<<"\n";
+    // llvm::outs()<<"SUCCESS, using:" <<ukernelOp<<"\n";
     rewriter.replaceAllUsesWith(op.getResults()[1], ukernelOp.value()->getResults());
     return success();
   }

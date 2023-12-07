@@ -1138,10 +1138,10 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     }
     // TODO: Add dyn_cast and check CMPF-Predicate is OGT.
     // Check that in and out of cmpf are loop variables.
-    if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
-        producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return failure();
-    }
+    // if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
+    // producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+    //   return failure();
+    // }
   }
 
   return success();

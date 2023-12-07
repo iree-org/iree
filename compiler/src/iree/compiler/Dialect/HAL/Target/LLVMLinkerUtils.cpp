@@ -148,10 +148,20 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
     }
     auto setAlwaysInline = [&](llvm::Module &module) {
       // ROCM/HIP builtin functions are non-inlinable.
-      if (targetMachine.getTargetTriple().isAMDGCN() ||
-          targetMachine.getTargetTriple().isAMDGPU())
-        return;
+      // if (targetMachine.getTargetTriple().isAMDGCN() || targetMachine.getTargetTriple().isAMDGPU()) return;
       for (auto &func : module.getFunctionList()) {
+        if (func.hasFnAttribute(llvm::Attribute::NoInline)) {
+          func.removeFnAttr(llvm::Attribute::NoInline);
+        }
+        if (func.hasFnAttribute(llvm::Attribute::OptimizeNone)) {
+          func.removeFnAttr(llvm::Attribute::OptimizeNone);
+        }
+        // if (func.hasFnAttribute(llvm::Attribute::Convergent)) {
+        //   func.removeFnAttr(llvm::Attribute::Convergent);
+        // }
+        // if (func.getName() == "rocm_argmax_F32I32") {
+        //   llvm::outs()<<func<<"\n";
+        // }
         func.addFnAttr(llvm::Attribute::AlwaysInline);
       }
     };
