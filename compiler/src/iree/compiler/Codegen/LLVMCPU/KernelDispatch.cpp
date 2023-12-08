@@ -868,11 +868,9 @@ static LogicalResult setMatmulNoPadRootConfig(
       cast<linalg::LinalgOp>(op.getOperation()), parallelTileSizes,
       reductionTileSizes, &parallelScalableFlags, &reductionScalableFlags);
 
-  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
-    setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
-                                   vecPreProcStrategy, parallelTileSizes,
-                                   reductionTileSizes);
-  }
+  setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
+                                 vecPreProcStrategy, parallelTileSizes,
+                                 reductionTileSizes);
 
   // Ensure there's no zero scalable dims.
   int64_t numTilingDims = parallelTileSizes.size();
@@ -911,6 +909,43 @@ static LogicalResult setMatmulNoPadRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, newTileSizes, newScalableTileFlags,
       getNoPadTilingExpert(vecPreProcStrategy));
+}
+
+/// Configure the Mmt4d tiling expert for AArch64
+static LogicalResult
+setMmt4dAArch64RootConfig(func::FuncOp entryPointFn,
+                          linalg::ContractionOpInterface op,
+                          ArrayRef<int64_t> distTileSizes,
+                          ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+  assert(distTileSizes.size() == vecTileSizes.size());
+  SmallVector<int64_t> parallelTileSizes;
+  auto shape = cast<linalg::LinalgOp>(op.getOperation()).getStaticLoopRanges();
+  for (auto [index, tileSize] : llvm::enumerate(distTileSizes.drop_back())) {
+    parallelTileSizes.push_back(
+        getMaxVectorTileSize(0, tileSize ? tileSize : shape[index],
+                             vecTileSizes[index], vectorSize));
+  }
+
+  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
+  int64_t K = lhsShapedType.getShape().back();
+  parallelTileSizes.push_back(
+      getMaxVectorTileSize(0, K, vecTileSizes.back(), vectorSize));
+
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(cast<linalg::LinalgOp>(op.getOperation()),
+                                 parallelTileSizes, reductionTileSizes);
+
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(distTileSizes.begin(), distTileSizes.end());
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+  // No need for tiling inner parallel dims.
+  int64_t numTilingDims = parallelTileSizes.size();
+  tileSizes.emplace_back(numTilingDims, 0);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, tileSizes,
+      DispatchLoweringPassPipeline::Mmt4dTilingExpert);
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -1089,6 +1124,14 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector scalable tile flags: " << vecScalableFlags
                        << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
+
+  // ARM SVE codgen switches to use codegen driver based approach. In non-SVE
+  // cases we use special logic instead. All the new pipeline is expected to use
+  // codegen driver based approach.
+  if (isAArch64(targetAttr) && !isQuantized && !hasAnySVEFeature(targetAttr)) {
+    return setMmt4dAArch64RootConfig(entryPointFn, contractionOp, distTileSizes,
+                                     vecTileSizes, vectorSize);
+  }
 
   if (usePaddingPipeline) {
     // TODO: Use scalable vector sizes.
