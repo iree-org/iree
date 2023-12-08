@@ -651,7 +651,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
   auto tensorType =
       llvm::cast<IREE::Flow::DispatchTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.getIndexAttr(dim));
@@ -801,7 +801,7 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
     // Result size matches the source size (no slicing).
     unsigned dynamicIdx = 0;
     for (int64_t dim : getType().getShape()) {
-      if (dim == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(dim)) {
         shape.push_back(getSourceDims()[dynamicIdx++]);
       } else {
         shape.push_back(b.getIndexAttr(dim));
@@ -1577,7 +1577,7 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
   unsigned dynamicIdx = 0;
   auto tensorType = llvm::cast<RankedTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.getIndexAttr(dim));

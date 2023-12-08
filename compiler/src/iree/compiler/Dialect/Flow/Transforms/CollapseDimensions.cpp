@@ -325,7 +325,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
       int64_t staticCollapsedShape = 1;
       SmallVector<OpFoldResult> dynamicCollapsedDims;
       for (auto collapsedDim : reassociation[index]) {
-        if (expandedShape[collapsedDim] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(expandedShape[collapsedDim])) {
           dynamicCollapsedDims.push_back(dynamicDimsList.front());
           dynamicDimsList = dynamicDimsList.drop_front();
         } else {

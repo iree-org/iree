@@ -138,7 +138,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
       return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
     if (llvm::any_of(shape,
-                     [](int64_t dim) { return dim == ShapedType::kDynamic; })) {
+                     [](int64_t dim) { return ShapedType::isDynamic(dim); })) {
       return failure();
     }
 
@@ -428,7 +428,7 @@ public:
         desc.setConstantStride(rewriter, loc, rank - 1, 1);
         OpFoldResult currentStride = rewriter.getIndexAttr(1);
         for (int i = rank - 1; i > 0; --i) {
-          if (strides[i - 1] == ShapedType::kDynamic) {
+          if (ShapedType::isDynamic(strides[i - 1])) {
             auto dim = desc.size(rewriter, loc, i);
             Value currentStrideVal;
             if (std::optional<int64_t> currentStrideInt =

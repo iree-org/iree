@@ -53,8 +53,8 @@ public:
     const int owIndex = isNHWC ? 2 : 3;
     const int ocIndex = isNHWC ? 3 : 1;
 
-    bool isInputHWDynamic = inputShape[ohIndex] == ShapedType::kDynamic &&
-                            inputShape[owIndex] == ShapedType::kDynamic;
+    bool isInputHWDynamic = ShapedType::isDynamic(inputShape[ohIndex]) &&
+                            ShapedType::isDynamic(inputShape[owIndex]);
 
     // We cannot merge the width and height if they are both dynamic as we
     // cannot expand them back to their dynamic values.
@@ -78,7 +78,7 @@ public:
       return failure();
 
     auto combineDims = [](int64_t a, int64_t b) {
-      if (a == ShapedType::kDynamic || b == ShapedType::kDynamic)
+      if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b))
         return ShapedType::kDynamic;
       return a * b;
     };
