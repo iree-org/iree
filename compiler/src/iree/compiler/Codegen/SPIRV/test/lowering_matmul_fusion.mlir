@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 128, 1, 32]]>,

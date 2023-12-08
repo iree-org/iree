@@ -1,4 +1,4 @@
-// RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline, iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" \
+// RUN: iree-opt %s  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline, iree-llvmgpu-lower-executable-target)))" \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_bufferize_spec.mlir | \
 // RUN: FileCheck %s
