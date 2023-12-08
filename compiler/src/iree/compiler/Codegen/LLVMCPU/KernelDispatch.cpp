@@ -915,11 +915,9 @@ static LogicalResult setMatmulNoPadRootConfig(
       cast<linalg::LinalgOp>(op.getOperation()), parallelTileSizes,
       reductionTileSizes, &parallelScalableFlags, &reductionScalableFlags);
 
-  if (vecPreProcStrategy == VectorPreProcStrategy::None) {
-    setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
-                                   vecPreProcStrategy, parallelTileSizes,
-                                   reductionTileSizes);
-  }
+  setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
+                                 vecPreProcStrategy, parallelTileSizes,
+                                 reductionTileSizes);
 
   // Ensure there's no zero scalable dims.
   int64_t numTilingDims = parallelTileSizes.size();
