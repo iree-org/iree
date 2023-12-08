@@ -304,20 +304,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
-  // Distribute shared memory copies.
-  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUDistributeSharedMemoryCopy());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
-
   // Linalg -> vector
-  {
-    GenericVectorizationPassOptions options;
-    options.enableCleanup = false;
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGenericVectorizationPass(options));
-  }
+  addGPUVectorizationPasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCorePreparationPass(GPUTensorCoreType::MMA_SYNC));
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -327,6 +315,13 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createHoistRedundantVectorTransfersPass());
+
+  // Distribute shared memory copies.
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Vector -> MMA ops
   nestedModulePM.addNestedPass<func::FuncOp>(
