@@ -91,17 +91,6 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
-  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
-  // TODO(#15784): If ukernel is enabled and the element types are not
-  // supported, currently CPULowerToUKernels will simply fail and lower into
-  // scalar loops. Don't set encoding for now. Otherwise codegen should still
-  // be able to generate code for ukernel unsupported types.
-  //
-  // This should be removed once CPULowerToUKernels can fallback to codegen.
-  if (hasUkernel(target) && ukType == IREE_UK_FLAG_MMT4D_TYPE_NONE) {
-    return {};
-  }
-
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32()) &&
         hasFeature(target, "+bf16")) {
@@ -172,17 +161,6 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
-
-  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
-  // TODO(#15784): If ukernel is enabled and the element types are not
-  // supported, currently CPULowerToUKernels will simply fail and lower into
-  // scalar loops. Don't set encoding for now. Otherwise codegen should still
-  // be able to generate code for ukernel unsupported types.
-  //
-  // This should be removed once CPULowerToUKernels can fallback to codegen.
-  if (hasUkernel(target) && ukType == IREE_UK_FLAG_MMT4D_TYPE_NONE) {
-    return {};
-  }
 
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
