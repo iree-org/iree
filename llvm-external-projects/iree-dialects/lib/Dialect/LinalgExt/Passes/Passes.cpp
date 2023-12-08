@@ -38,9 +38,8 @@ LinalgTransformationFilter::LinalgTransformationFilter(
     filters.push_back(f);
 }
 
-LogicalResult
-LinalgTransformationFilter::checkAndNotify(PatternRewriter &rewriter,
-                                           Operation *op) const {
+LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
+                                                         Operation *op) const {
   if (llvm::any_of(filters,
                    [&](const FilterFunction &f) { return failed(f(op)); }))
     return failure();
@@ -73,7 +72,7 @@ LinalgTransformationFilter::checkAndNotify(PatternRewriter &rewriter,
 }
 
 void LinalgTransformationFilter::replaceLinalgTransformationFilter(
-    PatternRewriter &rewriter, Operation *op) const {
+    RewriterBase &rewriter, Operation *op) const {
   if (replacement.has_value())
     op->setAttr(LinalgTransforms::kLinalgTransformMarker, replacement.value());
   else
