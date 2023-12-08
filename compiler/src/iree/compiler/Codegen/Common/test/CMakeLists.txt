@@ -28,6 +28,7 @@ iree_lit_test_suite(
     "decompose_batch_mmt4d_ops.mlir"
     "decompose_linalg_generic.mlir"
     "decompose_pack_unpack_ops.mlir"
+    "decompose_softmax.mlir"
     "eliminate_empty_tensors.mlir"
     "emulate_narrow_type.mlir"
     "erase_dead_alloc_and_stores.mlir"

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --split-input-file -iree-linalg-ext-decompose-softmax -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-decompose-softmax -cse %s | FileCheck %s
 
 func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
   %0 = tensor.empty() : tensor<2x16x32xf32>

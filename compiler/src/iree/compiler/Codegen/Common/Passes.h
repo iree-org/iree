@@ -98,6 +98,10 @@ std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
+/// Creates a pass to convert the softmax op into a sequence of linalg generic
+/// ops.
+std::unique_ptr<Pass> createDecomposeSoftmaxPass();
+
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();

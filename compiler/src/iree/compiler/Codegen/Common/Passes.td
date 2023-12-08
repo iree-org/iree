@@ -158,6 +158,13 @@ def DecomposePackUnPackOps :
   ];
 }
 
+def DecomposeSoftmax :
+    Pass<"iree-codegen-decompose-softmax", "func::FuncOp"> {
+  let summary =
+      "Decomposes softmax op into a sequence of linalg ops";
+  let constructor = "mlir::iree_compiler::createDecomposeSoftmaxPass()";
+}
+
 def ReplaceSlowMinMaxOps
     : Pass<"iree-codegen-replace-slow-min-max-ops", "func::FuncOp"> {
   let summary =
