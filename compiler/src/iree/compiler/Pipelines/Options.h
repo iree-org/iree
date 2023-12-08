@@ -116,7 +116,7 @@ struct SchedulingOptions {
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;
 
   // TODO(benvanik): find a way to share this with
-  // Stream/Transforms/PassDetail.h w/o circular deps.
+  // Stream/Transforms/Passes.h w/o circular deps.
   // Defines the output format of a dump pass.
   enum class DumpOutputFormat {
     // Dumping disabled.

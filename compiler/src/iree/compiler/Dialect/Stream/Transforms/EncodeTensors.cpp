@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -31,6 +30,11 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_ENCODEHOSTTENSORSPASS
+#define GEN_PASS_DEF_ENCODEDEVICETENSORSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -586,20 +590,12 @@ struct EncodeTensorStoreOp
 };
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-encode-host-tensors
+// --iree-stream-encode-host-tensors
 //===----------------------------------------------------------------------===//
 
-class EncodeHostTensorsPass
-    : public EncodeHostTensorsBase<EncodeHostTensorsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::complex::ComplexDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct EncodeHostTensorsPass
+    : public IREE::Stream::impl::EncodeHostTensorsPassBase<
+          EncodeHostTensorsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<
@@ -729,21 +725,12 @@ struct EncodeDispatchTensorStoreOp
 };
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-encode-device-tensors
+// --iree-stream-encode-device-tensors
 //===----------------------------------------------------------------------===//
 
-class EncodeDeviceTensorsPass
-    : public EncodeDeviceTensorsBase<EncodeDeviceTensorsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::complex::ComplexDialect>();
-    registry.insert<IREE::Flow::FlowDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct EncodeDeviceTensorsPass
+    : public IREE::Stream::impl::EncodeDeviceTensorsPassBase<
+          EncodeDeviceTensorsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.insert<EncodeBindingSubspanOp, EncodeDispatchTensorLoadOp,
@@ -756,13 +743,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<>> createEncodeHostTensorsPass() {
-  return std::make_unique<EncodeHostTensorsPass>();
-}
-
-std::unique_ptr<OperationPass<>> createEncodeDeviceTensorsPass() {
-  return std::make_unique<EncodeDeviceTensorsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream
