@@ -6,11 +6,13 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -90,6 +92,17 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
+  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
+  // TODO(#15784): If ukernel is enabled and the element types are not
+  // supported, currently CPULowerToUKernels will simply fail and lower into
+  // scalar loops. Don't set encoding for now. Otherwise codegen should still
+  // be able to generate code for ukernel unsupported types.
+  //
+  // This should be removed once CPULowerToUKernels can fallback to codegen.
+  if (hasUkernel(target) && ukType == IREE_UK_FLAG_MMT4D_TYPE_NONE) {
+    return {};
+  }
+
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32()) &&
         hasFeature(target, "+bf16")) {
@@ -100,10 +113,6 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-
-    // The LHS and RHS can be floating or integer types here. For the
-    // combinations where ukernel can't support, the codegen should still be
-    // able to generate reasonable code for the data-tiling.
 
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
@@ -165,6 +174,17 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
+  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
+  // TODO(#15784): If ukernel is enabled and the element types are not
+  // supported, currently CPULowerToUKernels will simply fail and lower into
+  // scalar loops. Don't set encoding for now. Otherwise codegen should still
+  // be able to generate code for ukernel unsupported types.
+  //
+  // This should be removed once CPULowerToUKernels can fallback to codegen.
+  if (hasUkernel(target) && ukType == IREE_UK_FLAG_MMT4D_TYPE_NONE) {
+    return {};
+  }
+
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32())) {
       if (hasFeature(target, "+avx512bf16")) {
@@ -184,10 +204,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      bool isUKernelSupported = (lhs.isBF16() && rhs.isBF16()) ||
-                                (lhs.isF16() && rhs.isF16()) ||
-                                (lhs.isF32() && rhs.isF32());
-      if (hasUkernel(target) && isUKernelSupported) {
+      if (hasUkernel(target)) {
         return {
             TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
             TileMxNxK{8, 16, 1},  // Truncation of the above.
