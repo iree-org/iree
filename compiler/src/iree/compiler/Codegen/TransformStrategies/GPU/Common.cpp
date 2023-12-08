@@ -561,8 +561,8 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
       transform::OperationType::get(b.getContext(), "scf.for"), funcH,
       b.getStrArrayAttr({scf::ForOp::getOperationName()}),
       /*matchInterfaceEnum=*/transform::MatchInterfaceEnumAttr(),
-      /*opAttrs=*/DictionaryAttr(), /*filterResultType=*/TypeAttr(),
-      /*filterOperandTYpes=*/ArrayAttr());
+      /*opAttrs=*/DictionaryAttr(),
+      /*filterResultType=*/TypeAttr());
   // TODO: At this time, this synchronization is needed for applying the
   // HoistRedundantVectorTransfersOp transform correctly. This is because the
   // transform does not take parallelism into accound.
@@ -611,8 +611,8 @@ void mlir::iree_compiler::gpu::buildMultiBuffering(
       transform::OperationType::get(b.getContext(), "memref.alloc"), funcH,
       b.getStrArrayAttr({memref::AllocOp::getOperationName()}),
       /*matchInterfaceEnum=*/transform::MatchInterfaceEnumAttr(),
-      /*opAttrs=*/DictionaryAttr(), /*filterResultType=*/TypeAttr(),
-      /*filterOperandTYpes=*/ArrayAttr());
+      /*opAttrs=*/DictionaryAttr(),
+      /*filterResultType=*/TypeAttr());
   // TODO: Better builder instead of setting post-hoc.
   auto multiBufferOp = b.create<transform::MemRefMultiBufferOp>(
       transform::AnyOpType::get(b.getContext()), allocH);
