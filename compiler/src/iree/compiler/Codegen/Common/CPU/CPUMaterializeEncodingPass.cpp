@@ -177,17 +177,16 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
       }
     }
 
-    // The LHS and RHS can be floating or integer types here. For the
-    // combinations where ukernel can't support, the codegen should still be
-    // able to generate reasonable code for the data-tiling.
-
     // Note: 16-bit floating point types currently use the same tile size as
     // f32. This makes sense when either (1) the accumulator is f32, or (2)
     // the arithmetic will have to expand f16 to f32 in registers. We may
     // reconsider when taking advantage of native f16/bf16 arithmetic when the
     // accumulator itself is f16/bf16.
     if (hasFeature(target, "+avx512f")) {
-      if (hasUkernel(target)) {
+      bool isUKernelSupported = (lhs.isBF16() && rhs.isBF16()) ||
+                                (lhs.isF16() && rhs.isF16()) ||
+                                (lhs.isF32() && rhs.isF32());
+      if (hasUkernel(target) && isUKernelSupported) {
         return {
             TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
             TileMxNxK{8, 16, 1},  // Truncation of the above.
