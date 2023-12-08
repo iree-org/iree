@@ -94,7 +94,8 @@ struct ExpandVectors
         RankedTensorType::get(expandedOutDims, vectorOutTy.getElementType());
     Location loc = linalgOp.getLoc();
     Value expandedIn;
-    std::optional<CastOpInterface> castOp = getDefiningNonI1CastOp(vectorIn);
+    std::optional<CastOpInterface> castOp =
+        getDefiningNonI1ExtendingCastOp(vectorIn);
     if (castOp) {
       Value castIn = vectorIn.getDefiningOp()->getOperand(0);
       Type castSrcElemType =

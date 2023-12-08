@@ -853,6 +853,34 @@ func.func @preset_compilation_info(
 
 // -----
 
+func.func @batch_matmul_truncf_f16f16f32(%arg0 : tensor<64x100x250xf32>, %arg1 : tensor<64x250x500xf32>,
+      %arg2 : tensor<64x100x500xf32>) -> tensor<64x100x500xf32> {
+  %0 = tensor.empty() : tensor<64x250x500xf16>
+  %casted0 = arith.truncf %arg0 : tensor<64x100x250xf32> to tensor<64x100x250xf16>
+  %casted1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                                              affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                              iterator_types = ["parallel", "parallel", "parallel"]}
+                              ins(%arg1 : tensor<64x250x500xf32>)
+                              outs(%0 : tensor<64x250x500xf16>) {
+  ^bb0(%in: f32, %out: f16):
+      %2 = arith.truncf %in : f32 to f16
+      linalg.yield %2 : f16
+  } -> tensor<64x250x500xf16>
+  %1 = linalg.batch_matmul ins(%casted0, %casted1 : tensor<64x100x250xf16>, tensor<64x250x500xf16>)
+      outs(%arg2 : tensor<64x100x500xf32>) -> tensor<64x100x500xf32>
+  return %1 : tensor<64x100x500xf32>
+}
+
+//      CHECK: func @batch_matmul_truncf_f16f16f32(%[[ARG0:.+]]: tensor<64x100x250xf32>, %[[ARG1:.+]]: tensor<64x250x500xf32>
+//  CHECK-DAG: %[[INIT:.+]] = tensor.empty() : tensor<64x250x500xf16>
+//  CHECK-DAG: arith.truncf %[[ARG0]] : tensor<64x100x250xf32> to tensor<64x100x250xf16>
+//      CHECK: linalg.generic
+// CHECK-SAME:   ins(%[[ARG1]] : tensor<64x250x500xf32>)
+// CHECK-SAME:   outs(%[[INIT]] : tensor<64x250x500xf16>)
+//      CHECK: element_types = [f16, f16, f32]
+
+// -----
+
 func.func @batch_matmul_casted_ui8i8i32(%arg0 : tensor<64x100x250xi8>, %arg1 : tensor<64x250x500xi8>,
       %arg2 : tensor<64x100x500xi32>) -> tensor<64x100x500xi32> {
   %0 = tensor.empty() : tensor<64x250x500xi32>
