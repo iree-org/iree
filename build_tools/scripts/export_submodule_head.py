@@ -45,8 +45,7 @@ def export_submodule_head(args, submodule_rel_path: str):
     print(f"Super-repo '{super_repo_name}' is on branch '{super_branch}'")
     submodule_path = super_repo_path / submodule_rel_path
     print(f"Operating on submodule {submodule_path}")
-    if not check_origin_update_help(submodule_path):
-        return 1
+    check_origin_update_help(submodule_path)
     git_fetch(repository="origin", repo_dir=submodule_path)
     submodule_head, submodule_summary = git_current_commit(repo_dir=submodule_path)
     print(f"Submodule at {submodule_head}\n  {submodule_summary}")
@@ -158,7 +157,8 @@ def check_origin_update_help(repo_dir):
     if existing_url.startswith("https://github.com/"):
         new_url = existing_url.replace("https://github.com/", "git@github.com:", 1)
         print(
-            "Your push URL is for GitHub HTTPS. You may need to switch to ssh for interactive use:"
+            "Your push URL is for GitHub HTTPS. Just in case if you are only set up "
+            "to push with SSH, here is a one-liner to update it:"
         )
         print(f"  (cd {repo_dir} && git remote set-url --push origin {new_url})")
         return False
