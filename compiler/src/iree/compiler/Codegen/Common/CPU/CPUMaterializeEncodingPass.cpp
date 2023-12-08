@@ -99,21 +99,24 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
-      // Note: 16-bit floating point types currently use the same tile size as
-      // f32. This makes sense when either (1) the accumulator is f32, or (2)
-      // the arithmetic will have to expand f16 to f32 in registers. We may
-      // reconsider when taking advantage of native f16/bf16 arithmetic when the
-      // accumulator itself is f16/bf16, as we could typically have a 2x wider
-      // tile in that case. However, on current CPUs, the existing tiles seem
-      // wide enough already to approach peak performance.
-      return {
-          TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
-          TileMxNxK{4, 8, 1}, // Truncation of the above.
-          TileMxNxK{2, 8, 1}, // Truncation of the above.
-          TileMxNxK{1, 8, 1}, // Truncation of the above.
-      };
-    }
+
+    // The LHS and RHS can be floating or integer types here. For the
+    // combinations where ukernel can't support, the codegen should still be
+    // able to generate reasonable code for the data-tiling.
+
+    // Note: 16-bit floating point types currently use the same tile size as
+    // f32. This makes sense when either (1) the accumulator is f32, or (2)
+    // the arithmetic will have to expand f16 to f32 in registers. We may
+    // reconsider when taking advantage of native f16/bf16 arithmetic when the
+    // accumulator itself is f16/bf16, as we could typically have a 2x wider
+    // tile in that case. However, on current CPUs, the existing tiles seem
+    // wide enough already to approach peak performance.
+    return {
+        TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
+        TileMxNxK{4, 8, 1}, // Truncation of the above.
+        TileMxNxK{2, 8, 1}, // Truncation of the above.
+        TileMxNxK{1, 8, 1}, // Truncation of the above.
+    };
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
