@@ -503,13 +503,12 @@ hal.executable private @pack  {
     }
   }
 }
-
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 40], [1, 1]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
-//       CHECK: hal.executable.export public @pack
-//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//       CHECK:   tensor.pack
-//  CHECK-SAME:       lowering_config = #[[CONFIG]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[2, 40], [1, 1]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: hal.executable.export public @pack
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   tensor.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
