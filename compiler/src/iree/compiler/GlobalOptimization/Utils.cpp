@@ -11,7 +11,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Interfaces/CastInterfaces.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
