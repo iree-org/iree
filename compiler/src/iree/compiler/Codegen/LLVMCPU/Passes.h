@@ -143,8 +143,7 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
-                                      bool enableMicrokernels,
-                                      bool lowerToAVX2);
+                                      bool enableMicrokernels);
 
 void addMultiTilingExpertPassPipeline(
     OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
