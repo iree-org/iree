@@ -240,12 +240,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addPass(createCSEPass());
 
   // Linalg -> vector
-  {
-    GenericVectorizationPassOptions options;
-    options.enableCleanup = false;
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGenericVectorizationPass(options));
-  }
+  addGPUVectorizationPasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTensorCorePreparationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
