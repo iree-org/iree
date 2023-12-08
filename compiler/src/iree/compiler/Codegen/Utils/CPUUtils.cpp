@@ -8,6 +8,7 @@
 
 #include <numeric>
 
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -61,6 +62,42 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   }
 
   return rootOperation;
+}
+
+uint32_t findMmt4dUkernelType(Type lhsElemType, Type rhsElemType,
+                              Type outElemType) {
+  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
+      outElemType.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
+  } else if (lhsElemType.isSignlessInteger(16) &&
+             rhsElemType.isSignlessInteger(16) &&
+             outElemType.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_MMT4D_TYPE_S16S16S32;
+  } else if (lhsElemType.isSignlessInteger(16) &&
+             rhsElemType.isUnsignedInteger(4) &&
+             outElemType.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_MMT4D_TYPE_S16U4S32;
+  } else if (lhsElemType.isSignlessInteger(16) &&
+             rhsElemType.isSignlessInteger(8) &&
+             outElemType.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_MMT4D_TYPE_S16S8S32;
+  } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
+             outElemType.isF32()) {
+    return IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
+  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+             outElemType.isF32()) {
+    return IREE_UK_FLAG_MMT4D_TYPE_F16F16F32;
+  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
+             outElemType.isF16()) {
+    return IREE_UK_FLAG_MMT4D_TYPE_F16F16F16;
+  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+             outElemType.isF32()) {
+    return IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32;
+  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
+             outElemType.isBF16()) {
+    return IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16;
+  }
+  return IREE_UK_FLAG_MMT4D_TYPE_NONE;
 }
 
 } // namespace mlir::iree_compiler
