@@ -913,50 +913,6 @@ public:
   }
 };
 
-/// Adds a link dependency on the ArmSME ABI routines if the LLVMFuncOp has
-/// either the `armNewZA` or `armLocallyStreaming` attribute set.
-struct LinkArmSMERoutinesIfNeeded : public OpRewritePattern<LLVM::LLVMFuncOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(LLVM::LLVMFuncOp llvmFuncOp,
-                                PatternRewriter &rewriter) const override {
-    if (!llvmFuncOp.getArmNewZa() && !llvmFuncOp.getArmLocallyStreaming())
-      return failure();
-
-    auto variantOp =
-        llvmFuncOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-
-    static auto sme_compiler_rt_lib =
-        std::getenv("IREE_ARM_SME_COMPILER_RT_BUILTINS_STATIC_LIB");
-
-    if (!sme_compiler_rt_lib)
-      return llvmFuncOp.emitError(
-          "IREE_ARM_SME_COMPILER_RT_BUILTINS_STATIC_LIB must be set!");
-
-    auto objectsAttr = variantOp.getObjectsAttr();
-    if (objectsAttr) {
-      for (auto objectAttr :
-           objectsAttr.getAsRange<IREE::HAL::ExecutableObjectAttr>()) {
-        if (objectAttr.getPath() == sme_compiler_rt_lib)
-          return failure(); // ArmSME rountines already linked.
-      }
-    }
-
-    SmallVector<Attribute> linkedObjects;
-    if (objectsAttr)
-      linkedObjects.append(objectsAttr.begin(), objectsAttr.end());
-
-    // Add ArmSME rountines to linked objects.
-    Attribute armSMEBuiltinsObj =
-        rewriter.getAttr<IREE::HAL::ExecutableObjectAttr>(
-            rewriter.getStringAttr(sme_compiler_rt_lib),
-            DenseIntElementsAttr{});
-    linkedObjects.push_back(armSMEBuiltinsObj);
-    variantOp.setObjectsAttr(rewriter.getArrayAttr(linkedObjects));
-
-    return success();
-  }
-};
-
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
 public:
   ConvertToLLVMPass(bool reassociateFpReductions) {
@@ -1147,10 +1103,6 @@ void ConvertToLLVMPass::runOnOperation() {
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
-    }
-    if (hasAArch64SME) {
-      // TODO(macdue): Find a better place for this.
-      postPatterns.insert<LinkArmSMERoutinesIfNeeded>(&getContext());
     }
     if (failed(applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
       return signalPassFailure();
