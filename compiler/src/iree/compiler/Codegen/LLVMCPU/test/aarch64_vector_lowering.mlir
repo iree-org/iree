@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering --iree-llvmcpu-vector-lowering --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering --split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -76,9 +76,10 @@ module {
 // CHECK-SAME:         iter_args(%[[ITER1:.+]] = %[[ITER0]]) -> (tensor<64x64xf32>)
 //      CHECK:         %[[MATMUL_RES:.+]] = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C512]] step %[[C32]]
 // CHECK-SAME:           iter_args(%[[ITER2:.+]] = %[[CST_VECTOR]]) -> (vector<16x16xf32>)
-//  CHECK-DAG:           {{.*}} = tensor.extract %[[LHS_TILE]]
-//  CHECK-DAD:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
-// CHECK-COUNT-32:       vector.fma
+//      CHECK:           {{.*}} = vector.transfer_read %[[LHS_TILE]]
+//      CHECK:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
+// CHECK-COUNT-16:       vector.outerproduct
+// CHECK-COUNT-16:       vector.outerproduct
 //      CHECK:           scf.yield %{{.*}} : vector<16x16xf32>
 //      CHECK:         %[[EXP:.+]] = math.exp %[[MATMUL_RES]] : vector<16x16xf32>
 //      CHECK:         %[[RES:.+]] = vector.transfer_write %[[EXP]], %[[ITER1]][%[[L1_I]], %[[L1_J]]] {{.*}} : vector<16x16xf32>, tensor<64x64xf32>
@@ -165,9 +166,7 @@ module {
     return
   }
 }
-
+//      CHECK: func.func @matmul_gather() {
 // Check that matmul is lowered to vector ops
-
-// CHECK-LABEL: func.func @matmul_gather() {
-//    CHECK-32:   vector.fma
-//       CHECK:   linalg.generic
+//      CHECK:   vector.outerproduct
+//      CHECK:   linalg.generic

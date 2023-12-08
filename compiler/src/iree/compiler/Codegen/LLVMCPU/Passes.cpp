@@ -10,6 +10,8 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -520,8 +522,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
-                                      bool enableMicrokernels,
-                                      bool lowerToAVX2) {
+                                      bool enableMicrokernels) {
   addTileAndDistributePasses(passManager);
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -548,20 +549,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   addCPUBufferizePasses(nestedModulePM);
 
   if (!enableMicrokernels) {
-    // Vector lowering of Mmt4d.
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMCPUMmt4dVectorLoweringPass());
-
-    // Fold unit dims before vector lowering.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createOptimizeVectorTransferPass(/*flatten=*/false));
-
-    // Generic vector lowering.
-    LLVMCPUVectorLoweringPassOptions options;
-    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
-    options.splitVectorTransfersTo = "linalg-copy";
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorLoweringPass(options));
   }
 }
 
