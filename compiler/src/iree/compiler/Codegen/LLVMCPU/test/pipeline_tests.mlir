@@ -178,15 +178,15 @@ hal.executable private @preset_pad_config_dynamic_matmul  {
     #hal.descriptor_set.binding<1, storage_buffer>,
     #hal.descriptor_set.binding<2, storage_buffer>]
   >]>
-hal.executable private @peel_partially_unaligned_matmul {
+hal.executable private @pad_partially_unaligned_matmul {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
-    hal.executable.export public @peel_partially_unaligned_matmul ordinal(0) layout(#pipeline_layout5) {
+    hal.executable.export public @pad_partially_unaligned_matmul ordinal(0) layout(#pipeline_layout5) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @peel_partially_unaligned_matmul() {
+      func.func @pad_partially_unaligned_matmul() {
         %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.constant.load[0] : i32
         %1 = hal.interface.constant.load[1] : i32
@@ -219,13 +219,10 @@ hal.executable private @peel_partially_unaligned_matmul {
   }
 }
 // Checks that the bounded stack allocation are created.
-// CHECK-LABEL: func.func @peel_partially_unaligned_matmul
-// Main loop:
-//       CHECK:     vector.fma
-//       CHECK:     arith.addf {{.*}} : vector<
-//       CHECK:     arith.maximumf {{.*}} : vector<
-//
-// Peeled loop:
+// CHECK-LABEL: func.func @pad_partially_unaligned_matmul
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
+//   CHECK-DAG:   memref.alloca() {{.+}} memref<1x32xf32>
+//   CHECK-NOT:   memref.alloca
 //       CHECK:     vector.fma
 //       CHECK:     arith.addf {{.*}} : vector<
 //       CHECK:     arith.maximumf {{.*}} : vector<

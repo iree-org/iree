@@ -26,8 +26,7 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //   3. [[distribution], [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
   //   4. [[distribution], [cache-parallel], [cache-reduction],
-  //       [vector-common-parallel], [vector-reduction],
-  //       [vector-inner-parallel]]
+  //       [vector-parallel], [vector-reduction]]
   int numTileLevels = loweringConfig.getTilingLevels().size();
   switch (numTileLevels) {
   case 4:
@@ -105,9 +104,9 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
     // Distribution + vector common parallel levels + vector inner parallel
     // levels.
     return {0, 1, 3};
-  case 6:
+  case 5:
     // Distribution + cache parallel levels.
-    return {0, 1, 3, 5};
+    return {0, 1};
   default:
     llvm_unreachable("Unexpected number of tiling levels");
   }

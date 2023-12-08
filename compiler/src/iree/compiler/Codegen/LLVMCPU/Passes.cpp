@@ -134,11 +134,6 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
-  if (tilingConfig.getNumTilingLevels() == 6) {
-    // TODO: update verification.
-    return success();
-  }
-
   if (tilingConfig.getNumTilingLevels() != 4) {
     return op->emitOpError("expected four tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
@@ -205,11 +200,6 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize) {
   if (!isa<linalg::ConvolutionOpInterface>(op))
     return success();
-
-  if (tilingConfig.getNumTilingLevels() == 6) {
-    // TODO: update verification.
-    return success();
-  }
 
   if (tilingConfig.getNumTilingLevels() != 4) {
     return op->emitOpError("expected four tiling levels, got ")
