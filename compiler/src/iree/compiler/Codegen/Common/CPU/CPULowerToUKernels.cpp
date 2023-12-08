@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -175,38 +176,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Type lhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(0)->get());
   Type rhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(1)->get());
   Type outElemType = outType.getElementType();
-  uint32_t flags = 0;
-  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-      outElemType.isSignlessInteger(32)) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isSignlessInteger(16) &&
-             outElemType.isSignlessInteger(32)) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_S16S16S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isUnsignedInteger(4) &&
-             outElemType.isSignlessInteger(32)) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_S16U4S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isSignlessInteger(8) &&
-             outElemType.isSignlessInteger(32)) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_S16S8S32;
-  } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
-             outElemType.isF32()) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
-  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-             outElemType.isF32()) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F32;
-  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-             outElemType.isF16()) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F16;
-  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-             outElemType.isF32()) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32;
-  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-             outElemType.isBF16()) {
-    flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16;
-  } else {
+  uint32_t flags = findMmt4dUkernelType(lhsElemType, rhsElemType, outElemType);
+  if (flags == IREE_UK_FLAG_MMT4D_TYPE_NONE) {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
   }
