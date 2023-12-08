@@ -59,6 +59,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/FlowBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/flow.py
   DIALECT_NAME flow
 )
@@ -67,6 +68,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/HALBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/hal.py
   DIALECT_NAME hal
 )
@@ -75,6 +77,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/StreamBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/stream.py
   DIALECT_NAME stream
 )
@@ -83,6 +86,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/UtilBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/util.py
   DIALECT_NAME util
 )
@@ -91,6 +95,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/VMBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/vm.py
   DIALECT_NAME vm
 )
