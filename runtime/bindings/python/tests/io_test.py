@@ -8,6 +8,7 @@ import array
 import logging
 import numpy as np
 from pathlib import Path
+import tempfile
 import unittest
 
 import iree.compiler
@@ -67,6 +68,35 @@ def _float_constant(val: float) -> array.array:
     return array.array("f", [val])
 
 
+class ParameterArchiveTest(unittest.TestCase):
+    def testCreateArchiveFile(self):
+        splat_index = rt.ParameterIndex()
+        splat_index.add_splat("weight", _float_constant(2.0), 30 * 20 * 4)
+        splat_index.add_splat("bias", _float_constant(1.0), 30 * 4)
+
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "archive.irpa"
+            target_index = splat_index.create_archive_file(str(file_path))
+            print(target_index)
+            self.assertTrue(file_path.exists())
+            self.assertGreater(file_path.stat().st_size, 0)
+
+    def testSaveArchiveFile(self):
+        index = rt.ParameterIndex()
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "archive.irpa"
+            rt.save_archive_file(
+                {
+                    "weight": rt.SplatValue(np.float32(2.0), 30 * 20),
+                    "bias": rt.SplatValue(array.array("f", [1.0]), 30),
+                    "array": np.asarray([1, 2, 3]),
+                },
+                file_path,
+            )
+            self.assertTrue(file_path.exists())
+            self.assertGreater(file_path.stat().st_size, 0)
+
+
 class ParameterTest(unittest.TestCase):
     def setUp(self):
         self.instance = rt.VmInstance()
@@ -109,6 +139,34 @@ class ParameterTest(unittest.TestCase):
         # TODO: Fix splat in the parameter code so it is not all zeros.
         # expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
         # np.testing.assert_array_almost_equal(result, expected_result)
+
+    def testSplatsFromBuiltIrpaFile(self):
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "archive.irpa"
+            rt.save_archive_file(
+                {
+                    "weight": rt.SplatValue(np.float32(2.0), 30 * 20),
+                    "bias": rt.SplatValue(np.float32(1.0), 30),
+                },
+                file_path,
+            )
+
+            index = rt.ParameterIndex()
+            index.load(str(file_path))
+        modules = rt.load_vm_modules(
+            rt.create_io_parameters_module(
+                self.instance, index.create_provider(scope="params")
+            ),
+            rt.create_hal_module(self.instance, self.device),
+            create_mm_test_module(self.instance),
+            config=self.config,
+        )
+        main = modules[-1]
+        input = np.zeros([128, 20], dtype=np.float32) + 2.0
+        result = main.run(input)
+        print(result.to_host())
+        expected_result = np.zeros([128, 30], dtype=np.float32) + 81.0
+        np.testing.assert_array_almost_equal(result, expected_result)
 
     def testBuffers(self):
         index = rt.ParameterIndex()
