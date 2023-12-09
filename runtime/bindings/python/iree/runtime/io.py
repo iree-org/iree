@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-from typing import Any, Union
+from typing import Any, Sequence, Union
 
 import array
 from functools import reduce
@@ -21,7 +21,9 @@ __all__ = [
 
 
 class SplatValue:
-    def __init__(self, pattern: Union[array.array, numpy.array], count: int):
+    def __init__(
+        self, pattern: Union[array.array, numpy.array], count: Union[Sequence[int], int]
+    ):
         if hasattr(pattern, "shape"):
             shape = pattern.shape
             if not shape:
@@ -34,7 +36,13 @@ class SplatValue:
         if total_elements != 1:
             raise ValueError(f"SplatValue requires an array of a single element")
         self.pattern = pattern
-        self.total_length = count * item_size
+        if isinstance(count, int):
+            logical_length = count
+        elif len(count) == 1:
+            logical_length = count[0]
+        else:
+            logical_length = reduce(lambda x, y: x * y, count)
+        self.total_length = logical_length * item_size
 
     def __repr__(self):
         return f"SplatValue({self.pattern} of {self.total_length})"

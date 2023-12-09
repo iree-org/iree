@@ -87,7 +87,7 @@ class ParameterArchiveTest(unittest.TestCase):
             file_path = Path(td) / "archive.irpa"
             rt.save_archive_file(
                 {
-                    "weight": rt.SplatValue(np.float32(2.0), 30 * 20),
+                    "weight": rt.SplatValue(np.float32(2.0), [30, 20]),
                     "bias": rt.SplatValue(array.array("f", [1.0]), 30),
                     "array": np.asarray([1, 2, 3]),
                 },
