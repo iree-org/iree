@@ -505,6 +505,25 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
       };
 }
 
+static FailureOr<MaterializeEncodingValueInfo>
+chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
+                                          OpBuilder &builder, Location loc) {
+  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
+  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
+      loc, resultTypes, TypeAttr::get(tensorType));
+  MaterializeEncodingValueInfo result;
+  result.innerTileSizes = op.getResults();
+  return result;
+}
+
+MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
+    return chooseDynamicEncodingInfoVMVXMicrokernels;
+  }
+  return {};
+}
+
 void CPUMaterializeEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
