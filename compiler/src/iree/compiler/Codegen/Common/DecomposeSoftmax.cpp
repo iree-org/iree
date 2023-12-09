@@ -61,7 +61,7 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     // the decomposition above.
     rewriter.replaceOp(decomposableSoftmaxOp, *result);
 
-        // Fusion later depends on couple of Ops/Values - we try to obtain the same
+    // Fusion later depends on couple of Ops/Values - we try to obtain the same
     // by backtracking through the generated value's def-chain.
     Operation *resultOp = (*result)[0].getDefiningOp();
     Value numerator = resultOp->getOperand(0);
