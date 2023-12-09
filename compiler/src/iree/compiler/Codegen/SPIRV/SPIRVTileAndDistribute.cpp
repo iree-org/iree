@@ -50,13 +50,13 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Invocation tiling patterns
+// Invocation tiling utils
 //===----------------------------------------------------------------------===//
 
-/// Patterns for third level tiling to target invocations.
-static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns,
-    const linalg::TileSizeComputationFunction &computeFn) {
+/// Tiles LinalgOp to target invocations.
+static LogicalResult
+tileToInvocationPatterns(func::FuncOp funcOp,
+                         const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -70,16 +70,30 @@ static void populateTilingToInvocationPatterns(
                            .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
-  MLIRContext *context = patterns.getContext();
+  MLIRContext *context = funcOp.getContext();
+  IRRewriter rewriter(context);
   auto marker = StringAttr::get(context, getTileReductionMarker());
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-                    ArrayRef<StringAttr>(), marker)
-                    .setMatchByDefault();
+      ArrayRef<StringAttr>(), marker);
 
-  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(context, tilingOptions,
-                                                     filter);
-  patterns.add<IREE::LinalgExt::TilingInterfaceTilingPattern>(
-      context, tilingOptions, filter);
+  SmallVector<linalg::LinalgOp> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) { candidates.push_back(op); });
+
+  for (auto op : candidates) {
+    FailureOr<linalg::TiledLinalgOp> res =
+        linalg::tileLinalgOp(rewriter, op, tilingOptions);
+    if (failed(res)) {
+      return failure();
+    }
+    filter.replaceLinalgTransformationFilter(rewriter, res->op);
+    if (res->tensorResults.empty()) {
+      rewriter.eraseOp(op);
+    } else {
+      rewriter.replaceOp(op, res->tensorResults);
+    }
+  }
+
+  return success();
 }
 
 //====---------------------------------------------------------------------===//
@@ -162,12 +176,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     return signalPassFailure();
 
   { // Tile and distribute to invocations.
-    RewritePatternSet invocationTilingPatterns(context);
-    populateTilingToInvocationPatterns(invocationTilingPatterns,
-                                       *threadTileComputeFn);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(invocationTilingPatterns)))) {
-      funcOp.emitOpError() << "failure in tiling";
+    if (failed(tileToInvocationPatterns(funcOp, *threadTileComputeFn))) {
+      funcOp.emitOpError() << "failure in tiling to invocations";
       return signalPassFailure();
     }
 
