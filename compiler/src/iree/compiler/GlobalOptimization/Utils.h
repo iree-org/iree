@@ -25,6 +25,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 /// Returns a CastOpInterface op, if the producer is a CastOpInterface op, or a
 /// linalg::GenericOp that performs only a CastOpInterface on its input.
+/// The CastOpInterface op should extend the bitwidth of the source.
 /// The bitwidth of the source element type should be greater than 1. If it is
 /// casting from i1 types, a std::nullopt is returned. It is dangerous to mix
 /// boalean concept and i1 subtypes concept at graph optimizatoin level. We
@@ -36,7 +37,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 ///
 /// **Note: If the CastOpInterface has been generalized, the return Operation
 ///         is the body CastOpInterface op, not the linalg::GenericOp.
-std::optional<CastOpInterface> getDefiningNonI1CastOp(Value input);
+std::optional<CastOpInterface> getDefiningNonI1ExtendingCastOp(Value input);
 
 /// Returns the source element type of the defining CastOpInterface of `input`,
 /// if there is one. Otherwise return std::nullopt.

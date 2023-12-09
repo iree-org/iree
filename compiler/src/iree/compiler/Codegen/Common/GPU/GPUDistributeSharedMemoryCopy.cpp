@@ -29,9 +29,6 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute-shared-memory-copy"
 
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
-
 /// Prints the given `funcOp` after a leading `step` comment header.
 void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
   LLVM_DEBUG({
@@ -273,14 +270,21 @@ static void populateTilingAndDistribute(RewritePatternSet &patterns,
           StringAttr::get(patterns.getContext(), kCopyDistributed)));
 }
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  VectorizationPatterns<linalg::GenericOp>::insert(
-      patterns, IREE::LinalgExt::LinalgVectorizationOptions(),
-      IREE::LinalgExt::LinalgTransformationFilter(
-          {StringAttr::get(patterns.getContext(),
-                           getCopyToWorkgroupMemoryMarker()),
-           StringAttr::get(patterns.getContext(), kCopyDistributed)},
-          std::nullopt));
+/// Vectorizes generic ops that have CopyToWorkgroupMemoryMarker or
+// `kCopyDistributed` marker.
+static void vectorizeCopyToWorkgroupMemoryOps(func::FuncOp funcOp) {
+  MLIRContext *context = funcOp.getContext();
+  IRRewriter rewriter(context);
+  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+      {StringAttr::get(context, getCopyToWorkgroupMemoryMarker()),
+       StringAttr::get(context, kCopyDistributed)},
+      std::nullopt);
+
+  funcOp.walk([&](linalg::GenericOp op) {
+    if (succeeded(filter.checkAndNotify(rewriter, op))) {
+      (void)linalg::vectorize(rewriter, op);
+    }
+  });
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
@@ -435,12 +439,7 @@ class GPUDistributeSharedMemoryCopyPass
       debugPrint(funcOp, "After step 2: thread distribution");
 
       // Step 3. Vectorize the distributed copies.
-      RewritePatternSet vectorizationPatterns(context);
-      populateVectorizationPatterns(vectorizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
-        return signalPassFailure();
-      }
+      vectorizeCopyToWorkgroupMemoryOps(funcOp);
       debugPrint(funcOp, "After step 3: vectorization");
 
       // Step4. Finally unroll all the loop created

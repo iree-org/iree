@@ -321,9 +321,11 @@ void buildStreamTransformPassPipeline(
   // Optimizations such as dispatch operand fusion remove information we can use
   // to determine memory usage by dispatches.
   if (transformOptions.dumpStatisticsFormat != DumpOutputFormat::None) {
-    passManager.addPass(IREE::Stream::createDumpStatisticsPass(
-        transformOptions.dumpStatisticsFormat,
-        transformOptions.dumpStatisticsFile));
+    DumpStatisticsPassOptions dumpStatisticsOptions;
+    dumpStatisticsOptions.outputFormat = transformOptions.dumpStatisticsFormat;
+    dumpStatisticsOptions.outputFile = transformOptions.dumpStatisticsFile;
+    passManager.addPass(
+        IREE::Stream::createDumpStatisticsPass(dumpStatisticsOptions));
   }
 
   //----------------------------------------------------------------------------

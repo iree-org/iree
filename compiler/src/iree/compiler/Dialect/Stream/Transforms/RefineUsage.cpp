@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/Analysis/ResourceUsage.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -28,6 +27,10 @@
 #define DEBUG_TYPE "iree-stream-refine-usage"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_REFINEUSAGEPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -437,20 +440,11 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-refine-usage
+// --iree-stream-refine-usage
 //===----------------------------------------------------------------------===//
 
-class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
-public:
-  RefineUsagePass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct RefineUsagePass
+    : public IREE::Stream::impl::RefineUsagePassBase<RefineUsagePass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
@@ -477,9 +471,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass() {
-  return std::make_unique<RefineUsagePass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream
