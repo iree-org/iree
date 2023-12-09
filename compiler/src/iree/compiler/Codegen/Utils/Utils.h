@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
@@ -174,6 +175,13 @@ isTiledAndDistributedLoop(scf::ForOp forOp);
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo>
 getTiledAndDistributedLoopInfo(func::FuncOp funcOp);
+
+/// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
+/// provided the corresponding tile size will be multiplied by a vector.vscale
+/// op.
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
+                     ArrayRef<int64_t> tileSizes,
+                     ArrayRef<bool> tileScalableFlags);
 
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
