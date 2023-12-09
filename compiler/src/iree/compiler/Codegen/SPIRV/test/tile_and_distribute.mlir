@@ -267,9 +267,10 @@ hal.executable private @conv_2d {
 //         CHECK:             scf.for %[[IV_IC:.+]] = %[[C0]] to %{{.+}} step %[[C4]]
 //         CHECK:               %[[INPUT:.+]] = memref.subview %[[INPUT_THREAD]]
 //         CHECK:               %[[FILTER:.+]] = memref.subview %[[FILTER_THREAD]]
+//         CHECK:               %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
 //         CHECK:               linalg.conv_2d_nhwc_hwcf
 //    CHECK-SAME:                 ins(%[[INPUT]], %[[FILTER]]
-//    CHECK-SAME:                 outs(%[[OUTPUT]]
+//    CHECK-SAME:                 outs(%[[OUTPUT_SUBVIEW]]
 
 // -----
 
