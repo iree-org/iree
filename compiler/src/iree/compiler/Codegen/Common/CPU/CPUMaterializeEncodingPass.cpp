@@ -517,7 +517,7 @@ chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
   return result;
 }
 
-MaterializeEncodingValueFn
+static MaterializeEncodingValueFn
 getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
     return chooseDynamicEncodingInfoVMVXMicrokernels;
