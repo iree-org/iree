@@ -22,6 +22,8 @@ RISCV = "riscv"
 VULKAN_NVIDIA = "vulkan-nvidia"
 # Default x86_64 execution benchmarks.
 X86_64 = "x86_64"
+# x86_64 execution benchmarks with only data-tiling.
+X86_64_DT_ONLY = "x86_64-dt-only"
 # Large x86_64 execution benchmarks.
 X86_64_LARGE = "x86_64-large"
 
@@ -45,5 +47,5 @@ LARGE_PRESETS = [
     X86_64_LARGE,
 ]
 
-ALL_EXECUTION_PRESETS = DEFAULT_PRESETS + LARGE_PRESETS
+ALL_EXECUTION_PRESETS = DEFAULT_PRESETS + LARGE_PRESETS + [X86_64_DT_ONLY]
 ALL_COMPILATION_PRESETS = [COMP_STATS, COMP_STATS_LARGE]
