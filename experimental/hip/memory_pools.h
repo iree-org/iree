@@ -18,6 +18,13 @@
 extern "C" {
 #endif  // __cplusplus
 
+// WARNING: hipMemPool API's are marked as beta in HIP library meaning
+// that while the feature is complete, it is still open to changes and may
+// have outstanding issues.
+// The following API's are used in this module: hipMallocFromPoolAsync,
+// hipMemPoolCreate, hipMemPoolDestroy, hipMemPoolGetAttribute,
+// hipMemPoolSetAttribute, hipMemPoolTrimTo
+
 // Retained HIP memory pools for various allocation types.
 typedef struct iree_hal_hip_memory_pools_t {
   // Used exclusively for DEVICE_LOCAL allocations.

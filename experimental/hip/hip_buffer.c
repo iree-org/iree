@@ -14,11 +14,11 @@
 #include "iree/base/tracing.h"
 
 typedef struct iree_hal_hip_buffer_t {
-  hipDeviceptr_t device_ptr;
   iree_hal_buffer_t base;
-  iree_hal_buffer_release_callback_t release_callback;
   iree_hal_hip_buffer_type_t type;
   void* host_ptr;
+  hipDeviceptr_t device_ptr;
+  iree_hal_buffer_release_callback_t release_callback;
 } iree_hal_hip_buffer_t;
 
 static const iree_hal_buffer_vtable_t iree_hal_hip_buffer_vtable;
@@ -101,6 +101,10 @@ static iree_status_t iree_hal_hip_buffer_map_range(
           : IREE_HAL_BUFFER_USAGE_MAPPING_SCOPED));
 
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
+  // If we mapped for discard scribble over the bytes. This is not a mandated
+  // behavior but it will make debugging issues easier. Alternatively for
+  // heap buffers we could reallocate them such that ASAN yells, but that
+  // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
     memset(data_ptr, 0xCD, local_byte_length);

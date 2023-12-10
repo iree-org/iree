@@ -19,7 +19,7 @@ typedef enum iree_hal_hip_buffer_type_e {
   // Device local buffer; allocated with hipMalloc/hipMallocManaged, freed
   // with hipFree.
   IREE_HAL_HIP_BUFFER_TYPE_DEVICE = 0,
-  // Host local buffer; allocated with hipHostMalloc, freed with hipFreeHost.
+  // Host local buffer; allocated with hipHostMalloc, freed with hipHostFree.
   IREE_HAL_HIP_BUFFER_TYPE_HOST,
   // Host local buffer; registered with hipHostRegister, freed with
   // hipHostUnregister.

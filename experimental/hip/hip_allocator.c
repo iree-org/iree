@@ -19,12 +19,26 @@ static const char* IREE_HAL_HIP_ALLOCATOR_ID = "HIP unpooled";
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 typedef struct iree_hal_hip_allocator_t {
+  // Abstract resource used for injecting reference counting and vtable;
+  // must be at offset 0.
   iree_hal_resource_t resource;
+
+  // The device that this allocator allocates memory from.
   hipDevice_t device;
+
+  // The HIP stream that allocations should be used in.
   hipStream_t stream;
+
+  // NOTE: optional depending on device support.
   iree_hal_hip_memory_pools_t* pools;
+
   const iree_hal_hip_dynamic_symbols_t* symbols;
+
   iree_allocator_t host_allocator;
+
+  // Whether the GPU and CPU can concurrently access HIP managed data in a
+  // coherent way. We would need to explicitly perform flushing and invalidation
+  // between GPU and CPU if not.
   bool supports_concurrent_managed_access;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -270,8 +284,8 @@ static void iree_hal_hip_buffer_free(
       break;
     }
     case IREE_HAL_HIP_BUFFER_TYPE_HOST: {
-      IREE_TRACE_ZONE_APPEND_TEXT(z0, "hipFreeHost");
-      IREE_HIP_IGNORE_ERROR(hip_symbols, hipFreeHost(host_ptr));
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, "hipHostFree");
+      IREE_HIP_IGNORE_ERROR(hip_symbols, hipHostFree(host_ptr));
       break;
     }
     case IREE_HAL_HIP_BUFFER_TYPE_HOST_REGISTERED: {
@@ -330,7 +344,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
   iree_status_t status = iree_ok_status();
   iree_hal_hip_buffer_type_t buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
   void* host_ptr = NULL;
-  hipDeviceptr_t device_ptr = 0;
+  hipDeviceptr_t device_ptr = NULL;
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_hip_buffer_allocate");
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, allocation_size);
   if (iree_all_bits_set(compat_params.type,
@@ -338,6 +352,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
     // Device local case.
     if (iree_all_bits_set(compat_params.type,
                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+      // Device local and host visible.
       buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
       status = IREE_HIP_RESULT_TO_STATUS(
           allocator->symbols,
@@ -358,6 +373,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
           allocator->symbols, hipMalloc(&device_ptr, allocation_size));
     }
   } else {
+    // Host local case.
     buffer_type = IREE_HAL_HIP_BUFFER_TYPE_HOST;
     unsigned int flags = hipHostMallocMapped;
     if (!iree_all_bits_set(compat_params.type,
@@ -365,7 +381,7 @@ static iree_status_t iree_hal_hip_allocator_allocate_buffer(
       flags |= hipHostMallocWriteCombined;
     }
     status = IREE_HIP_RESULT_TO_STATUS(
-        allocator->symbols, hipMemAllocHost(&host_ptr, allocation_size, flags));
+        allocator->symbols, hipHostMalloc(&host_ptr, allocation_size, flags));
     if (iree_status_is_ok(status)) {
       status = IREE_HIP_RESULT_TO_STATUS(
           allocator->symbols,
@@ -476,7 +492,7 @@ static iree_status_t iree_hal_hip_allocator_import_buffer(
   iree_status_t status = iree_ok_status();
   iree_hal_hip_buffer_type_t buffer_type = IREE_HAL_HIP_BUFFER_TYPE_DEVICE;
   void* host_ptr = NULL;
-  hipDeviceptr_t device_ptr = 0;
+  hipDeviceptr_t device_ptr = NULL;
 
   switch (external_buffer->type) {
     case IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION: {
@@ -555,7 +571,7 @@ static iree_status_t iree_hal_hip_allocator_export_buffer(
           out_external_buffer->flags = requested_flags;
           out_external_buffer->type = requested_type;
           out_external_buffer->handle.device_allocation.ptr =
-              *((uint64_t*)iree_hal_hip_buffer_device_pointer(buffer));
+              ((uint64_t)(uintptr_t)iree_hal_hip_buffer_device_pointer(buffer));
           out_external_buffer->size = iree_hal_buffer_allocation_size(buffer);
           return iree_ok_status();
 

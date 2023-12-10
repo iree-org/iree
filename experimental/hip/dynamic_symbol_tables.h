@@ -7,10 +7,7 @@
 //===----------------------------------------------------------------------===//
 // HIP symbols
 //===----------------------------------------------------------------------===//
-IREE_HIP_PFN_DECL(hipCtxCreate, hipCtx_t *, unsigned int, hipDevice_t)
-IREE_HIP_PFN_DECL(hipCtxDestroy, hipCtx_t)
-IREE_HIP_PFN_DECL(hipCtxGetDevice, hipDevice_t *)
-IREE_HIP_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
+
 IREE_HIP_PFN_DECL(hipDeviceGet, hipDevice_t *, int)
 IREE_HIP_PFN_DECL(hipDeviceGetAttribute, int *, hipDeviceAttribute_t, int)
 IREE_HIP_PFN_DECL(hipDeviceGetName, char *, int, hipDevice_t)
@@ -25,7 +22,6 @@ IREE_HIP_PFN_DECL(hipEventRecord, hipEvent_t, hipStream_t)
 IREE_HIP_PFN_DECL(hipEventSynchronize, hipEvent_t)
 IREE_HIP_PFN_DECL(hipFree, void *)
 IREE_HIP_PFN_DECL(hipFreeAsync, void *, hipStream_t)
-IREE_HIP_PFN_DECL(hipFreeHost, void *)
 IREE_HIP_PFN_DECL(hipFuncSetAttribute, const void *, hipFuncAttribute, int)
 IREE_HIP_PFN_DECL(hipGetDeviceCount, int *)
 IREE_HIP_PFN_DECL(hipGetDeviceProperties, hipDeviceProp_t *, int)
@@ -35,6 +31,7 @@ IREE_HIP_PFN_STR_DECL(hipGetErrorName, hipError_t)
 IREE_HIP_PFN_STR_DECL(hipGetErrorString, hipError_t)
 IREE_HIP_PFN_DECL(hipHostFree, void *)
 IREE_HIP_PFN_DECL(hipHostGetDevicePointer, void **, void *, unsigned int)
+IREE_HIP_PFN_DECL(hipHostMalloc, void **, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipHostRegister, void *, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipHostUnregister, void *)
 IREE_HIP_PFN_DECL(hipInit, unsigned int)
@@ -42,7 +39,6 @@ IREE_HIP_PFN_DECL(hipMalloc, void **, size_t)
 IREE_HIP_PFN_DECL(hipMallocFromPoolAsync, void **, size_t, hipMemPool_t,
                   hipStream_t)
 IREE_HIP_PFN_DECL(hipMallocManaged, hipDeviceptr_t *, size_t, unsigned int)
-IREE_HIP_PFN_DECL(hipMemAllocHost, void **, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipMemcpy, void *, const void *, size_t, hipMemcpyKind)
 IREE_HIP_PFN_DECL(hipMemcpyAsync, void *, const void *, size_t, hipMemcpyKind,
                   hipStream_t)

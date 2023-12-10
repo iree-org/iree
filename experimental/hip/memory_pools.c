@@ -41,15 +41,8 @@ static iree_status_t iree_hal_hip_create_memory_pool(
 
   hipMemPool_t pool = NULL;
 
-  // WARNING: hipMemPoolCreate() API is marked as beta in HIP library meaning
-  // that while the feature is complete, it is still open to changes and may
-  // have outstanding issues.
   IREE_HIP_RETURN_IF_ERROR(hip_symbols, hipMemPoolCreate(&pool, &pool_props),
                            "hipMemPoolCreate");
-
-  // WARNING: hipMemPoolSetAttribute() API is marked as beta in HIP library
-  // meaning that while the feature is complete, it is still open to changes and
-  // may have outstanding issues.
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       hip_symbols,
       hipMemPoolSetAttribute(pool, hipMemPoolAttrReleaseThreshold,
@@ -59,9 +52,6 @@ static iree_status_t iree_hal_hip_create_memory_pool(
   if (iree_status_is_ok(status)) {
     *out_pool = pool;
   } else {
-    // WARNING: hipMemPoolDestroy() API is marked as beta in HIP library meaning
-    // that while the feature is complete, it is still open to changes and may
-    // have outstanding issues.
     IREE_HIP_IGNORE_ERROR(hip_symbols, hipMemPoolDestroy(pool));
   }
   return status;
@@ -102,9 +92,6 @@ void iree_hal_hip_memory_pools_deinitialize(
     iree_hal_hip_memory_pools_t* pools) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // WARNING: hipMemPoolDestroy() API is marked as beta in HIP library meaning
-  // that while the feature is complete, it is still open to changes and may
-  // have outstanding issues.
   if (pools->device_local) {
     IREE_HIP_IGNORE_ERROR(pools->hip_symbols,
                           hipMemPoolDestroy(pools->device_local));
@@ -172,22 +159,19 @@ void iree_hal_hip_memory_pools_merge_statistics(
     statistics->host_bytes_freed = iree_atomic_load_int64(
         &pools->statistics.host_bytes_freed, iree_memory_order_relaxed);
 
-    // WARNING: hipMemPoolGetAttribute() API is marked as beta in HIP library
-    // meaning that while the feature is complete, it is still open to changes
-    // and may have outstanding issues.
     if (pools->device_local) {
       uint64_t pool_peak = 0;
       IREE_HIP_IGNORE_ERROR(
           pools->hip_symbols,
-          hipMemPoolGetAttribute(pools->device_local,
-                                 hipMemPoolAttrReservedMemHigh, &pool_peak));
+          hipMemPoolGetAttribute(pools->device_local, hipMemPoolAttrUsedMemHigh,
+                                 &pool_peak));
       statistics->device_bytes_peak += (iree_device_size_t)pool_peak;
     }
     if (pools->other) {
       uint64_t pool_peak = 0;
       IREE_HIP_IGNORE_ERROR(
           pools->hip_symbols,
-          hipMemPoolGetAttribute(pools->other, hipMemPoolAttrReservedMemHigh,
+          hipMemPoolGetAttribute(pools->other, hipMemPoolAttrUsedMemHigh,
                                  &pool_peak));
       statistics->host_bytes_peak += (iree_device_size_t)pool_peak;
     }
@@ -197,9 +181,6 @@ void iree_hal_hip_memory_pools_merge_statistics(
 iree_status_t iree_hal_hip_memory_pools_trim(
     iree_hal_hip_memory_pools_t* pools,
     const iree_hal_hip_memory_pooling_params_t* pooling_params) {
-  // WARNING: hipMemPoolTrimTo() API is marked as beta in HIP library meaning
-  // that while the feature is complete, it is still open to changes and may
-  // have outstanding issues.
   IREE_HIP_RETURN_IF_ERROR(
       pools->hip_symbols,
       hipMemPoolTrimTo(pools->device_local,
@@ -247,10 +228,7 @@ iree_status_t iree_hal_hip_memory_pools_allocate(
           ? pools->device_local
           : pools->other;
 
-  hipDeviceptr_t device_ptr = 0;
-  // WARNING: hipMallocFromPoolAsync() API is marked as beta in HIP library
-  // meaning that while the feature is complete, it is still open to changes and
-  // may have outstanding issues.
+  hipDeviceptr_t device_ptr = NULL;
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       pools->hip_symbols,
       hipMallocFromPoolAsync(&device_ptr, (size_t)allocation_size, memory_pool,
