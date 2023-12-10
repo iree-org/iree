@@ -51,6 +51,7 @@ add_custom_target(iree-benchmark-suites-cuda-large)
 add_custom_target(iree-benchmark-suites-riscv)
 add_custom_target(iree-benchmark-suites-vulkan-nvidia)
 add_custom_target(iree-benchmark-suites-x86_64)
+add_custom_target(iree-benchmark-suites-x86_64-dt-only)
 add_custom_target(iree-benchmark-suites-x86_64-large)
 
 # Compilation benchmark preset targets.
