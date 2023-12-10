@@ -4007,40 +4007,50 @@ add_dependencies(iree-benchmark-suites-android-gpu
 add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_demote-f32-to-f16_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_demote-f32-to-f16_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
@@ -4051,6 +4061,7 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_compile-stats_
@@ -4060,27 +4071,35 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -4128,40 +4147,50 @@ add_dependencies(iree-benchmark-suites-cuda
 add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_repeated-kernel_demote-f32-to-f16_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp16_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
@@ -4172,6 +4201,7 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___qualcomm-adreno-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___arm-valhall-vulkan_android31-vulkan_spirv__experimental-flags_fuse-padding_max-concurrency_
@@ -4181,27 +4211,35 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
