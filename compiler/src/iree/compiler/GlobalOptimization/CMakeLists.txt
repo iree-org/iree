@@ -54,6 +54,7 @@ iree_cc_library(
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
     "Passes.cpp"
+    "PromoteMatmulForUKernel.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "Utils.cpp"

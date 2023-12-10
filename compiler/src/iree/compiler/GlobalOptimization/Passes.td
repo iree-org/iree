@@ -102,4 +102,9 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
 }
 
+def PromoteMatmulForUKernelPass : Pass<"iree-global-opt-promote-matmul-for-ukernel", "">  {
+  let summary = "Promote matmul input types to match available ukernel";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createPromoteMatmulForUKernelPass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

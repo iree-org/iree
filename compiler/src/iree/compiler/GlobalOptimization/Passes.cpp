@@ -33,6 +33,11 @@ static llvm::cl::opt<bool> clEnableExpandVectors(
     llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clPromoteMatmulForUKernel(
+    "iree-global-opt-promote-matmul-for-ukernel",
+    llvm::cl::desc("Promote matmul input types to match available ukernel."),
+    llvm::cl::init(false));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -107,6 +112,9 @@ void buildGlobalOptimizationPassPipeline(
     // Expand all vectors in vecmat/matvec ops into matrices for tiling.
     if (clEnableExpandVectors) {
       mainPassManager.addPass(createExpandVectorsPass());
+    }
+    if (clPromoteMatmulForUKernel) {
+      mainPassManager.addPass(createPromoteMatmulForUKernelPassPass());
     }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
