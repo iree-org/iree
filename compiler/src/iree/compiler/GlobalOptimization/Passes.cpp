@@ -114,7 +114,7 @@ void buildGlobalOptimizationPassPipeline(
       mainPassManager.addPass(createExpandVectorsPass());
     }
     if (clPromoteMatmulForUKernel) {
-      mainPassManager.addPass(createPromoteMatmulForUKernelPassPass());
+      mainPassManager.addPass(createPromoteMatmulForUKernelPass());
     }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===--------------- PromoteMatmulForUKernelPass --------------------------===//
+//===--------------- PromoteMatmulForUKernel ------------------------------===//
 // Promote matmul input types to match available ukernel
 //===----------------------------------------------------------------------===//
 
@@ -66,7 +66,7 @@ static FailureOr<MatmulTypeTuple> findPromotionType(MLIRContext *ctx,
   return failure();
 }
 
-struct PromoteMatmulForUKernelPass
+struct PromoteMatmulForUKernel
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
 
   using OpInterfaceRewritePattern<
@@ -136,24 +136,24 @@ struct PromoteMatmulForUKernelPass
   }
 };
 
-struct PromoteMatmulForUKernelPassPass
-    : public PromoteMatmulForUKernelPassBase<PromoteMatmulForUKernelPassPass> {
+struct PromoteMatmulForUKernelPass
+    : public PromoteMatmulForUKernelPassBase<PromoteMatmulForUKernelPass> {
   void runOnOperation() override;
 };
 
 } // namespace
 
-void PromoteMatmulForUKernelPassPass::runOnOperation() {
+void PromoteMatmulForUKernelPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  patterns.insert<PromoteMatmulForUKernelPass>(context);
+  patterns.insert<PromoteMatmulForUKernel>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
 }
 
-std::unique_ptr<Pass> createPromoteMatmulForUKernelPassPass() {
-  return std::make_unique<PromoteMatmulForUKernelPassPass>();
+std::unique_ptr<Pass> createPromoteMatmulForUKernelPass() {
+  return std::make_unique<PromoteMatmulForUKernelPass>();
 }
 } // namespace mlir::iree_compiler::GlobalOptimization

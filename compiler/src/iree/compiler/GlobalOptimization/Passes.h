@@ -102,7 +102,7 @@ std::unique_ptr<Pass> createSetEncodingPass();
 std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
 
 // Promote matmul input types to match available ukernel.
-std::unique_ptr<Pass> createPromoteMatmulForUKernelPassPass();
+std::unique_ptr<Pass> createPromoteMatmulForUKernelPass();
 
 void registerGlobalOptimizationPipeline();
 
