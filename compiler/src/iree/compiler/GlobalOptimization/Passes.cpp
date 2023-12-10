@@ -33,8 +33,8 @@ static llvm::cl::opt<bool> clEnableExpandVectors(
     llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clPromoteMatmulForUKernel(
-    "iree-global-opt-promote-matmul-for-ukernel",
+static llvm::cl::opt<bool> clEnablePromoteMatmulForUKernel(
+    "iree-global-opt-enable-promote-matmul-for-ukernel",
     llvm::cl::desc("Promote matmul input types to match available ukernel."),
     llvm::cl::init(false));
 
@@ -113,7 +113,7 @@ void buildGlobalOptimizationPassPipeline(
     if (clEnableExpandVectors) {
       mainPassManager.addPass(createExpandVectorsPass());
     }
-    if (clPromoteMatmulForUKernel) {
+    if (clEnablePromoteMatmulForUKernel) {
       mainPassManager.addPass(createPromoteMatmulForUKernelPass());
     }
     mainPassManager.addPass(createSetEncodingPass());
