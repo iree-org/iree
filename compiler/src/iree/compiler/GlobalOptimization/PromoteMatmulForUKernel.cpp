@@ -9,6 +9,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
