@@ -18,7 +18,7 @@ set -euo pipefail
 
 POLICY="${1:-performance}"
 
-MALI_GPU_PATTERN="/sys/devices/platform/1c*.mali"
+MALI_GPU_PATTERN="/sys/devices/platform/*.mali"
 MALI_GPU_PATHS=($MALI_GPU_PATTERN)
 # Assume there is only 1 GPU.
 if (( "${#MALI_GPU_PATHS[@]}" != 1 )); then
