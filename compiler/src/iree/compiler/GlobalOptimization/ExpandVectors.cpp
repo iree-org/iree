@@ -27,8 +27,8 @@ struct ExpandVectors
       linalg::ContractionOpInterface>::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-    if (!linalgOp || !linalgOp.hasTensorSemantics()) {
+    auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+    if (!linalgOp.hasTensorSemantics()) {
       return failure();
     }
 
