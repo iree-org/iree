@@ -160,7 +160,7 @@ def _get_git_merge_base_commit(
 
 def _get_experimental_dt_comparison_markdown(
     execution_benchmarks: Dict[str, benchmark_presentation.AggregateBenchmarkLatency],
-):
+) -> Optional[str]:
     """Get the comparison table to compare different data-tiling options."""
 
     dt_tags = {"no-dt": "No-DT (baseline)", "dt-only": "DT-Only", "dt-uk": "DT-UK"}
@@ -177,6 +177,9 @@ def _get_experimental_dt_comparison_markdown(
         compile_targets = gen_tags.split("][")[0] + "]"
         key_name = " ".join([model, compile_targets, remaining])
         latency_map[key_name][dt_tag] = (bench_id, latency.mean_time / 1e6)
+
+    if len(latency_map) == 0:
+        return None
 
     # Compute speedup vs. the baseline.
     table = {}
@@ -231,19 +234,20 @@ def _get_benchmark_result_markdown(
     abbr_table = [md.header(comment_def.title, 2)]
     abbr_table.append(commit_info_md)
 
-    # This is a temporary table to help us compare different data-tiling options.
-    dt_cmp_header = md.header("Data-Tiling Comparison Table", 3)
+    # The temporary table to help compare different data-tiling options.
     dt_cmp_table = _get_experimental_dt_comparison_markdown(
         execution_benchmarks=execution_benchmarks
     )
-    full_table += [dt_cmp_header, dt_cmp_table]
-    abbr_table += [
-        dt_cmp_header,
-        "<details>",
-        "<summary>Click to show</summary>",
-        dt_cmp_table,
-        "</details>",
-    ]
+    if dt_cmp_table is not None:
+        dt_cmp_header = md.header("Data-Tiling Comparison Table", 3)
+        full_table += [dt_cmp_header, dt_cmp_table]
+        abbr_table += [
+            dt_cmp_header,
+            "<details>",
+            "<summary>Click to show</summary>",
+            dt_cmp_table,
+            "</details>",
+        ]
 
     if len(execution_benchmarks) > 0:
         full_table.append(
