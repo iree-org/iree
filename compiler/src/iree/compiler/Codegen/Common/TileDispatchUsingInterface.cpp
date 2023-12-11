@@ -259,22 +259,7 @@ static LogicalResult replaceAllStoresWithTiledVersion(
   return success();
 }
 
-namespace {
-/// Result of the tiled operation.
-struct IREETilingResult {
-  SmallVector<Operation *> tiledOps;
-  SmallVector<Value> tiledValues;
-  SmallVector<scf::ForOp> loops;
-  SmallVector<Value> workgroupCount;
-  // TODO(ravishankarm): Cleanup the following returns. We should not need
-  // these.
-  llvm::SmallBitVector tiledLoops;
-  SmallVector<OpFoldResult> tileOffsets;
-  SmallVector<OpFoldResult> tileSizes;
-};
-} // namespace
-
-static FailureOr<IREETilingResult>
+FailureOr<IREETilingResult>
 tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options) {
   OpBuilder::InsertionGuard guard(rewriter);

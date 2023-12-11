@@ -15,6 +15,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -76,10 +77,11 @@ tileToInvocationPatterns(func::FuncOp funcOp,
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       ArrayRef<StringAttr>(), marker);
 
-  SmallVector<linalg::LinalgOp> candidates;
-  funcOp.walk([&](linalg::LinalgOp op) { candidates.push_back(op); });
+  SmallVector<TilingInterface> candidates;
+  funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
 
   for (auto op : candidates) {
+#if 0
     FailureOr<linalg::TiledLinalgOp> res =
         linalg::tileLinalgOp(rewriter, op, tilingOptions);
     if (failed(res)) {
@@ -91,6 +93,14 @@ tileToInvocationPatterns(func::FuncOp funcOp,
     } else {
       rewriter.replaceOp(op, res->tensorResults);
     }
+#endif
+    FailureOr<IREETilingResult> res =
+        tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
+    if (failed(res)) {
+      return failure();
+    }
+    for (auto tiledOp : res->tiledOps)
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
   }
 
   return success();
