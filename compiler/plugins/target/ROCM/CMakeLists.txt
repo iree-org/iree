@@ -142,7 +142,7 @@ add_custom_command(
     ${_all_device_bc_copy_commands}
 )
 # set (_all_device_bc_files ${_all_device_bc_files} iree_builtins_ukernel_arch_rocm_rocm_argmax_ukernel)
-add_custom_target(iree_compiler_Dialect_HAL_Target_ROCM_GenDeviceLibs
+add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
   DEPENDS
     ${_all_device_bc_files}
 )

@@ -426,7 +426,7 @@ private:
 
     // Set Ukernels if it is a architecture that we have build ukernels for.
     // TODO: Build for variety of architectures.
-    if (clROCMTargetChip == "gfx940" || clROCMTargetChip == "gfx1100") {
+    if (options.targetChip == "gfx940" || options.targetChip == "gfx1100") {
       addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
     }
 
