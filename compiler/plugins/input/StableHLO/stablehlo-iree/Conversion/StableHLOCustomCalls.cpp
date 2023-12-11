@@ -34,12 +34,13 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 
 // Computes householder using vector `v` and a `tau` matrice
-// with the k-th element.
+// with the k-th element. See householder transformation as below:
+// https://en.wikipedia.org/wiki/Householder_transformation
 static Value computeHouseholder(Value v, Value tau, Value k,
                                 ImplicitLocOpBuilder b) {
   auto vTy = cast<ShapedType>(v.getType());
 
-  llvm::SmallVector<int64_t> hShape(vTy.getShape());
+  SmallVector<int64_t> hShape(vTy.getShape());
   hShape.push_back(hShape.back());
 
   auto hTy = RankedTensorType::get(hShape, vTy.getElementType());
@@ -47,7 +48,7 @@ static Value computeHouseholder(Value v, Value tau, Value k,
 
   auto outMap = b.getMultiDimIdentityMap(hShape.size());
 
-  llvm::SmallVector<AffineExpr> exprs;
+  SmallVector<AffineExpr> exprs;
   for (int i = 0; i < vTy.getRank(); ++i) {
     exprs.push_back(b.getAffineDimExpr(i));
   }
@@ -71,16 +72,17 @@ static Value computeHouseholder(Value v, Value tau, Value k,
           hTy, ValueRange{v, v}, empty, affineMaps, iterTypes,
           [&](OpBuilder &bb, Location loc, ValueRange args) {
             ImplicitLocOpBuilder b(loc, bb);
-            llvm::SmallVector<Value> indices;
+            SmallVector<Value> indices;
             for (int i = 0; i < hTy.getRank(); ++i) {
               indices.push_back(b.create<linalg::IndexOp>(loc, i));
             }
 
-            llvm::SmallVector<Value> tauIndices(indices.begin(),
-                                                indices.end() - 2);
+            SmallVector<Value> tauIndices(indices.begin(), indices.end() - 2);
             tauIndices.push_back(k);
             Value t = b.create<tensor::ExtractOp>(tau, tauIndices);
 
+            // Generates the lower triangularization of the matrix with
+            // one values on the diagonal.
             auto tri = [&](Value v, Value i) {
               Value eq =
                   b.create<arith::CmpIOp>(arith::CmpIPredicate::eq, i, k);
@@ -107,21 +109,21 @@ static Value computeHouseholder(Value v, Value tau, Value k,
       .getResult(0);
 }
 
-// Compute the householder matrice with the k-th column of matrix and k-th tau
-// value.
+// Slices the k-th column of matrix and computes the householder transformation
+// for using the `tau` value.
 static Value computeHouseholderSlice(Value matrix, Value tau, Value k,
                                      ImplicitLocOpBuilder b) {
   auto matrixTy = cast<ShapedType>(matrix.getType());
   int rank = matrixTy.getRank();
 
-  llvm::SmallVector<OpFoldResult> vStrides(rank, b.getIndexAttr(1));
-  llvm::SmallVector<int64_t> vShape(matrixTy.getShape());
+  SmallVector<OpFoldResult> vStrides(rank, b.getIndexAttr(1));
+  SmallVector<int64_t> vShape(matrixTy.getShape());
   vShape[vShape.size() - 1] = 1;
 
-  llvm::SmallVector<OpFoldResult> vOffsets(rank, b.getIndexAttr(0));
+  SmallVector<OpFoldResult> vOffsets(rank, b.getIndexAttr(0));
   vOffsets[vOffsets.size() - 1] = k;
 
-  llvm::SmallVector<OpFoldResult> vSizes;
+  SmallVector<OpFoldResult> vSizes;
   for (auto v : vShape) {
     vSizes.push_back(b.getIndexAttr(v));
   }
@@ -172,6 +174,8 @@ struct HouseholderReflectorRewriter final
       return rewriter.notifyMatchFailure(op, "requires minimum rank 2 matrix");
     }
 
+    // Implementation needs to be checked to work with variable dimension
+    // lengths. Should be relatively straightforward.
     if (!matrixTy.hasStaticShape() || !tauTy.hasStaticShape()) {
       return rewriter.notifyMatchFailure(op,
                                          "not supported for dynamic shapes");
@@ -200,10 +204,10 @@ struct HouseholderReflectorRewriter final
           b.create<scf::YieldOp>(loc, dot);
         });
 
-    llvm::SmallVector<OpFoldResult> vOffsets(rank, b.getIndexAttr(0));
-    llvm::SmallVector<OpFoldResult> vStrides(rank, b.getIndexAttr(1));
-    llvm::SmallVector<int64_t> vShape(matrixTy.getShape());
-    llvm::SmallVector<OpFoldResult> vSizes;
+    SmallVector<OpFoldResult> vOffsets(rank, b.getIndexAttr(0));
+    SmallVector<OpFoldResult> vStrides(rank, b.getIndexAttr(1));
+    SmallVector<int64_t> vShape(matrixTy.getShape());
+    SmallVector<OpFoldResult> vSizes;
     for (auto v : vShape) {
       vSizes.push_back(b.getIndexAttr(v));
     }
@@ -224,9 +228,8 @@ struct HouseholderReflectorRewriter final
 struct LegalizeStableHLOCustomCalls final
     : impl::LegalizeStableHLOCustomCallsBase<LegalizeStableHLOCustomCalls> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect, mlir::linalg::LinalgDialect,
-                    mlir::scf::SCFDialect, mlir::stablehlo::StablehloDialect,
-                    mlir::tensor::TensorDialect>();
+    registry.insert<arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
+                    mlir::stablehlo::StablehloDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {

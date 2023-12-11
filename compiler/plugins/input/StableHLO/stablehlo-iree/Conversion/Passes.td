@@ -53,7 +53,7 @@ def LegalizeChlo :
 
 def LegalizeStableHLOCustomCalls :
     Pass<"iree-stablehlo-legalize-custom-calls", "func::FuncOp"> {
-  let summary = "Inlines codegenerated solvers for StableHLO ops";
+  let summary = "Legalizes specialized custom calls to decomposed implementations";
 }
 
 def LegalizeShapeComputations :
