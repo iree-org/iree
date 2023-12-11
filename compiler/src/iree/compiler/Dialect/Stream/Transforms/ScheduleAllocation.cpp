@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -28,6 +27,10 @@
 #define DEBUG_TYPE "iree-stream-schedule-allocation"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_SCHEDULEALLOCATIONPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -1816,19 +1819,12 @@ static LogicalResult convertAsyncStoreOp(IREE::Stream::AsyncStoreOp asyncOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-schedule-allocation
+// --iree-stream-schedule-allocation
 //===----------------------------------------------------------------------===//
 
-class ScheduleAllocationPass
-    : public ScheduleAllocationBase<ScheduleAllocationPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct ScheduleAllocationPass
+    : public IREE::Stream::impl::ScheduleAllocationPassBase<
+          ScheduleAllocationPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     for (auto &parentOp : llvm::make_early_inc_range(moduleOp.getOps())) {
@@ -1865,9 +1861,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createScheduleAllocationPass() {
-  return std::make_unique<ScheduleAllocationPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream

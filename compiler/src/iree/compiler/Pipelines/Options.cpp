@@ -99,6 +99,10 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Converts all i64 ops and values into i32 counterparts "
                      "unconditionally before main global optimizations."),
       llvm::cl::cat(category));
+  binder.opt<bool>("iree-opt-enable-outer-dim-concat", outerDimConcat,
+                   llvm::cl::desc("Enables transposing all concatenations to "
+                                  "the outer most dimension."),
+                   llvm::cl::cat(category));
 
   binder.opt<bool>("iree-opt-data-tiling", dataTiling,
                    llvm::cl::desc("Enables data tiling path."),

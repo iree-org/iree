@@ -291,9 +291,9 @@ struct setContractionOpEncoding
       return {};
     };
     std::optional<CastOpInterface> maybeLhsCastOp =
-        getDefiningNonI1CastOp(origLhs);
+        getDefiningNonI1ExtendingCastOp(origLhs);
     std::optional<CastOpInterface> maybeRhsCastOp =
-        getDefiningNonI1CastOp(origRhs);
+        getDefiningNonI1ExtendingCastOp(origRhs);
     Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
                                       : getElemType(origLhs);
     Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()

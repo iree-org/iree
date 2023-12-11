@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "remove_zero_extent_tensors.mlir"
     "set_encoding.mlir"
     "transformation_pipeline.mlir"
+    "transpose_and_decompose_concat.mlir"
   TOOLS
     FileCheck
     iree-opt

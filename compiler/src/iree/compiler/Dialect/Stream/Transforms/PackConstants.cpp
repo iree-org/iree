@@ -7,14 +7,12 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -28,6 +26,10 @@
 #define DEBUG_TYPE "iree-stream-pack-constants"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_PACKCONSTANTSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -631,7 +633,7 @@ static Value generateUploads(Value awaitTimepoint,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-pack-constants
+// --iree-stream-pack-constants
 //===----------------------------------------------------------------------===//
 
 // NOTE: this pass currently produces suboptimal packing when multiple constant
@@ -644,16 +646,8 @@ static Value generateUploads(Value awaitTimepoint,
 // would be much nicer. For now, though, we don't do multi-device so there's
 // never a case where this matters by construction; which is a feature :P
 
-class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct PackConstantsPass
+    : public IREE::Stream::impl::PackConstantsPassBase<PackConstantsPass> {
   void runOnOperation() override {
     auto parentOp = getOperation();
     if (!parentOp || !parentOp.getCallableRegion() ||
@@ -686,9 +680,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass() {
-  return std::make_unique<PackConstantsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream

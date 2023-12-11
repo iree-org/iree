@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Defines IREE ARMv8-A benchmarks."""
 
-from typing import List
+from typing import List, Sequence
 
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
@@ -41,16 +41,40 @@ class Android_ARMv8_A_Benchmarks(object):
             "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )
+    DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+        id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DT_ONLY,
+        tags=["experimental-flags", "dt-only"],
+        compile_targets=[ARMV8_A_CPU_TARGET],
+        extra_flags=[
+            "--iree-opt-data-tiling=true",
+            "--iree-llvmcpu-enable-ukernels=none",
+            "--iree-llvmcpu-target-cpu-features=+dotprod",
+        ],
+    )
     DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DT_UK,
         tags=["default-flags", "dt-uk"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
-            "--iree-opt-data-tiling",
+            "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
         ],
     )
+
+    def _build_run_configs(
+        self,
+        gen_configs: Sequence[iree_definitions.ModuleGenerationConfig],
+        exec_configs: Sequence[iree_definitions.ModuleExecutionConfig],
+        device_specs: Sequence[common_definitions.DeviceSpec],
+        presets: Sequence[str],
+    ) -> List[iree_definitions.E2EModelRunConfig]:
+        return utils.generate_e2e_model_run_configs(
+            module_generation_configs=gen_configs,
+            module_execution_configs=exec_configs,
+            device_specs=device_specs,
+            presets=presets,
+        )
 
     def generate(
         self,
@@ -72,6 +96,13 @@ class Android_ARMv8_A_Benchmarks(object):
             )
             for model in self.MODELS
         ]
+        dt_only_gen_confings = [
+            iree_definitions.ModuleGenerationConfig.build(
+                compile_config=self.DT_ONLY_COMPILE_CONFIG,
+                imported_model=iree_definitions.ImportedModel.from_model(model),
+            )
+            for model in self.MODELS
+        ]
         dt_uk_gen_confings = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=self.DT_UK_COMPILE_CONFIG,
@@ -87,12 +118,16 @@ class Android_ARMv8_A_Benchmarks(object):
                 tags=["big-cores"],
             )
         )
-        run_configs = utils.generate_e2e_model_run_configs(
-            module_generation_configs=no_dt_gen_confings + dt_uk_gen_confings,
-            module_execution_configs=local_sync_execution_configs
-            + local_task_execution_configs,
-            device_specs=big_cores_devices,
-            presets=[benchmark_presets.ANDROID_CPU],
+        run_configs = self._build_run_configs(
+            no_dt_gen_confings + dt_uk_gen_confings,
+            local_sync_execution_configs + local_task_execution_configs,
+            big_cores_devices,
+            [benchmark_presets.ANDROID_CPU],
+        ) + self._build_run_configs(
+            dt_only_gen_confings,
+            local_sync_execution_configs + local_task_execution_configs,
+            big_cores_devices,
+            [benchmark_presets.ANDROID_CPU_DT_ONLY],
         )
 
         return run_configs
