@@ -52,7 +52,7 @@ endif()
 # TODO(benvanik): rule for building a matrix of bitcode files.
 
 iree_bitcode_library(
-    name = "libdevice_device_aarch64_sme",
+    name = "libdevice_aarch64_sme",
     srcs = BITCODE_SRCS + ["arch/arm_64/sme_abi.c"],
     arch = "arm_64",
     internal_hdrs = BITCODE_HDRS,
@@ -75,7 +75,7 @@ iree_bitcode_library(
 c_embed_data(
     name = "libdevice_bitcode",
     srcs = [
-        ":libdevice_device_aarch64_sme.bc",
+        ":libdevice_aarch64_sme.bc",
         ":libdevice_wasm32_generic.bc",
         ":libdevice_wasm64_generic.bc",
     ],
