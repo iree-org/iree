@@ -1,5 +1,7 @@
 iree_add_all_subdirs()
 
+set (_amd_ukernel_libs)
+set (_amd_ukernel_targets)
 function(iree_rocm_bitcode_library)
   cmake_parse_arguments(
     _RULE
@@ -57,7 +59,6 @@ function(iree_rocm_bitcode_library)
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
     )
-    message("BITCODE FILE IZ: ${_BITCODE_FILE}")
   endforeach()
 
   add_custom_command(
@@ -75,15 +76,15 @@ function(iree_rocm_bitcode_library)
       "Linking bitcode to ${_OUT}"
     VERBATIM
   )
-  message("OUT IZ ${_OUT}")
+  set(_amd_ukernel_libs ${_amd_ukernel_libs} ${_BITCODE_FILE} PARENT_SCOPE)
 
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
-  message("FOUND YOU: ${_PACKAGE_NAME}_${_RULE_NAME}")
   add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
     DEPENDS "${_OUT}"
   )
+  set(_amd_ukernel_targets ${_amd_ukernel_targets} "${_PACKAGE_NAME}_${_RULE_NAME}" PARENT_SCOPE)
 endfunction()
 
 iree_rocm_bitcode_library(
@@ -93,4 +94,41 @@ iree_rocm_bitcode_library(
     gfx940
   SRCS
     "argmax_ukernel.c"
+)
+
+# Copy UKernel into platform dir.
+set(_platform_lib_reldir "iree_platform_libs/rocm")
+set(_all_ukernel_bc_copy_commands)
+set(_all_ukernel_bc_files)
+set(_ukernel_lib_srcdir "/home/stwinata/nod/iree-build-notrace/runtime/src/iree/builtins/ukernel/arch/rocm")
+foreach(_amd_ukernel_name ${_amd_ukernel_libs})
+  # Copy to lib/ tree.
+  set(_ukernel_bc_srcpath "${_ukernel_lib_srcdir}/${_amd_ukernel_name}")
+  set(_ukernel_bc_relpath "${_platform_lib_reldir}/${_amd_ukernel_name}")
+  list(APPEND _all_ukernel_bc_files "${IREE_COMPILER_DYLIB_DIR}/${_ukernel_bc_relpath}")
+  list(APPEND _all_ukernel_bc_deps "${_ukernel_bc_path}")
+  list(APPEND _all_ukernel_bc_copy_commands
+    COMMAND ${CMAKE_COMMAND} -E copy
+      "${_ukernel_bc_srcpath}"
+      "${IREE_COMPILER_DYLIB_DIR}/${_ukernel_bc_relpath}"
+  )
+
+  # Note this bc file as being part of the bundle that must be included with
+  # the compiler dylib.
+  set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_RELPATHS "${_ukernel_bc_relpath}")
+endforeach()
+
+# Generate a custom target with all file level dependencies and commands to
+# copy to our build tree locations.
+# Our GenDeviceLibs target depends on all of the defined device lib targets.
+add_custom_command(
+  OUTPUT ${_all_ukernel_bc_files}
+  DEPENDS ${_amd_ukernel_targets}
+  POST_BUILD
+    ${_all_ukernel_bc_copy_commands}
+)
+
+add_custom_target(iree_builtin_ROCM_UkernelDeviceLibs
+  DEPENDS
+    ${_all_ukernel_bc_files}
 )
