@@ -86,11 +86,22 @@ void buildGlobalOptimizationPassPipeline(
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(createGeneralizeLinalgNamedOpsPass)
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
+      // We decompose and transpose concatenations immediately before folding
+      // unit extent dims because this allows decoupling unit dims in the
+      // concatenation from the transposes that are introduced.
+      .addPass([&]() {
+        return createDecomposeConcatPass(
+            transformOptions.options.outerDimConcat);
+      })
+      // We generalize certain named ops immediately before folding unit extent
+      // dims as the unit dim folding pass updates indexing maps and is better
+      // at working with generics. By this point we have already done any
+      // specialized raising and the op names are no longer useful.
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
