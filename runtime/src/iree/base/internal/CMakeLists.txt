@@ -227,6 +227,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    memory
+  HDRS
+    "memory.h"
+  SRCS
+    "memory.c"
+  DEPS
+    ::internal
+    iree::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     path
   HDRS
     "path.h"
