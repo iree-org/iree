@@ -10,10 +10,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 
-namespace mlir::scf {
-struct SCFTilingOptions;
-} // namespace mlir::scf
-
 namespace mlir::iree_compiler {
 
 bool preferIntrinsicsOverAsm(IREE::HAL::ExecutableTargetAttr targetAttr);
@@ -42,13 +38,6 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
-
-/// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
-/// provided the corresponding tile size will be multiplied by a vector.vscale
-/// op.
-void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface consumerOp,
-                     SmallVector<int64_t> tileSizes,
-                     SmallVector<bool> tileScalableFlags);
 
 } // namespace mlir::iree_compiler
 

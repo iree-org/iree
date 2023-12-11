@@ -14,17 +14,24 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-std::optional<CastOpInterface> getDefiningNonI1CastOp(Value input) {
+std::optional<CastOpInterface> getDefiningNonI1ExtendingCastOp(Value input) {
   // Returns true if the source of cast op has i1 element type.
   auto isI1Src = [](CastOpInterface castOp) -> bool {
     auto elemType = getElementTypeOrSelf(castOp->getOperandTypes()[0]);
     return elemType.getIntOrFloatBitWidth() == 1;
   };
 
+  auto isExtending = [](CastOpInterface castOp) -> bool {
+    auto inElemType = getElementTypeOrSelf(castOp->getOperandTypes()[0]);
+    auto outElemType = getElementTypeOrSelf(castOp->getResultTypes()[0]);
+    return inElemType.getIntOrFloatBitWidth() <
+           outElemType.getIntOrFloatBitWidth();
+  };
+
   std::optional<CastOpInterface> result = std::nullopt;
   auto castOp = input.getDefiningOp<CastOpInterface>();
   if (castOp) {
-    if (!isI1Src(castOp)) {
+    if (!isI1Src(castOp) && isExtending(castOp)) {
       result = castOp;
     }
     return result;
@@ -46,14 +53,15 @@ std::optional<CastOpInterface> getDefiningNonI1CastOp(Value input) {
       castIn.cast<BlockArgument>().getArgNumber() != 0) {
     return std::nullopt;
   }
-  if (!isI1Src(castOp)) {
+  if (!isI1Src(castOp) && isExtending(castOp)) {
     result = castOp;
   }
   return result;
 }
 
 std::optional<Type> getCastElemType(Value input) {
-  std::optional<CastOpInterface> castOp = getDefiningNonI1CastOp(input);
+  std::optional<CastOpInterface> castOp =
+      getDefiningNonI1ExtendingCastOp(input);
   if (!castOp) {
     return std::nullopt;
   }
