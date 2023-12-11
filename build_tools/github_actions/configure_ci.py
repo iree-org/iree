@@ -142,7 +142,12 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
 ]
 
 # Default presets enabled in CI.
-DEFAULT_BENCHMARK_PRESET_GROUP = benchmark_presets.DEFAULT_PRESETS + ["comp-stats"]
+DEFAULT_BENCHMARK_PRESET_GROUP = [
+    preset
+    for preset in benchmark_presets.DEFAULT_PRESETS
+    # RISC-V benchmarks haven't been supported in CI workflow.
+    if preset not in [benchmark_presets.RISCV]
+] + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
 LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS
 # All available benchmark preset options including experimental presets.
