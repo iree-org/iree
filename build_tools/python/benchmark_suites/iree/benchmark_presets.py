@@ -10,6 +10,8 @@ To put a benchmark into a preset, add the preset to its `presets` field.
 
 # Default Android CPU execution benchmarks.
 ANDROID_CPU = "android-cpu"
+# Android CPU execution benchmarks with data-tiling only.
+ANDROID_CPU_DT_ONLY = "android-cpu-dt-only"
 # Default Android GPU execution benchmarks.
 ANDROID_GPU = "android-gpu"
 # Default CUDA execution benchmarks.
@@ -22,6 +24,8 @@ RISCV = "riscv"
 VULKAN_NVIDIA = "vulkan-nvidia"
 # Default x86_64 execution benchmarks.
 X86_64 = "x86_64"
+# x86_64 execution benchmarks with data-tiling only.
+X86_64_DT_ONLY = "x86_64-dt-only"
 # Large x86_64 execution benchmarks.
 X86_64_LARGE = "x86_64-large"
 
@@ -33,11 +37,13 @@ COMP_STATS_LARGE = "comp-stats-large"
 # Default execution benchmark presets.
 DEFAULT_PRESETS = [
     ANDROID_CPU,
+    ANDROID_CPU_DT_ONLY,
     ANDROID_GPU,
     CUDA,
     RISCV,
     VULKAN_NVIDIA,
     X86_64,
+    X86_64_DT_ONLY,
 ]
 # Large execution benchmark presets.
 LARGE_PRESETS = [

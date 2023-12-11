@@ -49,6 +49,11 @@ from typing import Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 import yaml
 
+# Add build_tools python dir to the search path.
+sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
+
+from benchmark_suites.iree import benchmark_presets
+
 
 # We don't get StrEnum till Python 3.11
 @enum.unique
@@ -136,18 +141,14 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_windows", ["*win32*", "*windows*", "*msvc*"]),
 ]
 
-DEFAULT_BENCHMARK_PRESET_GROUP = [
-    "cuda",
-    "x86_64",
-    "android-cpu",
-    "android-gpu",
-    "vulkan-nvidia",
-    "comp-stats",
-]
+# Default presets enabled in CI.
+DEFAULT_BENCHMARK_PRESET_GROUP = benchmark_presets.DEFAULT_PRESETS + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
-LARGE_BENCHMARK_PRESET_GROUP = ["cuda-large", "x86_64-large"]
+LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS
 # All available benchmark preset options including experimental presets.
-BENCHMARK_PRESET_OPTIONS = DEFAULT_BENCHMARK_PRESET_GROUP + LARGE_BENCHMARK_PRESET_GROUP
+BENCHMARK_PRESET_OPTIONS = (
+    benchmark_presets.ALL_EXECUTION_PRESETS + benchmark_presets.ALL_COMPILATION_PRESETS
+)
 BENCHMARK_LABEL_PREFIX = "benchmarks"
 
 PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
