@@ -94,6 +94,10 @@ createMaterializeHomogeneousEncodingsPass();
 // iree-global-opt-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
+// Create a pass to raise sequence of ops to higher level linalg.ext
+// representation.
+std::unique_ptr<Pass> createRaiseSpecialOps();
+
 // Removes tensors that have 0-extents.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();

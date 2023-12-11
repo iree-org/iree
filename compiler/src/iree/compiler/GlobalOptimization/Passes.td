@@ -102,6 +102,12 @@ def OptimizeNumerics :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
+def RaiseSpecialOps :
+    Pass<"iree-global-opt-raise-special-ops", ""> {
+  let summary = "raise special ops like softmax to the high level linalg.ext representation";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createRaiseSpecialOps()";
+}
+
 def RemoveZeroExtentTensors :
     InterfacePass<"iree-global-opt-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
   let summary = "Remove tensors that have 0-extents";

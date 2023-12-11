@@ -89,7 +89,7 @@ void buildGlobalOptimizationPassPipeline(
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
-      .addPass(IREE::Flow::createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOps)
       // We decompose and transpose concatenations immediately before folding
       // unit extent dims because this allows decoupling unit dims in the
       // concatenation from the transposes that are introduced.
@@ -163,12 +163,14 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(
       IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
 
-  // Strip std.assert & co after we perform optimizations; prior to this we
-  // may use the assertions to derive information during analysis.
-  if (transformOptions.options.stripAssertions) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(IREE::Util::createStripDebugOpsPass);
-  }
+  FunctionLikeNest(mainPassManager)
+      // After running const-eval to a fixed point and folding unit extent dims,
+      // try any new raising opportunities.
+      .addPass(createRaiseSpecialOps)
+      // Strip std.assert & co after we perform optimizations; prior to this we
+      // may use the assertions to derive information during analysis.
+      .addPredicatedPass(transformOptions.options.stripAssertions,
+                         IREE::Util::createStripDebugOpsPass);
 }
 
 namespace {

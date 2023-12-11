@@ -9,8 +9,8 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/PassDetail.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -21,7 +21,7 @@
 using namespace mlir;
 using transform_ext::StructuredOpMatcher;
 
-namespace mlir::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -806,4 +806,4 @@ std::unique_ptr<Pass> createRaiseSpecialOps() {
   return std::make_unique<RaiseSpecialOpsPass>();
 }
 
-} // namespace mlir::iree_compiler::IREE::Flow
+} // namespace mlir::iree_compiler::GlobalOptimization
