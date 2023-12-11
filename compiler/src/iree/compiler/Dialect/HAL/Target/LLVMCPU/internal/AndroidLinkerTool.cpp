@@ -14,10 +14,7 @@
 
 #define DEBUG_TYPE "llvm-linker"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 using llvm::Triple;
 
@@ -233,7 +230,4 @@ createAndroidLinkerTool(const llvm::Triple &targetTriple,
   return std::make_unique<AndroidLinkerTool>(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

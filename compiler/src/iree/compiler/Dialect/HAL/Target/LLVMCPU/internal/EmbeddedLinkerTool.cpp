@@ -14,10 +14,7 @@
 
 #define DEBUG_TYPE "llvm-linker"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Embedded ELF linker targeting IREE's ELF loader (or Android/Linux).
 // This uses lld exclusively (though it can be overridden) as that lets us
@@ -222,7 +219,4 @@ createEmbeddedLinkerTool(const llvm::Triple &targetTriple,
   return std::make_unique<EmbeddedLinkerTool>(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

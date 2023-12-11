@@ -12,8 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Constructs a pipeline of passes across multiple nested op types.
 ///
@@ -83,7 +82,6 @@ private:
 // has been made which requires another iteration. No-op otherwise.
 void signalFixedPointModified(Operation *rootOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_FUNCTIONUTILS_H_

@@ -34,10 +34,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Op utilities used within the Flow dialect
@@ -654,7 +651,7 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
   auto tensorType =
       llvm::cast<IREE::Flow::DispatchTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.getIndexAttr(dim));
@@ -804,7 +801,7 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
     // Result size matches the source size (no slicing).
     unsigned dynamicIdx = 0;
     for (int64_t dim : getType().getShape()) {
-      if (dim == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(dim)) {
         shape.push_back(getSourceDims()[dynamicIdx++]);
       } else {
         shape.push_back(b.getIndexAttr(dim));
@@ -1580,7 +1577,7 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
   unsigned dynamicIdx = 0;
   auto tensorType = llvm::cast<RankedTensorType>(getResult().getType());
   for (int64_t dim : tensorType.getShape()) {
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       shape.push_back(getDynamicDims()[dynamicIdx++]);
     } else {
       shape.push_back(b.getIndexAttr(dim));
@@ -1899,7 +1896,7 @@ void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-    mlir::RewritePatternSet &patterns, MLIRContext *context) {
+    RewritePatternSet &patterns, MLIRContext *context) {
   patterns
       .insert<FoldTensorLoadWithExtractSlice, FoldInsertSliceWithTensorStoreOp>(
           context);
@@ -2077,10 +2074,7 @@ void CollectiveSendRecvOp::build(OpBuilder &builder, OperationState &state,
         recv, builder.getIndexArrayAttr({0}));
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

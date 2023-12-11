@@ -17,9 +17,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
                                            spirv::ResourceLimitsAttr limits) {
@@ -72,6 +70,4 @@ LogicalResult setAdrenoCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

@@ -73,6 +73,7 @@ iree_cc_library(
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
+    "DecomposeSoftmax.cpp"
     "EmulateNarrowType.cpp"
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
@@ -115,9 +116,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
-    IREELinalgExtPasses
     IREELinalgExtTransforms
-    IREELinalgExtUtils
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect

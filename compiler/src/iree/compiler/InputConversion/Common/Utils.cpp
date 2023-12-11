@@ -18,8 +18,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Reduce the input value along the reduction dimensions
 Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
@@ -84,5 +83,4 @@ Value sumReduceDimensionSubset(ImplicitLocOpBuilder &rewriter, Value val,
       .getResult(0);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

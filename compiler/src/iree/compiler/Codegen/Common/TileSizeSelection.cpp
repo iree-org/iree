@@ -8,8 +8,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
     : loweringConfig(lc) {
@@ -27,7 +26,8 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   //   3. [[distribution], [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
   //   4. [[distribution], [cache-parallel], [cache-reduction],
-  //       [vector-parallel], [vector-reduction]]
+  //       [vector-common-parallel], [vector-reduction],
+  //       [vector-inner-parallel]]
   int numTileLevels = loweringConfig.getTilingLevels().size();
   switch (numTileLevels) {
   case 4:
@@ -105,9 +105,9 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
     // Distribution + vector common parallel levels + vector inner parallel
     // levels.
     return {0, 1, 3};
-  case 5:
+  case 6:
     // Distribution + cache parallel levels.
-    return {0, 1};
+    return {0, 1, 3, 5};
   default:
     llvm_unreachable("Unexpected number of tiling levels");
   }
@@ -122,5 +122,4 @@ unsigned TilingConfig::getActualLevel(TilingLevel level) {
   return actualLevel;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

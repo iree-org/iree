@@ -27,16 +27,13 @@
 
 #define DEBUG_TYPE "iree-dispatch"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 namespace {
 
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
-    if (size == mlir::ShapedType::kDynamic)
+    if (ShapedType::isDynamic(size))
       return INT64_MAX;
     product *= size;
   }
@@ -402,7 +399,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass() {
   return std::make_unique<AnnotateDispatchesPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

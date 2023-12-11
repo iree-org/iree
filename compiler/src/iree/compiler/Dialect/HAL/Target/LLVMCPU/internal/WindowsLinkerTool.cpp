@@ -13,10 +13,7 @@
 
 #define DEBUG_TYPE "llvm-linker"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Windows linker (MSVC link.exe-like); for DLL files.
 class WindowsLinkerTool : public LinkerTool {
@@ -300,7 +297,4 @@ createWindowsLinkerTool(const llvm::Triple &targetTriple,
   return std::make_unique<WindowsLinkerTool>(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -14,10 +14,7 @@
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h.inc" // IWYU pragma: export
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 namespace detail {
 struct TargetEnvAttributeStorage;
@@ -30,6 +27,8 @@ class TargetEnvAttr
                                  detail::TargetEnvAttributeStorage> {
 public:
   using Base::Base;
+
+  static constexpr StringLiteral name = "vk.target_env";
 
   /// Gets a TargetEnvAttr instance.
   // TODO(antiagainst): support other physical device core properties, physical
@@ -85,9 +84,6 @@ public:
                               CapabilitiesAttr capabilities);
 };
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan
 
 #endif // IREE_COMPILER_DIALECT_VULKAN_IR_VULKANATTRIBUTES_H_

@@ -33,10 +33,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
@@ -115,7 +112,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
 
 static PassRegistration<ConvertToHALPass> pass;
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

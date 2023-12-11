@@ -6,8 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ChangeStatus status) {
   return os << (status == ChangeStatus::CHANGED ? "changed" : "unchanged");
@@ -34,5 +33,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

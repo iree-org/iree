@@ -19,10 +19,7 @@
 //
 // =============================================================================
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static inline int64_t RoundUpToAlignment(int64_t value, int64_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
@@ -574,7 +571,4 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
   return library;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

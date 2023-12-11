@@ -13,8 +13,7 @@
 /// Include the generated interface definitions.
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.cpp.inc"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static unsigned dimToIndex(gpu::Dimension dim) {
   switch (dim) {
@@ -91,5 +90,4 @@ void registerProcessorOpInterfaceExternalModels(DialectRegistry &registry) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

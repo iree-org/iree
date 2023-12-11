@@ -11,8 +11,7 @@
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -78,5 +77,4 @@ createLLVMCPULinkExecutablesPass() {
   return std::make_unique<LLVMCPULinkExecutablesPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

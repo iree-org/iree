@@ -22,9 +22,7 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -158,28 +156,6 @@ static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   }
 
   return success();
-}
-
-static FailureOr<IREE::Flow::DispatchRegionOp>
-wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
-                                   SmallVector<Operation *> ops) {
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
-      IREE::Flow::wrapOpInDispatchRegion(rewriter, ops.back());
-  if (failed(maybeRegionOp)) {
-    return failure();
-  }
-  IREE::Flow::DispatchRegionOp regionOp = maybeRegionOp.value();
-
-  SmallVector<Operation *> precedingOps(ops.begin(), ops.end() - 1);
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedRegionOp =
-      IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
-                                                     regionOp);
-  if (failed(maybeFusedRegionOp)) {
-    return failure();
-  }
-  regionOp = maybeFusedRegionOp.value();
-
-  return regionOp;
 }
 
 static SmallVector<utils::IteratorType>
@@ -878,6 +854,4 @@ createFuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
       enableQuantizedMatmulReassociation);
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

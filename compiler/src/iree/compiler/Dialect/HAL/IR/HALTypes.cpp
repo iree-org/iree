@@ -27,10 +27,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // Enum utilities
@@ -1202,7 +1199,4 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   }
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

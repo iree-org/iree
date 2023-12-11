@@ -30,10 +30,7 @@
 
 #define DEBUG_TYPE "iree-flow-fusion-of-tensor-ops"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 // TODO: Remove this and the backing code once consteval is beyond being
 // rolled back.
@@ -510,7 +507,4 @@ createFusionOfTensorOpsPass(bool fuseMultiUse,
                                                  multiUseFusionIteration);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

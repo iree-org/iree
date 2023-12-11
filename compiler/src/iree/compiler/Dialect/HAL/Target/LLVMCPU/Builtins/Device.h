@@ -12,10 +12,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Target/TargetMachine.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Loads the libdevice bitcode file and specializes it for |targetMachine|.
 llvm::Expected<std::unique_ptr<llvm::Module>>
@@ -27,9 +24,6 @@ void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
                             llvm::Module &module,
                             llvm::TargetMachine &targetMachine);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_BUILTINS_DEVICE_H_

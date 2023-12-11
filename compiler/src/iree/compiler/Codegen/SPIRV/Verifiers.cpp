@@ -16,9 +16,7 @@
 
 #define DEBUG_TYPE "iree-spirv-verifier"
 
-namespace mlir {
-namespace iree_compiler {
-
+namespace mlir::iree_compiler {
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
 constexpr unsigned kWorkgroupTileLevel = 0;
@@ -362,5 +360,4 @@ LogicalResult verifySPIRVBaseVectorizePassPipeline(
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

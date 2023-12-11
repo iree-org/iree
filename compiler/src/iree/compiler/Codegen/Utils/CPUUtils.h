@@ -9,8 +9,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Find the root operation for the dispatch region. The priority is:
 ///   1. A Linalg operation that has reduction loops.
@@ -20,7 +19,6 @@ namespace iree_compiler {
 /// to the end of the function is the root op.
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_

@@ -11,8 +11,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 SetVector<IREE::HAL::ExecutableTargetAttr>
 gatherExecutableTargets(ArrayRef<IREE::HAL::ExecutableOp> executableOps) {
@@ -308,5 +307,4 @@ LogicalResult linkExecutablesInto(
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

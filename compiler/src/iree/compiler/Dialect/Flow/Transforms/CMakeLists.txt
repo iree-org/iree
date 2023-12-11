@@ -51,6 +51,7 @@ iree_cc_library(
     "InsertDispatchDebugTargets.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
+    "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
     "PassDetail.h"
     "Passes.cpp"

@@ -16,10 +16,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Returns the size in bytes of the global when stored in memory.
 // Valid only for globals using primitive storage.
@@ -141,7 +138,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
 
 static PassRegistration<OrdinalAllocationPass> pass;
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

@@ -10,8 +10,7 @@
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
@@ -100,5 +99,4 @@ createLLVMCPUCheckIRBeforeLLVMConversionPass() {
   return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

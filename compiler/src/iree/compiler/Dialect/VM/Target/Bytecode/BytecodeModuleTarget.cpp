@@ -43,10 +43,7 @@
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
     mlir::iree_compiler::IREE::VM::BytecodeTargetOptions);
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 namespace {
 
@@ -733,7 +730,4 @@ void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {
           "(only applies to binary targets)"));
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

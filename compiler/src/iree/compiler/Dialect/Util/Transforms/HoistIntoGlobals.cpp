@@ -19,10 +19,7 @@
 
 using llvm::dbgs;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 static llvm::cl::opt<std::string> clPrintDotGraphToFile(
@@ -329,7 +326,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
   return std::make_unique<HoistIntoGlobalsPass>(options);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

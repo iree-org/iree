@@ -19,10 +19,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 // Returns the invocation model specified on |op| or the |defaultModel|.
 static IREE::ABI::InvocationModel
@@ -722,7 +719,4 @@ createWrapEntryPointsPass(IREE::ABI::InvocationModel invocationModel) {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI

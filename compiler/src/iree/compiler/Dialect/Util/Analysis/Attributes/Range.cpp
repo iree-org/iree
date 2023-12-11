@@ -15,10 +15,7 @@
 #define DEBUG_TYPE "iree-util-attributes"
 using llvm::dbgs;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // FloatRangeStats
@@ -263,7 +260,4 @@ const std::string FloatRangeValueElement::getAsStr(AsmState &asmState) const {
   return s;
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

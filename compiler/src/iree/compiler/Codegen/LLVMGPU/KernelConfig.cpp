@@ -27,13 +27,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-
-constexpr StringLiteral kCudaTarget = "cuda";
-constexpr StringLiteral kRocmTarget = "rocm";
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -52,10 +46,10 @@ llvm::cl::opt<bool>
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
                     llvm::cl::init(false));
 
-} // namespace iree_compiler
-} // namespace mlir
-
 namespace {
+
+constexpr StringLiteral kCudaTarget = "cuda";
+constexpr StringLiteral kRocmTarget = "rocm";
 
 /// Structure to represent target features.
 struct TargetInfo {
@@ -76,6 +70,7 @@ struct TileWorkgroupSizePair {
 
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
+
 } // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -288,18 +283,21 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.
-  int nonUnitParallelDimCount = 0;
+  // Currently dynamic dimensions are tiled with size=1 in codegen.
+  int staticNonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
   for (auto mDim : contractionDims->m) {
-    nonUnitParallelDimCount += bounds[mDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[mDim] != 1 && !ShapedType::isDynamic(bounds[mDim]);
   }
   for (auto nDim : contractionDims->n) {
-    nonUnitParallelDimCount += bounds[nDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
   }
-  if (nonUnitParallelDimCount <= 1)
+  if (staticNonUnitParallelDimCount <= 1)
     return failure();
 
   // Don't consider operations that don't have a broadcast, those should go
@@ -386,9 +384,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamic &&
-                      sizeN != ShapedType::kDynamic &&
-                      sizeK != ShapedType::kDynamic;
+  bool isStaticSize = !ShapedType::isDynamic(sizeM) &&
+                      !ShapedType::isDynamic(sizeN) &&
+                      !ShapedType::isDynamic(sizeK);
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
@@ -1242,9 +1240,6 @@ static void propagateLoweringConfig(Operation *rootOperation,
   }
 }
 
-namespace mlir {
-namespace iree_compiler {
-
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
@@ -1311,5 +1306,4 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

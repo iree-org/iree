@@ -13,10 +13,7 @@
 
 #define DEBUG_TYPE "llvm-linker"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Wasm linker using wasm-ld for producing WebAssembly binaries.
 // wasm-ld behaves like traditional ELF linkers and uses similar flags.
@@ -146,7 +143,4 @@ createWasmLinkerTool(const llvm::Triple &targetTriple,
   return std::make_unique<WasmLinkerTool>(targetTriple, targetOptions);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -16,9 +16,7 @@
 #include "torch-iree/InputConversion/Passes.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
@@ -205,6 +203,4 @@ createConvertTMTensorToLinalgExtPass() {
   return std::make_unique<ConvertTMTensorToLinalgExtPass>();
 }
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput

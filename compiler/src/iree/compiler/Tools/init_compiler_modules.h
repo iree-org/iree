@@ -9,8 +9,7 @@
 
 #include "iree/compiler/Modules/Check/IR/CheckDialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Add all the IREE compiler module dialects to the provided registry.
 inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
@@ -19,7 +18,6 @@ inline void registerIreeCompilerModuleDialects(DialectRegistry &registry) {
   // clang-format on
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_TOOLS_INIT_COMPILER_MODULES_H_

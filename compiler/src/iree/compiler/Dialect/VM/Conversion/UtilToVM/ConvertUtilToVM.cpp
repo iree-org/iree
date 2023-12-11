@@ -17,8 +17,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
@@ -125,5 +124,4 @@ void populateUtilToVMPatterns(MLIRContext *context,
                                  patterns);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

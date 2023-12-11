@@ -12,10 +12,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace TFLite {
+namespace mlir::iree_compiler::IREE::TFLite {
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -41,9 +38,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createWrapEntryPointsPass();
 
 inline void registerPasses() { createWrapEntryPointsPass(); }
 
-} // namespace TFLite
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::TFLite
 
 #endif // IREE_COMPILER_BINDINGS_TFLITE_TRANSFORMS_PASSES_H_

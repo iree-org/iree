@@ -12,10 +12,7 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Note: even if the llvm::Expected status is successful, the enclosed pointer
 // may still be null, indicating that the file was not found.
@@ -122,7 +119,4 @@ loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
   return loadUKernelBitcodeFile(filename, context);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

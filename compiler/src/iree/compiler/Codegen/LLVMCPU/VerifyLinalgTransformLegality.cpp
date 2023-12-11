@@ -12,8 +12,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 struct VerifyLinalgTransformLegalityPass
@@ -42,5 +41,4 @@ createVerifyLinalgTransformLegalityPass() {
   return std::make_unique<VerifyLinalgTransformLegalityPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

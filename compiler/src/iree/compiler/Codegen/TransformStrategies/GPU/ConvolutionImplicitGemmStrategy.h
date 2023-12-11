@@ -16,13 +16,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace llvm {
-class raw_ostream;
-}
-
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct GPUModel;
 
@@ -165,8 +159,6 @@ void buildConvolutionImplicitGemmStrategy(ImplicitLocOpBuilder &b,
                                           Value variantH,
                                           const ImplicitGemmStrategy &strategy);
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_CONVOLUTION_IMPLICIT_GEMM_STRATEGY_H_

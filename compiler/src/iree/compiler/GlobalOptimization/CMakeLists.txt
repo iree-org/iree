@@ -42,11 +42,13 @@ iree_cc_library(
   SRCS
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
+    "DecomposeConcat.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
+    "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"
     "LiftGenericToTransposeBatchMatmul.cpp"

@@ -16,10 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Inline {
 
 //===----------------------------------------------------------------------===//
@@ -57,9 +54,6 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 void registerHALInlinePasses();
 
 } // namespace Inline
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASSES_H_

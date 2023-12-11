@@ -17,10 +17,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
                                    StringRef filePath, llvm::raw_ostream &os) {
@@ -111,7 +108,4 @@ static PassRegistration<DumpExecutableSourcesPass> pass([] {
   return std::make_unique<DumpExecutableSourcesPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

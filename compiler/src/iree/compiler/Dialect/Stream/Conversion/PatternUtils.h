@@ -11,8 +11,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // https://reviews.llvm.org/D111620 broke 1->N type expansion during dialect
 // conversion. It inserts unrealized_conversion_casts but then passes the
@@ -29,7 +28,6 @@ struct ConvertedTensor {
 ConvertedTensor consumeTensorOperand(Location loc, Value operand,
                                      OpBuilder &builder);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_PATTERN_UTILS_H_

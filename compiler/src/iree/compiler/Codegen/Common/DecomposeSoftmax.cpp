@@ -4,27 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler {
 
 namespace {
 
-std::tuple<SmallVector<utils::IteratorType>, SmallVector<AffineMap>>
+static std::tuple<SmallVector<utils::IteratorType>, SmallVector<AffineMap>>
 computeIteratorTypesAndIndexingMaps(int64_t inputRank, int64_t dim,
                                     OpBuilder &builder,
                                     bool allParallel = false) {
@@ -116,7 +109,7 @@ static Value computeSoftmax(Value numerator, Value denominator, Value output,
 /// 4. Divide z and l. This gives the N-dimensional softmax.
 ///    softmax = z / l
 ///
-LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
+static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;
   SmallVector<Operation *> softmaxOpsToDecompose;
@@ -177,8 +170,7 @@ LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
 
 struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<linalg::LinalgDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -194,7 +186,4 @@ std::unique_ptr<Pass> createDecomposeSoftmaxPass() {
   return std::make_unique<DecomposeSoftmaxPass>();
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

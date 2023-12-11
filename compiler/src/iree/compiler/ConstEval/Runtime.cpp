@@ -15,9 +15,7 @@
 #define DEBUG_TYPE "iree-const-eval"
 using llvm::dbgs;
 
-namespace mlir {
-namespace iree_compiler {
-namespace ConstEval {
+namespace mlir::iree_compiler::ConstEval {
 
 namespace {
 
@@ -496,6 +494,4 @@ Runtime &Runtime::getInstance() {
   return instance;
 }
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval

@@ -29,10 +29,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // TODO(antiagainst): Enable option categories once the following bug is
@@ -419,7 +416,4 @@ void registerVulkanSPIRVTargetBackends(
                                                  backendFactory);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

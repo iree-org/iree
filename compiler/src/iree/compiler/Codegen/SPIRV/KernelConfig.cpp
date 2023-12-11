@@ -40,8 +40,7 @@ constexpr unsigned numTilesPerSubgroupDimK = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
@@ -1879,5 +1878,4 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

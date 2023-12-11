@@ -11,8 +11,7 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 #define GEN_PASS_REGISTRATION
@@ -38,5 +37,4 @@ void registerCommonInputConversionPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

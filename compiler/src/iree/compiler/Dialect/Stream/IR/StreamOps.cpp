@@ -28,10 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Op utilities used within the stream dialect
@@ -3727,10 +3724,7 @@ YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
   return getResourceOperandsMutable();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

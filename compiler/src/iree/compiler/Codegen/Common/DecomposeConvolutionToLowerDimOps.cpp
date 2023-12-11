@@ -12,8 +12,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -40,5 +39,4 @@ std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass() {
   return std::make_unique<DecomposeConvolutionToLowerDimOpsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

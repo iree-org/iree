@@ -78,6 +78,19 @@ provide the means for further customization. This will be extended over time:
   provide a `DialectRegistry` and configure appropriate context hooks for
   configuring MLIR prior to any parsing or operation creation.
 
+HAL targets:
+
+* `populateHALTargetBackends()`
+
+Input dialects:
+
+* `extendCustomInputConversionPassPipeline()`: Called to extend a pass pipeline
+  with conversion passes for a given conversion type.
+* `populateCustomInputConversionTypes()`: Called to get a list of all
+  conversion types this plugin _can_ support.
+* `populateDetectedCustomInputConversionTypes()`: Called to get a list of all
+  conversion types this plugin _found_ within a given module
+
 Less frequently used extension points:
 
 * `static globalInitialize()` : Perform once-only process level initialization,
@@ -90,9 +103,9 @@ Less frequently used extension points:
 
 ## Current Status
 
-* Statically linked, named plugins are supported in CMake. A mechanism has
-  not been created for Bazel (which will just always appear to have no
-  plugins).
+* Statically linked, named plugins are supported in CMake (with optional
+  inclusion).
+* Statically linked, named plugins are hardcoded in Bazel (no optionality).
 * An example in-tree plugin is under `compiler/plugins/example`.
 * See `iree_compiler_plugin.cmake` for the CMake integration. Specifically,
   the `-DIREE_COMPILER_PLUGINS=example` flag can be used to statically link

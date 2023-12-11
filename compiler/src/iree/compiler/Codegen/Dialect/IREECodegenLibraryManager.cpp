@@ -7,10 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Codegen {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 FailureOr<ModuleOp>
 IREECodegenDialect::getOrLoadTransformLibraryModule(std::string libraryPath) {
@@ -41,7 +38,4 @@ IREECodegenDialect::getOrLoadTransformLibraryModule(std::string libraryPath) {
   return *libraryModules[libraryPath];
 }
 
-} // namespace Codegen
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Codegen

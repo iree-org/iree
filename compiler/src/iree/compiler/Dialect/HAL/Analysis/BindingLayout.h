@@ -13,10 +13,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 struct DescriptorSetLayoutBinding {
   // Ordinal of the descriptor within its parent set layout.
@@ -81,9 +78,6 @@ private:
   ExportLayoutMap exportLayouts;
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_

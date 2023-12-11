@@ -554,7 +554,7 @@ struct ScanOpConversion final
       if (i == reduceAxis)
         continue;
       initDims.push_back(input0Ty.getDimSize(i));
-      if (initDims.back() == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(initDims.back())) {
         initDynDims.push_back(
             rewriter.createOrFold<tensor::DimOp>(op.getLoc(), input0, i));
       }

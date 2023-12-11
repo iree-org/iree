@@ -23,8 +23,8 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 // Erases an op. This should only be used for ops that are legalized away
@@ -187,5 +187,4 @@ void populateVMVXToVMPatterns(MLIRContext *context,
                   UnaryOpConversion>(context, importSymbols, typeConverter);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

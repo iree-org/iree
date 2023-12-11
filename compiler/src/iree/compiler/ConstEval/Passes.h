@@ -10,12 +10,11 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE::HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 class TargetBackendRegistry;
-} // namespace IREE::HAL
-namespace ConstEval {
+} // namespace mlir::iree_compiler::IREE::HAL
+
+namespace mlir::iree_compiler::ConstEval {
 
 /// Creates a pass which uses the compiler and runtime to Jit global
 /// initializers eligible for optimization and uses the actual results to
@@ -29,8 +28,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass();
 
 void registerConstEvalPasses();
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval
 
 #endif // IREE_COMPILER_CONSTEVAL_PASSES_H_

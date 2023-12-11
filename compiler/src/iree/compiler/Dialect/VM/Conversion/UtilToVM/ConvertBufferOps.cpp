@@ -17,8 +17,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 static Value castToI64(Value value, OpBuilder &builder) {
@@ -355,5 +355,4 @@ void populateUtilBufferToVMPatterns(MLIRContext *context,
   patterns.insert<BufferStoreOpConversion>(typeConverter, context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

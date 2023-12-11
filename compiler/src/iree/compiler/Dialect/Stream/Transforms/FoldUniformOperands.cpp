@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
@@ -25,10 +24,11 @@
 
 #define DEBUG_TYPE "iree-stream-fold-uniform-operands"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_FOLDUNIFORMOPERANDSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -254,19 +254,12 @@ inlineUniformConstants(mlir::func::FuncOp funcOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-specialize-dispatches
+// --iree-stream-specialize-dispatches
 //===----------------------------------------------------------------------===//
 
-class FoldUniformOperandsPass
-    : public FoldUniformOperandsBase<FoldUniformOperandsPass> {
-public:
-  FoldUniformOperandsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-  }
-
+struct FoldUniformOperandsPass
+    : public IREE::Stream::impl::FoldUniformOperandsPassBase<
+          FoldUniformOperandsPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
@@ -308,11 +301,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldUniformOperandsPass() {
-  return std::make_unique<FoldUniformOperandsPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -33,8 +33,7 @@
 #include "iree/compiler/Modules/IO/Parameters/IR/IOParametersDialect.h"
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Add all the IREE dialects to the provided registry.
 inline void registerIreeDialects(DialectRegistry &registry) {
@@ -62,7 +61,6 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   registerUKernelBufferizationInterface(registry);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_TOOLS_INIT_IREE_DIALECTS_H_

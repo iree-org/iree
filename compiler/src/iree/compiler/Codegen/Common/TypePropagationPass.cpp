@@ -37,8 +37,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Insert instructions to convert from one element type to another.
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
@@ -628,5 +627,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass() {
   return std::make_unique<TypePropagationPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

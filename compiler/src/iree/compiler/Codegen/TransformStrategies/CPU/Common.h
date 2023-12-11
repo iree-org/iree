@@ -12,9 +12,7 @@
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace cpu {
+namespace mlir::iree_compiler::cpu {
 
 //===----------------------------------------------------------------------===//
 // Mid-level problem-specific strategy builder APIs, follow MLIR-style builders.
@@ -53,8 +51,7 @@ struct CPUModel {
 LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
                                            linalg::LinalgOp op,
                                            const CPUModel &cpuModel);
-} // namespace cpu
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler::cpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_

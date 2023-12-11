@@ -33,10 +33,7 @@
 
 #define DEBUG_TYPE "iree-flow-collapse-dimensions"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 /// Pass declaration.
@@ -328,7 +325,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
       int64_t staticCollapsedShape = 1;
       SmallVector<OpFoldResult> dynamicCollapsedDims;
       for (auto collapsedDim : reassociation[index]) {
-        if (expandedShape[collapsedDim] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(expandedShape[collapsedDim])) {
           dynamicCollapsedDims.push_back(dynamicDimsList.front());
           dynamicDimsList = dynamicDimsList.drop_front();
         } else {
@@ -486,7 +483,4 @@ createCollapseDimensionsPass() {
   return std::make_unique<CollapseDimensionsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

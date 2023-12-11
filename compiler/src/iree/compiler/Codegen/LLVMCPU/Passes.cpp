@@ -24,8 +24,7 @@
 
 #define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
@@ -135,6 +134,11 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                                 CPUDoubleTilingPadExpert);
   }
 
+  if (tilingConfig.getNumTilingLevels() == 6) {
+    // TODO: update verification.
+    return success();
+  }
+
   if (tilingConfig.getNumTilingLevels() != 4) {
     return op->emitOpError("expected four tiling levels, got ")
            << tilingConfig.getNumTilingLevels();
@@ -201,6 +205,11 @@ LogicalResult verifyConvTileAndDecomposeExpertConfig(
     ArrayRef<int64_t> workgroupSize) {
   if (!isa<linalg::ConvolutionOpInterface>(op))
     return success();
+
+  if (tilingConfig.getNumTilingLevels() == 6) {
+    // TODO: update verification.
+    return success();
+  }
 
   if (tilingConfig.getNumTilingLevels() != 4) {
     return op->emitOpError("expected four tiling levels, got ")
@@ -773,5 +782,4 @@ void registerCodegenLLVMCPUPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

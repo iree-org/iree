@@ -27,8 +27,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -4545,8 +4544,7 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
 #undef ADD_GLOBAL_STORE_PATTERN
 }
 
-namespace IREE {
-namespace VM {
+namespace IREE::VM {
 
 namespace {
 
@@ -4688,10 +4686,8 @@ createConvertVMToEmitCPass() {
   return std::make_unique<ConvertVMToEmitCPass>();
 }
 
-} // namespace VM
-} // namespace IREE
+} // namespace IREE::VM
 
 static PassRegistration<IREE::VM::ConvertVMToEmitCPass> pass;
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -21,6 +21,17 @@ def Convert1X1FilterConv2DToMatmul:
   let constructor = "mlir::iree_compiler::GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass()";
 }
 
+def DecomposeConcat :
+    Pass<"iree-global-opt-decompose-concat", ""> {
+  let summary = "Decomposes concatenations into a destination and a sequence of slice inserts";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createDecomposeConcatPass()";
+  let options = [
+    Option<"enableConcatTransposition", "enable-concat-transposition", "bool",
+           /*default=*/"false", "Allows transposing concatenations such that "
+                                "they occur on the inner most dims">,
+  ];
+}
+
 def DetachElementwiseFromNamedOps :
     Pass<"iree-global-opt-detach-elementwise-from-named-ops", ""> {
   let summary = "Detaches elementwise ops from named Linalg ops";
@@ -52,6 +63,12 @@ def FuseDequantizationMatmul:
     Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation", "bool",
            /*default=*/"false", "Allow reassociation of quantized matmuls (experimental)">,
   ];
+}
+
+def FuseSiluHorizontalMatmul:
+    InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Fuse matmul ops and silu linalg.generic op";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseSiluHorizontalMatmulPass()";
 }
 
 def GeneralizeLinalgNamedOps :

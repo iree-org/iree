@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
@@ -28,10 +27,11 @@
 
 #define DEBUG_TYPE "iree-stream-annotate-dispatch-arguments"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_ANNOTATEDISPATCHARGUMENTSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -538,18 +538,12 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-specialize-dispatches
+// --iree-stream-specialize-dispatches
 //===----------------------------------------------------------------------===//
 
-class AnnotateDispatchArgumentsPass
-    : public AnnotateDispatchArgumentsBase<AnnotateDispatchArgumentsPass> {
-public:
-  AnnotateDispatchArgumentsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Stream::StreamDialect>();
-  }
-
+struct AnnotateDispatchArgumentsPass
+    : public IREE::Stream::impl::AnnotateDispatchArgumentsPassBase<
+          AnnotateDispatchArgumentsPass> {
   void runOnOperation() override {
     // Perform argument value analysis.
     ArgumentAnalysis analysis(getOperation());
@@ -570,12 +564,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createAnnotateDispatchArgumentsPass() {
-  return std::make_unique<AnnotateDispatchArgumentsPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

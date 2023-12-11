@@ -15,8 +15,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // SSA value liveness analysis.
 // Used to compute live ranges of values over all ops within a function CFG.
@@ -97,7 +96,6 @@ private:
   DenseMap<Value, llvm::BitVector> liveRanges_;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_ANALYSIS_VALUELIVENESS_H_

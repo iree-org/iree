@@ -13,8 +13,8 @@
 #include "mlir/TableGen/GenInfo.h"
 #include "mlir/TableGen/Operator.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 using ::llvm::formatv;
@@ -100,5 +100,5 @@ static GenRegistration
                        });
 
 } // namespace
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler

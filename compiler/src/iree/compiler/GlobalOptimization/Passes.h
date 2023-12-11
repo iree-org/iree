@@ -15,9 +15,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 // We have a layer of indirection around the GlobalOptimizationOptions because
 // we also need a reference to the const-eval builder, which is injected
@@ -50,6 +48,10 @@ std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 // linalg.matmul
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
+// A pass to fuse dequantization and matmul linalg.generic ops
+std::unique_ptr<Pass>
+createDecomposeConcatPass(bool enableConcatTransposition = false);
+
 // Create a pass to detach elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
@@ -69,6 +71,10 @@ std::unique_ptr<Pass> createExpandVectorsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
     bool enableQuantizedMatmulReassociation = false);
+
+// A pass to fuse two matmul ops and a linalg.generic Silu op
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseSiluHorizontalMatmulPass();
 
 // Create a pass that generalizes some named Linalg ops into `linalg.generic`
 // operations since the IREE compiler can handle that better.
@@ -101,8 +107,6 @@ std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
 
 void registerGlobalOptimizationPipeline();
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES_H_

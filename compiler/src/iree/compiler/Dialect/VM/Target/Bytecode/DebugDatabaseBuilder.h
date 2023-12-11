@@ -13,10 +13,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 struct BytecodeLocation {
   int32_t bytecodeOffset;
@@ -42,9 +39,6 @@ private:
   SmallVector<FunctionSourceMap> functionSourceMaps;
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_DEBUGDATABASEBUILDER_H_

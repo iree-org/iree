@@ -24,8 +24,8 @@
 
 #define DEBUG_TYPE "iree-llvmgpu-cast-address-space-function"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 struct LLVMGPUCastAddressSpaceFunctionPass
@@ -81,6 +81,7 @@ struct LLVMGPUCastAddressSpaceFunctionPass
     });
   }
 };
+
 } // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -88,5 +89,4 @@ createLLVMGPUCastAddressSpaceFunction() {
   return std::make_unique<LLVMGPUCastAddressSpaceFunctionPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

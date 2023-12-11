@@ -13,10 +13,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace TFLite {
+namespace mlir::iree_compiler::IREE::TFLite {
 
 void buildTransformPassPipeline(OpPassManager &passManager) {
   // Wraps the entry points in a "_tflite_xx" function and adds shape support.
@@ -38,7 +35,4 @@ void registerTransformPassPipeline() {
       });
 }
 
-} // namespace TFLite
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::TFLite

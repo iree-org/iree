@@ -17,11 +17,10 @@
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
-
 class ModuleOp;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace ConstEval {
+namespace mlir::iree_compiler::ConstEval {
 
 // Abstract base class for a compiled binary.
 class CompiledBinary {
@@ -100,8 +99,6 @@ private:
   ~Runtime();
 };
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval
 
 #endif // IREE_COMPILER_CONSTEVAL_RUNTIME_H_

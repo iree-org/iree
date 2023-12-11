@@ -14,9 +14,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct GPUModel;
 
@@ -190,8 +188,6 @@ void buildPipelineSharedMemoryCopies(ImplicitLocOpBuilder &b, Value funcH,
 
 Value buildBufferize(ImplicitLocOpBuilder &b, Value variantH);
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COMMON_H_

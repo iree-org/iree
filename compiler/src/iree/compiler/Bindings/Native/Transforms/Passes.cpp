@@ -13,10 +13,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 void buildTransformPassPipeline(OpPassManager &passManager,
                                 const InvocationOptions &invocationOptions) {
@@ -45,7 +42,4 @@ void registerTransformPassPipeline() {
       });
 }
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI

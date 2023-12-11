@@ -25,8 +25,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 extern void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                              SymbolTable &importSymbols,
@@ -156,5 +155,4 @@ static PassRegistration<ConvertHALToVMPass> pass([] {
   return std::make_unique<ConvertHALToVMPass>(options);
 });
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

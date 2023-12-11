@@ -15,14 +15,14 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
 
@@ -176,6 +176,13 @@ isTiledAndDistributedLoop(scf::ForOp forOp);
 SmallVector<LoopTilingAndDistributionInfo>
 getTiledAndDistributedLoopInfo(func::FuncOp funcOp);
 
+/// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
+/// provided the corresponding tile size will be multiplied by a vector.vscale
+/// op.
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
+                     ArrayRef<int64_t> tileSizes,
+                     ArrayRef<bool> tileScalableFlags);
+
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
 
@@ -212,7 +219,6 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

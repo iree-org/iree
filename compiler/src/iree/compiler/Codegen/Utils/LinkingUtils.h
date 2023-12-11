@@ -10,8 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Returns a uniqued set of all targets in |executableOps|.
 SetVector<IREE::HAL::ExecutableTargetAttr>
@@ -51,7 +50,6 @@ LogicalResult linkExecutablesInto(
                                 DenseMap<StringRef, Operation *> &symbolMap)>
         mergeInnerModuleFn);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_LINKINGUTILS_H_

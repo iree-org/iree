@@ -19,10 +19,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 class LinkTargetExecutablesPass
     : public PassWrapper<LinkTargetExecutablesPass,
@@ -138,7 +135,4 @@ static PassRegistration<LinkExecutablesPass> linkPass([] {
       TargetBackendRegistry::getGlobal());
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

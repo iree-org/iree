@@ -10,8 +10,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -237,5 +236,4 @@ verifyGPUMatmulPipeline(Operation *op,
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -13,9 +13,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
@@ -23,6 +21,16 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
+    llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
+    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
+    llvm::cl::desc(
+        "Enables fusing specifically structured matmuls (experimental)."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableExpandVectors(
+    "iree-global-opt-enable-expand-vectors",
+    llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
     llvm::cl::init(false));
 
 void buildGlobalOptExprHoistingPassPipeline(
@@ -78,12 +86,25 @@ void buildGlobalOptimizationPassPipeline(
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(createGeneralizeLinalgNamedOpsPass)
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
       .addPass(IREE::Flow::createRaiseSpecialOps)
+      // We decompose and transpose concatenations immediately before folding
+      // unit extent dims because this allows decoupling unit dims in the
+      // concatenation from the transposes that are introduced.
+      .addPass([&]() {
+        return createDecomposeConcatPass(
+            transformOptions.options.outerDimConcat);
+      })
+      // We generalize certain named ops immediately before folding unit extent
+      // dims as the unit dim folding pass updates indexing maps and is better
+      // at working with generics. By this point we have already done any
+      // specialized raising and the op names are no longer useful.
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
+                         createFuseSiluHorizontalMatmulPass)
       .addPass([&]() {
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
@@ -95,7 +116,9 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-    mainPassManager.addPass(createExpandVectorsPass());
+    if (clEnableExpandVectors) {
+      mainPassManager.addPass(createExpandVectorsPass());
+    }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
@@ -176,6 +199,4 @@ void registerGlobalOptimizationPipeline() {
           });
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

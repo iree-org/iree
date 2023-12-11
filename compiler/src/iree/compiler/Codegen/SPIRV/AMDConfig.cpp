@@ -21,9 +21,7 @@
 
 #define DEBUG_TYPE "iree-spirv-amd-config"
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 constexpr unsigned AMDSimtSoftwarePipelineDepth = 2;
 constexpr unsigned AMDSimtSoftwarePipelineStoreStage = 0;
@@ -98,6 +96,4 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

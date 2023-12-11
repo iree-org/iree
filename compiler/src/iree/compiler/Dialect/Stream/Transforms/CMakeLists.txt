@@ -31,7 +31,6 @@ iree_cc_library(
     "MaterializeCopyOnWrite.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
-    "PassDetail.h"
     "Passes.cpp"
     "PropagateTimepoints.cpp"
     "RefineUsage.cpp"

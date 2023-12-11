@@ -15,8 +15,7 @@
 #define DEBUG_TYPE "vmvx-kernel-dispatch"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 constexpr int kDefaultDistTileSize = 64;
 
@@ -138,5 +137,4 @@ LogicalResult initVMVXLaunchConfig(ModuleOp moduleOp) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
