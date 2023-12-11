@@ -56,8 +56,8 @@ namespace mlir::iree_compiler {
 
 /// Tiles LinalgOp to target invocations.
 static LogicalResult
-tileToInvocationPatterns(func::FuncOp funcOp,
-                         const linalg::TileSizeComputationFunction &computeFn) {
+tileToInvocation(func::FuncOp funcOp,
+                 const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -174,7 +174,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
     return signalPassFailure();
 
   { // Tile and distribute to invocations.
-    if (failed(tileToInvocationPatterns(funcOp, *threadTileComputeFn))) {
+    if (failed(tileToInvocation(funcOp, *threadTileComputeFn))) {
       funcOp.emitOpError() << "failure in tiling to invocations";
       return signalPassFailure();
     }
