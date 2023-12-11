@@ -345,7 +345,7 @@ iree_status_t iree_hal_vulkan_native_executable_create(
                                 shader_module_count * sizeof(VkShaderModule),
                                 (void**)&shader_modules));
 
-  // Create all sharder modules.
+  // Create all shader modules.
   // TODO: perform the shader module creation in multiple threaded manner.
   iree_status_t status = iree_ok_status();
   for (size_t i = 0; i < shader_module_count; ++i) {
