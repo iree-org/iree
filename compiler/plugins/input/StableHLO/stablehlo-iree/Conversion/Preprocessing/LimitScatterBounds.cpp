@@ -67,9 +67,9 @@ LogicalResult replaceScatter(mlir::stablehlo::ScatterOp op) {
   llvm::SmallVector<Value> windowBounds;
   {
     int j = 0;
-    for (auto it : llvm::enumerate(isUpdatedWindowDim)) {
-      Value dstSz = b.create<tensor::DimOp>(dest, it.index());
-      if (!it.value()) {
+    for (auto [idx, val] : llvm::enumerate(isUpdatedWindowDim)) {
+      Value dstSz = b.create<tensor::DimOp>(dest, idx);
+      if (!val) {
         windowBounds.push_back(
             b.create<arith::SubIOp>(b.getIndexType(), dstSz, oneIdx));
         continue;
