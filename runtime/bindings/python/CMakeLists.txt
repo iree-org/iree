@@ -97,6 +97,7 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::io::scope_map
   iree::modules::io::parameters
   iree::modules::hal
+  iree::schemas::parameter_archive
   iree::tooling::device_util
   iree::tooling::modules
   iree::vm
@@ -132,6 +133,7 @@ iree_py_library(
     "iree/runtime/benchmark.py"
     "iree/runtime/flags.py"
     "iree/runtime/function.py"
+    "iree/runtime/io.py"
     "iree/runtime/system_api.py"
     "iree/runtime/system_setup.py"
     "iree/runtime/tracing.py"
