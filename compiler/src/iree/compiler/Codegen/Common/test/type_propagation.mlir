@@ -460,7 +460,7 @@ func.func @sort_secondary() {
 //   CHECK-DAG:   %[[A_TENSOR:.+]] = flow.dispatch.tensor.load %[[A]]
 //   CHECK-DAG:   %[[B_TENSOR:.+]] = flow.dispatch.tensor.load %[[B]]
 //       CHECK:   %[[SORT:.+]]:2 = iree_linalg_ext.sort dimension(0)
-//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi32>, tensor<1xi8>) 
+//  CHECK-SAME:       outs(%[[A_TENSOR]], %[[B_TENSOR]] : tensor<1xi32>, tensor<1xi8>)
 //  CHECK-NEXT:     ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: i32, %[[ARG1:[a-zA-Z0-9]+]]: i32, %[[ARG2:[a-zA-Z0-9]+]]: i8, %[[ARG3:[a-zA-Z0-9]+]]: i8)
 //   CHECK-DAG:       %[[CMPI:.+]] = arith.cmpi ult, %[[ARG0]], %[[ARG1]] : i32
 //       CHECK:       iree_linalg_ext.yield %[[CMPI]]

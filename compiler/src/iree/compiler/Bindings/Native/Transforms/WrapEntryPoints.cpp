@@ -19,10 +19,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 // Returns the invocation model specified on |op| or the |defaultModel|.
 static IREE::ABI::InvocationModel
@@ -294,6 +291,102 @@ static LogicalResult wrapImportFunc(IREE::ABI::InvocationModel invocationModel,
   return success();
 }
 
+static StringAttr getNameFromDictAttr(DictionaryAttr attr) {
+  return attr ? attr.getAs<StringAttr>("iree.abi.name") : nullptr;
+}
+
+static StringAttr inferArgumentName(MLIRContext *context, int index,
+                                    DictionaryAttr attrs) {
+  if (auto attrName = getNameFromDictAttr(attrs))
+    return attrName;
+  return StringAttr::get(context, "input" + std::to_string(index));
+}
+
+static StringAttr inferResultName(MLIRContext *context, int index,
+                                  DictionaryAttr attrs) {
+  if (auto attrName = getNameFromDictAttr(attrs))
+    return attrName;
+  return StringAttr::get(context, "output" + std::to_string(index));
+}
+
+static DictionaryAttr getIOAttr(ArrayAttr allAttrs, unsigned i) {
+  if (!allAttrs)
+    return nullptr;
+  return cast_or_null<DictionaryAttr>(allAttrs.getValue()[i]);
+}
+
+static void formatIOAttr(DictionaryAttr attrs, llvm::raw_ostream &os) {
+  if (!attrs || attrs.empty())
+    return;
+  auto shouldIncludeAttr = [](const NamedAttribute &attr) {
+    return attr.getName().getValue() != "iree.abi.name";
+  };
+  if (!llvm::any_of(attrs, shouldIncludeAttr))
+    return;
+  os << " {";
+  llvm::interleaveComma(llvm::make_filter_range(attrs, shouldIncludeAttr), os,
+                        [&](auto argAttr) {
+                          os << argAttr.getName().getValue();
+                          os << " = ";
+                          os << argAttr.getValue();
+                        });
+  os << "}";
+}
+
+// Returns a string representing the |exportOp| in a human-friendly way.
+// This doesn't have to match the exact MLIR (though could) as the intent is for
+// it to be helpful instead of something a user could compile. This means we
+// want to bake away argument/result attributes if we can do something
+// meaningful with them (like names).
+static StringAttr
+formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
+                        func::FuncOp exportOp, StringRef publicName,
+                        ArrayAttr allArgAttrs, ArrayAttr allResultAttrs) {
+  std::string decl;
+  llvm::raw_string_ostream os(decl);
+  switch (invocationModel) {
+  default:
+    assert(false && "unhandled invocation model");
+    break;
+  case IREE::ABI::InvocationModel::Sync:
+    os << "sync ";
+    break;
+  case IREE::ABI::InvocationModel::CoarseFences:
+    os << "async ";
+    break;
+  }
+  os << "func @" << publicName;
+  os << "(";
+  for (auto arg : exportOp.getArguments()) {
+    if (arg.getArgNumber() > 0)
+      os << ", ";
+    os << "%";
+    os << inferArgumentName(exportOp.getContext(), arg.getArgNumber(),
+                            getIOAttr(allArgAttrs, arg.getArgNumber()))
+              .getValue();
+    os << ": " << arg.getType();
+    if (auto argAttrs = getIOAttr(allArgAttrs, arg.getArgNumber())) {
+      formatIOAttr(argAttrs, os);
+    }
+  }
+  os << ") -> (";
+  for (auto [resultNumber, resultType] :
+       llvm::enumerate(exportOp.getResultTypes())) {
+    if (resultNumber > 0)
+      os << ", ";
+    os << "%";
+    os << inferResultName(exportOp.getContext(), resultNumber,
+                          getIOAttr(allResultAttrs, resultNumber))
+              .getValue();
+    os << ": " << resultType;
+    if (auto resultAttrs = getIOAttr(allResultAttrs, resultNumber)) {
+      formatIOAttr(resultAttrs, os);
+    }
+  }
+  os << ")";
+  return StringAttr::get(exportOp.getContext(), decl);
+}
+
 // Populates attributes on |wrapperOp| to support runtime reflection.
 // These are attached to the exported function and can be queried at runtime
 // with iree_vm_function_lookup_attr_by_name.
@@ -317,32 +410,24 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
     break;
   }
 
+  // If not provided by the user add the source declaration as the MLIR type.
+  // Users in source frontends can override this with something more natural
+  // (python/whatever).
+  if (auto declAttr = exportOp->getAttr("iree.abi.declaration")) {
+    attrs.emplace_back(StringAttr::get(context, "iree.abi.declaration"),
+                       declAttr);
+  } else {
+    attrs.emplace_back(StringAttr::get(context, "iree.abi.declaration"),
+                       formatSourceDeclaration(invocationModel, exportOp,
+                                               wrapperOp.getName(),
+                                               exportOp.getAllArgAttrs(),
+                                               exportOp.getAllResultAttrs()));
+  }
+
   if (!attrs.empty()) {
     auto reflectionAttr = DictionaryAttr::get(context, attrs);
     wrapperOp->setAttr("iree.reflection", reflectionAttr);
   }
-}
-
-static StringAttr getNameFromDictAttr(DictionaryAttr attr, Builder &builder) {
-  // TODO(benvanik): support naming. We could look for iree.abi.name or some
-  // other attribute that gets populated by frontends.
-  return nullptr;
-}
-
-static StringAttr inferArgumentName(int index, ArrayRef<DictionaryAttr> attrs,
-                                    Builder &builder) {
-  if (auto attrName = getNameFromDictAttr(attrs[index], builder)) {
-    return attrName;
-  }
-  return builder.getStringAttr("input " + std::to_string(index));
-}
-
-static StringAttr inferResultName(int index, ArrayRef<DictionaryAttr> attrs,
-                                  Builder &builder) {
-  if (auto attrName = getNameFromDictAttr(attrs[index], builder)) {
-    return attrName;
-  }
-  return builder.getStringAttr("output " + std::to_string(index));
 }
 
 // Creates the corresponding wrapper function for the given export function.
@@ -450,7 +535,8 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
       auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), oldType, arg,
           encoding ? encoding : TypeAttr::get(oldType), waitFence,
-          inferArgumentName(argIndex, argAttrDict, entryBuilder));
+          inferArgumentName(entryBuilder.getContext(), argIndex,
+                            exportOp.getArgAttrDict(argIndex)));
       arguments.push_back(importOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -498,7 +584,8 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           result.getLoc(), newType, result,
           encoding ? encoding : TypeAttr::get(result.getType()), dynamicDims,
           resultStorage,
-          inferResultName(resultIndex, resultAttrDict, entryBuilder)));
+          inferResultName(entryBuilder.getContext(), resultIndex,
+                          exportOp.getResultAttrDict(resultIndex))));
     } else {
       results.push_back(result);
     }
@@ -632,7 +719,4 @@ createWrapEntryPointsPass(IREE::ABI::InvocationModel invocationModel) {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI

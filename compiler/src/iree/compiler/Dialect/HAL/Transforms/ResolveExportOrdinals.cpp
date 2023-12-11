@@ -9,10 +9,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 class ResolveCommandBufferDispatchOrdinals
     : public OpRewritePattern<IREE::HAL::CommandBufferDispatchSymbolOp> {
@@ -101,7 +98,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
 
 static PassRegistration<ResolveExportOrdinalsPass> pass;
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

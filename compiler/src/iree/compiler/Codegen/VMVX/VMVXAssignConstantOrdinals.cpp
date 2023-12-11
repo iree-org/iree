@@ -9,8 +9,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -63,5 +62,4 @@ createVMVXAssignConstantOrdinalsPass() {
   return std::make_unique<VMVXAssignConstantOrdinalsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -13,8 +13,7 @@
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
@@ -58,8 +57,11 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
                                 bool enableUKernels) {
   addTileAndDistributePasses(passManager);
 
+  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (enableUKernels) {
-    passManager.nest<ModuleOp>().addPass(
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createDecomposeBatchMmt4DOpsPass());
+    nestedModulePM.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
@@ -72,7 +74,6 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   }
 
   // Lower to buffers.
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addCPUBufferizePasses(nestedModulePM);
 
   // Cleanup the IR that may now have unused loops.
@@ -124,5 +125,4 @@ void registerCodegenVMVXPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

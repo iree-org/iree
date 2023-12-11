@@ -14,24 +14,23 @@
 
 namespace mlir {
 class DialectRegistry;
+} // namespace mlir
 
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Registers LLVMCPU transformations that require IREE-specific information
 /// into the transform dialect.
 void registerTransformDialectLLVMCPUExtension(DialectRegistry &registry);
 
-namespace IREE {
-namespace transform_dialect {
+namespace IREE ::transform_dialect {
 // Hook to register LLVMCPU transformations to the transform dialect.
 class LLVMCPUExtensions
     : public transform::TransformDialectExtension<LLVMCPUExtensions> {
 public:
   LLVMCPUExtensions();
 };
-} // namespace transform_dialect
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace IREE::transform_dialect
+
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_TRANSFORMEXTENSIONS_LLVMCPUEXTENSIONS_H_

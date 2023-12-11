@@ -32,10 +32,9 @@ iree_runtime_cc_test(
     name = "dynamic_library_test",
     srcs = ["dynamic_library_test.cc"],
     tags = [
-        # Disabled because of unknown CI failures only with bazel on the CI.
-        # This passes locally and with cmake.
-        # See #10034 for more information.
-        "nokokoro",
+        # This test fails with Bazel under Docker.
+        # See https://github.com/openxla/iree/pull/13131 for more information.
+        "nodocker",
     ],
     deps = [
         ":dynamic_library_test_library",

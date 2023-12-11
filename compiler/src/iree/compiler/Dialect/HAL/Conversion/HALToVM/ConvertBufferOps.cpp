@@ -10,8 +10,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class BufferLoadOpConversion
     : public OpConversionPattern<IREE::HAL::BufferLoadOp> {
@@ -190,5 +189,4 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                            typeConverter, "hal.buffer.store");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

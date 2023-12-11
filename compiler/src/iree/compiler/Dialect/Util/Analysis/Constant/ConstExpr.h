@@ -17,10 +17,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Analyzes an entire module to determine all operations/values that are
 // purely derived from constants or immutable data and builds a
@@ -257,10 +254,7 @@ inline raw_ostream &operator<<(raw_ostream &os,
   return os;
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 namespace llvm {
 template <>

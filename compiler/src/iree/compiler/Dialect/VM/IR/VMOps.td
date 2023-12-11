@@ -45,8 +45,8 @@ let opDocGroup = OpGroupStructuralOps in {
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::VM::ModuleTerminatorOp">,
-    NativeOpTrait<"SymbolTable">,
     Symbol,
+    SymbolTable,
   ]> {
   let summary = [{module containing VM functions and variables}];
   let description = [{

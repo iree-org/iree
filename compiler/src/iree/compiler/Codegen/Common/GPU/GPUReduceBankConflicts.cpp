@@ -10,10 +10,10 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-namespace mlir {
-namespace iree_compiler {
 
-/// Padd out the inner dimension of the allocOp in order reduce the chances to
+namespace mlir::iree_compiler {
+
+/// Pad out the inner dimension of the allocOp in order reduce the chances to
 /// have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
                      int64_t paddingSizeBits) {
@@ -77,6 +77,7 @@ public:
       padAlloc(context, alloc, paddingSizeBits);
   }
 };
+
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -84,5 +85,4 @@ createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
   return std::make_unique<GPUReduceBankConflictsPass>(paddingSizeBits);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

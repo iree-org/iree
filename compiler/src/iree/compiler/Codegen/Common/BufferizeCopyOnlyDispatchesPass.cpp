@@ -26,8 +26,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -125,5 +124,4 @@ createBufferizeCopyOnlyDispatchesPass() {
   return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

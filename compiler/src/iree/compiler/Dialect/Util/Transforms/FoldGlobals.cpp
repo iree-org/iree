@@ -27,10 +27,7 @@
 
 #define DEBUG_TYPE "iree-util-fold-globals"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 template <typename R>
@@ -507,7 +504,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass() {
   return std::make_unique<FoldGlobalsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

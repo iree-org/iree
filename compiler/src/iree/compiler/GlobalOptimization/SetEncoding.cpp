@@ -37,9 +37,7 @@
 
 #include "llvm/Support/Debug.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -88,15 +86,65 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
                                                         source);
 };
 
+enum class ContractionOpType {
+  kInvalid,
+  kMatmul,
+  kBatchMatmul,
+  kVecmat,
+  kBatchVecmat,
+  kMatvec,
+  kBatchMatvec,
+};
+
+static ContractionOpType
+getContractionOpType(linalg::ContractionOpInterface op) {
+  if (op.isRowMajorMatmul() || op.isColumnMajorMatmul())
+    return ContractionOpType::kMatmul;
+  if (op.isRowMajorBatchMatmul())
+    return ContractionOpType::kBatchMatmul;
+  if (op.isVecmat())
+    return ContractionOpType::kVecmat;
+  if (op.isBatchVecmat())
+    return ContractionOpType::kBatchVecmat;
+  if (op.isMatvec())
+    return ContractionOpType::kMatvec;
+  if (op.isBatchMatvec())
+    return ContractionOpType::kBatchMatvec;
+  return ContractionOpType::kInvalid;
+}
+
 struct MatmulNarrowSizes {
   std::optional<int64_t> M, N;
 };
 
-// Returns the minimum of static sizes of the M-dimension in the types of the
-// LHS and/or the Output operand of a matmul, whichever is static.
-static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType) {
-  int64_t M = outType.getDimSize(outType.getRank() - 2);
-  int64_t N = outType.getDimSize(outType.getRank() - 1);
+// Returns the minimum of static sizes of the M/N-dimensions in the types of the
+// Ouput.
+static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
+                                              ContractionOpType opType) {
+  int64_t M, N;
+  int64_t rank = outType.getRank();
+  switch (opType) {
+  case ContractionOpType::kMatmul:
+  case ContractionOpType::kBatchMatmul: {
+    M = outType.getDimSize(rank - 2);
+    N = outType.getDimSize(rank - 1);
+    break;
+  }
+  case ContractionOpType::kVecmat:
+  case ContractionOpType::kBatchVecmat: {
+    M = 1;
+    N = outType.getDimSize(outType.getRank() - 1);
+    break;
+  }
+  case ContractionOpType::kMatvec:
+  case ContractionOpType::kBatchMatvec: {
+    M = outType.getDimSize(outType.getRank() - 1);
+    N = 1;
+    break;
+  }
+  case ContractionOpType::kInvalid:
+    return MatmulNarrowSizes();
+  }
 
   MatmulNarrowSizes narrow;
   // Threshold below which a M/N size is considered "narrow", making it
@@ -206,24 +254,24 @@ static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
 
 namespace {
 
-/// Rewrites the matmul op to work on tensors with encoding. Optionally
-/// also pads the operands.
-struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
-  SetMatmulEncoding(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit) {}
-
-  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+struct setContractionOpEncoding
+    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
+  using OpInterfaceRewritePattern<
+      linalg::ContractionOpInterface>::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics())
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+    if (!linalgOp.hasTensorSemantics()) {
       return failure();
-
-    if (getCompilationInfo(matmulOp)) {
+    }
+    if (getCompilationInfo(linalgOp)) {
       return rewriter.notifyMatchFailure(
-          matmulOp, "the op has preset compilation strategy, skip SetEncoding");
+          linalgOp, "the op has preset compilation strategy, skip SetEncoding");
     }
 
-    auto inputs = matmulOp.getDpsInputs();
-    auto outputs = matmulOp.getDpsInits();
+    auto inputs = linalgOp.getDpsInputs();
+    auto outputs = linalgOp.getDpsInits();
+
     auto hasEncoding = [](Value operand) -> bool {
       auto type = llvm::dyn_cast<RankedTensorType>(operand.getType());
       return type && type.getEncoding();
@@ -232,7 +280,6 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
         llvm::any_of(outputs, hasEncoding)) {
       return failure();
     }
-
     Value origLhs = inputs[0];
     Value origRhs = inputs[1];
     Value origOut = outputs[0];
@@ -243,8 +290,10 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       }
       return {};
     };
-    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
-    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
+    std::optional<CastOpInterface> maybeLhsCastOp =
+        getDefiningNonI1ExtendingCastOp(origLhs);
+    std::optional<CastOpInterface> maybeRhsCastOp =
+        getDefiningNonI1ExtendingCastOp(origRhs);
     Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
                                       : getElemType(origLhs);
     Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
@@ -255,11 +304,28 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
       return failure();
     }
 
-    IREE::LinalgExt::EncodingUser user = IREE::LinalgExt::EncodingUser::MATMUL;
+    ContractionOpType opType = getContractionOpType(op);
+    IREE::LinalgExt::EncodingUser user;
+    switch (opType) {
+    case ContractionOpType::kMatmul:
+    case ContractionOpType::kVecmat:
+    case ContractionOpType::kMatvec:
+      user = IREE::LinalgExt::EncodingUser::MATMUL;
+      break;
+    case ContractionOpType::kBatchMatmul:
+    case ContractionOpType::kBatchVecmat:
+    case ContractionOpType::kBatchMatvec:
+      user = IREE::LinalgExt::EncodingUser::BATCH_MATMUL;
+      break;
+    case ContractionOpType::kInvalid:
+      return rewriter.notifyMatchFailure(op, "unsupported contraction op");
+    }
+
     MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
-    Location loc = matmulOp.getLoc();
-    SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
+        getMatmulNarrowSizes(origOut.getType().cast<ShapedType>(), opType);
+
+    Location loc = linalgOp.getLoc();
+    SmallVector<Type> operandTypes(linalgOp->getOperandTypes());
     operandTypes[0] =
         cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
     operandTypes[1] =
@@ -273,114 +339,23 @@ struct SetMatmulEncoding : public OpRewritePattern<linalg::MatmulOp> {
     Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
                                          IREE::LinalgExt::EncodingRole::RESULT,
                                          operandTypes, narrowSizes);
-
-    Value matmulTiled = rewriter
-                            .create<linalg::MatmulOp>(
-                                loc, encodedOut.getType(),
-                                ValueRange{encodedLhs, encodedRhs}, encodedOut)
-                            .getResult(0);
+    Value opTiled;
+    opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
+                    ValueRange{encodedLhs, encodedRhs, encodedOut})
+                  ->getResult(0);
 
     // Sizes are computed by original output size.
     FailureOr<SmallVector<OpFoldResult>> origOutSizes =
         IREE::LinalgExt::getDims(rewriter, loc, origOut);
     if (failed(origOutSizes)) {
-      return rewriter.notifyMatchFailure(matmulOp,
+      return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to get shape of result");
     }
 
-    Value result = unsetEncodingAndExtractSlice(rewriter, loc, matmulTiled,
+    Value result = unsetEncodingAndExtractSlice(rewriter, loc, opTiled,
                                                 origOutSizes.value());
 
-    rewriter.replaceOp(matmulOp, result);
-    return success();
-  }
-};
-
-struct SetBatchMatmulEncoding : public OpRewritePattern<linalg::BatchMatmulOp> {
-  SetBatchMatmulEncoding(MLIRContext *context, PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::BatchMatmulOp>(context, benefit) {}
-
-  LogicalResult matchAndRewrite(linalg::BatchMatmulOp matmulOp,
-                                PatternRewriter &rewriter) const override {
-    if (!matmulOp.hasTensorSemantics())
-      return failure();
-
-    if (getCompilationInfo(matmulOp)) {
-      return rewriter.notifyMatchFailure(
-          matmulOp, "the op has preset compilation strategy, skip SetEncoding");
-    }
-
-    auto inputs = matmulOp.getDpsInputs();
-    auto outputs = matmulOp.getDpsInits();
-    auto hasEncoding = [](Value operand) -> bool {
-      auto type = llvm::dyn_cast<RankedTensorType>(operand.getType());
-      return type && type.getEncoding();
-    };
-    if (llvm::any_of(inputs, hasEncoding) ||
-        llvm::any_of(outputs, hasEncoding)) {
-      return failure();
-    }
-
-    Value origLhs = inputs[0];
-    Value origRhs = inputs[1];
-    Value origOut = outputs[0];
-
-    auto getElemType = [](Value v) -> Type {
-      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
-        return tensorType.getElementType();
-      }
-      return {};
-    };
-    std::optional<CastOpInterface> maybeLhsCastOp = getDefiningCastOp(origLhs);
-    std::optional<CastOpInterface> maybeRhsCastOp = getDefiningCastOp(origRhs);
-    Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
-                                      : getElemType(origLhs);
-    Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
-                                      : getElemType(origRhs);
-    Type outElemType = getElemType(origOut);
-
-    if (!lhsElemType || !rhsElemType || !outElemType) {
-      return failure();
-    }
-
-    IREE::LinalgExt::EncodingUser user =
-        IREE::LinalgExt::EncodingUser::BATCH_MATMUL;
-    MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(origOut.getType().cast<ShapedType>());
-    Location loc = matmulOp.getLoc();
-    SmallVector<Type> operandTypes(matmulOp->getOperandTypes());
-    operandTypes[0] =
-        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
-    operandTypes[1] =
-        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
-    Value encodedLhs = padAndSetEncoding(
-        rewriter, loc, origLhs, user, IREE::LinalgExt::EncodingRole::LHS,
-        operandTypes, narrowSizes, maybeLhsCastOp);
-    Value encodedRhs = padAndSetEncoding(
-        rewriter, loc, origRhs, user, IREE::LinalgExt::EncodingRole::RHS,
-        operandTypes, narrowSizes, maybeRhsCastOp);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
-                                         IREE::LinalgExt::EncodingRole::RESULT,
-                                         operandTypes, narrowSizes);
-
-    Value matmulTiled = rewriter
-                            .create<linalg::BatchMatmulOp>(
-                                loc, encodedOut.getType(),
-                                ValueRange{encodedLhs, encodedRhs}, encodedOut)
-                            .getResult(0);
-
-    // Sizes are computed by original output size.
-    FailureOr<SmallVector<OpFoldResult>> origOutSizes =
-        IREE::LinalgExt::getDims(rewriter, loc, origOut);
-    if (failed(origOutSizes)) {
-      return rewriter.notifyMatchFailure(matmulOp,
-                                         "failed to get shape of result");
-    }
-
-    Value result = unsetEncodingAndExtractSlice(rewriter, loc, matmulTiled,
-                                                origOutSizes.value());
-
-    rewriter.replaceOp(matmulOp, result);
+    rewriter.replaceOp(linalgOp, result);
     return success();
   }
 };
@@ -424,7 +399,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<SetBatchMatmulEncoding, SetMatmulEncoding>(context);
+    patterns.insert<setContractionOpEncoding>(context);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -439,6 +414,4 @@ std::unique_ptr<Pass> createSetEncodingPass() {
   return std::make_unique<SetEncodingPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

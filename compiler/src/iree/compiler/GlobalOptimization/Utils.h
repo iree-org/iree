@@ -7,7 +7,10 @@
 #define IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_
 
 #include <optional>
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 namespace mlir {
 class Type;
@@ -16,17 +19,25 @@ class CastOpInterface;
 class OpBuilder;
 class Location;
 class NamedAttribute;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
-/// If the producer is a CastOpInterface, or a linalg::GenericOp that performs
-/// only a CastOpInterface on its input, return the CastOpInterface op.
-/// Otherwise, return std::nullopt.
+/// Returns a CastOpInterface op, if the producer is a CastOpInterface op, or a
+/// linalg::GenericOp that performs only a CastOpInterface on its input.
+/// The CastOpInterface op should extend the bitwidth of the source.
+/// The bitwidth of the source element type should be greater than 1. If it is
+/// casting from i1 types, a std::nullopt is returned. It is dangerous to mix
+/// boalean concept and i1 subtypes concept at graph optimizatoin level. We
+/// ignore this type of casting ops intentionally.
+/// TODO(hanchung): Remove the restriction about i1 after we can handle i1
+/// sub-type emulation and deprecate TypePropagation pass.
+///
+/// If it is not from a casting op, it returns a std::nullopt.
 ///
 /// **Note: If the CastOpInterface has been generalized, the return Operation
 ///         is the body CastOpInterface op, not the linalg::GenericOp.
-std::optional<CastOpInterface> getDefiningCastOp(Value input);
+std::optional<CastOpInterface> getDefiningNonI1ExtendingCastOp(Value input);
 
 /// Returns the source element type of the defining CastOpInterface of `input`,
 /// if there is one. Otherwise return std::nullopt.
@@ -39,8 +50,11 @@ Value createGenericElementwiseCastOp(
     ArrayRef<NamedAttribute> attrs,
     std::optional<IREE::LinalgExt::EncodingAttr> encoding = std::nullopt);
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+/// Creates a dispatch region out of a sequence of consecutive ops.
+FailureOr<IREE::Flow::DispatchRegionOp>
+wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
+                                   SmallVector<Operation *> ops);
+
+} // namespace mlir::iree_compiler::GlobalOptimization
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_UTILS_H_

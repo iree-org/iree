@@ -20,8 +20,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Value.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Class that tracks the equivalence relationship between tensors. Its a
 /// light-weight wrapper around `llvm::EquivalenceClasses` to account for
@@ -102,6 +101,5 @@ private:
 LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                              BufferizationPlan &plan);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_COMMON_BUFFERIZATIONANALYSIS_H

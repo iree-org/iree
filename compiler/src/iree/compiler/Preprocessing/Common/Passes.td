@@ -12,19 +12,19 @@ include "mlir/Pass/PassBase.td"
 def ConvertConv2DToImg2Col :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let constructor = "mlir::iree_compiler::IREE::createConvertConv2DToImg2ColPass()";
+  let constructor = "mlir::iree_compiler::Preprocessing::createConvertConv2DToImg2ColPass()";
 }
 
 def MakeSingleDispatchForFunction :
     Pass<"iree-preprocessing-make-single-dispatch-for-function", "func::FuncOp"> {
   let summary = "Convert entire function into a single dispatch";
-  let constructor = "mlir::iree_compiler::IREE::createMakeSingleDispatchForFunctionPass()";
+  let constructor = "mlir::iree_compiler::Preprocessing::createMakeSingleDispatchForFunctionPass()";
 }
 
 def PadLinalgOps :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::IREE::createPadLinalgOpsToIntegerMultiplePass()";
+  let constructor = "mlir::iree_compiler::Preprocessing::createPadLinalgOpsToIntegerMultiplePass()";
   let options = [
     Option<"paddingSize", "pad-size", "int",
            /*default=*/"4",

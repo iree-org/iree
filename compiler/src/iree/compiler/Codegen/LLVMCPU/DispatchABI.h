@@ -20,8 +20,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // NOTE: HALDispatchABI and the associated conversion patterns should live under
 // iree/compiler/Dialect/HAL/Target/LLVMCPU/ instead of here as they have
@@ -419,7 +418,6 @@ private:
   static llvm::sys::Mutex sMutex;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_DISPATCHABI_H_

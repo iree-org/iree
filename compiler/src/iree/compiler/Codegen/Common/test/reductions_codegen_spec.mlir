@@ -7,7 +7,7 @@ module attributes { transform.with_named_sequence } {
     %maybe_leading, %original_fill, %reduction, %maybe_trailing_0 =
       transform.iree.match_callback failures(propagate) "reduction"(%root)
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-    
+
     %_, %more_parallel_fill, %parallel_reduction, %combiner_op =
       transform.structured.split_reduction %reduction { split_factor = 2, insert_split_dimension = 1 }
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
@@ -18,7 +18,7 @@ module attributes { transform.with_named_sequence } {
     %outer_tiled, %grid_loop = transform.structured.tile_using_forall %fusion_root_1 tile_sizes [1]
       ( mapping = [#gpu.block<x>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-    
+
     %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func {
       transform.apply_patterns.iree.bubble_expand
@@ -50,7 +50,7 @@ module attributes { transform.with_named_sequence } {
       tile_sizes [1] ( mapping = [#gpu.thread<z>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.structured.fuse_into_containing_op %fusion_group_22_full into %block_loop_22 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    
+
 
     %fusion_group_21 = transform.merge_handles %maybe_leading_2, %more_parallel_fill_2
       : !transform.any_op
@@ -59,7 +59,7 @@ module attributes { transform.with_named_sequence } {
       tile_sizes [1, 1] ( mapping = [#gpu.thread<z>, #gpu.thread<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.structured.fuse_into_containing_op %fusion_group_21 into %block_loop_21 : (!transform.any_op, !transform.any_op) -> (!transform.any_op, !transform.any_op)
-    
+
     // Step 3. Rank-reduce.
     // ===========================================================================
     transform.apply_patterns to %func {

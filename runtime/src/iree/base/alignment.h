@@ -115,6 +115,17 @@ static inline bool iree_device_size_has_alignment(
   return iree_device_align(value, alignment) == value;
 }
 
+// Returns true if |value| is a power-of-two.
+static inline bool iree_is_power_of_two_uint64(uint64_t value) {
+  return (value != 0) && ((value & (value - 1)) == 0);
+}
+
+// Aligns |value| up to the given power-of-two |alignment| if required.
+// https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+static inline uint64_t iree_align_uint64(uint64_t value, uint64_t alignment) {
+  return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
 // Returns the size of a struct padded out to iree_max_align_t.
 // This must be used when performing manual trailing allocation packing to
 // ensure the alignment requirements of the trailing data are satisfied.

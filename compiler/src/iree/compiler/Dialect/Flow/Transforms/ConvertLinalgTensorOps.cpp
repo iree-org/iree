@@ -22,10 +22,7 @@
 
 #define DEBUG_TYPE "iree-flow-convert-linalg-tensor-ops"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -51,7 +48,7 @@ struct LinalgTensorReshapeToFlowTensorReshape
     SmallVector<Value> outputDynamicShapes;
     for (auto shape : llvm::zip_equal(reshapeOp.getResultType().getShape(),
                                       outputShape[0])) {
-      if (std::get<0>(shape) != ShapedType::kDynamic)
+      if (!ShapedType::isDynamic(std::get<0>(shape))
         continue;
       outputDynamicShapes.push_back(std::get<1>(shape));
     }
@@ -140,6 +137,7 @@ struct ConvertLinalgTensorOpsPass
     }
   }
 };
+
 } // namespace
 
 std::unique_ptr<OperationPass<mlir::func::FuncOp>>
@@ -148,7 +146,4 @@ createConvertLinalgTensorOpsPass(bool runBeforeDispatchRegionFormation) {
       runBeforeDispatchRegionFormation);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

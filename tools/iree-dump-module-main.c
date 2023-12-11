@@ -242,6 +242,10 @@ static void iree_tooling_print_exported_function_def(
         iree_vm_FunctionSignatureDef_calling_convention(signature_def));
   }
   fprintf(stdout, "\n");
+  if (iree_vm_FunctionSignatureDef_attrs_is_present(signature_def)) {
+    iree_tooling_print_attr_defs(
+        iree_vm_FunctionSignatureDef_attrs(signature_def), 8);
+  }
 }
 
 static void iree_tooling_print_exported_function_defs(

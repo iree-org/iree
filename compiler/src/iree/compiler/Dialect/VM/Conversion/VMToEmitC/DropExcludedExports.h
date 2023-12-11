@@ -10,18 +10,12 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // TODO(marbre): Switch pass registration to tablegen.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createDropExcludedExportsPass();
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_DROPEXCLUDEDEXPORTS_H_

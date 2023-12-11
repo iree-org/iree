@@ -11,9 +11,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 /// Encode a 3-staged strategy for a 1-d reduction mapped to a block.
 ///
@@ -89,8 +87,6 @@ private:
   int64_t numThreadsXInBlock;
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STAGED_REDUCTION_STRATEGY_H_

@@ -644,8 +644,9 @@ let opDocGroup = OpGroupExecutableOps in {
 def FLOW_ExecutableOp : FLOW_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Flow::ExecutableEndOp">,
-  NativeOpTrait<"SymbolTable">,
   Symbol,
+  SymbolTable,
+  Util_ObjectLike,
 ]> {
   let summary = [{generic executable module}];
   let description = [{
@@ -786,7 +787,6 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
                                $tied_operands)
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "ExecutableExportOp":$exportOp, "ValueRange":$workload,

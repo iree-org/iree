@@ -17,13 +17,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 
-namespace llvm {
-class raw_ostream;
-}
-
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct GPUModel;
 
@@ -279,8 +273,6 @@ public:
   }
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_TENSOR_CORE_MATMUL_STRATEGY_H_

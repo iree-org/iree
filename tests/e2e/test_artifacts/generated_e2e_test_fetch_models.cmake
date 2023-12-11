@@ -132,13 +132,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-Vit_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/BERT_LARGE_FP32_TF_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"
@@ -268,5 +261,12 @@ iree_fetch_artifact(
   NAME "model-matmul_128x256x8192_f32t_tile_config_default"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Vit_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
   UNPACK
 )

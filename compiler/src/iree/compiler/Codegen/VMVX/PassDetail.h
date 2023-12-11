@@ -13,13 +13,11 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Codegen/VMVX/Passes.h.inc"
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_VMVX_PASS_DETAIL_H_

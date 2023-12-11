@@ -16,10 +16,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
@@ -324,9 +321,11 @@ void buildStreamTransformPassPipeline(
   // Optimizations such as dispatch operand fusion remove information we can use
   // to determine memory usage by dispatches.
   if (transformOptions.dumpStatisticsFormat != DumpOutputFormat::None) {
-    passManager.addPass(IREE::Stream::createDumpStatisticsPass(
-        transformOptions.dumpStatisticsFormat,
-        transformOptions.dumpStatisticsFile));
+    DumpStatisticsPassOptions dumpStatisticsOptions;
+    dumpStatisticsOptions.outputFormat = transformOptions.dumpStatisticsFormat;
+    dumpStatisticsOptions.outputFile = transformOptions.dumpStatisticsFile;
+    passManager.addPass(
+        IREE::Stream::createDumpStatisticsPass(dumpStatisticsOptions));
   }
 
   //----------------------------------------------------------------------------
@@ -398,7 +397,4 @@ void registerStreamPasses() {
   registerStreamTransformPassPipelines();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

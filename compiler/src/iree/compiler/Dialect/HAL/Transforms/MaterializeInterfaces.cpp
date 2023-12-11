@@ -28,10 +28,7 @@
 
 #define DEBUG_TYPE "iree-hal-materialize-interfaces"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 // Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants.
@@ -665,7 +662,4 @@ static PassRegistration<MaterializeInterfacesPass> pass([] {
   return std::make_unique<MaterializeInterfacesPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -23,10 +23,7 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Used for custom printing support.
 struct UtilOpAsmInterface : public OpAsmDialectInterface {
@@ -77,8 +74,7 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     op->erase();
   }
 
-  void handleTerminator(Operation *op,
-                        ArrayRef<Value> valuesToReplace) const final {
+  void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
     // util.initialize.return takes no args.
   }
 };
@@ -125,7 +121,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // If it's a static dim then just fold to that.
     auto type = llvm::cast<ShapedType>(op.getSource().getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
-    if (staticDim != ShapedType::kDynamic) {
+    if (!ShapedType::isDynamic(staticDim)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
       return success();
     }
@@ -147,7 +143,4 @@ void UtilDialect::getCanonicalizationPatterns(
   results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

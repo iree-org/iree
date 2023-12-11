@@ -15,8 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Pass pipeline to lower IREE HAL executables without any tiling and
 /// distribution.
@@ -95,13 +94,20 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVEraseStorageBufferStaticShapePass();
 
+/// Pass to perform final vector ops lowering to meet SPIR-V requirements.
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVFinalVectorLoweringPass();
+
 /// Creates a pass to fold processor ID uses where possible.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFoldProcessorIDUsesPass();
 
-// This pass generalizes named Linalg ops that are better off as generics.
+/// Pass to perform initial vector ops lowering to meet SPIR-V requirements.
 std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVGeneralizeNamedOpsPass();
+createSPIRVInitialVectorLoweringPass();
+
+/// Links SPIR-V HAL executables within the top-level program module.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createSPIRVLinkExecutablesPass();
 
 /// Pass to set the lowering strategy for the target variant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -144,12 +150,6 @@ createSPIRVVectorToGPUSubgroupMMAOpsPass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Pass to lower vector ops to meet SPIR-V requirements.
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVInitialVectorLoweringPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
-createSPIRVFinalVectorLoweringPass();
-
 /// Pass to do vectorization suitable for lowering to SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVVectorizeToCooperativeOpsPass();
@@ -185,7 +185,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
 
 void registerCodegenSPIRVPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_

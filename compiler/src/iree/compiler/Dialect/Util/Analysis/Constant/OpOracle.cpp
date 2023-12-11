@@ -15,10 +15,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
@@ -56,6 +53,11 @@ ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
 // it is best to be conservative here, and we limit to known value
 // types.
 bool isLegalConstExprType(Type t) {
+  // If implementing the hoistable interface, just return what the interface
+  // says.
+  if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(t)) {
+    return hoistableType.isHoistableType();
+  }
   if (llvm::isa<IntegerType, FloatType>(t)) {
     // TODO: We shouldn't need to be this conservative about the bit widths we
     // support, but for now the consteval JIT has interop limitations. Lift
@@ -165,14 +167,8 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     }
   }
 
-  // Never hoist sub-byte aligned values: in legal programs, these will be
-  // cast or packed in some successor.
-  if (auto integerType = llvm::dyn_cast<IntegerType>(
-          getElementTypeOrSelf(info->constValue.getType()))) {
-    if (integerType.getWidth() % 8 != 0) {
-      return false;
-    }
-  }
+  // First check whether we should hoist this kind of operation. Type local
+  // decisions should always come last.
 
   // Generally, we prefer to not hoist broadcasts.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
@@ -197,6 +193,22 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     return false;
   }
 
+  // If implementing the HoistableTypeInterface, just return what the interface
+  // says.
+  if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
+          info->constValue.getType())) {
+    return hoistableType.isHoistableLeafType();
+  }
+
+  // Never hoist sub-byte aligned values: in legal programs, these will be
+  // cast or packed in some successor.
+  if (auto integerType = llvm::dyn_cast<IntegerType>(
+          getElementTypeOrSelf(info->constValue.getType()))) {
+    if (integerType.getWidth() % 8 != 0) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -211,7 +223,4 @@ bool isHoistableConstExprConsumingOperand(OpOperand *operand) {
   return true;
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

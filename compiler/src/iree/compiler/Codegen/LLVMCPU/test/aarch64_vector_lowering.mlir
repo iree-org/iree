@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering --iree-llvmcpu-vector-lowering --split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -76,10 +76,9 @@ module {
 // CHECK-SAME:         iter_args(%[[ITER1:.+]] = %[[ITER0]]) -> (tensor<64x64xf32>)
 //      CHECK:         %[[MATMUL_RES:.+]] = scf.for %[[L1_K:.+]] = %[[C0]] to %[[C512]] step %[[C32]]
 // CHECK-SAME:           iter_args(%[[ITER2:.+]] = %[[CST_VECTOR]]) -> (vector<16x16xf32>)
-//      CHECK:           {{.*}} = vector.transfer_read %[[LHS_TILE]]
-//      CHECK:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
-// CHECK-COUNT-16:       vector.outerproduct
-// CHECK-COUNT-16:       vector.outerproduct
+//  CHECK-DAG:           {{.*}} = tensor.extract %[[LHS_TILE]]
+//  CHECK-DAD:           {{.*}} = vector.transfer_read %[[RHS_TILE]]
+// CHECK-COUNT-32:       vector.fma
 //      CHECK:           scf.yield %{{.*}} : vector<16x16xf32>
 //      CHECK:         %[[EXP:.+]] = math.exp %[[MATMUL_RES]] : vector<16x16xf32>
 //      CHECK:         %[[RES:.+]] = vector.transfer_write %[[EXP]], %[[ITER1]][%[[L1_I]], %[[L1_J]]] {{.*}} : vector<16x16xf32>, tensor<64x64xf32>
@@ -142,7 +141,7 @@ module {
             %21 = vector.transfer_write %20, %12[%c0, %c0] {in_bounds = [true, true]} : vector<32x32xf32>, tensor<32x32xf32>
             %22 = tensor.extract_slice %15[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
             %23 = tensor.extract_slice %arg5[%arg2, %arg4] [32, 32] [1, 1] : tensor<64x64xf32> to tensor<32x32xf32>
-            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = ["parallel", "parallel"]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) attrs =  {__internal_linalg_transform__ = "vectorize"} {
+            %24 = linalg.generic {indexing_maps = [#map4, #map5, #map4, #map4], iterator_types = ["parallel", "parallel"]} ins(%21, %18, %22 : tensor<32x32xf32>, tensor<32xi32>, tensor<32x32xf32>) outs(%23 : tensor<32x32xf32>) {
             ^bb0(%arg6: f32, %arg7: i32, %arg8: f32, %arg9: f32):
               %26 = linalg.index 1 : index
               %27 = affine.apply #map6(%arg1, %26, %arg4)
@@ -166,7 +165,9 @@ module {
     return
   }
 }
-//      CHECK: func.func @matmul_gather() {
+
 // Check that matmul is lowered to vector ops
-//      CHECK:   vector.outerproduct
-//      CHECK:   linalg.generic
+
+// CHECK-LABEL: func.func @matmul_gather() {
+//    CHECK-32:   vector.fma
+//       CHECK:   linalg.generic

@@ -33,7 +33,7 @@ module attributes { transform.with_named_sequence } {
       %variant_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.workgroup_swizzle %0 { log_tile = 3 } : (!transform.any_op) -> ()
-    transform.yield 
+    transform.yield
   }
 } // module
 

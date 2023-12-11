@@ -19,9 +19,7 @@
 static const llvm::StringLiteral kStrictSymbolsMarker =
     "torch.assume_strict_symbolic_shapes";
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 struct SetStrictSymbolicShapesPass
@@ -38,6 +36,4 @@ createSetStrictSymbolicShapesPass() {
   return std::make_unique<SetStrictSymbolicShapesPass>();
 }
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput

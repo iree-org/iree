@@ -10,8 +10,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Helper to convert copy to shared memory to async copy. This creates groups
 /// of consecutive copies and emit wait operation right after.
@@ -33,7 +32,6 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp);
 /// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(func::FuncOp funcOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif

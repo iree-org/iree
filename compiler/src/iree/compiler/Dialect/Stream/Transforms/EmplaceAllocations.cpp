@@ -8,14 +8,11 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -25,10 +22,11 @@
 
 #define DEBUG_TYPE "iree-stream-emplace-allocations"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_EMPLACEALLOCATIONSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -168,21 +166,12 @@ static bool emplaceAllocationsInRegion(Region &region) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-emplace-allocations
+// --iree-stream-emplace-allocations
 //===----------------------------------------------------------------------===//
 
-class EmplaceAllocationsPass
-    : public EmplaceAllocationsBase<EmplaceAllocationsPass> {
-public:
-  EmplaceAllocationsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct EmplaceAllocationsPass
+    : public IREE::Stream::impl::EmplaceAllocationsPassBase<
+          EmplaceAllocationsPass> {
   void runOnOperation() override {
     bool didChange = false;
     getOperation()->walk([&](Region *region) {
@@ -195,11 +184,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<>> createEmplaceAllocationsPass() {
-  return std::make_unique<EmplaceAllocationsPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

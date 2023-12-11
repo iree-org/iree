@@ -48,6 +48,7 @@ iree_runtime_cc_library(
     hdrs = [
         "api.h",
     ],
+    tags = ["driver=cuda"],
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/base",
@@ -79,6 +80,7 @@ iree_runtime_cc_library(
         "dynamic_symbols.h",
         "status_util.h",
     ],
+    tags = ["driver=cuda"],
     textual_hdrs = [
         "dynamic_symbol_tables.h",
     ],

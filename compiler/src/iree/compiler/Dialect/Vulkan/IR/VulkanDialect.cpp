@@ -8,17 +8,11 @@
 
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 VulkanDialect::VulkanDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<VulkanDialect>()) {
   registerAttributes();
 }
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan

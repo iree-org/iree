@@ -11,10 +11,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/SymbolTable.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 class StreamDialect : public Dialect {
 public:
@@ -37,9 +34,6 @@ private:
   void registerTypes();
 };
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 #endif // IREE_COMPILER_DIALECT_STREAM_IR_STREAMDIALECT_H_

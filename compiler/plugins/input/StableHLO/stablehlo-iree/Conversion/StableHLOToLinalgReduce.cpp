@@ -629,7 +629,7 @@ struct ReduceWindowOpConversion final
 
       SmallVector<Value> resultDynamicDims;
       for (const auto &en : llvm::enumerate(resultType.getShape())) {
-        if (en.value() != ShapedType::kDynamic)
+        if (!ShapedType::isDynamic(en.value()))
           continue;
         Value dimSize = rewriter.create<tensor::DimOp>(loc, input, en.index());
         if (en.index() == 0 || static_cast<int64_t>(en.index()) == rank - 1) {

@@ -11,9 +11,7 @@
 
 #define DEBUG_TYPE "iree-util-dfx"
 
-namespace mlir {
-namespace iree_compiler {
-namespace DFX {
+namespace mlir::iree_compiler::DFX {
 
 Solver::~Solver() {
   // Cleanup all elements; since we allocated them from the bump ptr allocator
@@ -231,6 +229,4 @@ void Solver::print(llvm::raw_ostream &os) { depGraph.print(os); }
 
 void Solver::dumpGraph() { depGraph.dumpGraph(); }
 
-} // namespace DFX
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::DFX

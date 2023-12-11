@@ -94,6 +94,11 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
+  # Support for embedding external files (e.g. source code samples) via snippets
+  # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
+  - pymdownx.snippets:
+      base_path: ["../../"]  # Use paths relative to the repository root
+      check_paths: true
   # Diagram support, see
   #   https://squidfunk.github.io/mkdocs-material/reference/diagrams/
   #   Docs  : https://mermaid.js.org/
@@ -127,10 +132,10 @@ nav:
       - "guides/index.md"
       - "ML frameworks":
           - "guides/ml-frameworks/index.md"
-          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
-          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
           - JAX: "guides/ml-frameworks/jax.md"
           - PyTorch: "guides/ml-frameworks/pytorch.md"
+          - TensorFlow: "guides/ml-frameworks/tensorflow.md"
+          - TensorFlow Lite: "guides/ml-frameworks/tflite.md"
       - "Deployment configurations":
           - "guides/deployment-configurations/index.md"
           - CPU: "guides/deployment-configurations/cpu.md"
@@ -184,6 +189,7 @@ nav:
       - "Debugging":
           - "developers/debugging/android-with-lldb.md"
           - "developers/debugging/compile-time-regressions.md"
+          - "developers/debugging/gpu.md"
           - "developers/debugging/integration-tests.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"

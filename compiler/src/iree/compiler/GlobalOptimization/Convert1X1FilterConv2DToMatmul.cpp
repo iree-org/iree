@@ -12,9 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -55,8 +53,8 @@ public:
     const int owIndex = isNHWC ? 2 : 3;
     const int ocIndex = isNHWC ? 3 : 1;
 
-    bool isInputHWDynamic = inputShape[ohIndex] == ShapedType::kDynamic &&
-                            inputShape[owIndex] == ShapedType::kDynamic;
+    bool isInputHWDynamic = ShapedType::isDynamic(inputShape[ohIndex]) &&
+                            ShapedType::isDynamic(inputShape[owIndex]);
 
     // We cannot merge the width and height if they are both dynamic as we
     // cannot expand them back to their dynamic values.
@@ -80,7 +78,7 @@ public:
       return failure();
 
     auto combineDims = [](int64_t a, int64_t b) {
-      if (a == ShapedType::kDynamic || b == ShapedType::kDynamic)
+      if (ShapedType::isDynamic(a) || ShapedType::isDynamic(b))
         return ShapedType::kDynamic;
       return a * b;
     };
@@ -183,6 +181,4 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass() {
   return std::make_unique<Convert1X1FilterConv2DToMatmulPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -32,10 +31,11 @@
 
 #define DEBUG_TYPE "iree-stream-schedule-execution"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_SCHEDULEEXECUTIONPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 // Incremental builder for a partitioned region of executable work.
@@ -280,7 +280,10 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
           awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
         }
 
-        oldResult.replaceAllUsesWith(awaitOp.getResults().front());
+        // Explicitly copy the Value since it is marked as const.
+        Value toBeDeleted = oldResult;
+
+        toBeDeleted.replaceAllUsesWith(awaitOp.getResults().front());
         deadOps.insert(oldResult.getDefiningOp());
       }
 
@@ -312,14 +315,13 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
   return success();
 }
 
-class ScheduleExecutionPass
-    : public ScheduleExecutionBase<ScheduleExecutionPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// --iree-stream-schedule-execution
+//===----------------------------------------------------------------------===//
 
+struct ScheduleExecutionPass
+    : public IREE::Stream::impl::ScheduleExecutionPassBase<
+          ScheduleExecutionPass> {
   void runOnOperation() override {
     auto *context = &getContext();
     auto parentOp = getOperation();
@@ -358,12 +360,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<InterfacePass<CallableOpInterface>>
-createScheduleExecutionPass() {
-  return std::make_unique<ScheduleExecutionPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -12,10 +12,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Transforms/IPO/Internalize.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static llvm::cl::opt<std::string> clBitcodeFiles(
     "iree-link-bitcode",
@@ -168,7 +165,4 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
   return success();
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

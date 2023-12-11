@@ -25,8 +25,7 @@
 #include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Returns the CastOpInterface op of the body, if
 //   - the `genericOp` is element-wise with identity maps, and
@@ -188,6 +187,10 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
              rhsElemType.isUnsignedInteger(4) &&
              outElemType.isSignlessInteger(32)) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S16U4S32;
+  } else if (lhsElemType.isSignlessInteger(16) &&
+             rhsElemType.isSignlessInteger(8) &&
+             outElemType.isSignlessInteger(32)) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_S16S8S32;
   } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
              outElemType.isF32()) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
@@ -622,5 +625,4 @@ createCPULowerToUKernelsPass(bool skipIntermediateRoundings) {
   return std::make_unique<CPULowerToUKernelsPass>(skipIntermediateRoundings);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

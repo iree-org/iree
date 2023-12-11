@@ -30,10 +30,7 @@
 
 #define DEBUG_TYPE "iree-flow-fusion-of-tensor-ops"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 // TODO: Remove this and the backing code once consteval is beyond being
 // rolled back.
@@ -362,6 +359,11 @@ struct FusionOfTensorOpsPass
               return false;
             }
 
+            // Do not fuse by expand if consumer is dequant.
+            if (isGroupedDequantizationOp(consumer)) {
+              return false;
+            }
+
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
@@ -428,6 +430,12 @@ struct FusionOfTensorOpsPass
             Operation *consumer = fusedOperand->getOwner();
             if (!isNonNullAndOutsideDispatch({producer, consumer})) {
               return false;
+            }
+
+            // Do not fuse if consumer is a contraction/matmul like op.
+            if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+              if (linalg::isaContractionOpInterface(linalgConsumerOp))
+                return false;
             }
 
             auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
@@ -499,7 +507,4 @@ createFusionOfTensorOpsPass(bool fuseMultiUse,
                                                  multiUseFusionIteration);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

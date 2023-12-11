@@ -56,9 +56,8 @@ declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
   # For example:
-  #   ^nokokoro$
-  # TODO: update label name as part of dropping Kokoro
-  ^nokokoro$
+  #   ^nodocker$
+  ^nodocker$
 
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.

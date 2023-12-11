@@ -25,6 +25,10 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
     const iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* validation_state,
     iree_hal_command_category_t required_categories) {
+  if (IREE_UNLIKELY(!validation_state->is_recording)) {
+    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
+                            "command buffer is not in a recording state");
+  }
   if (!iree_all_bits_set(command_buffer->allowed_categories,
                          required_categories)) {
 #if IREE_STATUS_MODE

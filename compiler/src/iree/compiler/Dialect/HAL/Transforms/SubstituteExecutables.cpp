@@ -16,10 +16,7 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Scans |searchPath| for all child files and appends them to |substitutions|.
 // The file basename will be treated as an executable name and the path will be
@@ -310,7 +307,4 @@ static PassRegistration<SubstituteExecutablesPass> pass([] {
   return std::make_unique<SubstituteExecutablesPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

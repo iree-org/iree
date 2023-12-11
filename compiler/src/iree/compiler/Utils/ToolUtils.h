@@ -12,8 +12,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Escapes a command line component where required.
 // It's easy to run afoul of quoting rules on Windows, such as when using
@@ -54,7 +53,6 @@ std::string findTool(std::string toolName);
 // lib directory.
 std::string findPlatformLibDirectory(StringRef platformName);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_TOOLUTILS_H_

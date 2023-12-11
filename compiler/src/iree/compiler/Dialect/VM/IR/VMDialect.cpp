@@ -18,10 +18,7 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/InliningUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 #include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.cpp.inc" // IWYU pragma: keep
 
@@ -111,8 +108,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     op->erase();
   }
 
-  void handleTerminator(Operation *op,
-                        ArrayRef<Value> valuesToReplace) const final {
+  void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
     // TODO(benvanik): handle other terminators (break/etc).
     auto returnOp = dyn_cast<VM::ReturnOp>(op);
     if (!returnOp) {
@@ -302,7 +298,4 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
   return nullptr;
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

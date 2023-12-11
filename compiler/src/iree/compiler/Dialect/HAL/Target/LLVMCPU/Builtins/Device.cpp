@@ -12,10 +12,7 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static const iree_file_toc_t *lookupDeviceFile(StringRef filename) {
   for (size_t i = 0; i < iree_builtins_libdevice_bitcode_size(); ++i) {
@@ -101,7 +98,4 @@ void specializeDeviceModule(IREE::HAL::ExecutableVariantOp variantOp,
   overridePlatformGlobal(module, "libdevice_platform_example_flag", 0u);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

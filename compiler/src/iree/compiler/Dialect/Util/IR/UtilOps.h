@@ -27,8 +27,7 @@
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h.inc" // IWYU pragma: export
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Experimental
@@ -225,7 +224,6 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
                                   ArrayAttr tiedOperands, ArrayAttr argAttrs,
                                   ArrayAttr resultAttrs);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_

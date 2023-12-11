@@ -21,10 +21,6 @@ if(IREE_TARGET_BACKEND_VULKAN_SPIRV)
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
 endif()
-if(IREE_TARGET_BACKEND_ROCM)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::ROCM)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
-endif()
 
 set(IREE_VERSION_TARGET_COPTS "")
 if(IREE_EMBEDDED_RELEASE_INFO)
@@ -68,6 +64,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::GlobalOptimization::Interfaces::Interfaces
     iree::compiler::InputConversion::Common
     iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect
     iree::compiler::Modules::HAL::Inline::Transforms

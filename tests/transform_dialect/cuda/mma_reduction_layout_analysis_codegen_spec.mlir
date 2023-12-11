@@ -7,9 +7,15 @@ module attributes { transform.with_named_sequence } {
     // Step 1. Find the fill, matmul and generic ops
     // ===========================================================================
     %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %matmul = transform.structured.match ops{["linalg.matmul_transpose_b"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %generics = transform.structured.match ops{["linalg.generic"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %reduce, %broadcast = transform.split_handle %generics : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %matmul = transform.structured.match ops{["linalg.generic"]}
+                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
+                in %variant_op : (!transform.any_op) -> !transform.any_op
+    %reduce = transform.structured.match ops{["linalg.generic"]}
+                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
+                in %variant_op : (!transform.any_op) -> !transform.any_op
+    %broadcast = transform.structured.match ops{["linalg.generic"]}
+                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
+                in %variant_op : (!transform.any_op) -> !transform.any_op
 
     // Step 2. Tile the matmul and fuse the fill
     // ===========================================================================
@@ -60,6 +66,6 @@ module attributes { transform.with_named_sequence } {
     %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
 
-    transform.yield 
+    transform.yield
   }
 } // module

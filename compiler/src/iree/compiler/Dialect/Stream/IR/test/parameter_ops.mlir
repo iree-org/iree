@@ -11,12 +11,20 @@ util.global private @parameter_config = #stream.parameter.named<"scope"::"key", 
 
 // CHECK-LABEL: @parameterLoad
 // CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint)
-func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
+func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
+  %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
-  // CHECK: = stream.parameter.load await(%[[WAIT]]) => "scope"::"key"[%c50_i64] : !stream.resource<constant>{%c100} => !stream.timepoint
-  %result, %result_timepoint = stream.parameter.load await(%wait) => "scope"::"key"[%c50_i64] : !stream.resource<constant>{%c100} => !stream.timepoint
-  return %result, %result_timepoint : !stream.resource<constant>, !stream.timepoint
+  %c200 = arith.constant 200 : index
+  // CHECK: = stream.parameter.load await(%[[WAIT]]) => {
+  // CHECK-NEXT: "scope"::"key0"[%c50_i64] : !stream.resource<constant>{%c100},
+  // CHECK-NEXT: "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c200}
+  // CHECK-NEXT: } => !stream.timepoint
+  %results:2, %result_timepoint = stream.parameter.load await(%wait) => {
+    "scope"::"key0"[%c50_i64] : !stream.resource<constant>{%c100},
+    "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c200}
+  } => !stream.timepoint
+  return %results#0, %results#1, %result_timepoint : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
 
 // -----
@@ -26,8 +34,12 @@ func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant
 func.func @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
-  // CHECK: = stream.parameter.load await(%[[WAIT]]) => "key"[%c50_i64] : !stream.resource<constant>{%c100} => !stream.timepoint
-  %result, %result_timepoint = stream.parameter.load await(%wait) => "key"[%c50_i64] : !stream.resource<constant>{%c100} => !stream.timepoint
+  // CHECK: = stream.parameter.load await(%[[WAIT]]) => {
+  // CHECK-NEXT: "key"[%c50_i64] : !stream.resource<constant>{%c100}
+  // CHECK-NEXT: } => !stream.timepoint
+  %result, %result_timepoint = stream.parameter.load await(%wait) => {
+    "key"[%c50_i64] : !stream.resource<constant>{%c100}
+  } => !stream.timepoint
   return %result, %result_timepoint : !stream.resource<constant>, !stream.timepoint
 }
 

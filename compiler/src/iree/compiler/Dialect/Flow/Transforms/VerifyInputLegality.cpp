@@ -12,10 +12,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 class VerifyInputLegalityPass
@@ -43,7 +40,4 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

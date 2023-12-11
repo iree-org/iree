@@ -87,7 +87,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
   } -> tensor<10x4096x4096xf16>
   %229 = tensor.empty() : tensor<10x4096xf16>
   %230 = linalg.fill ins(%cst_121 : f16) outs(%229 : tensor<10x4096xf16>) -> tensor<10x4096xf16>
-  %231 = linalg.generic 
+  %231 = linalg.generic
   {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
   iterator_types = ["parallel", "parallel", "reduction"]}
   ins(%228 : tensor<10x4096x4096xf16>) outs(%230 : tensor<10x4096xf16>) {
@@ -95,7 +95,7 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
     %5290 = arith.addf %in, %out : f16
     linalg.yield %5290 : f16
   } -> tensor<10x4096xf16>
-  %232 = linalg.generic 
+  %232 = linalg.generic
   {indexing_maps = [
     affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
     affine_map<(d0, d1, d2) -> (d0, d1)>,
@@ -373,6 +373,33 @@ func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x128xf16>)
 }
 
 /// Verify that the pattern kicks in for a simple dynamic example.
+// CHECK-LABEL: func.func @test_slice_negate_cat_peephole_dynamic
+//       CHECK:    tensor.expand_shape
+//       CHECK:    linalg.generic
+//       CHECK:      tensor.extract
+//       CHECK:    %[[COL:.+]] = tensor.collapse_shape
+//       CHECK:    return %[[COL]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128xf16>) -> tensor<32x?x128xf16> {
+  %c2 = arith.constant 2 : index
+  %d2 = tensor.dim %arg0, %c2 : tensor<32x?x128xf16>
+  %1 = tensor.empty(%d2) : tensor<32x?x128xf16>
+  %2 = tensor.empty(%d2) : tensor<32x?x64xf16>
+  %extracted_slice = tensor.extract_slice %arg0[0, 0, 0] [32, %d2, 64] [1, 1, 1] : tensor<32x?x128xf16> to tensor<32x?x64xf16>
+  %extracted_slice_0 = tensor.extract_slice %arg0[0, 0, 64] [32, %d2, 64] [1, 1, 1] : tensor<32x?x128xf16> to tensor<32x?x64xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%extracted_slice_0 : tensor<32x?x64xf16>) outs(%2 : tensor<32x?x64xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %5 = arith.negf %in : f16
+    linalg.yield %5 : f16
+  } -> tensor<32x?x64xf16>
+  %concat = tensor.concat dim(2) %3, %extracted_slice : (tensor<32x?x64xf16>, tensor<32x?x64xf16>) -> tensor<32x?x128xf16>
+  return %concat : tensor<32x?x128xf16>
+}
+
+/// Verify that the pattern kicks in for tensor.concat as well.
 // CHECK-LABEL: func.func @test_slice_negate_cat_peephole_dynamic
 //       CHECK:    tensor.expand_shape
 //       CHECK:    linalg.generic

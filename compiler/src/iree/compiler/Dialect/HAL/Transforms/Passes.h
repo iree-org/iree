@@ -17,10 +17,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -113,6 +110,10 @@ createDumpExecutableSourcesPass(StringRef path, StringRef prefix = "");
 // Dumps standalone hal.executable benchmarks to |path|.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDumpExecutableBenchmarksPass(StringRef path);
+
+// Strips executable module contents for reducing IR size during debugging.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createStripExecutableContentsPass();
 
 // Substitutes hal.executable ops by parsing |substitutions| in
 // `executable_name=file.xxx` strings. File paths may be absolute or relative to
@@ -232,6 +233,7 @@ inline void registerHALPasses() {
   createResolveExportOrdinalsPass();
   createSerializeExecutablesPass(TargetBackendRegistry::getGlobal());
   createSerializeTargetExecutablesPass(TargetBackendRegistry::getGlobal(), "");
+  createStripExecutableContentsPass();
   createSubstituteExecutablesPass();
   createTranslateExecutablesPass(TargetBackendRegistry::getGlobal());
   createTranslateTargetExecutableVariantsPass(
@@ -239,9 +241,6 @@ inline void registerHALPasses() {
   createVerifyTargetEnvironmentPass(TargetBackendRegistry::getGlobal());
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_

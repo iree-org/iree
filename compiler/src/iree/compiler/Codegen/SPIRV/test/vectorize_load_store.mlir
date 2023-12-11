@@ -553,16 +553,13 @@ func.func @scalarize_masked_vector_transfer_op(%arg: vector<3xf32>, %mask: vecto
 
 // CHECK-LABEL: func.func @scalarize_masked_vector_transfer_op
 // CHECK-DAG: %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<3xf32>
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG: %[[C5:.+]] = arith.constant 5 : index
 // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
 // CHECK-DAG: %[[PAD:.+]] = arith.constant 0.000000e+00 : f32
 
 /// Transfer read.
-//     CHECK: %[[MB0:.+]] = vector.extract %{{.*}}[%[[C0]]] : i1 from vector<3xi1>
+//     CHECK: %[[MB0:.+]] = vector.extract %{{.*}}[0] : i1 from vector<3xi1>
 //     CHECK: %[[MASK_LD0:.+]] = scf.if %[[MB0]] -> (f32) {
 //     CHECK:   %[[LD0:.+]] = memref.load {{.*}}[%[[C3]]] : memref<20xf32>
 //     CHECK:   scf.yield %[[LD0]] : f32
@@ -570,10 +567,10 @@ func.func @scalarize_masked_vector_transfer_op(%arg: vector<3xf32>, %mask: vecto
 //     CHECK:   scf.yield %[[PAD]] : f32
 //     CHECK: }
 //     CHECK: vector.insert %[[MASK_LD0]], %[[INIT]] [0] : f32 into vector<3xf32>
-//     CHECK: vector.extract %{{.*}}[%[[C1]]] : i1 from vector<3xi1>
+//     CHECK: vector.extract %{{.*}}[1] : i1 from vector<3xi1>
 //     CHECK: scf.if %{{.*}} -> (f32) {
 //     CHECK:   memref.load %{{.*}}[%[[C4]]] : memref<20xf32>
-//     CHECK: vector.extract %{{.*}}[%[[C2]]] : i1 from vector<3xi1>
+//     CHECK: vector.extract %{{.*}}[2] : i1 from vector<3xi1>
 //     CHECK: scf.if %{{.*}} -> (f32) {
 //     CHECK:   memref.load %{{.*}}[%[[C5]]] : memref<20xf32>
 //     CHECK: %[[MASK_TR:.+]] = vector.insert {{.*}} [2] : f32 into vector<3xf32>

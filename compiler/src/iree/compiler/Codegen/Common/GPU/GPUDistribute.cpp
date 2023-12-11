@@ -15,8 +15,7 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static constexpr int64_t kCudaWarpSize = 32;
 
@@ -56,5 +55,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute() {
   return std::make_unique<GPUDistributePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

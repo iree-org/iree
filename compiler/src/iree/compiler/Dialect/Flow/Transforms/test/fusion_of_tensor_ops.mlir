@@ -366,6 +366,113 @@ func.func @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf3
 
 // -----
 
+func.func @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>) -> (tensor<11008xf16>) {
+  %cst_1 = arith.constant 0.000000e+00 : f16
+  %0 = tensor.empty() : tensor<11008x32x128xf16>
+  %1 = arith.constant dense<0.000000e+00> : tensor<1x1x32x128xf16>
+  %expanded = tensor.expand_shape %arg0 [[0], [1, 2]] : tensor<11008x4096xi4> into tensor<11008x32x128xi4>
+  %collapsed = tensor.collapse_shape %arg2 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
+  %collapsed_2 = tensor.collapse_shape %arg1 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
+  %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded, %collapsed, %collapsed_2 : tensor<11008x32x128xi4>, tensor<11008x32xf16>, tensor<11008x32xf16>) outs(%0 : tensor<11008x32x128xf16>) {
+  ^bb0(%in: i4, %in_8: f16, %in_9: f16, %out: f16):
+    %12 = arith.extui %in : i4 to i32
+    %13 = arith.uitofp %12 : i32 to f16
+    %14 = arith.subf %13, %in_9 : f16
+    %15 = arith.mulf %14, %in_8 : f16
+    linalg.yield %15 : f16
+  } -> tensor<11008x32x128xf16>
+  %collapsed_3 = tensor.collapse_shape %1 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
+  %3 = tensor.empty() : tensor<11008xf16>
+  %4 = linalg.fill ins(%cst_1 : f16) outs(%3 : tensor<11008xf16>) -> tensor<11008xf16>
+  %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%collapsed_3, %2 : tensor<32x128xf16>, tensor<11008x32x128xf16>) outs(%4 : tensor<11008xf16>) {
+  ^bb0(%in: f16, %in_8: f16, %out: f16):
+    %12 = arith.mulf %in, %in_8 : f16
+    %13 = arith.addf %12, %out : f16
+    linalg.yield %13 : f16
+  } -> tensor<11008xf16>
+  return %5 : tensor<11008xf16>
+}
+//     CHECK-LABEL: func.func @nofuse_by_expand_dequant
+//   CHECK-COUNT-2:   tensor.collapse_shape
+//           CHECK:     %[[DEQUANT:.+]] = linalg.generic
+//      CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]
+//       CHECK-NOT:   tensor.collapse_shape %[[DEQUANT]]
+//           CHECK:     %[[MATVEC:.+]] = linalg.generic
+//      CHECK-SAME:         iterator_types = ["parallel", "reduction", "reduction"]
+//      CHECK-SAME:         ins(%[[DEQUANT]] : tensor<11008x32x128xf16>)
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (0, 0, 0)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d1, 0)>
+#map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+#map5 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+#map6 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+func.func @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tensor<4096x32x128xi4>, %arg2: tensor<4096x32x1xf16>, %arg3: tensor<4096x32x1xf16>) -> tensor<1x1x4096xf16> {
+  %cst = arith.constant 0.000000e+00 : f16
+  %c32000 = arith.constant 32000 : index
+  %c0_i64 = arith.constant 0 : i64
+  %0 = util.unfoldable_constant dense<0.000000e+00> : tensor<32000x4096xf16>
+  %1 = util.unfoldable_constant dense<0.000000e+00> : tensor<1x1x1xf16>
+  %2 = tensor.empty() : tensor<1x1x4096xf16>
+  %3 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1x1xi64>) outs(%2 : tensor<1x1x4096xf16>) {
+  ^bb0(%in: i64, %out: f16):
+    %11 = arith.index_cast %in : i64 to index
+    %12 = linalg.index 2 : index
+    %13 = arith.cmpi slt, %11, %c32000 : index
+    cf.assert %13, "index must be smaller than dim size"
+    %14 = arith.cmpi sge, %in, %c0_i64 : i64
+    cf.assert %14, "index must be larger or equal to 0"
+    %extracted = tensor.extract %0[%11, %12] : tensor<32000x4096xf16>
+    linalg.yield %extracted : f16
+  } -> tensor<1x1x4096xf16>
+  %4 = tensor.empty() : tensor<1x1x4096xf16>
+  %5 = linalg.generic {indexing_maps = [#map1, #map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %1 : tensor<1x1x4096xf16>, tensor<1x1x1xf16>) outs(%4 : tensor<1x1x4096xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %11 = arith.mulf %in, %in_0 : f16
+    linalg.yield %11 : f16
+  } -> tensor<1x1x4096xf16>
+  %6 = linalg.generic {indexing_maps = [#map1, #map1, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%3, %5 : tensor<1x1x4096xf16>, tensor<1x1x4096xf16>) outs(%4 : tensor<1x1x4096xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %11 = arith.addf %in, %in_0 : f16
+    linalg.yield %11 : f16
+  } -> tensor<1x1x4096xf16>
+  %expanded = tensor.expand_shape %6 [[0], [1], [2, 3]] : tensor<1x1x4096xf16> into tensor<1x1x32x128xf16>
+  %7 = tensor.empty() : tensor<4096x32x128xf16>
+  %8 = linalg.fill ins(%cst : f16) outs(%2 : tensor<1x1x4096xf16>) -> tensor<1x1x4096xf16>
+  %9 = linalg.generic {indexing_maps = [#map1, #map3, #map3, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1, %arg2, %arg3 : tensor<4096x32x128xi4>, tensor<4096x32x1xf16>, tensor<4096x32x1xf16>) outs(%7 : tensor<4096x32x128xf16>) {
+  ^bb0(%in: i4, %in_0: f16, %in_1: f16, %out: f16):
+    %11 = arith.extui %in : i4 to i32
+    %12 = arith.uitofp %11 : i32 to f16
+    %13 = arith.subf %12, %in_1 : f16
+    %14 = arith.mulf %13, %in_0 : f16
+    linalg.yield %14 : f16
+  } -> tensor<4096x32x128xf16>
+  %10 = linalg.generic {indexing_maps = [#map4, #map5, #map6], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%expanded, %9 : tensor<1x1x32x128xf16>, tensor<4096x32x128xf16>) outs(%8 : tensor<1x1x4096xf16>) {
+  ^bb0(%in: f16, %in_0: f16, %out: f16):
+    %11 = arith.mulf %in, %in_0 : f16
+    %12 = arith.addf %11, %out : f16
+    linalg.yield %12 : f16
+  } -> tensor<1x1x4096xf16>
+  return %10 : tensor<1x1x4096xf16>
+}
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, 0)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
+//  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
+//  CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
+//      CHECK: func.func @nofuse_by_collapse_matmul
+//      CHECK:   %[[DEQUANT:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP1]],  #[[MAP]]],
+// CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel"]
+//  CHECK-NOT:   tensor.collapse_shape %[[DEQUANT]]
+//      CHECK:   %[[MATVEC:.+]] = linalg.generic  {indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]],
+// CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]
+// CHECK-SAME:     ins(%{{.+}}, %[[DEQUANT]] : tensor<1x1x32x128xf16>, tensor<4096x32x128xf16>)
+//  CHECK-NOT:   tensor.expand_shape %[[MATVEC]]
+// -----
+
 func.func @math_sin() {
   %cst = arith.constant 2.000000e+00 : f32
   %cst_0 = arith.constant dense<[0.000000e+00, 6.349640e-01, -6.349640e-01, 6.349640e-01]> : tensor<4xf32>

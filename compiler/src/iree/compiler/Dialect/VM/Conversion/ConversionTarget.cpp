@@ -6,8 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // static
 std::pair<mlir::ModuleOp, mlir::ModuleOp>
@@ -45,5 +44,4 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
       +[](mlir::ModuleOp op) { return isTopLevelModule(op); });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

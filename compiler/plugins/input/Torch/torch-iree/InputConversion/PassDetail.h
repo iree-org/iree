@@ -10,15 +10,11 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 #define GEN_PASS_CLASSES
 #include "torch-iree/InputConversion/Passes.h.inc"
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput
 
 #endif // TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_

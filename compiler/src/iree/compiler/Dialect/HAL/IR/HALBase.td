@@ -493,6 +493,7 @@ def HAL_BufferType : AnyTypeOf<[
 ]>;
 
 def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
+def HAL_OrdinalArrayAttr : TypedArrayAttrBase<HAL_OrdinalAttr, "Array of index ordinal attributes">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
@@ -807,7 +808,7 @@ def HAL_ExecutableTargetAttr :
   let extraClassDeclaration = [{
     // Returns a symbol-compatible name that pseudo-uniquely identifies this
     // target. Callers must perform deduplication when required.
-    std::string getSymbolNameFragment();
+    std::string getSymbolNameFragment() const;
 
     // Returns a hal.match.* expression tree that specifically matches a
     // device that can load an executable of this target.

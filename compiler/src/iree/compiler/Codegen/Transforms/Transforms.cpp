@@ -28,8 +28,7 @@
 
 #define DEBUG_TYPE "iree-codegen-transforms"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
@@ -761,5 +760,4 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -25,8 +25,7 @@ using namespace mlir;
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool isContiguousStore(Operation *write) {
   if (auto transferWrite = dyn_cast<vector::TransferWriteOp>(write)) {
@@ -334,8 +333,7 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp) {
     OpBuilder::InsertionGuard g(rewriter);
     Operation *op = transposeOp.getVector().getDefiningOp();
     rewriter.setInsertionPoint(op);
-    SmallVector<int64_t> perm;
-    transposeOp.getTransp(perm);
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
     SmallVector<Value> transposedOperands;
     for (auto operand : op->getOperands()) {
       Value transposed =
@@ -416,5 +414,4 @@ void packSharedMemoryAlloc(func::FuncOp funcOp) {
   packAllocs(builder, funcOp, aliasGroups);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

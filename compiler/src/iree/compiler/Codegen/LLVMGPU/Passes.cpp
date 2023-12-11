@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -33,8 +34,9 @@
 
 #define DEBUG_TYPE "iree-llvm-gpu-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
+constexpr int64_t kDefaultSubgroupSize = 32;
 
 static llvm::cl::opt<unsigned>
     logSwizzleTile("iree-codegen-log-swizzle-tile",
@@ -428,9 +430,19 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
+  auto getSubgroupSizeFn = [](func::FuncOp func) -> int {
+    auto moduleOp = func->getParentOfType<ModuleOp>();
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
+        getAllEntryPoints(moduleOp);
+    IREE::HAL::ExecutableExportOp exportOp = exportOps.lookup(func.getName());
+    std::optional<int64_t> maybeSubgroupSize = getSubgroupSize(exportOp);
+    return maybeSubgroupSize.value_or(kDefaultSubgroupSize);
+  };
+
   // vector -> simt gpu + vector
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertVectorReductionToGPUPass(/*expandSubgroupReduction=*/true));
+      createConvertVectorReductionToGPUPass(/*expandSubgroupReduction=*/true,
+                                            getSubgroupSizeFn));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -598,6 +610,8 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
@@ -655,5 +669,4 @@ void registerCodegenLLVMGPUPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

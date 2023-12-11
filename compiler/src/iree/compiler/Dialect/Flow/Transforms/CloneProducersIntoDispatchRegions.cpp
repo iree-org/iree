@@ -10,41 +10,45 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-flow-clone-producers-into-dispatch-regions"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
+
 struct CloneProducersIntoDispatchRegionPass
     : public CloneProducersIntoDispatchRegionsBase<
           CloneProducersIntoDispatchRegionPass> {
-  void runOnOperation() override;
+  void runOnOperation() override {
+    FunctionOpInterface funcOp = getOperation();
+    IRRewriter rewriter(funcOp->getContext());
+
+    funcOp->walk([&](DispatchRegionOp regionOp) {
+      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+        return signalPassFailure();
+    });
+
+    funcOp->walk([&](Operation *op) {
+      if (!isNonNullAndOutsideDispatch(op) || !isa<linalg::GenericOp>(op)) {
+        return;
+      }
+      if (failed(wrapOpInDispatchRegion(rewriter, op))) {
+        return signalPassFailure();
+      }
+    });
+  }
 };
+
 } // namespace
-
-void CloneProducersIntoDispatchRegionPass::runOnOperation() {
-  FunctionOpInterface funcOp = getOperation();
-  IRRewriter rewriter(funcOp->getContext());
-
-  funcOp->walk([&](DispatchRegionOp regionOp) {
-    if (failed(cloneProducersToRegion(rewriter, regionOp)))
-      return signalPassFailure();
-  });
-}
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCloneProducersIntoDispatchRegionsPass() {
   return std::make_unique<CloneProducersIntoDispatchRegionPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

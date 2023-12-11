@@ -15,8 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class TilingConfig;
 
@@ -144,7 +143,8 @@ void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
-                                      bool enableMicrokernels);
+                                      bool enableMicrokernels,
+                                      bool lowerToAVX2);
 
 void addMultiTilingExpertPassPipeline(
     OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
@@ -214,7 +214,6 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
 void registerCodegenLLVMCPUPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_

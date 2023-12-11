@@ -13,8 +13,8 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 class HoistRedundantVectorTransfersPass
@@ -40,6 +40,7 @@ void HoistRedundantVectorTransfersPass::runOnOperation() {
       [&](scf::ForOp forOp) { hoistLoopInvariantSubsets(rewriter, forOp); });
   vector::transferOpflowOpt(rewriter, funcOp);
 }
+
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -47,5 +48,4 @@ createHoistRedundantVectorTransfersPass() {
   return std::make_unique<HoistRedundantVectorTransfersPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

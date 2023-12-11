@@ -41,11 +41,11 @@
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
-namespace mlir {
-
 //===----------------------------------------------------------------------===//
 // Definition of TensorDimTrackingRewriter
 //===----------------------------------------------------------------------===//
+
+namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
@@ -70,9 +70,9 @@ void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
     dimOps.insert(op);
 }
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+} // namespace mlir
+
+namespace mlir::iree_compiler::IREE::Flow {
 
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
@@ -146,7 +146,7 @@ static bool hasFusionGroupsAttribute(Operation *op) {
 static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::map_to_vector<1>(fusionGroupsAttr, [](Attribute attr) {
+    fusionGroups = llvm::map_to_vector(fusionGroupsAttr, [](Attribute attr) {
       return llvm::cast<IntegerAttr>(attr).getInt();
     });
   }
@@ -154,7 +154,7 @@ static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
 }
 /// Appends the given `op` to the `newGroups` fusion groups.
 static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
+  SmallVector<int64_t> fusionGroups = getFusionGroups(op);
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
 }
@@ -757,10 +757,12 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
+      // to convert them to splats. Also avoid moving dequantization-like ops
+      // into their own dispatch since it is better to clone these ops and avoid
+      // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::LinalgExt::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op)) {
+          isa<linalg::FillOp>(op) || isGroupedDequantizationOp(&op)) {
         continue;
       }
 
@@ -927,7 +929,4 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
   return std::make_unique<FormDispatchRegionsPass>(options);
 }
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -22,10 +22,7 @@
 #include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Codegen {
+namespace mlir::iree_compiler::IREE::Codegen {
 
 //===---------------------------------------------------------------------===//
 // Helpers
@@ -185,14 +182,16 @@ UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
                                            getStridedOuterDimsAttr());
 }
 
-} // namespace Codegen
-} // namespace IREE
+} // namespace mlir::iree_compiler::IREE::Codegen
+
+namespace mlir::iree_compiler {
 
 //===---------------------------------------------------------------------===//
 // Register bufferization interface.
 //===---------------------------------------------------------------------===//
 
 namespace {
+
 template <typename OpTy>
 struct UKernelOpsBufferizationInterface
     : public bufferization::DstBufferizableOpInterfaceExternalModel<
@@ -250,6 +249,7 @@ struct RegisterUKernelOpsBufferizationInterface {
      ...);
   }
 };
+
 } // namespace
 
 void registerUKernelBufferizationInterface(DialectRegistry &registry) {
@@ -262,5 +262,4 @@ void registerUKernelBufferizationInterface(DialectRegistry &registry) {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

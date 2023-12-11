@@ -147,3 +147,40 @@ func.func @transpose_mask() {
 //   CHECK-NOT:   vector.transpose
 //   CHECK-NOT:   vector.shuffle
 //       CHECK:   vector.constant_mask [4, 2] : vector<4x2xi1>
+
+// -----
+
+// Make sure that the gather patterns get rid of vector.gather over strided
+// memref.
+
+func.func @gather_strided_memref() {
+  %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
+  %cst_0 = arith.constant dense<true> : vector<4xi1>
+  %c0_i32 = arith.constant 0 : i32
+  %c4 = arith.constant 4 : index
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
+  memref.assume_alignment %0, 64 : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
+  memref.assume_alignment %1, 64 : memref<518400xi32, #hal.descriptor_type<storage_buffer>>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
+  memref.assume_alignment %2, 64 : memref<518400xf32, #hal.descriptor_type<storage_buffer>>
+  %subview = memref.subview %0[0, 0] [2592000, 1] [1, 1] : memref<2592000x3xf32, #hal.descriptor_type<storage_buffer>> to memref<2592000xf32, strided<[3]>, #hal.descriptor_type<storage_buffer>>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 4096)>()[%workgroup_id_x]
+  %4 = affine.min affine_map<(d0) -> (-d0 + 518400, 4096)>(%3)
+  %subview_1 = memref.subview %2[%3] [%4] [1] : memref<518400xf32, #hal.descriptor_type<storage_buffer>> to memref<?xf32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+  %subview_2 = memref.subview %1[%3] [%4] [1] : memref<518400xi32, #hal.descriptor_type<storage_buffer>> to memref<?xi32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+  %5 = affine.apply affine_map<()[s0] -> ((s0 floordiv 4) * 4)>()[%4]
+  scf.for %arg0 = %c0 to %5 step %c4 {
+    %6 = vector.transfer_read %subview_2[%arg0], %c0_i32 {in_bounds = [true]} : memref<?xi32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<4xi32>
+    %7 = arith.index_cast %6 : vector<4xi32> to vector<4xindex>
+    %8 = vector.gather %subview[%c0] [%7], %cst_0, %cst : memref<2592000xf32, strided<[3]>, #hal.descriptor_type<storage_buffer>>, vector<4xindex>, vector<4xi1>, vector<4xf32> into vector<4xf32>
+    vector.transfer_write %8, %subview_1[%arg0] {in_bounds = [true]} : vector<4xf32>, memref<?xf32, strided<[1], offset: ?>, #hal.descriptor_type<storage_buffer>>
+  }
+  return
+}
+
+// CHECK-LABEL: func.func @gather_strided_memref
+// CHECK-NOT: memref.subview {{.*}} : memref<2592000xf32, strided<[3]>
+// CHECK-NOT: vector.gather %subview[%c0] [%7], %cst_0, %cst : memref<2592000xf32, strided<[3]>

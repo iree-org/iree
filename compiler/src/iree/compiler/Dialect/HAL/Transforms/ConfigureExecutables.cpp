@@ -19,10 +19,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 class ConfigureTargetExecutableVariantsPass
     : public PassWrapper<ConfigureTargetExecutableVariantsPass,
@@ -161,7 +158,4 @@ static PassRegistration<ConfigureExecutablesPass> translatePass([] {
   return std::make_unique<ConfigureExecutablesPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

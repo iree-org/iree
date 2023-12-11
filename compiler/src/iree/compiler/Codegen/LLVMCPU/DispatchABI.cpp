@@ -22,8 +22,7 @@ static llvm::cl::opt<bool> clVerboseDebugInfo(
     llvm::cl::desc("Emit verbose debug information in LLVM IR."),
     llvm::cl::init(false));
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -816,7 +815,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       desc.setConstantStride(builder, loc, rank - 1, 1);
       OpFoldResult currentStride = builder.getIndexAttr(1);
       for (int i = rank - 1; i > 0; --i) {
-        if (strides[i - 1] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(strides[i - 1])) {
           auto dim = desc.size(builder, loc, i);
           Value currentStrideVal;
           if (std::optional<int64_t> currentStrideInt =
@@ -1443,5 +1442,4 @@ Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

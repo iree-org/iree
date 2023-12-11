@@ -4,7 +4,7 @@
 
 // RUN: iree-compile --compile-to=abi %s | FileCheck %s --check-prefix=ABI-PHASE
 // ABI-PHASE: func.func @abs(%[[ARG0:.+]]: !hal.buffer_view)
-// ABI-PHASE: %[[INPUT:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<f32>
+// ABI-PHASE: %[[INPUT:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<f32>
 // ABI-PHASE: math.absf %[[INPUT]] : tensor<f32>
 
 // RUN: iree-compile --compile-to=flow %s | FileCheck %s --check-prefix=FLOW-PHASE

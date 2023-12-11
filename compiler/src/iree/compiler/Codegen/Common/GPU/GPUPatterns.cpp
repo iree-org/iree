@@ -14,8 +14,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Applies tranformation to drop unit dims in destination vector.transfer_read
@@ -252,5 +251,4 @@ void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns) {
   patterns.add<DropSharedMemoryDeallocOp>(patterns.getContext());
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

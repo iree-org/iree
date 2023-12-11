@@ -139,25 +139,27 @@ An _output_ (`iree_compiler_output_t`) represents a compilation artifact.
 #### Plugins
 
 A _plugin_ extends the compiler with some combination of target backends,
-options, passes, or pipelines.
+options, passes, or pipelines. For documentation on compiler plugins, see
+[`compiler/PluginAPI/README.md`](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md).
 
 ### Usage
 
 !!! info ""
 
     This snippet shows the general layout of the API. For working examples, see
-    the samples below.
+    the [samples below](#samples).
 
-```cmake
-# CMakeLists.txt
+To build a custom tool using the compiler API:
+
+<!-- TODO(scotttodd): snippet that links to a working in-tree sample instead -->
+
+```cmake title="CMakeLists.txt" linenums="1"
 set(_IREE_COMPILER_API "${_IREE_COMPILER_ROOT}/bindings/c/iree/compiler")
 target_include_directories(${_NAME} SYSTEM PRIVATE ${_IREE_COMPILER_API})
 target_link_libraries(${_NAME} iree_compiler_bindings_c_loader)
 ```
 
-```c
-// iree_compiler_demo.c
-
+```c title="iree_compiler_demo.c" linenums="1"
 #include <iree/compiler/embedding_api.h>
 #include <iree/compiler/loader.h>
 
@@ -195,10 +197,12 @@ int main(int argc, char** argv) {
 #### Samples
 
 | Project | Source | Description |
-| ------- |------- | ----------- |
-[iree-org/iree-template-compiler-cmake](https://github.com/iree-org/iree-template-compiler-cmake/) | [`hello_compiler.c`](https://github.com/iree-org/iree-template-compiler-cmake/blob/main/hello_compiler/hello_compiler.c) | Compiler application template
-[openxla/openxla-pjrt-plugin](https://github.com/openxla/openxla-pjrt-plugin/) | [`iree_compiler.cc`](https://github.com/openxla/openxla-pjrt-plugin/blob/main/iree/integrations/pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
-[openxla/iree](https://github.com/openxla/iree/) | [`samples/compiler_plugins/`](https://github.com/openxla/iree/tree/main/samples/compiler_plugins) | In-tree demos of compiler plugins
+| ------- | ------ | ----------- |
+[iree-org/iree-template-compiler-cmake](https://github.com/iree-org/iree-template-compiler-cmake/) |[`hello_compiler.c`](https://github.com/iree-org/iree-template-compiler-cmake/blob/main/hello_compiler/hello_compiler.c) | Compiler application template
+[openxla/iree](https://github.com/openxla/iree/) | [`integrations/pjrt/.../iree_compiler.cc`](https://github.com/openxla/iree/blob/main/integrations/pjrt/src/iree_pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
+[openxla/iree](https://github.com/openxla/iree/) | [`compiler/plugins`](https://github.com/openxla/iree/tree/main/compiler/plugins) | In-tree supported compiler plugins
+[openxla/iree](https://github.com/openxla/iree/) | [`samples/compiler_plugins/`](https://github.com/openxla/iree/tree/main/samples/compiler_plugins) | In-tree sample compiler plugins
+[nod-ai/iree-amd-aie](https://github.com/nod-ai/iree-amd-aie/) | [`plugins/.../iree-amd-aie`](https://github.com/nod-ai/iree-amd-aie/tree/main/compiler/plugins/target/AMD-AIE/iree-amd-aie) | Early-phase plugins for interfacing with AMD AIE accelerators
 
 ## Runtime API
 
@@ -456,63 +460,23 @@ hardware devices like CPUs, GPUs and other accelerators.
 
 !!! info ""
 
-    This snippet shows the general layout of the API. For working examples, see
-    the samples below.
+    For other examples, see the [samples below](#samples_1).
 
-```cmake
-# CMakeLists.txt
-target_include_directories(${_NAME} SYSTEM PRIVATE ${_IREE_RUNTIME_ROOT})
-target_link_libraries(${_NAME} iree_runtime_runtime)
-```
+=== "hello_world_terse.c"
 
-```c
-// iree_runtime_demo.c
+    Source file: [`runtime/src/iree/runtime/demo/hello_world_terse.c`](https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_terse.c)
 
-#include <iree/runtime/api.h>
+    ```c++ title="runtime/src/iree/runtime/demo/hello_world_terse.c" linenums="1"
+    --8<-- "runtime/src/iree/runtime/demo/hello_world_terse.c:7"
+    ```
 
-int main(int argc, char** argv) {
-  // Setup the shared runtime instance.
-  iree_runtime_instance_options_t instance_options;
-  iree_runtime_instance_options_initialize(&instance_options);
-  iree_runtime_instance_options_use_all_available_drivers(&instance_options);
-  iree_runtime_instance_t* instance = NULL;
-  iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &instance);
+=== "hello_world_explained.c"
 
-  // Create the HAL device used to run the workloads.
-  iree_hal_device_t* device = NULL;
-  iree_runtime_instance_try_create_default_device(
-      instance, iree_make_cstring_view("local-task"), &device);
+    Source file: [`runtime/src/iree/runtime/demo/hello_world_explained.c`](https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_explained.c)
 
-  // Create a session to hold the module state.
-  iree_runtime_session_options_t session_options;
-  iree_runtime_session_options_initialize(&session_options);
-  iree_runtime_session_t* session = NULL;
-  iree_runtime_session_create_with_device(
-      instance, &session_options, device,
-      iree_runtime_instance_host_allocator(instance), &session);
-
-  // Load the compiled user module from a file.
-  iree_runtime_session_append_bytecode_module_from_file(
-      session, "program.vmfb");
-
-  // Build and issue the call.
-  iree_runtime_call_t call;
-  iree_runtime_call_initialize_by_name(
-      session, iree_make_cstring_view("module.entry_function_name"), &call);
-  // iree_runtime_call_inputs_push_back_buffer_view(...);
-  iree_runtime_call_invoke(&call, /*flags=*/0);
-
-  // Retrieve the function outputs and clean up the call.
-  // iree_runtime_call_outputs_pop_front_buffer_view(...);
-  iree_runtime_call_deinitialize(&call);
-
-  // Cleanup state.
-  iree_runtime_session_release(session);
-  iree_hal_device_release(device);
-  iree_runtime_instance_release(instance);
-}
-```
+    ```c++ title="runtime/src/iree/runtime/demo/hello_world_explained.c" linenums="1"
+    --8<-- "runtime/src/iree/runtime/demo/hello_world_explained.c:7"
+    ```
 
 #### Samples
 

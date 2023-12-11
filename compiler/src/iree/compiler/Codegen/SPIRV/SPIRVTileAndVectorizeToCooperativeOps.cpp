@@ -48,8 +48,8 @@ using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
@@ -302,8 +302,7 @@ public:
         newMaps.push_back(map);
         continue;
       }
-      SmallVector<int64_t, 3> perm;
-      tranposeOp.getTransp(perm);
+      ArrayRef<int64_t> perm = tranposeOp.getPermutation();
       SmallVector<AffineExpr> exprs(perm.size());
       for (auto [remapIdx, remap] : llvm::enumerate(perm)) {
         exprs[remap] = map.getResult(remapIdx);
@@ -472,5 +471,4 @@ createSPIRVVectorizeToCooperativeOpsPass() {
   return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

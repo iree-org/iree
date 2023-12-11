@@ -19,8 +19,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Function to register all dependent dialects for Transform Dialect based
 /// passes.
@@ -98,6 +97,10 @@ std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 /// tiling and generalization. See implementation for more details.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
+
+/// Creates a pass to convert the softmax op into a sequence of linalg generic
+/// ops.
+std::unique_ptr<Pass> createDecomposeSoftmaxPass();
 
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
@@ -302,7 +305,6 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_

@@ -22,10 +22,10 @@ func.func @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
   %0 = flow.dispatch.region -> (tensor<10x20xf32>) {
     %cst_0 = arith.constant dense<1.000000e+00> : tensor<10x20xf32>
     cf.cond_br %arg0, ^bb1, ^bb2
-  ^bb1:  // pred: ^bb0                                                                                                                                                                                                                                                                                             
+  ^bb1:  // pred: ^bb0
     %2 = tensor.empty() : tensor<10x20xf32>
     flow.return %2 : tensor<10x20xf32>
-  ^bb2:  // pred: ^bb0                                                                                                                                                                                                                                                                                             
+  ^bb2:  // pred: ^bb0
     flow.return %cst_0 : tensor<10x20xf32>
   }
   return %0 : tensor<10x20xf32>

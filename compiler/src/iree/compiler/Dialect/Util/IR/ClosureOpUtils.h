@@ -16,10 +16,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //------------------------------------------------------------------------------
 // Closure optimization
@@ -81,9 +78,6 @@ private:
   const ClosureOptimizationOptions options;
 };
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_UTIL_IR_CLOSUREOPUTILS_H_

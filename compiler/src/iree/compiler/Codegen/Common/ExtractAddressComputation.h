@@ -12,8 +12,7 @@
 
 using namespace mlir;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Rewrite a store/load-like op so that all its indices are zeros.
 /// E.g., %ld = memref.load %base[%off0]...[%offN]
@@ -83,6 +82,5 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
 /// before hand. In other words, the address computation is not part of
 /// the memory access anymore.
 void populateExtractAddressComputationPatterns(RewritePatternSet &patterns);
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_COMMON_EXTRACTADDRESSCOMPUTATION_H_

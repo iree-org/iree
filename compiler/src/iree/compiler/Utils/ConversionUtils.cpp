@@ -12,8 +12,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static void emitLegalizationErrors(Location loc,
                                    const DenseSet<Operation *> &illegalOps) {
@@ -126,5 +125,4 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
   return oldAttr;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

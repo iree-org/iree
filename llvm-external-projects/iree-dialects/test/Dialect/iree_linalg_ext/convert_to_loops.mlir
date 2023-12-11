@@ -1417,7 +1417,7 @@ func.func @NPQK_to_NKPQk(%arg0: memref<1x56x56x64xf32>, %arg1: memref<1x2x56x56x
 
 func.func @unpack(%arg0: memref<1x4x6x6x2xf32>, %arg1: memref<1x6x6x8xf32>) {
   iree_linalg_ext.unpack %arg0 outer_dims_perm = [0, 3, 1, 2] inner_dims_pos = [3] inner_tiles = [2] into %arg1 : (memref<1x4x6x6x2xf32> memref<1x6x6x8xf32>)
-  return 
+  return
 }
 
 // CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> (d0 floordiv 2)>

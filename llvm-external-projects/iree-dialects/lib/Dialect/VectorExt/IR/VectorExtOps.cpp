@@ -10,26 +10,18 @@
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
-namespace IREE = mlir::iree_compiler::IREE;
 
 //===----------------------------------------------------------------------===//
 // LayoutConflictResolutionOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult validateLayout(Operation *op, StringRef label, LayoutAttr layout,
+LogicalResult validateLayout(Operation *op, StringRef label,
+                             VectorLayoutInterface layout,
                              ArrayRef<int64_t> inputShape) {
-  for (auto perDimLayout : llvm::enumerate(layout.getLayouts())) {
-    ArrayRef<int64_t> shape = perDimLayout.value().getShapes();
-    int64_t computedShape =
-        std::reduce(shape.begin(), shape.end(), 1, std::multiplies<int64_t>());
-    int64_t expectedShape = inputShape[perDimLayout.index()];
-    if (computedShape != expectedShape) {
-      return op->emitError("The " + label +
-                           " layout shape does not match the input shape. "
-                           "Expected shape to be ")
-             << std::to_string(expectedShape) << ", got "
-             << std::to_string(computedShape);
-    }
+  if (!layout.isValidLayout(inputShape)) {
+    return op->emitError(
+        "The " + label +
+        " layout shape cannot be distributed over the given vector shape.");
   }
   return success();
 }

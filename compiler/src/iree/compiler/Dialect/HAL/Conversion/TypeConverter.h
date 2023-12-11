@@ -13,8 +13,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class HALTypeConverter : public TypeConverter {
 public:
@@ -37,7 +36,6 @@ private:
   std::vector<const HALConversionDialectInterface *> conversionInterfaces;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_TYPECONVERTER_H_

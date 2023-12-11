@@ -28,8 +28,8 @@
 
 #define DEBUG_TYPE "iree-spirv-final-vector-lowering"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
@@ -79,6 +79,8 @@ public:
           patterns, vector::VectorMultiReductionLowering::InnerParallel);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
       vector::populateVectorGatherLoweringPatterns(patterns);
+      vector::populateVectorMaskOpLoweringPatterns(patterns);
+      vector::CreateMaskOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
@@ -111,5 +113,4 @@ createSPIRVFinalVectorLoweringPass() {
   return std::make_unique<SPIRVFinalVectorLoweringPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

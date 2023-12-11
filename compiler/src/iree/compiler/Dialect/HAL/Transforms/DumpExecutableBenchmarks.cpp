@@ -26,10 +26,7 @@
 
 #define DEBUG_TYPE "iree-dump-executable-benchmarks"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // We could use the resource constraints in the module when we have them.
 static const int64_t kBufferAlignment = 256;
@@ -538,7 +535,4 @@ static PassRegistration<DumpExecutableBenchmarksPass> pass([] {
   return std::make_unique<DumpExecutableBenchmarksPass>();
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

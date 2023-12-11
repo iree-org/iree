@@ -13,8 +13,7 @@
 #include "iree/compiler/Pipelines/Options.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class PipelineExtensions;
 
@@ -119,7 +118,6 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 // Registration hooks.
 void registerIREEVMTransformPassPipeline();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_PIPELINES_PIPELINES_H_

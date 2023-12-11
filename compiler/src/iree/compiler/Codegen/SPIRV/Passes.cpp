@@ -41,8 +41,7 @@
 
 #define DEBUG_TYPE "iree-spirv-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static llvm::cl::opt<int> clSPIRVIndexingBits(
     "iree-spirv-index-bits",
@@ -662,8 +661,7 @@ void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
 void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createSPIRVGeneralizeNamedOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
   pm.addPass(createSPIRVSelectLoweringStrategyPass());
 }
 
@@ -708,5 +706,4 @@ void registerCodegenSPIRVPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

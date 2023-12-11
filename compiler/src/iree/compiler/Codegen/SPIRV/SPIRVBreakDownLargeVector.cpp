@@ -14,8 +14,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 // Breaks down a chain of (bitcast -> extract -> extui) ops.
@@ -169,5 +169,4 @@ createSPIRVBreakDownLargeVectorPass() {
   return std::make_unique<SPIRVBreakDownLargeVectorPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

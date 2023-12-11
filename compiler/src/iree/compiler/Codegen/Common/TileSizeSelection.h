@@ -10,8 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using SizesAndScalableFlags =
     std::pair<SmallVector<int64_t>, SmallVector<bool>>;
@@ -160,7 +159,6 @@ private:
       tilingLevelToActualLevelMap;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_

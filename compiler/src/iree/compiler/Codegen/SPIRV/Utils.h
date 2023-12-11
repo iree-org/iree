@@ -18,8 +18,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
@@ -48,7 +47,6 @@ template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts(OpBuilder &builder, Location loc, unsigned numDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif //  IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_

@@ -10,10 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 // Dynamic pass which runs a sub-pipeline to a fixed point or a maximum
@@ -123,7 +120,4 @@ createFixedPointIteratorPass(OpPassManager pipeline) {
   return std::make_unique<FixedPointIteratorPass>(std::move(pipeline));
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

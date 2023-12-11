@@ -40,8 +40,7 @@ constexpr unsigned numTilesPerSubgroupDimK = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
@@ -64,10 +63,14 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
   // They should go down different pipelines.
   int nonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  SmallVector<utils::IteratorType, 4> kinds = linalgOp.getIteratorTypesArray();
-  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
-    if (kind == utils::IteratorType::parallel)
-      nonUnitParallelDimCount += bound != 1;
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  assert(succeeded(contractionDims) && "Could not infer contraction dims");
+  for (auto mDim : contractionDims->m) {
+    nonUnitParallelDimCount += bounds[mDim] != 1;
+  }
+  for (auto nDim : contractionDims->n) {
+    nonUnitParallelDimCount += bounds[nDim] != 1;
   }
   return nonUnitParallelDimCount > 1;
 }
@@ -1165,7 +1168,7 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
-                                        linalg::GenericOp op) {
+                                        linalg::LinalgOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
 
   // This pipeline eventually generates non-uniform group shuffle ops, which
@@ -1273,7 +1276,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const Type elementType =
-      llvm::cast<ShapedType>(op.getOutputs()[0].getType()).getElementType();
+      llvm::cast<ShapedType>(op.getDpsInits()[0].getType()).getElementType();
   if (!elementType.isIntOrFloat())
     return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
@@ -1726,7 +1729,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   // distributes/vectorizes.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([&](auto op) {
         // Try to tile and vectorize first. It's common to see 32 threads
         // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
@@ -1740,6 +1743,11 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         auto result =
             detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
         if (succeeded(result))
+          return success();
+
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed to set matmul op config, trying reduction\n");
+        if (succeeded(setReductionConfig(targetEnv, op)))
           return success();
 
         // If unsuccessful, try to tile and distribute.
@@ -1870,5 +1878,4 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

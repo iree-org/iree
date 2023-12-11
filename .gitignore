@@ -21,6 +21,7 @@
 # CMake artifacts
 build/
 build-*/
+Testing/
 
 # Bazel artifacts
 **/bazel-*

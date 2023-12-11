@@ -720,7 +720,7 @@ hal.executable private @static_1d_fft_stage2 {
             : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [32], strides = [1]
             : !flow.dispatch.tensor<readwrite:tensor<32xf32>> -> tensor<32xf32>
-        %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup", lowering_config = #config}
+        %4:2 = iree_linalg_ext.fft {lowering_config = #config}
             ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
         flow.dispatch.tensor.store %4#0, %0, offsets = [0], sizes = [32], strides = [1]
             : tensor<32xf32> -> !flow.dispatch.tensor<readwrite:tensor<32xf32>>

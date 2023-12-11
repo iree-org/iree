@@ -17,16 +17,14 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 /// Typedef for tile sizes to use at different levels of tiling.
 using TileSizesListType = SmallVector<SmallVector<int64_t>>;
 using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
 /// Typedef for scalable tile flags at different levels of tiling.
 using ScalableTileFlagsListType = SmallVector<SmallVector<bool>>;
 using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 // clang-format off
 #include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.h.inc"
@@ -34,8 +32,8 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h.inc"
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting iree_codegen.translation_info attribute on the
 // `hal.executable.export`
@@ -187,7 +185,6 @@ void setCompilationInfo(Operation *op,
 /// operation.
 void eraseCompilationInfo(Operation *op);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_

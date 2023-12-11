@@ -22,10 +22,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 namespace detail {
 struct ListTypeStorage;
@@ -36,6 +33,8 @@ struct RefTypeStorage;
 class BufferType : public Type::TypeBase<BufferType, Type, TypeStorage> {
 public:
   using Base::Base;
+
+  static constexpr StringLiteral name = "vm.buffer";
 };
 
 /// A list containing an optional element type.
@@ -43,6 +42,8 @@ class ListType
     : public Type::TypeBase<ListType, Type, detail::ListTypeStorage> {
 public:
   using Base::Base;
+
+  static constexpr StringLiteral name = "vm.list";
 
   /// Returns true if the given type can be wrapped in a list.
   static bool isCompatible(Type type);
@@ -73,6 +74,8 @@ public:
 class OpaqueType : public Type::TypeBase<OpaqueType, Type, TypeStorage> {
 public:
   using Base::Base;
+
+  static constexpr StringLiteral name = "vm.opaque";
 };
 
 /// A ref<T> containing a reference to a ref-object-compatible type.
@@ -80,6 +83,8 @@ public:
 class RefType : public Type::TypeBase<RefType, Type, detail::RefTypeStorage> {
 public:
   using Base::Base;
+
+  static constexpr StringLiteral name = "vm.ref";
 
   /// Returns true if the given type can be wrapped in a ref ptr.
   static bool isCompatible(Type type);
@@ -106,9 +111,6 @@ public:
   Type getObjectType();
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMTYPES_H_

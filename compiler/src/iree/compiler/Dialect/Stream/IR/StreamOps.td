@@ -644,6 +644,8 @@ def OpGroupParameterOps : OpDocGroup {
 let opDocGroup = OpGroupParameterOps in {
 
 def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
+  AttrSizedOperandSegments,
+  AllTypesMatch<["results"]>,
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
@@ -652,34 +654,36 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads a resource from a parameter scope}];
+  let summary = [{reads one or more resources from a parameter scope}];
   let description = [{
-    Asynchronously reads a resource from an external parameter provider and
-    returns the resulting stream resource. Depending on the resource type this
-    may alias existing cached storage or be directly mapped to the parameter
-    origin or result in a copy as if `stream.resource.alloca` and
-    `stream.parameter.read` had been used.
+    Asynchronously reads one or more resources from an external parameter
+    provider and returns the resulting stream resources. Depending on the
+    resource type this may alias existing cached storage or be directly mapped
+    to the parameter origin or result in a copy as if `stream.resource.alloca`
+    and `stream.parameter.read` had been used per parameter.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
-    I64:$source_offset,
-    Stream_Size:$result_size,
+    StrArrayAttr:$source_keys,
+    Variadic<I64>:$source_offsets,
+    Variadic<Stream_Size>:$result_sizes,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    Stream_AnyStreamResource:$result,
+    Variadic<Stream_AnyStreamResource>:$results,
     Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
-    custom<ParameterReference>($source_scope, $source_key)
-    `` `[` $source_offset `]` `:`
-    type($result) `` `{` $result_size `}`
+    `{`
+    custom<ParameterLoadOperations>(
+        $source_scope, $source_keys, $source_offsets,
+        type($results), $result_sizes)
+    `}`
     `=` `` `>`
     type($result_timepoint)
     attr-dict-with-keyword
@@ -687,11 +691,13 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
+    Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
     SmallVector<Value> getAwaitTimepoints() {
       if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
     }
   }];
+
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -3965,8 +3971,9 @@ let opDocGroup = OpGroupExecutableOps in {
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Stream::ExecutableEndOp">,
-  NativeOpTrait<"SymbolTable">,
   Symbol,
+  SymbolTable,
+  Util_ObjectLike,
 ]> {
   let summary = [{generic executable module}];
   let description = [{

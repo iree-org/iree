@@ -61,6 +61,25 @@ func.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
 
 // -----
 
+// Tests that if copy is required (because of a block argument), we will create
+// just one copy and pass it to all operands.
+
+// CHECK-LABEL: @oneCopyPerOperation
+//  CHECK-SAME: (%[[SRC:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
+func.func @oneCopyPerOperation(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c256 = arith.constant 128 : index
+  // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SRC]] : !stream.resource<*>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  // CHECK-NOT: stream.async.clone
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@dispatch(%[[CLONE]]{{.*}}, %[[CLONE]]{{.*}}) {{.*}} -> %[[CLONE]]{%[[SIZE]]}
+  %0 = stream.async.dispatch @ex::@dispatch(%src[%c0 to %c128 for %c128], %src[%c128 to %c256 for %c128]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %src{%size}
+  // CHECK: return %[[RESULT]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 // Tests that copies are inserted when there are multiple uses of a mutated
 // value (in this case, the splat acting as an initializer). The additional
 // copy will be elided with the --iree-stream-elide-async-copies pass.

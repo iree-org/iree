@@ -20,10 +20,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 class MaterializeResourceCachesPass
     : public PassWrapper<MaterializeResourceCachesPass,
@@ -281,6 +278,12 @@ private:
     // Fallback for no available variant.
     auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
     auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+    Value status = defaultBuilder.create<arith::ConstantIntOp>(
+        loc, static_cast<int>(IREE::Util::StatusCode::Unavailable), 32);
+    defaultBuilder.create<IREE::Util::StatusCheckOkOp>(
+        loc, status,
+        "none of the executable binaries in the module are supported by the "
+        "runtime");
     auto nullValue =
         defaultBuilder.createOrFold<IREE::Util::NullOp>(loc, executableType);
     defaultBuilder.create<scf::YieldOp>(loc, nullValue);
@@ -386,7 +389,4 @@ static PassRegistration<MaterializeResourceCachesPass> pass([] {
   return std::make_unique<MaterializeResourceCachesPass>(options);
 });
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

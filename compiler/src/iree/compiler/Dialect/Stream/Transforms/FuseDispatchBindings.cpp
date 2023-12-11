@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
@@ -25,10 +24,11 @@
 
 #define DEBUG_TYPE "iree-stream-fuse-dispatch-bindings"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_FUSEDISPATCHBINDINGSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -409,18 +409,12 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-fuse-dispatch-bindings
+// --iree-stream-fuse-dispatch-bindings
 //===----------------------------------------------------------------------===//
 
-class FuseDispatchBindingsPass
-    : public FuseDispatchBindingsBase<FuseDispatchBindingsPass> {
-public:
-  FuseDispatchBindingsPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Stream::StreamDialect>();
-  }
-
+struct FuseDispatchBindingsPass
+    : public IREE::Stream::impl::FuseDispatchBindingsPassBase<
+          FuseDispatchBindingsPass> {
   // TODO(benvanik): preserve the information we are eliding by inserting
   // appropriate memory ops. On devices that require prefetching and other
   // nasty things we want to pass along as fine-grained of information as
@@ -463,12 +457,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createFuseDispatchBindingsPass() {
-  return std::make_unique<FuseDispatchBindingsPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

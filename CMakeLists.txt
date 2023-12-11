@@ -607,6 +607,22 @@ iree_register_external_hal_driver(
 )
 
 #-------------------------------------------------------------------------------
+# Experimental HIP HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    hip
+  SOURCE_DIR 
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
+  DRIVER_TARGET
+    iree::experimental::hip::registration
+  REGISTER_FN
+    iree_hal_hip_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
 # Experimental WebGPU HAL driver
 # Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=webgpu
 #-------------------------------------------------------------------------------
@@ -616,6 +632,8 @@ iree_register_external_hal_driver(
     webgpu
   SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/webgpu"
+  BINARY_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/experimental/webgpu"
   DRIVER_TARGET
     iree::experimental::webgpu::registration
   REGISTER_FN
@@ -849,10 +867,18 @@ else()
   iree_llvm_add_usage_requirements(LLVMSupport IREELLVMIncludeSetup)
   iree_llvm_add_usage_requirements(MLIRSupport IREELLVMIncludeSetup)
 
-  # Add default external projects.
+  # Add external projects.
+
+  message(STATUS "Configuring llvm-external-projects/mlir-iree-dialects")
+  list(APPEND CMAKE_MESSAGE_INDENT "  ")
   iree_llvm_add_external_project(mlir-iree-dialects ${CMAKE_CURRENT_SOURCE_DIR}/llvm-external-projects/iree-dialects)
+  list(POP_BACK CMAKE_MESSAGE_INDENT)
+
   if(IREE_INPUT_STABLEHLO)
+    message(STATUS "Configuring third_party/stablehlo")
+    list(APPEND CMAKE_MESSAGE_INDENT "  ")
     iree_llvm_add_external_project(stablehlo ${CMAKE_CURRENT_SOURCE_DIR}/third_party/stablehlo)
+    list(POP_BACK CMAKE_MESSAGE_INDENT)
   endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.

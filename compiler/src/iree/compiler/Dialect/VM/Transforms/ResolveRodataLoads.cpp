@@ -17,10 +17,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // TODO(benvanik): replace this entire pass with generic IPO - the rodata refs
 // are kind of constant like and should be trivial to inline, though they can't
@@ -160,7 +157,4 @@ createResolveRodataLoadsPass() {
 
 static PassRegistration<ResolveRodataLoadsPass> pass;
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

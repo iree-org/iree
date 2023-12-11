@@ -34,8 +34,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -186,11 +185,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   }
 };
 
-} // anonymous namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass() {
   return std::make_unique<ConvertToNVVMPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -25,8 +25,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Lowers an hal.executable.variant operation to scalar/native-vector
@@ -130,5 +129,4 @@ createLLVMGPULowerExecutableTargetPass() {
   return std::make_unique<LLVMGPULowerExecutableTargetPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

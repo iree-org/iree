@@ -13,9 +13,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct CopyMapping {
   /// Vector size to use for the copy.
@@ -78,8 +76,6 @@ struct CopyMapping {
                                     int64_t elementalBitWidth = 32);
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_COPY_MAPPING_H_

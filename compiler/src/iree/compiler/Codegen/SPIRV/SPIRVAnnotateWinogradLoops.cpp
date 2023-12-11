@@ -8,8 +8,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -45,5 +44,4 @@ createSPIRVAnnotateWinogradLoopsPass() {
   return std::make_unique<SPIRVAnnotateWinogradLoopsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

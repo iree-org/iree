@@ -25,8 +25,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
@@ -36,12 +35,10 @@ using IREE::HAL::ExecutableTargetAttr;
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
 enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
-  if (hasUkernel(target)) {
-    // TODO(#15314): Remove the check once it is supported. vmvx + ukernel
-    // does not support batch_matmul atm.
-    if (user == EncodingUser::BATCH_MATMUL) {
-      return {};
-    }
+  // TODO(hanchung): The ukernel path does not support 3d
+  // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
+  // batch_matmul.
+  if (hasUkernel(target) && user != EncodingUser::BATCH_MATMUL) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -53,6 +50,23 @@ enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
       TileMxNxK{2, 8, 4}, // Truncation of the above.
       TileMxNxK{1, 8, 4}, // Truncation of the above.
   };
+}
+
+// Enumerate tile sizes to choose from on riscv32.
+// For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
+// are handled by transposition in chooseMatmulTile.
+static SmallVector<TileMxNxK>
+enumerateMatmulTileRiscv32(EncodingUser user, ExecutableTargetAttr target) {
+  if (hasUkernel(target)) {
+    return {
+        TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
+        TileMxNxK{4, 8, 4}, // Truncation of the above.
+        TileMxNxK{2, 8, 4}, // Truncation of the above.
+        TileMxNxK{1, 8, 4}, // Truncation of the above.
+    };
+  }
+  // Fallback - no architecture-optimized tile size for this case.
+  return {};
 }
 
 // Enumerate tile sizes to choose from on arm64.
@@ -85,19 +99,21 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
-    // Note: 16-bit floating point types currently use the same tile size as
-    // f32. This makes sense when either (1) the accumulator is f32, or (2)
-    // the arithmetic will have to expand f16 to f32 in registers. We may
-    // reconsider when taking advantage of native f16/bf16 arithmetic when the
-    // accumulator itself is f16/bf16, as we could typically have a 2x wider
-    // tile in that case. However, on current CPUs, the existing tiles seem
-    // wide enough already to approach peak performance.
-    return {
-        TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
-        TileMxNxK{4, 8, 1}, // Truncation of the above.
-        TileMxNxK{2, 8, 1}, // Truncation of the above.
-        TileMxNxK{1, 8, 1}, // Truncation of the above.
-    };
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
+      // Note: 16-bit floating point types currently use the same tile size as
+      // f32. This makes sense when either (1) the accumulator is f32, or (2)
+      // the arithmetic will have to expand f16 to f32 in registers. We may
+      // reconsider when taking advantage of native f16/bf16 arithmetic when the
+      // accumulator itself is f16/bf16, as we could typically have a 2x wider
+      // tile in that case. However, on current CPUs, the existing tiles seem
+      // wide enough already to approach peak performance.
+      return {
+          TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
+          TileMxNxK{4, 8, 1}, // Truncation of the above.
+          TileMxNxK{2, 8, 1}, // Truncation of the above.
+          TileMxNxK{1, 8, 1}, // Truncation of the above.
+      };
+    }
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
@@ -157,39 +173,51 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
         };
       }
     }
-    // Note: 16-bit floating point types currently use the same tile size as
-    // f32. This makes sense when either (1) the accumulator is f32, or (2)
-    // the arithmetic will have to expand f16 to f32 in registers. We may
-    // reconsider when taking advantage of native f16/bf16 arithmetic when the
-    // accumulator itself is f16/bf16.
-    if (hasFeature(target, "+avx512f")) {
+    if (isa<FloatType>(lhs) && isa<FloatType>(rhs)) {
+      // Note: 16-bit floating point types currently use the same tile size as
+      // f32. This makes sense when either (1) the accumulator is f32, or (2)
+      // the arithmetic will have to expand f16 to f32 in registers. We may
+      // reconsider when taking advantage of native f16/bf16 arithmetic when the
+      // accumulator itself is f16/bf16.
+      if (hasFeature(target, "+avx512f")) {
+        if (hasUkernel(target)) {
+          return {
+              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+              TileMxNxK{8, 16, 1},  // Truncation of the above.
+              TileMxNxK{4, 16, 1},  // Truncation of the above.
+              TileMxNxK{2, 16, 1},  // Truncation of the above.
+              TileMxNxK{1, 16, 1},  // Truncation of the above.
+          };
+        } else {
+          return {
+              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+              TileMxNxK{8, 32, 1},  // Use same number of accumulators.
+              TileMxNxK{4, 64, 1},  // Use same number of accumulators.
+              TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
+              TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
+          };
+        }
+      }
+      if (hasFeature(target, "+avx")) {
+        // Note: for good performance, most +avx users will also want to add
+        // +fma, but that's a local instruction selection detail and the tile
+        // layout is unaffected, as there are enough registers even with the
+        // need for intermediate product registers when +fma is not used.
+        return {
+            TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
+            TileMxNxK{4, 8, 1}, // Truncation of the above.
+            TileMxNxK{2, 8, 1}, // Truncation of the above.
+            TileMxNxK{1, 8, 1}, // Truncation of the above.
+        };
+      }
+      // SSE fallback.
       return {
-          TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-          TileMxNxK{8, 16, 1},  // Truncation of the above.
-          TileMxNxK{4, 16, 1},  // Truncation of the above.
-          TileMxNxK{2, 16, 1},  // Truncation of the above.
-          TileMxNxK{1, 16, 1},  // Truncation of the above.
+          TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
+          TileMxNxK{4, 4, 1}, // Truncation of the above.
+          TileMxNxK{2, 4, 1}, // Truncation of the above.
+          TileMxNxK{1, 4, 1}, // Truncation of the above.
       };
     }
-    if (hasFeature(target, "+avx")) {
-      // Note: for good performance, most +avx users will also want to add
-      // +fma, but that's a local instruction selection detail and the tile
-      // layout is unaffected, as there are enough registers even with the
-      // need for intermediate product registers when +fma is not used.
-      return {
-          TileMxNxK{8, 8, 1}, // Aim to use VFMADD* (ymm).
-          TileMxNxK{4, 8, 1}, // Truncation of the above.
-          TileMxNxK{2, 8, 1}, // Truncation of the above.
-          TileMxNxK{1, 8, 1}, // Truncation of the above.
-      };
-    }
-    // SSE fallback.
-    return {
-        TileMxNxK{8, 4, 1}, // Aim to use MULPS/ADDPS (xmm).
-        TileMxNxK{4, 4, 1}, // Truncation of the above.
-        TileMxNxK{2, 4, 1}, // Truncation of the above.
-        TileMxNxK{1, 4, 1}, // Truncation of the above.
-    };
   }
 
   if (out.isSignlessInteger(32) &&
@@ -264,11 +292,11 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // how to incorporate the handling of kDynamic in the cost-model evaluation
   // below to decide when to prefer a dynamic vs a static tile shape.
   for (auto tile : enumeratedTiles) {
-    if (tile.M == ShapedType::kDynamic || tile.N == ShapedType::kDynamic ||
-        tile.K == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(tile.M) || ShapedType::isDynamic(tile.N) ||
+        ShapedType::isDynamic(tile.K)) {
       assert(enumeratedTiles.size() == 1);
-      assert(tile.M == ShapedType::kDynamic && tile.N == ShapedType::kDynamic &&
-             tile.K == ShapedType::kDynamic);
+      assert(ShapedType::isDynamic(tile.M) && ShapedType::isDynamic(tile.N) &&
+             ShapedType::isDynamic(tile.K));
       return tile;
     }
   }
@@ -329,6 +357,9 @@ SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
   }
   if (isX86_64(target)) {
     return enumerateMatmulTileX86_64(user, elementTypes, target);
+  }
+  if (isRISCV32(target)) {
+    return enumerateMatmulTileRiscv32(user, target);
   }
   return {};
 }
@@ -412,8 +443,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
-  auto role = encoding.getRole().getValue();
-  return getEncodingInfoForMatmul(user, role, chosenTileMxNxK);
+  auto rank = tensorType.getRank();
+  return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }
 
 static MaterializeEncodingFn
@@ -462,7 +493,7 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
             return failure();
           }
           for (unsigned i = 0; i < info->innerTileSizes.size(); ++i) {
-            if (info->innerTileSizes[i] == ShapedType::kDynamic) {
+            if (ShapedType::isDynamic(info->innerTileSizes[i])) {
               result->innerTileSizes[i] = ShapedType::kDynamic;
             } else {
               result->innerTileSizes[i] =
@@ -543,5 +574,4 @@ createCPUMaterializeUpperBoundTileSizePass(
   return std::make_unique<CPUMaterializeUpperBoundTileSizePass>(targetAttrs);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

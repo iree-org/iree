@@ -16,10 +16,10 @@ class OpBuilder;
 class Operation;
 class RewriterBase;
 class Value;
+} // namespace mlir
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
+
 class DispatchRegionOp;
 
 /// Check if an operation is not null and is not nested within
@@ -96,14 +96,17 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
+/// Returns true if the operation is an generic op that represents dequant.
+bool isGroupedDequantizationOp(Operation *op);
+
+/// Collect all ops that should be cloned into the given dispatch region op.
+SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);
+
 /// Clone into the region producers of those value used in the region but
 /// defined above, to prepare the dispatch region isolated from above.
 LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp);
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_REGIONOPUTILS_H_

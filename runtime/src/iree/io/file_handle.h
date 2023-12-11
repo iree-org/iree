@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/io/stream.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -145,6 +146,29 @@ static inline iree_io_file_handle_primitive_value_t iree_io_file_handle_value(
     const iree_io_file_handle_t* handle) {
   return iree_io_file_handle_primitive(handle).value;
 }
+
+// Flushes pending writes of |handle| to its backing storage.
+IREE_API_EXPORT iree_status_t
+iree_io_file_handle_flush(iree_io_file_handle_t* handle);
+
+//===----------------------------------------------------------------------===//
+// iree_io_stream_t utilities
+//===----------------------------------------------------------------------===//
+
+// Opens a stream from the given |file_handle| at the absolute |file_offset|.
+// The returned stream will retain the file until it is released.
+IREE_API_EXPORT iree_status_t iree_io_stream_open(
+    iree_io_stream_mode_t mode, iree_io_file_handle_t* file_handle,
+    uint64_t file_offset, iree_allocator_t host_allocator,
+    iree_io_stream_t** out_stream);
+
+// Writes up to |length| bytes of |source_file_handle| starting at offset
+// |source_file_offset| to the target |stream|. |host_allocator| may be used
+// for transient allocations required during file I/O.
+IREE_API_EXPORT iree_status_t iree_io_stream_write_file(
+    iree_io_stream_t* stream, iree_io_file_handle_t* source_file_handle,
+    uint64_t source_file_offset, iree_io_stream_pos_t length,
+    iree_allocator_t host_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

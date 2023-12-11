@@ -68,6 +68,6 @@ module attributes { transform.with_named_sequence } {
     %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
 
-    transform.yield 
+    transform.yield
   }
 } // module

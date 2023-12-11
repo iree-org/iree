@@ -26,7 +26,7 @@ module {
     %dummy3 = tensor.empty() : tensor<10xf32>
     %c0 = arith.constant 0.0 : f32
     %operand = linalg.fill ins(%c0 : f32) outs(%dummy1 : tensor<10xf32>) -> tensor<10xf32>
-    
+
     // expected-remark @below {{first}}
     %first = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -82,7 +82,7 @@ module {
     %c5 = arith.constant 5.0 : f32
     %operand5 = linalg.fill ins(%c5 : f32) outs(%dummy5 : tensor<10xf32>) -> tensor<10xf32>
     %operand = linalg.fill ins(%c0 : f32) outs(%dummy1 : tensor<10xf32>) -> tensor<10xf32>
-    
+
     %first = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]
@@ -134,7 +134,7 @@ module {
     %dummy5 = tensor.empty() : tensor<10xf32>
     %c0 = arith.constant 0.0 : f32
     %operand = linalg.fill ins(%c0 : f32) outs(%dummy1 : tensor<10xf32>) -> tensor<10xf32>
-    
+
     %first = linalg.generic {
       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
       iterator_types = ["parallel"]
@@ -231,7 +231,7 @@ module {
     %0 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]
-    } ins(%arg0: tensor<42x10xf32>) 
+    } ins(%arg0: tensor<42x10xf32>)
       outs(%init: tensor<10x42xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       linalg.yield %arg1 : f32

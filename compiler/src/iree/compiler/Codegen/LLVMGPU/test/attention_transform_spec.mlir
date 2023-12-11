@@ -145,6 +145,6 @@ module attributes { transform.with_named_sequence } {
     } : !transform.any_op
     transform.iree.apply_cse %func_8 : !transform.any_op
     transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
-    transform.yield 
+    transform.yield
   }
 } ////  module

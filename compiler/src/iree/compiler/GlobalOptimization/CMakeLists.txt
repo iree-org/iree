@@ -40,13 +40,20 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
+    "DecomposeConcat.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
+    "ExpandTensorShapes.cpp"
     "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
+    "FuseSiluHorizontalMatmul.cpp"
+    "GeneralizeLinalgNamedOps.cpp"
+    "InferNumericNarrowing.cpp"
     "LiftGenericToTransposeBatchMatmul.cpp"
     "MaterializeHomogeneousEncodings.cpp"
+    "OptimizeNumerics.cpp"
     "Passes.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
@@ -61,6 +68,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
+    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -71,6 +79,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
@@ -83,6 +92,10 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::DFX
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Pipelines::Options
     iree::compiler::Utils

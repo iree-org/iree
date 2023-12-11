@@ -11,10 +11,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/IR/Operation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Registers dialects needed to query or construct const-expr information.
 void registerConstExprDependentDialects(DialectRegistry &registry);
@@ -59,9 +56,6 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info);
 // This is used to exclude certain operands that we never want in globals.
 bool isHoistableConstExprConsumingOperand(OpOperand *operand);
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_OP_ORACLE_H_

@@ -10,10 +10,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 class TypeConverter : public mlir::TypeConverter {
 public:
@@ -25,9 +22,6 @@ private:
   TargetOptions targetOptions_;
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_

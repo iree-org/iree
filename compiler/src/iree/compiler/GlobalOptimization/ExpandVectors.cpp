@@ -17,9 +17,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -30,7 +28,7 @@ struct ExpandVectors
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-    if (!linalgOp.hasTensorSemantics()) {
+    if (!linalgOp || !linalgOp.hasTensorSemantics()) {
       return failure();
     }
 
@@ -96,7 +94,8 @@ struct ExpandVectors
         RankedTensorType::get(expandedOutDims, vectorOutTy.getElementType());
     Location loc = linalgOp.getLoc();
     Value expandedIn;
-    std::optional<CastOpInterface> castOp = getDefiningCastOp(vectorIn);
+    std::optional<CastOpInterface> castOp =
+        getDefiningNonI1ExtendingCastOp(vectorIn);
     if (castOp) {
       Value castIn = vectorIn.getDefiningOp()->getOperand(0);
       Type castSrcElemType =
@@ -170,6 +169,4 @@ std::unique_ptr<Pass> createExpandVectorsPass() {
   return std::make_unique<ExpandVectorsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

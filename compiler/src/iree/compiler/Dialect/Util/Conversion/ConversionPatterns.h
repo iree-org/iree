@@ -10,8 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 template <typename T>
 struct GenericConvertTypesPattern : public OpConversionPattern<T> {
@@ -67,7 +66,6 @@ void populateGenericStructuralConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_UTIL_CONVERSION_CONVERSIONPATTERNS_H_

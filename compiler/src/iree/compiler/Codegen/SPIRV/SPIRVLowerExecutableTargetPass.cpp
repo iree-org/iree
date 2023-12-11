@@ -27,8 +27,7 @@
 
 #define DEBUG_TYPE "iree-spirv-lower-executable-target-pass"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
@@ -123,5 +122,4 @@ createSPIRVLowerExecutableTargetPass() {
   return std::make_unique<SPIRVLowerExecutableTargetPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
