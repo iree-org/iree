@@ -347,21 +347,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-enable-ukernels=none"
-  FRIENDLY_NAME "Falcon7bGptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
@@ -628,21 +613,6 @@ iree_bytecode_module(
     "--iree-opt-data-tiling"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-ukernels=all"
-  FRIENDLY_NAME "Falcon7bGptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
 
@@ -1845,25 +1815,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "Falcon7bGptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
@@ -2202,25 +2153,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "Falcon7bGptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
   PUBLIC
 )
 
@@ -3337,7 +3269,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-BertForMaskedLMTF
   ${PACKAGE_NAME}_model-BertLargeTF
   ${PACKAGE_NAME}_model-EfficientNetV2STF
-  ${PACKAGE_NAME}_model-Falcon7bGptqPT
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X1XI32
   ${PACKAGE_NAME}_model-GPT2_117M_TF_1X4XI32
   ${PACKAGE_NAME}_model-MiniLML12H384Uncased
@@ -3415,8 +3346,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
@@ -3536,8 +3465,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
@@ -3647,8 +3574,6 @@ add_dependencies(iree-benchmark-suites-x86_64
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
