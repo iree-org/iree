@@ -67,6 +67,7 @@ IREE_API_EXPORT void iree_hal_vulkan_driver_options_initialize(
   out_options->api_version = VK_API_VERSION_1_2;
   out_options->requested_features = 0;
   out_options->debug_verbosity = 0;
+  out_options->debug_check_errors = false;
   iree_hal_vulkan_device_options_initialize(&out_options->device_options);
 }
 
@@ -99,13 +100,12 @@ static iree_status_t iree_hal_vulkan_driver_create_internal(
   iree_hal_vulkan_instance_extensions_t instance_extensions =
       iree_hal_vulkan_populate_enabled_instance_extensions(enabled_extensions);
 
-  // The real debug messenger (not just the static one used above) can now be
-  // created as we've loaded all the required symbols.
   // TODO(benvanik): strip in min-size release builds.
   iree_hal_vulkan_debug_reporter_t* debug_reporter = NULL;
   if (instance_extensions.debug_utils) {
     IREE_RETURN_IF_ERROR(iree_hal_vulkan_debug_reporter_allocate(
         instance, instance_syms, options->debug_verbosity,
+        options->debug_check_errors,
         /*allocation_callbacks=*/NULL, host_allocator, &debug_reporter));
   }
 

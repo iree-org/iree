@@ -57,8 +57,9 @@ VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkSemaphore);
 // TODO(benvanik): replace with feature list (easier to version).
 // Bitfield that defines sets of Vulkan features.
 enum iree_hal_vulkan_feature_bits_t {
-  // Use VK_LAYER_KHRONOS_standard_validation to validate Vulkan API usage.
+  // Use VK_LAYER_KHRONOS_validation to validate Vulkan API usage.
   // Has a significant performance penalty and is *not* a security mechanism.
+  // https://vulkan.lunarg.com/doc/view/latest/windows/khronos_validation_layer.html
   IREE_HAL_VULKAN_FEATURE_ENABLE_VALIDATION_LAYERS = 1u << 0,
 
   // Use VK_EXT_debug_utils, record markers, and log errors.
@@ -273,6 +274,8 @@ typedef struct iree_hal_vulkan_driver_options_t {
 
   // Cutoff for debug output: 0=none, 1=errors, 2=warnings, 3=info, 4=debug.
   int32_t debug_verbosity;
+  // Check that debug output was clean when destroying the driver.
+  bool debug_check_errors;
 
   // TODO(benvanik): remove this single setting - it would be nice instead to
   // pass a list to force device enumeration/matrix expansion or omit entirely

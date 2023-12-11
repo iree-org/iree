@@ -6,9 +6,11 @@
 
 #include "iree/hal/drivers/vulkan/debug_reporter.h"
 
+#include <atomic>
 #include <cstddef>
 #include <cstdio>
 
+#include "iree/base/assert.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 struct iree_hal_vulkan_debug_reporter_t {
@@ -16,8 +18,11 @@ struct iree_hal_vulkan_debug_reporter_t {
   VkInstance instance;
   iree::hal::vulkan::DynamicSymbols* syms;
   int32_t min_verbosity;
+  bool check_errors;
   const VkAllocationCallbacks* allocation_callbacks;
   VkDebugUtilsMessengerEXT messenger;
+
+  std::atomic<bool> did_error{false};
 };
 
 // NOTE: |user_data| may be nullptr if we are being called during instance
@@ -56,6 +61,9 @@ iree_hal_vulkan_debug_utils_message_callback(
   }
   if (message_verbosity < reporter->min_verbosity) {
     fprintf(stderr, "[VULKAN] %c %s\n", severity_char, callback_data->pMessage);
+    if (reporter->check_errors) {
+      reporter->did_error = true;
+    }
   }
 
   return VK_FALSE;  // VK_TRUE is reserved for future use.
@@ -93,7 +101,8 @@ static void iree_hal_vulkan_debug_reporter_populate_create_info(
 
 iree_status_t iree_hal_vulkan_debug_reporter_allocate(
     VkInstance instance, iree::hal::vulkan::DynamicSymbols* syms,
-    int32_t min_verbosity, const VkAllocationCallbacks* allocation_callbacks,
+    int32_t min_verbosity, bool check_errors,
+    const VkAllocationCallbacks* allocation_callbacks,
     iree_allocator_t host_allocator,
     iree_hal_vulkan_debug_reporter_t** out_reporter) {
   IREE_ASSERT_ARGUMENT(instance);
@@ -111,6 +120,7 @@ iree_status_t iree_hal_vulkan_debug_reporter_allocate(
   reporter->instance = instance;
   reporter->syms = syms;
   reporter->min_verbosity = min_verbosity;
+  reporter->check_errors = check_errors;
   reporter->allocation_callbacks = allocation_callbacks;
 
   VkDebugUtilsMessengerCreateInfoEXT create_info;
@@ -140,6 +150,9 @@ void iree_hal_vulkan_debug_reporter_free(
     reporter->syms->vkDestroyDebugUtilsMessengerEXT(
         reporter->instance, reporter->messenger,
         reporter->allocation_callbacks);
+  }
+  if (reporter->check_errors && reporter->did_error) {
+    IREE_ASSERT(0);
   }
   iree_allocator_free(host_allocator, reporter);
 
