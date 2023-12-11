@@ -46,6 +46,7 @@ iree_compiler_cc_library(
     srcs = [
         "CleanupNumericNarrowing.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",
+        "DecomposeConcat.cpp",
         "DetachElementwiseFromNamedOps.cpp",
         "EraseUnusedLinalgOperands.cpp",
         "ExpandTensorShapes.cpp",

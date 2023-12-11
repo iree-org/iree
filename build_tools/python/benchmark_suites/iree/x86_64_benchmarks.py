@@ -29,6 +29,14 @@ class Linux_x86_64_Benchmarks(object):
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
+        ],
+    )
+    CASCADELAKE_DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
+        id=unique_ids.IREE_COMPILE_CONFIG_LINUX_CASCADELAKE_DT_ONLY,
+        tags=["experimental-flags", "dt-only"],
+        compile_targets=[CASCADELAKE_CPU_TARGET],
+        extra_flags=[
+            "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=none",
         ],
     )
@@ -37,7 +45,7 @@ class Linux_x86_64_Benchmarks(object):
         tags=["default-flags", "dt-uk"],
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
-            "--iree-opt-data-tiling",
+            "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
         ],
     )
@@ -100,6 +108,12 @@ class Linux_x86_64_Benchmarks(object):
             cascadelake_devices,
             presets=[benchmark_presets.X86_64],
         )
+        dt_only_run_configs = self._generate(
+            model_groups.X86_64_BENCHMARK_CONFIG,
+            self.CASCADELAKE_DT_ONLY_COMPILE_CONFIG,
+            cascadelake_devices,
+            presets=[benchmark_presets.X86_64_DT_ONLY],
+        )
         dt_uk_run_configs = self._generate(
             model_groups.X86_64_BENCHMARK_CONFIG,
             self.CASCADELAKE_DT_UK_COMPILE_CONFIG,
@@ -113,7 +127,12 @@ class Linux_x86_64_Benchmarks(object):
             presets=[benchmark_presets.X86_64_LARGE],
         )
 
-        return no_dt_run_configs + dt_uk_run_configs + large_run_configs
+        return (
+            no_dt_run_configs
+            + dt_only_run_configs
+            + dt_uk_run_configs
+            + large_run_configs
+        )
 
 
 def generate() -> List[iree_definitions.E2EModelRunConfig]:

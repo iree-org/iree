@@ -413,7 +413,7 @@ def collect_all_compilation_metrics(
     return compile_metrics
 
 
-def _make_series_link(name: str, series_id: str) -> str:
+def make_series_link(name: str, series_id: str) -> str:
     """Add link to the given benchmark name.
 
     Args:
@@ -544,7 +544,7 @@ def _sort_benchmarks_and_get_table(
         base = benchmark.base_mean_time / 1e6
         ratio = abs(current - base) / base
         str_mean = _get_compare_text(current, base)
-        clickable_name = _make_series_link(benchmark.name, series_id)
+        clickable_name = make_series_link(benchmark.name, series_id)
         sorted_rows.append(
             (
                 ratio,
@@ -600,7 +600,7 @@ def categorize_benchmarks_into_tables(
         tables.append(md.header("Raw Latencies", 3))
         raw_list = [
             (
-                _make_series_link(name=v.name, series_id=k),
+                make_series_link(name=v.name, series_id=k),
                 f"{_get_fixed_point_str(v.mean_time / 1e6)}",
                 f"{_get_fixed_point_str(v.median_time / 1e6)}",
                 f"{_get_fixed_point_str(v.stddev_time / 1e6)}",
@@ -641,9 +641,7 @@ def _sort_metrics_objects_and_get_table(
             (
                 ratio,
                 (
-                    _make_series_link(
-                        str(metrics_obj), mapper.get_series_id(target_id)
-                    ),
+                    make_series_link(str(metrics_obj), mapper.get_series_id(target_id)),
                     _get_compare_text(current, base),
                 ),
             )
@@ -714,7 +712,7 @@ def categorize_compilation_metrics_into_tables(
             for mapper in COMPILATION_METRICS_TO_TABLE_MAPPERS:
                 current, base = mapper.get_current_and_base_value(metrics)
                 row.append(
-                    _make_series_link(
+                    make_series_link(
                         _get_compare_text(current, base),
                         mapper.get_series_id(target_id),
                     )

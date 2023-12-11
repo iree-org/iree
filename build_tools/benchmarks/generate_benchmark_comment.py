@@ -16,6 +16,7 @@ import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
 import argparse
+import collections
 import dataclasses
 import json
 from typing import Any, Dict, Optional, Set, Tuple
@@ -157,6 +158,61 @@ def _get_git_merge_base_commit(
     )
 
 
+def _get_experimental_dt_comparison_markdown(
+    execution_benchmarks: Dict[str, benchmark_presentation.AggregateBenchmarkLatency],
+) -> Optional[str]:
+    """Get the comparison table to compare different data-tiling options."""
+
+    dt_tags = {"no-dt": "No-DT (baseline)", "dt-only": "DT-Only", "dt-uk": "DT-UK"}
+    latency_map = collections.defaultdict(dict)
+    for bench_id, latency in execution_benchmarks.items():
+        dt_tag = next((tag for tag in dt_tags if tag in latency.name), None)
+        if dt_tag is None:
+            continue
+        # See build_tools/python/e2e_test_framework/definitions/iree_definitions.py
+        # for how benchmark names are constructed.
+        # Format: model_name gen_tags exec_tags ...
+        model, gen_tags, remaining = latency.name.split(" ", maxsplit=2)
+        # Format: [compile targets][tags]
+        compile_targets = gen_tags.split("][")[0] + "]"
+        key_name = " ".join([model, compile_targets, remaining])
+        latency_map[key_name][dt_tag] = (bench_id, latency.mean_time / 1e6)
+
+    if len(latency_map) == 0:
+        return None
+
+    # Compute speedup vs. the baseline.
+    table = {}
+    for key_name, data in latency_map.items():
+        baseline = data.get("no-dt")
+        baseline = None if baseline is None else baseline[1]
+        row = {}
+        for dt_tag in dt_tags:
+            pair = data.get(dt_tag)
+            if pair is None:
+                continue
+            bench_id, mean_time = pair
+            text = f"{mean_time:.03f}"
+            if baseline is not None:
+                text += f" ({(baseline / mean_time):.01f}X)"
+            row[dt_tag] = (bench_id, text)
+        table[key_name] = row
+
+    table_columns = [["Name"] + list(table.keys())]
+    for dt_tag, dt_name in dt_tags.items():
+        column = [dt_name]
+        for key_name, data in table.items():
+            pair = data.get(dt_tag)
+            if pair is None:
+                column.append("N/A")
+                continue
+            bench_id, text = pair
+            column.append(benchmark_presentation.make_series_link(text, bench_id))
+        table_columns.append(column)
+
+    return md.table(table_columns)
+
+
 def _get_benchmark_result_markdown(
     execution_benchmarks: Dict[str, benchmark_presentation.AggregateBenchmarkLatency],
     compilation_metrics: Dict[str, benchmark_presentation.CompilationMetrics],
@@ -177,6 +233,21 @@ def _get_benchmark_result_markdown(
     # Compose the abbreviated benchmark tables.
     abbr_table = [md.header(comment_def.title, 2)]
     abbr_table.append(commit_info_md)
+
+    # The temporary table to help compare different data-tiling options.
+    dt_cmp_table = _get_experimental_dt_comparison_markdown(
+        execution_benchmarks=execution_benchmarks
+    )
+    if dt_cmp_table is not None:
+        dt_cmp_header = md.header("Data-Tiling Comparison Table", 3)
+        full_table += [dt_cmp_header, dt_cmp_table]
+        abbr_table += [
+            dt_cmp_header,
+            "<details>",
+            "<summary>Click to show</summary>",
+            dt_cmp_table,
+            "</details>",
+        ]
 
     if len(execution_benchmarks) > 0:
         full_table.append(
