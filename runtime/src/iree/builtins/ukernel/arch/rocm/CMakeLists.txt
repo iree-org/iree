@@ -1,3 +1,7 @@
+if (NOT IREE_TARGET_BACKEND_ROCM)
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 set (_amd_ukernel_libs)
@@ -14,14 +18,13 @@ function(iree_rocm_bitcode_library)
   if(DEFINED _RULE_OUT)
     set(_OUT "${_RULE_OUT}")
   else()
-    set(_OUT "${_RULE_NAME}.bc")
+    set(_OUT "${_RULE_NAME}_${_RULE_ROCM_ARCH}.bc")
   endif()
 
   set(_ROCM_ARCH "${_RULE_ROCM_ARCH}")
 
   set(_COPTS
     "-x" "hip"
-
     # Target architecture.
     "--offload-arch=${_ROCM_ARCH}"
 
@@ -29,6 +32,9 @@ function(iree_rocm_bitcode_library)
     # and benign warning about ROCM version.
     "-nogpulib"
     "--offload-device-only"
+    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    "-Xclang" "-disable-llvm-optzns"
+    "-O3"
 
     # https://github.com/llvm/llvm-project/issues/54609
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
@@ -76,14 +82,13 @@ function(iree_rocm_bitcode_library)
       "Linking bitcode to ${_OUT}"
     VERBATIM
   )
-  set(_amd_ukernel_libs ${_amd_ukernel_libs} ${_BITCODE_FILE} PARENT_SCOPE)
-
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
   add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
     DEPENDS "${_OUT}"
   )
+  set(_amd_ukernel_libs ${_amd_ukernel_libs} ${_OUT} PARENT_SCOPE)
   set(_amd_ukernel_targets ${_amd_ukernel_targets} "${_PACKAGE_NAME}_${_RULE_NAME}" PARENT_SCOPE)
 endfunction()
 
@@ -112,7 +117,6 @@ foreach(_amd_ukernel_name ${_amd_ukernel_libs})
       "${_ukernel_bc_srcpath}"
       "${IREE_COMPILER_DYLIB_DIR}/${_ukernel_bc_relpath}"
   )
-
   # Note this bc file as being part of the bundle that must be included with
   # the compiler dylib.
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_RELPATHS "${_ukernel_bc_relpath}")
@@ -132,3 +136,10 @@ add_custom_target(iree_builtin_ROCM_UkernelDeviceLibs
   DEPENDS
     ${_all_ukernel_bc_files}
 )
+
+set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
+  iree_builtin_ROCM_UkernelDeviceLibs)
+
+# Install.
+install(FILES ${_all_ukernel_bc_files}
+  DESTINATION "${IREE_COMPILER_DYLIB_INSTALL_PREFIX}/${_platform_lib_reldir}")

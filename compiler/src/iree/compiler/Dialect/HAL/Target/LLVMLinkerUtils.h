@@ -53,6 +53,12 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
                                       llvm::TargetMachine &targetMachine,
                                       llvm::LLVMContext &context);
 
+LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
+                                      unsigned linkerFlags,
+                                      StringRef path,
+                                      llvm::TargetMachine &targetMachine,
+                                      llvm::LLVMContext &context);
+
 } // namespace mlir::iree_compiler::IREE::HAL
 
 #endif //  IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_

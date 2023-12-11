@@ -6,6 +6,7 @@
 
 #include "./ROCMTargetUtils.h"
 
+#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -27,12 +28,26 @@ namespace mlir::iree_compiler::IREE::HAL {
 // https://github.com/openxla/xla/blob/main/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.cc
 
 bool couldNeedDeviceBitcode(const llvm::Module &module) {
+  // TODO: Change name of prefix of ukernel and make it detectable here.
   for (const llvm::Function &function : module.functions()) {
     // The list of prefixes should be in sync with library functions used in
     // target_util.cc.
     if (!function.isIntrinsic() && function.isDeclaration() &&
         (function.getName().starts_with("__ocml_") ||
          function.getName().starts_with("__ockl_"))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool couldNeedUkernelBitcode(const llvm::Module &module) {
+  // TODO: Change name of prefix of ukernel and make it detectable here.
+  for (const llvm::Function &function : module.functions()) {
+    // The list of prefixes should be in sync with library functions used in
+    // target_util.cc.
+    if (!function.isIntrinsic() && function.isDeclaration() &&
+        (function.getName().startswith("__iree_uk_rocm_"))) {
       return true;
     }
   }
@@ -60,6 +75,7 @@ std::unique_ptr<llvm::Module> loadIRModule(const std::string &filename,
   return module;
 }
 
+// TODO: Make sure it's performantly linked here, make sure it's inlined.
 LogicalResult
 linkWithBitcodeVector(llvm::Module *module,
                       const std::vector<std::string> &bitcode_path_vector) {
@@ -77,6 +93,7 @@ linkWithBitcodeVector(llvm::Module *module,
         loadIRModule(bitcode_path, &module->getContext());
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
+    llvm::outs() << "BC:" << bitcode_path << "\n";
     bitcode_module->setDataLayout(module->getDataLayout());
     if (linker.linkInModule(
             std::move(bitcode_module), llvm::Linker::Flags::LinkOnlyNeeded,
@@ -103,6 +120,34 @@ static std::vector<std::string> getROCDLPaths(std::string targetChip,
   std::string app = "/";
   for (auto &filename : rocdlFilenames) {
     result.push_back(bitCodeDir + app + filename);
+  }
+  return result;
+}
+
+static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
+                                              std::string targetChip,
+                                              std::string bitCodeDir) {
+  // AMD bitcodes.
+  static const std::vector<std::string> allUkernelNames({"argmax"});
+  std::vector<std::string> selectedUkernelNames;
+  if (enabledUkernelsStr == "all") {
+    selectedUkernelNames = allUkernelNames;
+  }
+  else {
+    while (!enabledUkernelsStr.empty()) {
+      auto split = enabledUkernelsStr.split(',');
+      selectedUkernelNames.push_back(split.first.str());
+      enabledUkernelsStr = split.second;
+    }
+  }
+
+  // Construct full path to ROCDL bitcode libraries.
+  std::vector<std::string> result;
+  std::string app = "/";
+  std::string bc_ext = ".bc";
+  for (auto &kernelName : selectedUkernelNames) {
+    std::string filename = "rocm_" + kernelName + "_ukernel_" + targetChip;
+    result.push_back(bitCodeDir + app + filename + bc_ext);
   }
   return result;
 }
@@ -178,6 +223,21 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
   if (!succeeded(HAL::linkModuleWithGlobal(module, targetChip))) {
     llvm::WithColor::error(llvm::errs()) << "Fail to Link with Globals.\n";
   };
+}
+
+// Links optimized Ukernel bitcodes into the given module if the module needs it.
+void linkUkernelBCIfNecessary(llvm::Module *module, Location loc, StringRef enabledUkernelsStr, std::string targetChip,
+                          std::string bitCodeDir, unsigned linkerFlags, llvm::TargetMachine &targetMachine) {
+  if (!couldNeedUkernelBitcode(*module)) {
+    return;
+  }
+  std::vector<std::string> ukernelPaths = getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
+  llvm::Linker linker(*module);
+  for (auto & path : ukernelPaths) {
+    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, StringRef(path), targetMachine, module->getContext()))) {
+      llvm::WithColor::error(llvm::errs()) << "Fail to Link Ukernel.\n";
+    }
+  }
 }
 
 //===========Link LLVM Module to ROCDL End===================/

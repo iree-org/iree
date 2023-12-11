@@ -105,7 +105,7 @@ getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID, Rewrite
                      IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
-    result.name = std::string("rocm_") + ukernelName + "_" + typeSuffixID;
+    result.name = std::string("__iree_uk_rocm_") + ukernelName + "_" + typeSuffixID;
     // TODO(#12327): Based on description in the issue, add an attribute
     // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
     // backend (obviously), but is enough to unblock while the proper fix

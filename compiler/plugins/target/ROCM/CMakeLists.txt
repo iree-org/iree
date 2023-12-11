@@ -142,10 +142,6 @@ add_custom_command(
     ${_all_device_bc_copy_commands}
 )
 
-if (iree_builtin_ROCM_UkernelDeviceLibs)
-  message("FOUNDZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ Ukernel target")
-endif()
-
 add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
   DEPENDS
     iree_builtin_ROCM_UkernelDeviceLibs
