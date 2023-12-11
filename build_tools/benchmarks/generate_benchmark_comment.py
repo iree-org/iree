@@ -170,7 +170,7 @@ def _get_experimental_dt_comparison_markdown(
         if dt_tag is None:
             continue
         # See build_tools/python/e2e_test_framework/definitions/iree_definitions.py
-        # for how benchmark name are constructed.
+        # for how benchmark names are constructed.
         # Format: model_name gen_tags exec_tags ...
         model, gen_tags, remaining = latency.name.split(" ", maxsplit=2)
         # Format: [compile targets][tags]
