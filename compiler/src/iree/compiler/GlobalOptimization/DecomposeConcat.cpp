@@ -32,7 +32,11 @@ static Value createTranspose(OpBuilder &builder, Value source,
       ->getResult(0);
 }
 
-// For narrowable inputs, selects
+// Transposes the concatenation dimension to happen along the inner most
+// non-unit dim of the inputs. The idea is that outer dim concatentations
+// can lower to `flow.tensor.update` and ideally disappear, in the worst case
+// becoming a sequence of copies. The hope then is that the transposes on the
+// inputs and output is then fusable with surrounding operations.
 struct TransposeInnerConcatenation : public OpRewritePattern<tensor::ConcatOp> {
   using OpRewritePattern::OpRewritePattern;
 
