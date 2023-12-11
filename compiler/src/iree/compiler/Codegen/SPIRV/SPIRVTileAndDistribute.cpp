@@ -81,26 +81,14 @@ tileToInvocationPatterns(func::FuncOp funcOp,
   funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
 
   for (auto op : candidates) {
-#if 0
-    FailureOr<linalg::TiledLinalgOp> res =
-        linalg::tileLinalgOp(rewriter, op, tilingOptions);
-    if (failed(res)) {
-      return failure();
-    }
-    filter.replaceLinalgTransformationFilter(rewriter, res->op);
-    if (res->tensorResults.empty()) {
-      rewriter.eraseOp(op);
-    } else {
-      rewriter.replaceOp(op, res->tensorResults);
-    }
-#endif
     FailureOr<IREETilingResult> res =
         tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
     if (failed(res)) {
       return failure();
     }
-    for (auto tiledOp : res->tiledOps)
+    for (auto tiledOp : res->tiledOps) {
       filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
   }
 
   return success();
