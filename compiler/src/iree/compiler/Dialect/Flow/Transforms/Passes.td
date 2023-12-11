@@ -241,12 +241,6 @@ def OutlineDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
-def RaiseSpecialOps :
-    Pass<"iree-flow-raise-special-ops", ""> {
-  let summary = "raise special ops like softmax to the high level linalg.ext representation";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createRaiseSpecialOps()";
-}
-
 def SplitReduction :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";

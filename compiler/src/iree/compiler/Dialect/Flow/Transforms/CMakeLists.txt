@@ -55,7 +55,6 @@ iree_cc_library(
     "OutlineDispatchRegions.cpp"
     "PassDetail.h"
     "Passes.cpp"
-    "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
