@@ -76,7 +76,7 @@ jobs:
             arch: "armv8.2-a"
             docker_image: "gcr.io/iree-oss/android@sha256:d349a3d137d0ed0f7360af16096db682da0233679cdbb00a326150149e3c4fa4"
             build_script: "./build_tools/cmake/build_android.sh"
-            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-arm_64-52b6af88"
+            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-arm_64-af73dba7"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
