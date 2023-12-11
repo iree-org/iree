@@ -60,31 +60,6 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     // Replace the result of linalg::softmax with the `result` generated via
     // the decomposition above.
     rewriter.replaceOp(decomposableSoftmaxOp, *result);
-
-    // // Fusion later depends on couple of Ops/Values - we try to obtain the same
-    // // by backtracking through the generated value's def-chain.
-    // Operation *resultOp = (*result)[0].getDefiningOp();
-    // Value numerator = resultOp->getOperand(0);
-    // Operation *numeratorOp = numerator.getDefiningOp();
-
-    // // Rematerialize operands that are marked for this.
-    // SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
-    //     numerator.getUses(), [](OpOperand &use) { return &use; }));
-    // for (OpOperand *use : uses) {
-    //   Operation *consumer = use->getOwner();
-    //   OpBuilder::InsertionGuard g(rewriter);
-    //   rewriter.setInsertionPoint(consumer);
-    //   FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
-    //       linalg::fuseElementwiseOps(rewriter, use);
-    //   if (succeeded(fusionResult)) {
-    //     SmallVector<Value> replacements = llvm::to_vector(
-    //         llvm::map_range(consumer->getResults(), [&](Value oldValue) {
-    //           return fusionResult->replacements.lookup(oldValue);
-    //         }));
-    //     rewriter.replaceOp(consumer, replacements);
-    //   }
-    // }
-    // toDelete.push_back(numeratorOp);
   }
   for (Operation *op : toDelete) {
     rewriter.eraseOp(op);
