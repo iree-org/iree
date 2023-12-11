@@ -22,7 +22,9 @@ __all__ = [
 
 class SplatValue:
     def __init__(
-        self, pattern: Union[array.array, numpy.ndarray], count: Union[Sequence[int], int]
+        self,
+        pattern: Union[array.array, numpy.ndarray],
+        count: Union[Sequence[int], int],
     ):
         if hasattr(pattern, "shape"):
             shape = pattern.shape
