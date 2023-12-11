@@ -759,58 +759,42 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       }
     });
 
-    for (std::pair<linalg::LinalgOp, Value> softmax : softmaxRoots) {
-      linalg::LinalgOp op = softmax.first;
-      Value src = softmax.second;
-      rewriter.setInsertionPoint(softmax.first);
+    for (auto [softmaxOp, src] : softmaxRoots) {
+      rewriter.setInsertionPoint(softmaxOp);
       rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
-          op, op->getResultTypes(), src, op.getDpsInitOperand(0)->get(),
-          op.getNumLoops() - 1);
+          softmaxOp, softmaxOp->getResultTypes(), src,
+          softmaxOp.getDpsInitOperand(0)->get(), softmaxOp.getNumLoops() - 1);
     }
 
-    for (std::pair<linalg::MatmulOp, Value> aTransposeBMatmul :
-         transposeMatmulRoots) {
-      auto matmulOp = aTransposeBMatmul.first;
+    for (auto [matmulOp, newRhs] : transposeMatmulRoots) {
       Value lhs = matmulOp.getDpsInputOperand(0)->get();
-      auto newRhs = aTransposeBMatmul.second;
       Value init = matmulOp.getDpsInitOperand(0)->get();
       rewriter.setInsertionPoint(matmulOp);
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
       rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
           matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
-    for (std::pair<linalg::BatchMatmulOp, Value> aTransposeBBatchMatmul :
-         transposeBatchMatmulRoots) {
-      auto bmmOp = aTransposeBBatchMatmul.first;
+    for (auto [bmmOp, newRhs] : transposeBatchMatmulRoots) {
       Value lhs = bmmOp.getDpsInputOperand(0)->get();
-      auto newRhs = aTransposeBBatchMatmul.second;
       Value init = bmmOp.getDpsInitOperand(0)->get();
       rewriter.setInsertionPoint(bmmOp);
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
       rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
           bmmOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
-    for (std::pair<linalg::GenericOp, Value> genericFill : genericFills) {
-      auto genericOp = genericFill.first;
-      Value fillInput = genericFill.second;
+    for (auto [genericOp, fillInput] : genericFills) {
       Value init = genericOp.getDpsInitOperand(0)->get();
       rewriter.setInsertionPoint(genericOp);
       SmallVector<NamedAttribute> attrs = getPrunedAttributeList(genericOp);
       rewriter.replaceOpWithNewOp<linalg::FillOp>(
           genericOp, ValueRange{fillInput}, ValueRange{init}, attrs);
     }
-    for (std::pair<tensor::InsertSliceOp, Value> catNegateAndSlice :
-         catAsInsertNegateAndSliceRoots) {
-      auto sliceOp = catNegateAndSlice.first;
-      Value res =
-          rewriteCatNegateAndSlice(rewriter, sliceOp, catNegateAndSlice.second);
+    for (auto [sliceOp, input] : catAsInsertNegateAndSliceRoots) {
+      Value res = rewriteCatNegateAndSlice(rewriter, sliceOp, input);
       rewriter.replaceOp(sliceOp, res);
     }
-    for (std::pair<tensor::ConcatOp, Value> catNegateAndSlice :
-         catNegateAndSliceRoots) {
-      auto concatOp = catNegateAndSlice.first;
-      Value res = rewriteCatNegateAndSlice(rewriter, concatOp,
-                                           catNegateAndSlice.second);
+    for (auto [concatOp, input] : catNegateAndSliceRoots) {
+      Value res = rewriteCatNegateAndSlice(rewriter, concatOp, input);
       rewriter.replaceOp(concatOp, res);
     }
   }
