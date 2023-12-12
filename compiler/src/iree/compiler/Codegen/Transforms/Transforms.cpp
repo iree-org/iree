@@ -758,4 +758,33 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 }
 
+LogicalResult
+tileLinalgOpsWithFilter(func::FuncOp funcOp,
+                        linalg::LinalgTilingOptions tilingOptions,
+                        IREE::LinalgExt::LinalgTransformationFilter filter) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<linalg::LinalgOp> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) {
+    if (succeeded(filter.checkAndNotify(rewriter, op))) {
+      candidates.push_back(op);
+    }
+  });
+
+  for (auto op : candidates) {
+    FailureOr<linalg::TiledLinalgOp> res =
+        linalg::tileLinalgOp(rewriter, op, tilingOptions);
+    if (failed(res)) {
+      return failure();
+    }
+    filter.replaceLinalgTransformationFilter(rewriter, res->op);
+    if (res->tensorResults.empty()) {
+      rewriter.eraseOp(op);
+    } else {
+      rewriter.replaceOp(op, res->tensorResults);
+    }
+  }
+
+  return success();
+}
+
 } // namespace mlir::iree_compiler

@@ -53,36 +53,6 @@ using IREE::LinalgExt::LinalgTransformationFilter;
 // For optimal performance we always want to copy 128 bits
 static constexpr int copyVectorNumBits = 128;
 
-/// Tiles and distributes the generic ops that match filter.
-static LogicalResult
-tileLinalgOpsWithFilter(func::FuncOp funcOp,
-                        linalg::LinalgTilingOptions tilingOptions,
-                        LinalgTransformationFilter filter) {
-  IRRewriter rewriter(funcOp.getContext());
-  SmallVector<linalg::LinalgOp> candidates;
-  funcOp.walk([&](linalg::LinalgOp op) {
-    if (succeeded(filter.checkAndNotify(rewriter, op))) {
-      candidates.push_back(op);
-    }
-  });
-
-  for (auto op : candidates) {
-    FailureOr<linalg::TiledLinalgOp> res =
-        linalg::tileLinalgOp(rewriter, op, tilingOptions);
-    if (failed(res)) {
-      return failure();
-    }
-    filter.replaceLinalgTransformationFilter(rewriter, res->op);
-    if (res->tensorResults.empty()) {
-      rewriter.eraseOp(op);
-    } else {
-      rewriter.replaceOp(op, res->tensorResults);
-    }
-  }
-
-  return success();
-}
-
 /// Tiles copy to shared memory mapping. Copy to shared memory are not part of
 /// the launch config but needs to be distributed on the workgroup picked by the
 /// root op.

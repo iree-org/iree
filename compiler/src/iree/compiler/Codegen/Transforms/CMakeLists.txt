@@ -20,6 +20,7 @@ iree_cc_library(
     "RemoveSingleIterationLoop.cpp"
     "Transforms.cpp"
   DEPS
+    IREELinalgExtTransforms
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
