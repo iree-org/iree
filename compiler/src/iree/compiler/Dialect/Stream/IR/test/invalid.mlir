@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file %s --verify-diagnostics | FileCheck %s
+// RUN: iree-opt --split-input-file %s --verify-diagnostics
 
 stream.executable private @executable {
   stream.executable.export public @dispatch
