@@ -15,6 +15,10 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
+IREE_FLAG(
+    bool, hip_async_allocations, true,
+    "Enables HIP asynchronous stream-ordered allocations when supported.");
+
 IREE_FLAG(int32_t, hip_default_index, 0,
           "Specifies the index of the default HIP device to use");
 
@@ -52,10 +56,14 @@ static iree_status_t iree_hal_hip_driver_factory_try_create(
   iree_hal_hip_driver_options_t driver_options;
   iree_hal_hip_driver_options_initialize(&driver_options);
 
+  iree_hal_hip_device_params_t device_params;
+  iree_hal_hip_device_params_initialize(&device_params);
+  device_params.async_allocations = FLAG_hip_async_allocations;
+
   driver_options.default_device_index = FLAG_hip_default_index;
 
   iree_status_t status = iree_hal_hip_driver_create(
-      driver_name, &driver_options, host_allocator, out_driver);
+      driver_name, &driver_options, &device_params, host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
 

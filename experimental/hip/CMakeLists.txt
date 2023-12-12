@@ -29,6 +29,8 @@ iree_cc_library(
     "hip_allocator.h"
     "hip_buffer.c"
     "hip_buffer.h"
+    "hip_device.c"
+    "hip_device.h"
     "hip_driver.c"
     "memory_pools.c"
     "memory_pools.h"
@@ -38,7 +40,10 @@ iree_cc_library(
     ::dynamic_symbols
     iree::base
     iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::arena
     iree::hal
+    iree::hal::utils::buffer_transfer
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
