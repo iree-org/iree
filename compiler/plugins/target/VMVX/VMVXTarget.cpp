@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
-
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
@@ -16,6 +14,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/VMVX/Transforms/Passes.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -25,19 +24,27 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-static llvm::cl::opt<bool> clEnableMicrokernels(
-    "iree-vmvx-enable-microkernels",
-    llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"),
-    llvm::cl::init(false));
+namespace {
+struct VMVXOptions {
+  bool enableMicrokernels = false;
+
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("VMVX HAL Target");
+    binder.opt<bool>(
+        "iree-vmvx-enable-microkernels", enableMicrokernels,
+        llvm::cl::cat(category),
+        llvm::cl::desc("Enables microkernel lowering for vmvx (experimental)"));
+  }
+};
+} // namespace
 
 static IREE::HAL::ExecutableTargetAttr
-getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
-                        StringRef format) {
+getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
+                        StringRef backend, StringRef format) {
   SmallVector<NamedAttribute> config;
-  config.emplace_back(StringAttr::get(context, "ukernels"),
-                      StringAttr::get(context, clEnableMicrokernels.getValue()
-                                                   ? "all"
-                                                   : "none"));
+  config.emplace_back(
+      StringAttr::get(context, "ukernels"),
+      StringAttr::get(context, enableMicrokernels ? "all" : "none"));
   return IREE::HAL::ExecutableTargetAttr::get(
       context, StringAttr::get(context, backend),
       StringAttr::get(context, format), DictionaryAttr::get(context, config));
@@ -45,7 +52,7 @@ getVMVXExecutableTarget(MLIRContext *context, StringRef backend,
 
 class VMVXTargetBackend final : public TargetBackend {
 public:
-  VMVXTargetBackend() = default;
+  VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
 
   std::string name() const override { return "vmvx"; }
 
@@ -101,7 +108,7 @@ public:
     buildVMVXLinkingPassPipeline(passManager);
   }
 
-  LogicalResult serializeExecutable(const SerializationOptions &options,
+  LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
     // Add reflection information used at runtime specific to the HAL interface.
@@ -134,8 +141,8 @@ public:
                << "failed to serialize VM bytecode module";
       }
     }
-    if (!options.dumpBinariesPath.empty()) {
-      dumpDataToPath<char>(options.dumpBinariesPath, options.dumpBaseName,
+    if (!serOptions.dumpBinariesPath.empty()) {
+      dumpDataToPath<char>(serOptions.dumpBinariesPath, serOptions.dumpBaseName,
                            variantOp.getName(), ".vmfb", moduleData);
     }
 
@@ -160,15 +167,17 @@ private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
-    targetAttrs.push_back(
-        getVMVXExecutableTarget(context, "vmvx", "vmvx-bytecode-fb"));
+    targetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
     return ArrayAttr::get(context, targetAttrs);
   }
+
+  const VMVXOptions &options;
 };
 
 class VMVXInlineTargetBackend final : public TargetBackend {
 public:
-  VMVXInlineTargetBackend() = default;
+  VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
 
   std::string name() const override { return "vmvx-inline"; }
 
@@ -204,20 +213,40 @@ private:
   ArrayAttr getExecutableTargets(MLIRContext *context) const {
     SmallVector<Attribute> targetAttrs;
     // This is where we would multiversion.
-    targetAttrs.push_back(
-        getVMVXExecutableTarget(context, "vmvx-inline", "vmvx-ir"));
+    targetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
     return ArrayAttr::get(context, targetAttrs);
+  }
+
+  const VMVXOptions &options;
+};
+
+namespace {
+struct VMVXSession
+    : public PluginSession<VMVXSession, VMVXOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    // #hal.device.target<"vmvx", ...
+    // #hal.executable.target<"vmvx", ...
+    targets.add("vmvx",
+                [&]() { return std::make_shared<VMVXTargetBackend>(options); });
+    // #hal.device.target<"vmvx-inline", ...
+    // #hal.executable.target<"vmvx-inline", ...
+    targets.add("vmvx-inline", [&]() {
+      return std::make_shared<VMVXInlineTargetBackend>(options);
+    });
   }
 };
 
-void registerVMVXTargetBackends() {
-  // #hal.device.target<"vmvx", ...
-  // #hal.executable.target<"vmvx", ...
-  static TargetBackendRegistration registration0(
-      "vmvx", [=]() { return std::make_shared<VMVXTargetBackend>(); });
-  static TargetBackendRegistration registration1("vmvx-inline", [=]() {
-    return std::make_shared<VMVXInlineTargetBackend>();
-  });
-}
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
+
+extern "C" bool iree_register_compiler_plugin_hal_target_vmvx(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::VMVXSession>(
+      "hal_target_vmvx");
+  return true;
+}
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(mlir::iree_compiler::IREE::HAL::VMVXOptions);
