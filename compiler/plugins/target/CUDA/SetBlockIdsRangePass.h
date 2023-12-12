@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
+#ifndef IREE_COMPILER_PLUGINS_TARGET_CUDA_SETBLOCKIDSRANGEPASS_H_
+#define IREE_COMPILER_PLUGINS_TARGET_CUDA_SETBLOCKIDSRANGEPASS_H_
 
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
@@ -25,4 +25,4 @@ private:
 
 } // namespace llvm
 
-#endif // IREE_COMPILER_DIALECT_HAL_TARGET_CUDA_PASS_H_
+#endif // IREE_COMPILER_PLUGINS_TARGET_CUDA_SETBLOCKIDSRANGEPASS_H_

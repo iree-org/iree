@@ -21,7 +21,7 @@ iree_cc_library(
   NAME
     CUDA
   HDRS
-    "LLVMPasses.h"
+    "SetBlockIdsRangePass.h"
   SRCS
     "CUDATarget.cpp"
     "SetBlockIdsRangePass.cpp"
