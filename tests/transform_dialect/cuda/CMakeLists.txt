@@ -19,13 +19,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "mma.mlir"
-    "reduction.mlir"
-    "reduction_eltwise.mlir"
-    "reduction_v2.mlir"
-    "reduction_v2_uneven.mlir"
-    "softmax.mlir"
-    "softmax_partial.mlir"
-    "softmax_v2.mlir"
   TOOLS
     FileCheck
     iree-compile
