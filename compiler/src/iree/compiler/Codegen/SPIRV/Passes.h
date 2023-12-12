@@ -152,6 +152,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileToCooperativeOpsPass();
 
+// Trims the SPIR-V target environment of a HAL executable variant to the
+// minimal requirement per the compiled spirv.module op needs.
+std::unique_ptr<OperationPass<ModuleOp>>
+createSPIRVTrimExecutableTargetEnvPass();
+
 /// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVVectorToGPUSubgroupMMAOpsPass();

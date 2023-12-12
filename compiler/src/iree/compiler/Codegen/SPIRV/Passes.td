@@ -133,6 +133,15 @@ def SPIRVTileToCooperativeOps : Pass<
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
 }
 
+def SPIRVTrimExecutableTargetEnv :
+    Pass<"iree-spirv-trim-executable-target-env", "ModuleOp"> {
+  let summary = "Trim the SPIR-V target environment of a HAL executable "
+                "variant to the minimal requirement per the compiled "
+                "spirv.module op needs";
+  let constructor =
+    "mlir::iree_compiler::createSPIRVTrimExecutableTargetEnvPass()";
+}
+
 def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
