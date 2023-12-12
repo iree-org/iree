@@ -17,6 +17,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+bool IsSPIRVBasedBackend(StringRef backend) {
+  return backend.starts_with("vulkan") || backend.starts_with("metal") ||
+         backend.starts_with("webgpu");
+}
+
 struct SPIRVTrimExecutableTargetEnvPass final
     : SPIRVTrimExecutableTargetEnvBase<SPIRVTrimExecutableTargetEnvPass> {
   void runOnOperation() override {
@@ -24,6 +29,9 @@ struct SPIRVTrimExecutableTargetEnvPass final
 
     for (auto executable : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       for (auto variant : executable.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        if (!IsSPIRVBasedBackend(variant.getTarget().getBackend())) {
+          continue;
+        }
         if (variant.getObjects().has_value()) {
           // Ignore external executable variants. We need to read spirv.module
           // ops to get the deduced minimal list of required capability and
