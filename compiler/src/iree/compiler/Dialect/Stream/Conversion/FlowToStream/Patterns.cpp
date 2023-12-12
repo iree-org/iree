@@ -756,6 +756,25 @@ static void convertReturnOps(Region &region) {
   });
 }
 
+template <typename FlowOpT, typename StreamOpT>
+static void replaceDispatchWorkgroupInfoOp(FlowOpT op,
+                                           PatternRewriter &rewriter) {
+  rewriter.replaceOpWithNewOp<StreamOpT>(op, op.getResult().getType(),
+                                         op.getDimension());
+}
+
+template <typename FlowOpT, typename StreamOpT>
+struct ConvertDispatchWorkgroupInfoOp : public OpConversionPattern<FlowOpT> {
+  using OpConversionPattern<FlowOpT>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(FlowOpT op, typename FlowOpT::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<StreamOpT>(op, op.getResult().getType(),
+                                           adaptor.getDimension());
+    return success();
+  }
+};
+
 struct ConvertExecutableOp
     : public OpConversionPattern<IREE::Flow::ExecutableOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -828,6 +847,31 @@ struct ConvertExecutableOp
 
         funcOp.setType(rewriter.getFunctionType(newTypes, {}));
       }
+
+      // Walk the module and replace some ops that we don't rely on the pattern
+      // rewriter for today. This is pretty shady and a side-effect of
+      // recursively marking the stream executable contents as legal - if we
+      // didn't do that (and converted all flow ops) we could drop this logic
+      // and rely only the patterns.
+      moduleOp.walk([&](Operation *op) {
+        TypeSwitch<Operation *>(op)
+            .Case<IREE::Flow::DispatchWorkgroupIDOp>([&](auto op) {
+              replaceDispatchWorkgroupInfoOp<
+                  IREE::Flow::DispatchWorkgroupIDOp,
+                  IREE::Stream::DispatchWorkgroupIDOp>(op, rewriter);
+            })
+            .Case<IREE::Flow::DispatchWorkgroupCountOp>([&](auto op) {
+              replaceDispatchWorkgroupInfoOp<
+                  IREE::Flow::DispatchWorkgroupCountOp,
+                  IREE::Stream::DispatchWorkgroupCountOp>(op, rewriter);
+            })
+            .Case<IREE::Flow::DispatchWorkgroupSizeOp>([&](auto op) {
+              replaceDispatchWorkgroupInfoOp<
+                  IREE::Flow::DispatchWorkgroupSizeOp,
+                  IREE::Stream::DispatchWorkgroupSizeOp>(op, rewriter);
+            })
+            .Default([&](auto *op) {});
+      });
     }
 
     rewriter.eraseOp(flowOp);
@@ -868,6 +912,14 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
   patterns.insert<ConvertDispatchOp>(typeConverter, context);
   patterns.insert<ConvertFuncOp, ConvertCallOp>(typeConverter, context);
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
+  patterns.insert<
+      ConvertDispatchWorkgroupInfoOp<IREE::Flow::DispatchWorkgroupIDOp,
+                                     IREE::Stream::DispatchWorkgroupIDOp>,
+      ConvertDispatchWorkgroupInfoOp<IREE::Flow::DispatchWorkgroupCountOp,
+                                     IREE::Stream::DispatchWorkgroupCountOp>,
+      ConvertDispatchWorkgroupInfoOp<IREE::Flow::DispatchWorkgroupSizeOp,
+                                     IREE::Stream::DispatchWorkgroupSizeOp>>(
+      typeConverter, context);
   patterns.insert<ConvertReturnOp>(typeConverter, context);
 }
 

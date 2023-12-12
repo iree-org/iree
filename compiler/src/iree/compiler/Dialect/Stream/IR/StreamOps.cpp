@@ -3716,6 +3716,59 @@ LogicalResult BindingSubspanOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.dispatch.workgroup.*
+//===----------------------------------------------------------------------===//
+
+static void getAsmResultNamesForDispatchWorkgroupInfoOp(
+    StringRef prefix, const APInt &dimension, Value result,
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result, (prefix + std::to_string(dimension.getZExtValue())).str());
+}
+
+static LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op,
+                                                   uint64_t dimension) {
+  if (dimension < 0 || dimension >= 3) {
+    return op->emitOpError()
+           << "dimension " << dimension
+           << " out of bounds of dispatch dimensions; expected [0, 3)";
+  }
+  return success();
+}
+
+void DispatchWorkgroupIDOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_id_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupIDOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp(
+      "workgroup_count_", getDimension(), getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupCountOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_size_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupSizeOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+//===----------------------------------------------------------------------===//
 // stream.yield
 //===----------------------------------------------------------------------===//
 
