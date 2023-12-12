@@ -62,7 +62,7 @@ set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT ON)
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
   set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 endif()
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
@@ -614,7 +614,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     hip
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
   DRIVER_TARGET
     iree::experimental::hip::registration
