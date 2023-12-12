@@ -28,7 +28,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 // https://github.com/openxla/xla/blob/main/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.cc
 
 bool couldNeedDeviceBitcode(const llvm::Module &module) {
-  // TODO: Change name of prefix of ukernel and make it detectable here.
   for (const llvm::Function &function : module.functions()) {
     // The list of prefixes should be in sync with library functions used in
     // target_util.cc.
@@ -42,7 +41,6 @@ bool couldNeedDeviceBitcode(const llvm::Module &module) {
 }
 
 bool couldNeedUkernelBitcode(const llvm::Module &module) {
-  // TODO: Change name of prefix of ukernel and make it detectable here.
   for (const llvm::Function &function : module.functions()) {
     // The list of prefixes should be in sync with library functions used in
     // target_util.cc.
@@ -75,7 +73,6 @@ std::unique_ptr<llvm::Module> loadIRModule(const std::string &filename,
   return module;
 }
 
-// TODO: Make sure it's performantly linked here, make sure it's inlined.
 LogicalResult
 linkWithBitcodeVector(llvm::Module *module,
                       const std::vector<std::string> &bitcode_path_vector) {
@@ -93,7 +90,6 @@ linkWithBitcodeVector(llvm::Module *module,
         loadIRModule(bitcode_path, &module->getContext());
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
-    llvm::outs() << "BC:" << bitcode_path << "\n";
     bitcode_module->setDataLayout(module->getDataLayout());
     if (linker.linkInModule(
             std::move(bitcode_module), llvm::Linker::Flags::LinkOnlyNeeded,

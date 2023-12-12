@@ -100,16 +100,4 @@
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16F32 0x0500
 #define IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_BF16BF16BF16 0x0600
 
-//===----------------------------------------------------------------------===//
-// argmax
-//===----------------------------------------------------------------------===//
-
-// type enum
-#define IREE_UK_FLAG_ARGMAX_TYPE_MASK 0xFF
-#define IREE_UK_FLAG_ARGMAX_TYPE_NONE 0x00
-#define IREE_UK_FLAG_ARGMAX_TYPE_F16I32 0x01
-#define IREE_UK_FLAG_ARGMAX_TYPE_F16I64 0x02
-#define IREE_UK_FLAG_ARGMAX_TYPE_F32I32 0x03
-#define IREE_UK_FLAG_ARGMAX_TYPE_F32I64 0x04
-
 #endif  // IREE_BUILTINS_UKERNEL_EXPORTED_BITS_H_

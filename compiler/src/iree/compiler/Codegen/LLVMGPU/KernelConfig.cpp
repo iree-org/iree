@@ -1092,7 +1092,9 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   if (numParallelLoops != (numLoops - 1)) {
     return failure();
   }
-  // TODO: Add more checks on affine maps.
+  // TODO: Add better affine map checks.
+  auto indexing_maps = genericOp.getIndexingMapsArray();
+  if (!indexing_maps[0].isIdentity()) return failure();
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
@@ -1133,15 +1135,21 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
     if (!producer || producer->getNumOperands() == 0) {
       return failure();
     }
-    if (!matchPattern(producer, m_Op<arith::CmpFOp>())) {
+    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
+    if (!producerCmpFOp) {
       return failure();
     }
-    // TODO: Add dyn_cast and check CMPF-Predicate is OGT.
+    if (producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
+      return failure();
+    }
+
     // Check that in and out of cmpf are loop variables.
-    // if (producer->getOperand(0) != genericOp.getBody()->getArgument(0) ||
-    // producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-    //   return failure();
-    // }
+    // Currently first operand is disabled because it may be mixed type
+    // which would lead it to be extf(%arg0).
+    // TODO: Add better mixed type support check.
+    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
+      return failure();
+    }
   }
 
   return success();

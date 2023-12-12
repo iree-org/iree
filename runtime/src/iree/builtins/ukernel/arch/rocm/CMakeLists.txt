@@ -47,7 +47,7 @@ function(iree_rocm_bitcode_library)
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})
     get_filename_component(_BITCODE_SRC_PATH "${_SRC}" REALPATH)
-    set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}.bc")
+    set(_BITCODE_FILE "${_RULE_NAME}_${_SRC}_${_ROCM_ARCH}.bc")
     list(APPEND _BITCODE_FILES ${_BITCODE_FILE})
     add_custom_command(
       OUTPUT
@@ -85,21 +85,25 @@ function(iree_rocm_bitcode_library)
   # Only add iree_${NAME} as custom target doesn't support aliasing to
   # iree::${NAME}.
   iree_package_name(_PACKAGE_NAME)
-  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}"
+  add_custom_target("${_PACKAGE_NAME}_${_RULE_NAME}_${_ROCM_ARCH}"
     DEPENDS "${_OUT}"
   )
   set(_amd_ukernel_libs ${_amd_ukernel_libs} ${_OUT} PARENT_SCOPE)
-  set(_amd_ukernel_targets ${_amd_ukernel_targets} "${_PACKAGE_NAME}_${_RULE_NAME}" PARENT_SCOPE)
+  set(_amd_ukernel_targets ${_amd_ukernel_targets} "${_PACKAGE_NAME}_${_RULE_NAME}_${_ROCM_ARCH}" PARENT_SCOPE)
 endfunction()
 
-iree_rocm_bitcode_library(
-  NAME
-    rocm_argmax_ukernel
-  ROCM_ARCH
-    gfx940
-  SRCS
-    "argmax_ukernel.c"
-)
+# TODO: Decide what to build by default.
+set(_amd_ukernel_chips "gfx90a" "gfx940" "gfx1030" "gfx1100")
+foreach(_amd_chip ${_amd_ukernel_chips})
+  iree_rocm_bitcode_library(
+    NAME
+      rocm_argmax_ukernel
+    ROCM_ARCH
+      ${_amd_chip}
+    SRCS
+      "argmax_ukernel.c"
+  )
+endforeach()
 
 # Copy UKernel into platform dir.
 set(_platform_lib_reldir "iree_platform_libs/rocm")
@@ -136,9 +140,6 @@ add_custom_target(iree_builtin_ROCM_UkernelDeviceLibs
   DEPENDS
     ${_all_ukernel_bc_files}
 )
-
-set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
-  iree_builtin_ROCM_UkernelDeviceLibs)
 
 # Install.
 install(FILES ${_all_ukernel_bc_files}

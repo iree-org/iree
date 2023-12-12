@@ -20,7 +20,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size
     uint idx = laneCount * i + laneID;
     float new_in = idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f32(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -43,7 +43,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer, size
     uint idx = laneCount * i + laneID;
     float new_in = idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f32(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -67,7 +67,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half* inputBuffer, size_
     uint idx = laneCount * i + laneID;
     half new_in = idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f16(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -91,7 +91,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half* inputBuffer, size_
     uint idx = laneCount * i + laneID;
     half new_in = idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f16(new_in, laneMax);
   }
 
   // Final reduction with one subgroup

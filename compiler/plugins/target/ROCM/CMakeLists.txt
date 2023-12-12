@@ -141,16 +141,15 @@ add_custom_command(
   POST_BUILD
     ${_all_device_bc_copy_commands}
 )
-
 add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
   DEPENDS
-    iree_builtin_ROCM_UkernelDeviceLibs
     ${_all_device_bc_files}
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
 set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
-  iree_compiler_plugins_target_ROCM_GenDeviceLibs)
+  iree_compiler_plugins_target_ROCM_GenDeviceLibs
+  iree_builtin_ROCM_UkernelDeviceLibs)
 
 # Install.
 install(FILES ${_all_device_bc_files}

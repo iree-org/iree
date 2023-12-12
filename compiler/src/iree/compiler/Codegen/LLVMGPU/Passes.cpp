@@ -485,7 +485,6 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
 }
 
 void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
-  //   tileAndBufferize(pm);
   tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   if (enableMicrokernels) {
