@@ -55,9 +55,9 @@ stream.executable private @func_a_ex_0 {
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi32>>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi32>>
       %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<4xi32>>
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+      %workgroup_size_0 = stream.dispatch.workgroup.size[0] : index
+      %workgroup_id_0 = stream.dispatch.workgroup.id[0] : index
+      %workgroup_count_0 = stream.dispatch.workgroup.count[0] : index
       %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
       %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
       scf.for %arg3 = %3 to %c4 step %4 {
@@ -86,9 +86,9 @@ stream.executable private @func_a_ex_1 {
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<3xi32>>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<3xi32>>
       %2 = stream.binding.subspan %arg2[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<3xi32>>
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+      %workgroup_size_0 = stream.dispatch.workgroup.size[0] : index
+      %workgroup_id_0 = stream.dispatch.workgroup.id[0] : index
+      %workgroup_count_0 = stream.dispatch.workgroup.count[0] : index
       %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_0, %workgroup_size_0]
       %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_0, %workgroup_size_0]
       scf.for %arg3 = %3 to %c3 step %4 {
