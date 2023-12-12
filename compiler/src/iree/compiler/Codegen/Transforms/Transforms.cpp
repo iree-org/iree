@@ -12,9 +12,7 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
-// TODO(#13038): Remove this dependency on VMVX dialect.
 #include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
-#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"

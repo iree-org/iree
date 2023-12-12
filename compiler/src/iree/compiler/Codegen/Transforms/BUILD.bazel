@@ -23,12 +23,10 @@ iree_compiler_cc_library(
         "Transforms.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        # TODO(#13181) : Remove this dependency on VMVX dialect.
-        "//compiler/src/iree/compiler/Dialect/VMVX/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineUtils",
