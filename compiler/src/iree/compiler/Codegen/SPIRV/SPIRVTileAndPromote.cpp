@@ -59,8 +59,8 @@ tileReductionLoops(func::FuncOp funcOp,
 
 static LogicalResult
 tileToInvocation(func::FuncOp funcOp,
-                         IREE::LinalgExt::LinalgTransformationFilter filter,
-                         const linalg::TileSizeComputationFunction &computeFn) {
+                 IREE::LinalgExt::LinalgTransformationFilter filter,
+                 const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
