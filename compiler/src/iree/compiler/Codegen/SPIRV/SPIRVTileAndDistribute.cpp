@@ -175,7 +175,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 
   { // Tile and distribute to invocations.
     if (failed(tileToInvocation(funcOp, *threadTileComputeFn))) {
-      funcOp.emitOpError() << "failure in tiling to invocations";
+      funcOp.emitOpError() << "failed to tile to invocations";
       return signalPassFailure();
     }
 
