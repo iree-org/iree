@@ -2890,21 +2890,10 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
              << " binding arguments on exported function, but has "
              << bindingCounts;
     }
-    auto typesCompatible = [](Type actual, Type expected) {
-      if (actual == expected) {
-        return true;
-      }
-      if (isa<IndexType>(actual) || isa<IndexType>(expected)) {
-        return false;
-      }
-      return IREE::Util::getTypeBitWidth(actual) ==
-             IREE::Util::getTypeBitWidth(expected);
-    };
     for (auto [expectedType, actualType] :
          llvm::zip_equal(uniformTypes, uniformEntryPointTypes)) {
-      if (!typesCompatible(expectedType, actualType)) {
-        return emitOpError("uniform dispatch argument type mismatch: expected "
-                           "type with bit width matching ")
+      if (expectedType != actualType) {
+        return emitOpError("uniform dispatch argument type mismatch: expected ")
                << expectedType << " but got " << actualType;
       }
     }
