@@ -39,6 +39,8 @@ iree_cc_library(
     LLVMSupport
     LLVMTargetParser
     MLIRArmNeonDialect
+    MLIRArmSMEDialect
+    MLIRArmSMEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
