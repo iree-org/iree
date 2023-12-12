@@ -107,69 +107,6 @@ splitReduction(PatternRewriter &b, linalg::LinalgOp op,
 }
 
 ///
-/// Linalg tiling pattern.
-///
-/// Apply the `tiling` transformation as a pattern.
-/// `filter` controls LinalgTransformMarker matching and update when specified.
-/// See `tiling` for more details.
-// TODO: TiledOpInterface
-struct LinalgTilingPattern
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  /// Construct a generic pattern applied to all LinalgOp that verify `filter`.
-  LinalgTilingPattern(
-      MLIRContext *context, linalg::LinalgTilingOptions options,
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
-
-  /// Construct a pattern specifically applied to `opName`.
-  LinalgTilingPattern(
-      StringRef opName, MLIRContext *context,
-      linalg::LinalgTilingOptions options,
-      LinalgTransformationFilter f = LinalgTransformationFilter(),
-      PatternBenefit benefit = 1);
-
-  /// `matchAndRewrite` implementation that returns the significant transformed
-  /// pieces of IR.
-  FailureOr<linalg::TiledLinalgOp>
-  returningMatchAndRewrite(linalg::LinalgOp op,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(op, rewriter);
-  }
-
-private:
-  /// LinalgTransformMarker handles special attribute manipulations.
-  LinalgTransformationFilter filter;
-  /// Options to control tiling;
-  linalg::LinalgTilingOptions options;
-};
-
-template <typename... OpTypes>
-class TilingPatterns;
-
-template <>
-class TilingPatterns<> {
-public:
-  static void insert(RewritePatternSet &patterns,
-                     const linalg::LinalgTilingOptions &options,
-                     const LinalgTransformationFilter &f) {}
-};
-
-template <typename OpTy, typename... OpTypes>
-class TilingPatterns<OpTy, OpTypes...> {
-public:
-  static void insert(RewritePatternSet &patterns,
-                     const linalg::LinalgTilingOptions &options,
-                     const LinalgTransformationFilter &f) {
-    patterns.add<LinalgTilingPattern>(OpTy::getOperationName(),
-                                      patterns.getContext(), options, f);
-    TilingPatterns<OpTypes...>::insert(patterns, options, f);
-  }
-};
-
-///
 /// Linalg promotion patterns.
 ///
 /// Apply the `promoteSubViews` transformation as a pattern.

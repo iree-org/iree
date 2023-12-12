@@ -148,7 +148,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-/// Tiles and distributes LinalgOp ops that match filter.
+/// Tiles and optionally distributes LinalgOp ops that match filter.
 LogicalResult
 tileLinalgOpsWithFilter(func::FuncOp funcOp,
                         linalg::LinalgTilingOptions tilingOptions,
