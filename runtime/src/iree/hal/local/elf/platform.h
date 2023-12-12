@@ -9,95 +9,15 @@
 
 #include "iree/base/api.h"
 
-// TODO(benvanik): move some of this to iree/base/internal/. A lot of this code
-// comes from an old partial implementation of memory objects that should be
-// finished. When done it will replace the need for all of these platform files.
+// TODO(benvanik): move the rest of this to iree/base/internal/. A lot of this
+// code comes from an old partial implementation of memory objects that should
+// be finished. When done it will replace the need for all of these platform
+// files. Portions have already been moved to memory.h:
+#include "iree/base/internal/memory.h"
 
-//==============================================================================
-// Alignment utilities
-//==============================================================================
-
-// Defines a range of bytes with any arbitrary alignment.
-// Most operations will adjust this range by the allocation granularity, meaning
-// that a range that stradles a page boundary will be specifying multiple pages
-// (such as offset=1, length=4096 with a page size of 4096 indicating 2 pages).
-typedef struct iree_byte_range_t {
-  iree_host_size_t offset;
-  iree_host_size_t length;
-} iree_byte_range_t;
-
-static inline uintptr_t iree_page_align_start(uintptr_t addr,
-                                              iree_host_size_t page_alignment) {
-  return addr & (~(page_alignment - 1));
-}
-
-static inline uintptr_t iree_page_align_end(uintptr_t addr,
-                                            iree_host_size_t page_alignment) {
-  return iree_page_align_start(addr + (page_alignment - 1), page_alignment);
-}
-
-// Computes a page-aligned range base and total length from a range.
-// This will produce a starting address <= the range offset and a length >=
-// the range length.
-static inline void iree_page_align_range(void* base_address,
-                                         iree_byte_range_t range,
-                                         iree_host_size_t page_alignment,
-                                         void** out_start_address,
-                                         iree_host_size_t* out_aligned_length) {
-  void* range_start = (void*)iree_page_align_start(
-      (uintptr_t)base_address + range.offset, page_alignment);
-  void* range_end = (void*)iree_page_align_end(
-      (uintptr_t)base_address + range.offset + range.length, page_alignment);
-  *out_start_address = range_start;
-  *out_aligned_length =
-      (iree_host_size_t)range_end - (iree_host_size_t)range_start;
-}
-
-//==============================================================================
-// Memory subsystem information and control
-//==============================================================================
-
-// System platform/environment information defining memory parameters.
-// These can be used to control application behavior (such as whether to enable
-// a JIT if executable pages can be allocated) and allow callers to compute
-// memory ranges based on the variable page size of the platform.
-typedef struct iree_memory_info_t {
-  // The page size and the granularity of page protection and commitment. This
-  // is the page size used by the iree_memory_view_t functions.
-  iree_host_size_t normal_page_size;
-
-  // The granularity for the starting address at which virtual memory can be
-  // allocated.
-  iree_host_size_t normal_page_granularity;
-
-  // The minimum page size and granularity for large pages or 0 if unavailable.
-  // To use large pages the size and alignment must be a multiple of this value
-  // and the IREE_MEMORY_VIEW_FLAG_LARGE_PAGES must be set.
-  iree_host_size_t large_page_granularity;
-
-  // Indicates whether executable pages may be allocated within the process.
-  // Some platforms or release environments have restrictions on whether
-  // executable pages may be allocated from user code (such as iOS).
-  bool can_allocate_executable_pages;
-} iree_memory_info_t;
-
-// Queries the system platform/environment memory information.
-// Callers should cache the results to avoid repeated queries, such as storing
-// the used fields in an allocator upon initialization to reuse during
-// allocations made via the allocator.
-void iree_memory_query_info(iree_memory_info_t* out_info);
-
-// Enter a W^X region where pages will be changed RW->RX or RX->RW and write
-// protection should be suspended. Only effects the calling thread and must be
-// paired with iree_memory_jit_context_end.
-void iree_memory_jit_context_begin(void);
-
-// Exits a W^X region previously entered with iree_memory_jit_context_begin.
-void iree_memory_jit_context_end(void);
-
-//==============================================================================
+//===----------------------------------------------------------------------===//
 // Virtual address space manipulation
-//==============================================================================
+//===----------------------------------------------------------------------===//
 
 // Defines which access operations are allowed on a view of memory.
 // Attempts to perform an access not originally allowed when the view was
@@ -168,10 +88,5 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
                                               iree_host_size_t range_count,
                                               const iree_byte_range_t* ranges,
                                               iree_memory_access_t new_access);
-
-// Flushes the CPU instruction cache for a given range of bytes.
-// May be a no-op depending on architecture, but must be called prior to
-// executing code from any pages that have been written during load.
-void iree_memory_view_flush_icache(void* base_address, iree_host_size_t length);
 
 #endif  // IREE_HAL_LOCAL_ELF_PLATFORM_H_
