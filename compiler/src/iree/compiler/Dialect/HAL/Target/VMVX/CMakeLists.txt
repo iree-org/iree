@@ -29,7 +29,6 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::VMVX
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
@@ -37,7 +36,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
-    iree::compiler::Utils
   PUBLIC
 )
 
