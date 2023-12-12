@@ -2858,7 +2858,56 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
       return failure();
     }
 
-    // TODO(benvanik): verify that the target function has matching operands.
+    // Verify that the exported function, if present, matches the signature of
+    // the dispatch.
+    auto funcOp = exportOp.lookupFunctionRef();
+    if (!funcOp) {
+      return success();
+    }
+
+    TypeRange uniformTypes = getUniformOperands().getTypes();
+    int64_t numResources = getResources().size();
+
+    auto entryPointType = funcOp.getFunctionType();
+    SmallVector<Type> uniformEntryPointTypes;
+    int64_t bindingCounts = 0;
+    for (auto entryPointArg : entryPointType.getInputs()) {
+      if (isa<IREE::Stream::BindingType>(entryPointArg)) {
+        bindingCounts++;
+      } else {
+        uniformEntryPointTypes.push_back(entryPointArg);
+      }
+    }
+    if (uniformTypes.size() != uniformEntryPointTypes.size()) {
+      return emitOpError("function type mismatch; expected ")
+             << uniformTypes.size()
+             << " uniform arguments on exported function, but has "
+             << uniformEntryPointTypes.size();
+    }
+    if (numResources != bindingCounts) {
+      return emitOpError("function type mismatch; expected ")
+             << numResources
+             << " binding arguments on exported function, but has "
+             << bindingCounts;
+    }
+    auto typesCompatible = [](Type actual, Type expected) {
+      if (actual == expected) {
+        return true;
+      }
+      if (isa<IndexType>(actual) || isa<IndexType>(expected)) {
+        return false;
+      }
+      return IREE::Util::getTypeBitWidth(actual) ==
+             IREE::Util::getTypeBitWidth(expected);
+    };
+    for (auto [expectedType, actualType] :
+         llvm::zip_equal(uniformTypes, uniformEntryPointTypes)) {
+      if (!typesCompatible(expectedType, actualType)) {
+        return emitOpError("uniform dispatch argument type mismatch: expected "
+                           "type with bit width matching ")
+               << expectedType << " but got " << actualType;
+      }
+    }
   }
   return success();
 }

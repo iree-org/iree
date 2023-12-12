@@ -36,8 +36,8 @@ stream.executable private @annotatePotentialValuesEx {
     // CHECK-SAME: %arg0: i32,
     // CHECK-SAME: %arg1: index {stream.alignment = 4 : index, stream.values = [20 : index, 40 : index]},
     // CHECK-SAME: %arg2: i1 {stream.values = [false, true]},
-    // CHECK-SAME: %arg3: f32)
-    func.func @dispatch(%arg0: i32, %arg1: index, %arg2: i1, %arg3: f32) {
+    // CHECK-SAME: %arg3: f32
+    func.func @dispatch(%arg0: i32, %arg1: index, %arg2: i1, %arg3: f32, %binding: !stream.binding) {
       return
     }
   }
@@ -83,7 +83,7 @@ stream.executable private @annotateOperandAlignmentEx {
     // CHECK-SAME: %arg2: index {stream.values = [4096 : index, 4097 : index]},
     // CHECK-SAME: %arg3: index {stream.alignment = 16 : index, stream.values = [1200 : index, 5232 : index]}
     // CHECK-SAME: %arg4: index {stream.alignment = 1024 : index, stream.values = [1024 : index, 2048 : index]}
-    func.func @dispatch(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
+    func.func @dispatch(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %binding: !stream.binding) {
       return
     }
   }
