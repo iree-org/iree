@@ -109,6 +109,9 @@ createSPIRVInitialVectorLoweringPass();
 /// Links SPIR-V HAL executables within the top-level program module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createSPIRVLinkExecutablesPass();
 
+/// Populates passes needed to link HAL executables across SPIRV targets.
+void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
+
 /// Pass to set the lowering strategy for the target variant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVSelectLoweringStrategyPass();
@@ -180,7 +183,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize);
 
 //----------------------------------------------------------------------------//
-// Register SPIRV Passes
+// Register SPIR-V Passes
 //----------------------------------------------------------------------------//
 
 void registerCodegenSPIRVPasses();

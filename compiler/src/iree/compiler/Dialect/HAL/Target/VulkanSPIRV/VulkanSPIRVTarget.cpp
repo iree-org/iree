@@ -162,6 +162,10 @@ public:
     buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
   }
 
+  void buildLinkingPassPipeline(OpPassManager &passManager) override {
+    buildSPIRVLinkingPassPipeline(passManager);
+  }
+
   LogicalResult serializeExecutable(const SerializationOptions &options,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
@@ -174,46 +178,61 @@ public:
 
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
-    if (!llvm::hasSingleElement(spirvModuleOps)) {
-      return variantOp.emitError()
-             << "should only contain exactly one spirv.module op";
-    }
-    auto spvModuleOp = *spirvModuleOps.begin();
-    if (!options.dumpIntermediatesPath.empty()) {
-      std::string assembly;
-      llvm::raw_string_ostream os(assembly);
-      spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
-      dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
-                     variantOp.getName(), ".mlir", assembly);
+    if (spirvModuleOps.empty()) {
+      return variantOp.emitError() << "should contain some spirv.module ops";
     }
 
     FlatbufferBuilder builder;
     iree_hal_spirv_ExecutableDef_start_as_root(builder);
 
-    // Serialize the spirv::ModuleOp into the binary that we will embed in the
-    // final FlatBuffer.
-    SmallVector<uint32_t, 256> spvBinary;
-    if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
-      return variantOp.emitError() << "failed to serialize spirv.module";
-    }
-    if (!options.dumpBinariesPath.empty()) {
-      dumpDataToPath<uint32_t>(options.dumpBinariesPath, options.dumpBaseName,
-                               variantOp.getName(), ".spv", spvBinary);
-    }
-
-    auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
-                                                    spvBinary.size());
-
-    // The runtime uses ordinals instead of names. We provide the list of entry
-    // point names here that are then passed in VkShaderModuleCreateInfo.
     SmallVector<StringRef> entryPointNames;
     SmallVector<uint32_t> subgroupSizes;
+    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
+    SmallVector<uint32_t> shaderModuleIndices;
     SmallVector<iree_hal_spirv_FileLineLocDef_ref_t> sourceLocationRefs;
     bool hasAnySubgroupSizes = false;
-    spvModuleOp.walk([&](spirv::EntryPointOp exportOp) {
-      entryPointNames.push_back(exportOp.getFn());
 
-      auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(exportOp.getFn());
+    // Iterate over all spirv.module ops and encode them into the FlatBuffer
+    // data structure.
+    for (spirv::ModuleOp spvModuleOp : spirvModuleOps) {
+      // Currently the spirv.module op should only have one entry point. Get it.
+      auto spirvEntryPoints = spvModuleOp.getOps<spirv::EntryPointOp>();
+      if (!llvm::hasSingleElement(spirvEntryPoints)) {
+        return spvModuleOp.emitError()
+               << "expected to contain exactly one entry point";
+      }
+      spirv::EntryPointOp spvEntryPoint = *spirvEntryPoints.begin();
+
+      if (!options.dumpIntermediatesPath.empty()) {
+        std::string assembly;
+        llvm::raw_string_ostream os(assembly);
+        spvModuleOp.print(os, OpPrintingFlags().useLocalScope());
+        dumpDataToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                       spvEntryPoint.getFn(), ".spirv.mlir", assembly);
+      }
+
+      // Serialize the spirv::ModuleOp into the binary blob.
+      SmallVector<uint32_t, 0> spvBinary;
+      if (failed(spirv::serialize(spvModuleOp, spvBinary)) ||
+          spvBinary.empty()) {
+        return spvModuleOp.emitError() << "failed to serialize";
+      }
+      if (!options.dumpBinariesPath.empty()) {
+        dumpDataToPath<uint32_t>(options.dumpBinariesPath, options.dumpBaseName,
+                                 spvEntryPoint.getFn(), ".spv", spvBinary);
+      }
+      auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
+                                                      spvBinary.size());
+      shaderModuleIndices.push_back(shaderModuleRefs.size());
+      shaderModuleRefs.push_back(
+          iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
+
+      // The IREE runtime uses ordinals instead of names. We need to attach the
+      // entry point name for VkShaderModuleCreateInfo.
+      entryPointNames.push_back(spvEntryPoint.getFn());
+
+      // If there are subgroup size requests, we need to pick up too.
+      auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(spvEntryPoint.getFn());
       auto abi = fn->getAttrOfType<spirv::EntryPointABIAttr>(
           spirv::getEntryPointABIAttrName());
       if (abi && abi.getSubgroupSize()) {
@@ -225,29 +244,37 @@ public:
 
       // Optional source location information for debugging/profiling.
       if (options.debugLevel >= 1) {
-        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+        if (auto loc = findFirstFileLoc(spvEntryPoint.getLoc())) {
           auto filenameRef = builder.createString(loc->getFilename());
           sourceLocationRefs.push_back(iree_hal_spirv_FileLineLocDef_create(
               builder, filenameRef, loc->getLine()));
         }
-      }
-    });
+      };
+    }
+
+    // Add top-level executable fields following their order of definition.
     auto entryPointsRef = builder.createStringVec(entryPointNames);
     flatbuffers_int32_vec_ref_t subgroupSizesRef =
         hasAnySubgroupSizes ? builder.createInt32Vec(subgroupSizes) : 0;
-
+    flatbuffers_int32_vec_ref_t shaderModuleIndicesRef =
+        builder.createInt32Vec(shaderModuleIndices);
     iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
     if (subgroupSizesRef) {
       iree_hal_spirv_ExecutableDef_subgroup_sizes_add(builder,
                                                       subgroupSizesRef);
     }
-    iree_hal_spirv_ExecutableDef_code_add(builder, spvCodeRef);
+    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+        builder, shaderModuleIndicesRef);
+    auto shaderModulesRef =
+        builder.createOffsetVecDestructive(shaderModuleRefs);
+    iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
     if (!sourceLocationRefs.empty()) {
       auto sourceLocationsRef =
           builder.createOffsetVecDestructive(sourceLocationRefs);
       iree_hal_spirv_ExecutableDef_source_locations_add(builder,
                                                         sourceLocationsRef);
     }
+
     iree_hal_spirv_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
@@ -281,6 +308,9 @@ public:
     for (auto exportOp : variantOp.getExportOps()) {
       entryPointNames.emplace_back(exportOp.getSymName());
     }
+    // We only have one object file for now. So all entry points have shader
+    // module index 0.
+    SmallVector<uint32_t, 8> shaderModuleIndices(entryPointNames.size(), 0);
 
     // Load .spv object file.
     auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
@@ -303,11 +333,20 @@ public:
     auto spvCodeRef = flatbuffers_uint32_vec_create(
         builder, reinterpret_cast<const uint32_t *>(spvBinary.data()),
         spvBinary.size() / sizeof(uint32_t));
+    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
+    shaderModuleRefs.push_back(
+        iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
 
+    // Add top-level executable fields following their order of definition.
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-
+    auto shaderModuleIndicesRef = builder.createInt32Vec(shaderModuleIndices);
     iree_hal_spirv_ExecutableDef_entry_points_add(builder, entryPointsRef);
-    iree_hal_spirv_ExecutableDef_code_add(builder, spvCodeRef);
+    iree_hal_spirv_ExecutableDef_shader_module_indices_add(
+        builder, shaderModuleIndicesRef);
+    auto shaderModulesRef =
+        builder.createOffsetVecDestructive(shaderModuleRefs);
+    iree_hal_spirv_ExecutableDef_shader_modules_add(builder, shaderModulesRef);
+
     iree_hal_spirv_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.

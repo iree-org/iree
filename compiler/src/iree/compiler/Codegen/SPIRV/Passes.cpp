@@ -678,6 +678,17 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
   });
 }
 
+// NOTE: this runs on the top-level program module containing all hal.executable
+// ops.
+void buildSPIRVLinkingPassPipeline(OpPassManager &passManager) {
+  // Link together executables. This may produce some IR duplication.
+  passManager.addPass(createSPIRVLinkExecutablesPass());
+
+  // Cleanup IR duplication.
+  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+      mlir::createCanonicalizerPass());
+}
+
 //===---------------------------------------------------------------------===//
 // Register SPIRV Passes
 //===---------------------------------------------------------------------===//
