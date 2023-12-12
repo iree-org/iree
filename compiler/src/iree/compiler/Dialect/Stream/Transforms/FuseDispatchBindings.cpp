@@ -335,9 +335,7 @@ fuseDispatchBindings(IREE::Stream::ExecutableOp executableOp,
   }
   // Bail if the exported function does not have the same number of bindings
   // as the dispatch. This could be because the executable already lowered the
-  // bindings, in which case we can no longer reliably fuse them. We could try
-  // to be clever and fuse a subset of bindings, but this typically only happens
-  // when the user is trying to do something custom.
+  // bindings, in which case we can no longer fuse them.
   if (numBindingsOnFunc != bindingCount)
     return;
 
