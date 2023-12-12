@@ -55,7 +55,8 @@ hal.executable private @pad_only {
 //       CHECK:                   %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
 //       CHECK:                   scf.yield %[[VEC_LOAD]]
 //       CHECK:                 }
-//       CHECK:                 vector.store %[[RESULT_VEC]], %[[OUTPUT_SLICE]]
+//       CHECK:                 %[[DROP_UNIT_OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
+//       CHECK:                 vector.store %[[RESULT_VEC]], %[[DROP_UNIT_OUTPUT_SLICE]]
 
 // -----
 

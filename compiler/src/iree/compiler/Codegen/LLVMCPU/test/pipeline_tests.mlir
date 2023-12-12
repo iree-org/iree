@@ -324,7 +324,7 @@ hal.executable private @check_buffer_ops_vectorization {
 // CHECK-LABEL:  #{{.+}} = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize
 //       CHECK:      func.func @check_buffer_ops_vectorization
 //       CHECK:        vector.load
-//  CHECK-NEXT:        vector.store
+//       CHECK:        vector.store
 
 // -----
 
