@@ -6,11 +6,11 @@
 
 #include "iree/hal/drivers/vulkan/debug_reporter.h"
 
-#include <atomic>
 #include <cstddef>
 #include <cstdio>
 
-#include "iree/base/assert.h"
+#include "iree/base/api.h"
+#include "iree/base/internal/atomics.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
 
 struct iree_hal_vulkan_debug_reporter_t {
@@ -22,8 +22,33 @@ struct iree_hal_vulkan_debug_reporter_t {
   const VkAllocationCallbacks* allocation_callbacks;
   VkDebugUtilsMessengerEXT messenger;
 
-  std::atomic<bool> did_error{false};
+  // If |check_errors| is true, this will be set to a status code when a
+  // message above |min_verbosity| is reported. Only the first status code will
+  // be tracked. Messages can be sent from any thread and after any API call,
+  // so components can lazily check this status to see if any errors occured.
+  iree_atomic_intptr_t error_status;
 };
+
+static void iree_hal_vulkan_debug_reporter_try_set_status(
+    iree_hal_vulkan_debug_reporter_t* reporter, iree_status_t new_status) {
+  if (IREE_UNLIKELY(iree_status_is_ok(new_status))) return;
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, "Vulkan debug error: ");
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, iree_status_code_string(iree_status_code(new_status)));
+
+  iree_status_t old_status = iree_ok_status();
+  if (!iree_atomic_compare_exchange_strong_intptr(
+          &reporter->error_status, (intptr_t*)&old_status, (intptr_t)new_status,
+          iree_memory_order_acq_rel,
+          iree_memory_order_relaxed /* old_status is unused */)) {
+    // Previous status was not OK; drop our new status.
+    IREE_IGNORE_ERROR(new_status);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
 
 // NOTE: |user_data| may be nullptr if we are being called during instance
 // creation. Otherwise it is a pointer to the DebugReporter instance.
@@ -62,7 +87,10 @@ iree_hal_vulkan_debug_utils_message_callback(
   if (message_verbosity < reporter->min_verbosity) {
     fprintf(stderr, "[VULKAN] %c %s\n", severity_char, callback_data->pMessage);
     if (reporter->check_errors) {
-      reporter->did_error = true;
+      iree_hal_vulkan_debug_reporter_try_set_status(
+          reporter,
+          iree_make_status(IREE_STATUS_INTERNAL, "Vulkan debug message:\n%s",
+                           callback_data->pMessage));
     }
   }
 
@@ -151,10 +179,33 @@ void iree_hal_vulkan_debug_reporter_free(
         reporter->instance, reporter->messenger,
         reporter->allocation_callbacks);
   }
-  if (reporter->check_errors && reporter->did_error) {
-    IREE_ASSERT(0);
-  }
   iree_allocator_free(host_allocator, reporter);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+bool iree_hal_vulkan_debug_reporter_has_error(
+    iree_hal_vulkan_debug_reporter_t* reporter) {
+  if (!reporter->check_errors) return false;
+  return iree_atomic_load_intptr(&reporter->error_status,
+                                 iree_memory_order_acquire) != 0;
+}
+
+iree_status_t iree_hal_vulkan_debug_reporter_consume_status(
+    iree_hal_vulkan_debug_reporter_t* reporter) {
+  iree_status_t old_status = iree_ok_status();
+  iree_status_t new_status = iree_ok_status();
+  while (!iree_atomic_compare_exchange_strong_intptr(
+      &reporter->error_status, (intptr_t*)&old_status, (intptr_t)new_status,
+      iree_memory_order_acq_rel,
+      iree_memory_order_acquire /* old_status is actually used */)) {
+    // Previous status was not OK; we have it now though and can try again.
+    new_status = iree_status_from_code(iree_status_code(old_status));
+  }
+  // If old_status is not iree_ok_status then it was obtained through the
+  // comparison-failed mode of the above compare_exchange, which loaded it with
+  // iree_memory_order_acquire. This guarantees that if we are returning a
+  // failure status to the caller then all past memory operations are already
+  // visible, such as any information attached to that failure status.
+  return old_status;
 }

@@ -34,4 +34,16 @@ iree_status_t iree_hal_vulkan_debug_reporter_allocate(
 void iree_hal_vulkan_debug_reporter_free(
     iree_hal_vulkan_debug_reporter_t* reporter);
 
+// Returns true if the reporter encountered an error.
+// iree_hal_vulkan_debug_reporter_consume_status can be used once to get the
+// full status describing the failure and subsequent calls will return the
+// status code.
+bool iree_hal_vulkan_debug_reporter_has_error(
+    iree_hal_vulkan_debug_reporter_t* reporter);
+
+// Returns the error to the caller (transfering ownership).
+// The reporter will remain in a failed state with the status code.
+iree_status_t iree_hal_vulkan_debug_reporter_consume_status(
+    iree_hal_vulkan_debug_reporter_t* reporter);
+
 #endif  // IREE_HAL_DRIVERS_VULKAN_DEBUG_REPORTER_H_
