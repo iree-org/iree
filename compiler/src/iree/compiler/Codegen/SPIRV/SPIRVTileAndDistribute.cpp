@@ -44,8 +44,6 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
-
 #define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
 namespace mlir::iree_compiler {

@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
@@ -31,16 +30,14 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
-
 #define DEBUG_TYPE "iree-llvmgpu-tile-and-distribute"
 
 namespace mlir::iree_compiler {
 
-/// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
-/// level but we may have extra tiling for the reduction dimension. Therefore we
-/// tile again without distributing.
-static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
+/// Tiles to workgroup level. Workgroup tiling is done at the flow level but we
+/// may have extra tiling for the reduction dimension. Therefore we tile again
+/// without distributing.
+static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
   auto tileSizesFn = [](OpBuilder &builder, Operation *op) {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
@@ -58,17 +55,15 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(tileSizesFn);
-  MLIRContext *context = patterns.getContext();
 
+  MLIRContext *context = funcOp.getContext();
   IREE::LinalgExt::LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
-  TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp, linalg::GenericOp,
-                 linalg::Conv2DNhwcHwcfOp,
-                 linalg::Conv2DNchwFchwOp>::insert(patterns, tilingOptions,
-                                                   filter);
+
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
@@ -76,10 +71,7 @@ static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
-    RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingReductionPatterns(wgTilingPatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(wgTilingPatterns)))) {
+    if (failed(tileReductionLoops(funcOp))) {
       return failure();
     }
   }
@@ -136,10 +128,9 @@ calculateDistributedTileSize(ArrayRef<int64_t> numElements, OpBuilder &builder,
   return tileSizesVal;
 }
 
-/// Patterns for warp level tiling.
-static void
-populateTilingToWarpPatterns(RewritePatternSet &patterns,
-                             SmallVectorImpl<int64_t> &workgroupSize) {
+/// Tiles to warp.
+static LogicalResult tileToWarp(func::FuncOp funcOp,
+                                SmallVectorImpl<int64_t> &workgroupSize) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
 
@@ -161,20 +152,18 @@ populateTilingToWarpPatterns(RewritePatternSet &patterns,
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(getInnerTileSizeFn)
                            .setDistributionOptions(warpDistributionOptions);
-  MLIRContext *context = patterns.getContext();
+  MLIRContext *context = funcOp.getContext();
   IREE::LinalgExt::LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
-  TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
-                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 /// Patterns for thread level tiling.
-static void
-populateTilingToInvocationPatterns(RewritePatternSet &patterns,
-                                   SmallVectorImpl<int64_t> &workgroupSize) {
+static LogicalResult tileToInvocation(func::FuncOp funcOp,
+                                      SmallVectorImpl<int64_t> &workgroupSize) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
         return calculateDistributedTileSize(workgroupSize, builder, operation);
@@ -194,7 +183,7 @@ populateTilingToInvocationPatterns(RewritePatternSet &patterns,
           .setTileSizeComputationFunction(getInnerTileSizeFn)
           .setDistributionOptions(invocationDistributionOptions);
 
-  MLIRContext *context = patterns.getContext();
+  MLIRContext *context = funcOp.getContext();
   IREE::LinalgExt::LinalgTransformationFilter f(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
@@ -203,9 +192,8 @@ populateTilingToInvocationPatterns(RewritePatternSet &patterns,
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
-  patterns.insert<IREE::LinalgExt::LinalgTilingPattern,
-                  IREE::LinalgExt::TilingInterfaceTilingPattern>(
-      context, tilingOptions, f);
+
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, f);
 }
 
 namespace {
@@ -287,20 +275,13 @@ public:
 
     if (distributeToWarp) {
       // Apply last level of tiling and distribute to warps.
-      RewritePatternSet warpLevelTilingPatterns(context);
-      populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(warpLevelTilingPatterns)))) {
+      if (failed(tileToWarp(funcOp, workgroupSize))) {
         return signalPassFailure();
       }
 
     } else {
       // Apply last level of tiling and distribute to threads.
-      RewritePatternSet threadLevelTilingPatterns(context);
-      populateTilingToInvocationPatterns(threadLevelTilingPatterns,
-                                         workgroupSize);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(threadLevelTilingPatterns)))) {
+      if (failed(tileToInvocation(funcOp, workgroupSize))) {
         return signalPassFailure();
       }
     }
