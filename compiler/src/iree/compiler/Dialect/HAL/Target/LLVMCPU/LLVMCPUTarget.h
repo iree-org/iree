@@ -8,9 +8,14 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMCPUTARGET_H_
 
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMTargetOptions.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+void populateLLVMCPUTargetBackends(IREE::HAL::TargetBackendList &list,
+                                   TileSizeSelectionPatternList &patternList);
 
 // Registers the LLVM CPU target backends.
 void registerLLVMCPUTargetBackends(

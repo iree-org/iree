@@ -200,4 +200,11 @@ void PluginManagerSession::populateHALTargetBackends(
   }
 }
 
+void PluginManagerSession::populateTileSizeSelectionPatterns(
+    TileSizeSelectionPatternList &list) {
+  for (auto *s : initializedSessions) {
+    s->populateTileSizeSelectionPatterns(list);
+  }
+}
+
 } // namespace mlir::iree_compiler

@@ -12,7 +12,9 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -34,7 +36,8 @@ createLLVMCPUEmitVectorizationRemarksPass();
 /// The variant is annotated with the selected strategies, which are
 /// subsequently ingested by LLVMCPULowerExecutableTargetPass.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPUSelectLoweringStrategyPass();
+createLLVMCPUSelectLoweringStrategyPass(
+    const TileSizeSelectionPatternList &patternList = {});
 
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
@@ -198,7 +201,9 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 
 /// Populates passes needed for preprocessing before codegen lowerings, as well
 /// as high level lowering strategy selection.
-void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager);
+void buildLLVMCPUCodegenConfigurationPassPipeline(
+    OpPassManager &passManager,
+    const TileSizeSelectionPatternList &patternList = {});
 
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the

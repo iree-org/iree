@@ -35,7 +35,9 @@ class LLVMCPUSelectLoweringStrategyPass
     : public LLVMCPUSelectLoweringStrategyBase<
           LLVMCPUSelectLoweringStrategyPass> {
 public:
-  LLVMCPUSelectLoweringStrategyPass() = default;
+  LLVMCPUSelectLoweringStrategyPass(
+      const TileSizeSelectionPatternList &patternList)
+      : tileSizeSelectionPatterns(patternList) {}
   LLVMCPUSelectLoweringStrategyPass(
       const LLVMCPUSelectLoweringStrategyPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -58,6 +60,9 @@ public:
   }
 
   void runOnOperation() override;
+
+private:
+  TileSizeSelectionPatternList tileSizeSelectionPatterns;
 };
 } // namespace
 
@@ -82,8 +87,11 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
 
+  SmallVector<std::unique_ptr<TileSizeSelectionPattern>> patterns;
+  tileSizeSelectionPatterns.populatePatterns(patterns);
+
   // Set the strategy with default heuristics.
-  if (failed(initCPULaunchConfig(moduleOp))) {
+  if (failed(initCPULaunchConfig(moduleOp, patterns))) {
     return signalPassFailure();
   }
 
@@ -119,8 +127,9 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPUSelectLoweringStrategyPass() {
-  return std::make_unique<LLVMCPUSelectLoweringStrategyPass>();
+createLLVMCPUSelectLoweringStrategyPass(
+    const TileSizeSelectionPatternList &patternList) {
+  return std::make_unique<LLVMCPUSelectLoweringStrategyPass>(patternList);
 }
 
 } // namespace mlir::iree_compiler

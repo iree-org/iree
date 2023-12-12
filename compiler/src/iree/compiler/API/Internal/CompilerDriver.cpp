@@ -75,6 +75,8 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
+#include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
+
 #ifdef IREE_HAVE_C_OUTPUT_FORMAT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
@@ -344,9 +346,13 @@ struct Session {
         context.appendDialectRegistry(registry);
         pluginActivationStatus = pluginSession.activatePlugins(&context);
 
+        TileSizeSelectionPatternList patternList;
+        pluginSession.populateTileSizeSelectionPatterns(patternList);
+
         // Initialize target registry, bootstrapping with the static globals.
         targetRegistry.mergeFrom(IREE::HAL::TargetBackendRegistry::getGlobal());
         IREE::HAL::TargetBackendList pluginTargetList;
+        IREE::HAL::populateLLVMCPUTargetBackends(pluginTargetList, patternList);
         pluginSession.populateHALTargetBackends(pluginTargetList);
         targetRegistry.mergeFrom(pluginTargetList);
       }

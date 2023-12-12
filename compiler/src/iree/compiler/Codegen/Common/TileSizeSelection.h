@@ -159,6 +159,111 @@ private:
       tilingLevelToActualLevelMap;
 };
 
+struct TileSizeConfig {
+  SizesAndScalableFlags distributedTileSizes;
+  std::optional<SizesAndScalableFlags> cacheTileSizes;
+  SizesAndScalableFlags vectorTileSizes;
+
+  TileSizeConfig() = default;
+
+  TileSizeConfig(SizesAndScalableFlags _distributedTileSizes,
+                 SizesAndScalableFlags _vectorTileSizes)
+      : distributedTileSizes(_distributedTileSizes),
+        vectorTileSizes(_vectorTileSizes) {}
+
+  TileSizeConfig(SizesAndScalableFlags _distributedTileSizes,
+                 SizesAndScalableFlags _cacheTileSizes,
+                 SizesAndScalableFlags _vectorTileSizes)
+      : distributedTileSizes(_distributedTileSizes),
+        cacheTileSizes(_cacheTileSizes), vectorTileSizes(_vectorTileSizes) {}
+};
+
+struct TileSizeAndPipelineConfig {
+  TileSizeConfig rootConfig;
+  IREE::Codegen::DispatchLoweringPassPipeline pipeline;
+};
+
+class TileSizeSelectionPattern {
+public:
+  virtual ~TileSizeSelectionPattern() = default;
+
+  virtual FailureOr<TileSizeAndPipelineConfig>
+  matchAndConfig(func::FuncOp funcOp, Operation *rootOp) const {
+    llvm_unreachable("need to implement");
+  }
+};
+
+template <typename T>
+class OpTileSizeSelectionPattern : public TileSizeSelectionPattern {
+public:
+  virtual ~OpTileSizeSelectionPattern() = default;
+
+  virtual FailureOr<TileSizeAndPipelineConfig>
+  matchAndConfig(func::FuncOp funcOp, T rootOp) const {
+    llvm_unreachable("need to implement");
+  }
+
+  FailureOr<TileSizeAndPipelineConfig>
+  matchAndConfig(func::FuncOp funcOp, Operation *rootOp) const final override {
+    if (T op = dyn_cast<T>(rootOp)) {
+      return matchAndConfig(funcOp, op);
+    }
+    return failure();
+  }
+};
+
+class ContractionOpTileSizeSelectionPattern : public TileSizeSelectionPattern {
+public:
+  virtual ~ContractionOpTileSizeSelectionPattern() = default;
+
+  virtual FailureOr<TileSizeAndPipelineConfig>
+  matchAndConfig(func::FuncOp funcOp,
+                 linalg::ContractionOpInterface rootOp) const {
+    llvm_unreachable("need to implement");
+  }
+
+  FailureOr<TileSizeAndPipelineConfig>
+  matchAndConfig(func::FuncOp funcOp, Operation *rootOp) const final override {
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp);
+    if (!linalgOp || !linalg::isaContractionOpInterface(linalgOp)) {
+      return failure();
+    }
+    return matchAndConfig(funcOp, cast<linalg::ContractionOpInterface>(rootOp));
+  }
+
+protected:
+  static bool isInnermostReduction(linalg::ContractionOpInterface op) {
+    auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+
+    SmallVector<unsigned> dims;
+    linalgOp.getReductionDims(dims);
+    // Only support exactly one reduction dim, and it is the innermost one.
+    if (dims.size() != 1 || dims[0] != linalgOp.getNumLoops() - 1) {
+      return false;
+    }
+    return true;
+  }
+};
+
+class TileSizeSelectionPatternRegister {
+public:
+  virtual ~TileSizeSelectionPatternRegister() = default;
+
+  virtual void populatePatterns(
+      SmallVector<std::unique_ptr<TileSizeSelectionPattern>> &patterns) const {}
+};
+
+struct TileSizeSelectionPatternList {
+  SmallVector<std::shared_ptr<TileSizeSelectionPatternRegister>> registers;
+
+  void populatePatterns(
+      SmallVector<std::unique_ptr<TileSizeSelectionPattern>> &patterns) {
+    for (auto patternRegister : registers) {
+      patternRegister->populatePatterns(patterns);
+    }
+  }
+};
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_TILESIZESELECTION_H_

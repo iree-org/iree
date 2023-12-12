@@ -137,6 +137,8 @@ public:
   // plugins.
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
 
+  void populateTileSizeSelectionPatterns(TileSizeSelectionPatternList &list);
+
 private:
   PluginManagerOptions &options;
   // At construction, uninitialized plugin sessions are created for all

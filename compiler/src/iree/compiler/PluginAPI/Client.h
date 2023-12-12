@@ -31,6 +31,8 @@ class TargetBackendList;
 
 namespace mlir::iree_compiler {
 
+class TileSizeSelectionPatternList;
+
 class AbstractPluginSession;
 class PluginRegistrar;
 
@@ -182,6 +184,9 @@ public:
   // Targets will be merged into the plugin session-owned registry.
   virtual void
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
+
+  virtual void
+  populateTileSizeSelectionPatterns(TileSizeSelectionPatternList &list) {}
 
 protected:
   // Called from registerDialects() prior to initializing the context and

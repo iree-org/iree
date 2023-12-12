@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <unordered_set>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -150,8 +152,10 @@ public:
     int64_t vectorSize;
   };
 
-  explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
-      : defaultOptions_(std::move(options)) {
+  explicit LLVMCPUTargetBackend(LLVMTargetOptions options,
+                                TileSizeSelectionPatternList patternList)
+      : defaultOptions_(std::move(options)),
+        tileSizeSelectionPatterns(std::move(patternList)) {
     initializeAdditionalConfiguration(defaultOptions_);
   }
 
@@ -204,7 +208,8 @@ public:
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                       OpPassManager &passManager) override {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager,
+                                                 tileSizeSelectionPatterns);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -903,7 +908,19 @@ private:
   // Additional target information besides that is contained in
   // LLVMTargetOptions defaultOptions_.
   AdditionalConfigurationValues defaultAddlConfig_;
+
+  TileSizeSelectionPatternList tileSizeSelectionPatterns;
 };
+
+void populateLLVMCPUTargetBackends(IREE::HAL::TargetBackendList &list,
+                                   TileSizeSelectionPatternList &patternList) {
+  // #hal.device.target<"llvm-cpu", ...
+  // #hal.executable.target<"llvm-cpu", ...
+  list.add("llvm-cpu", [=]() {
+    return std::make_shared<LLVMCPUTargetBackend>(
+        IREE::HAL::LLVMTargetOptions::getFromFlags(), patternList);
+  });
+}
 
 void registerLLVMCPUTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
@@ -956,13 +973,13 @@ void registerLLVMCPUTargetBackends(
 #define LLVM_TARGET(TargetName) LLVM_INITIALIZE_TARGET_##TargetName()
 #include "llvm/Config/Targets.def"
 
-  auto backendFactory = [=]() {
-    return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
-  };
+  // auto backendFactory = [=]() {
+  //   return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
+  // };
 
-  // #hal.device.target<"llvm-cpu", ...
-  // #hal.executable.target<"llvm-cpu", ...
-  static TargetBackendRegistration registration("llvm-cpu", backendFactory);
+  // // #hal.device.target<"llvm-cpu", ...
+  // // #hal.executable.target<"llvm-cpu", ...
+  // static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

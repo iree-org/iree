@@ -6,12 +6,12 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/CPU/Common.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
-#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -96,20 +96,6 @@ llvm::cl::opt<bool> clEnableTransformDialectJit(
     llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
-
-// Encodes the pre-processing strategy to be applied on a Linalg operation
-// before vectorization.
-enum class VectorPreProcStrategy {
-  // Peel iterations from the vector dimensions so that they become multiple of
-  // the vector length.
-  Peeling,
-  // Compute vector dimensions assuming vector masking support. Vector sizes may
-  // be rounded up to the nearest power of two and out-of-bounds elements would
-  // be masked-out.
-  Masking,
-  // Do not apply any vectorization pre-processing transformation.
-  None
-};
 
 // NOTE: This flag is meant for testing + experimentation and should not be
 // used in deployment.
@@ -279,8 +265,8 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
                              unsigned byteWidth) {
   return getNativeVectorSizeInBytes(entryPointFn) / byteWidth;
 }
-static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
-                             ShapedType shapedType) {
+int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
+                      ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
   if (!elementType.isIntOrFloat())
     return 1;
@@ -293,7 +279,7 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
 /// looking into all the operands.
 // TODO(diegocaballero): Refactor this logic to a method that computes the final
 // tile sizes for vectorization/unrolling in one shot.
-static SmallVector<int64_t>
+SmallVector<int64_t>
 getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
                             linalg::LinalgOp op,
                             const LinalgOpInfo &linalgOpInfo,
@@ -578,26 +564,9 @@ static int64_t getMaxVectorTileSize(int64_t numElem, int64_t tileSize,
   return 1;
 }
 
-/// Struct that holds factors for heuristic distribution tile sizes selection.
-/// The `minTileSizes`, `maxTileSizes` and `vectorSizeHints` can be empty or
-/// as many as the number of loops.
-struct DistributionHeuristicConfig {
-  // TODO(hanchung): Remove `allowIncompleteTile` option after codegen can
-  // vectorize all the shapes. Allowing incomplete tile is critical for odd
-  // shapes (e.g., some dim sizes could be prime number).
-  bool allowIncompleteTile = false;
-
-  SmallVector<int64_t> minTileSizes;
-  SmallVector<int64_t> maxTileSizes;
-
-  // On the dimensions where the hints != 1, it will try to find the tile sizes
-  // which are multipliers of the hints.
-  SmallVector<int64_t> vectorSizeHints;
-};
-
 /// Returns the tile size to use for distribution. The `op` needs to be a
 /// TilingInterface op.
-static SmallVector<int64_t>
+SmallVector<int64_t>
 getDefaultDistributedLevelTileSizes(Operation *op,
                                     const DistributionHeuristicConfig &config) {
   SmallVector<int64_t> lbs, ubs;
@@ -662,7 +631,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
 /// reduction loops.
 static void splitParallelAndReductionTiles(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
+    TilingInterface op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes,
     SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
     SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
@@ -673,7 +642,7 @@ static void splitParallelAndReductionTiles(
                                    parallelScalableFlags->end());
   }
   for (auto [index, iteratorType] :
-       llvm::enumerate(op.getIteratorTypesArray())) {
+       llvm::enumerate(op.getLoopIteratorTypes())) {
     if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
       if (reductionScalableFlags)
@@ -684,6 +653,16 @@ static void splitParallelAndReductionTiles(
         (*parallelScalableFlags)[index] = false;
     }
   }
+}
+
+static void splitParallelAndReductionTiles(
+    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
+    SmallVectorImpl<int64_t> &reductionSizes,
+    SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
+    SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
+  splitParallelAndReductionTiles(cast<TilingInterface>(op.getOperation()),
+                                 parallelSizes, reductionSizes,
+                                 parallelScalableFlags, reductionScalableFlags);
 }
 
 static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
@@ -1042,10 +1021,9 @@ static void getMatmulVectorSizesUsingFullVectorHeuristics(
 /// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
 /// tile sizes picked here must exactly match the SME hardware virtual tiles, as
 /// there is currently no support for lowering non-standard shapes.
-static void
-getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
-                               SmallVectorImpl<int64_t> &sizes,
-                               SmallVectorImpl<bool> &scalableSizeFlags) {
+void getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
+                                    SmallVectorImpl<int64_t> &sizes,
+                                    SmallVectorImpl<bool> &scalableSizeFlags) {
   // Double-check the operation is one that is supported for lowering to ArmSME.
   if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(op))
     return;
@@ -1057,11 +1035,13 @@ getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
   if (elementType->isF32()) {
     sizes.append({4, 4, 1});
     scalableSizeFlags.append({true, true, false});
+    return;
   }
 
   if (elementType->isF64()) {
     sizes.append({2, 2, 1});
     scalableSizeFlags.append({true, true, false});
+    return;
   }
 
   // TODO(macdue): Other element types (there is little support for anything
@@ -1150,7 +1130,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
 }
 
 /// Adjust cache-level tile sizes based on the op shape.
-static SmallVector<int64_t>
+SmallVector<int64_t>
 getMatmulCacheTileSizesForShape(ArrayRef<int64_t> inputTileSizes,
                                 ArrayRef<int64_t> inputShape) {
   // Make sure the tile sizes are not larger than the dim sizes.
@@ -1470,13 +1450,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-static void setX86VectorTileSizes(linalg::GenericOp genericOp,
-                                  unsigned numLoops,
-                                  ArrayRef<int64_t> distTileSizes,
-                                  ArrayRef<int64_t> minTileSizes,
-                                  ArrayRef<int64_t> maxTileSizes,
-                                  VectorPreProcStrategy vecPreProcStrategy,
-                                  SmallVectorImpl<int64_t> &vecTileSizes) {
+void setX86VectorTileSizes(linalg::GenericOp genericOp, unsigned numLoops,
+                           ArrayRef<int64_t> distTileSizes,
+                           ArrayRef<int64_t> minTileSizes,
+                           ArrayRef<int64_t> maxTileSizes,
+                           VectorPreProcStrategy vecPreProcStrategy,
+                           SmallVectorImpl<int64_t> &vecTileSizes) {
   vecTileSizes.append(numLoops, 0);
   SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
@@ -2509,7 +2488,6 @@ lowerUsingDefaultPipeline(mlir::FunctionOpInterface entryPointFn) {
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
-/// Sets the translation information to use for a dispatch region.
 static LogicalResult
 setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
                                 ArrayRef<Operation *> computeOps) {
@@ -2529,12 +2507,30 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
     return lowerUsingDefaultPipeline(entryPointFn);
   }
 
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  auto targetMLTransInfo =
-      TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
-  if (failed(
-          setRootConfigImpl(entryPointFn, rootOperation, targetMLTransInfo))) {
-    return failure();
+  bool tssFound = false;
+  for (auto &pattern : tssPatterns) {
+    FailureOr<TileSizeAndPipelineConfig> config =
+        pattern->matchAndConfig(entryPointFn, rootOperation);
+    if (succeeded(config)) {
+      auto tileSizeConfig = config->rootConfig;
+      auto pipeline = config->pipeline;
+      if (succeeded(setTileSizeConfigAndPipeline(
+              entryPointFn, cast<TilingInterface>(rootOperation),
+              tileSizeConfig, pipeline))) {
+        tssFound = true;
+        break;
+      }
+    }
+  }
+
+  if (!tssFound) {
+    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+    auto targetMLTransInfo =
+        TargetMLTransformInfo::getTargetMLTransformInfo(targetAttr);
+    if (failed(setRootConfigImpl(entryPointFn, rootOperation,
+                                 targetMLTransInfo))) {
+      return failure();
+    }
   }
 
   // The transform dialect codegen has differnet logics and codegen flow.
@@ -2555,7 +2551,9 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
-LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
+LogicalResult initCPULaunchConfig(
+    ModuleOp moduleOp,
+    const SmallVector<std::unique_ptr<TileSizeSelectionPattern>> &tssPatterns) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
@@ -2572,7 +2570,8 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     }
 
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
+    if (failed(
+            setTranslationInfoAndRootConfig(funcOp, computeOps, tssPatterns))) {
       return failure();
     }
   }

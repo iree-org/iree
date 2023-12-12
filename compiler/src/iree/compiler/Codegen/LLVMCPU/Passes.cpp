@@ -695,7 +695,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   passManager.addNestedPass<LLVM::LLVMFuncOp>(createAddFastMathFlagsPass());
 }
 
-void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
+void buildLLVMCPUCodegenConfigurationPassPipeline(
+    OpPassManager &passManager,
+    const TileSizeSelectionPatternList &patternList) {
   {
     addCommonTargetExecutablePreprocessingPasses(passManager,
                                                  clUseSoftmaxInterFusion);
@@ -713,7 +715,7 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
     modulePassManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
   }
 
-  passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
+  passManager.addPass(createLLVMCPUSelectLoweringStrategyPass(patternList));
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager,
