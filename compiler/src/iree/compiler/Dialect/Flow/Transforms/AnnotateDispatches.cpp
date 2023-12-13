@@ -165,13 +165,7 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   // Check if the op is a transpose and mark it as such for a better summary.
   {
     // Check if the body only contains a yield.
-    bool hasOnlyYield = true;
-    op.walk([&](Operation *child) {
-      if (op == child || isa<linalg::YieldOp>(child))
-        return WalkResult::advance();
-      hasOnlyYield = false;
-      return WalkResult::interrupt();
-    });
+    bool hasOnlyYield = op.getBlock()->without_terminator().empty();
 
     // Check if the indexing maps are only permutations.
     bool hasOnlyPermutation = true;
