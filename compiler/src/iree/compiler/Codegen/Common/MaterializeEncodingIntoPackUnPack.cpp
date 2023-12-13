@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -870,25 +869,6 @@ protected:
 };
 
 } // namespace
-
-static FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
-  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getResults();
-  return result;
-}
-
-MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
-    return chooseDynamicEncodingInfoVMVXMicrokernels;
-  }
-  return {};
-}
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
