@@ -197,12 +197,11 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
       // Put it in a NON_CONSTANT state and bail. This is terminal.
       valueInfo->state = ConstValueInfo::NON_CONSTANT;
       LLVM_DEBUG(dbgs() << "  EXPAND TO INELIGIBLE: " << result << "\n");
-      continue;
+    } else {
+      // If here, then an unknown state.
+      LLVM_DEBUG(dbgs() << "  EXPAND TO UNKNOWN: " << result << "\n");
+      worklist.push_back(valueInfo);
     }
-
-    // If here, then an unknown state.
-    LLVM_DEBUG(dbgs() << "  EXPAND TO UNKNOWN: " << result << "\n");
-    worklist.push_back(valueInfo);
 
     // Process producers.
     for (auto producer : opInfo.producers) {
@@ -210,7 +209,9 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
       if (!definingOp) {
         // Consider crossing out of block to be non-const.
         valueInfo->state = ConstValueInfo::NON_CONSTANT;
-        break;
+        // Continue to ensure all producers are traversed and build complete
+        // producer-consumer edges.
+        continue;
       }
       expandToOp(definingOp);
 
