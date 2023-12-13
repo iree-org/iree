@@ -280,8 +280,8 @@ public:
       vector::populatePropagateWarpVectorDistributionPatterns(
           patterns, distributionFn, simpleWarpShuffleFunction);
       vector::populateDistributeReduction(patterns, groupReductionFn);
-      vector::populateDistributeTransferWriteOpPatterns(patterns,
-                                                        distributionFn);
+      vector::populateDistributeTransferWriteOpPatterns(
+          patterns, distributionFn, /*maxNumElementsToExtract=*/1);
       patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }

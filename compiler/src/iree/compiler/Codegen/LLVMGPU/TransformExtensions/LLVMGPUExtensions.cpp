@@ -543,7 +543,8 @@ static void populateVectorTransferWriteDistribution(Operation *target,
                                                     PatternBenefit benefit) {
   assert(target->hasTrait<OpTrait::IsIsolatedFromAbove>());
   vector::populateDistributeTransferWriteOpPatterns(
-      patterns, simpleDistributionFunction, benefit);
+      patterns, simpleDistributionFunction, /*maxNumElementsToExtract=*/1,
+      benefit);
 }
 
 static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
