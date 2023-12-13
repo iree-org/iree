@@ -28,7 +28,6 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
-#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
@@ -825,7 +824,6 @@ static const iree_hal_device_vtable_t iree_hal_cuda2_device_vtable = {
     .create_semaphore = iree_hal_cuda2_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_cuda2_device_query_semaphore_compatibility,
-    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_alloca = iree_hal_cuda2_device_queue_alloca,
     .queue_dealloca = iree_hal_cuda2_device_queue_dealloca,
     .queue_read = iree_hal_cuda2_device_queue_read,

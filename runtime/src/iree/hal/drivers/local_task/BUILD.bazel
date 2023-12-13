@@ -47,7 +47,6 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/local",
         "//runtime/src/iree/hal/local:executable_environment",
         "//runtime/src/iree/hal/local:executable_library",
-        "//runtime/src/iree/hal/utils:buffer_transfer",
         "//runtime/src/iree/hal/utils:file_transfer",
         "//runtime/src/iree/hal/utils:memory_file",
         "//runtime/src/iree/hal/utils:resource_set",

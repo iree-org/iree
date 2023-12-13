@@ -91,6 +91,7 @@ target_link_libraries(${_NAME}
   iree_runtime_runtime
   iree_hal_local_loaders_static_library_loader
   iree_hal_drivers_local_task_task_driver
+  iree_hal_utils_buffer_transfer
   iree_task_api
 )
 

@@ -53,7 +53,6 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
     iree::hal
-    iree::hal::utils::buffer_transfer
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::file_transfer
