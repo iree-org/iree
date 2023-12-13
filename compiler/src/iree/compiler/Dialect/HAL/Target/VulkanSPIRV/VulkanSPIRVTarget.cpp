@@ -182,14 +182,31 @@ public:
       return variantOp.emitError() << "should contain some spirv.module ops";
     }
 
+    DenseMap<StringRef, uint64_t> entryPointOrdinals;
+    uint64_t ordinalCount = 0;
+    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+      uint64_t ordinal = exportOp.getOrdinal()->getZExtValue();
+      entryPointOrdinals[exportOp.getSymName()] = ordinal;
+      ordinalCount = std::max(ordinalCount, ordinal + 1);
+    }
+
     FlatbufferBuilder builder;
     iree_hal_spirv_ExecutableDef_start_as_root(builder);
 
+    // The list of shader modules.
+    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
+
+    // Per entry-point data.
+    // Note that the following vectors should all be of the same size and
+    // element at index #i is for entry point with ordinal #i!
     SmallVector<StringRef> entryPointNames;
     SmallVector<uint32_t> subgroupSizes;
-    SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
     SmallVector<uint32_t> shaderModuleIndices;
     SmallVector<iree_hal_spirv_FileLineLocDef_ref_t> sourceLocationRefs;
+    entryPointNames.resize(ordinalCount);
+    subgroupSizes.resize(ordinalCount);
+    shaderModuleIndices.resize(ordinalCount);
+
     bool hasAnySubgroupSizes = false;
 
     // Iterate over all spirv.module ops and encode them into the FlatBuffer
@@ -202,6 +219,7 @@ public:
                << "expected to contain exactly one entry point";
       }
       spirv::EntryPointOp spvEntryPoint = *spirvEntryPoints.begin();
+      uint64_t ordinal = entryPointOrdinals.at(spvEntryPoint.getFn());
 
       if (!options.dumpIntermediatesPath.empty()) {
         std::string assembly;
@@ -223,31 +241,34 @@ public:
       }
       auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                       spvBinary.size());
-      shaderModuleIndices.push_back(shaderModuleRefs.size());
+      shaderModuleIndices[ordinal] = shaderModuleRefs.size();
       shaderModuleRefs.push_back(
           iree_hal_spirv_ShaderModuleDef_create(builder, spvCodeRef));
 
       // The IREE runtime uses ordinals instead of names. We need to attach the
       // entry point name for VkShaderModuleCreateInfo.
-      entryPointNames.push_back(spvEntryPoint.getFn());
+      entryPointNames[ordinal] = spvEntryPoint.getFn();
 
       // If there are subgroup size requests, we need to pick up too.
       auto fn = spvModuleOp.lookupSymbol<spirv::FuncOp>(spvEntryPoint.getFn());
       auto abi = fn->getAttrOfType<spirv::EntryPointABIAttr>(
           spirv::getEntryPointABIAttrName());
       if (abi && abi.getSubgroupSize()) {
-        subgroupSizes.push_back(*abi.getSubgroupSize());
+        subgroupSizes[ordinal] = *abi.getSubgroupSize();
         hasAnySubgroupSizes = true;
       } else {
-        subgroupSizes.push_back(0);
+        subgroupSizes[ordinal] = 0;
       }
 
       // Optional source location information for debugging/profiling.
       if (options.debugLevel >= 1) {
         if (auto loc = findFirstFileLoc(spvEntryPoint.getLoc())) {
+          // We only ever resize to the maximum -- so all previous data will be
+          // kept as-is.
+          sourceLocationRefs.resize(ordinalCount);
           auto filenameRef = builder.createString(loc->getFilename());
-          sourceLocationRefs.push_back(iree_hal_spirv_FileLineLocDef_create(
-              builder, filenameRef, loc->getLine()));
+          sourceLocationRefs[ordinal] = iree_hal_spirv_FileLineLocDef_create(
+              builder, filenameRef, loc->getLine());
         }
       };
     }
