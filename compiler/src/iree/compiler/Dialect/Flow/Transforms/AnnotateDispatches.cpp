@@ -160,33 +160,43 @@ static std::string getOpNameWithoutDialectName(Operation *op) {
 }
 
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
-  // Check if the body only contains a yield.
-  bool hasOnlyYield = true;
-  op.walk([&](Operation *child) {
-    if (op == child || isa<linalg::YieldOp>(child))
-      return WalkResult::advance();
-    hasOnlyYield = false;
-    return WalkResult::interrupt();
-  });
+  std::string prefix;
 
-  // Check if the indexing maps are only permutations.
-  bool hasOnlyPermutation = true;
-  for (AffineMap map : op.getIndexingMapsArray()) {
-    if (!map.isPermutation()) {
-      hasOnlyPermutation = false;
+  // Check if the op is a transpose and mark it as such for a better summary.
+  {
+    // Check if the body only contains a yield.
+    bool hasOnlyYield = true;
+    op.walk([&](Operation *child) {
+      if (op == child || isa<linalg::YieldOp>(child))
+        return WalkResult::advance();
+      hasOnlyYield = false;
+      return WalkResult::interrupt();
+    });
+
+    // Check if the indexing maps are only permutations.
+    bool hasOnlyPermutation = true;
+    for (AffineMap map : op.getIndexingMapsArray()) {
+      if (!map.isPermutation()) {
+        hasOnlyPermutation = false;
+      }
+    }
+
+    if (hasOnlyYield && hasOnlyPermutation) {
+      prefix = "transpose";
     }
   }
 
-  if (hasOnlyYield && hasOnlyPermutation) {
-    return "transpose";
+  if (prefix.empty()) {
+    // By default, use the op name as prefix.
+    auto opName = op->getName().getStringRef();
+    if (!opName.consume_front("linalg."))
+      return "";
+    prefix = opName.str();
   }
 
-  auto opName = op->getName().getStringRef();
-  if (!opName.consume_front("linalg."))
-    return "";
   std::string opLoopRanges = loopRangesToString(op.getStaticLoopRanges());
   std::string opTypes = opLoopRanges.empty() ? "" : getLinalgDataTypes(op);
-  return opName.str() + (opLoopRanges.empty() ? "" : "_" + opLoopRanges) +
+  return prefix + (opLoopRanges.empty() ? "" : "_" + opLoopRanges) +
          (opTypes.empty() ? "" : "_" + opTypes);
 }
 

@@ -251,7 +251,7 @@ flow.executable private @ex {
 // Dispatch with only a yield and having indexing_maps only as permutations are transposes.
 
 flow.executable private @ex {
-  // CHECK: flow.executable.export public @dispatch_transpose
+  // CHECK: flow.executable.export public @dispatch_transpose_8x4_f32
   flow.executable.export public @dispatch
   builtin.module {
     func.func @dispatch(%arg0: !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>) {
