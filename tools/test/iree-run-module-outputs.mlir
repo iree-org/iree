@@ -39,7 +39,7 @@ func.func @default() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // RUN:                  --output= \
 // RUN:                  --output=@%t \
 // RUN:                  --output=+%t) && \
-// RUN:  %PYTHON %S/echo_npy.py %t | \
+// RUN:  "%PYTHON" %S/echo_npy.py %t | \
 // RUN: FileCheck --check-prefix=OUTPUT-NUMPY %s
 func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
   // Output skipped:
