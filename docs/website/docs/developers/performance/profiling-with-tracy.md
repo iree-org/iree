@@ -51,6 +51,12 @@ Run IREE device binaries loading your modules | [Nothing particular](#running-th
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
 Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvmcpu-link-embedded=false` will be passed to `iree-compile`.
 
+NOTE: If are using a `pip` release of IREE, it probably comes with a
+Tracy-enabled runtime already. You can select it by setting the
+`IREE_PY_RUNTIME=tracy` environment variable. Next time you run the IREE
+runtime, you should see the following message printed to stderr:
+'-- Using Tracy runtime (IREE_PY_RUNTIME=tracy)'.
+
 ## Install dependencies
 
 ### Do you need capstone-next?
@@ -228,6 +234,12 @@ Example:
 TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module ... (usual flags)
 ```
 
+NOTE: By default, `iree-tracy-capture` tries to connect on the `8086` port.
+However, your profiled program may use a different port for Tracy if `8086` is
+not available for some reason. You can pass `-p <port>` to override the default
+port to connect to. Alternatively, you can try capturing the tracy using the
+Tracy GUI which scans other ports too by default.
+
 ### Additional steps for Sampling
 
 In order for Sampling to work, the IREE compiled module code mapping must still
@@ -245,6 +257,16 @@ TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 /data/local/tmp/iree-benchmark-
 Tracing doesn't work properly on VMs (see "Problematic Platforms / Virtual
 Machines" section 2.1.6.4 of the [manual](#the-tracy-manual)). To get sampling,
 you should run the profiled program on bare metal.
+
+### Additional steps for Python bindings
+
+When writing a Python-based program that you wan to profile, you may need to
+insert IREE runtime calls to periodically flush the profile data:
+
+```python
+device = ... # HalDevice
+device.flush_profiling()
+```
 
 ## Operating system settings required for Sampling and SysTrace
 
