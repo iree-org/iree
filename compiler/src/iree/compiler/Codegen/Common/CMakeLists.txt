@@ -190,6 +190,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransformOps
