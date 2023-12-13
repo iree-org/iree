@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
@@ -76,9 +77,10 @@ void registerTransformDialectTranslationDependentDialects(
                   scf::SCFDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,
-                  vector::VectorDialect
-                  // clang-format on
-                  >();
+                  vector::VectorDialect,
+                  arm_sme::ArmSMEDialect
+      // clang-format on
+      >();
 
   // TODO: these should be registered by the extension instead, but there is
   // no support for it in core currently.

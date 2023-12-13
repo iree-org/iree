@@ -62,6 +62,31 @@ py_binary(
     "large",
 ]]
 
+# LLVMCPU, non-data-tiling, no microkernels, ArmSME
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_arm_sme_nondt_%s_%s" % (dtype, size),
+    compiler_flags = [
+        "--iree-opt-data-tiling=false",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % dtype,
+        "--acc_type=%s" % dtype,
+        "--shapes=%s" % size,
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
+    trace_runner = "//tools:iree-e2e-matmul-test",
+) for dtype in [
+    "f32",
+    # "f64" (also supported for ArmSME, but not by the test generator)
+] for size in [
+    "small",
+    "large",
+]]
+
 X86_64_AVX2 = [
     "+avx",
     "+avx2",

@@ -199,6 +199,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils
+    MLIRArmSMEDialect
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransformOps

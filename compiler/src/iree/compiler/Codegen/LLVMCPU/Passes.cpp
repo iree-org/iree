@@ -12,9 +12,12 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Conversion/VectorToArmSME/VectorToArmSME.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -619,7 +622,8 @@ void addTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(createDropSchedulePass());
 }
 
-static void addLowerToLLVMPasses(OpPassManager &passManager) {
+static void addLowerToLLVMPasses(OpPassManager &passManager,
+                                 bool enableAArch64SME) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
   // memory space through the stack.
   passManager.addPass(createEraseHALDescriptorTypeFromMemRefPass());
@@ -659,6 +663,21 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
   if (clUseFastMinMaxOps) {
     passManager.addNestedPass<func::FuncOp>(createReplaceSlowMinMaxOpsPass());
+  }
+
+  if (enableAArch64SME) {
+    // Lower vector operations to Arm SME operations.
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::createConvertVectorToArmSMEPass());
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::arm_sme::createTileAllocationPass());
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::arm_sme::createEnableArmStreamingPass(
+            mlir::arm_sme::ArmStreamingMode::StreamingLocally,
+            mlir::arm_sme::ArmZaMode::NewZA,
+            /*onlyIfRequiredByOps=*/true));
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::createConvertArmSMEToSCFPass());
   }
 
   // Resolve get_buffer_descriptor ops. All structural buffer manipulations
@@ -720,10 +739,11 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
 }
 
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager,
+                                     bool enableAArch64SME) {
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  addLowerToLLVMPasses(nestedModulePM);
+  addLowerToLLVMPasses(nestedModulePM, enableAArch64SME);
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";

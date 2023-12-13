@@ -838,13 +838,18 @@ static LogicalResult setMatmulNoPadRootConfig(
   const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<bool> parallelScalableFlags;
+  int numScalableDims = llvm::count(vecScalableDims, true);
 
   for (auto [index, tileSize] : llvm::enumerate(vecTileSizes)) {
     int64_t sz = tileSize;
+    bool isScalable = vecScalableDims[index];
     // The backend struggles to legalize non-power-of-two scalable vectors.
-    bool enforcePowerOfTwo = vecScalableDims[index];
+    bool enforcePowerOfTwo = isScalable;
 
-    if (sz != 0) {
+    // Ad-hoc: Don't attempt to resize scalable tiles when numScalableDims >= 2.
+    // For ArmSME (the only current user of 2D scalable vectors), tile sizes
+    // must match SME tiles (and cannot be arbitrarily resized).
+    if (sz != 0 && (numScalableDims < 2 || !isScalable)) {
       sz = getMaxVectorTileSize(
           /*numElem=*/shape[index],
           /*tileSize=*/sz, vectorSize, enforcePowerOfTwo);
@@ -852,7 +857,7 @@ static LogicalResult setMatmulNoPadRootConfig(
     parallelTileSizes.push_back(sz);
     // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
     // fallback to fixed vectorization if they occur:
-    parallelScalableFlags.push_back(sz > 1 ? vecScalableDims[index] : false);
+    parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
@@ -942,6 +947,50 @@ static void getDefaultMatmulVectorSizes(
   return;
 }
 
+/// Checks if the input and output types of a linalg op are the same, and if so
+/// returns the type. Otherwise, returns failure.
+static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
+  SmallVector<Type, 3> inputAndOutputElementTypes;
+  for (Value v :
+       llvm::concat<Value>(op.getRegionInputArgs(), op.getRegionOutputArgs())) {
+    inputAndOutputElementTypes.push_back(v.getType());
+  }
+  assert(!inputAndOutputElementTypes.empty() &&
+         "expected linalg op to have input and output types");
+  if (!llvm::all_equal(inputAndOutputElementTypes))
+    return failure();
+  return inputAndOutputElementTypes[0];
+}
+
+/// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
+/// tile sizes picked here must exactly match the SME hardware virtual tiles, as
+/// there is currently no support for lowering non-standard shapes.
+static void
+getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
+                               SmallVectorImpl<int64_t> &sizes,
+                               SmallVectorImpl<bool> &scalableSizeFlags) {
+  // Double-check the operation is one that is supported for lowering to ArmSME.
+  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(op))
+    return;
+
+  auto elementType = nonWideningLinalgElementType(op);
+  if (failed(elementType))
+    return;
+
+  if (elementType->isF32()) {
+    sizes.append({4, 4, 1});
+    scalableSizeFlags.append({true, true, false});
+  }
+
+  if (elementType->isF64()) {
+    sizes.append({2, 2, 1});
+    scalableSizeFlags.append({true, true, false});
+  }
+
+  // TODO(macdue): Other element types (there is little support for anything
+  // other than f32 and f64 yet).
+}
+
 /// Main utility to compute the vectorization/unrolling tile sizes.
 static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
                                                   linalg::LinalgOp op,
@@ -949,8 +998,15 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
                                                   bool isQuantized) {
   SmallVector<int64_t> matmulTileSizes;
   SmallVector<bool> matmulScalableFlags;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // TODO: Compute vector tile sizes using heuristics.
+
+  if (isAArch64(targetAttr) && hasSMEFeature(targetAttr)) {
+    // Note: This may not pick any sizes (which will fallback to the default
+    // SVE) sizes below.
+    getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
+  }
 
   // Get default hard-coded tile sizes if we couldn't compute anything better.
   if (matmulTileSizes.empty()) {
@@ -979,6 +1035,8 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
   // For proper 2-D or higher order matmuls, make sure we don't use a tile size
   // greater than the static dim size for dims that are only unrolled, i.e., N
   // and batch dims.
+
+  int numScalableDims = llvm::count(scalableTileFlags, true);
   SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
   if (numLoops >= 3) {
     for (int i = 0; i < (numLoops - 2); ++i) {
@@ -987,7 +1045,12 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
       if (tileSize == 0 || ShapedType::isDynamic(dimSize)) {
         continue;
       }
-
+      // Ad-hoc: Don't attempt to resize scalable tiles when numScalableDims
+      // >= 2. For ArmSME (the only current user of 2D scalable vectors), tile
+      // sizes must match SME tiles (and cannot be arbitrarily resized).
+      if (numScalableDims >= 2 && scalableTileFlags[i]) {
+        continue;
+      }
       tileSizes[i] = std::min<int64_t>(tileSize, dimSize);
     }
   }

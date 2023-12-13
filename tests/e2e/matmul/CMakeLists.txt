@@ -12,6 +12,48 @@ iree_add_all_subdirs()
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_arm_sme_nondt_f32_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_arm_sme_nondt_f32_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_dt_i8_i32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"

@@ -94,6 +94,7 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorTransferDropUnitDimsPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
         /*benefit=*/1,
