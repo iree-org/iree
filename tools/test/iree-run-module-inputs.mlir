@@ -11,7 +11,7 @@ func.func @no_input() {
 // -----
 
 // Scalars use the form `--input=value`. Type (float/int) should be omitted.
-//   * Type conversions between bit depths (e.g. i8 -> i32) may occur!
+//   * The VM does not use i1/i8 types, so i32 VM types are returned instead.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
 // RUN:  iree-run-module --device=local-sync --module=- --function=scalars \
@@ -53,7 +53,7 @@ func.func @buffers(%arg0: tensor<i32>, %arg1: tensor<2xi32>, %arg2: tensor<2x3xi
 // Buffer values can be read from binary files with `@some/file.bin`.
 //   * numpy npy files from numpy.save or previous tooling output can be read to
 //     provide 1+ values.
-//   * Some data types may be converted (i32 -> si32 here)
+//   * Some data types may be converted (i32 -> si32 here) - bug?
 
 // RUN: iree-compile --iree-hal-target-backends=vmvx %s -o %t.vmfb
 //
