@@ -531,16 +531,18 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
         createDecomposeBatchMmt4DOpsPass());
     nestedModulePM.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  } else {
-    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-        static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
-    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-        static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createGenericVectorizationPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
   }
+  // We still run codegen pipeline because we want a better fallback when
+  // ukernels are not available. They are nop if the mmt4d op is convereted to
+  // ukernels. If ukernels are not implemented, the lowering config is still
+  // carried by compute ops, so we can use it as a fallback solution.
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
+      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
+      static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
+  nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistRedundantVectorTransfersPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
