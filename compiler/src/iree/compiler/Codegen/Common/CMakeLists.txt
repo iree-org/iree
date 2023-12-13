@@ -117,6 +117,7 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtTransforms
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect
@@ -189,6 +190,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransformOps
