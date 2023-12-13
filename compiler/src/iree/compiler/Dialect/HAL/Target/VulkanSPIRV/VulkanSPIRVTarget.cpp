@@ -183,7 +183,6 @@ public:
     }
 
     DenseMap<StringRef, uint64_t> entryPointOrdinals;
-    uint64_t ordinalCount = 0;
 
     SmallVector<IREE::HAL::ExecutableExportOp> exportOps =
         llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
@@ -199,8 +198,8 @@ public:
         }
       }
       entryPointOrdinals[exportOp.getSymName()] = ordinal;
-      ordinalCount = std::max(ordinalCount, ordinal + 1);
     }
+    uint64_t ordinalCount = entryPointOrdinals.size();
 
     FlatbufferBuilder builder;
     iree_hal_spirv_ExecutableDef_start_as_root(builder);
