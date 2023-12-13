@@ -138,7 +138,6 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
-  memset(device, 0, total_size);
 
   iree_hal_resource_initialize(&iree_hal_cuda2_device_vtable,
                                &device->resource);
