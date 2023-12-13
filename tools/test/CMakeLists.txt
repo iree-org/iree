@@ -54,7 +54,6 @@ iree_lit_test_suite(
     parameters_b.safetensors
   LABELS
     "driver=local-task"
-    "driver=vulkan"
     "hostonly"
 )
 

@@ -54,7 +54,6 @@ iree_lit_test_suite(
     ],
     tags = [
         "driver=local-task",
-        "driver=vulkan",
         "hostonly",
     ],
     tools = [
