@@ -275,7 +275,8 @@ struct ConvertBf16ToUInt16BuffersPass final
             return legal;
           });
 
-      // Support the list of all vector operations that do not perform numerical changes:
+      // Support the list of all vector operations that do not perform numerical
+      // changes:
       target.addDynamicallyLegalOp<
           vector::BroadcastOp, vector::ShuffleOp, vector::ExtractElementOp,
           vector::ExtractOp, vector::InsertElementOp, vector::InsertOp,
