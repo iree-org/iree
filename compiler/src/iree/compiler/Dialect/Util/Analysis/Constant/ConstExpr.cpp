@@ -210,13 +210,13 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
       if (!definingOp) {
         // Consider crossing out of block to be non-const.
         valueInfo->state = ConstValueInfo::NON_CONSTANT;
-        break;
-      }
-      expandToOp(definingOp);
+      } else {
+        expandToOp(definingOp);
 
-      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
-      assert(producerInfo && "should have producer info in map");
-      valueInfo->producers.insert(producerInfo);
+        ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
+        assert(producerInfo && "should have producer info in map");
+        valueInfo->producers.insert(producerInfo);
+      }
     }
   }
 }
