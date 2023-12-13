@@ -184,8 +184,20 @@ public:
 
     DenseMap<StringRef, uint64_t> entryPointOrdinals;
     uint64_t ordinalCount = 0;
-    for (auto exportOp : variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
-      uint64_t ordinal = exportOp.getOrdinal()->getZExtValue();
+
+    SmallVector<IREE::HAL::ExecutableExportOp> exportOps =
+        llvm::to_vector(variantOp.getOps<IREE::HAL::ExecutableExportOp>());
+    for (auto exportOp : exportOps) {
+      uint64_t ordinal = 0;
+      if (std::optional<APInt> optionalOrdinal = exportOp.getOrdinal()) {
+        ordinal = optionalOrdinal->getZExtValue();
+      } else {
+        // For executables with only one entry point, linking doesn't kick in at
+        // all. So the ordinal can be missing for this case.
+        if (!llvm::hasSingleElement(exportOps)) {
+          return exportOp.emitError() << "should have ordinal attribute";
+        }
+      }
       entryPointOrdinals[exportOp.getSymName()] = ordinal;
       ordinalCount = std::max(ordinalCount, ordinal + 1);
     }
