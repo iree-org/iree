@@ -59,7 +59,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: %[[ARG0_BUFFER:.+]] = hal.buffer_view.buffer<%[[ARG0]] : !hal.buffer_view> : !hal.buffer
 
     // (annoyingly out of order)
-    // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
+    // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
     // CHECK-DAG: %[[ALLOCATOR:.+]] = hal.device.allocator<%[[DEVICE]] : !hal.device> : !hal.allocator
 
     // CHECK: hal.buffer.assert<%[[ARG0_BUFFER]] : !hal.buffer>

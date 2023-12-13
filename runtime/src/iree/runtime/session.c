@@ -94,8 +94,9 @@ IREE_API_EXPORT iree_status_t iree_runtime_session_create_with_device(
   iree_vm_module_t* hal_module = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_module_create(iree_runtime_instance_vm_instance(instance),
-                                    device, IREE_HAL_MODULE_FLAG_NONE,
-                                    host_allocator, &hal_module);
+                                    /*device_count=*/1, &device,
+                                    IREE_HAL_MODULE_FLAG_NONE, host_allocator,
+                                    &hal_module);
   }
   if (iree_status_is_ok(status)) {
     status = iree_vm_context_register_modules(
@@ -163,7 +164,8 @@ IREE_API_EXPORT iree_vm_context_t* iree_runtime_session_context(
 IREE_API_EXPORT iree_hal_device_t* iree_runtime_session_device(
     const iree_runtime_session_t* session) {
   IREE_ASSERT_ARGUMENT(session);
-  return iree_hal_module_state_device(session->hal_module_state);
+  // NOTE: only one device is supported via this API today.
+  return iree_hal_module_state_device_get(session->hal_module_state, 0);
 }
 
 IREE_API_EXPORT iree_hal_allocator_t* iree_runtime_session_device_allocator(

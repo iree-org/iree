@@ -8,9 +8,6 @@ vm.module @hal {
 // Experimental/temporary ops
 //===----------------------------------------------------------------------===//
 
-vm.import private @ex.shared_device() -> !vm.ref<!hal.device>
-attributes {nosideeffects}
-
 // Creates a file mapped into a byte range of a host buffer.
 // EXPERIMENTAL: may be removed in future versions.
 vm.import private @ex.file.from_memory(
@@ -417,6 +414,22 @@ vm.import private @device.queue.flush(
   %device : !vm.ref<!hal.device>,
   %queue_affinity : i64
 )
+
+//===----------------------------------------------------------------------===//
+// iree_hal_device_t management
+//===----------------------------------------------------------------------===//
+
+vm.import private @devices.count() -> i32
+attributes {
+  minimum_version = 2 : i32,
+  nosideeffects
+}
+
+vm.import private @devices.get(%index : i32) -> !vm.ref<!hal.device>
+attributes {
+  minimum_version = 2 : i32,
+  nosideeffects
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_executable_t

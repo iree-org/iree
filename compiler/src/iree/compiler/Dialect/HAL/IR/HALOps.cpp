@@ -332,11 +332,6 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 // hal.ex.*
 //===----------------------------------------------------------------------===//
 
-void ExSharedDeviceOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "device");
-}
-
 void ExFileFromMemoryOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "memory_file");
@@ -921,6 +916,27 @@ LogicalResult DeviceQueueWriteOp::verify() {
 
 LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.devices.*
+//===----------------------------------------------------------------------===//
+
+void DevicesCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "device_count");
+}
+
+void DevicesGetOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  APInt index;
+  if (matchPattern(getIndex(), m_ConstantInt(&index))) {
+    llvm::SmallString<16> str("device_");
+    index.toStringUnsigned(str);
+    setNameFn(getResult(), str);
+  } else {
+    setNameFn(getResult(), "device_n");
+  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -44,6 +44,7 @@ public:
         auto fullKey = ArrayAttr::get(
             moduleOp.getContext(),
             {
+                // TODO(multi-device): add attr key on device resolve source.
                 StringAttr::get(moduleOp.getContext(),
                                 queryOp.getCategory() + queryOp.getKey()),
                 queryOp.getDefaultValue().has_value()
@@ -90,8 +91,8 @@ public:
       auto initializerOp =
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
-      auto device =
-          funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(fusedLoc);
+      // TODO(multi-device): pass in resolve info to the call and reuse.
+      Value device = IREE::HAL::DeviceType::resolveAny(fusedLoc, funcBuilder);
       auto queryOp = funcBuilder.create<IREE::HAL::DeviceQueryOp>(
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.getCategoryAttr(), anyQueryOp.getKeyAttr(),

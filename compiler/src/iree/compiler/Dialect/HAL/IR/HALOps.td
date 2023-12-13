@@ -37,24 +37,6 @@ def OpGroupExperimentalOps : OpDocGroup {
 
 let opDocGroup = OpGroupExperimentalOps in {
 
-def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let results = (outs
-    HAL_Device:$result
-  );
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins),
-    [{
-      $_state.addTypes({DeviceType::get($_builder.getContext())});
-    }]>,
-  ];
-}
-
 def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -1862,6 +1844,57 @@ def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
 }
 
 } // OpGroupDeviceOps
+
+//===----------------------------------------------------------------------===//
+// !hal.device management
+//===----------------------------------------------------------------------===//
+
+def OpGroupDeviceManagementOps : OpDocGroup {
+  let summary = "Device management ops";
+  let description = "Device availability and selection support.";
+}
+
+let opDocGroup = OpGroupDeviceManagementOps in {
+
+def HAL_DevicesCountOp : HAL_PureOp<"devices.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the number of available devices}];
+  let description = [{
+    Returns the total number of available devices registered at runtime.
+  }];
+
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
+
+def HAL_DevicesGetOp : HAL_PureOp<"devices.get", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the device with the given index}];
+  let description = [{
+    Returns the device with the given index in the [0, hal.devices.count) range.
+    Devices may be lazily initialized upon first use.
+  }];
+
+  let arguments = (ins
+    Index:$index
+  );
+  let results = (outs
+    HAL_Device:$result
+  );
+
+  let assemblyFormat = [{
+    $index attr-dict `:` type($result)
+  }];
+}
+
+}  // OpGroupDeviceManagementOps
 
 //===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t

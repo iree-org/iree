@@ -73,7 +73,8 @@ func.func @basic_linking() -> () attributes {
   testing.func.b = @dispatch_0::@spirv,
   testing.func.c = @dispatch_0::@spirv::@dispatch_0
 } {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer attributes {
     testing.op.a = @dispatch_0,
     testing.op.b = @dispatch_0::@spirv,
@@ -86,7 +87,8 @@ func.func @basic_linking() -> () attributes {
   return
 }
 util.initializer {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
@@ -237,7 +239,8 @@ hal.executable private @dispatch_3 {
   }
 }
 func.func @two_target_environments_1() -> () {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
@@ -245,7 +248,8 @@ func.func @two_target_environments_1() -> () {
   return
 }
 func.func @two_target_environments_2() -> () {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])

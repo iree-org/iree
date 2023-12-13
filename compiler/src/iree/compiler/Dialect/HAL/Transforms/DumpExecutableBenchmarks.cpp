@@ -173,8 +173,8 @@ appendGlobalBuffer(Location loc, StringRef baseName,
   auto initBuilder = OpBuilder::atBlockBegin(initOp.addEntryBlock());
   IndexSet indexSet(loc, initBuilder);
 
-  // TODO(benvanik): real device lookup.
-  auto device = initBuilder.create<IREE::HAL::ExSharedDeviceOp>(loc);
+  // TODO(multi-device): support multiple devices in benchmark generation.
+  Value device = IREE::HAL::DeviceType::resolveAny(loc, initBuilder);
   auto allocator =
       initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).getResult();
 
@@ -242,8 +242,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   auto batchSizeArg = funcBuilder.create<arith::IndexCastOp>(
       loc, funcBuilder.getIndexType(), entryBlock->getArgument(0));
 
-  // TODO(benvanik): real device lookup.
-  auto device = funcBuilder.create<IREE::HAL::ExSharedDeviceOp>(loc);
+  // TODO(multi-device): support multiple devices in benchmark generation.
+  Value device = IREE::HAL::DeviceType::resolveAny(loc, funcBuilder);
 
   // Create and begin command buffer.
   // TODO(benvanik): reuse the command buffer (initialize once and store).

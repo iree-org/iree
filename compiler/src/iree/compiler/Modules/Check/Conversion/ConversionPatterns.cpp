@@ -68,7 +68,8 @@ static LogicalResult applyDefaultCheckBufferRewrite(
   state.addAttributes(srcOp->getAttrs());
 
   // Add device argument.
-  Value device = rewriter.create<IREE::HAL::ExSharedDeviceOp>(srcOp->getLoc());
+  // TODO(multi-device): support multiple devices in check tests .
+  Value device = IREE::HAL::DeviceType::resolveAny(srcOp->getLoc(), rewriter);
   state.addOperands({device});
 
   for (auto [srcOperand, dstOperand] :

@@ -32,17 +32,25 @@
 // Module type definitions
 //===----------------------------------------------------------------------===//
 
-#define IREE_HAL_MODULE_VERSION_0_1 0x00000001u
-#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_1
+#define IREE_HAL_MODULE_VERSION_0_2 0x00000002u
+#define IREE_HAL_MODULE_VERSION_LATEST IREE_HAL_MODULE_VERSION_0_2
 
 typedef struct iree_hal_module_t {
   iree_allocator_t host_allocator;
   iree_hal_module_flags_t flags;
-  iree_hal_device_t* shared_device;
+  iree_host_size_t device_count;
+  iree_hal_device_t* devices[];
 } iree_hal_module_t;
 
 #define IREE_HAL_MODULE_CAST(module) \
   (iree_hal_module_t*)((uint8_t*)(module) + iree_vm_native_module_size());
+
+static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
+  iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
+  for (iree_host_size_t i = 0; i < module->device_count; ++i) {
+    iree_hal_device_release(module->devices[i]);
+  }
+}
 
 typedef struct iree_hal_module_state_t {
   iree_allocator_t host_allocator;
@@ -51,28 +59,25 @@ typedef struct iree_hal_module_state_t {
   // application. All instantiations of a module share the same flags.
   iree_hal_module_flags_t flags;
 
-  // HACK: today we only support a single device per context - in the future
-  // this should be a set of available devices that the module is able to pick
-  // from - the module will then hang on to them and use them as native globals
-  // instead of storing anything in module state here.
-  iree_hal_device_t* shared_device;
+  // Total number of devices available to the module.
+  iree_host_size_t device_count;
+  // Devices referencing the storage in the parent module.
+  // Unretained as the parent module must remain live longer than any module
+  // state allocated from it and we can rely on it to keep the devices retained.
+  iree_hal_device_t** devices;
 
   // TODO(benvanik): add iree_loop_t to module constructor.
   // Status of the nested loop we run for executable creation today. We should
   // instead be taking a loop upon creation and scheduling work against that.
   iree_status_t loop_status;
 
-  // Shared executable cache for all executables created in the context.
-  // We could have multiple to allow for modules to create distinct sets of
-  // executables like ones for training vs inference in the same model, or just
-  // always use this.
-  iree_hal_executable_cache_t* executable_cache;
+  // Shared executable cache for each device used to cache all executables
+  // created in the context. We could have multiple to allow for modules to
+  // create distinct sets of executables like ones for training vs inference in
+  // the same model or allow these to be injected so that multiple loaded
+  // contexts share the caches.
+  iree_hal_executable_cache_t* executable_caches[];
 } iree_hal_module_state_t;
-
-static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
-  iree_hal_module_t* module = IREE_HAL_MODULE_CAST(base_module);
-  iree_hal_device_release(module->shared_device);
-}
 
 static iree_status_t IREE_API_PTR
 iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
@@ -81,24 +86,36 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
 
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(self);
   iree_hal_module_state_t* state = NULL;
+  iree_host_size_t total_size =
+      sizeof(*state) +
+      module->device_count * sizeof(state->executable_caches[0]);
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_allocator_malloc(host_allocator, sizeof(*state), (void**)&state));
-  memset(state, 0, sizeof(*state));
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&state));
+  memset(state, 0, total_size);
   state->host_allocator = host_allocator;
   state->flags = module->flags;
-  state->shared_device = module->shared_device;
-  iree_hal_device_retain(state->shared_device);
-
+  state->device_count = module->device_count;
+  state->devices = module->devices;
   state->loop_status = iree_ok_status();
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_executable_cache_create(
-              state->shared_device, iree_string_view_empty(),
-              iree_loop_inline(&state->loop_status), &state->executable_cache));
 
-  *out_module_state = (iree_vm_module_state_t*)state;
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < state->device_count; ++i) {
+    status = iree_hal_executable_cache_create(
+        state->devices[i], iree_string_view_empty(),
+        iree_loop_inline(&state->loop_status), &state->executable_caches[i]);
+    if (!iree_status_is_ok(status)) break;
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_module_state = (iree_vm_module_state_t*)state;
+  } else {
+    for (iree_host_size_t i = 0; i < state->device_count; ++i) {
+      iree_hal_executable_cache_release(state->executable_caches[i]);
+    }
+    iree_allocator_free(host_allocator, state);
+  }
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static void IREE_API_PTR
@@ -106,12 +123,34 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
-  iree_hal_executable_cache_release(state->executable_cache);
+  for (iree_host_size_t i = 0; i < state->device_count; ++i) {
+    iree_hal_executable_cache_release(state->executable_caches[i]);
+  }
   iree_status_ignore(state->loop_status);
-  iree_hal_device_release(state->shared_device);
   iree_allocator_free(state->host_allocator, state);
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+// Returns an unretained reference to the executable cache for the given device.
+// If the same device is registered multiple times the first cache is returned.
+static iree_status_t iree_hal_module_state_lookup_executable_cache(
+    iree_hal_module_state_t* state, iree_hal_device_t* device,
+    iree_hal_executable_cache_t** out_executable_cache) {
+  IREE_ASSERT_ARGUMENT(state);
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(out_executable_cache);
+  *out_executable_cache = NULL;
+  for (iree_host_size_t i = 0; i < state->device_count; ++i) {
+    if (state->devices[i] == device) {
+      *out_executable_cache = state->executable_caches[i];
+      return iree_ok_status();
+    }
+  }
+  return iree_make_status(
+      IREE_STATUS_NOT_FOUND,
+      "no executable cache for the given device found; possibly a device not "
+      "registered with the HAL module");
 }
 
 static iree_status_t IREE_API_PTR iree_hal_module_notify(
@@ -119,10 +158,17 @@ static iree_status_t IREE_API_PTR iree_hal_module_notify(
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
   switch (signal) {
     case IREE_VM_SIGNAL_SUSPEND:
-    case IREE_VM_SIGNAL_LOW_MEMORY:
-      return iree_hal_device_trim(state->shared_device);
-    default:
+    case IREE_VM_SIGNAL_LOW_MEMORY: {
+      for (iree_host_size_t i = 0; i < state->device_count; ++i) {
+        IREE_RETURN_IF_ERROR(iree_hal_device_trim(state->devices[i]));
+      }
       return iree_ok_status();
+    }
+    default: {
+      // Ignored today but if we started managing device power down we could
+      // use this to wake them back up again.
+      return iree_ok_status();
+    }
   }
 }
 
@@ -149,13 +195,6 @@ static iree_device_size_t iree_hal_cast_device_size(int64_t value) {
 //===----------------------------------------------------------------------===//
 // NOTE: Ex* APIs are experimental and likely to be removed soon. Modules
 // using these APIs are not forward compatible.
-
-IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
-                   iree_hal_module_state_t,           //
-                   v, r) {
-  rets->r0 = iree_hal_device_retain_ref(state->shared_device);
-  return iree_ok_status();
-}
 
 static void iree_hal_module_file_buffer_release(
     void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
@@ -411,9 +450,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load,  //
                             "load length byte count %d exceeds max", length);
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
-      state->shared_device, source_buffer, source_offset, &target_buffer,
-      length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_read(source_buffer, source_offset,
+                                                &target_buffer, length));
 
   rets->i0 = target_buffer;
   return iree_ok_status();
@@ -440,9 +478,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
                             iree_hal_buffer_byte_length(target_buffer));
   }
 
-  return iree_hal_device_transfer_h2d(
-      state->shared_device, &value, target_buffer, target_offset, length,
-      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
+  return iree_hal_buffer_map_write(target_buffer, target_offset, &value,
+                                   length);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1104,6 +1141,30 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_queue_flush,  //
   return iree_hal_device_queue_flush(device, queue_affinity);
 }
 
+//===----------------------------------------------------------------------===//
+// iree_hal_device_t management
+//===----------------------------------------------------------------------===//
+
+IREE_VM_ABI_EXPORT(iree_hal_module_devices_count,  //
+                   iree_hal_module_state_t,        //
+                   v, i) {
+  rets->i0 = (int32_t)state->device_count;
+  return iree_ok_status();
+}
+
+IREE_VM_ABI_EXPORT(iree_hal_module_devices_get,  //
+                   iree_hal_module_state_t,      //
+                   i, r) {
+  if (args->i0 >= state->device_count) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "device index %d out of bounds (%" PRIhsz
+                            " devices available)",
+                            args->i0, state->device_count);
+  }
+  rets->r0 = iree_hal_device_retain_ref(state->devices[args->i0]);
+  return iree_ok_status();
+}
+
 //===--------------------------------------------------------------------===//
 // iree_hal_executable_t
 //===--------------------------------------------------------------------===//
@@ -1135,6 +1196,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
     constant_count = constant_buffer->data.data_length / sizeof(uint32_t);
     constants = (const uint32_t*)constant_buffer->data.data;
   }
+
+  iree_hal_executable_cache_t* executable_cache = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_module_state_lookup_executable_cache(
+      state, device, &executable_cache));
+
   iree_host_size_t pipeline_layout_count = args->a4_count;
   iree_hal_pipeline_layout_t** pipeline_layouts = NULL;
   IREE_RETURN_IF_ERROR(
@@ -1164,7 +1230,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
     executable_params.constant_count = constant_count;
     executable_params.constants = constants;
     status = iree_hal_executable_cache_prepare_executable(
-        state->executable_cache, &executable_params, &executable);
+        executable_cache, &executable_params, &executable);
   }
 
   iree_allocator_free(state->host_allocator, pipeline_layouts);
@@ -1573,13 +1639,15 @@ static const iree_vm_native_module_descriptor_t iree_hal_module_descriptor_ = {
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
-    iree_vm_instance_t* instance, iree_hal_device_t* device,
-    iree_hal_module_flags_t flags, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module) {
+    iree_vm_instance_t* instance, iree_host_size_t device_count,
+    iree_hal_device_t** devices, iree_hal_module_flags_t flags,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(instance);
-  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(device_count);
+  IREE_ASSERT_ARGUMENT(devices);
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   // Setup the interface with the functions we implement ourselves. Any function
   // we omit will be handled by the base native module.
@@ -1591,8 +1659,9 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
   };
 
   // Allocate shared module state.
-  iree_host_size_t total_size =
-      iree_vm_native_module_size() + sizeof(iree_hal_module_t);
+  iree_host_size_t total_size = iree_vm_native_module_size() +
+                                sizeof(iree_hal_module_t) +
+                                device_count * sizeof(iree_hal_device_t*);
   iree_vm_module_t* base_module = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&base_module));
@@ -1602,6 +1671,7 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
                                        instance, host_allocator, base_module);
   if (!iree_status_is_ok(status)) {
     iree_allocator_free(host_allocator, base_module);
+    IREE_TRACE_ZONE_END(z0);
     return status;
   }
 
@@ -1609,15 +1679,25 @@ IREE_API_EXPORT iree_status_t iree_hal_module_create(
   module->host_allocator = host_allocator;
   // TODO(benvanik): fix vm yield with result storage.
   module->flags = flags | IREE_HAL_MODULE_FLAG_SYNCHRONOUS;
-  module->shared_device = device;
-  iree_hal_device_retain(module->shared_device);
+  module->device_count = device_count;
+  for (iree_host_size_t i = 0; i < device_count; ++i) {
+    module->devices[i] = devices[i];
+    iree_hal_device_retain(module->devices[i]);
+  }
 
   *out_module = base_module;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
-    iree_vm_module_state_t* module_state) {
+IREE_API_EXPORT iree_host_size_t
+iree_hal_module_state_device_count(iree_vm_module_state_t* module_state) {
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
-  return state->shared_device;
+  return state->device_count;
+}
+
+IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device_get(
+    iree_vm_module_state_t* module_state, iree_host_size_t index) {
+  iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
+  return index < state->device_count ? state->devices[index] : NULL;
 }
