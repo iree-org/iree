@@ -265,15 +265,34 @@ struct ConvertBf16ToUInt16BuffersPass final
                                                      Operation *op) {
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
       });
-      target.addDynamicallyLegalDialect<
-          arith::ArithDialect, func::FuncDialect, IREE::HAL::HALDialect,
-          memref::MemRefDialect, scf::SCFDialect, vector::VectorDialect>(
+      target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
+                                        IREE::HAL::HALDialect,
+                                        memref::MemRefDialect, scf::SCFDialect>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()
                        << "Bf16Emulation: illegal op: " << *op << "\n");
             return legal;
           });
+
+      // Support the list of all vector operations that do not perform numerical changes:
+      target.addDynamicallyLegalOp<
+          vector::BroadcastOp, vector::ShuffleOp, vector::ExtractElementOp,
+          vector::ExtractOp, vector::InsertElementOp, vector::InsertOp,
+          vector::ScalableInsertOp, vector::ScalableExtractOp,
+          vector::InsertStridedSliceOp, vector::ReshapeOp,
+          vector::ExtractStridedSliceOp, vector::TransferReadOp,
+          vector::TransferWriteOp, vector::LoadOp, vector::StoreOp,
+          vector::MaskedLoadOp, vector::MaskedStoreOp, vector::GatherOp,
+          vector::ScatterOp, vector::ExpandLoadOp, vector::CompressStoreOp,
+          vector::ShapeCastOp, vector::ConstantMaskOp, vector::CreateMaskOp,
+          vector::MaskOp, vector::TransposeOp, vector::FlatTransposeOp,
+          vector::SplatOp, vector::YieldOp>([&typeConverter](Operation *op) {
+        bool legal = typeConverter.isLegal(op);
+        LLVM_DEBUG(if (!legal) llvm::dbgs()
+                   << "Bf16Emulation: illegal op: " << *op << "\n");
+        return legal;
+      });
 
       RewritePatternSet patterns(ctx);
       arith::populateExpandBFloat16Patterns(patterns);
