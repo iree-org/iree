@@ -54,12 +54,15 @@ typedef enum iree_thread_priority_class_e {
 //   group threads that having matching values together and (hopefully) schedule
 //   them on cores that may share some level of the cache hierarchy. The API is
 //   effectively just asking nicely and hoping the kernel is on the same
-//   wavelength.
+//   wavelength. It rarely is. As a workaround for the lack of specific pinning
+//   we use the smt bit of 1 to indicate that _only_ efficiency cores should be
+//   used by effectively changing the QoS of the thread to one in the range
+//   where only efficiency cores will be used.
 //
 //   Mapping:
 //    group: (unused)
 //       id: used for THREAD_AFFINITY_POLICY to request exclusive cores.
-//      smt: (unused)
+//      smt: 1 if only efficiency cores should be used (QOS_CLASS_BACKGROUND).
 //
 // Linux/Android:
 //   sched_setaffinity is used to pin the thread to the core with the given ID.
