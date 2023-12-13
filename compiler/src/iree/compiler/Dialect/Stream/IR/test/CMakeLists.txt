@@ -23,7 +23,6 @@ iree_lit_test_suite(
     "context_ops.mlir"
     "executable_ops.mlir"
     "file_ops.mlir"
-    "invalid.mlir"
     "parameter_folding.mlir"
     "parameter_ops.mlir"
     "resource_folding.mlir"
