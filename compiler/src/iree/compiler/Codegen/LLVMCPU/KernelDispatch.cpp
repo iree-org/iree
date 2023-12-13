@@ -955,8 +955,9 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
        llvm::concat<Value>(op.getRegionInputArgs(), op.getRegionOutputArgs())) {
     inputAndOutputElementTypes.push_back(v.getType());
   }
-  if (inputAndOutputElementTypes.empty() ||
-      !llvm::all_equal(inputAndOutputElementTypes))
+  assert(!inputAndOutputElementTypes.empty() &&
+         "expected linalg op to have input and output types");
+  if (!llvm::all_equal(inputAndOutputElementTypes))
     return failure();
   return inputAndOutputElementTypes[0];
 }
@@ -968,9 +969,8 @@ static void
 getMatmulAArch64SMEVectorSizes(linalg::LinalgOp op,
                                SmallVectorImpl<int64_t> &sizes,
                                SmallVectorImpl<bool> &scalableSizeFlags) {
-  // Double check the operation is one that is supported for lowering to ArmSME.
-  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(
-          op))
+  // Double-check the operation is one that is supported for lowering to ArmSME.
+  if (!llvm::isa<linalg::MatmulOp, linalg::MatmulTransposeAOp>(op))
     return;
 
   auto elementType = nonWideningLinalgElementType(op);

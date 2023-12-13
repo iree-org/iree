@@ -27,19 +27,19 @@ typedef struct sme_state {
 typedef struct TPIDR2_block TPIDR2_block_t;
 
 IREE_DEVICE_EXPORT sme_state_t __arm_sme_state(void) {
-  // TODO(macdue): Implement.
+  // No-op as not needed yet.
   sme_state_t null_state = {0, 0};
   return null_state;
 }
 
 IREE_DEVICE_EXPORT void __arm_tpidr2_restore(TPIDR2_block_t* blk) {
-  // TODO(macdue): Implement.
+  // No-op as not needed yet.
 }
 
 IREE_DEVICE_EXPORT void __arm_tpidr2_save(void) {
-  // TODO(macdue): Implement.
+  // No-op as not needed yet.
 }
 
 IREE_DEVICE_EXPORT void __arm_za_disable(void) {
-  // TODO(macdue): Implement.
+  // No-op as not needed yet.
 }
