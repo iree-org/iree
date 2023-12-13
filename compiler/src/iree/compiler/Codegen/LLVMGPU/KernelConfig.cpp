@@ -23,6 +23,7 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
@@ -761,6 +762,20 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+  // TODO: Allow for matvec with fused dequantization.
+  if (!linalg::isaContractionOpInterface(linalgOp))
+    return false;
+
+  if (linalgOp.getNumParallelLoops() != 2)
+    return false;
+
+  if (linalgOp.getNumReductionLoops() > 2)
+    return false;
+
+  return true;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op,
@@ -924,6 +939,25 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 
+  // With just one subgroup per workgroup, make each subgroup do more work and
+  // process a few reductions (rows) along the last parallel dimension.
+  //
+  // TODO: This is enabled for matvec on ROCm for now. We should
+  // validate this strategy and extend to more linalg generics and to CUDA.
+  if (isRocmTarget(entryPoint) && groupSize == subgroupSize &&
+      isMatvecLike(op) && llvm::none_of(bounds, ShapedType::isDynamic)) {
+    int64_t lastParallelBound = bounds[parallelDims.back()];
+    int64_t numParallelReductions = 1;
+    for (int64_t parallelFactor = 2;
+         (parallelFactor * groupSize < maxWorkgroupSize) &&
+         (lastParallelBound % parallelFactor == 0) &&
+         (lastParallelBound > parallelFactor);
+         parallelFactor *= 2) {
+      numParallelReductions = parallelFactor;
+    }
+    workgroupTileSizes.back() = numParallelReductions;
+  }
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t remainingGroupSize = groupSize;
@@ -941,7 +975,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
