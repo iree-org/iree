@@ -25,6 +25,8 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "graph_command_buffer.c"
+    "graph_command_buffer.h"
     "hip_allocator.c"
     "hip_allocator.h"
     "hip_buffer.c"
@@ -38,6 +40,8 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "pipeline_layout.c"
+    "pipeline_layout.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -48,6 +52,8 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::hal
+    iree::hal::utils::collective_batch
+    iree::hal::utils::resource_set
     iree::schemas::rocm_executable_def_c_fbs
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
