@@ -51,9 +51,9 @@ struct ContextResolveOpPattern
     auto resultTypes = llvm::to_vector(resolveOp.getResultTypes());
     assert(!resultTypes.empty() && "must have at least one result");
 
-    // TODO(benvanik): make this do multi-device lookup and other fancy things.
+    // TODO(multi-device): emit get with derived ordinal or lookup with attr.
     Value device =
-        rewriter.create<IREE::HAL::ExSharedDeviceOp>(resolveOp.getLoc());
+        IREE::HAL::DeviceType::resolveAny(resolveOp.getLoc(), rewriter);
 
     SmallVector<Value> results;
     if (resultTypes[0].isa<IREE::HAL::DeviceType>()) {
@@ -678,7 +678,7 @@ struct CmdDispatchOpPattern
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
-    auto deviceValue = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
+    Value device = rewriter.create<IREE::HAL::CommandBufferDeviceOp>(
         loc, rewriter.getType<IREE::HAL::DeviceType>(), commandBuffer);
 
     // Prepare for variant switch table by gathering the conditions selecting
@@ -703,7 +703,7 @@ struct CmdDispatchOpPattern
           auto exportOp = caseExportOps[i].second;
           auto variantOp =
               exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-          return variantOp.buildCondition(deviceValue, rewriter);
+          return variantOp.buildCondition(device, rewriter);
         },
         rewriter);
 
@@ -718,12 +718,12 @@ struct CmdDispatchOpPattern
       auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, deviceValue, commandBuffer, dispatchOp, adaptor,
+      recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
                        exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, deviceValue, adaptor.getWorkload(), caseBuilder);
+          loc, device, adaptor.getWorkload(), caseBuilder);
       caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
           loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);

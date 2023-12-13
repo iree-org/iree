@@ -26,18 +26,23 @@ enum iree_hal_module_flag_bits_t {
 };
 typedef uint32_t iree_hal_module_flags_t;
 
-// Creates the HAL module initialized to use a specific |device|.
-// Each context using this module will share the device and have compatible
+// Creates the HAL module initialized to use one or more |devices|.
+// Each context using this module will share the devices and have compatible
 // allocations.
 IREE_API_EXPORT iree_status_t iree_hal_module_create(
-    iree_vm_instance_t* instance, iree_hal_device_t* device,
-    iree_hal_module_flags_t flags, iree_allocator_t host_allocator,
-    iree_vm_module_t** out_module);
+    iree_vm_instance_t* instance, iree_host_size_t device_count,
+    iree_hal_device_t** devices, iree_hal_module_flags_t flags,
+    iree_allocator_t host_allocator, iree_vm_module_t** out_module);
 
-// Returns the device currently in use by the HAL module.
-// Returns NULL if no device has been initialized yet.
-IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device(
-    iree_vm_module_state_t* module_state);
+// Returns the total number of available devices registered with the HAL module.
+IREE_API_EXPORT iree_host_size_t
+iree_hal_module_state_device_count(iree_vm_module_state_t* module_state);
+
+// Returns the device at |index| currently in use by the HAL module.
+// Returns NULL if no device has been initialized yet or the index is out of
+// bounds.
+IREE_API_EXPORT iree_hal_device_t* iree_hal_module_state_device_get(
+    iree_vm_module_state_t* module_state, iree_host_size_t index);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "channel_ops.mlir"
     "command_buffer_ops.mlir"
     "device_ops.mlir"
+    "devices_ops.mlir"
     "executable_ops.mlir"
     "fence_ops.mlir"
   TOOLS

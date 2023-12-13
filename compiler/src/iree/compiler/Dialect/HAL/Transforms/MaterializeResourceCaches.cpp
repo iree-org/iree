@@ -136,10 +136,11 @@ private:
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
-    auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
-        loc, layoutType, deviceValue, flags, bindingAttrs);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
+    // TODO(multi-device): pass in resolve info to the call and reuse.
+    Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
+    Value layout = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
+        loc, layoutType, device, flags, bindingAttrs);
+    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
@@ -188,12 +189,13 @@ private:
           setLayoutGlobalOp.getSymName());
       setLayoutValues.push_back(setLayoutValue);
     }
-    auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
-    auto layoutValue = blockBuilder.createOrFold<PipelineLayoutCreateOp>(
-        loc, layoutType, deviceValue,
+    // TODO(multi-device): pass in resolve info to the call and reuse.
+    Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
+    Value layout = blockBuilder.createOrFold<PipelineLayoutCreateOp>(
+        loc, layoutType, device,
         blockBuilder.getIndexAttr(layoutAttr.getPushConstants()),
         setLayoutValues);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
+    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
 
@@ -214,7 +216,8 @@ private:
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
-    auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
+    // TODO(multi-device): pass in resolve info to the call and reuse.
+    Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
 
     // Create a switch statement with a case for each variant.
     // Each case should then cache only executables which contain a matching
@@ -232,7 +235,7 @@ private:
     Value selectedIndex = buildIfElseTree(
         loc, caseVariantOps.size(),
         [&](Location loc, size_t i, OpBuilder &builder) {
-          return caseVariantOps[i].buildCondition(deviceValue, builder);
+          return caseVariantOps[i].buildCondition(device, builder);
         },
         blockBuilder);
 
@@ -261,18 +264,18 @@ private:
       SmallVector<Value> constantValues;
       for (auto blockOp :
            llvm::make_early_inc_range(variantOp.getConstantBlockOps())) {
-        constantValues.append(inlineConstantBlockOp(blockOp, moduleBuilder,
-                                                    caseBuilder, deviceValue));
+        constantValues.append(
+            inlineConstantBlockOp(blockOp, moduleBuilder, caseBuilder, device));
         blockOp.erase();
       }
 
-      auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
-          loc, executableType, deviceValue,
+      Value executable = caseBuilder.createOrFold<ExecutableCreateOp>(
+          loc, executableType, device,
           SymbolRefAttr::get(executableOp.getSymNameAttr(),
                              {SymbolRefAttr::get(variantOp.getSymNameAttr())}),
           pipelineLayoutValues, constantValues);
 
-      caseBuilder.create<scf::YieldOp>(loc, executableValue);
+      caseBuilder.create<scf::YieldOp>(loc, executable);
     }
 
     // Fallback for no available variant.
@@ -299,7 +302,7 @@ private:
   SmallVector<Value> inlineConstantBlockOp(ExecutableConstantBlockOp blockOp,
                                            OpBuilder &moduleBuilder,
                                            OpBuilder &callerBuilder,
-                                           Value deviceValue) {
+                                           Value device) {
     // Create the function with the region contents of the constant block.
     auto funcName = (StringRef("__constant_block_") +
                      std::to_string(nextUniqueConstantBlockId++))
@@ -320,7 +323,7 @@ private:
     // Create the call passing in the device if needed.
     SmallVector<Value> callOperands;
     if (funcOp.getNumArguments() > 0) {
-      callOperands.push_back(deviceValue);
+      callOperands.push_back(device);
     }
     auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
                                                      callOperands);

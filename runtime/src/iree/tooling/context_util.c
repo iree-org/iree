@@ -196,6 +196,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_module_register_all_types(instance));
 
+  // TODO(multi-device): create multiple devices (maybe with an
+  // iree_hal_device_list_t helper for retaining/managing the dynamic list).
   // Create the device to use.
   // In the future this will change to a set of available devices instead.
   if (iree_string_view_is_empty(default_device_uri)) {
@@ -214,8 +216,8 @@ static iree_status_t iree_tooling_load_hal_async_module(
   // Create HAL module wrapping the device created above.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
-  iree_status_t status =
-      iree_hal_module_create(instance, device, flags, host_allocator, &module);
+  iree_status_t status = iree_hal_module_create(
+      instance, /*device_count=*/1, &device, flags, host_allocator, &module);
 
   if (iree_status_is_ok(status)) {
     *out_module = module;
