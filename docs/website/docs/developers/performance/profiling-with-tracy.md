@@ -51,11 +51,21 @@ Run IREE device binaries loading your modules | [Nothing particular](#running-th
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
 Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvmcpu-link-embedded=false` will be passed to `iree-compile`.
 
-NOTE: If are using a `pip` release of IREE, it probably comes with a
-Tracy-enabled runtime already. You can select it by setting the
-`IREE_PY_RUNTIME=tracy` environment variable. Next time you run the IREE
-runtime, you should see the following message printed to stderr:
-'-- Using Tracy runtime (IREE_PY_RUNTIME=tracy)'.
+!!! tip - "Tip - python bindings"
+
+    The `iree-runtime` Python package includes instrumented tools. Set the
+    `IREE_PY_RUNTIME=tracy` environment variable to use them:
+
+    ```console
+    $ python -m pip install iree-runtime
+    $ IREE_PY_RUNTIME=tracy iree-run-module ...
+    ```
+
+    You should see the following message printed to stderr:
+    '-- Using Tracy runtime (IREE_PY_RUNTIME=tracy)'.
+
+    See [this section](../../reference/bindings/python.md#profiling) in the
+    Python bindings documentation for more details.
 
 ## Install dependencies
 
@@ -193,19 +203,6 @@ cmake -DIREE_ENABLE_RUNTIME_TRACING=ON .
 cmake --build .
 ```
 
-!!! tip - "Tip - python bindings"
-
-    The `iree-runtime` Python package includes instrumented tools too. Set the
-    `IREE_PY_RUNTIME=tracy` environment variable to use them:
-
-    ```console
-    $ python -m pip install iree-runtime
-    $ IREE_PY_RUNTIME=tracy iree-run-module ...
-    ```
-
-    See [this section](../../reference/bindings/python.md#profiling) in the
-    Python bindings documentation for more details.
-
 ### Additional steps for Sampling
 
 In order for Sampling features to work, make sure that binaries contain debug
@@ -260,13 +257,8 @@ you should run the profiled program on bare metal.
 
 ### Additional steps for Python bindings
 
-When writing a Python-based program that you want to profile you may need to
-insert IREE runtime calls to periodically flush the profile data:
-
-```python
-device = ... # HalDevice
-device.flush_profiling()
-```
+See [this section](../../reference/bindings/python.md#profiling) in the
+Python bindings documentation for more details.
 
 ## Operating system settings required for Sampling and SysTrace
 
