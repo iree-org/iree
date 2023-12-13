@@ -8,6 +8,7 @@
 // HIP symbols
 //===----------------------------------------------------------------------===//
 
+IREE_HIP_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
 IREE_HIP_PFN_DECL(hipDeviceGet, hipDevice_t *, int)
 IREE_HIP_PFN_DECL(hipDeviceGetAttribute, int *, hipDeviceAttribute_t, int)
 IREE_HIP_PFN_DECL(hipDeviceGetName, char *, int, hipDevice_t)

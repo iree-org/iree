@@ -6,7 +6,6 @@
 
 #include "experimental/hip/hip_device.h"
 
-#include <iree/hal/device.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -21,10 +20,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
-
-// Utility macros to convert between hipDevice_t and iree_hal_device_id_t.
-#define IREE_HIPDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
-#define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id)-1)
 
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_device_t
@@ -106,7 +101,6 @@ static iree_status_t iree_hal_hip_device_create_internal(
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
-  memset(device, 0, total_size);
 
   iree_hal_resource_initialize(&iree_hal_hip_device_vtable, &device->resource);
   iree_string_view_append_to_buffer(
@@ -179,8 +173,7 @@ iree_status_t iree_hal_hip_device_create(
         symbols, hipDevicePrimaryCtxRetain(&context, device));
   }
   if (iree_status_is_ok(status)) {
-    status = IREE_HIP_RESULT_TO_STATUS(
-        symbols, hipSetDevice(IREE_HIPDEVICE_TO_DEVICE_ID(device)));
+    status = IREE_HIP_RESULT_TO_STATUS(symbols, hipCtxSetCurrent(context));
   }
 
   // Create the default stream for the device.
@@ -197,7 +190,7 @@ iree_status_t iree_hal_hip_device_create(
   }
   if (!iree_status_is_ok(status)) {
     if (stream) symbols->hipStreamDestroy(stream);
-    // WARNING: This function return hipSuccess though doesn't release the
+    // NOTE: This function return hipSuccess though doesn't release the
     // primaryCtx by design on HIP/HCC path.
     if (context) symbols->hipDevicePrimaryCtxRelease(device);
   }
@@ -232,7 +225,7 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   IREE_HIP_IGNORE_ERROR(device->hip_symbols,
                         hipStreamDestroy(device->hip_stream));
 
-  // WARNING: This function return hipSuccess though doesn't release the
+  // NOTE: This function return hipSuccess though doesn't release the
   // primaryCtx by design on HIP/HCC path.
   IREE_HIP_IGNORE_ERROR(device->hip_symbols,
                         hipDevicePrimaryCtxRelease(device->hip_device));
