@@ -2634,26 +2634,6 @@
     Android GPUs
   </a>
   
-    <nav class="md-nav" aria-label="Android GPUs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-android-app-to-run-iree" class="md-nav__link">
-    Build Android app to run IREE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capture-and-analyze-with-agi" class="md-nav__link">
-    Capture and analyze with AGI
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -3334,26 +3314,6 @@
     Android GPUs
   </a>
   
-    <nav class="md-nav" aria-label="Android GPUs">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#build-android-app-to-run-iree" class="md-nav__link">
-    Build Android app to run IREE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#capture-and-analyze-with-agi" class="md-nav__link">
-    Capture and analyze with AGI
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -3456,60 +3416,7 @@ stat<span class="w"> </span>/some/path/foo.rdc
 <p>There are multiple GPU vendors for the Android platforms, each offering their
 own tools. <a href="https://gpuinspector.dev/">Android GPU Inspector</a>
 (AGI) provides a cross-vendor solution. See the
-<a href="https://gpuinspector.dev/docs/">documentation</a> for more details.</p>
-<h3 id="build-android-app-to-run-iree">Build Android app to run IREE<a class="headerlink" href="#build-android-app-to-run-iree" title="Permanent link">link</a></h3>
-<p>In order to perform capture and analysis with AGI, you will need a full Android
-app. In IREE we have a simple Android native app wrapper to help package
-IREE core libraries together with a specific VM bytecode invocation into an
-Android app. The wrapper and its documentation are placed at
-<a href="https://github.com/openxla/iree/tree/main/tools/android/run_module_app"><code>tools/android/run_module_app/</code></a>.</p>
-<p>For example, to package a module compiled from the following
-<code>stablehlo-dot.mlir</code> as an Android app:</p>
-<div class="highlight"><pre><span></span><code>func @dot(%lhs: tensor&lt;2x4xf32&gt;, %rhs: tensor&lt;4x2xf32&gt;) -&gt; tensor&lt;2x2xf32&gt; {
-  %0 = &quot;stablehlo.dot&quot;(%lhs, %rhs) : (tensor&lt;2x4xf32&gt;, tensor&lt;4x2xf32&gt;) -&gt; tensor&lt;2x2xf32&gt;
-  return %0 : tensor&lt;2x2xf32&gt;
-}
-</code></pre></div>
-<div class="highlight"><pre><span></span><code><span class="c1"># First compile into a VM bytecode module</span>
-$<span class="w"> </span>/path/to/iree/build/tools/iree-compile<span class="w"> </span>--<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vulkan-spirv<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>/path/to/stablehlo-dot.mlir<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>-o<span class="w"> </span>/tmp/stablehlo-dot.vmfb
-
-<span class="c1"># Then package the Android app</span>
-$<span class="w"> </span>/path/to/iree/source/tools/android/run_module_app/build_apk.sh<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./build-apk<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--device<span class="w"> </span>vulkan<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--module<span class="w"> </span>/tmp/stablehlo-dot.vmfb<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--function<span class="w"> </span>dot<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input<span class="o">=</span>...
-</code></pre></div>
-<p>Where <code>/path/to/input/file</code> is a file containing inputs to <code>dot</code>, for example:</p>
-<div class="highlight"><pre><span></span><code>2x4xf32=[[1.0 2.0 3.0 4.0][5.0 6.0 7.0 8.0]]
-4x2xf32=[[9.0 10.0][11.0 12.0][13.0 14.0][15.0 16.0]]
-</code></pre></div>
-<p>The above will build an <code>iree-run-module.apk</code> under the <code>./build-apk/</code>
-directory, which you can then install via <code>adb install</code>.</p>
-<p><code>build_apk.sh</code> needs the Android SDK and NDK internally, an easy way to manage
-them is by installing <a href="https://developer.android.com/studio">Android Studio</a>.
-After installation, you will need to set up a few environment variables, which
-are printed at the beginning of <code>build_apk.sh</code> invocation.</p>
-<h3 id="capture-and-analyze-with-agi">Capture and analyze with AGI<a class="headerlink" href="#capture-and-analyze-with-agi" title="Permanent link">link</a></h3>
-<p>You can follow AGI's
-<a href="https://gpuinspector.dev/docs/getting-started">Getting Started</a> page to learn
-how to use it. In general the steps are:</p>
-<ul>
-<li>Install the latest AGI from <a href="https://github.com/google/agi/releases">https://github.com/google/agi/releases</a> and launch.</li>
-<li>Fill in the "Application" field by searching the app. The line should read
-  like <code>android.intent.action.MAIN:dev.iree.run_module/android.app.NativeActivity</code>.</li>
-<li>Select start at beginning and choose a proper duration.</li>
-<li>Configure system profile to include all GPU counters.</li>
-<li>Start capture.</li>
-</ul>
-<p>Generated traces are in the <a href="https://perfetto.dev/">perfetto</a> format. They can
-be viewed directly within AGI and also online in a browser at
-<a href="https://ui.perfetto.dev/">https://ui.perfetto.dev/</a>, without needing an Android device.</p>
+<a href="https://developer.android.com/agi">documentation</a> for more details.</p>
 <h2 id="desktop-gpus">Desktop GPUs<a class="headerlink" href="#desktop-gpus" title="Permanent link">link</a></h2>
 <p>Vulkan supports both graphics and compute, but most tools in the Vulkan
 ecosystem focus on graphics. As a result, some Vulkan profiling tools expect
