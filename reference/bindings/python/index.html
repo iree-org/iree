@@ -3657,6 +3657,14 @@ environment variable:</p>
 <p>See the developer documentation page on
 <a href="../../../developers/performance/profiling-with-tracy/">Profiling with Tracy</a>
 for information on using Tracy.</p>
+<div class="admonition tip -">
+<p class="admonition-title">Tip - flushing profile data</p>
+<p>When writing a Python-based program that you want to profile you may need to
+insert IREE runtime calls to periodically flush the profile data:</p>
+<div class="highlight"><pre><span></span><code><span class="n">device</span> <span class="o">=</span> <span class="o">...</span> <span class="c1"># HalDevice</span>
+<span class="n">device</span><span class="o">.</span><span class="n">flush_profiling</span><span class="p">()</span>
+</code></pre></div>
+</div>
 
 
 
