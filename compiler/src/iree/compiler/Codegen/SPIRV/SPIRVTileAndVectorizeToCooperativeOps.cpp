@@ -14,7 +14,6 @@
 #include <algorithm>
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
@@ -22,6 +21,7 @@
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -43,8 +43,6 @@
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
-using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
 
 #define DEBUG_TYPE "iree-spirv-tile-and-vectorize-to-cooperative-ops"
 
@@ -125,11 +123,12 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
   return subgroupCounts;
 }
 
-/// Adds patterns to tile Linalg ops with workgroup markers to subgroups.
-static void populateTilingToSubgroupPatterns(
-    ArrayRef<int64_t> subgroupCounts, const unsigned subgroupSize,
-    ArrayRef<int64_t> subgroupTileSizes, RewritePatternSet &patterns) {
-  MLIRContext *context = patterns.getContext();
+/// Tiles Linalg ops with workgroup markers to subgroups.
+static LogicalResult tileToSubgroup(func::FuncOp funcOp,
+                                    ArrayRef<int64_t> subgroupCounts,
+                                    const unsigned subgroupSize,
+                                    ArrayRef<int64_t> subgroupTileSizes) {
+  MLIRContext *context = funcOp.getContext();
 
   auto getSubgroupProcInfoFn =
       [subgroupCounts, subgroupSize](OpBuilder &builder, Location loc,
@@ -164,8 +163,7 @@ static void populateTilingToSubgroupPatterns(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
-  TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::MatmulOp,
-                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -371,13 +369,9 @@ public:
         funcOp.emitError("failed to query subgroup size");
         return signalPassFailure();
       }
-      RewritePatternSet subgroupTilingPatterns(context);
       SmallVector<int64_t> subgroupTileSizes = getTileSizes(rootOp, 1);
-      populateTilingToSubgroupPatterns(subgroupCounts, *subgroupSize,
-                                       subgroupTileSizes,
-                                       subgroupTilingPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(subgroupTilingPatterns)))) {
+      if (failed(tileToSubgroup(funcOp, subgroupCounts, *subgroupSize,
+                                subgroupTileSizes))) {
         return signalPassFailure();
       }
 

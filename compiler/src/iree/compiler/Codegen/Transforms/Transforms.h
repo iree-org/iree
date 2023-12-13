@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -146,6 +147,12 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, func::FuncOp entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
+
+/// Tiles and optionally distributes LinalgOp ops that match filter.
+LogicalResult
+tileLinalgOpsWithFilter(func::FuncOp funcOp,
+                        linalg::LinalgTilingOptions tilingOptions,
+                        IREE::LinalgExt::LinalgTransformationFilter filter);
 
 } // namespace mlir::iree_compiler
 

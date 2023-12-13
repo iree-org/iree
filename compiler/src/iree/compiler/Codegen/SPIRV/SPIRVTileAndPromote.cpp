@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
@@ -34,8 +35,6 @@
 
 #define DEBUG_TYPE "iree-spirv-tile-and-promote"
 
-using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
-
 constexpr int kMaxVectorNumBits = 128;
 
 namespace mlir::iree_compiler {
@@ -44,25 +43,24 @@ namespace mlir::iree_compiler {
 // Reduction tiling patterns
 //====---------------------------------------------------------------------===//
 
-static void populateTilingReductionPatterns(
-    RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter,
-    const linalg::TileSizeComputationFunction &computeFn) {
+static LogicalResult
+tileReductionLoops(func::FuncOp funcOp,
+                   IREE::LinalgExt::LinalgTransformationFilter filter,
+                   const linalg::TileSizeComputationFunction &computeFn) {
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(computeFn);
-  TilingPatterns<linalg::BatchMatmulOp, linalg::MatmulOp,
-                 linalg::GenericOp>::insert(patterns, tilingOptions, filter);
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
 // Invocation tiling patterns
 //===----------------------------------------------------------------------===//
 
-static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns,
-    IREE::LinalgExt::LinalgTransformationFilter filter,
-    const linalg::TileSizeComputationFunction &computeFn) {
+static LogicalResult
+tileToInvocation(func::FuncOp funcOp,
+                 IREE::LinalgExt::LinalgTransformationFilter filter,
+                 const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -76,8 +74,7 @@ static void populateTilingToInvocationPatterns(
                            .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
-  TilingPatterns<linalg::BatchMatmulOp, linalg::FillOp, linalg::GenericOp,
-                 linalg::MatmulOp>::insert(patterns, tilingOptions, filter);
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -181,8 +178,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
         {workgroupMarker}, kTiledMarker);
     // Not going through C matrix promotion we will have no marker..
     filter.setMatchByDefault();
-    populateTilingReductionPatterns(patterns, filter, *reductionTileComputeFn);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(tileReductionLoops(funcOp, filter, *reductionTileComputeFn))) {
       funcOp.emitOpError() << "failed tiling reduction";
       return signalPassFailure();
     }
@@ -265,13 +261,9 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   if (!skipThreadLevel) { // Tile and distribute to invocations.
-    RewritePatternSet tilingPatterns(context);
     IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
                                                        std::nullopt);
-    populateTilingToInvocationPatterns(tilingPatterns, filter,
-                                       *threadTileComputeFn);
-    if (failed(
-            applyPatternsAndFoldGreedily(funcOp, std::move(tilingPatterns)))) {
+    if (failed(tileToInvocation(funcOp, filter, *threadTileComputeFn))) {
       funcOp.emitOpError() << "failed tiling and distributing to invocations";
       return signalPassFailure();
     }
