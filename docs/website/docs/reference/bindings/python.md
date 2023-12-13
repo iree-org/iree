@@ -190,6 +190,7 @@ See the developer documentation page on
 for information on using Tracy.
 
 !!! tip - "Tip - flushing profile data"
+
     When writing a Python-based program that you want to profile you may need to
     insert IREE runtime calls to periodically flush the profile data:
 
