@@ -177,11 +177,9 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         ("f32", "f32"),
         ("f16", "f16"),
         ("f16", "f32"),
-    ] + ([
-        # TODO(#15258): enable bf16 tests for !use_uk when that bug is fixed.
         ("bf16", "bf16"),
         ("bf16", "f32"),
-    ] if use_uk else [])
+    ]
 ) for size in [
     "small",
     "large",
