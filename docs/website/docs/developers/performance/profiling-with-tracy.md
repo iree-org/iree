@@ -260,7 +260,7 @@ you should run the profiled program on bare metal.
 
 ### Additional steps for Python bindings
 
-When writing a Python-based program that you wan to profile, you may need to
+When writing a Python-based program that you want to profile you may need to
 insert IREE runtime calls to periodically flush the profile data:
 
 ```python
