@@ -8,6 +8,7 @@
 // HIP symbols
 //===----------------------------------------------------------------------===//
 
+IREE_HIP_PFN_DECL(hipCtxSetCurrent, hipCtx_t)
 IREE_HIP_PFN_DECL(hipDeviceGet, hipDevice_t *, int)
 IREE_HIP_PFN_DECL(hipDeviceGetAttribute, int *, hipDeviceAttribute_t, int)
 IREE_HIP_PFN_DECL(hipDeviceGetName, char *, int, hipDevice_t)
@@ -62,6 +63,7 @@ IREE_HIP_PFN_DECL(hipModuleLoadData, hipModule_t *, const void *)
 IREE_HIP_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *,
                   unsigned int, hipJitOption *, void **)
 IREE_HIP_PFN_DECL(hipModuleUnload, hipModule_t)
+IREE_HIP_PFN_DECL(hipSetDevice, int)
 IREE_HIP_PFN_DECL(hipStreamCreateWithFlags, hipStream_t *, unsigned int)
 IREE_HIP_PFN_DECL(hipStreamDestroy, hipStream_t)
 IREE_HIP_PFN_DECL(hipStreamSynchronize, hipStream_t)
