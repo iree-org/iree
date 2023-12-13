@@ -136,6 +136,44 @@ $ ../iree-build/tools/iree-run-module \
   --input=f32=-2
 ```
 
+???+ example "Other usage examples"
+
+    See these test files for advanced usage examples:
+
+    <!-- TODO(scotttodd): switch these to 'mlir' syntax when available -->
+
+    === "Basic tests"
+
+        Source file: [`tools/test/iree-run-module.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module.mlir)
+
+        ```c++ title="tools/test/iree-run-module.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module.mlir"
+        ```
+
+    === "Inputs"
+
+        Source file: [`tools/test/iree-run-module-inputs.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-inputs.mlir)
+
+        ```c++ title="tools/test/iree-run-module-inputs.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-inputs.mlir"
+        ```
+
+    === "Outputs"
+
+        Source file: [`tools/test/iree-run-module-outputs.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-outputs.mlir)
+
+        ```c++ title="tools/test/iree-run-module-outputs.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-outputs.mlir"
+        ```
+
+    === "Expected"
+
+        Source file: [`tools/test/iree-run-module-expected.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-expected.mlir)
+
+        ```c++ title="tools/test/iree-run-module-expected.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-expected.mlir"
+        ```
+
 ### iree-check-module
 
 The `iree-check-module` program takes an already translated IREE module as input
