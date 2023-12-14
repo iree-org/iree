@@ -76,14 +76,6 @@ static llvm::cl::opt<int> clGeneralMatmulTileBytes(
                    "in data-tiled matmuls (mmt4d)."),
     llvm::cl::init(64 * 1024));
 
-// TODO(hanchung): Remove the flag. This is the flag for fastly falling back to
-// the previous snapshot.
-
-static llvm::cl::opt<bool>
-    enableVectorPadding("iree-codegen-enable-vector-padding",
-                        llvm::cl::desc("Enable padding for vectorization"),
-                        llvm::cl::init(true));
-
 static llvm::cl::opt<bool>
     enableVectorPeeling("iree-codegen-enable-vector-peeling",
                         llvm::cl::desc("Enable peeling for vectorization"),
@@ -100,9 +92,6 @@ using IREE::Codegen::DispatchLoweringPassPipeline;
 // Encodes the pre-processing strategy to be applied on a Linalg operation
 // before vectorization.
 enum class VectorPreProcStrategy {
-  // Pad vector dimensions of tensors so that they are multiple of the vector
-  // length.
-  Padding,
   // Peel iterations from the vector dimensions so that they become multiple of
   // the vector length.
   Peeling,
@@ -118,9 +107,6 @@ enum class VectorPreProcStrategy {
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const VectorPreProcStrategy &strategy) {
   switch (strategy) {
-  case VectorPreProcStrategy::Padding:
-    os << "Padding";
-    break;
   case VectorPreProcStrategy::Peeling:
     os << "Peeling";
     break;
@@ -183,7 +169,7 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
                       [](int64_t size) { return ShapedType::isDynamic(size); });
 }
 
-/// Returns the vectorization pre-processing strategy (padding, peeling) for the
+/// Returns the vectorization pre-processing strategy (peeling, masking) for the
 /// given LinalgOp, depending on the op traits and the target architecture.
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
@@ -597,9 +583,9 @@ static int64_t getMaxVectorTileSize(int64_t numElem, int64_t tileSize,
 /// hints != 1, it will try to find the tile sizes which are multipliers of the
 /// hints.
 ///
-/// TODO(hanchung): Remove `allowIncompleteTile` option after codegen can handle
-/// padding/peeling for all the kernels. Allowing incomplete tile is critical
-/// for odd shapes (e.g., some dim sizes could be prime number).
+/// TODO(hanchung): Remove `allowIncompleteTile` option after codegen can
+/// vectorize all the ops. Allowing incomplete tile is critical for odd shapes
+/// (e.g., some dim sizes could be prime number).
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<unsigned> partitionableLoops, ArrayRef<int64_t> lbs,
     ArrayRef<int64_t> ubs, ArrayRef<int64_t> minTileSizes,
@@ -791,7 +777,7 @@ static LogicalResult setMatmulPeelingRootConfig(
     parallelTileSizes[index] = std::min(parallelTileSizes[index], size);
   }
 
-  // TODO(hanchung): Make logic more heuristic. Padding hurts performance a lot
+  // TODO(hanchung): Make logic more heuristic. Peeling hurts performance a lot
   // if the dim size is small (e.g., K=24).
   int64_t numTilingDims = vecTileSizes.size();
   SmallVector<int64_t> reductionTileSizes(numTilingDims - 1, 0);
@@ -817,19 +803,12 @@ static LogicalResult setMatmulPeelingRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
 }
 
-static DispatchLoweringPassPipeline
-getNoPadTilingExpert(VectorPreProcStrategy strategy) {
-  if (strategy == VectorPreProcStrategy::Peeling) {
-    return DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
-  }
-  return DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-}
-
-static LogicalResult setMatmulNoPadRootConfig(
-    func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    const TileSizesListTypeRef inputTileSizes,
-    const ScalableTileFlagsListTypeRef inputScalableTileFlags, int vectorSize,
-    VectorPreProcStrategy vecPreProcStrategy) {
+static LogicalResult
+setMatmulRootConfig(func::FuncOp entryPointFn,
+                    linalg::ContractionOpInterface op,
+                    const TileSizesListTypeRef inputTileSizes,
+                    const ScalableTileFlagsListTypeRef inputScalableTileFlags,
+                    int vectorSize, VectorPreProcStrategy vecPreProcStrategy) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
@@ -899,15 +878,17 @@ static LogicalResult setMatmulNoPadRootConfig(
   // No scalable inner parallel dims.
   newScalableTileFlags.emplace_back(numTilingDims, false);
 
-  LLVM_DEBUG(
-      KD_DBGS() << "Final tile sizes for non-padding contraction: "
-                << newTileSizes << "\n"
-                << "Final tile scalable flags for no-padding contraction: "
-                << newScalableTileFlags << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for contraction: " << newTileSizes
+                       << "\n"
+                       << "Final tile scalable flags for contraction: "
+                       << newScalableTileFlags << "\n");
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, newTileSizes, newScalableTileFlags,
-      getNoPadTilingExpert(vecPreProcStrategy));
+  auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
+  }
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, newTileSizes,
+                                               newScalableTileFlags, pipeline);
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -1146,9 +1127,6 @@ setRootConfig(func::FuncOp entryPointFn,
     minTileSizes.push_back(minTileSize);
   }
 
-  // There are hard-coded configurations in DoubleTilingPadExpert, so it only
-  // works for linalg.matmul cases. We can relax it once we have better
-  // scheduling, e.g., transform dialect.
   SmallVector<int64_t> distTileSizes;
   auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
   bool usePeelingPipeline =
@@ -1203,9 +1181,8 @@ setRootConfig(func::FuncOp entryPointFn,
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
   ScalableTileFlagsListType scalableTileFlags = {distScalableTileFlags,
                                                  vecScalableFlags};
-  return setMatmulNoPadRootConfig(entryPointFn, contractionOp, tileSizes,
-                                  scalableTileFlags, vectorSize,
-                                  vecPreProcStrategy);
+  return setMatmulRootConfig(entryPointFn, contractionOp, tileSizes,
+                             scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
 static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
