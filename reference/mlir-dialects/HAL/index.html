@@ -2326,34 +2326,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#devicematcharchitectureattr" class="md-nav__link">
-    DeviceMatchArchitectureAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchexecutableformatattr" class="md-nav__link">
-    DeviceMatchExecutableFormatAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchfeatureattr" class="md-nav__link">
-    DeviceMatchFeatureAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchidattr" class="md-nav__link">
-    DeviceMatchIDAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#devicetargetattr" class="md-nav__link">
     DeviceTargetAttr
   </a>
@@ -2384,27 +2356,6 @@
           <li class="md-nav__item">
   <a href="#interfacebindingattr" class="md-nav__link">
     InterfaceBindingAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchallattr" class="md-nav__link">
-    MatchAllAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchalwaysattr" class="md-nav__link">
-    MatchAlwaysAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchanyattr" class="md-nav__link">
-    MatchAnyAttr
   </a>
   
 </li>
@@ -5113,34 +5064,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#devicematcharchitectureattr" class="md-nav__link">
-    DeviceMatchArchitectureAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchexecutableformatattr" class="md-nav__link">
-    DeviceMatchExecutableFormatAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchfeatureattr" class="md-nav__link">
-    DeviceMatchFeatureAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#devicematchidattr" class="md-nav__link">
-    DeviceMatchIDAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#devicetargetattr" class="md-nav__link">
     DeviceTargetAttr
   </a>
@@ -5171,27 +5094,6 @@
           <li class="md-nav__item">
   <a href="#interfacebindingattr" class="md-nav__link">
     InterfaceBindingAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchallattr" class="md-nav__link">
-    MatchAllAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchalwaysattr" class="md-nav__link">
-    MatchAlwaysAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#matchanyattr" class="md-nav__link">
-    MatchAnyAttr
   </a>
   
 </li>
@@ -5483,18 +5385,11 @@ input.</p>
 <li><a href="#descriptorsetbindingattr">DescriptorSetBindingAttr</a></li>
 <li><a href="#descriptorsetlayoutattr">DescriptorSetLayoutAttr</a></li>
 <li><a href="#descriptortypeattr">DescriptorTypeAttr</a></li>
-<li><a href="#devicematcharchitectureattr">DeviceMatchArchitectureAttr</a></li>
-<li><a href="#devicematchexecutableformatattr">DeviceMatchExecutableFormatAttr</a></li>
-<li><a href="#devicematchfeatureattr">DeviceMatchFeatureAttr</a></li>
-<li><a href="#devicematchidattr">DeviceMatchIDAttr</a></li>
 <li><a href="#devicetargetattr">DeviceTargetAttr</a></li>
 <li><a href="#executableobjectattr">ExecutableObjectAttr</a></li>
 <li><a href="#executableobjectsattr">ExecutableObjectsAttr</a></li>
 <li><a href="#executabletargetattr">ExecutableTargetAttr</a></li>
 <li><a href="#interfacebindingattr">InterfaceBindingAttr</a></li>
-<li><a href="#matchallattr">MatchAllAttr</a></li>
-<li><a href="#matchalwaysattr">MatchAlwaysAttr</a></li>
-<li><a href="#matchanyattr">MatchAnyAttr</a></li>
 <li><a href="#pipelinelayoutattr">PipelineLayoutAttr</a></li>
 </ul>
 </li>
@@ -7305,11 +7200,7 @@ it was the value converted to the specified type. Queries must return the
 same value for the lifetime of the module though may vary from run to run.</p>
 <p>This is roughly equivalent to the <code>sysconf</code> linux syscall
 (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-set of keys available and their interpretation is target-dependent. If there
-is a HAL match attribute (<code>#hal.device.match.*</code>) or op
-(<code>hal.device.match.*</code>) prefer to use that in order to get compile-time
-propagation when the target is specified and elide the runtime query and
-get compile-time verification when a runtime query is required.</p>
+set of keys available and their interpretation is target-dependent.</p>
 <p>Users of the op must check the <code>ok</code> result before using the value as what
 set of keys is available may change over time. If in doubt: don't use this.
 Each key used adds additional versioning and testing complexity as runtime
@@ -7336,7 +7227,7 @@ forever; all non-experimental keys should be vetted.</p>
   The actual concurrency available may be less depending on device state.</p>
 </li>
 </ul>
-<p>Traits: AlwaysSpeculatableImplTrait, HAL_DeviceQuery</p>
+<p>Traits: AlwaysSpeculatableImplTrait</p>
 <p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
 <p>Effects: MemoryEffects::Effect{}</p>
 <h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
@@ -9573,98 +9464,6 @@ point to allow for bindings with similar update frequencies to be grouped.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="devicematcharchitectureattr">DeviceMatchArchitectureAttr<a class="headerlink" href="#devicematcharchitectureattr" title="Permanent link">link</a></h3>
-<p>matches against a device architecture pattern</p>
-<p>Matches a device by its runtime architecture. The format of the architecture
-pattern is device-dependent.</p>
-<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">pattern</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="devicematchexecutableformatattr">DeviceMatchExecutableFormatAttr<a class="headerlink" href="#devicematchexecutableformatattr" title="Permanent link">link</a></h3>
-<p>matches when a device supports the given executable format</p>
-<p>Matches a device only if it claims to support the given executable format
-pattern. It's still possible that the executable cannot be loaded such as if
-it uses unavailable device features. This is used for queries such as
-"can you load ELF libraries?" to quickly get to a set of executables to
-attempt without needing to try dozens that definitely cannot be loaded.</p>
-<p>Note that different devices may share the same executable formats: for
-example a local synchronous CPU executor and a remote asynchronous CPU
-executor can both load ELF libraries. It's also possible for the same device
-to support multiple formats such as being able to load both
-platform-agnostic ELF libraries and platform-specific DLL/MachO/etc
-libraries.</p>
-<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">pattern</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="devicematchfeatureattr">DeviceMatchFeatureAttr<a class="headerlink" href="#devicematchfeatureattr" title="Permanent link">link</a></h3>
-<p>matches against a supported device feature pattern</p>
-<p>Matches a device that supports the given feature. The format of the feature
-pattern is device-dependent.</p>
-<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">pattern</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="devicematchidattr">DeviceMatchIDAttr<a class="headerlink" href="#devicematchidattr" title="Permanent link">link</a></h3>
-<p>matches against a device ID pattern</p>
-<p>Matches a device by its canonical compiler/runtime ID.</p>
-<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">pattern</td>
-<td style="text-align: center;"><code>StringAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
 <h3 id="devicetargetattr">DeviceTargetAttr<a class="headerlink" href="#devicetargetattr" title="Permanent link">link</a></h3>
 <p>generic device target specification</p>
 <p>Specifies the properties of a target runtime device.
@@ -9680,7 +9479,7 @@ An optional configuration dictionary allows for overriding backend defaults.</p>
   ]
 }&gt;
 </code></pre></div></p>
-<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
+<h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9726,7 +9525,7 @@ variant without needing to reach into the IREE compiler code.</p>
   data = dense&lt;[...]&gt; : vector&lt;2048xi8&gt;
 }&gt;
 </code></pre></div></p>
-<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
+<h5 id="parameters_6">Parameters:<a class="headerlink" href="#parameters_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9769,7 +9568,7 @@ ones ("only x86_64 targets with vector_size = 64 get these objects").</p>
   ]
 }&gt;
 </code></pre></div></p>
-<h5 id="parameters_11">Parameters:<a class="headerlink" href="#parameters_11" title="Permanent link">link</a></h5>
+<h5 id="parameters_7">Parameters:<a class="headerlink" href="#parameters_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9813,7 +9612,7 @@ backend-specific defaults.</p>
 several different runtime devices. Likewise the same runtime device may use
 one of many different executable targets. Assume an N:M mapping between the
 two in all cases.</p>
-<h5 id="parameters_12">Parameters:<a class="headerlink" href="#parameters_12" title="Permanent link">link</a></h5>
+<h5 id="parameters_8">Parameters:<a class="headerlink" href="#parameters_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9853,7 +9652,7 @@ binding.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>#hal.interface.binding&lt;0, 1&gt;
 </code></pre></div></p>
-<h5 id="parameters_13">Parameters:<a class="headerlink" href="#parameters_13" title="Permanent link">link</a></h5>
+<h5 id="parameters_9">Parameters:<a class="headerlink" href="#parameters_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -9875,50 +9674,6 @@ binding.</p>
 </tr>
 </tbody>
 </table>
-<h3 id="matchallattr">MatchAllAttr<a class="headerlink" href="#matchallattr" title="Permanent link">link</a></h3>
-<p>matches if all subexpressions match</p>
-<p>Returns true only if all subexpressions return true (logical AND) or empty.</p>
-<h5 id="parameters_14">Parameters:<a class="headerlink" href="#parameters_14" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">conditions</td>
-<td style="text-align: center;"><code>ArrayAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
-<h3 id="matchalwaysattr">MatchAlwaysAttr<a class="headerlink" href="#matchalwaysattr" title="Permanent link">link</a></h3>
-<p>always matches</p>
-<p>Syntax: <code>#hal.match.always</code></p>
-<p>Returns true (constant true).</p>
-<h3 id="matchanyattr">MatchAnyAttr<a class="headerlink" href="#matchanyattr" title="Permanent link">link</a></h3>
-<p>matches if any subexpression matches</p>
-<p>Returns true if any subexpression matches (logical OR) and not empty.</p>
-<h5 id="parameters_15">Parameters:<a class="headerlink" href="#parameters_15" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">conditions</td>
-<td style="text-align: center;"><code>ArrayAttr</code></td>
-<td></td>
-</tr>
-</tbody>
-</table>
 <h3 id="pipelinelayoutattr">PipelineLayoutAttr<a class="headerlink" href="#pipelinelayoutattr" title="Permanent link">link</a></h3>
 <p>executable entry point layout specification</p>
 <p>Syntax:</p>
@@ -9930,7 +9685,7 @@ binding.</p>
 <p>Specifies the layout information used for interacting with executable
 functions. This allows host code to correctly map parameters to the
 lower-level target-specific argument passing behavior.</p>
-<h5 id="parameters_16">Parameters:<a class="headerlink" href="#parameters_16" title="Permanent link">link</a></h5>
+<h5 id="parameters_10">Parameters:<a class="headerlink" href="#parameters_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>

@@ -4303,11 +4303,7 @@ it was the value converted to the specified type. Queries must return the
 same value for the lifetime of the module though may vary from run to run.</p>
 <p>This is roughly equivalent to the <code>sysconf</code> linux syscall
 (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-set of keys available and their interpretation is target-dependent. If there
-is a HAL match attribute (<code>#hal.device.match.*</code>) or op
-(<code>hal.device.match.*</code>) prefer to use that in order to get compile-time
-propagation when the target is specified and elide the runtime query and
-get compile-time verification when a runtime query is required.</p>
+set of keys available and their interpretation is target-dependent.</p>
 <p>Users of the op must check the <code>ok</code> result before using the value as what
 set of keys is available may change over time. If in doubt: don't use this.
 Each key used adds additional versioning and testing complexity as runtime
