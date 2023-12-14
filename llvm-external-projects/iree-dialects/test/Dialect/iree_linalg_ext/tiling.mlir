@@ -125,23 +125,14 @@ transform.sequence failures(propagate) {
   %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
   %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
 }
-// TODO(hanchung): Remove extract_slice ops. They are not needed..
 //       CHECK: func.func @scatter_no_tiling
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:   %[[UPDATES_D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
-//   CHECK-DAG:   %[[UPDATES_D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
-//   CHECK-DAG:   %[[UPDATES_SLICE:.+]] = tensor.extract_slice %[[UPDATES]][0, 0] [%[[UPDATES_D0]], %[[UPDATES_D1]]]
-//   CHECK-DAG:   %[[INDICES_SLICE:.+]] = tensor.extract_slice %[[INDICES]][0, 0] [%[[UPDATES_D0]], 1]
-//   CHECK-DAG:   %[[ORIGINAL_D0:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
-//   CHECK-DAG:   %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[ORIGINAL]][0, 0] [%[[ORIGINAL_D0]], %[[UPDATES_D1]]]
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
 //  CHECK-SAME:       unique_indices(true)
-//  CHECK-SAME:       ins(%[[UPDATES_SLICE]], %[[INDICES_SLICE]]
-//  CHECK-SAME:       outs(%[[ORIGINAL_SLICE]]
+//  CHECK-SAME:       ins(%[[UPDATES]], %[[INDICES]]
+//  CHECK-SAME:       outs(%[[ORIGINAL]]
 //       CHECK:   return %[[RESULT]]
 
 // -----
@@ -195,30 +186,6 @@ transform.sequence failures(propagate) {
 //       CHECK:       scf.yield %[[RES]]
 //       CHECK:   return %[[RESULT]]
 
-
-// XXX: Deprecate the test? Upstream method does not check reduction dims as
-//      well.
-// func.func @scatter_repeated_indices_no_tiling(
-//     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
-//     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
-//   // expected-no-error @+1 {{unimplemented tiling of non-parallel loop iterator type}}
-//   %0 = iree_linalg_ext.scatter
-//     dimension_map = [0]
-//     unique_indices(false)
-//     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
-//     outs(%original : tensor<?x?xf32>) {
-//     ^bb0(%arg1: f32, %arg2: f32):
-//       %1 = arith.addf %arg1, %arg2 : f32
-//       iree_linalg_ext.yield %1 : f32
-//     } -> tensor<?x?xf32>
-//   return %0 : tensor<?x?xf32>
-// }
-// transform.sequence failures(propagate) {
-// ^bb1(%module_op: !transform.any_op):
-//   %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-//   %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
-// }
-
 // -----
 
 func.func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
@@ -236,14 +203,10 @@ transform.sequence failures(propagate) {
   %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
   %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
 }
-// TODO(hanchung): Remove extract_slice ops..
 //      CHECK: func.func @sort_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<?xi32>
-//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[OPERAND_D0:.+]] = tensor.dim %[[OPERAND]], %[[C0]]
-//   CHECK-DAG:   %[[OPERAND_SLICE:.+]] = tensor.extract_slice %[[OPERAND]][0] [%[[OPERAND_D0]]]
 //      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.sort
-// CHECK-SAME:       outs(%[[OPERAND_SLICE]] :
+// CHECK-SAME:       outs(%[[OPERAND]] :
 //      CHECK:   return %[[RESULT]]
 
 // -----
@@ -592,8 +555,6 @@ transform.sequence failures(propagate) {
 
 // -----
 
-// TODO(hanchung): Enable the test after fixing tensor<?xi32> and
-// tensor<128xi32> mismatch issue.
 func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   %c0 = tensor.empty() : tensor<i32>
   %1 = tensor.empty() : tensor<128xi32>
@@ -608,17 +569,17 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 }
 transform.sequence failures(propagate) {
 ^bb1(%module_op: !transform.any_op):
-//  %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-//  %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+  %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
+  %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
 }
-//      NOCHECK: func.func @scan_1d(
-// NOCHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
-//      NOCHECK:   %[[ACC:.+]] = tensor.empty() : tensor<i32>
-//      NOCHECK:   %[[OUTPUT:.+]] = tensor.empty() : tensor<128xi32>
-//      NOCHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.scan
-// NOCHECK-SAME:       ins(%[[OPERAND]] :
-// NOCHECK-SAME:       outs(%[[OUTPUT]], %[[ACC]] :
-//      NOCHECK:   return %[[RESULT]]
+//      CHECK: func.func @scan_1d(
+// CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
+//      CHECK:   %[[ACC:.+]] = tensor.empty() : tensor<i32>
+//      CHECK:   %[[OUTPUT:.+]] = tensor.empty() : tensor<128xi32>
+//      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.scan
+// CHECK-SAME:       ins(%[[OPERAND]] :
+// CHECK-SAME:       outs(%[[OUTPUT]], %[[ACC]] :
+//      CHECK:   return %[[RESULT]]
 
 // -----
 
