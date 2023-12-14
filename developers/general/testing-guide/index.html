@@ -3738,22 +3738,22 @@ to running CTest (from the build directory):</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>--build<span class="w"> </span>.<span class="w"> </span>--target<span class="w"> </span>iree-test-deps
 </code></pre></div>
 <p>To run e2e model tests in
-<a href="https://github.com/openxla/iree/tree/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake">generated_e2e_model_tests.cmake</a>,
+<a href="https://github.com/openxla/iree/blob/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake">generated_e2e_model_tests.cmake</a>,
 because of their dependencies, <code>-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON</code> needs to be
 set when configuring CMake. Also see
 <a href="../../performance/benchmark-suites/#prerequisites">IREE Benchmark Suite Prerequisites</a>
 for required packages.</p>
 <h3 id="running-a-test_2">Running a Test<a class="headerlink" href="#running-a-test_2" title="Permanent link">link</a></h3>
 <p>For the test
-<a href="https://github.com/openxla/iree/tree/main/tests/e2e/xla_ops/floor.mlir"><code>tests/e2e/xla_ops/floor.mlir</code></a>
+<a href="https://github.com/openxla/iree/blob/main/tests/e2e/stablehlo_ops/floor.mlir"><code>tests/e2e/stablehlo_ops/floor.mlir</code></a>
 compiled for the VMVX target backend and running on the VMVX driver (here they
 match exactly, but in principle there's a many-to-many mapping from backends to
 drivers).</p>
 <p>With CMake, run this from the build directory:</p>
-<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>-R<span class="w"> </span>tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
+<div class="highlight"><pre><span></span><code>ctest<span class="w"> </span>-R<span class="w"> </span>tests/e2e/stablehlo_ops/check_vmvx_local-task_floor.mlir
 </code></pre></div>
 <p>With Bazel, run this from the repo root:</p>
-<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
+<div class="highlight"><pre><span></span><code>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>tests/e2e/stablehlo_ops:check_vmvx_local-task_floor.mlir
 </code></pre></div>
 <h3 id="setting-test-environments_1">Setting test environments<a class="headerlink" href="#setting-test-environments_1" title="Permanent link">link</a></h3>
 <p>Similarly, you can use environment variables to select Vulkan implementations

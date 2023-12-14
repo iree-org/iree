@@ -3590,17 +3590,393 @@ supported input MLIR assembly.</p>
 </code></pre></div>
 <h3 id="iree-run-module">iree-run-module<a class="headerlink" href="#iree-run-module" title="Permanent link">link</a></h3>
 <p>The <code>iree-run-module</code> program takes an already translated IREE module as input
-and executes an exported main function using the provided inputs.</p>
+and executes an exported function using the provided inputs.</p>
 <p>This program can be used in sequence with <code>iree-compile</code> to translate a
 <code>.mlir</code> file to an IREE module and then execute it. Here is an example command
 that executes the simple <code>simple_abs_vmvx.vmfb</code> compiled from <code>simple_abs.mlir</code>
-above on IREE's VMVX driver:</p>
+above on IREE's local-task CPU device:</p>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--module<span class="o">=</span>/tmp/simple_abs_vmvx.vmfb<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--function<span class="o">=</span>abs<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--input<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2
 </code></pre></div>
+<p>Input scalars are passed as <code>value</code> and input buffers are passed as
+<code>[shape]xtype=[value]</code>.</p>
+<ul>
+<li>Input buffers may also be read from raw binary files or Numpy npy files.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>MLIR type</th>
+<th>Description</th>
+<th>Input example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>i32</code></td>
+<td>Scalar</td>
+<td><code>--input=1234</code></td>
+</tr>
+<tr>
+<td><code>tensor&lt;i32&gt;</code></td>
+<td>0-D tensor</td>
+<td><code>--input=i32=1234</code></td>
+</tr>
+<tr>
+<td><code>tensor&lt;1xi32&gt;</code></td>
+<td>1-D tensor (shape [1])</td>
+<td><code>--input=1xi32=1234</code></td>
+</tr>
+<tr>
+<td><code>tensor&lt;2xi32&gt;</code></td>
+<td>1-D tensor (shape [2])</td>
+<td><code>--input="2xi32=12 34"</code></td>
+</tr>
+<tr>
+<td><code>tensor&lt;2x3xi32&gt;</code></td>
+<td>2-D tensor (shape [2, 3])</td>
+<td><code>--input="2x3xi32=[1 2 3][4 5 6]"</code></td>
+</tr>
+</tbody>
+</table>
+<details class="example" open="open">
+<summary>Other usage examples</summary>
+<p>See these test files for advanced usage examples:</p>
+<!-- TODO(scotttodd): switch these to 'mlir' syntax when available -->
+<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Basic tests</label><label for="__tabbed_1_2">Inputs</label><label for="__tabbed_1_3">Outputs</label><label for="__tabbed_1_4">Expected</label></div>
+<div class="tabbed-content">
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/tools/test/iree-run-module.mlir"><code>tools/test/iree-run-module.mlir</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tools/test/iree-run-module.mlir</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=llvm-cpu %s | iree-run-module --device=local-task --module=- --function=abs --input=&quot;2xf32=-2 3&quot;) | FileCheck %s</span>
+
+<span class="c1">// CHECK-LABEL: EXEC @abs</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">abs</span><span class="p">(</span><span class="o">%</span><span class="n">input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="o">%</span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">math</span><span class="p">.</span><span class="n">absf</span><span class="w"> </span><span class="o">%</span><span class="n">input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">result</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xf32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS: result[1]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS-NEXT: 2xf32=-2.0 3.0</span>
+</code></pre></div></td></tr></table></div>
+</div>
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-inputs.mlir"><code>tools/test/iree-run-module-inputs.mlir</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tools/test/iree-run-module-inputs.mlir</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Passing no inputs is okay.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=no_input) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=NO-INPUT %s</span>
+<span class="c1">// NO-INPUT-LABEL: EXEC @no_input</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">no_input</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Scalars use the form `--input=value`. Type (float/int) should be omitted.</span>
+<span class="c1">//   * The VM does not use i1/i8 types, so i32 VM types are returned instead.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=scalars \</span>
+<span class="c1">// RUN:  --input=1 --input=5 --input=1234 --input=-3.14) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=INPUT-SCALARS %s</span>
+<span class="c1">// INPUT-SCALARS-LABEL: EXEC @scalars</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">scalars</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">i1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">i8</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg2</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg3</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">f32</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">i1</span><span class="p">,</span><span class="w"> </span><span class="n">i8</span><span class="p">,</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">f32</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// INPUT-SCALARS: result[0]: i32=1</span>
+<span class="w">  </span><span class="c1">// INPUT-SCALARS: result[1]: i32=5</span>
+<span class="w">  </span><span class="c1">// INPUT-SCALARS: result[2]: i32=1234</span>
+<span class="w">  </span><span class="c1">// INPUT-SCALARS: result[3]: f32=-3.14</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg2</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg3</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i1</span><span class="p">,</span><span class="w"> </span><span class="n">i8</span><span class="p">,</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">f32</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Buffers (&quot;tensors&quot;) use the form `--input=[shape]xtype=[value]`.</span>
+<span class="c1">//   * If any values are omitted, zeroes will be used.</span>
+<span class="c1">//   * Quotes should be used around values with spaces.</span>
+<span class="c1">//   * Brackets may also be used to separate element values.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=buffers \</span>
+<span class="c1">// RUN:  --input=i32=5 --input=2xi32 --input=&quot;2x3xi32=1 2 3 4 5 6&quot;) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=INPUT-BUFFERS %s</span>
+<span class="c1">// INPUT-BUFFERS-LABEL: EXEC @buffers</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">buffers</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg2</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x3xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x3xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS: result[0]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS-NEXT: i32=5</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS: result[1]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS-NEXT: 2xi32=0 0</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS: result[2]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-BUFFERS-NEXT: 2x3xi32=[1 2 3][4 5 6]</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg2</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">i32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x3xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Buffer values can be read from binary files with `@some/file.bin`.</span>
+<span class="c1">//   * numpy npy files from numpy.save or previous tooling output can be read to</span>
+<span class="c1">//     provide 1+ values.</span>
+<span class="c1">//   * Some data types may be converted (i32 -&gt; si32 here) - bug?</span>
+
+<span class="c1">// RUN: iree-compile --iree-hal-target-backends=vmvx %s -o %t.vmfb</span>
+<span class="c1">//</span>
+<span class="c1">// RUN: iree-run-module --device=local-sync --module=%t.vmfb --function=npy_round_trip \</span>
+<span class="c1">// RUN:   --input=&quot;2xi32=11 12&quot; --input=&quot;3xi32=1 2 3&quot; --output=@%t.npy --output=+%t.npy</span>
+<span class="c1">//</span>
+<span class="c1">// RUN: iree-run-module --device=local-sync --module=%t.vmfb --function=npy_round_trip \</span>
+<span class="c1">// RUN:   --input=@%t.npy | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=INPUT-NPY_FILES %s</span>
+
+<span class="c1">// INPUT-NPY_FILES-LABEL: EXEC @npy_round_trip</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">npy_round_trip</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">3</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">3</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// INPUT-NPY_FILES: result[0]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-NPY_FILES-NEXT: 2xsi32=11 12</span>
+<span class="w">  </span><span class="c1">// INPUT-NPY_FILES: result[1]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// INPUT-NPY_FILES-NEXT: 3xsi32=1 2 3</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">xi32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">3</span><span class="n">xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+</div>
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-outputs.mlir"><code>tools/test/iree-run-module-outputs.mlir</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tools/test/iree-run-module-outputs.mlir</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span>
+<span class="normal">47</span>
+<span class="normal">48</span>
+<span class="normal">49</span>
+<span class="normal">50</span>
+<span class="normal">51</span>
+<span class="normal">52</span>
+<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Tests that execution providing no outputs is ok.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=no_output) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=NO-OUTPUT %s</span>
+<span class="c1">// NO-OUTPUT-LABEL: EXEC @no_output</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">no_output</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">return</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Tests the default output printing to stdout.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=default) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-DEFAULT %s</span>
+<span class="c1">// OUTPUT-DEFAULT-LABEL: EXEC @default</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="k">default</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// OUTPUT-DEFAULT: result[0]: i32=123</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arith</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="mi">123</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span>
+<span class="w">  </span><span class="c1">// OUTPUT-DEFAULT: result[1]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// OUTPUT-DEFAULT-NEXT: f32=4</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arith</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="mf">4.0</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="c1">// OUTPUT-DEFAULT: result[2]: hal.buffer_view</span>
+<span class="w">  </span><span class="c1">// OUTPUT-DEFAULT-NEXT: 2x4xi32=[0 1 2 3][4 5 6 7]</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">flow</span><span class="p">.</span><span class="n">tensor</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">]]</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Tests explicit output to npy files by producing a concatenated .npy and then</span>
+<span class="c1">// printing the results in python. This also verifies our npy files can be</span>
+<span class="c1">// parsed by numpy.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=numpy \</span>
+<span class="c1">// RUN:                  --output= \</span>
+<span class="c1">// RUN:                  --output=@%t \</span>
+<span class="c1">// RUN:                  --output=+%t) &amp;&amp; \</span>
+<span class="c1">// RUN:  &quot;%PYTHON&quot; %S/echo_npy.py %t | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-NUMPY %s</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">numpy</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Output skipped:</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arith</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="mi">123</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span>
+<span class="w">  </span><span class="c1">// OUTPUT-NUMPY{LITERAL}: 4.0</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arith</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="mf">4.0</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="c1">// OUTPUT-NUMPY-NEXT{LITERAL}: [[0 1 2 3]</span>
+<span class="w">  </span><span class="c1">// OUTPUT-NUMPY-NEXT{LITERAL}:  [4 5 6 7]]</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">flow</span><span class="p">.</span><span class="n">tensor</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">]]</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+</div>
+<div class="tabbed-block">
+<p>Source file: <a href="https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-expected.mlir"><code>tools/test/iree-run-module-expected.mlir</code></a></p>
+<div class="highlight"><table class="highlighttable"><tr><th colspan="2" class="filename"><span class="filename">tools/test/iree-run-module-expected.mlir</span></th></tr><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.0) | FileCheck %s --check-prefix=SUCCESS-MATCHES</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=&quot;(ignored)&quot;) | FileCheck %s --check-prefix=SUCCESS-IGNORED</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=2.1 --expected_f32_threshold=0.1) | FileCheck %s --check-prefix=SUCCESS-THRESHOLD</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=123 --expected_output=f32=2.0) | FileCheck %s --check-prefix=FAILED-FIRST</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=f32=4.5) | FileCheck %s --check-prefix=FAILED-SECOND</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=4xf32=2.0) | FileCheck %s --check-prefix=FAILED-SHAPE</span>
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | not iree-run-module --device=local-task --module=- --function=abs --input=f32=-2 --expected_output=f32=-2 --expected_output=8) | FileCheck %s --check-prefix=FAILED-TYPE</span>
+
+<span class="c1">// SUCCESS-MATCHES: [SUCCESS]</span>
+<span class="c1">// SUCCESS-THRESHOLD: [SUCCESS]</span>
+<span class="c1">// SUCCESS-IGNORED: [SUCCESS]</span>
+<span class="c1">// FAILED-FIRST: [FAILED] result[0]: element at index 0 (-2) does not match the expected (123)</span>
+<span class="c1">// FAILED-SECOND: [FAILED] result[1]: element at index 0 (2) does not match the expected (4.5)</span>
+<span class="c1">// FAILED-SHAPE: [FAILED] result[1]: metadata is f32; expected that the view matches 4xf32</span>
+<span class="c1">// FAILED-TYPE: [FAILED] result[1]: variant types mismatch</span>
+
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">abs</span><span class="p">(</span><span class="o">%</span><span class="n">input</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="o">%</span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">math</span><span class="p">.</span><span class="n">absf</span><span class="w"> </span><span class="o">%</span><span class="n">input</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">result</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+</div>
+</div>
+</div>
+</details>
 <h3 id="iree-check-module">iree-check-module<a class="headerlink" href="#iree-check-module" title="Permanent link">link</a></h3>
 <p>The <code>iree-check-module</code> program takes an already translated IREE module as input
 and executes it as a series of
@@ -3609,7 +3985,7 @@ runner for the IREE <a href="../testing-guide/#end-to-end-tests">check framework
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-input-type<span class="o">=</span>stablehlo<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>vmvx<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/xla_ops/abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">$PWD</span>/tests/e2e/stablehlo_ops/abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>/tmp/abs.vmfb
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>$<span class="w"> </span>../iree-build/tools/iree-check-module<span class="w"> </span><span class="se">\</span>
