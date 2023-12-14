@@ -83,9 +83,9 @@ if(IREE_BUILD_TESTS AND
       "local-sync"
     RUNNER_ARGS
       "--function=abs"
-      "--input=f32=-10"
+      "--input=2xf32=-10 -5"
     EXPECTED_OUTPUT
-      "f32=10"
+      "2xf32=10 5"
     DEPS
       iree_tools_test_iree_run_module_bytecode_module_vmvx
   )
