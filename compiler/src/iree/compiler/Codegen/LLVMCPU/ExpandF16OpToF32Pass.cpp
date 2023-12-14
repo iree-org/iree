@@ -8,8 +8,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
-#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -17,7 +15,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-/// A pattern that expands floating-point arithmetic operations with f16
+/// A pattern that expands floating-point arithmetic/math operations with f16
 /// operands to f32 operands. It performs the expansion by extending the
 /// f16 operands to f32, performing the arithmetic operation on the extended
 /// operands, and then truncating the result back to f16.
