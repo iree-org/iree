@@ -392,9 +392,12 @@ static void iree_trace_replay_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       *min = -4;
       *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *min = -2;
+      *max = +2;
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       *min = 0;
