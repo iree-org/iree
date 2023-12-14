@@ -552,22 +552,20 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   addCPUBufferizePasses(nestedModulePM);
 
-  if (!enableMicrokernels) {
-    // Vector lowering of Mmt4d.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUMmt4dVectorLoweringPass());
+  // Vector lowering of Mmt4d.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUMmt4dVectorLoweringPass());
 
-    // Fold unit dims before vector lowering.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createOptimizeVectorTransferPass(/*flatten=*/false));
+  // Fold unit dims before vector lowering.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass(/*flatten=*/false));
 
-    // Generic vector lowering.
-    LLVMCPUVectorLoweringPassOptions options;
-    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
-    options.splitVectorTransfersTo = "linalg-copy";
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUVectorLoweringPass(options));
-  }
+  // Generic vector lowering.
+  LLVMCPUVectorLoweringPassOptions options;
+  options.lowerVectorTransposeToAVX2 = lowerToAVX2;
+  options.splitVectorTransfersTo = "linalg-copy";
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMCPUVectorLoweringPass(options));
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager,

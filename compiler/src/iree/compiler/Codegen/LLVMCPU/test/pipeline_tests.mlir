@@ -619,6 +619,47 @@ hal.executable private @ukernel_pass_through {
 
 // -----
 
+hal.executable private @unsupported_ukernel_fallback_to_vectorization {
+  hal.executable.variant public @embedded_elf_x86_64 target(<
+    "llvm-cpu", "embedded-elf-x86_64", {
+      cpu = "generic",
+      cpu_features = "+fma,+avx512f",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index,
+      target_triple = "x86_64-unknown-unknown-eabi-elf", ukernels = "all"}>
+    ) {
+    hal.executable.export public @unsupported_ukernel_fallback_to_vectorization ordinal(0)
+      layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>)
+      attributes {translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>} {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @unsupported_ukernel_fallback_to_vectorization() {
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c132096 = arith.constant 132096 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x256x1x1xf32>>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c1024) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4x256x128x1xi8>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c132096) : !flow.dispatch.tensor<writeonly:tensor<1x4x1x128xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 256, 1, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x256x1x1xf32>> -> tensor<1x256x1x1xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [4, 256, 128, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x256x128x1xi8>> -> tensor<4x256x128x1xi8>
+        %5 = tensor.empty() : tensor<1x4x1x128xf32>
+        %6 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0], [1, 1, 0, 1], [0, 0, 0, 0], [0, 0, 0, 0]]>} ins(%cst : f32) outs(%5 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
+        %7 = linalg.mmt4d {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 2, 0, 0, 0, 0], [1, 1, 0, 1, 128, 0], [0, 0, 1, 0, 0, 1]]>} ins(%3, %4 : tensor<1x256x1x1xf32>, tensor<4x256x128x1xi8>) outs(%6 : tensor<1x4x1x128xf32>) -> tensor<1x4x1x128xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 4, 1, 128], strides = [1, 1, 1, 1] : tensor<1x4x1x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x4x1x128xf32>>
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @unsupported_ukernel_fallback_to_vectorization
+// CHECK:         vector.fma
+
+// -----
+
 // Check Armv9 Streaming SVE mode is enabled for the following pipelines:
 //
 //   * CPUBufferOpsTileAndVectorize
