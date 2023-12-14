@@ -50,11 +50,6 @@ def ExpandTensorShapes :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandTensorShapesPass()";
 }
 
-def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
-  let summary = "Expand vector in vector/matrix operations";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
-}
-
 def FuseDequantizationMatmul:
     InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Fuse dequantization and matmul linalg.generic ops";
