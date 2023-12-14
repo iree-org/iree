@@ -287,6 +287,9 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - name: Querying GPU information
+        run: |
+          ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -296,8 +299,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
             gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
+            ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   test_gpu:
     needs: [setup, build_all]
@@ -342,10 +344,7 @@ jobs:
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
               gcr.io/iree-oss/nvidia@sha256:4bc8f74e6f8dece34184eedfafede9c28ba3af1674e6774f5cd867802beffc9b \
-              bash -euo pipefail -c \
-                "./build_tools/scripts/check_cuda.sh
-                ./build_tools/scripts/check_vulkan.sh
-                ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+              ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   test_a100:
     needs: [setup, build_all]
@@ -390,10 +389,7 @@ jobs:
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
               gcr.io/iree-oss/nvidia@sha256:4bc8f74e6f8dece34184eedfafede9c28ba3af1674e6774f5cd867802beffc9b \
-              bash -euo pipefail -c \
-                "./build_tools/scripts/check_cuda.sh
-                ./build_tools/scripts/check_vulkan.sh
-                ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
+              ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
   ################################## Subsets ###################################
   # Jobs that build some subset of IREE
@@ -532,6 +528,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - name: Querying GPU information
+        run: |
+          ./build_tools/scripts/check_cuda.sh
+          ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -544,10 +544,7 @@ jobs:
             --gpus all \
             --env NVIDIA_DRIVER_CAPABILITIES=all \
             gcr.io/iree-oss/frontends-nvidia@sha256:c3d590c6f1a6369cd34ccf0fc6f9ca2fbf8ee06abdc58a2827fc847718c308b8 \
-            bash -euo pipefail -c \
-              "./build_tools/scripts/check_cuda.sh
-              ./build_tools/scripts/check_vulkan.sh
-              build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
+            build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
