@@ -348,12 +348,6 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.device.match.id
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): fold matches that are known true based on device config.
-
-//===----------------------------------------------------------------------===//
 // hal.device.queue.execute
 //===----------------------------------------------------------------------===//
 

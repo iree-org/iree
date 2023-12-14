@@ -88,9 +88,6 @@ struct CmdDispatchOpPattern
                << entryPointAttr;
       }
       auto exportOp = *exportIt;
-
-      // TODO(benvanik): check variant target:
-      //   if (variantOp.target().getMatchExpression()) { dispatch }
       dispatchVariant(dispatchOp, adaptor, executableOp, variantOp, exportOp,
                       lookupOp.getResult(), rewriter);
     }
