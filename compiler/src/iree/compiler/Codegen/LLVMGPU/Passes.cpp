@@ -86,7 +86,7 @@ static void
 tileAndDistributeToWorkgroup(OpPassManager &pm,
                              bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass(
-      /*maxWorkgroupParallelDims=*/1,
+      kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
