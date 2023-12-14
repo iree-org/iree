@@ -1559,7 +1559,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
 }
 
 def HAL_DeviceQueryOp :
-    HAL_PureOp<"device.query", [HAL_DeviceQuery]> {
+    HAL_PureOp<"device.query", []> {
   let summary = [{returns a runtime configuration parameter from the device}];
   let description = [{
     Queries a device configuration parameter with the given key.
@@ -1569,11 +1569,7 @@ def HAL_DeviceQueryOp :
 
     This is roughly equivalent to the `sysconf` linux syscall
     (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-    set of keys available and their interpretation is target-dependent. If there
-    is a HAL match attribute (`#hal.device.match.*`) or op
-    (`hal.device.match.*`) prefer to use that in order to get compile-time
-    propagation when the target is specified and elide the runtime query and
-    get compile-time verification when a runtime query is required.
+    set of keys available and their interpretation is target-dependent.
 
     Users of the op must check the `ok` result before using the value as what
     set of keys is available may change over time. If in doubt: don't use this.
