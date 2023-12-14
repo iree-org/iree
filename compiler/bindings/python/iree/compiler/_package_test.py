@@ -34,7 +34,7 @@ assert v.REVISIONS["IREE"]
 assert v.VERSION
 print("IREE version:", v.VERSION)
 
-check_tool("iree-compiler", ["--help"], "IREE compilation driver")
+check_tool("iree-compile", ["--help"], "IREE compilation driver")
 check_tool("iree-ir-tool", ["--help"], "IREE IR Tool")
 
 # ONNX dependent.
