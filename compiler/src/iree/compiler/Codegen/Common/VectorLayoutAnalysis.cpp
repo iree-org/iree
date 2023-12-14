@@ -252,11 +252,12 @@ ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
     llvm::errs() << "With: " << rhs << "\n";
     llvm::report_fatal_error("Layout conflict should have been handled with "
                              "resolveWithPossibleConflict instead");
-    // This return will never be reached, but it's here to make the compiler
-    // happy.
-    return ChangeResult::NoChange;
   }
   }
+
+  // This return will never be reached, but it's here to make the compiler
+  // happy.
+  return ChangeResult::NoChange;
 }
 
 ChangeResult DistributionLayout::resolve(const DistributionLayout *rhs) {
