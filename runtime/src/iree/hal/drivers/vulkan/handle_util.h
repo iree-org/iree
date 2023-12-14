@@ -21,6 +21,7 @@
 // clang-format on
 
 #include "iree/base/internal/synchronization.h"
+#include "iree/hal/drivers/vulkan/debug_reporter.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 #include "iree/hal/drivers/vulkan/status_util.h"
@@ -43,14 +44,16 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
                  iree_hal_vulkan_features_t enabled_features,
                  iree_hal_vulkan_device_extensions_t enabled_extensions,
                  bool owns_device, iree_allocator_t host_allocator,
-                 const VkAllocationCallbacks* allocator = nullptr)
+                 const VkAllocationCallbacks* allocator = nullptr,
+                 iree_hal_vulkan_debug_reporter_t* debug_reporter = nullptr)
       : syms_(add_ref(syms)),
         physical_device_(physical_device),
         enabled_features_(enabled_features),
         enabled_extensions_(enabled_extensions),
         owns_device_(owns_device),
         allocator_(allocator),
-        host_allocator_(host_allocator) {}
+        host_allocator_(host_allocator),
+        debug_reporter_(debug_reporter) {}
   ~VkDeviceHandle() { reset(); }
 
   VkDeviceHandle(const VkDeviceHandle&) = delete;
@@ -64,7 +67,8 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
         enabled_extensions_(other.enabled_extensions_),
         owns_device_(other.owns_device_),
         allocator_(other.allocator_),
-        host_allocator_(other.host_allocator_) {}
+        host_allocator_(other.host_allocator_),
+        debug_reporter_(other.debug_reporter_) {}
 
   void reset() {
     if (value_ == VK_NULL_HANDLE) return;
@@ -93,6 +97,10 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
     return enabled_extensions_;
   }
 
+  iree_hal_vulkan_debug_reporter_t* debug_reporter() const {
+    return debug_reporter_;
+  }
+
  private:
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
   VkDevice value_ = VK_NULL_HANDLE;
@@ -102,6 +110,8 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
   bool owns_device_;
   const VkAllocationCallbacks* allocator_ = nullptr;
   iree_allocator_t host_allocator_;
+  // Optional debug reporter shared with devices associated with a VkInstance.
+  iree_hal_vulkan_debug_reporter_t* debug_reporter_ = nullptr;
 };
 
 class VkCommandPoolHandle {

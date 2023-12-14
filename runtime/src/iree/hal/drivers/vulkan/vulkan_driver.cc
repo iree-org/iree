@@ -587,7 +587,8 @@ static iree_status_t iree_hal_vulkan_driver_create_device_by_id(
   iree_status_t status = iree_hal_vulkan_device_create(
       base_driver, device_name, driver->enabled_features,
       &driver->device_options, (iree_hal_vulkan_syms_t*)driver->syms.get(),
-      driver->instance, physical_device, host_allocator, out_device);
+      driver->instance, physical_device, host_allocator, driver->debug_reporter,
+      out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

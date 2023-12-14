@@ -853,6 +853,7 @@ iree_status_t iree_hal_vulkan_device_create(
     const iree_hal_vulkan_device_options_t* options,
     iree_hal_vulkan_syms_t* opaque_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
+    iree_hal_vulkan_debug_reporter_t* debug_reporter,
     iree_hal_device_t** out_device) {
   DynamicSymbols* instance_syms = (DynamicSymbols*)opaque_syms;
 
@@ -1104,7 +1105,7 @@ iree_status_t iree_hal_vulkan_device_create(
   auto logical_device = new VkDeviceHandle(
       instance_syms, physical_device, enabled_features,
       enabled_device_extensions,
-      /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
+      /*owns_device=*/true, host_allocator, /*allocator=*/NULL, debug_reporter);
 
   iree_status_t status = VK_RESULT_TO_STATUS(
       instance_syms->vkCreateDevice(physical_device, &device_create_info,

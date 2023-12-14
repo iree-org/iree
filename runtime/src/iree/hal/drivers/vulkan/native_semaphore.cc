@@ -264,15 +264,28 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
         semaphore_list->semaphores[i], &value));
   }
 
+  iree_status_t status = iree_ok_status();
   if (result == VK_SUCCESS) {
-    return iree_ok_status();
+    status = iree_ok_status();
   } else if (result == VK_ERROR_DEVICE_LOST) {
     // Nothing we do now matters.
-    return VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
+    status = VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
   } else if (result == VK_TIMEOUT) {
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+  } else {
+    status = VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
   }
-  return VK_RESULT_TO_STATUS(result, "vkWaitSemaphores");
+
+  // Check opportunistically for debug errors.
+  if (logical_device->debug_reporter() &&
+      iree_hal_vulkan_debug_reporter_has_error(
+          logical_device->debug_reporter())) {
+    status =
+        iree_status_join(status, iree_hal_vulkan_debug_reporter_consume_status(
+                                     logical_device->debug_reporter()));
+  }
+
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_native_semaphore_wait(

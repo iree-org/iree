@@ -10,6 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/vulkan/api.h"
+#include "iree/hal/drivers/vulkan/debug_reporter.h"
 #include "iree/hal/drivers/vulkan/dynamic_symbols.h"
 #include "iree/hal/drivers/vulkan/extensibility_util.h"
 
@@ -29,6 +30,7 @@ iree_status_t iree_hal_vulkan_device_create(
     const iree_hal_vulkan_device_options_t* options,
     iree_hal_vulkan_syms_t* instance_syms, VkInstance instance,
     VkPhysicalDevice physical_device, iree_allocator_t host_allocator,
+    iree_hal_vulkan_debug_reporter_t* debug_reporter,
     iree_hal_device_t** out_device);
 
 #ifdef __cplusplus

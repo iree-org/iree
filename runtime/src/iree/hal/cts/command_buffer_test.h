@@ -65,7 +65,7 @@ class command_buffer_test : public CtsTestBase {
         command_buffer, device_buffer, target_offset, fill_length, pattern,
         pattern_length));
     IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
-    IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
+    IREE_EXPECT_OK(SubmitCommandBufferAndWait(command_buffer));
 
     // Read data for returning.
     std::vector<uint8_t> actual_data(buffer_size);
