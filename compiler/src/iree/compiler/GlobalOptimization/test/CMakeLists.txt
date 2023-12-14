@@ -18,7 +18,6 @@ iree_lit_test_suite(
     "conv1x1_to_matmul.mlir"
     "detach_elementwise_from_named_ops.mlir"
     "expand_tensor_shapes.mlir"
-    "expand_vectors.mlir"
     "flow_hoist_into_globals.mlir"
     "fuse_dequantization_matmul.mlir"
     "fuse_silu_horizontal_matmul.mlir"

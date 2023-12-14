@@ -63,10 +63,6 @@ createEraseUnusedLinalgOperands();
 // Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
-// Expands vectors in vector/matrix operations into linalg.batch_matmul/matmul
-// forms.
-std::unique_ptr<Pass> createExpandVectorsPass();
-
 // A pass to fuse dequantization and matmul linalg.generic ops
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
