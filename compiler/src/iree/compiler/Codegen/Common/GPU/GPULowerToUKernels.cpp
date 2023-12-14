@@ -101,11 +101,13 @@ struct FnNameAndDefAttrs {
 /// Returns the function name and attributes to use for a ukernel with given
 /// `ukernelName` on the target described by `targetAttr`.
 static FnNameAndDefAttrs
-getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID, RewriterBase &rewriter,
+getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
+                     RewriterBase &rewriter,
                      IREE::HAL::ExecutableTargetAttr targetAttr) {
   FnNameAndDefAttrs result;
   if (isROCMBackend(targetAttr)) {
-    result.name = std::string("__iree_uk_rocm_") + ukernelName + "_" + typeSuffixID;
+    result.name =
+        std::string("__iree_uk_rocm_") + ukernelName + "_" + typeSuffixID;
     // TODO(#12327): Based on description in the issue, add an attribute
     // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
     // backend (obviously), but is enough to unblock while the proper fix
@@ -156,7 +158,7 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // If max value is being used, it is not a pure argmax.
-  if(!genericOp.getResults()[0].use_empty()) {
+  if (!genericOp.getResults()[0].use_empty()) {
     return failure();
   }
 
@@ -176,7 +178,8 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
   // TODO: Add better affine map checks.
   auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity()) return failure();
+  if (!indexing_maps[0].isIdentity())
+    return failure();
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
@@ -198,7 +201,8 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // Producer of linalg.yield op 2nd arg is arith.select
-  // TODO: Add check that select is selecting between linalg.index and index of current max.
+  // TODO: Add check that select is selecting between linalg.index and index of
+  // current max.
   {
     producerOutput = yieldOp->getOperand(1);
     producer = producerOutput.getDefiningOp();
@@ -236,8 +240,6 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
 
   return success();
 }
-
-
 
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
@@ -291,8 +293,10 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   // Currently only support 1D reduction, where reduc is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
   const int kReductionDim = op.getNumLoops() - 1;
-  Value reductionDimSize = rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
-  auto fn = getFnNameAndDefAttrs(ukernelName, typeSuffixID, rewriter, targetAttr);
+  Value reductionDimSize =
+      rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
+  auto fn =
+      getFnNameAndDefAttrs(ukernelName, typeSuffixID, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, indexType, fn.name, ValueRange{input}, index,
       ValueRange{reductionDimSize},
@@ -307,9 +311,11 @@ namespace {
 using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
 
 struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
-  LowerArgmaxToUKernelPattern(MLIRContext *context, TargetPredicate targetPredicate,
-                        bool skipIntermediateRoundings = false)
-      : OpRewritePattern<linalg::GenericOp>(context), targetPredicate(targetPredicate),
+  LowerArgmaxToUKernelPattern(MLIRContext *context,
+                              TargetPredicate targetPredicate,
+                              bool skipIntermediateRoundings = false)
+      : OpRewritePattern<linalg::GenericOp>(context),
+        targetPredicate(targetPredicate),
         skipIntermediateRoundings(skipIntermediateRoundings) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
@@ -329,7 +335,8 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
     }
     // llvm::outs()<<"SUCCESS, from:" <<op<<"\n";
     // llvm::outs()<<"SUCCESS, using:" <<ukernelOp<<"\n";
-    rewriter.replaceAllUsesWith(op.getResults()[1], ukernelOp.value()->getResults());
+    rewriter.replaceAllUsesWith(op.getResults()[1],
+                                ukernelOp.value()->getResults());
     return success();
   }
 
@@ -354,8 +361,7 @@ void GPULowerToUKernelsPass::runOnOperation() {
   // that it is difficult for codegen to consistently approach microkernels
   // performance, and that consideration overrides the benefit of fusions for
   // these ops.
-  patterns.insert<LowerArgmaxToUKernelPattern>(
-      context, isROCMBackend);
+  patterns.insert<LowerArgmaxToUKernelPattern>(context, isROCMBackend);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();

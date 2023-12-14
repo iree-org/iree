@@ -121,34 +121,33 @@ linkBitcodeObjects(Location loc, llvm::Linker &linker, unsigned linkerFlags,
 }
 
 LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
-                                      unsigned linkerFlags,
-                                      StringRef path,
-                                      llvm::TargetMachine &targetMachine,
-                                      llvm::LLVMContext &context) {
-    auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(path);
-    if (auto ec = bitcodeBufferRef.getError()) {
-      return mlir::emitError(loc) << "failed reading user bitcode file `"
-                                  << path << "`: " << ec.message();
-    }
-    auto setAlwaysInline = [&](llvm::Module &module) {
-      // ROCM/HIP builtin functions are non-inlinable.
-      // if (targetMachine.getTargetTriple().isAMDGCN() || targetMachine.getTargetTriple().isAMDGPU()) return;
-      for (auto &func : module.getFunctionList()) {
-        if (func.hasFnAttribute(llvm::Attribute::NoInline)) {
-          func.removeFnAttr(llvm::Attribute::NoInline);
-        }
-        func.addFnAttr(llvm::Attribute::AlwaysInline);
+                                   unsigned linkerFlags, StringRef path,
+                                   llvm::TargetMachine &targetMachine,
+                                   llvm::LLVMContext &context) {
+  auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(path);
+  if (auto ec = bitcodeBufferRef.getError()) {
+    return mlir::emitError(loc) << "failed reading user bitcode file `" << path
+                                << "`: " << ec.message();
+  }
+  auto setAlwaysInline = [&](llvm::Module &module) {
+    // ROCM/HIP builtin functions are non-inlinable.
+    // if (targetMachine.getTargetTriple().isAMDGCN() ||
+    // targetMachine.getTargetTriple().isAMDGPU()) return;
+    for (auto &func : module.getFunctionList()) {
+      if (func.hasFnAttribute(llvm::Attribute::NoInline)) {
+        func.removeFnAttr(llvm::Attribute::NoInline);
       }
-    };
-    if (failed(linkBitcodeModule(
-            loc, linker, linkerFlags, targetMachine, path,
-            llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
-            setAlwaysInline))) {
-      return mlir::emitError(loc)
-             << "failed linking in user bitcode file `" << path
-             << "` for target triple '" << targetMachine.getTargetTriple().str()
-             << "'";
+      func.addFnAttr(llvm::Attribute::AlwaysInline);
     }
+  };
+  if (failed(linkBitcodeModule(
+          loc, linker, linkerFlags, targetMachine, path,
+          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
+          setAlwaysInline))) {
+    return mlir::emitError(loc) << "failed linking in user bitcode file `"
+                                << path << "` for target triple '"
+                                << targetMachine.getTargetTriple().str() << "'";
+  }
 
   return success();
 }
@@ -174,7 +173,8 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
       }
       path = components.second;
     }
-    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, path, targetMachine, context))) {
+    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, path,
+                                    targetMachine, context))) {
       return mlir::emitError(loc) << "failed linking cmd line bit code.";
     }
   }

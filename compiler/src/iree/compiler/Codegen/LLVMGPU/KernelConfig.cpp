@@ -1080,7 +1080,7 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // If max value is being used, it is not a pure argmax.
-  if(!genericOp.getResults()[0].use_empty()) {
+  if (!genericOp.getResults()[0].use_empty()) {
     return failure();
   }
 
@@ -1094,7 +1094,8 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
   // TODO: Add better affine map checks.
   auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity()) return failure();
+  if (!indexing_maps[0].isIdentity())
+    return failure();
 
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
@@ -1116,7 +1117,8 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   }
 
   // Producer of linalg.yield op 2nd arg is arith.select
-  // TODO: Add check that select is selecting between linalg.index and index of current max.
+  // TODO: Add check that select is selecting between linalg.index and index of
+  // current max.
   {
     producerOutput = yieldOp->getOperand(1);
     producer = producerOutput.getDefiningOp();
@@ -1156,11 +1158,11 @@ static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
 }
 
 /// Set the configuration for argmax that can be mapped to argmax uKernel.
-/// Distribute all parallel dim across different wg, and only use single 
+/// Distribute all parallel dim across different wg, and only use single
 /// subgroup per workgroup.
 static LogicalResult setArgmaxConfig(func::FuncOp entryPoint,
-                                            linalg::GenericOp op,
-                                            const TargetInfo &targetInfo) {
+                                     linalg::GenericOp op,
+                                     const TargetInfo &targetInfo) {
   if (!targetInfo.hasWarpShuffle || !targetInfo.hasUkernels)
     return failure();
 
@@ -1201,9 +1203,10 @@ static LogicalResult setArgmaxConfig(func::FuncOp entryPoint,
   size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
 
-  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize number of elements,
-  // and then it does a single step butterfly warp reduce. Hence it expects wgSize to be
-  // workgroupSize, and reductionTileSize to be size of the reduction dim.
+  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // number of elements, and then it does a single step butterfly warp reduce.
+  // Hence it expects wgSize to be workgroupSize, and reductionTileSize to be
+  // size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
@@ -1414,8 +1417,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
-    }
-    else if (genericOp && succeeded(setArgmaxConfig(entryPointFn, genericOp, targetInfo))) {
+    } else if (genericOp && succeeded(setArgmaxConfig(entryPointFn, genericOp,
+                                                      targetInfo))) {
       return success();
     }
   }

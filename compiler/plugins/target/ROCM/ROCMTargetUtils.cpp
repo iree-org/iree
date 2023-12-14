@@ -121,15 +121,14 @@ static std::vector<std::string> getROCDLPaths(std::string targetChip,
 }
 
 static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
-                                              std::string targetChip,
-                                              std::string bitCodeDir) {
+                                                std::string targetChip,
+                                                std::string bitCodeDir) {
   // AMD bitcodes.
   static const std::vector<std::string> allUkernelNames({"argmax"});
   std::vector<std::string> selectedUkernelNames;
   if (enabledUkernelsStr == "all") {
     selectedUkernelNames = allUkernelNames;
-  }
-  else {
+  } else {
     while (!enabledUkernelsStr.empty()) {
       auto split = enabledUkernelsStr.split(',');
       selectedUkernelNames.push_back(split.first.str());
@@ -221,16 +220,22 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
   };
 }
 
-// Links optimized Ukernel bitcodes into the given module if the module needs it.
-void linkUkernelBCIfNecessary(llvm::Module *module, Location loc, StringRef enabledUkernelsStr, std::string targetChip,
-                          std::string bitCodeDir, unsigned linkerFlags, llvm::TargetMachine &targetMachine) {
+// Links optimized Ukernel bitcodes into the given module if the module needs
+// it.
+void linkUkernelBCIfNecessary(llvm::Module *module, Location loc,
+                              StringRef enabledUkernelsStr,
+                              std::string targetChip, std::string bitCodeDir,
+                              unsigned linkerFlags,
+                              llvm::TargetMachine &targetMachine) {
   if (!couldNeedUkernelBitcode(*module)) {
     return;
   }
-  std::vector<std::string> ukernelPaths = getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
+  std::vector<std::string> ukernelPaths =
+      getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
   llvm::Linker linker(*module);
-  for (auto & path : ukernelPaths) {
-    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, StringRef(path), targetMachine, module->getContext()))) {
+  for (auto &path : ukernelPaths) {
+    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, StringRef(path),
+                                    targetMachine, module->getContext()))) {
       llvm::WithColor::error(llvm::errs()) << "Fail to Link Ukernel.\n";
     }
   }

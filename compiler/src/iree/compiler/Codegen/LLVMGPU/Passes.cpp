@@ -488,8 +488,7 @@ void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
   tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   if (enableMicrokernels) {
-    nestedModulePM.addPass(
-        createGPULowerToUKernelsPass(false));
+    nestedModulePM.addPass(createGPULowerToUKernelsPass(false));
   }
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());

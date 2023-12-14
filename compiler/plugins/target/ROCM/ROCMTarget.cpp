@@ -47,11 +47,8 @@ struct ROCMOptions {
   std::string targetChip = "gfx908";
   bool linkBitcode = false;
   std::string bitcodeDirectory;
-<<<<<<< HEAD
   int wavesPerEu = 0;
-=======
   std::string enableROCMUkernels = "none";
->>>>>>> c940f9ea7 ([LLVMGPU] Add tiling and plumbing for argmax UKernel attributes.)
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
@@ -67,11 +64,13 @@ struct ROCMOptions {
                     llvm::cl::cat(category),
                     llvm::cl::desc("Optimization hint specifying minimum "
                                    "number of waves per execution unit"));
-    binder.opt<std::string>("iree-rocm-enable-ukernels", enableROCMUkernels,
-                            llvm::cl::cat(category),
-                            llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
-                                      "`default`, `none`, `all`, or a comma-separated list of "
-                                      "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+    binder.opt<std::string>(
+        "iree-rocm-enable-ukernels", enableROCMUkernels,
+        llvm::cl::cat(category),
+        llvm::cl::desc(
+            "Enables microkernels in the llvmcpu backend. May be "
+            "`default`, `none`, `all`, or a comma-separated list of "
+            "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
   }
 };
 } // namespace
@@ -322,16 +321,19 @@ public:
     // Link user modules and libdevice (if required).
     // Note that linking order matters:
     llvm::Linker linker(*llvmModule);
-    if (failed(linkCmdlineBitcodeFiles(variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
-                                      *targetMachine, llvmModule->getContext()))) {
+    if (failed(linkCmdlineBitcodeFiles(
+            variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
+            *targetMachine, llvmModule->getContext()))) {
       return failure();
     }
 
     if (!options.enableROCMUkernels.empty()) {
       if (options.enableROCMUkernels != "none") {
         auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-        linkUkernelBCIfNecessary(llvmModule.get(), variantOp.getLoc(), enabledUkernelsStr, options.targetChip,
-                              options.bitcodeDirectory, llvm::Linker::OverrideFromSrc, *targetMachine);
+        linkUkernelBCIfNecessary(llvmModule.get(), variantOp.getLoc(),
+                                 enabledUkernelsStr, options.targetChip,
+                                 options.bitcodeDirectory,
+                                 llvm::Linker::OverrideFromSrc, *targetMachine);
       }
     }
     // Link module to Device Library
@@ -434,7 +436,8 @@ private:
     // Set Ukernels if it is a architecture that we have build ukernels for.
     // TODO: Build for variety of architectures.
     if (options.targetChip == "gfx940" || options.targetChip == "gfx1100") {
-      addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
+      addConfig("ukernels",
+                StringAttr::get(context, options.enableROCMUkernels));
     }
 
     auto configAttr = b.getDictionaryAttr(configItems);
