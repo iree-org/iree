@@ -196,7 +196,8 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   // If there is no conflict, simply return.
   if (result == ResolutionResult::NoChange) {
     return ChangeResult::NoChange;
-  } else if (result == ResolutionResult::Change) {
+  }
+  if (result == ResolutionResult::Change) {
     return ChangeResult::Change;
   }
 
@@ -249,8 +250,8 @@ ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
   case ResolutionResult::Conflict: {
     llvm::errs() << "Layout conflict at: " << *this << "\n";
     llvm::errs() << "With: " << rhs << "\n";
-    llvm_unreachable("Layout conflict should have been handled with "
-                     "resolveWithPossibleConflict instead");
+    llvm::report_fatal_error("Layout conflict should have been handled with "
+                             "resolveWithPossibleConflict instead");
   }
   }
 }
@@ -310,28 +311,26 @@ void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
 static OpOperand &getOpOperand(Operation *op, unsigned operandLatticeIndex) {
   unsigned operandIndex = 0;
   for (OpOperand &operand : op->getOpOperands()) {
-    if (operand.get().getType().isa<VectorType>()) {
+    if (isa<VectorType>(operand.get().getType())) {
       if (operandIndex == operandLatticeIndex) {
         return operand;
       }
-      operandIndex++;
+      ++operandIndex;
     }
   }
-  llvm_unreachable("No vector operand found");
+  llvm::report_fatal_error("No vector operand found");
 }
 
 /// Get a layout if all the given layouts are same. If all layouts are not same,
 /// return nullptr.
 static const DistributionLayout *
 getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
-  if (layouts.size() == 0)
+  if (layouts.empty())
     return nullptr;
 
   // Check if all layouts are same.
-  for (unsigned i = 1, e = layouts.size(); i < e; ++i) {
-    if (*layouts[i] != *layouts[0]) {
-      return nullptr;
-    }
+  if (!llvm::all_equal(llvm::make_pointee_range(layouts))) {
+    return nullptr;
   }
 
   return layouts[0];
@@ -590,14 +589,14 @@ static void enforceLayoutToBroadcastOp(
 
   // Ensure that there are no broadcasted unit dims as we do not know how to
   // handle them as of now.
-  assert(broadcast.computeBroadcastedUnitDims().size() == 0 &&
+  assert(broadcast.computeBroadcastedUnitDims().empty() &&
          "Streching in broadcasting not implemented yet.");
   // The starting k dimensions of the result are the ones that need to be
   // projected out.
 
   auto resultShape = broadcast.getResultVectorType().getShape();
   auto inputType = broadcast.getSourceType();
-  assert(inputType.isa<VectorType>() &&
+  assert(isa<VectorType>(inputType) &&
          "Scalar broadcast not supported for now.");
   auto inputShape = inputType.cast<VectorType>().getShape();
 
@@ -717,7 +716,7 @@ void PropagateLayout::visitOperation(Operation *op) {
   }
 
   // Exit early on operations with no results.
-  if (resultLattices.size() == 0) {
+  if (resultLattices.empty()) {
     return;
   }
 
@@ -825,7 +824,7 @@ void EnforceLayout::visitOperation(Operation *op) {
   }
 
   // Exit early on operations with no results.
-  if (operandLattices.size() == 0) {
+  if (operandLattices.empty()) {
     return;
   }
 

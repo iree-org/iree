@@ -924,9 +924,9 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 
 static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
                                        func::FuncOp funcOp) {
-  for (auto &block : funcOp) {
-    for (auto &op : block) {
-      for (auto attr : op.getAttrs()) {
+  for (Block &block : funcOp) {
+    for (Operation &op : block) {
+      for (NamedAttribute attr : op.getAttrs()) {
         StringRef name = attr.getName().strref();
         if (name.find("__vector_layout_test_anchor_operand_") !=
             std::string::npos) {
