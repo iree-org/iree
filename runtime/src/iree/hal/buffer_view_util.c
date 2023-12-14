@@ -10,6 +10,7 @@
 #include <stdbool.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/buffer_transfer.h"
 #include "iree/hal/resource.h"
 #include "iree/hal/string_util.h"
 

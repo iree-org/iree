@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/buffer_transfer.h"
 
 //===----------------------------------------------------------------------===//
 // Transfer utilities
@@ -95,7 +95,94 @@ static iree_status_t iree_hal_device_transfer_and_wait(
 // iree_hal_device_transfer_range implementations
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
+// Generic implementation of iree_hal_device_transfer_range for when the buffers
+// are mappable. In certain implementations even if buffers are mappable it's
+// often cheaper to still use the full queue transfers: instead of wasting CPU
+// cycles copying the memory (and possible PCIe round-trips) letting the device
+// do it is effectively free.
+//
+// Precondition: source and target do not overlap.
+static iree_status_t iree_hal_device_transfer_mappable_range(
+    iree_hal_device_t* device, iree_hal_transfer_buffer_t source,
+    iree_device_size_t source_offset, iree_hal_transfer_buffer_t target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
+  iree_status_t status = iree_ok_status();
+
+  iree_hal_buffer_mapping_t source_mapping = {{0}};
+  if (iree_status_is_ok(status)) {
+    if (source.device_buffer) {
+      status = iree_hal_buffer_map_range(
+          source.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+          IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length,
+          &source_mapping);
+    } else {
+      source_mapping = (iree_hal_buffer_mapping_t){
+          .contents = source.host_buffer,
+      };
+    }
+  }
+
+  iree_hal_buffer_mapping_t target_mapping = {{0}};
+  if (iree_status_is_ok(status)) {
+    if (target.device_buffer) {
+      status = iree_hal_buffer_map_range(
+          target.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+          IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset, data_length,
+          &target_mapping);
+    } else {
+      target_mapping = (iree_hal_buffer_mapping_t){
+          .contents = target.host_buffer,
+      };
+    }
+  }
+
+  iree_device_size_t adjusted_data_length = 0;
+  if (iree_status_is_ok(status)) {
+    // Adjust the data length based on the min we have.
+    if (data_length == IREE_WHOLE_BUFFER) {
+      // Whole buffer copy requested - that could mean either, so take the min.
+      adjusted_data_length = iree_min(source_mapping.contents.data_length,
+                                      target_mapping.contents.data_length);
+    } else {
+      // Specific length requested - validate that we have matching lengths.
+      IREE_ASSERT_EQ(source_mapping.contents.data_length,
+                     target_mapping.contents.data_length);
+      adjusted_data_length = target_mapping.contents.data_length;
+    }
+
+    // Perform the copy, assuming there's anything to do.
+    if (adjusted_data_length != 0) {
+      memcpy(target_mapping.contents.data, source_mapping.contents.data,
+             adjusted_data_length);
+    }
+  }
+
+  if (source.device_buffer) {
+    status =
+        iree_status_join(status, iree_hal_buffer_unmap_range(&source_mapping));
+  }
+  if (target.device_buffer) {
+    if (adjusted_data_length > 0 &&
+        !iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
+                           IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+      status = iree_status_join(
+          status, iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
+                                                      adjusted_data_length));
+    }
+    status =
+        iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));
+  }
+  return status;
+}
+
+// Performs a full transfer operation on a device transfer queue.
+// This creates a transfer command buffer, submits it against the device, and
+// waits for it to complete synchronously. Implementations that can do this
+// cheaper are encouraged to do so.
+//
+// Precondition: source and target do not overlap.
+static iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     iree_hal_device_t* device, iree_hal_transfer_buffer_t source,
     iree_device_size_t source_offset, iree_hal_transfer_buffer_t target,
     iree_device_size_t target_offset, iree_device_size_t data_length,
@@ -221,78 +308,90 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_mappable_range(
+//===----------------------------------------------------------------------===//
+// Human-friendly/performance-hostile transfer APIs
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
     iree_hal_device_t* device, iree_hal_transfer_buffer_t source,
     iree_device_size_t source_offset, iree_hal_transfer_buffer_t target,
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
-  iree_status_t status = iree_ok_status();
-
-  iree_hal_buffer_mapping_t source_mapping = {{0}};
-  if (iree_status_is_ok(status)) {
-    if (source.device_buffer) {
-      status = iree_hal_buffer_map_range(
-          source.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-          IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length,
-          &source_mapping);
-    } else {
-      source_mapping = (iree_hal_buffer_mapping_t){
-          .contents = source.host_buffer,
-      };
-    }
+  if (data_length == 0) {
+    return iree_ok_status();  // No-op.
   }
 
-  iree_hal_buffer_mapping_t target_mapping = {{0}};
-  if (iree_status_is_ok(status)) {
-    if (target.device_buffer) {
-      status = iree_hal_buffer_map_range(
-          target.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-          IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset, data_length,
-          &target_mapping);
-    } else {
-      target_mapping = (iree_hal_buffer_mapping_t){
-          .contents = target.host_buffer,
-      };
-    }
+  // host->host is not allowed. We may want to support this one day to allow for
+  // parallelized copies and such, however the validation code differs quite a
+  // bit and it'd be better to have this as part of a task system API.
+  bool is_source_host = source.device_buffer == NULL;
+  bool is_target_host = target.device_buffer == NULL;
+  if (is_source_host && is_target_host) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "cannot perform host->host transfers via this API, use memcpy/memmove");
   }
 
-  iree_device_size_t adjusted_data_length = 0;
-  if (iree_status_is_ok(status)) {
-    // Adjust the data length based on the min we have.
-    if (data_length == IREE_WHOLE_BUFFER) {
-      // Whole buffer copy requested - that could mean either, so take the min.
-      adjusted_data_length = iree_min(source_mapping.contents.data_length,
-                                      target_mapping.contents.data_length);
-    } else {
-      // Specific length requested - validate that we have matching lengths.
-      IREE_ASSERT_EQ(source_mapping.contents.data_length,
-                     target_mapping.contents.data_length);
-      adjusted_data_length = target_mapping.contents.data_length;
-    }
-
-    // Perform the copy, assuming there's anything to do.
-    if (adjusted_data_length != 0) {
-      memcpy(target_mapping.contents.data, source_mapping.contents.data,
-             adjusted_data_length);
-    }
+  // Check for overlap - like memcpy we require that the two ranges don't have
+  // any overlap as we may use memcpy. This only matters if the buffers are
+  // both device buffers - host and device should never alias: behavior is
+  // undefined if a user tries to pass a mapped device pointer as if it was a
+  // host pointer.
+  if (!is_source_host && !is_target_host &&
+      iree_hal_buffer_test_overlap(source.device_buffer, source_offset,
+                                   data_length, target.device_buffer,
+                                   target_offset, data_length) !=
+          IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "source and target ranges must not overlap within the same buffer");
   }
 
-  if (source.device_buffer) {
-    status =
-        iree_status_join(status, iree_hal_buffer_unmap_range(&source_mapping));
-  }
-  if (target.device_buffer) {
-    if (adjusted_data_length > 0 &&
-        !iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
-                           IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-      status = iree_status_join(
-          status, iree_hal_buffer_mapping_flush_range(&target_mapping, 0,
-                                                      adjusted_data_length));
-    }
-    status =
-        iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));
-  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, is_source_host ? "h2d" : (is_target_host ? "d2h" : "d2d"));
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, data_length);
+
+  // Defer to the backing implementation.
+  iree_status_t status = iree_hal_device_submit_transfer_range_and_wait(
+      device, source, source_offset, target, target_offset, data_length, flags,
+      timeout);
+
+  IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_h2d(
+    iree_hal_device_t* device, const void* source, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device,
+      iree_hal_make_host_transfer_buffer_span((void*)source, data_length), 0,
+      iree_hal_make_device_transfer_buffer(target), target_offset, data_length,
+      flags, timeout);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2h(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, void* target,
+    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags,
+    iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device, iree_hal_make_device_transfer_buffer(source), source_offset,
+      iree_hal_make_host_transfer_buffer_span(target, data_length), 0,
+      data_length, flags, timeout);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device, iree_hal_make_device_transfer_buffer(source), source_offset,
+      iree_hal_make_device_transfer_buffer(target), target_offset, data_length,
+      flags, timeout);
 }
 
 //===----------------------------------------------------------------------===//

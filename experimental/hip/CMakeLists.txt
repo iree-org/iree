@@ -43,7 +43,6 @@ iree_cc_library(
     iree::base::internal
     iree::base::internal::arena
     iree::hal
-    iree::hal::utils::buffer_transfer
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
