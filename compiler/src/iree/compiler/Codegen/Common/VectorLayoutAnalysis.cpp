@@ -322,23 +322,6 @@ static OpOperand &getOpOperand(Operation *op, unsigned operandLatticeIndex) {
 
 /// Get a layout if all the given layouts are same. If all layouts are not same,
 /// return nullptr.
-static DistributionLayout *
-getAgreedLayout(ArrayRef<DistributionLayout *> layouts) {
-  if (layouts.size() == 0)
-    return nullptr;
-
-  // Check if all layouts are same.
-  for (unsigned i = 1, e = layouts.size(); i < e; ++i) {
-    if (*layouts[i] != *layouts[0]) {
-      return nullptr;
-    }
-  }
-
-  return layouts[0];
-}
-
-/// Get a layout if all the given layouts are same. If all layouts are not same,
-/// return nullptr.
 static const DistributionLayout *
 getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
   if (layouts.size() == 0)
@@ -354,13 +337,12 @@ getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
   return layouts[0];
 }
 
-/// Given a list of layouts, enforce a single layout for all of them.
-/// The layout chosen is a heuristic that choses the first enforced layout.
-/// TODO: Use the most common layout to minimize the number of conflicts.
-static void enforceSameLayoutForOperands(
-    Operation *op, ArrayRef<DistributionLayout *> operands,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
-  // Get any enforced layout.
+/// Hueristic to use to choose the best layout when enforcing the same layout
+/// to all operands. Current hueristic is to simply choose the first operand
+/// which has a layout.
+/// TODO: Use a better hueristic.
+static DistributionLayout *
+enforceSameLayoutHueristic(ArrayRef<DistributionLayout *> operands) {
   DistributionLayout *chosenOperandLayout = nullptr;
   for (DistributionLayout *lattice : operands) {
     if (lattice->hasLayout()) {
@@ -368,6 +350,16 @@ static void enforceSameLayoutForOperands(
       break;
     }
   }
+  return chosenOperandLayout;
+}
+
+/// Given a list of layouts for operands, enforce a single layout for all of
+/// them.
+static void enforceSameLayoutForOperands(
+    Operation *op, ArrayRef<DistributionLayout *> operands,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  DistributionLayout *chosenOperandLayout =
+      enforceSameLayoutHueristic(operands);
 
   // Enforce the layout to other operands.
   if (chosenOperandLayout) {
