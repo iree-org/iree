@@ -607,13 +607,18 @@ jobs:
         shell: bash
         env:
           packages: "iree-compiler"
-          output_dir: "${{ github.workspace }}/bindist"
           # Note when upgrading: Build just one Python version synced to our
           # minimum.
           override_python_versions: cp39-cp39
         run: |
-          ./build_tools/python_deploy/build_linux_packages.sh
-
+          output_dir="$PWD" ./build_tools/python_deploy/build_linux_packages.sh
+      - name: Validate compiler wheel (Linux)
+        shell: bash
+        run: |
+          pip install --upgrade pip
+          pip install --no-index -f $PWD -v iree-compiler[onnx]
+          echo "Testing default compiler:"
+          python -m iree.compiler._package_test
   asan:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'asan')
