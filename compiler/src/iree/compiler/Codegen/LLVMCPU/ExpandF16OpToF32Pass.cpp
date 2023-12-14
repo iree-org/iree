@@ -53,7 +53,7 @@ public:
 };
 
 struct ExpandF16OpToF32Pass
-    : public ExpandArithF16ToF32Base<ExpandF16OpToF32Pass> {
+    : public ExpandF16OpToF32Base<ExpandF16OpToF32Pass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
