@@ -46,11 +46,10 @@ namespace mlir::iree_compiler {
 static LogicalResult
 tileReductionLoops(func::FuncOp funcOp,
                    IREE::LinalgExt::LinalgTransformationFilter filter,
-                   const linalg::TileSizeComputationFunction &computeFn) {
-  auto tilingOptions = linalg::LinalgTilingOptions()
-                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(computeFn);
-  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+                   const scf::SCFTileSizeComputationFunction &computeFn) {
+  auto options =
+      scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
+  return tileLinalgOpsWithFilter(funcOp, options, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,7 +156,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))
     return signalPassFailure();
-  auto reductionTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 2);
+  auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
   if (failed(reductionTileComputeFn))
     return signalPassFailure();
 
