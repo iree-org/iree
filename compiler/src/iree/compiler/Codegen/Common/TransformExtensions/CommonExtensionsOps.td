@@ -551,6 +551,7 @@ def TestVectorLayoutAnalysisOp :
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
