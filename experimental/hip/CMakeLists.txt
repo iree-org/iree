@@ -34,6 +34,10 @@ iree_cc_library(
     "hip_driver.c"
     "memory_pools.c"
     "memory_pools.h"
+    "native_executable.c"
+    "native_executable.h"
+    "nop_executable_cache.c"
+    "nop_executable_cache.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -42,7 +46,9 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::flatcc::parsing
     iree::hal
+    iree::schemas::hip_executable_def_c_fbs
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
