@@ -204,7 +204,8 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     auto target = variantOp.getTarget();
-    info.hasUkernels = hasUkernel(target);
+    info.hasUkernels =
+        hasUkernel(target) && hasUkernelSupportedRocmArch(target);
   }
 
   // RDNA supports wave32 and wave64, GCN and CDNA only wave64.
@@ -1068,93 +1069,6 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       entryPoint, linalgOp, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
       workgroupSize);
-}
-
-static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
-  // Check for 2 results(value, index), and 1 input
-  if (genericOp.getNumDpsInits() != 2) {
-    return failure();
-  }
-  if (genericOp.getNumDpsInputs() != 1) {
-    return failure();
-  }
-
-  // If max value is being used, it is not a pure argmax.
-  if (!genericOp.getResults()[0].use_empty()) {
-    return failure();
-  }
-
-  // Check that the rank is at least 3 and all loops are parallel
-  unsigned numLoops = genericOp.getNumLoops();
-  unsigned numParallelLoops = genericOp.getNumParallelLoops();
-
-  // Argmax will require 1D reduction.
-  if (numParallelLoops != (numLoops - 1)) {
-    return failure();
-  }
-  // TODO: Add better affine map checks.
-  auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity())
-    return failure();
-
-  // Work back from linalg.yield and check body of genericOp.
-  // The genericOp should yield the result of an arith.select,
-  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  Value producerOutput;
-  Operation *producer;
-
-  // Producer of linalg.yield 1st arg is arith.maximumf
-  {
-    producerOutput = yieldOp->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
-      return failure();
-    }
-  }
-
-  // Producer of linalg.yield op 2nd arg is arith.select
-  // TODO: Add check that select is selecting between linalg.index and index of
-  // current max.
-  {
-    producerOutput = yieldOp->getOperand(1);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
-      return failure();
-    }
-  }
-
-  // Producer of arith.select op is arith.cmpf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
-    if (!producerCmpFOp) {
-      return failure();
-    }
-    if (producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
-      return failure();
-    }
-
-    // Check that in and out of cmpf are loop variables.
-    // Currently first operand is disabled because it may be mixed type
-    // which would lead it to be extf(%arg0).
-    // TODO: Add better mixed type support check.
-    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return failure();
-    }
-  }
-
-  return success();
 }
 
 /// Set the configuration for argmax that can be mapped to argmax uKernel.

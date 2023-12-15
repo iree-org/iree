@@ -148,99 +148,6 @@ static Type getElementTypeForUKernel(Value input) {
   return castOpSrcType;
 }
 
-static LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
-  // Check for 2 results(value, index), and 1 input
-  if (genericOp.getNumDpsInits() != 2) {
-    return failure();
-  }
-  if (genericOp.getNumDpsInputs() != 1) {
-    return failure();
-  }
-
-  // If max value is being used, it is not a pure argmax.
-  if (!genericOp.getResults()[0].use_empty()) {
-    return failure();
-  }
-
-  // Check that the rank is at least 3 and all loops are parallel
-  unsigned numLoops = genericOp.getNumLoops();
-  unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  // Currently only support 2D argmax to simplify problem.
-  // Tiling pipeline is also set to tile all parallel dims to 1, and
-  // reduction dim to be size of whole reduction problem. Which allow
-  // this constraint to be true for a lot of argmax variances.
-  if (numLoops > 2) {
-    return failure();
-  }
-  // Argmax will require 1D reduction.
-  if (numParallelLoops != (numLoops - 1)) {
-    return failure();
-  }
-  // TODO: Add better affine map checks.
-  auto indexing_maps = genericOp.getIndexingMapsArray();
-  if (!indexing_maps[0].isIdentity())
-    return failure();
-
-  // Work back from linalg.yield and check body of genericOp.
-  // The genericOp should yield the result of an arith.select,
-  // preceded by an arith.cmpf, arith.maximumf, and arith.extui
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  Value producerOutput;
-  Operation *producer;
-
-  // Producer of linalg.yield 1st arg is arith.maximumf
-  {
-    producerOutput = yieldOp->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    if (!matchPattern(producer, m_Op<arith::MaximumFOp>())) {
-      return failure();
-    }
-  }
-
-  // Producer of linalg.yield op 2nd arg is arith.select
-  // TODO: Add check that select is selecting between linalg.index and index of
-  // current max.
-  {
-    producerOutput = yieldOp->getOperand(1);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    if (!matchPattern(producer, m_Op<arith::SelectOp>())) {
-      return failure();
-    }
-  }
-
-  // Producer of arith.select op is arith.cmpf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0) {
-      return failure();
-    }
-    auto producerCmpFOp = dyn_cast<arith::CmpFOp>(producer);
-    if (!producerCmpFOp) {
-      return failure();
-    }
-    if (producerCmpFOp.getPredicate() != arith::CmpFPredicate::OGT) {
-      return failure();
-    }
-
-    // Check that in and out of cmpf are loop variables.
-    // Currently first operand is disabled because it may be mixed type
-    // which would lead it to be extf(%arg0).
-    // TODO: Add better mixed type support check.
-    if (producer->getOperand(1) != genericOp.getBody()->getArgument(1)) {
-      return failure();
-    }
-  }
-
-  return success();
-}
-
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
@@ -251,6 +158,20 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   if (!hasUkernel(targetAttr, ukernelName)) {
     return failure();
   }
+
+  if (!hasUkernelSupportedRocmArch(targetAttr)) {
+    return failure();
+  }
+
+  // Currently only support 2D argmax to simplify problem.
+  // Tiling pipeline is also set to tile all parallel dims to 1, and
+  // reduction dim to be size of whole reduction problem. Which allow
+  // this constraint to be true for a lot of argmax variances.
+  unsigned numLoops = op.getNumLoops();
+  if (numLoops > 2) {
+    return failure();
+  }
+
   // Get value/input type.
   Value input = op.getDpsInputOperand(0)->get();
   auto inputType = llvm::cast<ShapedType>(input.getType());
@@ -292,7 +213,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   Location loc = op.getLoc();
   // Currently only support 1D reduction, where reduc is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
-  const int kReductionDim = op.getNumLoops() - 1;
+  const int kReductionDim = numLoops - 1;
   Value reductionDimSize =
       rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
   auto fn =

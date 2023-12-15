@@ -433,12 +433,7 @@ private:
     // Set target arch
     addConfig("target_arch", StringAttr::get(context, options.targetChip));
 
-    // Set Ukernels if it is a architecture that we have build ukernels for.
-    // TODO: Build for variety of architectures.
-    if (options.targetChip == "gfx940" || options.targetChip == "gfx1100") {
-      addConfig("ukernels",
-                StringAttr::get(context, options.enableROCMUkernels));
-    }
+    addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

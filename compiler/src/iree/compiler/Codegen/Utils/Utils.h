@@ -82,6 +82,9 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName = "");
 
+// Returns true if the rocm archtecture target is supported for ukernels.
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 /// Returns the CPU target features associated with the `targetAttr`, if set.
 std::optional<StringRef>
 getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);
@@ -206,6 +209,9 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
                                               OpFoldResult byteOffset,
                                               Type elementType);
+
+/// Check if a linalg.generic is representing an argmax operation.
+LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
 
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to

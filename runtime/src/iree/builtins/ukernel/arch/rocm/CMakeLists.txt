@@ -92,9 +92,10 @@ function(iree_rocm_bitcode_library)
   set(_amd_ukernel_targets ${_amd_ukernel_targets} "${_PACKAGE_NAME}_${_RULE_NAME}_${_ROCM_ARCH}" PARENT_SCOPE)
 endfunction()
 
-# TODO: Decide what to build by default.
-set(_amd_ukernel_chips "gfx90a" "gfx940" "gfx1030" "gfx1100")
-foreach(_amd_chip ${_amd_ukernel_chips})
+# TODO: Decide what to build by default. No real constaints here
+#       except compile-time cost, so just picked out the popular ones.
+set(_ukernel_supported_chips "gfx90a" "gfx940" "gfx1030" "gfx1100")
+foreach(_amd_chip ${_ukernel_supported_chips})
   iree_rocm_bitcode_library(
     NAME
       rocm_argmax_ukernel

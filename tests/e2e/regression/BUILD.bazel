@@ -37,6 +37,7 @@ BACKEND_TESTS = [
 iree_lit_test_suite(
     name = "lit",
     srcs = [
+        "argmax_linking.mlir",
         "fill_i64.mlir",
         "force_single_dispatch.mlir",
         "globals.mlir",
@@ -52,6 +53,7 @@ iree_lit_test_suite(
         "hostonly",
     ],
     tools = [
+        "//tools:iree-compile",
         "//tools:iree-opt",
         "//tools:iree-run-mlir",
         "@llvm-project//lld",
