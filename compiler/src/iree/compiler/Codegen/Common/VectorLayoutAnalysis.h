@@ -104,7 +104,9 @@ public:
   void setAnchor(Value val, T layout) {
     assert(isa<VectorLayoutInterface>(layout) &&
            "expected layout to implement VectorLayoutInterface");
-    anchors[val] = cast<VectorLayoutInterface>(layout);
+    auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
+    assert(typedVal && "expected value to be a vector type");
+    anchors[typedVal] = cast<VectorLayoutInterface>(layout);
   }
 
   /// Run the analysis. The analysis expects that the user has set some anchor
@@ -128,7 +130,7 @@ private:
   VectorLayoutInterface getLayout(Value val);
 
   Operation *root;
-  DenseMap<Value, VectorLayoutInterface> anchors;
+  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
   DataFlowSolver solver;
 };
 

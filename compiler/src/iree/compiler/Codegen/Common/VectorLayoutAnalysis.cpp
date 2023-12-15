@@ -131,9 +131,10 @@ private:
 
 class PropagateLayout : public DataFlowAnalysis {
 public:
-  explicit PropagateLayout(DataFlowSolver &solver,
-                           DenseMap<Value, VectorLayoutInterface> &anchors,
-                           MLIRContext *ctx)
+  explicit PropagateLayout(
+      DataFlowSolver &solver,
+      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
+      MLIRContext *ctx)
       : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
 
   LogicalResult initialize(Operation *root) override;
@@ -156,7 +157,7 @@ private:
 
   DistributionLayout *getLatticeElement(Value val);
 
-  DenseMap<Value, VectorLayoutInterface> anchors;
+  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
 
   MLIRContext *ctx;
 };
