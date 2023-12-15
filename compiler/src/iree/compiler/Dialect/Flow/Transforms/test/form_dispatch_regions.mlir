@@ -374,6 +374,46 @@ func.func @unpack_encoding_elementwise_fusion(
 
 // -----
 
+func.func @unpack_non_intersecting_reduction(
+    %arg0: tensor<?x?x?xf32>,
+    %arg1: tensor<?xf32>) -> tensor<?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c2 = arith.constant 2 : index
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
+  %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
+  %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
+  %folded_dim = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%d1, %d2]
+  %dest0 = tensor.empty(%d0, %folded_dim) : tensor<?x?xf32>
+  %dest1 = tensor.empty(%folded_dim) : tensor<?xf32>
+  %0 = tensor.unpack %arg0 inner_dims_pos = [1] inner_tiles = [%d2]
+      into %dest0 : tensor<?x?x?xf32> -> tensor<?x?xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%0, %arg1 : tensor<?x?xf32>, tensor<?xf32>)
+      outs(%dest1 : tensor<?xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %2 = arith.addf %b0, %b1 : f32
+      %3 = arith.addf %2, %b2 : f32
+      linalg.yield %3 : f32
+    } -> tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+// CHECK-LABEL: func @unpack_non_intersecting_reduction(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?x?xf32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
+//       CHECK:     %[[UNPACK:.+]] = tensor.unpack %[[ARG0]]
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[UNPACK]], %[[ARG1]]
+//       CHECK:     flow.return %[[GENERIC]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
 func.func @data_dependent_shape(%arg0 : tensor<f32>, %arg1 : tensor<2xi32>)
     -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
