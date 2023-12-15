@@ -276,12 +276,17 @@ public:
         return AffineMap::get(vecRank, 0,
                               builder.getAffineDimExpr(vecRank - 1));
       };
+
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(
           patterns, distributionFn, simpleWarpShuffleFunction);
       vector::populateDistributeReduction(patterns, groupReductionFn);
+
+      // We don't want to sink large transfer writes to a single lane -- pick a
+      // conservative value based on the group size.
+      unsigned maxWriteElementsToExtract = std::max(groupSize / 4, 1);
       vector::populateDistributeTransferWriteOpPatterns(
-          patterns, distributionFn, /*maxNumElementsToExtract=*/1);
+          patterns, distributionFn, maxWriteElementsToExtract);
       patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
