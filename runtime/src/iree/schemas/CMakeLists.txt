@@ -38,19 +38,6 @@ flatbuffer_c_library(
 
 flatbuffer_c_library(
   NAME
-    hip_executable_def_c_fbs
-  SRCS
-    "hip_executable_def.fbs"
-  FLATCC_ARGS
-    "--reader"
-    "--builder"
-    "--verifier"
-    "--json"
-  PUBLIC
-)
-
-flatbuffer_c_library(
-  NAME
     rocm_executable_def_c_fbs
   SRCS
     "rocm_executable_def.fbs"

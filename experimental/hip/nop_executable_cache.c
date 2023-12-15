@@ -40,6 +40,7 @@ iree_status_t iree_hal_hip_nop_executable_cache_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
     iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
+  IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(out_executable_cache);
   IREE_TRACE_ZONE_BEGIN(z0);
 

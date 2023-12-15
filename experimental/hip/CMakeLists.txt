@@ -48,7 +48,7 @@ iree_cc_library(
     iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::hal
-    iree::schemas::hip_executable_def_c_fbs
+    iree::schemas::rocm_executable_def_c_fbs
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC

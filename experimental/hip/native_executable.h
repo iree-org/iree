@@ -19,7 +19,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct iree_hal_hip_kernel_params_t {
+typedef struct iree_hal_hip_kernel_info_t {
   iree_hal_pipeline_layout_t* layout;
   hipFunction_t function;
   uint32_t block_size[3];
@@ -28,7 +28,7 @@ typedef struct iree_hal_hip_kernel_params_t {
   IREE_TRACE(iree_string_view_t function_name;)
   IREE_TRACE(iree_string_view_t source_filename;)
   IREE_TRACE(uint32_t source_line;)
-} iree_hal_hip_kernel_params_t;
+} iree_hal_hip_kernel_info_t;
 
 // Creates an IREE executable from a HSACO module. The module may contain
 // several kernels that can be extracted along with the associated block size.
@@ -41,10 +41,10 @@ iree_status_t iree_hal_hip_native_executable_create(
 // |executable|.
 iree_status_t iree_hal_hip_native_executable_entry_point_kernel_params(
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_hip_kernel_params_t* out_params);
+    iree_hal_hip_kernel_info_t* out_params);
 
 #ifdef __cplusplus
-}  // extern "C"'
+}  // extern "C"
 #endif  // __cplusplus
 
 #endif  // IREE_EXPERIMENTAL_HIP_NATIVE_EXECUTABLE_H_
