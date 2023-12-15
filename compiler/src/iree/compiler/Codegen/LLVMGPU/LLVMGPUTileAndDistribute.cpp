@@ -38,23 +38,27 @@ namespace mlir::iree_compiler {
 /// may have extra tiling for the reduction dimension. Therefore we tile again
 /// without distributing.
 static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
-  auto tileSizesFn = [](OpBuilder &builder, Operation *op) {
+  auto tileSizesFn = [](OpBuilder &builder,
+                        Operation *op) -> SmallVector<OpFoldResult> {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
     auto partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<Value> tileSizes = getTileSizes(builder, op, 0);
-    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
+    SmallVector<OpFoldResult> tileSizes =
+        getAsIndexOpFoldResult(op->getContext(), getTileSizes(op, 0));
+    auto zeroAttr = builder.getIndexAttr(0);
     for (unsigned depth : partitionedLoops) {
       if (depth < tileSizes.size()) {
-        tileSizes[depth] = zero;
+        tileSizes[depth] = zeroAttr;
       }
     }
+
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    tileSizes.resize(numLoops, zeroAttr);
     return tileSizes;
   };
 
-  auto tilingOptions = linalg::LinalgTilingOptions()
-                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
-                           .setTileSizeComputationFunction(tileSizesFn);
+  auto tilingOptions =
+      scf::SCFTilingOptions().setTileSizeComputationFunction(tileSizesFn);
 
   MLIRContext *context = funcOp.getContext();
   IREE::LinalgExt::LinalgTransformationFilter filter(
@@ -63,7 +67,7 @@ static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
 
-  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {

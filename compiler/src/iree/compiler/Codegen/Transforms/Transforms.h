@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
@@ -148,6 +149,10 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
+/// Tiles LinalgOp ops that match filter.
+LogicalResult
+tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
+                        IREE::LinalgExt::LinalgTransformationFilter filter);
 /// Distributes LinalgOp ops that match filter.
 LogicalResult distributeLinalgOpsWithFilter(
     func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,

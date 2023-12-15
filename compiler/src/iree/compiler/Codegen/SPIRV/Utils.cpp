@@ -77,6 +77,23 @@ getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
   return computeFn;
 }
 
+FailureOr<scf::SCFTileSizeComputationFunction>
+getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
+  auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
+  if (failed(tileSizes))
+    return failure();
+  scf::SCFTileSizeComputationFunction computeFn =
+      [tileSizes](OpBuilder &builder,
+                  Operation *op) -> SmallVector<OpFoldResult> {
+    auto tileSizesOfr = getAsIndexOpFoldResult(op->getContext(), *tileSizes);
+    auto zeroAttr = builder.getIndexAttr(0);
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    tileSizesOfr.resize(numLoops, zeroAttr);
+    return tileSizesOfr;
+  };
+  return computeFn;
+}
+
 template <typename GPUIdOp, typename GPUCountOp>
 static linalg::ProcInfo
 getGPUProcessorIdAndCountImpl(OpBuilder &builder, Location loc, unsigned dim) {

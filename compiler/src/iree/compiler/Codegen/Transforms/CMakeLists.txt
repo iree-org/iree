@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRPass
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTransforms
     MLIRValueBoundsOpInterface
