@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// SPIRV passes (keep alphabetical)
+// SPIR-V passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {

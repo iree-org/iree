@@ -17,6 +17,10 @@
 
 namespace mlir::iree_compiler {
 
+//===---------------------------------------------------------------------===//
+// SPIR-V pass pipelines
+//===---------------------------------------------------------------------===//
+
 /// Pass pipeline to lower IREE HAL executables without any tiling and
 /// distribution.
 void addSPIRVBaseLoweringPassPipeline(OpPassManager &pm);
@@ -57,6 +61,13 @@ void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm);
 /// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
+
+/// Populates passes needed to link HAL executables across SPIRV targets.
+void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
+
+//===---------------------------------------------------------------------===//
+// SPIR-V passes
+//===---------------------------------------------------------------------===//
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
@@ -108,9 +119,6 @@ createSPIRVInitialVectorLoweringPass();
 
 /// Links SPIR-V HAL executables within the top-level program module.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createSPIRVLinkExecutablesPass();
-
-/// Populates passes needed to link HAL executables across SPIRV targets.
-void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
 
 /// Pass to set the lowering strategy for the target variant.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -183,7 +191,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize);
 
 //----------------------------------------------------------------------------//
-// Register SPIR-V Passes
+// Registration
 //----------------------------------------------------------------------------//
 
 void registerCodegenSPIRVPasses();
