@@ -83,3 +83,12 @@ func.func @mmt4d_bf16xbf16xf32() {
   }
   return
 }
+
+// -----
+
+// CHECK-LABEL: func.func @outerproduct_bf16_preserved
+func.func @outerproduct_bf16_preserved(%arg0 : vector<1xbf16>, %arg1 : vector<1xbf16>, %arg2 : vector<1x1xbf16>) -> vector<1x1xbf16> {
+  // CHECK: vector.outerproduct %[[ARG0:.+]], %[[ARG1:.+]], %[[ARG2:.+]] {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
+  %0 = vector.outerproduct %arg0, %arg1, %arg2 {kind = #vector.kind<add>} : vector<1xbf16>, vector<1xbf16>
+  return %0 : vector<1x1xbf16>
+}
