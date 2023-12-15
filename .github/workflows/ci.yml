@@ -292,9 +292,13 @@ jobs:
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"
+        # Note: VK_LOADER_LAYERS_ENABLE is used to disable the
+        # Vulkan Validation Layers (VVL), since we have unresolved errors on
+        # SwiftShader.
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_CUDA_DISABLE=1 \
+            --env VK_LOADER_LAYERS_ENABLE= \
             gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819 \
             bash -euo pipefail -c \
               "./build_tools/scripts/check_vulkan.sh
