@@ -163,14 +163,23 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
     return failure();
   }
 
-  // Currently only support 2D argmax to simplify problem.
+  // Currently only support argmax where parallel dims are 1.
   // Tiling pipeline is also set to tile all parallel dims to 1, and
   // reduction dim to be size of whole reduction problem. Which allow
   // this constraint to be true for a lot of argmax variances.
-  unsigned numLoops = op.getNumLoops();
-  if (numLoops > 2) {
-    return failure();
+  // TODO: Support multi-row or grid-strided argmax ukernel.
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  SmallVector<unsigned> parallelDims;
+  op.getParallelDims(parallelDims);
+  int64_t parallelSize = 1;
+  for (int64_t dim : parallelDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      return failure();
+    }
+    parallelSize *= bounds[dim];
   }
+  if (parallelSize != 1)
+    return failure();
 
   // Get value/input type.
   Value input = op.getDpsInputOperand(0)->get();
@@ -213,7 +222,7 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   Location loc = op.getLoc();
   // Currently only support 1D reduction, where reduc is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
-  const int kReductionDim = numLoops - 1;
+  const int kReductionDim = op.getNumLoops() - 1;
   Value reductionDimSize =
       rewriter.create<tensor::DimOp>(loc, input, kReductionDim);
   auto fn =
