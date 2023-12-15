@@ -7,21 +7,41 @@
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Pass/Pass.h"
 
+#define DEBUG_TYPE "iree-spirv-link-executable"
+
 namespace mlir::iree_compiler {
 
+namespace IREE::HAL {
+// MLIR attributes are pointers to uniqued data. So we can just compare the
+// pointer for order.
+bool operator<(const ExecutableTargetAttr &a, const ExecutableTargetAttr &b) {
+  return a.getAsOpaquePointer() < b.getAsOpaquePointer();
+}
+} // namespace IREE::HAL
+
 namespace {
+
+using IREE::HAL::ExecutableTargetAttr;
+
+bool isSPIRVBasedBackend(StringRef backend) {
+  return backend.starts_with("vulkan") || backend.starts_with("metal") ||
+         backend.starts_with("webgpu");
+}
 
 struct SPIRVLinkExecutablesPass final
     : SPIRVLinkExecutablesBase<SPIRVLinkExecutablesPass> {
   void runOnOperation() override {
     mlir::ModuleOp moduleOp = getOperation();
-    OpBuilder moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
+    // Collect all source executable ops.
     SmallVector<IREE::HAL::ExecutableOp, 8> sourceExecutableOps =
         llvm::to_vector<8>(moduleOp.getOps<IREE::HAL::ExecutableOp>());
     if (sourceExecutableOps.size() <= 1)
@@ -40,12 +60,103 @@ struct SPIRVLinkExecutablesPass final
     }
     sourceExecutableOps.resize(retainSize);
 
-    // Guess a module name, if needed, to make the output files readable.
-    std::string moduleName = guessModuleName(moduleOp, "spirv_module");
+    // Note that at runtime, for a particular executable, only one variant of it
+    // will be loaded. So, all variants of an executable are expected to provide
+    // the exact same set of entry points; this way we can guarantee no matter
+    // which variant is chosen, we have all entry points to call into. The same
+    // entry point in different variants may have different target requirements
+    // though.
+    //
+    // The input to the linking stage are a collection of executables, each may
+    // have multiple variants, but only ever provide one entry point. Together
+    // with the above restriction, we can link two executables if and only if
+    // their variants have the exact same set of target requirements. Under such
+    // circumstances, we can make sure for a particular target requirement
+    // (loaded as one variant during runtime), we can provide all entry points.
+
+    // Build a map from all variants' target requirements to their wrapping
+    // executable ops.
+    std::map<SmallVector<ExecutableTargetAttr, 0>,
+             SmallVector<IREE::HAL::ExecutableOp>>
+        executableBuckets;
+
+    SmallVector<ExecutableTargetAttr, 0> currentTargets;
+    for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
+      IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
+
+      // Go through all variants and collect all their target requirements and
+      // sort as the unique key.
+      currentTargets.clear();
+      for (auto variant : executable.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        ExecutableTargetAttr target = variant.getTarget();
+        if (isSPIRVBasedBackend(target.getBackend())) {
+          currentTargets.push_back(target);
+        }
+      }
+      llvm::sort(currentTargets);
+      LLVM_DEBUG({
+        llvm::dbgs() << "executable op @" << executable.getSymName()
+                     << " targets:\n";
+        for (ExecutableTargetAttr attr : currentTargets) {
+          llvm::dbgs() << "  " << attr << "\n";
+        }
+      });
+
+      // Put this executable into its proper bucket.
+      executableBuckets[std::move(currentTargets)].push_back(executable);
+    }
+
+    // Scan through the buckets and drop those with only one executables, given
+    // nothing to link for such cases.
+    for (auto it = executableBuckets.begin(), ie = executableBuckets.end();
+         it != ie;) {
+      if (it->second.size() <= 1) {
+        it = executableBuckets.erase(it);
+      } else {
+        ++it;
+      }
+    }
+
+    // Guess a base module name, if needed, to make the output files readable.
+    std::string baseModuleName =
+        guessModuleName(moduleOp, "spirv_module") + "_linked_spirv";
+    // Go reverse order with index, so when we keep inserting at the beginning,
+    // the final IR has ascending order.
+    int bucketIndex = executableBuckets.size();
+
+    for (auto [key, bucket] : llvm::reverse(executableBuckets)) {
+      --bucketIndex;
+      // Build a unique name for this particular executable.
+      std::string moduleName =
+          executableBuckets.size() == 1
+              ? baseModuleName
+              : llvm::formatv("{0}_{1}", baseModuleName, bucketIndex);
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "executable bucket #" << bucketIndex << " targets:\n";
+        for (ExecutableTargetAttr attr : key) {
+          llvm::dbgs() << "  " << attr << "\n";
+        }
+        llvm::dbgs() << "executable bucket #" << bucketIndex
+                     << " exectuables:\n";
+        for (IREE::HAL::ExecutableOp executable : bucket) {
+          llvm::dbgs() << "  " << executable.getSymName() << "\n";
+        }
+      });
+
+      if (failed(linkOneExecutableBucket(moduleOp, moduleName, key, bucket)))
+        return signalPassFailure();
+    }
+  }
+
+  // Links all executables that are known to be in the same bucket.
+  LogicalResult linkOneExecutableBucket(
+      mlir::ModuleOp moduleOp, StringRef linkedExecutableName,
+      ArrayRef<ExecutableTargetAttr> executableTargetAttrs,
+      SmallVectorImpl<IREE::HAL::ExecutableOp> &sourceExecutableOps) const {
+    OpBuilder moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
 
     // Create our new "linked" hal.executable.
-    std::string linkedExecutableName =
-        llvm::formatv("{0}_linked_{1}", moduleName, "spirv");
     auto linkedExecutableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
         moduleOp.getLoc(), linkedExecutableName);
     linkedExecutableOp.setVisibility(
@@ -53,9 +164,6 @@ struct SPIRVLinkExecutablesPass final
     OpBuilder executableBuilder =
         OpBuilder::atBlockBegin(&linkedExecutableOp.getBlock());
 
-    // Gather all unique executable targets - we may have multiple.
-    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs =
-        gatherExecutableTargets(sourceExecutableOps);
     for (auto [index, attr] : llvm::enumerate(executableTargetAttrs)) {
       // Add our hal.executable.variant with an empty module.
       std::string linkedVariantName =
@@ -90,9 +198,10 @@ struct SPIRVLinkExecutablesPass final
       if (failed(linkExecutablesInto(moduleOp, sourceExecutableOps,
                                      linkedExecutableOp, linkedTargetOp,
                                      mergeModuleFn))) {
-        return signalPassFailure();
+        return failure();
       }
     }
+    return success();
   }
 };
 
