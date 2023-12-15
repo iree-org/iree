@@ -1004,19 +1004,16 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
 
-  // Look for ops that move to/from workgroup memory and mark as copies for
+  // Look for ops that move to workgroup memory and mark as copies for
   // distribution.
   target.walk([&](linalg::GenericOp copyOp) {
     if (copyOp.getNumDpsInputs() != 1 || copyOp.getNumDpsInits() != 1)
       return;
-    auto source =
-        dyn_cast<TypedValue<MemRefType>>(copyOp.getDpsInputOperand(0)->get());
     auto dest =
         dyn_cast<TypedValue<MemRefType>>(copyOp.getDpsInitOperand(0)->get());
-    if (!source || !dest)
+    if (!dest)
       return;
 
-    MemRefType sourceType = source.getType();
     MemRefType destType = dest.getType();
 
     // Check if the only operation in the possible copy op region is a
@@ -1025,20 +1022,13 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
     if (!std::begin(body)->hasTrait<OpTrait::IsTerminator>())
       return;
 
-    auto sourceSpace =
-        dyn_cast_or_null<gpu::AddressSpaceAttr>(sourceType.getMemorySpace());
     auto destSpace =
         dyn_cast_or_null<gpu::AddressSpaceAttr>(destType.getMemorySpace());
-    if (!sourceSpace && !destSpace)
+    if (!destSpace)
       return;
 
-    // If the memory spaces are equal, we don't need to do anything.
-    if (sourceSpace == destSpace)
-      return;
-
-    // At least one of the memory spaces should be shared memory.
-    if (sourceSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace() &&
-        destSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+    // The destination space must be shared memory.
+    if (destSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
       return;
 
     // Mark this copy operation as a copy to workgroup memory.
