@@ -101,7 +101,7 @@ static LogicalResult tileCopyToWorkgroupMem(func::FuncOp funcOp,
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       {StringAttr::get(funcOp.getContext(), getCopyToWorkgroupMemoryMarker())},
       StringAttr::get(funcOp.getContext(), getVectorizeMarker()));
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 // Returns the vector size to use for the given genericOp considering its
@@ -180,7 +180,7 @@ static LogicalResult tileToUnroll(func::FuncOp funcOp,
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       {StringAttr::get(context, getCopyToWorkgroupMemoryMarker())},
       StringAttr::get(context, kCopyToDistribute));
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 /// Break up the flat id onto the static loop ranges.
@@ -261,7 +261,7 @@ static LogicalResult tileAndDistribute(func::FuncOp funcOp,
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       {StringAttr::get(funcOp.getContext(), kCopyToDistribute)},
       StringAttr::get(funcOp.getContext(), kCopyDistributed));
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 /// Vectorizes generic ops that have CopyToWorkgroupMemoryMarker or

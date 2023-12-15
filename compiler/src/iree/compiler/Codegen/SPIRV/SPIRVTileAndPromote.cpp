@@ -50,7 +50,7 @@ tileReductionLoops(func::FuncOp funcOp,
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(computeFn);
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -74,7 +74,7 @@ tileToInvocation(func::FuncOp funcOp,
                            .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 //===----------------------------------------------------------------------===//

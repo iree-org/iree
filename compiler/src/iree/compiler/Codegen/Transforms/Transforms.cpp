@@ -758,10 +758,9 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 }
 
-LogicalResult
-tileLinalgOpsWithFilter(func::FuncOp funcOp,
-                        linalg::LinalgTilingOptions tilingOptions,
-                        IREE::LinalgExt::LinalgTransformationFilter filter) {
+LogicalResult distributeLinalgOpsWithFilter(
+    func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<linalg::LinalgOp> candidates;
   funcOp.walk([&](linalg::LinalgOp op) {
@@ -771,6 +770,7 @@ tileLinalgOpsWithFilter(func::FuncOp funcOp,
   });
 
   for (auto op : candidates) {
+    // TODO: Tile and distribute LinalgOps using interface methods.
     FailureOr<linalg::TiledLinalgOp> res =
         linalg::tileLinalgOp(rewriter, op, tilingOptions);
     if (failed(res)) {

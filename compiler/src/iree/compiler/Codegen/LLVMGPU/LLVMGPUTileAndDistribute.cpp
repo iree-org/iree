@@ -63,7 +63,7 @@ static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
 
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
@@ -158,7 +158,7 @@ static LogicalResult tileToWarp(func::FuncOp funcOp,
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
 /// Patterns for thread level tiling.
@@ -193,7 +193,7 @@ static LogicalResult tileToInvocation(func::FuncOp funcOp,
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
 
-  return tileLinalgOpsWithFilter(funcOp, tilingOptions, f);
+  return distributeLinalgOpsWithFilter(funcOp, tilingOptions, f);
 }
 
 namespace {
