@@ -10,12 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -143,37 +146,34 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 }
 
 /// Tiles reduction dimensions.
-static LogicalResult tileReduction(func::FuncOp funcOp,
-                                   ArrayRef<int64_t> tileSizes) {
+static LogicalResult
+tileReduction(func::FuncOp funcOp,
+              const scf::SCFTileSizeComputationFunction &computeFn) {
   MLIRContext *context = funcOp.getContext();
-
-  SmallVector<Operation *> candidates;
+  // Set markers to drive tiling reduction dimensions.
+  OpBuilder builder(context);
+  auto marker = builder.getStringAttr(getTileReductionMarker());
   funcOp.walk([&](linalg::LinalgOp op) {
-    if (isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface,
-            linalg::GenericOp>(op.getOperation())) {
-      candidates.push_back(op);
+    if (isa<linalg::ContractionOpInterface>(*op) ||
+        isa<linalg::ConvolutionOpInterface>(*op) ||
+        isa<linalg::GenericOp>(*op)) {
+      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
+                  marker);
     }
   });
 
-  IRRewriter rewriter(context);
-  for (auto op : candidates) {
-    auto target = cast<TilingInterface>(op);
-    scf::SCFTilingOptions options;
-    setSCFTileSizes(options, target, tileSizes, /*tileScalableFlags=*/{});
-    FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, target, options);
-    if (failed(tiledResults)) {
-      return failure();
-    }
-    rewriter.replaceOp(op, tiledResults->replacements);
-  };
+  auto filter =
+      IREE::LinalgExt::LinalgTransformationFilter({marker}, std::nullopt);
+  auto options =
+      scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
+  auto result = tileLinalgOpsWithFilter(funcOp, options, filter);
 
   LLVM_DEBUG({
     llvm::dbgs() << "--- After tiling reduction dimensions  ---\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-  return success();
+  return result;
 }
 
 /// Fuses `tensor.pad` ops into the the materalized loop nests containing
@@ -307,9 +307,9 @@ public:
 
     concretizePadShape(funcOp);
 
-    SmallVector<int64_t> reductionTileSizes =
-        loweringConfig->getTileSizeVals(2);
-    if (failed(tileReduction(funcOp, reductionTileSizes))) {
+    auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
+    if (failed(reductionTileComputeFn) ||
+        failed(tileReduction(funcOp, reductionTileComputeFn.value()))) {
       return signalPassFailure();
     }
 
