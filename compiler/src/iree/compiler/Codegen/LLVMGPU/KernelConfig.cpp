@@ -920,7 +920,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   // Total parallel size that can fill the GPU with enough workgorups.
   // TODO: query from the target device; roughly 2x hardware compute unit.
-  int parallelThreshold = 256;
+  const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
@@ -944,12 +944,13 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isRocmTarget(entryPoint) && groupSize == subgroupSize &&
-      isMatvecLike(op) && llvm::none_of(bounds, ShapedType::isDynamic)) {
+  if (isRocmTarget(entryPoint) && isMatvecLike(op) &&
+      llvm::none_of(bounds, ShapedType::isDynamic)) {
     int64_t lastParallelBound = bounds[parallelDims.back()];
     int64_t numParallelReductions = 1;
+    const int64_t maxParallelFactor = groupSize / 4;
     for (int64_t parallelFactor = 2;
-         (parallelFactor * groupSize < maxWorkgroupSize) &&
+         (parallelFactor < maxParallelFactor) &&
          (lastParallelBound % parallelFactor == 0) &&
          (lastParallelBound > parallelFactor);
          parallelFactor *= 2) {

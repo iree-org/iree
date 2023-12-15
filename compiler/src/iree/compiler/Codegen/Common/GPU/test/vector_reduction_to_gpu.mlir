@@ -260,7 +260,7 @@ hal.executable private @shared_memory_copy  {
 
 // -----
 
-// Check that we multi-row matvec gets distributed across subgoroup threads.
+// Check that we multi-row matvec gets distributed across subgroup threads.
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
