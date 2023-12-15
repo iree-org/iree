@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -911,6 +912,82 @@ DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
 }
 
 void transform_dialect::WorkgroupSwizzleOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// TestVectorLayoutAnalysisOp
+//===----------------------------------------------------------------------===//
+
+static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
+                                       func::FuncOp funcOp) {
+  for (Block &block : funcOp) {
+    for (Operation &op : block) {
+      for (NamedAttribute attr : op.getAttrs()) {
+        StringRef name = attr.getName().strref();
+        if (name.find("__vector_layout_test_anchor_operand_") !=
+            std::string::npos) {
+          int operandNum;
+          name.substr(name.find_last_of("_") + 1)
+              .getAsInteger(/*Radix=*/10, operandNum);
+          assert(operandNum < op.getNumOperands() &&
+                 "operand number out of range");
+          analysis.setAnchor(op.getOperand(operandNum), attr.getValue());
+        }
+        if (name.find("__vector_layout_test_anchor_result_") !=
+            std::string::npos) {
+          int resultNum;
+          name.substr(name.find_last_of("_") + 1)
+              .getAsInteger(/*Radix=*/10, resultNum);
+          assert(resultNum < op.getNumResults() &&
+                 "result number out of range");
+          analysis.setAnchor(op.getResult(resultNum), attr.getValue());
+        }
+      }
+    }
+  }
+}
+
+static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
+                              func::FuncOp funcOp) {
+  funcOp.walk([&](Operation *op) {
+    // Do not emit remarks for conflict operations.
+    if (isa<VectorExt::LayoutConflictResolutionOp>(op)) {
+      return;
+    }
+
+    for (OpResult result : op->getOpResults()) {
+      if (auto layout = analysis.getLayout<Attribute>(result)) {
+        // Print layout attr to a string.
+        std::string layoutStr;
+        llvm::raw_string_ostream s(layoutStr);
+        s << layout;
+        // Emit remark.
+        op->emitRemark("layout of result #" + Twine(result.getResultNumber()) +
+                       " is " + s.str());
+      }
+    }
+  });
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  VectorLayoutAnalysis analysis(target);
+  setAnchorOpsFromAttributes(analysis, target);
+  if (failed(analysis.run())) {
+    target.emitError("layout analysis failed");
+    return emitDefaultSilenceableFailure(target);
+  }
+  emitLayoutRemarks(analysis, target);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
