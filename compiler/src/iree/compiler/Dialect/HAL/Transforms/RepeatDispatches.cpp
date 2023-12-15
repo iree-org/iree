@@ -7,42 +7,33 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_REPEATDISPATCHESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
 namespace {
 
-// Repeats dispatches a specified number of times.
-class BenchmarkBatchDispatchesPass
-    : public PassWrapper<BenchmarkBatchDispatchesPass,
-                         OperationPass<func::FuncOp>> {
-public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BenchmarkBatchDispatchesPass)
+//===----------------------------------------------------------------------===//
+// --iree-hal-repeat-dispatches
+//===----------------------------------------------------------------------===//
 
-  explicit BenchmarkBatchDispatchesPass(unsigned repeatCount)
-      : repeatCount_(repeatCount) {}
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<func::FuncDialect, IREE::HAL::HALDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "test-iree-hal-benchmark-batch-dispatches-2-times";
-  }
-
-  StringRef getDescription() const override {
-    return "Test pass used for benchmarking batch dispatches analysis";
-  }
-
+struct RepeatDispatchesPass
+    : public IREE::HAL::impl::RepeatDispatchesPassBase<RepeatDispatchesPass> {
+  using IREE::HAL::impl::RepeatDispatchesPassBase<
+      RepeatDispatchesPass>::RepeatDispatchesPassBase;
   void runOnOperation() override {
     // Collect all (nested) command buffer dispatch ops.
-    std::vector<IREE::HAL::CommandBufferDispatchOp> ops;
-    getOperation().walk(
+    SmallVector<IREE::HAL::CommandBufferDispatchOp> ops;
+    getOperation()->walk(
         [&ops](IREE::HAL::CommandBufferDispatchOp op) { ops.push_back(op); });
     for (auto op : ops) {
       OpBuilder builder(op);
-      for (unsigned i = 1; i < repeatCount_; ++i) {
+      for (unsigned i = 1; i < repeatCount; ++i) {
+        // Clone the op at its original location in the IR.
         builder.clone(*op.getOperation());
         // Add a barrier after each clone. If the original dispatch has a small
         // problem size, simply duplicating without barrier will increase the
@@ -60,20 +51,8 @@ public:
       }
     }
   }
-
-private:
-  unsigned repeatCount_;
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<func::FuncOp>>
-createBenchmarkBatchDispatchesPass(unsigned repeatCount) {
-  return std::make_unique<BenchmarkBatchDispatchesPass>(repeatCount);
-}
-
-static PassRegistration<BenchmarkBatchDispatchesPass> pass([] {
-  return std::make_unique<BenchmarkBatchDispatchesPass>(2);
-});
 
 } // namespace mlir::iree_compiler::IREE::HAL

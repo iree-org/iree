@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -21,31 +22,25 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-class LinkTargetExecutablesPass
-    : public PassWrapper<LinkTargetExecutablesPass,
-                         OperationPass<mlir::ModuleOp>> {
-public:
-  LinkTargetExecutablesPass()
-      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
-  LinkTargetExecutablesPass(const LinkTargetExecutablesPass &pass)
-      : targetRegistry(pass.targetRegistry) {}
-  LinkTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
-                            StringRef target)
-      : targetRegistry(targetRegistry) {
-    this->target = target.str();
-  }
+#define GEN_PASS_DEF_LINKEXECUTABLESPASS
+#define GEN_PASS_DEF_LINKTARGETEXECUTABLESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
-  StringRef getArgument() const override {
-    return "iree-hal-link-target-executables";
-  }
+namespace {
 
-  StringRef getDescription() const override {
-    return "Links together hal.executables for the specified target.";
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-link-target-executables
+//===----------------------------------------------------------------------===//
+
+struct LinkTargetExecutablesPass
+    : public IREE::HAL::impl::LinkTargetExecutablesPassBase<
+          LinkTargetExecutablesPass> {
+  using IREE::HAL::impl::LinkTargetExecutablesPassBase<
+      LinkTargetExecutablesPass>::LinkTargetExecutablesPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = targetRegistry.getTargetBackend(target);
+    auto targetBackend = targetRegistry->getTargetBackend(target);
     if (targetBackend) {
       targetBackend->getDependentDialects(registry);
     }
@@ -53,7 +48,7 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto targetBackend = targetRegistry.getTargetBackend(target);
+    auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
       moduleOp.emitError() << "unregistered target backend '" << target << "'";
       return signalPassFailure();
@@ -68,38 +63,16 @@ public:
       return signalPassFailure();
     }
   }
-
-private:
-  Option<std::string> target{
-      *this, "target",
-      llvm::cl::desc("Target backend name whose executables will be linked by "
-                     "this pass.")};
-
-  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createLinkTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
-                                StringRef target) {
-  return std::make_unique<LinkTargetExecutablesPass>(targetRegistry, target);
-}
+//===----------------------------------------------------------------------===//
+// --iree-hal-link-executables
+//===----------------------------------------------------------------------===//
 
-static PassRegistration<LinkTargetExecutablesPass> linkTargetPass([] {
-  return std::make_unique<LinkTargetExecutablesPass>();
-});
-
-class LinkExecutablesPass
-    : public PassWrapper<LinkExecutablesPass, OperationPass<mlir::ModuleOp>> {
-public:
-  LinkExecutablesPass(const TargetBackendRegistry &targetRegistry)
-      : targetRegistry(targetRegistry) {}
-
-  StringRef getArgument() const override { return "iree-hal-link-executables"; }
-
-  StringRef getDescription() const override {
-    return "Links together hal.executables depending on target backend rules";
-  }
-
+struct LinkExecutablesPass
+    : public IREE::HAL::impl::LinkExecutablesPassBase<LinkExecutablesPass> {
+  using IREE::HAL::impl::LinkExecutablesPassBase<
+      LinkExecutablesPass>::LinkExecutablesPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -107,8 +80,8 @@ public:
     // These will create/rearrange executables.
     OpPassManager passManager(moduleOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(moduleOp)) {
-      passManager.addPass(
-          createLinkTargetExecutablesPass(targetRegistry, targetName));
+      passManager.addPass(IREE::HAL::createLinkTargetExecutablesPass(
+          {targetRegistry, targetName}));
     }
 
     // Cleanup any remaining empty executables after each pipeline has run.
@@ -121,18 +94,8 @@ public:
       return signalPassFailure();
     }
   }
-
-  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createLinkExecutablesPass(const TargetBackendRegistry &targetRegistry) {
-  return std::make_unique<LinkExecutablesPass>(targetRegistry);
-}
-
-static PassRegistration<LinkExecutablesPass> linkPass([] {
-  return std::make_unique<LinkExecutablesPass>(
-      TargetBackendRegistry::getGlobal());
-});
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
