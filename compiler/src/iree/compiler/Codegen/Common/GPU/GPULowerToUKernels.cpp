@@ -28,69 +28,17 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Returns the CastOpInterface op of the body, if
-//   - the `genericOp` is element-wise with identity maps, and
-//   - it has only a  CastOpInterface op.
-// Returns std::nullopt, otherwise.
-static std::optional<CastOpInterface>
-getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
-  if (!genericOp || genericOp.getNumDpsInputs() != 1 ||
-      genericOp.getNumDpsInits() != 1 ||
-      genericOp.getBody()->getOperations().size() != 2 ||
-      !isElementwise(genericOp)) {
-    return std::nullopt;
-  }
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  auto castOp = yieldOp->getOperand(0).getDefiningOp<CastOpInterface>();
-  if (!castOp) {
-    return std::nullopt;
-  }
-  Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
-    return std::nullopt;
-  }
-  return castOp;
-}
-
 namespace {
 class GPULowerToUKernelsPass
     : public GPULowerToUKernelsBase<GPULowerToUKernelsPass> {
 public:
-  GPULowerToUKernelsPass(bool skipIntermediateRoundings)
-      : skipIntermediateRoundings(skipIntermediateRoundings) {}
-
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
   void runOnOperation() override;
-
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
-      return failure();
-    }
-    // This option defaults to `true` both in Passes.td and in C++ code.
-    // If either side has `false`, that's a non-default choice, so we let that
-    // override a `true` on the other side.
-    skipIntermediateRoundings &= optionSkipIntermediateRoundings;
-    return success();
-  }
-
-private:
-  bool skipIntermediateRoundings;
 };
 } // namespace
-
-/// Returns `true` if an `outsOperand` value is initialized to zero.
-static bool isInitializedToZero(Value outsOperand) {
-  auto fillOp = outsOperand.getDefiningOp<linalg::FillOp>();
-  if (!fillOp)
-    return false;
-  Value fillVal = fillOp.getDpsInputOperand(0)->get();
-  return matchPattern(fillVal, m_Zero()) ||
-         matchPattern(fillVal, m_AnyZeroFloat());
-}
 
 /// Holds a function name and attributes.
 struct FnNameAndDefAttrs {
@@ -117,35 +65,6 @@ getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
                                  rewriter.getStringAttr("rocm"));
   }
   return result;
-}
-
-// If the defining op of `input` is an element-wise cast, return the input to
-// the casting `linalg.generic` op. Otherwise, return `input`.
-static Value getInputForUKernel(Value input) {
-  auto genericOp = input.getDefiningOp<linalg::GenericOp>();
-  std::optional<CastOpInterface> castOp = getCastOpOfElementWiseCast(genericOp);
-  if (!castOp) {
-    return input;
-  }
-  return genericOp->getOperand(0);
-}
-
-// If the defining op of `input` is an element-wise cast, return the element
-// type of the cast source with explicit signedness. Otherwise, return the
-// element type of `input`.
-static Type getElementTypeForUKernel(Value input) {
-  auto genericOp = input.getDefiningOp<linalg::GenericOp>();
-  std::optional<CastOpInterface> castOp = getCastOpOfElementWiseCast(genericOp);
-  if (!castOp) {
-    return llvm::cast<ShapedType>(input.getType()).getElementType();
-  }
-  Type castOpSrcType = castOp.value()->getOperand(0).getType();
-  if (isa<arith::ExtUIOp>(*castOp)) {
-    return IntegerType::get(castOp->getContext(),
-                            castOpSrcType.getIntOrFloatBitWidth(),
-                            IntegerType::SignednessSemantics::Unsigned);
-  }
-  return castOpSrcType;
 }
 
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
@@ -213,12 +132,6 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
         op, "unsupported combination of element types");
   }
 
-  // Check if the accumulator is zero-filled.
-  Value out = op.getDpsInitOperand(0)->get();
-  if (!isInitializedToZero(out) && !isInitializedToZero(index)) {
-    return rewriter.notifyMatchFailure(op, "Do not support accumulate");
-  }
-
   Location loc = op.getLoc();
   // Currently only support 1D reduction, where reduc is on fastest dim.
   // Tiling argmax ukernel is also set to enforce this structure.
@@ -242,11 +155,9 @@ using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
 
 struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
   LowerArgmaxToUKernelPattern(MLIRContext *context,
-                              TargetPredicate targetPredicate,
-                              bool skipIntermediateRoundings = false)
+                              TargetPredicate targetPredicate)
       : OpRewritePattern<linalg::GenericOp>(context),
-        targetPredicate(targetPredicate),
-        skipIntermediateRoundings(skipIntermediateRoundings) {}
+        targetPredicate(targetPredicate) {}
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
@@ -263,15 +174,12 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
     }
-    // llvm::outs()<<"SUCCESS, from:" <<op<<"\n";
-    // llvm::outs()<<"SUCCESS, using:" <<ukernelOp<<"\n";
     rewriter.replaceAllUsesWith(op.getResults()[1],
                                 ukernelOp.value()->getResults());
     return success();
   }
 
   TargetPredicate targetPredicate;
-  bool skipIntermediateRoundings;
 };
 
 } // namespace
@@ -298,9 +206,8 @@ void GPULowerToUKernelsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<>>
-createGPULowerToUKernelsPass(bool skipIntermediateRoundings) {
-  return std::make_unique<GPULowerToUKernelsPass>(skipIntermediateRoundings);
+std::unique_ptr<OperationPass<>> createGPULowerToUKernelsPass() {
+  return std::make_unique<GPULowerToUKernelsPass>();
 }
 
 } // namespace iree_compiler
