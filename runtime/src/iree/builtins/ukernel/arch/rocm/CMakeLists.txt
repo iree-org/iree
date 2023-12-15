@@ -110,7 +110,7 @@ endforeach()
 set(_platform_lib_reldir "iree_platform_libs/rocm")
 set(_all_ukernel_bc_copy_commands)
 set(_all_ukernel_bc_files)
-set(_ukernel_lib_srcdir "/home/stwinata/nod/iree-build-notrace/runtime/src/iree/builtins/ukernel/arch/rocm")
+set(_ukernel_lib_srcdir ${CMAKE_CURRENT_BINARY_DIR})
 foreach(_amd_ukernel_name ${_amd_ukernel_libs})
   # Copy to lib/ tree.
   set(_ukernel_bc_srcpath "${_ukernel_lib_srcdir}/${_amd_ukernel_name}")

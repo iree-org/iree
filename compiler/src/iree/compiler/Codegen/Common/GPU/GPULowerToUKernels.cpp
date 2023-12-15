@@ -56,11 +56,6 @@ getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
   if (isROCMBackend(targetAttr)) {
     result.name =
         std::string("__iree_uk_rocm_") + ukernelName + "_" + typeSuffixID;
-    // TODO(#12327): Based on description in the issue, add an attribute
-    // `vm.import.module` and set it to `vmvx`. This only works on `vmvx`
-    // backend (obviously), but is enough to unblock while the proper fix
-    // lands. For now there are a bunch of attributes set on the function, but
-    // this should be made more controllable based on the backend.
     result.defAttrs.emplace_back(rewriter.getStringAttr("vm.import.module"),
                                  rewriter.getStringAttr("rocm"));
   }
