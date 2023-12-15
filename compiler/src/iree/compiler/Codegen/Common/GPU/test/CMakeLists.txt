@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "gpu_tile_reduction.mlir"
     "gpu_vector_distribution.mlir"
     "gpu_workgroup_swizzle.mlir"
+    "lower_to_ukernel_ops.mlir"
     "reduce_bank_conflicts.mlir"
     "transform_gpu_distribute_shared_memory.mlir"
     "transform_gpu_workgroup_swizzle.mlir"
