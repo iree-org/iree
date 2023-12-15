@@ -22,6 +22,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
@@ -763,14 +764,34 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
 }
 
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  // TODO: Allow for matvec with fused dequantization.
-  if (!linalg::isaContractionOpInterface(linalgOp))
+  if (linalgOp.getNumDpsInputs() != 2)
     return false;
 
   if (linalgOp.getNumParallelLoops() != 2)
     return false;
 
-  if (linalgOp.getNumReductionLoops() > 2)
+  if (linalgOp.getNumReductionLoops() != 1)
+    return false;
+
+  // TODO: Allow for matvec with fused dequantization.
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // TODO: Support batch matvec.
+  if (!dims->batch.empty())
+    return false;
+
+  for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
+    if (!llvm::hasSingleElement(indices))
+      return true;
+  }
+
+  // Check if the first parallel dimension has bound 1, indicating we found a
+  // vector shape.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  if (bounds[dims->m.front()] != 1)
     return false;
 
   return true;
@@ -944,8 +965,8 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isRocmTarget(entryPoint) && isMatvecLike(op) &&
-      llvm::none_of(bounds, ShapedType::isDynamic)) {
+  if (isRocmTarget(entryPoint) &&
+      llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
     int64_t lastParallelBound = bounds[parallelDims.back()];
     int64_t numParallelReductions = 1;
     const int64_t maxParallelFactor = groupSize / 4;
