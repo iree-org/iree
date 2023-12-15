@@ -782,7 +782,7 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 
   for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
     if (!llvm::hasSingleElement(indices))
-      return true;
+      return false;
   }
 
   // Check if the first parallel dimension has bound 1, indicating we found a
