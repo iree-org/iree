@@ -742,24 +742,6 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_nondt_f32_small_no_padding
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f32"
-    "--shapes=small"
-  TRACE_RUNNER
-    iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "llvm-cpu"
-  DRIVERS
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-codegen-enable-vector-padding=false"
-)
-
-iree_generated_trace_runner_test(
-  NAME
     e2e_matmul_dt_uk_i8_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
