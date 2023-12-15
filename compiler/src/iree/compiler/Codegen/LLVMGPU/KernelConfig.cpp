@@ -59,7 +59,6 @@ struct TargetInfo {
   bool hasTF32TensorCore = false;
   bool hasWarpShuffle = false;
   bool hasMmaSync = false;
-  bool hasUkernels = false;
   // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
 };
@@ -199,14 +198,6 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
 
   // Assumes all gfx versions have warp shuffle.
   info.hasWarpShuffle = true;
-
-  // Checks if UKernels are enabled.
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    auto target = variantOp.getTarget();
-    info.hasUkernels =
-        hasUkernel(target) && hasUkernelSupportedRocmArch(target);
-  }
 
   // RDNA supports wave32 and wave64, GCN and CDNA only wave64.
   if (targetName.starts_with("gfx10") || targetName.starts_with("gfx11"))
@@ -1074,10 +1065,22 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 /// Set the configuration for argmax that can be mapped to argmax uKernel.
 /// Distribute all parallel dim across different wg, and only use single
 /// subgroup per workgroup.
-static LogicalResult setArgmaxConfig(func::FuncOp entryPoint,
-                                     linalg::GenericOp op,
-                                     const TargetInfo &targetInfo) {
-  if (!targetInfo.hasWarpShuffle || !targetInfo.hasUkernels)
+static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
+                                            linalg::GenericOp op,
+                                            const TargetInfo &targetInfo) {
+
+  // Checks if UKernels are enabled.
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    auto target = variantOp.getTarget();
+    const char ukernelName[] = "argmax";
+    if (!hasUkernel(target, ukernelName) ||
+        !hasUkernelSupportedRocmArch(target)) {
+      return failure();
+    }
+  }
+
+  if (!targetInfo.hasWarpShuffle)
     return failure();
 
   if (failed(isArgmaxOp(op)))
@@ -1331,8 +1334,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
-    } else if (genericOp && succeeded(setArgmaxConfig(entryPointFn, genericOp,
-                                                      targetInfo))) {
+    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
+                                entryPointFn, genericOp, targetInfo))) {
       return success();
     }
   }
