@@ -44,7 +44,7 @@ public:
   ChangeResult resolve(const DistributionLayout *rhs);
   ChangeResult resolve(const VectorLayoutInterface &rhs);
 
-  VectorLayoutInterface getInnerLayout() const { return vectorLayout; }
+  VectorLayoutInterface getLayout() const { return vectorLayout; }
 
   bool isUninitialized() const { return !vectorLayout; }
   bool hasLayout() const { return !isUninitialized(); }
@@ -434,7 +434,7 @@ static void propagateLayoutToMultiReductionOp(
   if (vector->hasLayout()) {
     SmallVector<bool> reductionMask = multiReduce.getReductionMask();
     ChangeResult changed =
-        result->resolve(vector->getInnerLayout().project(reductionMask));
+        result->resolve(vector->getLayout().project(reductionMask));
     update(result, changed);
     return;
   }
@@ -468,7 +468,7 @@ static void propagateLayoutToTransposeOp(
   // Build a transposed layout.
   SmallVector<unsigned> permutation;
   ArrayRef<int64_t> perm = transpose.getPermutation();
-  VectorLayoutInterface permutedLayout = value->getInnerLayout().permute(perm);
+  VectorLayoutInterface permutedLayout = value->getLayout().permute(perm);
 
   // Try to resolve with the transposed layout.
   ChangeResult changed = result->resolve(permutedLayout);
@@ -565,7 +565,7 @@ static void enforceLayoutToTransposeOp(
   // Build a transposed layout.
   SmallVector<unsigned> permutation;
   ArrayRef<int64_t> perm = transpose.getPermutation();
-  VectorLayoutInterface permutedLayout = result->getInnerLayout().permute(perm);
+  VectorLayoutInterface permutedLayout = result->getLayout().permute(perm);
 
   // Try to resolve with the transposed layout.
   ChangeResult changed = value->resolveWithPossibleConflict(
@@ -613,7 +613,7 @@ static void enforceLayoutToBroadcastOp(
   }
 
   VectorLayoutInterface resultLayout =
-      result->getInnerLayout().project(reductionMask);
+      result->getLayout().project(reductionMask);
   ChangeResult changed = value->resolveWithPossibleConflict(
       resultLayout, getOpOperand(broadcast, 0));
   update(value, changed);
@@ -922,5 +922,5 @@ VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
   if (!layout) {
     return VectorLayoutInterface();
   }
-  return layout->getInnerLayout();
+  return layout->getLayout();
 }
