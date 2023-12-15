@@ -79,7 +79,8 @@ getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
 
 FailureOr<scf::SCFTileSizeComputationFunction>
 getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
-  auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
+  FailureOr<SmallVector<int64_t>> tileSizes =
+      getSPIRVTileSize(funcOp, tilingLevel);
   if (failed(tileSizes))
     return failure();
   scf::SCFTileSizeComputationFunction computeFn =
