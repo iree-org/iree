@@ -764,9 +764,6 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
 }
 
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumDpsInputs() != 2)
-    return false;
-
   if (linalgOp.getNumParallelLoops() != 2)
     return false;
 
