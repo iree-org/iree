@@ -52,7 +52,6 @@ function(iree_rocm_bitcode_library)
 
     # Suppress warnings about missing path to rocm lib,
     # and benign warning about ROCM version.
-    "--hip-device-lib-path=${_device_bc_path}"
     "-nogpulib"
     "--offload-device-only"
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
@@ -81,7 +80,6 @@ function(iree_rocm_bitcode_library)
       DEPENDS
         "${IREE_CLANG_BINARY}"
         "${_SRC}"
-        iree_compiler_plugins_target_ROCM_GenDeviceLibs
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM

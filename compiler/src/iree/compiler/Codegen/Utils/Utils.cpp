@@ -845,6 +845,17 @@ LogicalResult isArgmaxOp(linalg::GenericOp genericOp) {
   if (!indexing_maps[0].isIdentity())
     return failure();
 
+  // Check that initial value is negative Infinite.
+  // TODO: Move this check to ukernel once we implement
+  //       variant to handle non neg-Inf initial value.
+  Value initVal = genericOp.getDpsInitOperand(0)->get();
+  auto fillOp = initVal.getDefiningOp<linalg::FillOp>();
+  if (!fillOp)
+    return failure();
+  Value fillVal = fillOp.getDpsInputOperand(0)->get();
+  if (!matchPattern(fillVal, m_NegInfFloat()))
+    return failure();
+
   // Work back from linalg.yield and check body of genericOp.
   // The genericOp should yield the result of an arith.select,
   // preceded by an arith.cmpf, arith.maximumf, and arith.extui
