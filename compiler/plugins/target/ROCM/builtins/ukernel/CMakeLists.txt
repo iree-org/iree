@@ -10,6 +10,8 @@ endif()
 
 iree_add_all_subdirs()
 
+set(_platform_lib_reldir "iree_platform_libs/rocm")
+set(_device_bc_path "${IREE_COMPILER_DYLIB_DIR}/iree_platform_libs/rocm")
 set (_amd_ukernel_libs)
 set (_amd_ukernel_targets)
 function(iree_rocm_bitcode_library)
@@ -36,6 +38,7 @@ function(iree_rocm_bitcode_library)
 
     # Suppress warnings about missing path to rocm lib,
     # and benign warning about ROCM version.
+    "--hip-device-lib-path=${_device_bc_path}"
     "-nogpulib"
     "--offload-device-only"
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
@@ -67,6 +70,7 @@ function(iree_rocm_bitcode_library)
       DEPENDS
         "${IREE_CLANG_BINARY}"
         "${_SRC}"
+        iree_compiler_plugins_target_ROCM_GenDeviceLibs
       COMMENT
         "Compiling ${_SRC} to ${_BITCODE_FILE}"
       VERBATIM
@@ -113,7 +117,6 @@ foreach(_amd_chip ${_ukernel_supported_chips})
 endforeach()
 
 # Copy UKernel into platform dir.
-set(_platform_lib_reldir "iree_platform_libs/rocm")
 set(_all_ukernel_bc_copy_commands)
 set(_all_ukernel_bc_files)
 set(_ukernel_lib_srcdir ${CMAKE_CURRENT_BINARY_DIR})
@@ -147,6 +150,10 @@ add_custom_target(iree_builtin_ROCM_UkernelDeviceLibs
   DEPENDS
     ${_all_ukernel_bc_files}
 )
+
+# Ensure that the device libs are built when the compiler dylib is built.
+set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
+  iree_builtin_ROCM_UkernelDeviceLibs)
 
 # Install.
 install(FILES ${_all_ukernel_bc_files}
