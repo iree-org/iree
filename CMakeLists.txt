@@ -452,7 +452,9 @@ if(IREE_BUILD_COMPILER)
       message(SEND_ERROR
           "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
           "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-          "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
+          "ASAN/TSAN instrumentation is not currently supported in embedded modules."
+          "When --iree-llvmcpu-sanitize is set to address, "
+          "--iree-llvmcpu-link-embedded should automatically be set to false.")
     endif()
   endif()
 endif()
