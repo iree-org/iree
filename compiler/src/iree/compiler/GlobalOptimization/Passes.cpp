@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -164,6 +165,12 @@ void buildGlobalOptimizationPassPipeline(
 
   if (transformOptions.options.constExprHoisting) {
     buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
+  }
+
+  if (!transformOptions.options.parameterArchivePath.empty()) {
+    pipeline.addPass(IREE::IO::Parameters::createParameterizeGlobalsPass(
+        transformOptions.options.parameterArchivePath,
+        transformOptions.options.parameterNamespace));
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {

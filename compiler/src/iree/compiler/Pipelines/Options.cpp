@@ -133,6 +133,17 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-parameter-archive-file", parameterArchivePath,
+      llvm::cl::desc(
+          "File path to create a parameter archive using the inline global "
+          "constants."),
+      llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-parameter-archive-namespace", parameterNamespace,
+      llvm::cl::desc("Namespace for parameters in the archive created in "
+                     "`iree-opt-parameter-archive-file`."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {

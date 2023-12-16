@@ -94,6 +94,12 @@ struct GlobalOptimizationOptions {
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
+  // File path to create a parameter archive out of global initial values.
+  std::string parameterArchivePath = "";
+
+  // Optional namespace to use for the created parameter archive.
+  std::string parameterNamespace = "";
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };

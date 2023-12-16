@@ -103,6 +103,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Modules::IO::Parameters::Transforms
     iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
