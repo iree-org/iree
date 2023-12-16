@@ -92,6 +92,7 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
   Type rhs = elementTypes[1];
   Type out = elementTypes[2];
 
+  uint32_t ukType = findMmt4dUkernelType(lhs, rhs, out);
   if (out.isF32() || out.isF16() || out.isBF16()) {
     if (lhs.isBF16() && rhs.isBF16() && (out.isBF16() || out.isF32()) &&
         hasFeature(target, "+bf16")) {
@@ -110,12 +111,22 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
     // accumulator itself is f16/bf16, as we could typically have a 2x wider
     // tile in that case. However, on current CPUs, the existing tiles seem
     // wide enough already to approach peak performance.
-    return {
-        TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
-        TileMxNxK{4, 8, 1}, // Truncation of the above.
-        TileMxNxK{2, 8, 1}, // Truncation of the above.
-        TileMxNxK{1, 8, 1}, // Truncation of the above.
-    };
+    if (hasUkernel(target) && ukType != IREE_UK_FLAG_MMT4D_TYPE_NONE) {
+      return {
+          TileMxNxK{8, 8, 1}, // Aim to use FMLA or FMLAL.
+          TileMxNxK{4, 8, 1}, // Truncation of the above.
+          TileMxNxK{2, 8, 1}, // Truncation of the above.
+          TileMxNxK{1, 8, 1}, // Truncation of the above.
+      };
+    } else {
+      // Use larger tile sizes for data-tiling only codegen.
+      return {
+          TileMxNxK{8, 8, 1},  // Aim to use FMLA or FMLAL.
+          TileMxNxK{4, 16, 1}, // Use same number of accumulators.
+          TileMxNxK{2, 32, 1}, // Use same number of accumulators.
+          TileMxNxK{1, 64, 1}, // Use same number of accumulators
+      };
+    }
   }
 
   if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
@@ -192,6 +203,7 @@ enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
             TileMxNxK{1, 16, 1},  // Truncation of the above.
         };
       } else {
+        // Use larger tile sizes for data-tiling only codegen.
         return {
             TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
             TileMxNxK{8, 32, 1},  // Use same number of accumulators.
