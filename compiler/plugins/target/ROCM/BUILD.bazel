@@ -30,6 +30,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/LLVMGPU",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target:LLVMLinkerUtils",
         "//compiler/src/iree/compiler/PluginAPI",
         "//compiler/src/iree/compiler/Utils",
         "//runtime/src/iree/schemas:rocm_executable_def_c_fbs",

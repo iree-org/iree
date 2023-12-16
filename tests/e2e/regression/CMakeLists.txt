@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "argmax_linking.mlir"
     "fill_i64.mlir"
     "force_single_dispatch.mlir"
     "globals.mlir"
@@ -25,7 +24,6 @@ iree_lit_test_suite(
   TOOLS
     ${IREE_LLD_TARGET}
     FileCheck
-    iree-compile
     iree-opt
     iree-run-mlir
   LABELS

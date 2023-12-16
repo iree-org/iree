@@ -1,18 +1,6 @@
-// RUN: iree-compile --split-input-file --iree-hal-target-backends=rocm --iree-rocm-enable-ukernels=argmax --iree-rocm-target-chip=gfx1100 --compile-to=executable-targets %s | FileCheck %s
+// RUN: [[ $IREE_ROCM_DISABLE == 1 ]] || iree-compile --split-input-file --iree-hal-target-backends=rocm --iree-rocm-enable-ukernels=argmax --iree-rocm-target-chip=gfx1100 --compile-to=executable-targets %s | FileCheck %s
 
-// When lowering to uKernel code through LLVM, certain LLVM intrinsics require
-// linking against libm (the standard C library of math functions, `-lm`).
-//
-// We require that our linked executables be free standing with no runtime
-// dependencies, so we link implementations of the required functions into
-// our executables prior to invoking a linker tool like lld. These
-// implementations are mostly from musl (https://musl.libc.org/) and are
-// bundled at iree/builtins/musl/.
-//
-// This test checks that the LLVM lowerings for certain operations are
-// correctly covered by our linker configurations.
-//
-// See https://github.com/openxla/iree/issues/4717 for more details.
+// We want to check that uKernel is indeed generated from e2e workflow.
 
 // CHECK: llvm.func @__iree_uk_rocm_argmax_F32I64
 // CHECK: llvm.call @__iree_uk_rocm_argmax_F32I64
