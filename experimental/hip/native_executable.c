@@ -235,20 +235,20 @@ iree_status_t iree_hal_hip_native_executable_create(
       if (!iree_status_is_ok(status)) break;
 
       // Package required parameters for kernel launches for each entry point.
-      iree_hal_hip_kernel_info_t* params = &executable->entry_points[i];
-      params->layout = executable_params->pipeline_layouts[i];
-      iree_hal_pipeline_layout_retain(params->layout);
-      params->function = function;
-      params->block_size[0] = block_sizes_vec[i].x;
-      params->block_size[1] = block_sizes_vec[i].y;
-      params->block_size[2] = block_sizes_vec[i].z;
-      params->shared_memory_size = shared_memory_sizes_vec[i];
+      iree_hal_hip_kernel_info_t* kernel_info = &executable->entry_points[i];
+      kernel_info->layout = executable_params->pipeline_layouts[i];
+      iree_hal_pipeline_layout_retain(kernel_info->layout);
+      kernel_info->function = function;
+      kernel_info->block_size[0] = block_sizes_vec[i].x;
+      kernel_info->block_size[1] = block_sizes_vec[i].y;
+      kernel_info->block_size[2] = block_sizes_vec[i].z;
+      kernel_info->shared_memory_size = shared_memory_sizes_vec[i];
 
       // Stash the entry point name in the string table for use when tracing.
       IREE_TRACE({
         iree_host_size_t entry_name_length = flatbuffers_string_len(entry_name);
         memcpy(string_table_buffer, entry_name, entry_name_length);
-        params->function_name =
+        kernel_info->function_name =
             iree_make_string_view(string_table_buffer, entry_name_length);
         string_table_buffer += entry_name_length;
       });
@@ -263,9 +263,9 @@ iree_status_t iree_hal_hip_native_executable_create(
           flatbuffers_string_t filename =
               iree_hal_hip_FileLineLocDef_filename_get(source_loc);
           uint32_t line = iree_hal_hip_FileLineLocDef_line_get(source_loc);
-          params->source_filename =
+          kernel_info->source_filename =
               iree_make_string_view(filename, flatbuffers_string_len(filename));
-          params->source_line = line;
+          kernel_info->source_line = line;
         }
       });
     }
@@ -300,9 +300,9 @@ static void iree_hal_hip_native_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_hip_native_executable_entry_point_kernel_params(
+iree_status_t iree_hal_hip_native_executable_entry_point_kernel_info(
     iree_hal_executable_t* base_executable, int32_t entry_point,
-    iree_hal_hip_kernel_info_t* out_params) {
+    iree_hal_hip_kernel_info_t* out_info) {
   iree_hal_hip_native_executable_t* executable =
       iree_hal_hip_native_executable_cast(base_executable);
   if (entry_point >= executable->entry_point_count) {
@@ -311,8 +311,7 @@ iree_status_t iree_hal_hip_native_executable_entry_point_kernel_params(
                             "only contains %ld entry points",
                             entry_point, executable->entry_point_count);
   }
-  memcpy(out_params, &executable->entry_points[entry_point],
-         sizeof(*out_params));
+  memcpy(out_info, &executable->entry_points[entry_point], sizeof(*out_info));
   return iree_ok_status();
 }
 

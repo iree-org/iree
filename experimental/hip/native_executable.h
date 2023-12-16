@@ -39,9 +39,9 @@ iree_status_t iree_hal_hip_native_executable_create(
 
 // Returns the kernel launch parameters for the given |entry_point| in the
 // |executable|.
-iree_status_t iree_hal_hip_native_executable_entry_point_kernel_params(
+iree_status_t iree_hal_hip_native_executable_entry_point_kernel_info(
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_hip_kernel_info_t* out_params);
+    iree_hal_hip_kernel_info_t* out_info);
 
 #ifdef __cplusplus
 }  // extern "C"
