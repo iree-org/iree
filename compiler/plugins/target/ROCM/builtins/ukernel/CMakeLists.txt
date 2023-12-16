@@ -3,10 +3,24 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-
 if (NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
+
+# Check if Hip is installed on system.
+# Hip is required to compile ukernels.
+if (NOT IREE_ROCM_PATH)
+  set(IREE_ROCM_PATH "/opt/rocm")
+endif()
+set (IREE_ROCM_VERSION "${IREE_ROCM_PATH}/.info/version")
+if (NOT EXISTS ${IREE_ROCM_VERSION})
+  message(STATUS
+          "hip runtime cannot be found in ${IREE_ROCM_PATH}.
+          Please try setting IREE_ROCM_PATH to rocm directory.
+          Ukernel will not be compiled.")
+  return()
+endif()
+
 
 iree_add_all_subdirs()
 
@@ -44,9 +58,6 @@ function(iree_rocm_bitcode_library)
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
     "-Xclang" "-disable-llvm-optzns"
     "-O3"
-
-    # https://github.com/llvm/llvm-project/issues/54609
-    "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
 
     # Object file only in bitcode format:
     "-c"
