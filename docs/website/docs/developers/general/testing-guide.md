@@ -227,7 +227,7 @@ cmake --build . --target iree-test-deps
 ```
 
 To run e2e model tests in
-[generated_e2e_model_tests.cmake](https://github.com/openxla/iree/tree/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
+[generated_e2e_model_tests.cmake](https://github.com/openxla/iree/blob/main/tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake),
 because of their dependencies, `-DIREE_BUILD_E2E_TEST_ARTIFACTS=ON` needs to be
 set when configuring CMake. Also see
 [IREE Benchmark Suite Prerequisites](../performance/benchmark-suites.md#prerequisites)
@@ -236,7 +236,7 @@ for required packages.
 ### Running a Test
 
 For the test
-[`tests/e2e/xla_ops/floor.mlir`](https://github.com/openxla/iree/tree/main/tests/e2e/xla_ops/floor.mlir)
+[`tests/e2e/stablehlo_ops/floor.mlir`](https://github.com/openxla/iree/blob/main/tests/e2e/stablehlo_ops/floor.mlir)
 compiled for the VMVX target backend and running on the VMVX driver (here they
 match exactly, but in principle there's a many-to-many mapping from backends to
 drivers).
@@ -244,13 +244,13 @@ drivers).
 With CMake, run this from the build directory:
 
 ```shell
-ctest -R tests/e2e/xla_ops/check_vmvx_local-task_floor.mlir
+ctest -R tests/e2e/stablehlo_ops/check_vmvx_local-task_floor.mlir
 ```
 
 With Bazel, run this from the repo root:
 
 ```shell
-bazel test tests/e2e/xla_ops:check_vmvx_local-task_floor.mlir
+bazel test tests/e2e/stablehlo_ops:check_vmvx_local-task_floor.mlir
 ```
 
 ### Setting test environments

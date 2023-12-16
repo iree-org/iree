@@ -1222,9 +1222,17 @@ DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
 
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
-  auto matchAttr =
-      cast<IREE::HAL::MatchAttrInterface>(getTarget().getMatchExpression());
-  auto selected = matchAttr.buildConditionExpression(getLoc(), device, builder);
+  // TODO(multi-device): condition on device target ID and other queries that
+  // may be useful for disambiguating two devices that support the same
+  // executable targets. Today executable targets are unique per device target
+  // but that need not always be the case.
+  auto i1Type = builder.getI1Type();
+  Value selected = builder
+                       .create<IREE::HAL::DeviceQueryOp>(
+                           getLoc(), i1Type, i1Type, device,
+                           builder.getStringAttr("hal.executable.format"),
+                           getTarget().getFormat(), builder.getZeroAttr(i1Type))
+                       .getValue();
 
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();

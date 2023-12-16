@@ -135,10 +135,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE = false);
 
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
-                                          TilingConfig &tilingConfig,
-                                          bool enableVectorMasking);
-
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,

@@ -175,12 +175,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                      enableVectorMasking, lowerToAVX2);
     break;
   }
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert: {
-    TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addDoubleTilingPadExpertPassPipeline(pipeline, tilingConfig,
-                                         enableVectorMasking);
-    break;
-  }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUDoubleTilingPeelingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
