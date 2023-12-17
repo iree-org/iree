@@ -13,6 +13,7 @@
 #include <array>
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -26,7 +27,7 @@ static LogicalResult setAdrenoMatmulConfig(linalg::LinalgOp op,
   std::array<int64_t, 3> threadMNK;
   auto inputType =
       llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
-  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+  if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {16, 8, 8};
   } else {
     threadMNK = {16, 4, 4};
