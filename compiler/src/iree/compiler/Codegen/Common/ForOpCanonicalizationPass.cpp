@@ -198,7 +198,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
         continue;
       }
       int64_t numElements = ShapedType::getNumElements(iterType.getShape());
-      int64_t totalBits = IREE::Util::getRoundedPhysicalStorageSize(iterType);
+      int64_t bitWidth = IREE::Util::getTypeBitWidth(iterType.getElementType());
+      int64_t totalBits = numElements * bitWidth;
       if (numElements > 4 && totalBits <= 128 &&
           llvm::isPowerOf2_64(totalBits)) {
         ivIndices.push_back(index);
