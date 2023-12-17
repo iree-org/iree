@@ -261,7 +261,7 @@ flow.executable private @ex {
       ^bb0(%in: f32, %out: f32):
         linalg.yield %in : f32
       } -> tensor<8x4xf32>
-      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [4, 8], strides = [1, 1] : tensor<8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [8, 4], strides = [1, 1] : tensor<8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>
       return
     }
   }

@@ -344,7 +344,7 @@ hal.executable @dwconv_elementwise {
             %23 = arith.addf %arg3, %cst_9 : f32
             linalg.yield %23 : f32
           } -> tensor<1x19x18x1x4xf32>
-        flow.dispatch.tensor.store %21, %1, offsets = [0, 0, 0, 0, 0], sizes = [1, 19, 18, 1, 14], strides = [1, 1, 1, 1, 1]
+        flow.dispatch.tensor.store %21, %1, offsets = [0, 0, 0, 0, 0], sizes = [1, 19, 18, 1, 4], strides = [1, 1, 1, 1, 1]
             : tensor<1x19x18x1x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x19x18x1x4xf32>>
         return
       }
