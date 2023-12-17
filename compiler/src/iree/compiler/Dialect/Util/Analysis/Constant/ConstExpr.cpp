@@ -37,7 +37,23 @@ OpOperand *findOperandFor(Operation *op, Value input) {
 
 bool isHoistableToRootOp(Operation *rootOp, Operation *constOp) {
   Operation *syms = SymbolTable::getNearestSymbolTable(constOp);
-  return syms == rootOp;
+  if (syms != rootOp)
+    return false;
+
+  // Conservely only hoist ops from nested regions under known conditions.
+  Operation *parentOp = constOp->getParentOp();
+  while (parentOp != rootOp) {
+    assert(parentOp && "constOp is not a descendant of the rootOp.");
+    // For now only hoist descendants from nested control flow ops and
+    // functions.
+    if (!(parentOp->hasTrait<RegionBranchOpInterface::Trait>() ||
+          parentOp->hasTrait<FunctionOpInterface::Trait>())) {
+      return false;
+    }
+    parentOp = parentOp->getParentOp();
+  }
+
+  return true;
 }
 
 } // namespace
@@ -103,11 +119,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     Operation *constOp = it.second;
     for (auto &use : constOp->getUses()) {
       Operation *useOp = use.getOwner();
-      // For now ignore operations that are not in the same scope.
-      if (constOp->getParentOp() != useOp->getParentOp()) {
-        continue;
-      }
-      expandToOp(useOp);
+      if (isHoistableToRootOp(rootOp, useOp))
+        expandToOp(useOp);
     }
   }
 
@@ -160,11 +173,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
         assert(definingOp && "const values should have defining op");
         for (auto &use : definingOp->getUses()) {
           Operation *useOp = use.getOwner();
-          // Skip expanding of ops within dispatch or nested regions.
-          if (definingOp->getParentOp() != useOp->getParentOp()) {
-            continue;
-          }
-          expandToOp(useOp);
+          if (isHoistableToRootOp(rootOp, useOp))
+            expandToOp(useOp);
         }
       }
     }
