@@ -10,6 +10,10 @@
 
 extern "C" __device__ __attribute__((const)) half __ockl_wfred_max_f16(half);
 extern "C" __device__ __attribute__((const)) float __ockl_wfred_max_f32(float);
+extern "C" __device__ __attribute__((const))
+int64_t __ockl_wfred_min_i64(int64_t);
+extern "C" __device__ __attribute__((const))
+int32_t __ockl_wfred_min_i32(int32_t);
 
 extern "C" __device__ void
 __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size_t input_offset,
@@ -20,9 +24,9 @@ __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size_t input_offset,
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
       laneID >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + laneID];
-  uint laneResult = laneID;
+  int32_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize;
+  uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = laneCount * i + laneID;
     float new_in =
@@ -33,6 +37,13 @@ __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size_t input_offset,
 
   // Final reduction with one subgroup
   float wgMax = __ockl_wfred_max_f32(laneMax);
+  // Check if there are multiple max value holders.
+  uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
+  // if there are, find smallest index (argmax semantics).
+  if (__popcll(laneHasMaxValmask) > 1) {
+    int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
+    laneResult = __ockl_wfred_min_i64(indexVal);
+  }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
 }
@@ -46,9 +57,9 @@ __iree_uk_rocm_argmax_F32I64(float *inputBuffer, size_t input_offset,
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
       laneID >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + laneID];
-  uint laneResult = laneID;
+  int64_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize;
+  uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = laneCount * i + laneID;
     float new_in =
@@ -59,6 +70,13 @@ __iree_uk_rocm_argmax_F32I64(float *inputBuffer, size_t input_offset,
 
   // Final reduction with one subgroup
   float wgMax = __ockl_wfred_max_f32(laneMax);
+  // Check if there are multiple max value holders.
+  uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
+  // if there are, find smallest index (argmax semantics).
+  if (__popcll(laneHasMaxValmask) > 1) {
+    int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+    laneResult = __ockl_wfred_min_i64(indexVal);
+  }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
 }
@@ -73,19 +91,26 @@ __iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
   // Set identity value to handle problem non divisible by subgroupSize.
   half laneMax = laneID >= reductionSize ? NEG_F16_MAX
                                          : inputBuffer[input_offset + laneID];
-  uint laneResult = laneID;
+  int32_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize;
+  uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = laneCount * i + laneID;
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f16(new_in, laneMax);
+    laneMax = __hmax(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
   half wgMax = __ockl_wfred_max_f16(laneMax);
+  // Check if there are multiple max value holders.
+  uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
+  // if there are, find smallest index (argmax semantics).
+  if (__popcll(laneHasMaxValmask) > 1) {
+    int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
+    laneResult = __ockl_wfred_min_i64(indexVal);
+  }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
 }
@@ -100,19 +125,26 @@ __iree_uk_rocm_argmax_F16I64(half *inputBuffer, size_t input_offset,
   // Set identity value to handle problem non divisible by subgroupSize.
   half laneMax = laneID >= reductionSize ? NEG_F16_MAX
                                          : inputBuffer[input_offset + laneID];
-  uint laneResult = laneID;
+  int64_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize;
+  uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = laneCount * i + laneID;
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f16(new_in, laneMax);
+    laneMax = __hmax(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
   half wgMax = __ockl_wfred_max_f16(laneMax);
+  // Check if there are multiple max value holders.
+  uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
+  // if there are, find smallest index (argmax semantics).
+  if (__popcll(laneHasMaxValmask) > 1) {
+    int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+    laneResult = __ockl_wfred_min_i64(indexVal);
+  }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
 }
