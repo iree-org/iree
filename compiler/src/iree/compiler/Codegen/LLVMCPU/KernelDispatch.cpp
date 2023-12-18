@@ -1076,7 +1076,7 @@ setRootConfig(func::FuncOp entryPointFn,
   auto [vecTileSizes, vecScalableFlags] =
       getMatmulVectorSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
-  DistributionHeuristicConfig config;
+  DistributionHeuristicConfig distConfig;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // Use the default distribution for the matmul loops.
@@ -1087,9 +1087,9 @@ setRootConfig(func::FuncOp entryPointFn,
   }
 
   bool isBM = isa<linalg::BatchMatmulOp>(contractionOp.getOperation());
-  config.maxTileSizes.resize(numLoops, defaultMaxSize);
+  distConfig.maxTileSizes.resize(numLoops, defaultMaxSize);
   if (isBM) {
-    config.maxTileSizes[0] = 1;
+    distConfig.maxTileSizes[0] = 1;
   }
 
   // Compute cache-level tile sizes. Cache a dimension only if there are
@@ -1114,18 +1114,18 @@ setRootConfig(func::FuncOp entryPointFn,
     // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
     // because 288/12*8=192
     if (numLoops == 3) {
-      config.maxTileSizes[0] = 192;
-      config.maxTileSizes[1] = 128;
+      distConfig.maxTileSizes[0] = 192;
+      distConfig.maxTileSizes[1] = 128;
     }
   }
 
-  config.minTileSizes = vecTileSizes;
-  config.allowIncompleteTile = true;
-  config.vectorSizeHints.resize(numLoops, vectorSize);
+  distConfig.minTileSizes = vecTileSizes;
+  distConfig.allowIncompleteTile = true;
+  distConfig.vectorSizeHints.resize(numLoops, vectorSize);
   if (isBM) {
-    config.vectorSizeHints[0] = 1;
+    distConfig.vectorSizeHints[0] = 1;
   }
-  distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, config);
+  distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, distConfig);
 
   // TODO: We set cache tile sizes to the distribution sizes for now (no-op) to
   // make sure there are no performance changes. This will let us change the
@@ -1159,9 +1159,9 @@ setRootConfig(func::FuncOp entryPointFn,
 }
 
 static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
-  DistributionHeuristicConfig config;
-  config.minTileSizes.resize(op.getNumLoops(), 0);
-  config.maxTileSizes.resize(op.getNumLoops(), 0);
+  DistributionHeuristicConfig distConfig;
+  distConfig.minTileSizes.resize(op.getNumLoops(), 0);
+  distConfig.maxTileSizes.resize(op.getNumLoops(), 0);
 
   Value lhs = op.getDpsInputs()[0];
   Value rhs = op.getDpsInputs()[1];
@@ -1170,11 +1170,11 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   int mmt4dDimBase = 0;
   if (isa<linalg::BatchMmt4DOp>(op)) {
     mmt4dDimBase = 1;
-    config.minTileSizes[0] = 1;
-    config.maxTileSizes[0] = 1; // Force batch dimension tile size 1.
+    distConfig.minTileSizes[0] = 1;
+    distConfig.maxTileSizes[0] = 1; // Force batch dimension tile size 1.
   }
-  config.minTileSizes[mmt4dDimBase + 0] = 1;
-  config.minTileSizes[mmt4dDimBase + 1] = 1;
+  distConfig.minTileSizes[mmt4dDimBase + 0] = 1;
+  distConfig.minTileSizes[mmt4dDimBase + 1] = 1;
   auto lhsShape = lhsType.getShape();
   auto rhsShape = rhsType.getShape();
   int64_t M1 = lhsShape[mmt4dDimBase + 0];
@@ -1198,11 +1198,11 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   };
   int64_t tileBytes =
       (M1 == 1 || N1 == 1) ? clNarrowMatmulTileBytes : clGeneralMatmulTileBytes;
-  config.maxTileSizes[mmt4dDimBase + 0] =
+  distConfig.maxTileSizes[mmt4dDimBase + 0] =
       M1 == 1 ? 1
               : getMatmulTileSize(tileBytes, lhsType.getElementTypeBitWidth(),
                                   reductionSize, M0);
-  config.maxTileSizes[mmt4dDimBase + 1] =
+  distConfig.maxTileSizes[mmt4dDimBase + 1] =
       N1 == 1 ? 1
               : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
                                   reductionSize, N0);
@@ -1214,8 +1214,8 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   parallelTileSizes[mmt4dDimBase + 5] = K0;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
-  return {getDefaultDistributedLevelTileSizes(op, config), parallelTileSizes,
-          reductionTileSizes};
+  return {getDefaultDistributedLevelTileSizes(op, distConfig),
+          parallelTileSizes, reductionTileSizes};
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
@@ -1270,18 +1270,18 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
 
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  DistributionHeuristicConfig config;
-  config.allowIncompleteTile = true;
-  config.vectorSizeHints.resize(op.getSourceRank(), 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.allowIncompleteTile = true;
+  distConfig.vectorSizeHints.resize(op.getSourceRank(), 1);
   for (auto dim : op.getInnerDimsPos()) {
-    config.vectorSizeHints[dim] = vectorSize;
+    distConfig.vectorSizeHints[dim] = vectorSize;
   }
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, config);
+      getDefaultDistributedLevelTileSizes(op, distConfig);
   SmallVector<int64_t> workload(op.getSourceType().getShape());
   reduceDistributionWorkgroups(workload, distTileSizes,
                                /*maxTileSizes=*/std::nullopt,
-                               config.vectorSizeHints);
+                               distConfig.vectorSizeHints);
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
@@ -1304,9 +1304,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    tensor::UnPackOp op) {
-  DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, config);
+      getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
   SmallVector<int64_t> workload(op.getDestType().getShape());
   reduceDistributionWorkgroups(workload, distTileSizes);
 
@@ -1335,9 +1334,8 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
 static LogicalResult setRootConfig(func::FuncOp entryPointFn,
                                    IREE::LinalgExt::FftOp fftOp) {
   assert(!getLoweringConfig(fftOp) && "expected lowering_config is not set");
-  DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(fftOp, config);
+      getDefaultDistributedLevelTileSizes(fftOp, DistributionHeuristicConfig{});
   auto rank = fftOp.getOperandRank();
   if (distTileSizes.size() >= rank && distTileSizes[rank - 1] != 0) {
     APInt value;
@@ -1425,15 +1423,15 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
         DispatchLoweringPassPipeline::CPUDefault);
   }
 
-  DistributionHeuristicConfig config;
-  config.minTileSizes = getMinTilingSizesForEachDim(
+  DistributionHeuristicConfig distConfig;
+  distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
-  config.maxTileSizes.append(numLoops, defaultDistTileSize / 2);
+  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize / 2);
 
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(genericOp, config);
+      getDefaultDistributedLevelTileSizes(genericOp, distConfig);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for distribution: " << distTileSizes
                        << "\n");
@@ -1445,9 +1443,9 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes, config.minTileSizes,
-                        config.maxTileSizes, vecPreProcStrategy,
-                        parallelTileSizes);
+  setX86VectorTileSizes(genericOp, numLoops, distTileSizes,
+                        distConfig.minTileSizes, distConfig.maxTileSizes,
+                        vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
@@ -1515,15 +1513,16 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   }
 
   unsigned numLoops = genericOp.getNumLoops();
-  DistributionHeuristicConfig config;
-  config.minTileSizes = getMinTilingSizesForEachDim(
+  DistributionHeuristicConfig distConfig;
+  distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  if (llvm::all_of(config.minTileSizes, [](int64_t vs) { return vs == 1; })) {
+  if (llvm::all_of(distConfig.minTileSizes,
+                   [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
     return failure();
   }
 
-  if (llvm::count_if(config.minTileSizes,
+  if (llvm::count_if(distConfig.minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
     // Transpose patterns are not applicable if vectorizing more or less than
     // two dims.
@@ -1533,7 +1532,7 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   // Make sure that the original tile sizes are multiple of the tile sizes
   // to be used for the transpose op (i.e., 8x8).
   // TODO(diegocaballero): Enable 4x8 tile sizes if we find it useful.
-  if (llvm::any_of(config.minTileSizes, [](int64_t tileSize) {
+  if (llvm::any_of(distConfig.minTileSizes, [](int64_t tileSize) {
         return tileSize > 1 && (tileSize % 8) != 0;
       })) {
     return failure();
@@ -1541,11 +1540,11 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
 
   // Replace dims to be vectorized with the new 8x8 tile sizes.
   std::replace_if(
-      config.minTileSizes.begin(), config.minTileSizes.end(),
+      distConfig.minTileSizes.begin(), distConfig.minTileSizes.end(),
       [](int64_t tileSize) { return tileSize > 1; }, 8);
 
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(genericOp, config);
+      getDefaultDistributedLevelTileSizes(genericOp, distConfig);
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
   LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
@@ -1553,9 +1552,9 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
 
   // Set the next level tile sizes.
   SmallVector<int64_t> parallelTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes, config.minTileSizes,
-                        config.maxTileSizes, vecPreProcStrategy,
-                        parallelTileSizes);
+  setX86VectorTileSizes(genericOp, numLoops, distTileSizes,
+                        distConfig.minTileSizes, distConfig.maxTileSizes,
+                        vecPreProcStrategy, parallelTileSizes);
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes};
   // No need for tiling reduction dims and inner parallel dims.
@@ -1587,13 +1586,13 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   if (!linalg::isElementwise(genericOp))
     return failure();
 
-  DistributionHeuristicConfig config;
-  config.allowIncompleteTile = true;
-  config.minTileSizes = getMinTilingSizesForEachDim(
+  DistributionHeuristicConfig distConfig;
+  distConfig.allowIncompleteTile = true;
+  distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  config.maxTileSizes.append(numLoops, defaultDistTileSize);
+  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(genericOp, config);
+      getDefaultDistributedLevelTileSizes(genericOp, distConfig);
 
   // TODO(dcaballe): The logic below is disconnected from the main tile size
   // selection logic in getMaxTileSize. We should either port it there or remove
@@ -1632,7 +1631,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   // Adjust tiling sizes of vector levels to avoid large unroll factors. Most of
   // the cases are f32 and i32, so we divide it by 4.
   int64_t vecSize = getNativeVectorSizeInBytes(entryPointFn) / 4;
-  SmallVector<int64_t> vecTileSizes = config.minTileSizes;
+  SmallVector<int64_t> vecTileSizes = distConfig.minTileSizes;
   for (auto &i : vecTileSizes) {
     i = roundUpToPow2(std::min(i, vecSize),
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
@@ -1736,14 +1735,14 @@ static LogicalResult setConvRootConfig(func::FuncOp entryPointFn,
   assert(!getLoweringConfig(convOp) && "expected lowering_config is not set");
 
   unsigned numLoops = convOp.getNumLoops();
-  DistributionHeuristicConfig config;
+  DistributionHeuristicConfig distConfig;
 
   // Give the vector size hint on OC.
-  config.vectorSizeHints.append(numLoops, 1);
-  config.vectorSizeHints[3] = vectorSize;
+  distConfig.vectorSizeHints.append(numLoops, 1);
+  distConfig.vectorSizeHints[3] = vectorSize;
 
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(convOp, config);
+      getDefaultDistributedLevelTileSizes(convOp, distConfig);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
@@ -1870,18 +1869,18 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
   unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
       padOp.getResultType().getElementType());
   int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
-  DistributionHeuristicConfig config;
-  config.vectorSizeHints.append(numLoops, 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints.append(numLoops, 1);
   if (!ShapedType::isDynamic(ubs.back())) {
-    config.vectorSizeHints.back() = std::min(typeVectorSize, ubs.back());
+    distConfig.vectorSizeHints.back() = std::min(typeVectorSize, ubs.back());
   }
 
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(padOp, config);
+      getDefaultDistributedLevelTileSizes(padOp, distConfig);
   // No further tiling for reduction and inner parallel loops.
   SmallVector<int64_t> zeros(numLoops, 0);
-  TileSizesListType tileSizes = {distTileSizes, config.vectorSizeHints, zeros,
-                                 zeros};
+  TileSizesListType tileSizes = {distTileSizes, distConfig.vectorSizeHints,
+                                 zeros, zeros};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, padOp, tileSizes,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
