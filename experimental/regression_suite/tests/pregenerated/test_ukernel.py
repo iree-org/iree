@@ -23,6 +23,7 @@ argmax_ukernel_source = fetch_source_fixture(
     group="argmax_ukernel",
 )
 
+
 @pytest.fixture
 def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
     return iree_compile(
@@ -33,9 +34,10 @@ def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
             "--iree-hal-target-backends=rocm",
             "--iree-rocm-target-chip=gfx1100",
             "--iree-rocm-link-bc=true",
-            "--iree-rocm-enable-ukernels=all"
+            "--iree-rocm-enable-ukernels=all",
         ],
     )
+
 
 ###############################################################################
 # Correctness
@@ -68,6 +70,7 @@ argmax_output_f32 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_output_f32.npy",
     group="argmax_ukernel",
 )
+
 
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
