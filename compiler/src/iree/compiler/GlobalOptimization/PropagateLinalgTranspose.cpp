@@ -469,13 +469,6 @@ struct PropagateLinalgTransposePass
   void runOnOperation() override;
 
 private:
-  Option<bool> keepTransposes{
-      *this, "keep-transposes",
-      llvm::cl::desc(
-          "Flag used for lit-testing without re-generalizing the transposes. "
-          "Not for general usage"),
-      llvm::cl::init(false)};
-
   Option<bool> testSinkingOnly{
       *this, "test-sinking-only",
       llvm::cl::desc("Flag used for lit-testing sinking patterns only. "
@@ -596,35 +589,6 @@ void PropagateLinalgTransposePass::runOnOperation() {
     }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
-    }
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After combining transpose ops ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // Re-generalize any remaining transposes. Later pipelines expect it.
-  if (!keepTransposes && false) {
-    SmallVector<linalg::LinalgOp> transposeCandidates;
-    funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
-        return;
-      }
-      if (isa_and_nonnull<linalg::TransposeOp>(linalgOp.getOperation())) {
-        transposeCandidates.push_back(linalgOp);
-      }
-    });
-    IRRewriter rewriter(&getContext());
-    for (auto linalgOp : transposeCandidates) {
-      rewriter.setInsertionPoint(linalgOp);
-      FailureOr<linalg::GenericOp> generalizedOp =
-          linalg::generalizeNamedOp(rewriter, linalgOp);
-      if (failed(generalizedOp)) {
-        linalgOp->emitOpError("failed to generalize operation");
-        return signalPassFailure();
-      }
     }
   }
 

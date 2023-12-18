@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose{keep-transposes=true}))" --split-input-file %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose{keep-transposes=true test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
 
 func.func @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
