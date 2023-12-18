@@ -149,21 +149,8 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 static LogicalResult
 tileReduction(func::FuncOp funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
-  MLIRContext *context = funcOp.getContext();
-  // Set markers to drive tiling reduction dimensions.
-  OpBuilder builder(context);
-  auto marker = builder.getStringAttr(getTileReductionMarker());
-  funcOp.walk([&](linalg::LinalgOp op) {
-    if (isa<linalg::ContractionOpInterface>(*op) ||
-        isa<linalg::ConvolutionOpInterface>(*op) ||
-        isa<linalg::GenericOp>(*op)) {
-      op->setAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker,
-                  marker);
-    }
-  });
-
   auto filter =
-      IREE::LinalgExt::LinalgTransformationFilter({marker}, std::nullopt);
+      IREE::LinalgExt::LinalgTransformationFilter().setMatchByDefault();
   auto options =
       scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
   auto result = tileLinalgOpsWithFilter(funcOp, options, filter);
