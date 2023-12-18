@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -988,6 +989,60 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
 }
 
 void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// GpuDistributeSharedMemoryCopyOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  // Look for ops that move to workgroup memory and mark as copies for
+  // distribution.
+  target.walk([&](linalg::GenericOp copyOp) {
+    if (copyOp.getNumDpsInputs() != 1 || copyOp.getNumDpsInits() != 1)
+      return;
+    auto dest =
+        dyn_cast<TypedValue<MemRefType>>(copyOp.getDpsInitOperand(0)->get());
+    if (!dest)
+      return;
+
+    MemRefType destType = dest.getType();
+
+    // Check if the only operation in the possible copy op region is a
+    // terminator.
+    Block &body = copyOp.getRegion().front();
+    if (!std::begin(body)->hasTrait<OpTrait::IsTerminator>())
+      return;
+
+    auto destSpace =
+        dyn_cast_or_null<gpu::AddressSpaceAttr>(destType.getMemorySpace());
+    if (!destSpace)
+      return;
+
+    // The destination space must be shared memory.
+    if (destSpace.getValue() != gpu::GPUDialect::getWorkgroupAddressSpace())
+      return;
+
+    // Mark this copy operation as a copy to workgroup memory.
+    setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
+  });
+
+  if (failed(mlir::iree_compiler::gpuDistributeSharedMemoryCopy(target))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Pattern failed to apply");
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::GpuDistributeSharedMemoryCopyOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
