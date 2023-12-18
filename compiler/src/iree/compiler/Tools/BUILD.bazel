@@ -60,6 +60,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Modules/HAL/Loader/IR:HALLoaderDialect",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/Transforms",
         "//compiler/src/iree/compiler/Modules/IO/Parameters/IR:IOParametersDialect",
+        "//compiler/src/iree/compiler/Modules/IO/Stream/IR:IOStreamDialect",
         "//compiler/src/iree/compiler/Pipelines",
         "//compiler/src/iree/compiler/Preprocessing:Passes",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",

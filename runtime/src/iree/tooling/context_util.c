@@ -24,6 +24,11 @@
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/dynamic/module.h"
 
+#if IREE_FILE_IO_ENABLE && defined(IREE_HAVE_IO_STREAM_MODULE)
+#define IREE_TOOLING_HAVE_IO_STREAM_MODULE 1
+#include "iree/modules/io/stream/module.h"
+#endif  // IREE_FILE_IO_ENABLE && IREE_HAVE_IO_STREAM_MODULE
+
 //===----------------------------------------------------------------------===//
 // Module loading
 //===----------------------------------------------------------------------===//
@@ -431,6 +436,25 @@ static iree_status_t iree_tooling_resolve_module_dependency_callback(
                                     IREE_SV("io_parameters"))) {
     IREE_RETURN_IF_ERROR(iree_tooling_create_parameters_module_from_flags(
         state->instance, state->host_allocator, &module));
+#if defined(IREE_TOOLING_HAVE_IO_STREAM_MODULE)
+  } else if (iree_string_view_equal(dependency->name, IREE_SV("io_stream"))) {
+    // TODO(benvanik): support flags for controlling stdin/stdout/etc:
+    // we could route to files, /dev/null, etc. For now we always expose the
+    // console as we're assuming this tooling utility is used in a command line
+    // app. We should find a way to make this happen in
+    // tooling/modules/resolver.h but currently it does not support flags.
+    iree_io_stream_console_files_t console = {
+#if IREE_FILE_IO_ENABLE
+      .stdin_handle = stdin,
+      .stdout_handle = stdout,
+      .stderr_handle = stderr,
+#else
+      .unavailable = 1,
+#endif  // IREE_FILE_IO_ENABLE
+    };
+    IREE_RETURN_IF_ERROR(iree_io_stream_module_create(
+        state->instance, console, state->host_allocator, &module));
+#endif  // IREE_TOOLING_HAVE_IO_STREAM_MODULE
   } else {
     // Defer to the generic module resolver registry.
     IREE_RETURN_IF_ERROR(iree_tooling_resolve_module_dependency(
@@ -568,7 +592,15 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 
   // HACK: to load modules we need the types registered even though we don't
   // know if the types are used.
-  iree_status_t status = iree_hal_module_register_all_types(instance);
+  iree_status_t status = iree_ok_status();
+#if defined(IREE_TOOLING_HAVE_IO_STREAM_MODULE)
+  if (iree_status_is_ok(status)) {
+    status = iree_io_stream_module_register_types(instance);
+  }
+#endif  // IREE_TOOLING_HAVE_IO_STREAM_MODULE
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_module_register_all_types(instance);
+  }
   if (iree_status_is_ok(status)) {
     status = iree_tooling_register_all_module_types(instance);
   }

@@ -85,6 +85,27 @@ OpFoldResult CmpEQOp::fold(FoldAdaptor operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// util.cmp.ne
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CmpNEOp::fold(FoldAdaptor operands) {
+  auto makeBool = [&](bool value) {
+    return IntegerAttr::get(IntegerType::get(getContext(), 1), value ? 1 : 0);
+  };
+  if (getLhs() == getRhs()) {
+    // SSA values are exactly the same.
+    return makeBool(false);
+  } else if (operands.getLhs() && operands.getRhs() &&
+             operands.getLhs() == operands.getRhs()) {
+    // Folded attributes are equal but may come from separate ops.
+    return makeBool(false);
+  }
+  // TODO(benvanik): we could add some interfaces for comparing, but this is
+  // likely good enough for now.
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // util.range.min/max
 //===----------------------------------------------------------------------===//
 

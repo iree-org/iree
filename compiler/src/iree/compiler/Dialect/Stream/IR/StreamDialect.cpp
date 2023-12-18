@@ -103,7 +103,9 @@ StreamDialect::StreamDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.cpp.inc"
       >();
-  addInterfaces<StreamInlinerInterface, StreamFolderInterface>();
+
+  addInterfaces<StreamInlinerInterface>();
+  addInterfaces<StreamFolderInterface>();
 }
 
 void StreamDialect::getCanonicalizationPatterns(

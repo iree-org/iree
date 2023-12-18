@@ -115,6 +115,31 @@ def Util_CmpEQOp : Util_PureOp<"cmp.eq", [
   let hasFolder = 1;
 }
 
+def Util_CmpNEOp : Util_PureOp<"cmp.ne", [
+  AllTypesMatch<["lhs", "rhs"]>,
+  Commutative,
+]> {
+  let summary = [{compares two values for inequality}];
+  let description = [{
+    Compares two operands for inequality. This is intended for comparing IREE
+    reference types (like !util.buffer) that cannot be used with std.cmpi.
+  }];
+
+  let arguments = (ins
+    AnyType:$lhs,
+    AnyType:$rhs
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    operands attr-dict `:` type($lhs)
+  }];
+
+  let hasFolder = 1;
+}
+
 } // OpGroupTypeManipulationOps
 
 //===----------------------------------------------------------------------===//

@@ -86,6 +86,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/modules/hal",
         "//runtime/src/iree/modules/hal/inline",
         "//runtime/src/iree/modules/hal/loader",
+        "//runtime/src/iree/modules/io/stream",
         "//runtime/src/iree/tooling/modules",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",

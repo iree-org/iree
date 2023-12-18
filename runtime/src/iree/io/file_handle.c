@@ -154,7 +154,7 @@ IREE_API_EXPORT iree_status_t iree_io_stream_open(
             file_offset, file_primitive.value.host_allocation.data_length);
         break;
       }
-      iree_io_memory_stream_release_callback_t release_callback = {
+      iree_io_stream_release_callback_t release_callback = {
           .fn = iree_io_memory_stream_file_release,
           .user_data = file_handle,
       };

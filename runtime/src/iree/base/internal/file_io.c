@@ -495,7 +495,7 @@ iree_status_t iree_file_write_contents(const char* path,
 
   iree_status_t status = iree_ok_status();
   if (content.data_length > 0) {
-    int ret = fwrite((char*)content.data, content.data_length, 1, file);
+    size_t ret = fwrite((char*)content.data, content.data_length, 1, file);
     if (ret != 1) {
       status = iree_make_status(IREE_STATUS_DATA_LOSS,
                                 "unable to write file contents of %" PRIhsz

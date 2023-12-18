@@ -137,6 +137,14 @@ static iree_status_t iree_io_stream_apply_fixed_seek(
 // iree_io_stream_t
 //===----------------------------------------------------------------------===//
 
+IREE_API_EXPORT void iree_io_stream_destroy(iree_io_stream_t* stream) {
+  if (IREE_LIKELY(stream)) {
+    IREE_TRACE_ZONE_BEGIN(z0);
+    stream->vtable->destroy(stream);
+    IREE_TRACE_ZONE_END(z0);
+  }
+}
+
 IREE_API_EXPORT void iree_io_stream_retain(iree_io_stream_t* stream) {
   if (IREE_LIKELY(stream)) {
     iree_atomic_ref_count_inc(&stream->ref_count);
@@ -146,9 +154,7 @@ IREE_API_EXPORT void iree_io_stream_retain(iree_io_stream_t* stream) {
 IREE_API_EXPORT void iree_io_stream_release(iree_io_stream_t* stream) {
   if (IREE_LIKELY(stream) &&
       iree_atomic_ref_count_dec(&stream->ref_count) == 1) {
-    IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_io_stream_destroy");
-    stream->vtable->destroy(stream);
-    IREE_TRACE_ZONE_END(z0);
+    iree_io_stream_destroy(stream);
   }
 }
 
@@ -359,7 +365,7 @@ IREE_API_EXPORT iree_status_t iree_io_stream_copy(
 typedef struct iree_io_memory_stream_t {
   iree_io_stream_t base;
   iree_allocator_t host_allocator;
-  iree_io_memory_stream_release_callback_t release_callback;
+  iree_io_stream_release_callback_t release_callback;
   iree_io_stream_pos_t offset;
   iree_io_stream_pos_t length;
   uint8_t* contents;
@@ -374,7 +380,7 @@ static iree_io_memory_stream_t* iree_io_memory_stream_cast(
 
 IREE_API_EXPORT iree_status_t iree_io_memory_stream_wrap(
     iree_io_stream_mode_t mode, iree_byte_span_t contents,
-    iree_io_memory_stream_release_callback_t release_callback,
+    iree_io_stream_release_callback_t release_callback,
     iree_allocator_t host_allocator, iree_io_stream_t** out_stream) {
   IREE_ASSERT_ARGUMENT(out_stream);
   *out_stream = NULL;

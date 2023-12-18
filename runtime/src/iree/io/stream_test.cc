@@ -32,7 +32,7 @@ TEST(MemoryStreamTest, Wrap) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   EXPECT_EQ(iree_io_stream_mode(stream), IREE_IO_STREAM_MODE_READABLE);
@@ -48,7 +48,7 @@ TEST(MemoryStreamTest, WrapEmpty) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, 0),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   EXPECT_EQ(iree_io_stream_mode(stream), IREE_IO_STREAM_MODE_READABLE);
@@ -61,7 +61,7 @@ TEST(MemoryStreamTest, WrapEmpty) {
 
 TEST(MemoryStreamTest, WrapReleaseCallback) {
   int callback_count = 0;
-  iree_io_memory_stream_release_callback_t release_callback = {
+  iree_io_stream_release_callback_t release_callback = {
       +[](void* user_data, iree_io_stream_t* stream) {
         int* callback_count = (int*)user_data;
         ++(*callback_count);
@@ -87,7 +87,7 @@ TEST(MemoryStreamTest, SeekSet) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -130,7 +130,7 @@ TEST(MemoryStreamTest, SeekFromCurrent) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -192,7 +192,7 @@ TEST(MemoryStreamTest, SeekFromEnd) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -235,7 +235,7 @@ TEST(MemoryStreamTest, SeekToAlignment) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -287,7 +287,7 @@ TEST(MemoryStreamTest, ReadUpTo) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -348,7 +348,7 @@ TEST(MemoryStreamTest, ReadExact) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   // Streams start at origin 0.
@@ -407,7 +407,7 @@ TEST(MemoryStreamTest, Write) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_WRITABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   const uint8_t write_buffer[8] = {0, 1, 2, 3, 4, 5, 6, 7};
@@ -464,7 +464,7 @@ TEST(MemoryStreamTest, Fill) {
   iree_io_stream_t* stream = NULL;
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_WRITABLE, iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   uint8_t pattern[] = {0x80, 0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xF0};
@@ -538,7 +538,7 @@ TEST(MemoryStreamTest, MapRead) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE | IREE_IO_STREAM_MODE_MAPPABLE,
       iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   iree_const_byte_span_t span = iree_const_byte_span_empty();
@@ -569,7 +569,7 @@ TEST(MemoryStreamTest, MapWrite) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_WRITABLE | IREE_IO_STREAM_MODE_MAPPABLE,
       iree_make_byte_span(data, sizeof(data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &stream));
 
   iree_byte_span_t span = iree_byte_span_empty();
@@ -601,7 +601,7 @@ TEST(MemoryStreamTest, Copy) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE,
       iree_make_byte_span(source_data, sizeof(source_data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &source_stream));
 
   uint8_t target_data[5] = {0xDD};
@@ -609,7 +609,7 @@ TEST(MemoryStreamTest, Copy) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_WRITABLE,
       iree_make_byte_span(target_data, sizeof(target_data)),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &target_stream));
 
   // Bounds checks length.
@@ -674,7 +674,7 @@ TEST(MemoryStreamTest, CopyLarge) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_READABLE,
       iree_make_byte_span(source_data.data(), source_data.size()),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &source_stream));
 
   std::vector<uint8_t> target_data(1 * 1024 * 1024);
@@ -682,7 +682,7 @@ TEST(MemoryStreamTest, CopyLarge) {
   IREE_ASSERT_OK(iree_io_memory_stream_wrap(
       IREE_IO_STREAM_MODE_WRITABLE,
       iree_make_byte_span(target_data.data(), target_data.size()),
-      iree_io_memory_stream_release_callback_null(), iree_allocator_system(),
+      iree_io_stream_release_callback_null(), iree_allocator_system(),
       &target_stream));
 
   // Copy an interior subrange.

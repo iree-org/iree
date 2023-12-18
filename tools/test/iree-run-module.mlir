@@ -6,5 +6,5 @@ func.func @abs(%input : tensor<2xf32>) -> (tensor<2xf32>) {
   %result = math.absf %input : tensor<2xf32>
   return %result : tensor<2xf32>
 }
-  // INPUT-BUFFERS: result[1]: hal.buffer_view
-  // INPUT-BUFFERS-NEXT: 2xf32=-2.0 3.0
+// CHECK: result[0]: hal.buffer_view
+// CHECK-NEXT: 2xf32=2 3
