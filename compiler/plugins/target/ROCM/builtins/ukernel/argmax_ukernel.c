@@ -99,7 +99,7 @@ __iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f16(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -133,7 +133,7 @@ __iree_uk_rocm_argmax_F16I64(half *inputBuffer, size_t input_offset,
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __hmax(new_in, laneMax);
+    laneMax = __ocml_fmax_f16(new_in, laneMax);
   }
 
   // Final reduction with one subgroup
