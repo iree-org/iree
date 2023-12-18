@@ -154,7 +154,7 @@ createSPIRVTileToCooperativeOpsPass();
 
 // Trims the SPIR-V target environment of a HAL executable variant to the
 // minimal requirement per the compiled spirv.module op needs.
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVTrimExecutableTargetEnvPass();
 
 /// Converts vector ops to gpu subgroup MMA ops.

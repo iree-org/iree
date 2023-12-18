@@ -682,10 +682,12 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
 // NOTE: this runs on the top-level program module containing all hal.executable
 // ops.
 void buildSPIRVLinkingPassPipeline(OpPassManager &passManager) {
+  auto &nestedExecutablePM = passManager.nest<IREE::HAL::ExecutableOp>();
   // Trim the allowed target environment (version/capability/extension/etc.) to
   // the minimal requirement needed by compiled spirv.module ops. This helps to
   // increase the chance of linking different variant ops together.
-  passManager.addPass(createSPIRVTrimExecutableTargetEnvPass());
+  nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
+      createSPIRVTrimExecutableTargetEnvPass());
   // Link together executables. This may produce some IR duplication.
   passManager.addPass(createSPIRVLinkExecutablesPass());
 

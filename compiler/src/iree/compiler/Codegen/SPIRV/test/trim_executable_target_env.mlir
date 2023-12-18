@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-trim-executable-target-env %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-spirv-trim-executable-target-env)))' %s | FileCheck %s
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float64, Float16, Int64, Int16, Int8, GroupNonUniformArithmetic],

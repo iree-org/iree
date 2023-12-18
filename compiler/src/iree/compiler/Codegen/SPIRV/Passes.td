@@ -134,7 +134,8 @@ def SPIRVTileToCooperativeOps : Pass<
 }
 
 def SPIRVTrimExecutableTargetEnv :
-    Pass<"iree-spirv-trim-executable-target-env", "ModuleOp"> {
+    Pass<"iree-spirv-trim-executable-target-env",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Trim the SPIR-V target environment of a HAL executable "
                 "variant to the minimal requirement per the compiled "
                 "spirv.module op needs";
