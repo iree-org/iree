@@ -52,22 +52,22 @@ def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
 #       cannot compare signless i64 from vmfb and by default si64 from npy.
 
 argmax_input_f16 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_input_f16.npy",
+    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f16.npy",
     group="argmax_ukernel",
 )
 
 argmax_output_f16 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_output_f16.npy",
+    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f16.npy",
     group="argmax_ukernel",
 )
 
 argmax_input_f32 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_input_f32.npy",
+    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f32.npy",
     group="argmax_ukernel",
 )
 
 argmax_output_f32 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_output_f32.npy",
+    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f32.npy",
     group="argmax_ukernel",
 )
 
