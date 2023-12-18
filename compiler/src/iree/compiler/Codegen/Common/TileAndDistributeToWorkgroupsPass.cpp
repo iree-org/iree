@@ -296,14 +296,22 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     if (!exportOp)
       continue;
 
-    // If the function already contains workgroup id ops, infer that tiling +
-    // distribution has already occurred. This is in lieu of a formal attribute
-    // for specifying this. A user could write workgroup independent code
-    // (or code for a single workgroup) and this check would fail.
-    WalkResult res = funcOp.walk([&](IREE::HAL::InterfaceWorkgroupIDOp) {
-      return WalkResult::interrupt();
+    Block *body = exportOp.getWorkgroupCountBody();
+    if (!body) {
+      exportOp.emitOpError("unexpected empty workgroup count region");
+      return signalPassFailure();
+    }
+
+    // If the function has already lowered the workgroup count region, infer
+    // that tiling + distribution has already occurred.
+    WalkResult res = body->walk([&](Operation *op) {
+      if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
+              IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(op)) {
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
     });
-    if (res.wasInterrupted()) {
+    if (!res.wasInterrupted()) {
       continue;
     }
 
