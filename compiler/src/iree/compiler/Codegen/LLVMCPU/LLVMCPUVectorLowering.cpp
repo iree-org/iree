@@ -95,6 +95,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    // Drop unit dims on elementwise ops and cancel shape_cast between them.
+    vector::populateDropUnitDimWithShapeCastPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
         /*benefit=*/1,
