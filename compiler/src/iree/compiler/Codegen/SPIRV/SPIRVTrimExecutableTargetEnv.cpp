@@ -53,12 +53,15 @@ struct SPIRVTrimExecutableTargetEnvPass final
       spvModule.emitError("should have deduced vce triple");
       return signalPassFailure();
     }
+    auto minimalTarget = spirv::TargetEnvAttr::get(
+        vceTriple.value(),
+        spirv::getDefaultResourceLimits(vceTriple->getContext()));
 
     // Replace the provided allow list to the minimal requirement deduced
     // from compilation.
     IREE::HAL::ExecutableTargetAttr providedTarget = variant.getTarget();
     auto deducedConfig = providedTarget.getConfiguration().replace(
-        [&](spirv::TargetEnvAttr attr) { return vceTriple; });
+        [&](spirv::TargetEnvAttr attr) { return minimalTarget; });
     auto deducedTarget = IREE::HAL::ExecutableTargetAttr::get(
         providedTarget.getContext(), providedTarget.getBackend(),
         providedTarget.getFormat(), cast<DictionaryAttr>(deducedConfig));

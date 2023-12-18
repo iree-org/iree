@@ -6,8 +6,8 @@
                                       api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<>>}>
 
 
-// CHECK-DAG: #[[$TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>}>
-// CHECK-DAG: #[[$TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.vce<v1.3, [Shader, GroupNonUniformArithmetic], [SPV_KHR_storage_buffer_storage_class]>}>
+// CHECK-DAG: #[[$TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}>
+// CHECK-DAG: #[[$TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniformArithmetic], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 
