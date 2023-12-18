@@ -54,7 +54,7 @@ hal.executable private @simple_reduce  {
 //   CHECK-DAG:     %[[E:.*]] = vector.extractelement %[[V0]][%[[C0]] : index] : vector<1xf32>
 //   CHECK-DAG:     %[[ID:.*]] = affine.apply
 //   CHECK-DAG:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
-//       CHECK:     %[[S:.*]] = vector.reduction <add>, %[[V1]] : vector<1xf32> into f32
+//       CHECK:     %[[S:.*]] = vector.extract %[[V1]][0] : f32 from vector<1xf32>
 //       CHECK:     %[[S0:.*]], %{{.*}} = gpu.shuffle  xor %[[S]], %[[C1]], %[[C32]] : f32
 //       CHECK:     %[[S1:.*]] = arith.addf %[[S]], %[[S0]] : f32
 //       CHECK:     %[[S2:.*]], %{{.*}} = gpu.shuffle  xor %[[S1]], %[[C2]], %[[C32]] : f32
@@ -141,8 +141,8 @@ hal.executable private @reduce_uniform_buffer_offset  {
 //         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-//         CHECK:     vector.reduction
 // CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
 // -----
@@ -210,8 +210,8 @@ hal.executable private @reduce_storage_buffer_offset  {
 //         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-//         CHECK:     vector.reduction
 // CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
 // -----
