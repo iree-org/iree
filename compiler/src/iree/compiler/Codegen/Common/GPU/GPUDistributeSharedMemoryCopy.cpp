@@ -115,7 +115,8 @@ static int getBaseVectorSize(linalg::GenericOp genericOp) {
   // sure we at least read a full byte for the sub-byte-element operands.
   unsigned operandBW = std::numeric_limits<unsigned>::max();
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
-    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    unsigned b =
+        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand->get()));
     operandBW = std::min(operandBW, b);
   }
   int vectorSize = copyVectorNumBits / resultBW;
