@@ -126,9 +126,10 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
-    FunctionLikeNest(mainPassManager)
-        .addPass(createGeneralizeLinalgNamedOpsPass);
   }
+  // Generalize transposes and any other remaining named linalg ops that can now
+  // be represented as generics.
+  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)

@@ -24,7 +24,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-opt-propagate-linalg-transpose"
+#define DEBUG_TYPE "iree-global-opt-propagate-linalg-transpose"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
@@ -70,11 +70,9 @@ static RankedTensorType getPermutedTensorType(RankedTensorType type,
 // it requires a single input where the indexing maps are full permutations and
 // non-equal.
 static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
-  // Structural.
   if (linalgOp.getNumParallelLoops() != linalgOp.getNumLoops())
     return false;
 
-  // Operands and maps.
   if (linalgOp.getNumDpsInputs() != 1 || linalgOp.getNumDpsInits() != 1)
     return false;
   auto mapRange = linalgOp.getIndexingMapsArray();
@@ -82,27 +80,28 @@ static bool isaTransposeOpInterface(linalg::LinalgOp linalgOp) {
       !mapRange.back().isPermutation() || mapRange.front() == mapRange.back()) {
     return false;
   }
-  // Region.
   return llvm::hasSingleElement(linalgOp.getBlock()->getOperations());
 }
 
-// Checks whether the given linalg.generic is a transpose and specializes.
+// Specializes linalg.generic op to linalg.transpose if it is transposing a
+// single input.
 static void specializeGenericTransposeOp(RewriterBase &rewriter,
                                          linalg::GenericOp genericOp) {
-  if (isaTransposeOpInterface(genericOp)) {
-    auto mapRange = genericOp.getIndexingMapsArray();
-    AffineMap outMap = mapRange.back();
-    AffineMap inMap = mapRange.front();
-    SmallVector<int64_t> perm;
-    // To get the permutation, look at each output index and find which
-    // dimension in the input we're reading from for that index.
-    for (AffineExpr expr : outMap.getResults()) {
-      perm.push_back(*inMap.getResultPosition(expr));
-    }
-    rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
-        genericOp, genericOp.getDpsInputs()[0], genericOp.getDpsInits()[0],
-        perm);
+  if (!isaTransposeOpInterface(genericOp)) {
+    return;
   }
+
+  auto mapRange = genericOp.getIndexingMapsArray();
+  AffineMap outMap = mapRange.back();
+  AffineMap inMap = mapRange.front();
+  SmallVector<int64_t> perm;
+  // To get the permutation, look at each output index and find which
+  // dimension in the input we're reading from for that index.
+  for (AffineExpr expr : outMap.getResults()) {
+    perm.push_back(*inMap.getResultPosition(expr));
+  }
+  rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
+      genericOp, genericOp.getDpsInputs()[0], genericOp.getDpsInits()[0], perm);
 }
 
 //===----------------------------------------------------------------------===//
@@ -607,7 +606,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
   });
 
   // Re-generalize any remaining transposes. Later pipelines expect it.
-  if (!keepTransposes) {
+  if (!keepTransposes && false) {
     SmallVector<linalg::LinalgOp> transposeCandidates;
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
       if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {

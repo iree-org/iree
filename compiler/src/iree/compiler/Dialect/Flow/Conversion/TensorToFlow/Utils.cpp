@@ -38,10 +38,6 @@ getShapeFromSizes(ArrayRef<OpFoldResult> valueOrAttrList) {
       });
 }
 
-/// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
-/// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
-/// eventually map to DMA operations if the offsets/sizes/strides represent a
-/// contiguous memory.
 bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
                                          ArrayRef<OpFoldResult> sizes,
                                          ArrayRef<OpFoldResult> strides,
