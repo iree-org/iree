@@ -1204,10 +1204,10 @@ def VM_RodataTableOp : VM_PureOp<"rodata.table", [
   let description = [{
     vm.rodata with another associated vm.rodata table specifying byte offsets
     and sizes as a subview into the flattened data. The table is a flat array
-    of 32-bit integers storing (offset, size) in element order.
+    of 32 or 64-bit integers storing (offset, size) in element order.
 
     The optional alignment attribute applies to both the table and data rodata.
-    The dataAligment attribute can be used to specify an alignment for the
+    The data_alignment attribute can be used to specify an alignment for the
     elements of the table, padding to the data alignment with zeros. The element
     sizes reflect the unpadded attribute storage sizes.
 
@@ -1217,7 +1217,8 @@ def VM_RodataTableOp : VM_PureOp<"rodata.table", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$table_name,
     OptionalAttr<StrAttr>:$data_name,
-    Util_CompositeAttr:$data_array,
+    TypeAttrOf<VM_AnyIntegerType>:$table_type,
+    Util_AnySerializableArrayAttr:$data_array,
     OptionalAttr<I64Attr>:$alignment,
     OptionalAttr<I64Attr>:$data_alignment,
     OptionalAttr<StrAttr>:$mime_type
@@ -1229,17 +1230,12 @@ def VM_RodataTableOp : VM_PureOp<"rodata.table", [
   );
 
   let assemblyFormat = [{
-    attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+    $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
   }];
 
   let builders = [
-    OpBuilder<(ins "TypeRange":$resultTypes, "ArrayAttr":$value),
-    [{
-      $_state.addTypes(resultTypes);
-      $_state.addAttribute("data_array", value);
-    }]>,
-    OpBuilder<(ins "Util::CompositeAttr":$value)>,
-    OpBuilder<(ins "StringAttr":$name, "Util::CompositeAttr":$value)>
+    OpBuilder<(ins "IntegerType":$table_type, "ArrayAttr":$value)>,
+    OpBuilder<(ins "StringAttr":$name, "IntegerType":$table_type, "ArrayAttr":$value)>
   ];
 }
 

@@ -8,11 +8,7 @@ func.func @parameterLoad(%device: !hal.device, %queue_affinity: i64, %wait: !hal
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
   %c101 = arith.constant 101 : index
-  //  CHECK-DAG: %[[KEY_TABLE:.+]] = vm.rodata.inline : !vm.buffer = dense<[0, 4, 4, 4]> : vector<4xi32>
-  //  CHECK-DAG: %[[KEY_DATA:.+]] = vm.rodata.inline : !vm.buffer = #util.composite<8xi8, [
-  // CHECK-NEXT:  "key0",
-  // CHECK-NEXT:  "key1",
-  // CHECK-NEXT: ]>
+  //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table i32 : !vm.buffer, !vm.buffer = ["key0", "key1"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 0, 100, 51, 0, 101]> : vector<6xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
   // CHECK: %[[TARGET_BUFFERS:.+]] = vm.call @io_parameters.load
@@ -37,10 +33,7 @@ func.func @parameterLoad(%device: !hal.device, %queue_affinity: i64, %wait: !hal
 func.func @parameterLoadNoScope(%device: !hal.device, %queue_affinity: i64, %wait: !hal.fence, %signal: !hal.fence) -> !hal.buffer {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
-  //  CHECK-DAG: %[[KEY_TABLE:.+]] = vm.rodata.inline : !vm.buffer = dense<[0, 3]> : vector<2xi32>
-  //  CHECK-DAG: %[[KEY_DATA:.+]] = vm.rodata.inline : !vm.buffer = #util.composite<3xi8, [
-  // CHECK-NEXT:  "key",
-  // CHECK-NEXT: ]>
+  //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table i32 : !vm.buffer, !vm.buffer = ["key"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 0, 100]> : vector<3xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK: %[[TARGET_BUFFERS:.+]] = vm.call @io_parameters.load
@@ -69,12 +62,7 @@ func.func @parameterGather(%device: !hal.device, %queue_affinity: i64, %wait: !h
   %c200 = arith.constant 200 : index
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
-  //  CHECK-DAG: %[[KEY_TABLE:.+]] = vm.rodata.inline : !vm.buffer = dense<[0, 4, 4, 4, 8, 4]> : vector<6xi32>
-  //  CHECK-DAG: %[[KEY_DATA:.+]] = vm.rodata.inline : !vm.buffer = #util.composite<12xi8, [
-  // CHECK-NEXT:  "key0",
-  // CHECK-NEXT:  "key1",
-  // CHECK-NEXT:  "key2",
-  // CHECK-NEXT: ]>
+  //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table i32 : !vm.buffer, !vm.buffer = ["key0", "key1", "key2"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 100, 200, 51, 101, 201, 52, 102, 202]> : vector<9xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
   //      CHECK: vm.call @io_parameters.gather
@@ -102,12 +90,7 @@ func.func @parameterScatter(%device: !hal.device, %queue_affinity: i64, %wait: !
   %c200 = arith.constant 200 : index
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
-  //  CHECK-DAG: %[[KEY_TABLE:.+]] = vm.rodata.inline : !vm.buffer = dense<[0, 4, 4, 4, 8, 4]> : vector<6xi32>
-  //  CHECK-DAG: %[[KEY_DATA:.+]] = vm.rodata.inline : !vm.buffer = #util.composite<12xi8, [
-  // CHECK-NEXT:  "key0",
-  // CHECK-NEXT:  "key1",
-  // CHECK-NEXT:  "key2",
-  // CHECK-NEXT: ]>
+  //      CHECK: %[[KEY_TABLE:.+]], %[[KEY_DATA:.+]] = vm.rodata.table i32 : !vm.buffer, !vm.buffer = ["key0", "key1", "key2"]
   //  CHECK-DAG: %[[SPANS:.+]] = vm.rodata.inline : !vm.buffer = dense<[50, 100, 200, 51, 101, 201, 52, 102, 202]> : vector<9xi64>
   //  CHECK-DAG: %[[SCOPE:.+]] = vm.rodata.inline {{.+}} = "scope"
   //      CHECK: vm.call @io_parameters.scatter

@@ -35,9 +35,8 @@ static Value getStringRodata(Location loc, StringAttr attr,
 
 static std::pair<Value, Value> buildKeyTable(Location loc, ArrayAttr keysAttr,
                                              OpBuilder &builder) {
-  auto compositeAttr =
-      IREE::Util::CompositeAttr::get(builder.getContext(), keysAttr.getValue());
-  auto tableOp = builder.create<IREE::VM::RodataTableOp>(loc, compositeAttr);
+  auto tableOp = builder.create<IREE::VM::RodataTableOp>(
+      loc, builder.getIntegerType(32), keysAttr);
   return {tableOp.getTableResult(), tableOp.getDataResult()};
 }
 

@@ -20,14 +20,15 @@ namespace mlir::iree_compiler::IREE::VM {
 
 // Replaces a vm.rodata.table op with two vm.rodata.inline ops, one for the
 // indexing table, and the second for the padded data.
+template <typename IntTy>
 static void reifyRodataTable(RewriterBase &rewriter,
                              IREE::VM::RodataTableOp tableOp) {
-  SmallVector<int32_t> table;
+  SmallVector<IntTy> table;
   SmallVector<Attribute> dataAttrs;
   size_t dataSize = 0;
   size_t dataAlignment =
       tableOp.getDataAlignment() ? *tableOp.getDataAlignment() : 1;
-  for (auto value : tableOp.getDataArray().getValues()) {
+  for (auto value : tableOp.getDataArray().getValue()) {
     auto serializableAttr =
         llvm::cast<IREE::Util::SerializableAttrInterface>(value);
     size_t storageSize = serializableAttr.getStorageSize();
@@ -54,8 +55,14 @@ static void reifyRodataTable(RewriterBase &rewriter,
 
   auto refType =
       IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>());
-  auto tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
-      tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
+  IREE::VM::RodataInlineOp tableRodata;
+  if constexpr (std::is_same<IntTy, int32_t>()) {
+    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
+        tableOp.getLoc(), refType, rewriter.getI32VectorAttr(table));
+  } else {
+    tableRodata = rewriter.create<IREE::VM::RodataInlineOp>(
+        tableOp.getLoc(), refType, rewriter.getI64VectorAttr(table));
+  }
   if (auto tableNameAttr = tableOp.getTableNameAttr()) {
     tableRodata.setNameAttr(tableNameAttr);
   }
@@ -102,7 +109,14 @@ public:
     IRRewriter rewriter(moduleOp.getContext());
     moduleOp.walk([&](IREE::VM::RodataTableOp tableOp) {
       rewriter.setInsertionPoint(tableOp);
-      reifyRodataTable(rewriter, tableOp);
+      size_t tableBitwidth = tableOp.getTableType().getIntOrFloatBitWidth();
+      if (tableBitwidth == 32) {
+        reifyRodataTable<int32_t>(rewriter, tableOp);
+      } else if (tableBitwidth == 64) {
+        reifyRodataTable<int64_t>(rewriter, tableOp);
+      } else {
+        llvm_unreachable("Invalid table bit width");
+      }
     });
   }
 };

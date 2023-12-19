@@ -809,7 +809,8 @@ void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
 }
 
 void RodataTableOp::build(OpBuilder &builder, OperationState &result,
-                          StringAttr name, IREE::Util::CompositeAttr value) {
+                          StringAttr name, IntegerType tableType,
+                          ArrayAttr value) {
   // Make an identifier-friendly version of the string so that the value is
   // more readable in IR (so "I'm some string" becomes "im_some_string", etc).
   auto safeIdentifier = makeSafeIdentifier(name.getValue());
@@ -820,16 +821,17 @@ void RodataTableOp::build(OpBuilder &builder, OperationState &result,
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   build(builder, result, TypeRange{refType, refType},
         /*tableName=*/builder.getStringAttr(tableName),
-        /*dataName=*/builder.getStringAttr(dataName), /*dataArray=*/value,
+        /*dataName=*/builder.getStringAttr(dataName), /*tableType=*/tableType,
+        /*dataArray=*/value,
         /*alignment=*/nullptr, /*dataAlignment=*/nullptr, /*mimeType=*/nullptr);
 }
 
 void RodataTableOp::build(OpBuilder &builder, OperationState &result,
-                          IREE::Util::CompositeAttr value) {
+                          IntegerType tableType, ArrayAttr value) {
   auto refType =
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
   build(builder, result, TypeRange{refType, refType},
-        /*tableName=*/nullptr, /*dataName=*/nullptr,
+        /*tableName=*/nullptr, /*dataName=*/nullptr, /*tableType=*/tableType,
         /*dataArray=*/value, /*alignment=*/nullptr, /*dataAlignment=*/nullptr,
         /*mimeType=*/nullptr);
 }
