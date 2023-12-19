@@ -48,7 +48,7 @@ createConversionPass(TargetOptions targetOptions);
 // Module layout
 //===----------------------------------------------------------------------===//
 
-// Reifies and pads vm.rodata.table ops as two vm.rodata.inline ops.
+// Reifies and pads vm.rodata.inline.table ops as two vm.rodata.inline ops.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createReifyRodataTablesPass();
 

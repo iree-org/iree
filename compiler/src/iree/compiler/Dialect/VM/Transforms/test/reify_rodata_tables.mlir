@@ -15,7 +15,7 @@ vm.module @module {
   vm.func @fn() {
     // CHECK-DAG: = vm.rodata.inline : !vm.buffer = dense<[0, 1, 1, 1, 2, 2]> : vector<6xi32>
     // CHECK-DAG: = vm.rodata.inline : !vm.buffer = #[[$DATA]]
-    %0:2 = vm.rodata.table i32 : !vm.buffer, !vm.buffer = #table_data
+    %0:2 = vm.rodata.inline.table i32 : !vm.buffer, !vm.buffer = #table_data
     vm.return
   }
 }
@@ -33,7 +33,7 @@ vm.module @module {
   vm.func @fn() {
     // CHECK-DAG: = vm.rodata.inline "table" {alignment = 64 : i64} : !vm.buffer = dense<[0, 2]> : vector<2xi64>
     // CHECK-DAG: = vm.rodata.inline "data" {alignment = 64 : i64} : !vm.buffer = #[[$DATA]]
-    %0:2 = vm.rodata.table i64 {table_name = "table", data_name = "data", alignment = 64 : i64} : !vm.buffer, !vm.buffer = #table_data
+    %0:2 = vm.rodata.inline.table i64 {table_name = "table", data_name = "data", alignment = 64 : i64} : !vm.buffer, !vm.buffer = #table_data
     vm.return
   }
 }
@@ -58,7 +58,7 @@ vm.module @module {
   vm.func @fn() {
     // CHECK-DAG: = vm.rodata.inline : !vm.buffer = dense<[0, 2, 3, 5, 9, 5]>
     // CHECK-DAG: = vm.rodata.inline : !vm.buffer = #[[$DATA]]
-    %0:2 = vm.rodata.table i32 {data_alignment = 3 : i64} : !vm.buffer, !vm.buffer = #table_data
+    %0:2 = vm.rodata.inline.table i32 {data_alignment = 3 : i64} : !vm.buffer, !vm.buffer = #table_data
     vm.return
   }
 }
