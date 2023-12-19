@@ -29,6 +29,8 @@ class Linux_x86_64_Benchmarks(object):
         compile_targets=[CASCADELAKE_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
+            # TODO(#15973): Remove the flag after the regression is fixed.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
     CASCADELAKE_DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -38,6 +40,9 @@ class Linux_x86_64_Benchmarks(object):
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=none",
+            # TODO(#15973, #15643): Remove the flag after we can data-tile
+            # matmul with transpose variatns.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
     CASCADELAKE_DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -47,6 +52,9 @@ class Linux_x86_64_Benchmarks(object):
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
+            # TODO(#15973, #15643): Remove the flag after we can data-tile
+            # matmul with transpose variatns.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
 

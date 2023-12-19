@@ -39,6 +39,8 @@ class Android_ARMv8_A_Benchmarks(object):
         extra_flags=[
             "--iree-opt-data-tiling=false",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
+            # TODO(#15973): Remove the flag after the regression is fixed.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
     DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -49,6 +51,9 @@ class Android_ARMv8_A_Benchmarks(object):
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=none",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
+            # TODO(#15973, #15643): Remove the flag after we can data-tile
+            # matmul with transpose variatns.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
     DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -59,6 +64,9 @@ class Android_ARMv8_A_Benchmarks(object):
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
             "--iree-llvmcpu-target-cpu-features=+dotprod",
+            # TODO(#15973, #15643): Remove the flag after we can data-tile
+            # matmul with transpose variatns.
+            "--iree-global-opt-propagate-transposes=false",
         ],
     )
 
