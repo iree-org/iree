@@ -48,6 +48,8 @@ def _init_dylib():
         None,
         [c_int, POINTER(c_char_p), c_char_p, c_bool],
     )
+    _setsig(_dylib.ireeCompilerGlobalInitialize, None, [])
+    _setsig(_dylib.ireeCompilerGlobalShutdown, None, [])
 
     # Setup signatures.
     # Error
@@ -222,7 +224,7 @@ class Session:
         )
         return results
 
-    def set_flags(self, *flags: Sequence[str]):
+    def set_flags(self, *flags: str):
         argv_type = c_char_p * len(flags)
         argv = argv_type(*[flag.encode("UTF-8") for flag in flags])
         _handle_error(
@@ -261,6 +263,7 @@ class Output:
 
     def keep(self) -> "Output":
         _dylib.ireeCompilerOutputKeep(self._output_p)
+        return self
 
     def write(self, buffer):
         _handle_error(
@@ -291,7 +294,7 @@ class Source:
     """Wraps an iree_compiler_source_t."""
 
     def __init__(self, session: Session, source_p: c_void_p, backing_ref):
-        self._session: c_void_p = session  # Keeps ref alive.
+        self._session: Session = session  # Keeps ref alive.
         self._source_p: c_void_p = source_p
         self._backing_ref = backing_ref
         self._local_dylib = _dylib
