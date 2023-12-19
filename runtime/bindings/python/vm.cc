@@ -271,7 +271,22 @@ VmModule VmModule::MMap(VmInstance* instance, std::string filepath,
 VmModule VmModule::WrapBuffer(VmInstance* instance, py::object buffer_obj,
                               py::object destroy_callback, bool close_buffer) {
   IREE_TRACE_SCOPE_NAMED("VmModule::FromAlignedMemory");
-  PyBufferRequest buffer_info(buffer_obj, PyBUF_SIMPLE);
+  // Bridge to the C-based deallocator API.
+  struct BufferState {
+    BufferState(py::object buffer_obj, py::object destroy_callback,
+                bool close_buffer)
+        : buffer_info(buffer_obj, PyBUF_SIMPLE),
+          buffer_obj(std::move(buffer_obj)),
+          destroy_callback(std::move(destroy_callback)),
+          close_buffer(close_buffer) {}
+    PyBufferRequest buffer_info;
+    py::object buffer_obj;
+    py::object destroy_callback;
+    bool close_buffer;
+  };
+  BufferState* state =
+      new BufferState(buffer_obj, destroy_callback, close_buffer);
+  PyBufferRequest& buffer_info = state->buffer_info;
   if (!iree_host_size_has_alignment((uintptr_t)buffer_info.view().buf,
                                     IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
     std::stringstream err;
@@ -282,26 +297,12 @@ VmModule VmModule::WrapBuffer(VmInstance* instance, py::object buffer_obj,
   }
 
   iree_vm_module_t* module = nullptr;
-
-  // Bridge to the C-based deallocator API.
-  struct DeallocateState {
-    DeallocateState(py::object buffer_obj, py::object destroy_callback,
-                    bool close_buffer)
-        : buffer_obj(std::move(buffer_obj)),
-          destroy_callback(std::move(destroy_callback)),
-          close_buffer(close_buffer) {}
-    py::object buffer_obj;
-    py::object destroy_callback;
-    bool close_buffer;
-  };
-  DeallocateState* state =
-      new DeallocateState(buffer_obj, destroy_callback, close_buffer);
   auto ctl_fn = +([](void* self, iree_allocator_command_t command,
                      const void* params, void** inout_ptr) {
     py::gil_scoped_acquire gil;
     assert(command == IREE_ALLOCATOR_COMMAND_FREE);
     try {
-      DeallocateState* state = static_cast<DeallocateState*>(self);
+      BufferState* state = static_cast<BufferState*>(self);
       if (state->close_buffer) {
         state->buffer_obj.attr("close")();
       }

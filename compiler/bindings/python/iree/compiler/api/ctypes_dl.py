@@ -9,12 +9,12 @@
 from ctypes import *
 from enum import IntEnum
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import Sequence
 
 import ctypes
 import logging
-import os
 import platform
+import weakref
 
 __all__ = [
     "Invocation",
@@ -276,7 +276,15 @@ class Output:
             )
         )
         size = size.value
-        return memoryview((c_char * size).from_address(contents.value))
+        pointer = (c_char * size).from_address(contents.value)
+        # When the pointer is free'd, the no-op callback is invoked with
+        # the argument `self`. This implicitly keeps `self` alive until
+        # the callback is invoked, which keeps the compiler Output alive.
+        # The typical use of this pointer is to read it via the buffer
+        # protocol, and that will keep the pointer alive. Therefore, the
+        # chain is secure.
+        weakref.finalize(pointer, lambda x: ..., self)
+        return pointer
 
 
 class Source:
@@ -345,7 +353,7 @@ class Invocation:
     def __init__(self, session: Session):
         self._session = session
         self._inv_p = _dylib.ireeCompilerInvocationCreate(self._session._session_p)
-        self._sources: List[Source] = []
+        self._sources: list[Source] = []
         self._local_dylib = _dylib
         # If we are importing from a module, then the MLIR/Python Operation
         # will own the module, so we need to make sure that it outlives the
