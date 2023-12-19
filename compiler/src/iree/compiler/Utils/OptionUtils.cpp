@@ -22,9 +22,9 @@ LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
   for (int i = 0; i < argc; ++i) {
     llvm::StringRef arg(argv[i]);
     llvm::StringRef nameVal;
-    if (arg.startswith("--")) {
+    if (arg.starts_with("--")) {
       nameVal = arg.drop_front(2);
-    } else if (arg.startswith("-")) {
+    } else if (arg.starts_with("-")) {
       nameVal = arg.drop_front(1);
     } else {
       // Pure positional options not supported.
