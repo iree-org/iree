@@ -33,27 +33,12 @@ static Value getStringRodata(Location loc, StringAttr attr,
   return builder.create<IREE::VM::RodataInlineOp>(loc, attr);
 }
 
-// TODO(benvanik): make a vm.rodata.table or something that returns the
-// offset/length and data buffers. We could then do a whole-program analysis to
-// build a single data table with multiple views into it.
 static std::pair<Value, Value> buildKeyTable(Location loc, ArrayAttr keysAttr,
                                              OpBuilder &builder) {
-  SmallVector<int32_t> table;
-  SmallVector<Attribute> dataAttrs;
-  size_t dataSize = 0;
-  for (auto key : keysAttr.getAsRange<StringAttr>()) {
-    table.push_back(dataSize);
-    table.push_back(key.size());
-    dataAttrs.push_back(key);
-    dataSize += key.size();
-  }
-  Value tableRodata = builder.create<IREE::VM::RodataInlineOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
-      builder.getI32VectorAttr(table));
-  Value stringRodata = builder.create<IREE::VM::RodataInlineOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
-      IREE::Util::CompositeAttr::get(builder.getContext(), dataAttrs));
-  return {tableRodata, stringRodata};
+  auto compositeAttr =
+      IREE::Util::CompositeAttr::get(builder.getContext(), keysAttr.getValue());
+  auto tableOp = builder.create<IREE::VM::RodataTableOp>(loc, compositeAttr);
+  return {tableOp.getTableResult(), tableOp.getDataResult()};
 }
 
 static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,

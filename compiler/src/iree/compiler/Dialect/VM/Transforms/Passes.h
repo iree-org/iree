@@ -48,6 +48,10 @@ createConversionPass(TargetOptions targetOptions);
 // Module layout
 //===----------------------------------------------------------------------===//
 
+// Reifies and pads vm.rodata.table ops as two vm.rodata.inline ops.
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createReifyRodataTablesPass();
+
 // Hoists inline vm.rodata.inline values to module-level constant storage.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createHoistInlinedRodataPass();

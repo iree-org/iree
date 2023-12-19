@@ -54,3 +54,21 @@ vm.module @my_module {
     vm.return %0 : !vm.buffer
   }
 }
+
+// -----
+
+// CHECK: #[[$DATA:.+]] = #util.composite<10xi8, [
+#table_data = #util.composite<10xi8, [
+  dense<[2, 3]> : vector<2xi8>,
+  "hello",
+  dense<4> : tensor<3xi8>
+]>
+
+vm.module @my_module {
+  // CHECK-LABEL: @rodata_table
+  vm.func @rodata_table() -> !vm.buffer {
+    // CHECK-NEXT: = vm.rodata.table : !vm.buffer, !vm.buffer = #[[$DATA]]
+    %0:2 = vm.rodata.table : !vm.buffer, !vm.buffer = #table_data
+    vm.return %0#1 : !vm.buffer
+  }
+}
