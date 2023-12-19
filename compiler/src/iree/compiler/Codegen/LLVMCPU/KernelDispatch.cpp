@@ -1106,20 +1106,22 @@ setRootConfig(func::FuncOp entryPointFn,
   auto [vecTileSizes, vecScalableFlags] =
       getMatmulVectorSizes(entryPointFn, linalgOp, vectorSize, isQuantized);
 
+  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
+  bool usePeelingPipeline =
+      vecPreProcStrategy == VectorPreProcStrategy::Peeling;
+
+  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
+                       << vecPreProcStrategy << "\n");
+
   DistributionHeuristicConfig distConfig;
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-
-  // Use the default distribution for the matmul loops.
-  int64_t defaultMaxSize = clDefaultDistTileSize;
-  if (isX86(targetAttr) || isRISCV(targetAttr) ||
-      (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr))) {
-    defaultMaxSize = 128;
-  }
-
+  distConfig.maxTileSizes.resize(numLoops, clDefaultDistTileSize);
+  distConfig.allowIncompleteTile =
+      vecPreProcStrategy != VectorPreProcStrategy::None;
+  distConfig.vectorSizeHints.resize(numLoops, vectorSize);
   bool isBM = isa<linalg::BatchMatmulOp>(contractionOp.getOperation());
-  distConfig.maxTileSizes.resize(numLoops, defaultMaxSize);
   if (isBM) {
     distConfig.maxTileSizes[0] = 1;
+    distConfig.vectorSizeHints[0] = 1;
   }
 
   // Compute cache-level tile sizes. Cache a dimension only if there are
@@ -1131,31 +1133,13 @@ setRootConfig(func::FuncOp entryPointFn,
 
   // Choose the next non-zero tile size immediately after the distribution
   // level to help compute the distribution tile sizes.
-  SmallVector<int64_t> distTileSizes;
-  auto vecPreProcStrategy = getVectorPreProcStrategy(linalgOp);
-  bool usePeelingPipeline =
-      vecPreProcStrategy == VectorPreProcStrategy::Peeling;
-
-  LLVM_DEBUG(KD_DBGS() << "Vector pre-processing strategy: "
-                       << vecPreProcStrategy << "\n");
-
-  if (usePeelingPipeline && isX86(targetAttr)) {
-    // It's inspired from https://github.com/iree-org/iree-llvm-sandbox repo.
-    // Sandbox has [[288, 128, 512], [12, 32, 1]] setup. We scale 288 to 192
-    // because 288/12*8=192
-    if (numLoops == 3) {
-      distConfig.maxTileSizes[0] = 192;
-      distConfig.maxTileSizes[1] = 128;
-    }
+  for (auto [cacheTileSize, vecTileSize] :
+       llvm::zip_equal(cacheTileSizes, vecTileSizes)) {
+    int64_t minTileSize = cacheTileSize != 0 ? cacheTileSize : vecTileSize;
+    distConfig.minTileSizes.push_back(minTileSize);
   }
-
-  distConfig.minTileSizes = vecTileSizes;
-  distConfig.allowIncompleteTile = true;
-  distConfig.vectorSizeHints.resize(numLoops, vectorSize);
-  if (isBM) {
-    distConfig.vectorSizeHints[0] = 1;
-  }
-  distTileSizes = getDefaultDistributedLevelTileSizes(linalgOp, distConfig);
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(linalgOp, distConfig);
 
   // TODO: We set cache tile sizes to the distribution sizes for now (no-op) to
   // make sure there are no performance changes. This will let us change the
