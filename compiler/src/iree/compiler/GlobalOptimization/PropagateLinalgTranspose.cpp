@@ -192,8 +192,12 @@ public:
 
     ArrayRef<int64_t> staticSizes = extractOp.getStaticSizes();
     ArrayRef<int64_t> sliceShape = extractOp.getResultType().getShape();
-    llvm::SmallDenseSet<unsigned> rankReducingMask =
-        *mlir::computeRankReductionMask(staticSizes, sliceShape);
+    std::optional<llvm::SmallDenseSet<unsigned>> maybeRankReducingMask =
+        mlir::computeRankReductionMask(staticSizes, sliceShape);
+    if (!maybeRankReducingMask) {
+      return failure();
+    }
+    llvm::SmallDenseSet<unsigned> rankReducingMask = *maybeRankReducingMask;
 
     int64_t dim = 0;
     llvm::SmallDenseMap<int64_t, int64_t> rankReducedMap;
