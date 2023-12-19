@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -16,7 +16,6 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "AssignTargetDevices.cpp",
-        "BenchmarkBatchDispatches.cpp",
         "ConfigureExecutables.cpp",
         "ConvertToHAL.cpp",
         "DumpExecutableBenchmarks.cpp",
@@ -29,7 +28,9 @@ iree_compiler_cc_library(
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
         "Passes.cpp",
+        "Passes.h.inc",
         "PreprocessExecutables.cpp",
+        "RepeatDispatches.cpp",
         "ResolveExportOrdinals.cpp",
         "SerializeExecutables.cpp",
         "StripExecutableContents.cpp",
@@ -41,6 +42,7 @@ iree_compiler_cc_library(
         "Passes.h",
     ],
     deps = [
+        ":PassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common/CPU:CommonCPUPasses",
         "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
@@ -76,5 +78,20 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "Passes.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Passes.td",
+    deps = [
+        "@llvm-project//mlir:PassBaseTdFiles",
     ],
 )

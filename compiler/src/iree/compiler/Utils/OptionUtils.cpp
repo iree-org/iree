@@ -122,12 +122,10 @@ static int64_t ParseByteSize(llvm::StringRef value) {
   return size * scale;
 }
 
-namespace llvm {
-namespace cl {
+namespace llvm::cl {
 template class basic_parser<ByteSize>;
 template class basic_parser<PowerOf2ByteSize>;
-} // namespace cl
-} // namespace llvm
+} // namespace llvm::cl
 
 using ByteSize = llvm::cl::ByteSize;
 using PowerOf2ByteSize = llvm::cl::PowerOf2ByteSize;

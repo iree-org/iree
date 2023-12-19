@@ -37,7 +37,7 @@ void buildIREEPrecompileTransformPassPipeline(
   // specifying targets.
   if (!executableOptions.targets.empty()) {
     passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        targetRegistry, executableOptions.targets));
+        {&targetRegistry, executableOptions.targets}));
   }
 
   // Input pipelines can result in changes to the exported functions and types
