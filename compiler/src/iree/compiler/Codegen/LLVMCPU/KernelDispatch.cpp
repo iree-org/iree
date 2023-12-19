@@ -1451,12 +1451,12 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
   }
 
   // Check that the two indexing maps are a permutation of each other.
-  auto indexing_maps = genericOp.getIndexingMapsArray();
-  return !indexing_maps[0].isEmpty() && !indexing_maps[1].isEmpty() &&
-         ((indexing_maps[0].isIdentity() && !indexing_maps[1].isIdentity() &&
-           indexing_maps[1].isPermutation()) ||
-          (!indexing_maps[0].isIdentity() && indexing_maps[0].isPermutation() &&
-           indexing_maps[1].isIdentity()));
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  return !indexingMaps[0].isEmpty() && !indexingMaps[1].isEmpty() &&
+         ((indexingMaps[0].isIdentity() && !indexingMaps[1].isIdentity() &&
+           indexingMaps[1].isPermutation()) ||
+          (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
+           indexingMaps[1].isIdentity()));
 }
 
 /// Sets the default lowering configuration for a generic op to use
