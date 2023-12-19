@@ -175,6 +175,16 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
+  // Before lowering 'vector.shape_cast', try to move them around and cancel
+  // them. This especially cleans up the remaining shape_cast created in
+  // vector::populateDropUnitDimWithShapeCastPatterns but can't be removed
+  // during the steps above.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateBubbleShapeCastPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
   // 'vector.shape_cast' are very expensive operations that are even generated
   // by some of the lowerings above (e.g., transpose lowering). There are
   // chances to cancel them out if they are not lowered too early so we lower
