@@ -9,7 +9,7 @@
 from ctypes import *
 from enum import IntEnum
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 import ctypes
 import logging
@@ -41,7 +41,7 @@ def _init_dylib():
     if dylib_path is None:
         # TODO: Look for a bundled dylib.
         raise RuntimeError("Could not find libIREECompiler.so")
-    _dylib = cdll.LoadLibrary(dylib_path)
+    _dylib: Any = cdll.LoadLibrary(dylib_path)
 
     _setsig(
         _dylib.ireeCompilerSetupGlobalCL,
@@ -293,8 +293,8 @@ class Output:
 class Source:
     """Wraps an iree_compiler_source_t."""
 
-    def __init__(self, session: Session, source_p: c_void_p, backing_ref):
-        self._session: Session = session  # Keeps ref alive.
+    def __init__(self, session: c_void_p, source_p: c_void_p, backing_ref):
+        self._session: c_void_p = session  # Keeps ref alive.
         self._source_p: c_void_p = source_p
         self._backing_ref = backing_ref
         self._local_dylib = _dylib
