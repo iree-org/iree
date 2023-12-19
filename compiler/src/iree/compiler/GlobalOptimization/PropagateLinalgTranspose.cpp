@@ -187,7 +187,8 @@ public:
     // the slice, and the transpose is on the slice rather than the full tensor.
     if (!IREE::Flow::isOffsetSizeAndStrideMappableToFlow(offsets, sizes,
                                                          strides, baseShape)) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "transposed slice not mappable to flow ops");
     }
 
     ArrayRef<int64_t> staticSizes = extractOp.getStaticSizes();
@@ -195,7 +196,8 @@ public:
     std::optional<llvm::SmallDenseSet<unsigned>> maybeRankReducingMask =
         mlir::computeRankReductionMask(staticSizes, sliceShape);
     if (!maybeRankReducingMask) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractOp, "failed to compute rank reducing mask");
     }
     llvm::SmallDenseSet<unsigned> rankReducingMask = *maybeRankReducingMask;
 
@@ -248,7 +250,8 @@ public:
     // this could end up duplicating the transposes. We should only propagate
     // through reshape when it is free to do so.
     if (!transposeOp || !transposeOp->hasOneUse()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          expandOp, "expand shape input is not a single-use transpose");
     }
 
     auto invPerm = invertPermutationVector(transposeOp.getPermutation());
@@ -330,17 +333,16 @@ public:
     }
     OpOperand *transposeOperand = nullptr;
     linalg::TransposeOp transposeOp;
-    for (int64_t i = 0, e = genericOp.getInputs().size(); i < e; ++i) {
-      OpOperand *inputOperand = &genericOp->getOpOperand(i);
-      Value input = inputOperand->get();
-      transposeOp = input.getDefiningOp<linalg::TransposeOp>();
-      if (transposeOp) {
-        transposeOperand = inputOperand;
+    for (OpOperand *input : genericOp.getDpsInputOperands()) {
+      if (auto maybeTransposeOp =
+              input->get().getDefiningOp<linalg::TransposeOp>()) {
+        transposeOp = maybeTransposeOp;
+        transposeOperand = input;
         break;
       }
     }
     if (!transposeOperand) {
-      return failure();
+      return rewriter.notifyMatchFailure(genericOp, "no transpose operand");
     }
 
     int64_t inputIndex = transposeOperand->getOperandNumber();
@@ -388,7 +390,8 @@ public:
     }
     // Don't generalize transposes.
     if (isa<linalg::TransposeOp>(linalgOp)) {
-      return failure();
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "do not generalize transposes");
     }
     bool hasTranspose = false;
     for (Value input : linalgOp.getDpsInputs()) {
@@ -398,10 +401,11 @@ public:
       }
     }
     if (!hasTranspose) {
-      return failure();
+      return rewriter.notifyMatchFailure(linalgOp, "no transpose input");
     }
     if (failed(linalg::generalizeNamedOp(rewriter, linalgOp))) {
-      return failure();
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "failed to generalize named op");
     }
     return success();
   }
@@ -437,7 +441,8 @@ public:
 
     SmallVector<int64_t> transPerm(transpose.getPermutation());
     if (transPerm != permutation) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          namedOp, "transpose permutation does not match target permutation");
     }
     SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
     SmallVector<Value> newInputs = namedOp.getInputs();
@@ -448,7 +453,9 @@ public:
   }
 
 private:
-  // non-type literal array template parameters are a C++20 feature.
+  // Non-type literal array template parameters are a C++20 feature, so instead
+  // all the named op patterns pass their permutation explicitly as a
+  // SmallVector.
   SmallVector<int64_t> permutation;
 };
 
