@@ -242,6 +242,45 @@ module @do_not_hoist_non_value_type_results {
 }
 
 // -----
+module @hoist_uses_within_control_flows {
+  // CHECK: util.global private @[[HOISTED:.*]] : i32
+  // CHECK: func.func @main
+  func.func @main(%bound : i32) -> i32 {
+    // CHECK: arith.constant 0
+    // CHECK-NOT: arith.constant 2
+    // CHECK-NOT: arith.constant 5
+    %cst0 = arith.constant 0 : i32
+    %cst2 = arith.constant 2 : i32
+    %cst5 = arith.constant 5 : i32
+    // CHECK: scf.while
+    %res = scf.while (%iter = %cst0) : (i32) -> i32 {
+      // CHECK: arith.cmpi
+      %cond = arith.cmpi slt, %iter, %bound : i32
+      scf.condition(%cond) %iter : i32
+    // CHECK: } do {
+    } do {
+    // CHECK: ^bb0(%[[ARG1:.*]]: i32)
+    ^bb0(%arg1: i32):
+      // CHECK: %[[STEP:.*]] = util.global.load @[[HOISTED]] : i32
+      // CHECK-NOT: arith.subi
+      // CHECK: %[[NEXT:.*]] = arith.addi %[[STEP]], %[[ARG1]]
+      // CHECK: scf.yield %[[NEXT]]
+      %step = arith.subi %cst5, %cst2 : i32
+      %next = arith.addi %step, %arg1 : i32
+      scf.yield %next : i32
+    }
+    return %res : i32
+  }
+  // CHECK: util.initializer attributes {iree.compiler.consteval} {
+  // CHECK-DAG:   %[[C2:.*]] = arith.constant 2 : i32
+  // CHECK-DAG:   %[[C5:.*]] = arith.constant 5 : i32
+  // CHECK-DAG:   %[[SUB:.*]] = arith.subi %[[C5]], %[[C2]] : i32
+  // CHECK:       util.global.store %[[SUB]], @[[HOISTED]] : i32
+  // CHECK:       util.initializer.return
+  // CHECK: }
+}
+
+// -----
 
 module @do_not_hoist_uses_within_dispatches {
   func.func @main() -> (tensor<i32>) {

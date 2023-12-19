@@ -36,16 +36,35 @@ OpOperand *findOperandFor(Operation *op, Value input) {
 }
 
 bool isHoistableToRootOp(Operation *rootOp, Operation *constOp) {
-  Operation *syms = SymbolTable::getNearestSymbolTable(constOp);
-  if (syms != rootOp)
-    return false;
+  if (constOp->isRegistered()) {
+    Operation *syms = SymbolTable::getNearestSymbolTable(constOp);
+    if (syms != rootOp)
+      return false;
+  } else {
+    // Special handling for unregistered testing ops.
+    // Since these are unregistered, SymbolTable::getNearestSymbolTable can't
+    // check if they define new symbol tables.
+    auto opName = constOp->getName().getStringRef();
+    if (opName != "iree_unregistered.var_expr" &&
+        opName != "iree_unregistered.non_leaf_const_expr" &&
+        opName != "iree_unregistered.const_expr") {
+      // Returns false for unknown unregistered ops.
+      return false;
+    }
+    // Check if unregistered ops' parents are in the same symbol table.
+    // For now we don't handle the case where unregistered ops' parent is
+    // another unregistered op (will return false in this case).
+    Operation *syms =
+        SymbolTable::getNearestSymbolTable(constOp->getParentOp());
+    if (syms != rootOp)
+      return false;
+  }
 
-  // Conservely only hoist ops from nested regions under known conditions.
   Operation *parentOp = constOp->getParentOp();
   while (parentOp != rootOp) {
     assert(parentOp && "constOp is not a descendant of the rootOp.");
-    // For now only hoist descendants from nested control flow ops and
-    // functions.
+    // For now only hoist descendants from functions and nested control flow
+    // regions.
     if (!(parentOp->hasTrait<RegionBranchOpInterface::Trait>() ||
           parentOp->hasTrait<FunctionOpInterface::Trait>())) {
       return false;
