@@ -371,6 +371,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=false"
+    "--iree-global-opt-propagate-transposes=false"
   FRIENDLY_NAME "Falcon7bInt4GptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -690,6 +691,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-global-opt-propagate-transposes=false"
   FRIENDLY_NAME "Falcon7bInt4GptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1009,6 +1011,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
+    "--iree-global-opt-propagate-transposes=false"
   FRIENDLY_NAME "Falcon7bInt4GptqPT(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -2357,6 +2360,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=false"
+    "--iree-global-opt-propagate-transposes=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -2756,6 +2760,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-global-opt-propagate-transposes=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3155,6 +3160,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
+    "--iree-global-opt-propagate-transposes=false"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
