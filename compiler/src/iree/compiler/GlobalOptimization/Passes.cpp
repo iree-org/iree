@@ -27,6 +27,11 @@ static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
     llvm::cl::desc(
         "Enables fusing specifically structured matmuls (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnableTransposePropagation(
+    "iree-global-opt-propagate-transposes",
+    llvm::cl::desc(
+        "Enables propagation of transpose ops to improve fusion chances."),
+    llvm::cl::init(true));
 
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
@@ -112,10 +117,12 @@ void buildGlobalOptimizationPassPipeline(
       // decisions as SetEncoding is expected to pick the ideal layout for
       // that operation anyway, and this way we only need to make such a
       // decision once.
-      .addPass([&]() {
-        return createPropagateLinalgTransposePass(
-            transformOptions.options.aggressiveTransposePropagation);
-      })
+      .addPredicatedPass(
+          clEnableTransposePropagation,
+          [&]() {
+            return createPropagateLinalgTransposePass(
+                transformOptions.options.aggressiveTransposePropagation);
+          })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
