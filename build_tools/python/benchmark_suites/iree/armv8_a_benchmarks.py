@@ -10,7 +10,7 @@ from typing import List, Sequence
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_collections
+from e2e_test_framework.device_specs import pixel_8_pro_specs
 from e2e_test_framework.models import tflite_models, tf_models
 
 
@@ -111,13 +111,7 @@ class Android_ARMv8_A_Benchmarks(object):
             for model in self.MODELS
         ]
 
-        big_cores_devices = (
-            device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-                architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-                host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                tags=["big-cores"],
-            )
-        )
+        big_cores_devices = [pixel_8_pro_specs.BIG_CORES]
         run_configs = self._build_run_configs(
             no_dt_gen_confings + dt_uk_gen_confings,
             local_sync_execution_configs + local_task_execution_configs,
