@@ -41,7 +41,7 @@ def _init_dylib():
     if dylib_path is None:
         # TODO: Look for a bundled dylib.
         raise RuntimeError("Could not find libIREECompiler.so")
-    _dylib: Any = cdll.LoadLibrary(dylib_path)
+    _dylib = cdll.LoadLibrary(dylib_path)
 
     _setsig(
         _dylib.ireeCompilerSetupGlobalCL,
