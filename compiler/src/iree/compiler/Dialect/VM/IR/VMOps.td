@@ -1197,7 +1197,7 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   ];
 }
 
-def VM_RodataInlineTableOp : VM_PureOp<"rodata.inline.table", [
+def VM_RodataTableInlineOp : VM_PureOp<"rodata.table.inline", [
     VM_PseudoOp,
   ]> {
   let summary = [{inlined constant rodata table}];

@@ -64,11 +64,11 @@ vm.module @my_module {
 ]
 
 vm.module @my_module {
-  // CHECK-LABEL: @rodata_inline_table
-  vm.func @rodata_inline_table() -> !vm.buffer {
-    // CHECK-NEXT: = vm.rodata.inline.table i32 : !vm.buffer, !vm.buffer
+  // CHECK-LABEL: @rodata_table_inline
+  vm.func @rodata_table_inline() -> !vm.buffer {
+    // CHECK-NEXT: = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer
     // CHECK-SAME: = [dense<[2, 3]> : vector<2xi8>, "hello", dense<4> : tensor<3xi8>]
-    %0:2 = vm.rodata.inline.table i32 : !vm.buffer, !vm.buffer = #table_data
+    %0:2 = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer = #table_data
     vm.return %0#1 : !vm.buffer
   }
 }

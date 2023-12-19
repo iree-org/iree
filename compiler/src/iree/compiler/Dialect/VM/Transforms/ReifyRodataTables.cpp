@@ -18,11 +18,11 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
-// Replaces a vm.rodata.inline.table op with two vm.rodata.inline ops, one for
+// Replaces a vm.rodata.table.inline op with two vm.rodata.inline ops, one for
 // the indexing table, and the second for the padded data.
 template <typename IntTy>
 static void reifyRodataTable(RewriterBase &rewriter,
-                             IREE::VM::RodataInlineTableOp tableOp) {
+                             IREE::VM::RodataTableInlineOp tableOp) {
   SmallVector<IntTy> table;
   SmallVector<Attribute> dataAttrs;
   size_t dataSize = 0;
@@ -98,7 +98,7 @@ public:
   }
 
   StringRef getDescription() const override {
-    return "Converts vm.rodata.inline.table into two rodata, one for the flat "
+    return "Converts vm.rodata.table.inline into two rodata, one for the flat "
            "data and"
            "the other for a newly constructed table for the element subviews.";
   }
@@ -108,7 +108,7 @@ public:
 
     // Walk all of the rodata table ops and convert to rodata.inline
     IRRewriter rewriter(moduleOp.getContext());
-    moduleOp.walk([&](IREE::VM::RodataInlineTableOp tableOp) {
+    moduleOp.walk([&](IREE::VM::RodataTableInlineOp tableOp) {
       rewriter.setInsertionPoint(tableOp);
       size_t tableBitwidth = tableOp.getTableType().getIntOrFloatBitWidth();
       if (tableBitwidth == 32) {

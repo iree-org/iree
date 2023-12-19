@@ -808,7 +808,7 @@ void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
         /*mimeType=*/nullptr);
 }
 
-void RodataInlineTableOp::build(OpBuilder &builder, OperationState &result,
+void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
                                 StringAttr name, IntegerType tableType,
                                 ArrayAttr value) {
   // Make an identifier-friendly version of the string so that the value is
@@ -826,7 +826,7 @@ void RodataInlineTableOp::build(OpBuilder &builder, OperationState &result,
         /*alignment=*/nullptr, /*dataAlignment=*/nullptr, /*mimeType=*/nullptr);
 }
 
-void RodataInlineTableOp::build(OpBuilder &builder, OperationState &result,
+void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
                                 IntegerType tableType, ArrayAttr value) {
   auto refType =
       IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
