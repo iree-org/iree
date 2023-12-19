@@ -247,9 +247,7 @@ public:
       return failure();
     }
 
-    ArrayRef<int64_t> perm = transposeOp.getPermutation();
-
-    auto invPerm = invertPermutationVector(perm);
+    auto invPerm = invertPermutationVector(transposeOp.getPermutation());
     SmallVector<ReassociationIndices> reassociations =
         expandOp.getReassociationIndices();
 
@@ -263,8 +261,8 @@ public:
     //
     // Becomes
     //
-    // reassociation_map = [[0, 1, 2], [4, 5], [3]]
-    // permutation = [0, 1, 2, 3, 4, 5]
+    // reassociation_map = [[0, 1, 2], [3, 4], [5]]
+    // permutation = [0, 1, 2, 4, 5, 3]
     applyPermutationToVector(reassociations, invPerm);
 
     SmallVector<int64_t> newInvPerm;
@@ -413,11 +411,11 @@ public:
 
 namespace {
 
-template <typename OpTy, typename ReplTy, int64_t inputIdx, int64_t N>
+template <typename OpTy, typename ReplTy, int64_t inputIdx>
 class NamedOpConversion : public OpRewritePattern<OpTy> {
 public:
   using OpRewritePattern<OpTy>::OpRewritePattern;
-  NamedOpConversion(MLIRContext *ctx, std::array<int64_t, N> perm,
+  NamedOpConversion(MLIRContext *ctx, SmallVector<int64_t> perm,
                     PatternBenefit b = 1)
       : OpRewritePattern<OpTy>(ctx, b), permutation(perm) {}
 
@@ -426,26 +424,28 @@ public:
     if (!IREE::Flow::isNonNullAndOutsideDispatch(namedOp)) {
       return failure();
     }
+
     Value input = namedOp.getInputs()[inputIdx];
-    SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
-    if (auto transpose = input.getDefiningOp<linalg::TransposeOp>()) {
-      if (llvm::all_of(llvm::zip_equal(transpose.getPermutation(), permutation),
-                       [](std::tuple<int64_t, int64_t> it) {
-                         return std::get<0>(it) == std::get<1>(it);
-                       })) {
-        SmallVector<Value> newInputs = namedOp.getInputs();
-        newInputs[inputIdx] = transpose.getInput();
-        rewriter.replaceOpWithNewOp<ReplTy>(namedOp, newInputs,
-                                            namedOp.getDpsInits(), attrs);
-        return success();
-      }
+    auto transpose = input.getDefiningOp<linalg::TransposeOp>();
+    if (!transpose) {
+      return failure();
     }
-    return failure();
+
+    SmallVector<int64_t> transPerm(transpose.getPermutation());
+    if (transPerm != permutation) {
+      return failure();
+    }
+    SmallVector<NamedAttribute> attrs = getPrunedAttributeList(namedOp);
+    SmallVector<Value> newInputs = namedOp.getInputs();
+    newInputs[inputIdx] = transpose.getInput();
+    rewriter.replaceOpWithNewOp<ReplTy>(namedOp, newInputs,
+                                        namedOp.getDpsInits(), attrs);
+    return success();
   }
 
 private:
   // non-type literal array template parameters are a C++20 feature.
-  std::array<int64_t, N> permutation;
+  SmallVector<int64_t> permutation;
 };
 
 } // namespace
@@ -508,54 +508,47 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<
         NamedOpConversion</*OpType=*/linalg::MatmulOp,
                           /*ReplacementType=*/linalg::MatmulTransposeBOp,
-                          /*inputIdx=*/1,
-                          /*inputRank=*/2>>(context,
-                                            std::array<int64_t, 2>{1, 0});
+                          /*inputIdx=*/1>>(context, SmallVector<int64_t>{1, 0});
     sinkingPatterns.insert<
         NamedOpConversion</*OpType=*/linalg::MatmulOp,
                           /*ReplacementType=*/linalg::MatmulTransposeAOp,
-                          /*inputIdx=*/0,
-                          /*inputRank=*/2>>(context,
-                                            std::array<int64_t, 2>{1, 0});
+                          /*inputIdx=*/0>>(context, SmallVector<int64_t>{1, 0});
     sinkingPatterns
         .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeBOp,
                                   /*ReplacementType=*/linalg::MatmulOp,
-                                  /*inputIdx=*/1,
-                                  /*inputRank=*/2>>(
-            context, std::array<int64_t, 2>{1, 0});
+                                  /*inputIdx=*/1>>(context,
+                                                   SmallVector<int64_t>{1, 0});
     sinkingPatterns
         .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeAOp,
                                   /*ReplacementType=*/linalg::MatmulOp,
-                                  /*inputIdx=*/0,
-                                  /*inputRank=*/2>>(
-            context, std::array<int64_t, 2>{1, 0});
+                                  /*inputIdx=*/0>>(context,
+                                                   SmallVector<int64_t>{1, 0});
     sinkingPatterns.insert<
         NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                           /*ReplacementType=*/linalg::BatchMatmulTransposeBOp,
-                          /*inputIdx=*/1,
-                          /*inputRank=*/3>>(context,
-                                            std::array<int64_t, 3>{0, 2, 1});
+                          /*inputIdx=*/1>>(context,
+                                           SmallVector<int64_t>{0, 2, 1});
     sinkingPatterns.insert<
         NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
                           /*ReplacementType=*/linalg::BatchMatmulTransposeAOp,
-                          /*inputIdx=*/0,
-                          /*inputRank=*/3>>(context,
-                                            std::array<int64_t, 3>{0, 2, 1});
+                          /*inputIdx=*/0>>(context,
+                                           SmallVector<int64_t>{0, 2, 1});
     sinkingPatterns
         .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeBOp,
                                   /*ReplacementType=*/linalg::BatchMatmulOp,
-                                  /*inputIdx=*/1,
-                                  /*inputRank=*/3>>(
-            context, std::array<int64_t, 3>{0, 2, 1});
+                                  /*inputIdx=*/1>>(
+            context, SmallVector<int64_t>{0, 2, 1});
     sinkingPatterns
         .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeAOp,
                                   /*ReplacementType=*/linalg::BatchMatmulOp,
-                                  /*inputIdx=*/0,
-                                  /*inputRank=*/3>>(
-            context, std::array<int64_t, 3>{0, 2, 1});
+                                  /*inputIdx=*/0>>(
+            context, SmallVector<int64_t>{0, 2, 1});
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     sinkingPatterns.insert<FuseTransposeWithGenericConsumer>(context);
+    if (enableAggressivePropagation) {
+      sinkingPatterns.insert<GeneralizeInputTransposedNamedOp>(context);
+    }
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
       return signalPassFailure();
@@ -584,9 +577,6 @@ void PropagateLinalgTransposePass::runOnOperation() {
   {
     RewritePatternSet patterns(context);
     patterns.insert<ComposeTransposes>(context);
-    if (enableAggressivePropagation) {
-      patterns.insert<GeneralizeInputTransposedNamedOp>(context);
-    }
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

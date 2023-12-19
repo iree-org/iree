@@ -1,4 +1,5 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation=true}))" --split-input-file %s | FileCheck %s --check-prefix=APROP
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
 
 func.func @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
@@ -160,6 +161,54 @@ func.func @propagate_to_transposed_bmm_ops(%lhs: tensor<2x16x16xf32>,
 //       CHECK:   linalg.batch_matmul ins
 //       CHECK:   %[[SECOND_MM:.+]] = linalg.batch_matmul ins
 //       CHECK:   return %[[SECOND_MM]]
+
+// -----
+
+func.func @do_not_propagate_to_matmul_in_dispatch(%lhs: tensor<16x16xf32>,
+                                                  %transposed_b: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty = tensor.empty(): tensor<16x16xf32>
+  %rhs = linalg.transpose ins(%transposed_b : tensor<16x16xf32>)
+      outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
+  %dispatch = flow.dispatch.region[] -> (tensor<16x16xf32>) {
+    %mm = linalg.matmul ins(%lhs, %rhs : tensor<16x16xf32>, tensor<16x16xf32>)
+                              outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+    flow.return %mm : tensor<16x16xf32>
+  }
+  return %dispatch : tensor<16x16xf32>
+}
+// CHECK-LABEL: func @do_not_propagate_to_matmul_in_dispatch
+//       CHECK:   linalg.transpose
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
+//       CHECK:     linalg.matmul ins
+//       CHECK:   return %[[DISPATCH]]
+
+// -----
+
+func.func @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x16xf32>,
+                                            %rhs: tensor<2x16x16xf32>) -> tensor<2x16x16xf32> {
+  %empty = tensor.empty(): tensor<2x16x16xf32>
+  %lhs = linalg.transpose ins(%transposed_lhs : tensor<16x2x16xf32>)
+      outs(%empty : tensor<2x16x16xf32>) permutation = [1, 0, 2]
+  %bmm = linalg.batch_matmul ins(%lhs, %rhs : tensor<2x16x16xf32>, tensor<2x16x16xf32>)
+                            outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
+  return %bmm : tensor<2x16x16xf32>
+}
+// Verify that without aggressive propagation, this stays as a batch matmul
+// CHECK-LABEL: func @propagate_to_bmm_transpose_batch
+//       CHECK:   linalg.batch_matmul
+
+// APROP: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
+// APROP: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+// APROP: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+
+// APROP-LABEL: func @propagate_to_bmm_transpose_batch
+//  APROP-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<16x2x16xf32>
+//  APROP-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<2x16x16xf32>
+//       APROP:   %[[GENERIC:.+]] = linalg.generic
+//  APROP-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]]
+//  APROP-SAME:     iterator_types = ["parallel", "parallel", "parallel", "reduction"]
+//  APROP-SAME:     ins(%[[ARG0]], %[[ARG1]] : tensor<16x2x16xf32>, tensor<2x16x16xf32>
+//       APROP:   return %[[GENERIC]] : tensor<2x16x16xf32>
 
 // -----
 
