@@ -142,7 +142,8 @@ hal.executable private @pad_with_producer {
 //       CHECK:               scf.for
 //   CHECK-DAG:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
 //   CHECK-DAG:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
-	@@ -148,12 +147,12 @@ hal.executable private @pad_with_producer {
+//       CHECK:                 linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:                     ins(%[[CONV_INPUT]], %[[CONV_FILTER]] :
 //  CHECK-SAME:                     outs(%[[CONV_OUTPUT]] :
 //       CHECK:               %[[BIAS_INPUT:.+]] = memref.subview %[[BIAS_SUBVIEW]]
 //       CHECK:               linalg.generic
