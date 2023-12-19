@@ -296,6 +296,25 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     if (!exportOp)
       continue;
 
+    Block *body = exportOp.getWorkgroupCountBody();
+    if (!body) {
+      exportOp.emitOpError("unexpected empty workgroup count region");
+      return signalPassFailure();
+    }
+
+    // If the function has already lowered the workgroup count region, infer
+    // that tiling + distribution has already occurred.
+    WalkResult res = body->walk([&](Operation *op) {
+      if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
+              IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(op)) {
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (!res.wasInterrupted()) {
+      continue;
+    }
+
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;
     SmallVector<unsigned> partitionableLoops;
