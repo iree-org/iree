@@ -11,7 +11,7 @@
 
 namespace mlir::iree_compiler {
 
-/// Register all global optimization related interfaces.
+/// Registers all global optimization related interfaces.
 void registerGlobalOptimizationInterfaces(DialectRegistry &registry);
 
 } // namespace mlir::iree_compiler
