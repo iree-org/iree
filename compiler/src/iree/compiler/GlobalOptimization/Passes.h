@@ -110,6 +110,9 @@ std::unique_ptr<Pass> createSetEncodingPass();
 // on operands/result.
 std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
 
+// Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.
+std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass();
+
 void registerGlobalOptimizationPipeline();
 
 } // namespace mlir::iree_compiler::GlobalOptimization

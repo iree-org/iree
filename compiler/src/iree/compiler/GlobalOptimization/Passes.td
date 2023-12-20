@@ -124,4 +124,9 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
 }
 
+def DemoteContractionInputsToBF16 : Pass<"iree-global-opt-demote-contraction-inputs-to-bf16", ""> {
+  let summary = "Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createDemoteContractionInputsToBF16Pass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

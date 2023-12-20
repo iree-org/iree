@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
+    "demote_contraction_inputs_to_bf16.mlir"
     "detach_elementwise_from_named_ops.mlir"
     "expand_tensor_shapes.mlir"
     "flow_hoist_into_globals.mlir"
