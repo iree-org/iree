@@ -61,8 +61,7 @@ static void loopInvariantCodeMotion(func::FuncOp funcOp) {
 
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
-  OptimizeVectorTransferPass(bool flatten, bool dropUnitDims)
-      : flatten(flatten), dropUnitDims(dropUnitDims) {}
+  OptimizeVectorTransferPass(bool flatten) : flatten(flatten) {}
   void runOnOperation() override {
     func::FuncOp funcOp = getOperation();
     LDBG("before optimize vector transfer\n" << funcOp);
@@ -106,18 +105,12 @@ struct OptimizeVectorTransferPass
 
     LDBG("after bubbling vector bitcasts\n" << funcOp);
 
-    // TODO(#14191): SPIR-V can't handle the vector.shape_cast created for
-    // dropping unit dims so this option is disabled in SPIR-V pipeline.
-    // This option should go away after all backend issues have been resolved.
-    if (dropUnitDims) {
-      RewritePatternSet patterns(&getContext());
-      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
-
-      LDBG("after dropping vector transfer unit dims\n" << funcOp);
+    RewritePatternSet patterns(&getContext());
+    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
     }
+    LDBG("after dropping vector transfer unit dims\n" << funcOp);
 
     // Second stage of patterns to flatten transfer ops.
     if (flatten) {
@@ -147,14 +140,13 @@ struct OptimizeVectorTransferPass
 
 private:
   bool flatten;
-  bool dropUnitDims;
 };
 
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createOptimizeVectorTransferPass(bool flatten, bool dropUnitDims) {
-  return std::make_unique<OptimizeVectorTransferPass>(flatten, dropUnitDims);
+createOptimizeVectorTransferPass(bool flatten) {
+  return std::make_unique<OptimizeVectorTransferPass>(flatten);
 }
 
 } // namespace mlir::iree_compiler

@@ -372,8 +372,6 @@ def OptimizeVectorTransfer :
   let options = [
     Option<"optionFlatten", "flatten", "bool", "false",
            "Flatten the vector type of vector transfers where possible (contiguous row-major data).">,
-    Option<"optionDropUnitDims", "drop-unit-dims", "bool", /*default=*/"true",
-           "Drop unit dims in vector transfers where possible (might generate vector.shape_cast).">,
   ];
   let dependentDialects = [
       "memref::MemRefDialect"

@@ -90,10 +90,10 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    %[[R8:.+]] = arith.addf %[[R7]], %[[S6]] : f32
 //         CHECK:    %[[S7:.+]], %{{.*}} = gpu.shuffle  idx %[[R8]], %[[C0I]], %[[C32]] : f32
 //         CHECK:    %[[R12:.+]] = arith.addf %[[S7]], %[[CF]] : f32
-//         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<1xf32>
+//         CHECK:    %[[R13:.+]] = vector.splat %[[R12]] : vector<f32>
 //         CHECK:    %[[TID0:.+]] = arith.cmpi eq, %[[TID]], %[[C0]] : index
 //         CHECK:    scf.if %[[TID0]] {
-//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] {in_bounds = [true]} : vector<1xf32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
+//         CHECK:      vector.transfer_write %[[R13]], %{{.*}}[%{{.*}}] : vector<f32>, memref<512xf32, #hal.descriptor_type<storage_buffer>>
 //         CHECK:    }
 
 // -----
