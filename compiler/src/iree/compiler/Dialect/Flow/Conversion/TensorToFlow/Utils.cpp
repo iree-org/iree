@@ -66,10 +66,10 @@ static bool producedByValueExtract(OpFoldResult index) {
   return hasExtract;
 }
 
-static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
-                                                ArrayRef<OpFoldResult> sizes,
-                                                ArrayRef<OpFoldResult> strides,
-                                                ArrayRef<int64_t> baseShape) {
+bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes,
+                                         ArrayRef<OpFoldResult> strides,
+                                         ArrayRef<int64_t> baseShape) {
   if (offsets.size() != baseShape.size()) {
     // Unhanded rank-reducing case.
     return false;
