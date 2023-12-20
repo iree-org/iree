@@ -129,4 +129,9 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
 }
 
+def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
+  let summary = "Simplifies tensor pack and unpack ops";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createSimplifyPackUnpackPass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES
