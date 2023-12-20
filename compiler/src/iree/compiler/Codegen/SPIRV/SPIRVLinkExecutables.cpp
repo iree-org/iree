@@ -20,10 +20,22 @@
 namespace mlir::iree_compiler {
 
 namespace IREE::HAL {
-// MLIR attributes are pointers to uniqued data. So we can just compare the
-// pointer for order.
+// Compares two ExecutableTargetAttr according to the alphabetical order of used
+// SPIR-V features.
+//
+// Note that this is a very specific ordering per the needs of this pass--we
+// guarantee that input ExectuableTargetAttr only differ w.r.t. their used
+// SPIR-V features, and we want a deterministic order when mutating the IR.
 bool operator<(const ExecutableTargetAttr &a, const ExecutableTargetAttr &b) {
-  return a.getAsOpaquePointer() < b.getAsOpaquePointer();
+  auto aFeatures = a.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
+  auto bFeatures = b.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
+  for (unsigned i = 0; i < std::min(aFeatures.size(), bFeatures.size()); ++i) {
+    if (aFeatures[i] != bFeatures[i]) {
+      return cast<StringAttr>(aFeatures[i]).getValue() <
+             cast<StringAttr>(bFeatures[i]).getValue();
+    }
+  }
+  return aFeatures.size() < bFeatures.size();
 }
 } // namespace IREE::HAL
 
