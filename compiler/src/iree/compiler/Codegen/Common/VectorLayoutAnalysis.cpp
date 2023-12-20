@@ -763,7 +763,8 @@ void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Propagate the layouts.
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      inputLattice->resolve(forwardedLattice);
+      ChangeResult changed = inputLattice->resolve(forwardedLattice);
+      propagateIfChanged(inputLattice, changed);
     }
   }
 }
@@ -887,8 +888,9 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     int64_t curr = 0;
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      forwardedLattice->resolveWithPossibleConflict(inputLattice,
-                                                    *forwardedOperands[curr]);
+      ChangeResult changed = forwardedLattice->resolveWithPossibleConflict(
+          inputLattice, *forwardedOperands[curr]);
+      propagateIfChanged(forwardedLattice, changed);
       curr++;
     }
   }
