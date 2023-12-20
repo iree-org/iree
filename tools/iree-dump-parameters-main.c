@@ -121,10 +121,12 @@ int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
   if (argc > 1) {
-      fprintf(stderr, "Error: no positional arguments expected.\n");
-      fprintf(stderr, "Use one or more --parameters=file.ext flags to specify parameter files.\n");
-      IREE_TRACE_ZONE_END(z0);
-      return EXIT_FAILURE;
+    fprintf(stderr, "Error: no positional arguments expected.\n");
+    fprintf(stderr,
+            "Use one or more --parameters=file.ext flags to specify parameter "
+            "files.\n");
+    IREE_TRACE_ZONE_END(z0);
+    return EXIT_FAILURE;
   }
 
   iree_io_scope_map_t scope_map = {0};
