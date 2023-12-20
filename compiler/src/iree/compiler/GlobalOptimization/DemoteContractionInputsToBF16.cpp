@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -52,8 +52,7 @@ struct DemoteContractionInputsToBF16Pattern
           RankedTensorType::get(inputType.getShape(), rewriter.getBF16Type(),
                                 inputType.getEncoding());
       SmallVector<AffineMap> maps(
-          2, AffineMap::getMultiDimIdentityMap(inputType.getRank(),
-                                               rewriter.getContext()));
+          2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
       SmallVector<utils::IteratorType> iteratorTypes(
           inputType.getRank(), utils::IteratorType::parallel);
       SmallVector<OpFoldResult> mixedSizes =
