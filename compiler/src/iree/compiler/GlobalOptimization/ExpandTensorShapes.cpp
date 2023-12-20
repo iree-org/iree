@@ -27,7 +27,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
-#define DEBUG_TYPE "iree-flow-expand-tensor-shapes"
+#define DEBUG_TYPE "iree-global-opt-expand-tensor-shapes"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 namespace {
@@ -580,7 +580,7 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-flow-expand-tensor-shapes
+// -iree-global-opt-expand-tensor-shapes
 //===----------------------------------------------------------------------===//
 
 // This does a relatively mechanical transformation of a module to expand all
