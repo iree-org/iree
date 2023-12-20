@@ -789,7 +789,7 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
     }
   }
   std::string prefix = os.str().substr(0, 32);
-  if (!StringRef(prefix).endswith("_")) {
+  if (!StringRef(prefix).ends_with("_")) {
     prefix += "_";
   }
   return prefix + llvm::utohexstr(static_cast<uint64_t>(
