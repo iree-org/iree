@@ -284,7 +284,7 @@ module {
         %7 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1} -> tensor<3x1xf32>
         %8 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1} -> tensor<1x1xf32>
         %9 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%8 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %9, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %9, %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -325,8 +325,8 @@ module {
         %8 = flow.dispatch.tensor.load %4, offsets = [0, %arg1], sizes = [3, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %1} -> tensor<3x1xf32>
         %9 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1} -> tensor<1x1xf32>
         %10 = linalg.matmul ins(%7, %8 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
-        flow.dispatch.tensor.store %10, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %10, %6, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -376,7 +376,7 @@ module {
         } -> tensor<1x3xf32>
         %10 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1} -> tensor<1x1xf32>
         %11 = linalg.matmul ins(%9, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%10 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %11, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %11, %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -428,7 +428,7 @@ module {
           linalg.yield %13 : f32
         } -> tensor<1x1xf32>
         %12 = linalg.matmul ins(%8, %9 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%11 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %12, %6, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %12, %6, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -480,7 +480,7 @@ module {
           linalg.yield %11 : f32
         } -> tensor<1x1xf32>
         %10 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -526,7 +526,7 @@ module {
         %8 = flow.dispatch.tensor.load %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1} -> tensor<1x1xf32>
         %9 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%8 : tensor<1x1xf32>) -> tensor<1x1xf32>
         %10 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>) -> tensor<1x1xf32>
-        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
+        flow.dispatch.tensor.store %10, %5, offsets = [%arg0, %arg1], sizes = [1, 1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32>>{%0, %1}
       }
     }
     return
@@ -1336,7 +1336,7 @@ module {
           %9 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1024, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<4x1024x64xf32>> -> tensor<1x1024x32xf32>
           %10 = linalg.fill ins(%cst : f32) outs(%7 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
           %11 = linalg.batch_matmul ins(%8, %9 : tensor<1x32x1024xf32>, tensor<1x1024x32xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
-          flow.dispatch.tensor.store %11, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %c32, %c32], strides = [1, 1, 1] : tensor<1x32x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>>
+          flow.dispatch.tensor.store %11, %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, 32, 32], strides = [1, 1, 1] : tensor<1x32x32xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x32x64xf32>>
         }
       }
     }
@@ -1394,9 +1394,9 @@ func.func @bufferize_transfer_op_inplace() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<2x3xf32>>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<3x4xf32>>
   %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readwrite:tensor<2x4xf32>>
-  %4 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0], sizes = [%c1, %c3], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32>> -> tensor<2x3xf32>
-  %5 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0], sizes = [%c3, %c1], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:tensor<3x4xf32>> -> tensor<3x1xf32>
-  %6 = flow.dispatch.tensor.load %3, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : !flow.dispatch.tensor<readwrite:tensor<2x4xf32>> -> tensor<2x1xf32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [%c0, %c0], sizes = [2, 3], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:tensor<2x3xf32>> -> tensor<2x3xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [%c0, %c0], sizes = [3, 1], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:tensor<3x4xf32>> -> tensor<3x1xf32>
+  %6 = flow.dispatch.tensor.load %3, offsets = [%c0, %c0], sizes = [2, 1], strides = [%c1, %c1] : !flow.dispatch.tensor<readwrite:tensor<2x4xf32>> -> tensor<2x1xf32>
   %7 = vector.transfer_read %4[%c0, %c0], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
   %8 = vector.transfer_read %4[%c0, %c1], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
   %9 = vector.transfer_read %4[%c0, %c2], %cst {in_bounds = [true, true]} : tensor<2x3xf32>, vector<1x1xf32>
@@ -1416,7 +1416,7 @@ func.func @bufferize_transfer_op_inplace() {
   %23 = vector.contract {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} %12, %15, %22 : vector<1x1xf32>, vector<1x1xf32> into vector<1x1xf32>
   %24 = vector.transfer_write %20, %6[%c0, %c0] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
   %25 = vector.transfer_write %23, %24[%c1, %c0] {in_bounds = [true, true]} : vector<1x1xf32>, tensor<2x1xf32>
-  flow.dispatch.tensor.store %25, %3, offsets = [%c0, %c0], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<2x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x4xf32>>
+  flow.dispatch.tensor.store %25, %3, offsets = [%c0, %c0], sizes = [2, 1], strides = [%c1, %c1] : tensor<2x1xf32> -> !flow.dispatch.tensor<readwrite:tensor<2x4xf32>>
   return
 }
 
@@ -1424,10 +1424,9 @@ func.func @bufferize_transfer_op_inplace() {
 //     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//     CHECK-DAG:   %[[ARG0V:.+]] = memref.subview %[[ARG0]]
 //     CHECK-DAG:   %[[ARG1V:.+]] = memref.subview %[[ARG1]]
 //     CHECK-DAG:   %[[RET0V:.+]] = memref.subview %[[RET0]]
-// CHECK-COUNT-6:   vector.transfer_read %[[ARG0V]]
+// CHECK-COUNT-6:   vector.transfer_read %[[ARG0]]
 // CHECK-COUNT-3:   vector.transfer_read %[[ARG1V]]
 // CHECK-COUNT-2:   vector.transfer_read %[[RET0V]]
 //     CHECK-NOT:   linalg.generic
@@ -2070,7 +2069,7 @@ module {
           %21 = tensor.extract %6[%16, %18] : tensor<512x384xf32>
           linalg.yield %21 : f32
         } -> tensor<?x64xf32>
-        flow.dispatch.tensor.store %15, %4, offsets = [%arg0, %arg1], sizes = [%12, %c64], strides = [1, 1] : tensor<?x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x384xf32>>{%1}
+        flow.dispatch.tensor.store %15, %4, offsets = [%arg0, %arg1], sizes = [%12, 64], strides = [1, 1] : tensor<?x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x384xf32>>{%1}
       }
     }
     return
@@ -2126,7 +2125,7 @@ module {
           %19 = vector.transfer_write %18, %15[%c0, %c0, %c0] {in_bounds = [true, false, true]} : vector<1x4x2xf32>, tensor<1x?x2xf32>
           %20 = tensor.insert_slice %19 into %14[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
           %21 = tensor.insert_slice %20 into %11[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
-          flow.dispatch.tensor.store %21, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %7, %c2], strides = [1, 1, 1] : tensor<1x?x2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x6x2xf32>>
+          flow.dispatch.tensor.store %21, %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %7, 2], strides = [1, 1, 1] : tensor<1x?x2xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x6x2xf32>>
         }
       }
     }

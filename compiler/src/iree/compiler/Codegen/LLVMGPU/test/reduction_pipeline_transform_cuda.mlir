@@ -201,7 +201,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
         %6 = arith.addf %in, %out : f32
         linalg.yield %6 : f32
       } -> tensor<33xf32>
-      flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [8], strides = [1] : tensor<33xf32> -> !flow.dispatch.tensor<writeonly:tensor<33xf32>>
+      flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [33], strides = [1] : tensor<33xf32> -> !flow.dispatch.tensor<writeonly:tensor<33xf32>>
       return
     }
   }
