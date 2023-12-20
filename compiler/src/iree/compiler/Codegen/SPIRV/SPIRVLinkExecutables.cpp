@@ -81,9 +81,7 @@ struct SPIRVLinkExecutablesPass final
         executableBuckets;
 
     SmallVector<ExecutableTargetAttr, 0> currentTargets;
-    for (int i = 0, e = sourceExecutableOps.size(); i < e; ++i) {
-      IREE::HAL::ExecutableOp executable = sourceExecutableOps[i];
-
+    for (IREE::HAL::ExecutableOp executable : sourceExecutableOps) {
       // Go through all variants and collect all their target requirements and
       // sort as the unique key.
       currentTargets.clear();
