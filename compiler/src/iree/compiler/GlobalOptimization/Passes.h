@@ -75,7 +75,7 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseSiluHorizontalMatmulPass();
 
 /// Generalizes some named Linalg ops into `linalg.generic` operations since the
-/// IREE compiler can handle that better.
+/// compiler can handle that better.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGeneralizeLinalgNamedOpsPass();
 
@@ -96,7 +96,8 @@ std::unique_ptr<Pass> createOptimizeNumericsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation = false);
 
-/// Raises sequence of ops to higher level linalg.ext representation.
+/// Performs specialized raisings of various sequences of ops to a
+/// representation easier for the compiler to handle.
 std::unique_ptr<Pass> createRaiseSpecialOps();
 
 /// Removes tensors that have 0-extents.
