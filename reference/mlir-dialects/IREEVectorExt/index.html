@@ -1760,6 +1760,20 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simd-vectorexttosimdop" class="md-nav__link">
+    iree_vector_ext.to_simd (VectorExt::ToSIMDOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simt-vectorexttosimtop" class="md-nav__link">
+    iree_vector_ext.to_simt (VectorExt::ToSIMTOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3324,6 +3338,20 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simd-vectorexttosimdop" class="md-nav__link">
+    iree_vector_ext.to_simd (VectorExt::ToSIMDOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree_vector_extto_simt-vectorexttosimtop" class="md-nav__link">
+    iree_vector_ext.to_simt (VectorExt::ToSIMTOp)
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3396,6 +3424,8 @@ beyond what is currently available in the Vector Dialect.</p>
 <li><a href="#iree_vector_ext-dialect">'iree_vector_ext' Dialect</a><ul>
 <li><a href="#operations">Operations</a><ul>
 <li><a href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop">iree_vector_ext.layout_conflict_resolution (VectorExt::LayoutConflictResolutionOp)</a></li>
+<li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
+<li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
 </ul>
 </li>
 <li><a href="#attributes_1">Attributes</a><ul>
@@ -3440,6 +3470,88 @@ desired layout.</p>
 </tbody>
 </table>
 <h5 id="results">Results:<a class="headerlink" href="#results" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>output</code></td>
+<td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iree_vector_extto_simd-vectorexttosimdop"><code>iree_vector_ext.to_simd</code> (VectorExt::ToSIMDOp)<a class="headerlink" href="#iree_vector_extto_simd-vectorexttosimdop" title="Permanent link">link</a></h3>
+<p><em>SIMT to SIMD conversion operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_simd` $input attr-dict `:` type($input) `-&gt;` type($output)
+</code></pre></div>
+<p>This operation is a temporary operation useful for source/target
+materializations when doing type conversions between distributed and not
+distributed vectors.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultElementType</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>input</code></td>
+<td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_1">Results:<a class="headerlink" href="#results_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>output</code></td>
+<td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
+<h3 id="iree_vector_extto_simt-vectorexttosimtop"><code>iree_vector_ext.to_simt</code> (VectorExt::ToSIMTOp)<a class="headerlink" href="#iree_vector_extto_simt-vectorexttosimtop" title="Permanent link">link</a></h3>
+<p><em>SIMD to SIMT conversion operation</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `iree_vector_ext.to_simt` $input attr-dict `:` type($input) `-&gt;` type($output)
+</code></pre></div>
+<p>This operation is a temporary operation useful for source/target
+materializations when doing type conversions between distributed and not
+distributed vectors.</p>
+<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultElementType</p>
+<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
+<p>Effects: MemoryEffects::Effect{}</p>
+<h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>input</code></td>
+<td>vector of any type values</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_2">Results:<a class="headerlink" href="#results_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
