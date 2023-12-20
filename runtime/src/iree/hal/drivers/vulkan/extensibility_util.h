@@ -106,4 +106,42 @@ iree_hal_vulkan_device_extensions_t
 iree_hal_vulkan_infer_enabled_device_extensions(
     const iree::hal::vulkan::DynamicSymbols* device_syms);
 
+// Struct for supported device properties.
+typedef struct iree_hal_vulkan_device_properties_t {
+  // Whether supporting 16-bit floating-point type for computation.
+  // See VkPhysicalDeviceShaderFloat16Int8Features::shaderFloat16.
+  bool compute_f16 : 1;
+  // Whether supporting 64-bit floating-point type for computation.
+  // See VkPhysicalDeviceFeatures::shaderFloat64.
+  bool compute_f64 : 1;
+  // Whether supporting 8-bit integer type for computation.
+  // See VkPhysicalDeviceShaderFloat16Int8Features::shaderInt8.
+  bool compute_i8 : 1;
+  // Whether supporting 16-bit integer type for computation.
+  // See VkPhysicalDeviceFeatures::shaderInt16.
+  bool compute_i16 : 1;
+  // Whether supporting 64-bit integer type for computation.
+  // See VkPhysicalDeviceFeatures::shaderInt64.
+  bool compute_i64 : 1;
+  // Whether supporting 8-bit storage features. True means both
+  // storageBuffer8BitAccess and uniformAndStorageBuffer8BitAccess.
+  // See VkPhysicalDevice8BitStorageFeatures.
+  bool storage_8bit : 1;
+  // Whether supporting 16-bit storage features. True means both
+  // storageBuffer16BitAccess and uniformAndStorageBuffer16BitAccess.
+  // See VkPhysicalDevice16BitStorageFeatures.
+  bool storage_16bit : 1;
+  // Bitfield of supported dot product operations.
+  // Format: "dotprod.<input-type>.<output-type>".
+  // 0x1: dotprod.4xi8.i32
+  uint32_t dot_product_operations : 8;
+  // Bitfield of supported cooperative matrix operations.
+  // Format: "coopmatrix.<input-type>.<output-type>.<m>x<n>x<k>".
+  // 0x1: coopmatrix.f16.f16.16x16x16
+  uint32_t cooperative_matrix_operations : 8;
+  // Bitfield of supported subgroup operations; directly copied from
+  // VkPhysicalDeviceSubgroupProperties::supportedOperations.
+  uint32_t subgroup_operations;
+} iree_hal_vulkan_iree_hal_vulkan_device_properties_t;
+
 #endif  // IREE_HAL_DRIVERS_VULKAN_EXTENSIBILITY_UTIL_H_

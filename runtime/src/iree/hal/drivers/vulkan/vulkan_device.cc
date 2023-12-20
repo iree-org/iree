@@ -498,6 +498,8 @@ typedef struct iree_hal_vulkan_device_t {
   iree_hal_vulkan_device_flags_t flags;
   // Which optional extensions are active and available on the device.
   iree_hal_vulkan_device_extensions_t device_extensions;
+  // Device properties for various optional features.
+  iree_hal_vulkan_device_properties_t device_properties;
 
   VkInstance instance;
   VkPhysicalDevice physical_device;
@@ -690,6 +692,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
     const iree_hal_vulkan_device_options_t* options, VkInstance instance,
     VkPhysicalDevice physical_device, VkDeviceHandle* logical_device,
     const iree_hal_vulkan_device_extensions_t* device_extensions,
+    const iree_hal_vulkan_device_properties_t* device_properties,
     const iree_hal_vulkan_queue_set_t* compute_queue_set,
     const iree_hal_vulkan_queue_set_t* transfer_queue_set,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
@@ -721,6 +724,7 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->flags = options->flags;
 
   device->device_extensions = *device_extensions;
+  device->device_properties = *device_properties;
   device->instance = instance;
   device->physical_device = physical_device;
   device->logical_device = logical_device;
@@ -846,6 +850,147 @@ static iree_status_t iree_hal_vulkan_device_query_extensibility_set(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_vulkan_get_device_properties(
+    DynamicSymbols* instance_syms, VkPhysicalDevice physical_device,
+    iree_hal_vulkan_device_properties_t* device_properties) {
+  memset(device_properties, 0, sizeof(*device_properties));
+
+  VkPhysicalDeviceFeatures2 physical_device_features;
+  memset(&physical_device_features, 0, sizeof(physical_device_features));
+  physical_device_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+
+  // + Shader float16 and int8 features.
+  VkPhysicalDeviceShaderFloat16Int8Features shader_float16_int8_features;
+  memset(&shader_float16_int8_features, 0,
+         sizeof(shader_float16_int8_features));
+  shader_float16_int8_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
+  shader_float16_int8_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &shader_float16_int8_features;
+
+  // + Shader 8 bit storage features.
+  VkPhysicalDevice8BitStorageFeatures supported_8bit_storage_features;
+  memset(&supported_8bit_storage_features, 0,
+         sizeof(supported_8bit_storage_features));
+  supported_8bit_storage_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES;
+  supported_8bit_storage_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &supported_8bit_storage_features;
+
+  // + Shader 16 bit storage features.
+  VkPhysicalDevice16BitStorageFeatures supported_16bit_storage_features;
+  memset(&supported_16bit_storage_features, 0,
+         sizeof(supported_16bit_storage_features));
+  supported_16bit_storage_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES;
+  supported_16bit_storage_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &supported_16bit_storage_features;
+
+  // + Shader integer dot product features.
+  VkPhysicalDeviceShaderIntegerDotProductFeatures dot_product_features;
+  memset(&dot_product_features, 0, sizeof(dot_product_features));
+  dot_product_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_FEATURES;
+  dot_product_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &dot_product_features;
+
+  // + Cooperative matrix features.
+  VkPhysicalDeviceCooperativeMatrixFeaturesKHR coop_matrix_features;
+  memset(&coop_matrix_features, 0, sizeof(coop_matrix_features));
+  coop_matrix_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_MATRIX_FEATURES_KHR;
+  coop_matrix_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &coop_matrix_features;
+
+  instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
+                                              &physical_device_features);
+
+  VkPhysicalDeviceProperties2 physical_device_properties;
+  memset(&physical_device_properties, 0, sizeof(physical_device_properties));
+  physical_device_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  physical_device_properties.pNext = NULL;
+
+  // + Subgroup properties.
+  VkPhysicalDeviceSubgroupProperties subgroup_properties;
+  memset(&subgroup_properties, 0, sizeof(subgroup_properties));
+  subgroup_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  subgroup_properties.pNext = physical_device_properties.pNext;
+  physical_device_properties.pNext = &subgroup_properties;
+
+  // + Shader integer dot product properties.
+  VkPhysicalDeviceShaderIntegerDotProductProperties dot_product_properties;
+  memset(&dot_product_properties, 0, sizeof(dot_product_properties));
+  dot_product_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_INTEGER_DOT_PRODUCT_PROPERTIES;
+  dot_product_properties.pNext = physical_device_properties.pNext;
+  physical_device_properties.pNext = &dot_product_properties;
+
+  instance_syms->vkGetPhysicalDeviceProperties2(physical_device,
+                                                &physical_device_properties);
+
+  device_properties->compute_f16 = shader_float16_int8_features.shaderFloat16;
+  device_properties->compute_f64 =
+      physical_device_features.features.shaderFloat64;
+  device_properties->compute_i8 = shader_float16_int8_features.shaderInt8;
+  device_properties->compute_i16 =
+      physical_device_features.features.shaderInt16;
+  device_properties->compute_i64 =
+      physical_device_features.features.shaderInt64;
+  if (supported_8bit_storage_features.storageBuffer8BitAccess &&
+      supported_8bit_storage_features.uniformAndStorageBuffer8BitAccess) {
+    device_properties->storage_8bit = true;
+  }
+  if (supported_16bit_storage_features.storageBuffer16BitAccess &&
+      supported_16bit_storage_features.uniformAndStorageBuffer16BitAccess) {
+    device_properties->storage_16bit = true;
+  }
+
+  if (dot_product_features.shaderIntegerDotProduct &&
+      dot_product_properties.integerDotProduct8BitUnsignedAccelerated &&
+      dot_product_properties.integerDotProduct8BitSignedAccelerated &&
+      dot_product_properties.integerDotProduct8BitMixedSignednessAccelerated &&
+      dot_product_properties
+          .integerDotProductAccumulatingSaturating8BitUnsignedAccelerated &&
+      dot_product_properties
+          .integerDotProductAccumulatingSaturating8BitSignedAccelerated &&
+      dot_product_properties
+          .integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated) {
+    device_properties->dot_product_operations |= 0x1u;
+  }
+
+  if (coop_matrix_features.cooperativeMatrix &&
+      instance_syms->vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR) {
+    uint32_t count = 0;
+    IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
+        instance_syms->vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+            physical_device, &count, NULL)));
+    VkCooperativeMatrixPropertiesKHR* properties =
+        (VkCooperativeMatrixPropertiesKHR*)iree_alloca(
+            count * sizeof(VkCooperativeMatrixPropertiesKHR));
+    IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
+        instance_syms->vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
+            physical_device, &count, properties)));
+    for (uint32_t i = 0; i < count; ++i) {
+      VkCooperativeMatrixPropertiesKHR* p = properties + i;
+      if (p->AType == VK_COMPONENT_TYPE_FLOAT16_KHR &&
+          p->BType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
+        if (p->CType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
+          if (p->MSize == 16 && p->NSize == 16 && p->KSize == 16) {
+            device_properties->cooperative_matrix_operations |= 0x1u;
+          }
+        }
+      }
+    }
+  }
+
+  device_properties->subgroup_operations =
+      subgroup_properties.supportedOperations;
+
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_vulkan_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     iree_hal_vulkan_features_t requested_features,
@@ -965,6 +1110,15 @@ iree_status_t iree_hal_vulkan_device_create(
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES;
   available_shader_float16_int8_features.pNext = available_features2.pNext;
   available_features2.pNext = &available_shader_float16_int8_features;
+
+  // + Subgroup matrix features.
+  VkPhysicalDeviceSubgroupProperties available_subgroup_properties;
+  memset(&available_subgroup_properties, 0,
+         sizeof(available_subgroup_properties));
+  available_subgroup_properties.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  available_subgroup_properties.pNext = available_features2.pNext;
+  available_features2.pNext = &available_subgroup_properties;
 
   // + Cooperative matrix features.
   VkPhysicalDeviceCooperativeMatrixFeaturesKHR available_coop_matrix_features;
@@ -1094,15 +1248,19 @@ iree_status_t iree_hal_vulkan_device_create(
     enabled_features2.pNext = &available_shader_float16_int8_features;
   }
 
-  // Enable all available coop matrix features.
+  // Enable all available cooperative matrix features.
   if (enabled_device_extensions.cooperative_matrix) {
     available_coop_matrix_features.pNext = enabled_features2.pNext;
     enabled_features2.pNext = &available_coop_matrix_features;
   }
 
+  iree_hal_vulkan_device_properties_t device_properties;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_get_device_properties(
+      instance_syms, physical_device, &device_properties));
+
   auto logical_device = new VkDeviceHandle(
       instance_syms, physical_device, enabled_features,
-      enabled_device_extensions,
+      enabled_device_extensions, device_properties,
       /*owns_device=*/true, host_allocator, /*allocator=*/NULL);
 
   iree_status_t status = VK_RESULT_TO_STATUS(
@@ -1129,7 +1287,8 @@ iree_status_t iree_hal_vulkan_device_create(
     status = iree_hal_vulkan_device_create_internal(
         driver, identifier, enabled_features, options, instance,
         physical_device, logical_device, &enabled_device_extensions,
-        &compute_queue_set, &transfer_queue_set, host_allocator, out_device);
+        &device_properties, &compute_queue_set, &transfer_queue_set,
+        host_allocator, out_device);
   }
 
   logical_device->ReleaseReference();
@@ -1169,6 +1328,11 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   iree_hal_vulkan_device_extensions_t enabled_device_extensions =
       iree_hal_vulkan_infer_enabled_device_extensions(device_syms.get());
 
+  // We can still retrieve the correct device properties though.
+  iree_hal_vulkan_device_properties_t device_properties;
+  IREE_RETURN_IF_ERROR(iree_hal_vulkan_get_device_properties(
+      device_syms.get(), physical_device, &device_properties));
+
   iree_hal_vulkan_features_t enabled_features = 0;
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   enabled_features |= IREE_HAL_VULKAN_FEATURE_ENABLE_TRACING;
@@ -1177,7 +1341,7 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
   auto logical_device_handle = new VkDeviceHandle(
       device_syms.get(), physical_device, enabled_features,
-      enabled_device_extensions,
+      enabled_device_extensions, device_properties,
       /*owns_device=*/false, host_allocator, /*allocator=*/NULL);
   *logical_device_handle->mutable_value() = logical_device;
 
@@ -1185,7 +1349,8 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_wrap_device(
   iree_status_t status = iree_hal_vulkan_device_create_internal(
       /*driver=*/NULL, identifier, enabled_features, options, instance,
       physical_device, logical_device_handle, &enabled_device_extensions,
-      compute_queue_set, transfer_queue_set, host_allocator, out_device);
+      &device_properties, compute_queue_set, transfer_queue_set, host_allocator,
+      out_device);
 
   logical_device_handle->ReleaseReference();
   return status;
@@ -1238,14 +1403,13 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   *out_value = 0;
 
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.executable.format"))) {
-    if (iree_string_view_equal(key,
-                               iree_make_cstring_view("vulkan-spirv-fb"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
+    if (iree_string_view_equal(key, IREE_SV("vulkan-spirv-fb"))) {
       // Base SPIR-V always supported.
       *out_value = 1;
-    } else if (iree_string_view_equal(
-                   key, iree_make_cstring_view("vulkan-spirv-fb-ptr"))) {
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("vulkan-spirv-fb-ptr"))) {
       // SPIR-V with device addresses is optionally supported based on whether
       // we have device feature support.
       *out_value = iree_all_bits_set(
@@ -1253,8 +1417,74 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
                        IREE_HAL_VULKAN_FEATURE_ENABLE_BUFFER_DEVICE_ADDRESSES)
                        ? 1
                        : 0;
+      return iree_ok_status();
     }
-    return iree_ok_status();
+  }
+
+  // Note that the device queries used here should match the ones used in
+  // mapToDeviceQuery() on the compiler side.
+  if (iree_string_view_equal(category, IREE_SV("hal.device.vulkan"))) {
+    if (iree_string_view_equal(key, IREE_SV("compute.f16"))) {
+      bool v = device->logical_device->supported_properties().compute_f16;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("compute.f64"))) {
+      bool v = device->logical_device->supported_properties().compute_f64;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("compute.i8"))) {
+      bool v = device->logical_device->supported_properties().compute_i8;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("compute.i16"))) {
+      bool v = device->logical_device->supported_properties().compute_i16;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("compute.i64"))) {
+      bool v = device->logical_device->supported_properties().compute_i64;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("storage.8bit"))) {
+      bool v = device->logical_device->supported_properties().storage_8bit;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("storage.16bit"))) {
+      bool v = device->logical_device->supported_properties().storage_16bit;
+      *out_value = v ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("subgroup.arithmetic"))) {
+      uint32_t ops =
+          device->logical_device->supported_properties().subgroup_operations;
+      *out_value =
+          iree_all_bits_set(ops, VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("subgroup.shuffle"))) {
+      uint32_t ops =
+          device->logical_device->supported_properties().subgroup_operations;
+      *out_value =
+          iree_all_bits_set(ops, VK_SUBGROUP_FEATURE_SHUFFLE_BIT) ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("dotprod.4xi8.i32"))) {
+      uint32_t ops =
+          device->logical_device->supported_properties().dot_product_operations;
+      *out_value = iree_all_bits_set(ops, 0x1u) ? 1 : 0;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("coopmatrix.f16.f16.16x16x16"))) {
+      uint32_t ops = device->logical_device->supported_properties()
+                         .cooperative_matrix_operations;
+      *out_value = iree_all_bits_set(ops, 0x1u) ? 1 : 0;
+      return iree_ok_status();
+    }
   }
 
   return iree_make_status(

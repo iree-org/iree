@@ -11,14 +11,27 @@
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Support/LogicalResult.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler {
+
+bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
+  if (variantOp.getObjects().has_value()) {
+    // Variants containing external executables do not go through CodeGen.
+    return false;
+  }
+
+  DictionaryAttr configuration = variantOp.getTargetAttr().getConfiguration();
+  // The spirv.target_env attribute is attached if going down SPIR-V CodeGen
+  // pipelines. Later we turn spirv.target_env into iree.spirv.features after
+  // materializing device queries.
+  return configuration.contains(spirv::getTargetEnvAttrName()) or
+         configuration.contains("iree.spirv.features");
+}
 
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
