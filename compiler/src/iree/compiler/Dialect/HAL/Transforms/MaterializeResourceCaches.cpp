@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -22,27 +23,15 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-class MaterializeResourceCachesPass
-    : public PassWrapper<MaterializeResourceCachesPass,
-                         OperationPass<ModuleOp>> {
-public:
-  explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
-      : targetOptions_(targetOptions) {}
+#define GEN_PASS_DEF_MATERIALIZERESOURCECACHESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
-  StringRef getArgument() const override {
-    return "iree-hal-materialize-resource-caches";
-  }
+namespace {
 
-  StringRef getDescription() const override {
-    return "Materializes hal.executable resource caches and rewrites lookups.";
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<IREE::HAL::HALDialect>();
-  }
-
+// TODO(multi-device): rewrite this to shard resources per device.
+struct MaterializeResourceCachesPass
+    : public IREE::HAL::impl::MaterializeResourceCachesPassBase<
+          MaterializeResourceCachesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
@@ -368,8 +357,6 @@ private:
     lookupOp.erase();
   }
 
-  TargetOptions targetOptions_;
-
   OpBuilder moduleBuilder{static_cast<MLIRContext *>(nullptr)};
   DenseMap<std::pair<Attribute, IREE::HAL::DescriptorSetLayoutFlags>,
            IREE::Util::GlobalOp>
@@ -382,14 +369,6 @@ private:
   int nextUniqueDescriptorSetLayoutId = 0;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createMaterializeResourceCachesPass(TargetOptions targetOptions) {
-  return std::make_unique<MaterializeResourceCachesPass>(targetOptions);
-}
-
-static PassRegistration<MaterializeResourceCachesPass> pass([] {
-  auto options = TargetOptions::FromFlags::get();
-  return std::make_unique<MaterializeResourceCachesPass>(options);
-});
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL

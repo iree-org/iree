@@ -37,7 +37,7 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
   }
 
   unsigned sourceBitWidth = 32;
-  unsigned destBitWidth = opType.getIntOrFloatBitWidth();
+  unsigned destBitWidth = IREE::Util::getTypeBitWidth(opType);
 
   // AnySignlessInteger
   if (llvm::isa<IntegerType>(opType)) {

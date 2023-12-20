@@ -58,7 +58,7 @@ shapedTypeStaticSize(memref::AllocOp allocOp, ShapedType shapedType,
              "getIndexBitwidth should have been set earlier");
       allocSize *= getIndexBitwidth(func);
     } else
-      allocSize *= shapedType.getElementType().getIntOrFloatBitWidth();
+      allocSize *= IREE::Util::getTypeBitWidth(shapedType.getElementType());
   }
   return allocSize;
 }

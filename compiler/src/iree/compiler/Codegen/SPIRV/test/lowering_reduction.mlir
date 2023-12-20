@@ -173,8 +173,9 @@ hal.executable @warp_reduction_dispatch {
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I1]], %[[I32]] : i32
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  xor %{{.+}}, %[[I2]], %[[I32]] : i32
 //         CHECK:    %{{.+}}, %{{.+}} = gpu.shuffle  idx %{{.+}}, %[[I0]], %[[I32]] : i32
-//         CHECK:    %[[ADD:.+]] = vector.reduction <add>, %{{.+}} : vector<2xf16> into f16
-//         CHECK:    %[[ADD1:.+]] = arith.addf %[[ADD]], %[[F0]] : f16
+//         CHECK:    %[[TRUNC:.+]] = arith.trunci %{{.+}} : i32 to i16
+//         CHECK:    %[[BCAST:.+]] = arith.bitcast %[[TRUNC]] : i16 to f16
+//         CHECK:    %[[ADD1:.+]] = arith.addf %[[BCAST]], %[[F0]] : f16
 //         CHECK:    %[[SPLAT:.+]] = vector.splat %[[ADD1]] : vector<4xf16>
 //         CHECK:    scf.for %[[IV:.+]] = %[[C0]] to %[[C9216]] step %[[C1024]] {
 //         CHECK:      %[[OFFSET:.+]] = affine.apply #[[$MAP]](%[[IV]])[%[[TIDX]]]

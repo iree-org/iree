@@ -27,6 +27,11 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+#define GEN_PASS_DEF_MATERIALIZEDISPATCHINSTRUMENTATIONPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
 static std::string getAttrStr(Attribute attr) {
   if (!attr)
     return "";
@@ -94,32 +99,16 @@ static void appendListItems(Location loc, Value list, ArrayRef<Value> items,
   }
 }
 
-class MaterializeDispatchInstrumentationPass
-    : public PassWrapper<MaterializeDispatchInstrumentationPass,
-                         OperationPass<mlir::ModuleOp>> {
-public:
-  MaterializeDispatchInstrumentationPass() = default;
-  MaterializeDispatchInstrumentationPass(
-      const MaterializeDispatchInstrumentationPass &pass) {}
-  explicit MaterializeDispatchInstrumentationPass(int64_t bufferSize) {
-    this->bufferSize = bufferSize;
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-materialize-dispatch-instrumentation
+//===----------------------------------------------------------------------===//
 
-  StringRef getArgument() const override {
-    return "iree-hal-materialize-dispatch-instrumentation";
-  }
-
-  StringRef getDescription() const override {
-    return "Materializes dispatch instrumentation resources.";
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<IREE::HAL::HALDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct MaterializeDispatchInstrumentationPass
+    : public IREE::HAL::impl::MaterializeDispatchInstrumentationPassBase<
+          MaterializeDispatchInstrumentationPass> {
+  using IREE::HAL::impl::MaterializeDispatchInstrumentationPassBase<
+      MaterializeDispatchInstrumentationPass>::
+      MaterializeDispatchInstrumentationPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     if (moduleOp.getBody()->empty())
@@ -378,23 +367,8 @@ public:
       queryBuilder.create<func::ReturnOp>(loc);
     }
   }
-
-private:
-  Option<llvm::cl::PowerOf2ByteSize> bufferSize{
-      *this,
-      "bufferSize",
-      llvm::cl::desc("Power-of-two byte size of the instrumentation buffer."),
-      llvm::cl::init(llvm::cl::PowerOf2ByteSize(64 * 1024 * 1024)),
-  };
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createMaterializeDispatchInstrumentationPass(int64_t bufferSize) {
-  return std::make_unique<MaterializeDispatchInstrumentationPass>(bufferSize);
-}
-
-static PassRegistration<MaterializeDispatchInstrumentationPass> pass([] {
-  return std::make_unique<MaterializeDispatchInstrumentationPass>();
-});
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL

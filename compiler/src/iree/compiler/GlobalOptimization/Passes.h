@@ -90,6 +90,11 @@ createMaterializeHomogeneousEncodingsPass();
 // iree-global-opt-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
+// Create a pass that propagates linalg.transpose ops to a restricted set of
+// operations.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createPropagateLinalgTransposePass(bool enableAggressivePropagation = false);
+
 // Create a pass to raise sequence of ops to higher level linalg.ext
 // representation.
 std::unique_ptr<Pass> createRaiseSpecialOps();

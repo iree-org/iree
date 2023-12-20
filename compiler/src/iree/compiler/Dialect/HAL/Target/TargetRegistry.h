@@ -15,6 +15,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -95,5 +96,45 @@ gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp);
 SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
 
 } // namespace mlir::iree_compiler::IREE::HAL
+
+namespace llvm::cl {
+
+struct TargetBackendRegistryRef {
+  const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *value =
+      &mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal();
+  TargetBackendRegistryRef() = default;
+  TargetBackendRegistryRef(
+      const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry &value)
+      : value(&value) {}
+  TargetBackendRegistryRef(
+      const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *value)
+      : value(value) {}
+  operator bool() const noexcept {
+    return value->getRegisteredTargetBackends() !=
+           mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal()
+               .getRegisteredTargetBackends();
+  }
+  const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *
+  operator->() const {
+    return value;
+  }
+};
+
+extern template class basic_parser<TargetBackendRegistryRef>;
+
+template <>
+class parser<TargetBackendRegistryRef>
+    : public basic_parser<TargetBackendRegistryRef> {
+public:
+  parser(Option &O) : basic_parser(O) {}
+  bool parse(Option &O, StringRef ArgName, StringRef Arg,
+             TargetBackendRegistryRef &Val);
+  StringRef getValueName() const override { return "target backend registry"; }
+  void printOptionDiff(const Option &O, TargetBackendRegistryRef V,
+                       const OptVal &Default, size_t GlobalWidth) const;
+  void anchor() override;
+};
+
+} // namespace llvm::cl
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_TARGETREGISTRY_H_

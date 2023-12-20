@@ -29,6 +29,10 @@
 #define DEBUG_TYPE "iree-hal-materialize-interfaces"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_MATERIALIZEINTERFACESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
 namespace {
 
 // Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants.
@@ -510,28 +514,12 @@ convertDispatchWorkgroupInfoOps(IREE::HAL::ExecutableOp executableOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-hal-materialize-interfaces
+// --iree-hal-materialize-interfaces
 //===----------------------------------------------------------------------===//
 
-class MaterializeInterfacesPass
-    : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
-public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MaterializeInterfacesPass)
-
-  MaterializeInterfacesPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-materialize-interfaces";
-  }
-
-  StringRef getDescription() const override {
-    return "Materializes hal.executable ops from stream.executable ops";
-  }
-
+struct MaterializeInterfacesPass
+    : public IREE::HAL::impl::MaterializeInterfacesPassBase<
+          MaterializeInterfacesPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
@@ -655,13 +643,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass() {
-  return std::make_unique<MaterializeInterfacesPass>();
-}
-
-static PassRegistration<MaterializeInterfacesPass> pass([] {
-  return std::make_unique<MaterializeInterfacesPass>();
-});
 
 } // namespace mlir::iree_compiler::IREE::HAL

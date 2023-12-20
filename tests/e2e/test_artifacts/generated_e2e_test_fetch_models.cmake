@@ -132,6 +132,13 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-Falcon7bInt4GptqPT"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Falcon7bInt4GptqPT.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-BertLargeTFBatch1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975/BERT_LARGE_FP32_TF_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTFBatch1.mlirbc"

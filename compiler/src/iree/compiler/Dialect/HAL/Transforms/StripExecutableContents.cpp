@@ -14,18 +14,18 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+#define GEN_PASS_DEF_STRIPEXECUTABLECONTENTSPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
+//===----------------------------------------------------------------------===//
+// --iree-hal-strip-executable-contents
+//===----------------------------------------------------------------------===//
+
 struct StripExecutableContentsPass
-    : public PassWrapper<StripExecutableContentsPass,
-                         OperationPass<mlir::ModuleOp>> {
-  StringRef getArgument() const override {
-    return "iree-hal-strip-executable-contents";
-  }
-
-  StringRef getDescription() const override {
-    return "Strips executable module contents for reducing IR size during "
-           "debugging.";
-  }
-
+    : public IREE::HAL::impl::StripExecutableContentsPassBase<
+          StripExecutableContentsPass> {
   void runOnOperation() override {
     for (auto executableOp : getOperation().getOps<IREE::HAL::ExecutableOp>()) {
       for (auto variantOp :
@@ -38,11 +38,6 @@ struct StripExecutableContentsPass
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createStripExecutableContentsPass() {
-  return std::make_unique<StripExecutableContentsPass>();
-}
-
-static PassRegistration<StripExecutableContentsPass> pass;
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL

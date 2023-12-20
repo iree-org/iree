@@ -833,6 +833,7 @@ jobs:
       build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
+      shard-count: "c2-standard-60=2,default=1"
 
   compilation_benchmarks:
     needs: [setup, build_e2e_test_artifacts]

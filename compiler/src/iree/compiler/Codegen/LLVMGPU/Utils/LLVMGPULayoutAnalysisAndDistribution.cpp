@@ -881,9 +881,10 @@ static void distributeReductionBroadcastTranspose(
         if (index)
           return;
       }
-      result = !result ? tmp
-                       : makeArithReduction(rewriter, loc, combiningKind,
-                                            result, tmp, mask);
+      result = !result
+                   ? tmp
+                   : makeArithReduction(rewriter, loc, combiningKind, result,
+                                        tmp, /*fastmath=*/nullptr, mask);
     };
     iterate(0, reductionOrder, state, layout, reduceLocal);
 
@@ -896,7 +897,7 @@ static void distributeReductionBroadcastTranspose(
             unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                            llvm::cast<VectorType>(result.getType()));
         result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
-                                    result, mask);
+                                    result, /*fastmath=*/nullptr, mask);
       }
 
       // Convert to f16 or f32
@@ -904,13 +905,14 @@ static void distributeReductionBroadcastTranspose(
                                                     SmallVector<int64_t>{0});
       if (isFP32) {
         result = makeArithReduction(rewriter, loc, combiningKind, v0, accValue,
-                                    mask);
+                                    /*fastmath=*/nullptr, mask);
       } else {
         Value v1 = rewriter.create<vector::ExtractOp>(loc, result,
                                                       SmallVector<int64_t>{1});
-        result = makeArithReduction(rewriter, loc, combiningKind, v0, v1, mask);
+        result = makeArithReduction(rewriter, loc, combiningKind, v0, v1,
+                                    /*fastmath=*/nullptr, mask);
         result = makeArithReduction(rewriter, loc, combiningKind, result,
-                                    accValue, mask);
+                                    accValue, /*fastmath=*/nullptr, mask);
       }
     };
     reduceGlobal();

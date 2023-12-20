@@ -70,6 +70,7 @@ iree_cc_library(
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
+    "SPIRVTrimExecutableTargetEnv.cpp"
     "SPIRVVectorToGPUSubgroupMMAOps.cpp"
     "SPIRVVectorizeLoadStore.cpp"
     "Utils.cpp"
