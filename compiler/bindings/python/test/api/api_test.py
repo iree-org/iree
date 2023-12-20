@@ -15,6 +15,7 @@ import unittest
 from iree.compiler.api import *
 from iree.compiler import ir
 
+
 class DlFlagsTest(unittest.TestCase):
     def testDefaultFlags(self):
         session = Session()
@@ -42,6 +43,7 @@ class DlFlagsTest(unittest.TestCase):
         session = Session()
         with self.assertRaises(ValueError):
             session.set_flags("--does-not-exist=1")
+
 
 class DlInvocationTest(unittest.TestCase):
     def testCreate(self):
@@ -126,6 +128,7 @@ class DlInvocationTest(unittest.TestCase):
         inv.output_vm_bytecode(out)
         out.close()
 
+
 class DlOutputTest(unittest.TestCase):
     def testOpenMembuffer(self):
         out = Output.open_membuffer()
@@ -169,6 +172,7 @@ class DlOutputTest(unittest.TestCase):
         finally:
             Path(file_path).unlink()
 
+
 class DlInteropTest(unittest.TestCase):
     def testContextFromSession(self):
         s = Session()
@@ -209,6 +213,7 @@ class DlInteropTest(unittest.TestCase):
             contents = bytes(output.map_memory()).decode()
             print(contents)
             self.assertIn('test.test = "working"', contents)
+
 
 if __name__ == "__main__":
     unittest.main()
