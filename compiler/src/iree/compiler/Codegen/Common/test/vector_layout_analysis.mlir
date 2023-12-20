@@ -145,3 +145,34 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield 
   }
 }
+
+// -----
+
+#layoutA = #iree_vector_ext.layout<<[VECTORX], [32]>, <[VECTORY], [64]>>
+#layoutB = #iree_vector_ext.layout<<[VECTORX], [128]>, <[VECTORY], [64]>>
+#layoutC = #iree_vector_ext.layout<<[VECTORY], [32]>, <[VECTORY], [128]>>
+
+#map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d1, d0)>
+
+// Propagate and enforce through vector.contract.
+builtin.module attributes { transform.with_named_sequence } {
+  func.func 
+    @contract(%A : vector<32x64xf16>, %B : vector<128x64xf16>, %C : vector<128x32xf32>) -> vector<128x32xf32>
+    attributes {
+      "__vector_layout_test_anchor_operand_0" = #layoutA,
+      "__vector_layout_test_anchor_operand_1" = #layoutB,
+      "__vector_layout_test_anchor_operand_2" = #layoutC
+    } {
+    %D = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %B, %A, %C : vector<128x64xf16>, vector<32x64xf16> into vector<128x32xf32>
+    func.return %D : vector<128x32xf32>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield 
+  }
+}
+
