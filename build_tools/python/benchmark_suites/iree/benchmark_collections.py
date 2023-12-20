@@ -106,7 +106,7 @@ def generate_benchmarks() -> (
         adreno_benchmarks.Android_Adreno_Benchmarks(),
         mali_benchmarks.Android_Mali_Benchmarks(),
         vulkan_nvidia_benchmarks.Linux_Vulkan_NVIDIA_Benchmarks(),
-        vmvx_benchmarks.Android_VMVX_Benchmarks(),
+        vmvx_benchmarks.VMVX_Benchmarks(),
     ]
     all_run_configs: List[iree_definitions.E2EModelRunConfig] = []
     for benchmark in benchmarks:
