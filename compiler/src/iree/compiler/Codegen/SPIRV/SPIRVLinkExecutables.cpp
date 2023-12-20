@@ -49,9 +49,9 @@ namespace {
 
 using IREE::HAL::ExecutableTargetAttr;
 
-bool isSPIRVBasedBackend(StringRef backend) {
-  return backend.starts_with("vulkan") || backend.starts_with("metal") ||
-         backend.starts_with("webgpu");
+bool isSPIRVBasedBackend(IREE::HAL::ExecutableVariantOp variantOp) {
+  return variantOp.getTargetAttr().getConfiguration().contains(
+      spirv::getTargetEnvAttrName());
 }
 
 struct SPIRVLinkExecutablesPass final
@@ -105,7 +105,7 @@ struct SPIRVLinkExecutablesPass final
       currentTargets.clear();
       for (auto variant : executable.getOps<IREE::HAL::ExecutableVariantOp>()) {
         ExecutableTargetAttr target = variant.getTarget();
-        if (isSPIRVBasedBackend(target.getBackend())) {
+        if (isSPIRVBasedBackend(variant)) {
           currentTargets.push_back(target);
         }
       }
