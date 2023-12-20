@@ -120,6 +120,12 @@ int main(int argc, char** argv) {
                        "Dumps information about parsed parameter files.\n");
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
 
+  if (argc > 1) {
+      fprintf(stderr, "Error, no positional arguments expected. \n"
+                      "Pass --parameters=flags\n");
+      exit_code = EXIT_FAILURE;
+  }
+
   iree_io_scope_map_t scope_map = {0};
   iree_io_scope_map_initialize(host_allocator, &scope_map);
 
