@@ -12,7 +12,9 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-spirv-link-executable"
@@ -20,19 +22,23 @@
 namespace mlir::iree_compiler {
 
 namespace IREE::HAL {
-// Compares two ExecutableTargetAttr according to the alphabetical order of used
-// SPIR-V features.
+// Compares two ExecutableTargetAttr according to the order of used SPIR-V
+// capabilities.
 //
 // Note that this is a very specific ordering per the needs of this pass--we
 // guarantee that input ExectuableTargetAttr only differ w.r.t. their used
 // SPIR-V features, and we want a deterministic order when mutating the IR.
 bool operator<(const ExecutableTargetAttr &a, const ExecutableTargetAttr &b) {
-  auto aFeatures = a.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
-  auto bFeatures = b.getConfiguration().getAs<ArrayAttr>("iree.spirv.features");
+  auto aTarget = a.getConfiguration().getAs<spirv::TargetEnvAttr>(
+      spirv::getTargetEnvAttrName());
+  auto bTarget = b.getConfiguration().getAs<spirv::TargetEnvAttr>(
+      spirv::getTargetEnvAttrName());
+  auto aFeatures = aTarget.getCapabilitiesAttr();
+  auto bFeatures = bTarget.getCapabilitiesAttr();
   for (unsigned i = 0; i < std::min(aFeatures.size(), bFeatures.size()); ++i) {
     if (aFeatures[i] != bFeatures[i]) {
-      return cast<StringAttr>(aFeatures[i]).getValue() <
-             cast<StringAttr>(bFeatures[i]).getValue();
+      return cast<IntegerAttr>(aFeatures[i]).getInt() <
+             cast<IntegerAttr>(bFeatures[i]).getInt();
     }
   }
   return aFeatures.size() < bFeatures.size();

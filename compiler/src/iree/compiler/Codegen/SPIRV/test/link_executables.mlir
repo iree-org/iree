@@ -6,7 +6,9 @@
 //
 // For such case we can link all executables into one, with just one variant.
 
-#vulkan_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb">
+#vulkan_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader], []>,
+    api=Vulkan, Unknown:DiscreteGPU, #spirv.resource_limits<>>}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
