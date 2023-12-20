@@ -76,6 +76,14 @@ protected:
 /// Otherwise, returns null.
 IREE::LinalgExt::EncodingAttr getEncodingAttr(RankedTensorType type);
 
+///
+std::optional<SmallVector<int64_t>>
+getPermutationToCanonicalMatmulShape(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns a RankedTensorType that has been transposed into the canonical
+/// form for an ordinary matmul/batch_matmul op.
+RankedTensorType getCanonicalMatmulTypeWithEncoding(RankedTensorType type);
+
 /// Returns the original type that carried by encoding.
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
 
