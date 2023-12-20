@@ -383,6 +383,12 @@ class Invocation:
 
     def export_module(self):
         """Exports the module."""
+        if self.session._owned_context is None:
+            raise RuntimeError(
+                "In order to export a module, the context must first be exported from "
+                "the session (i.e. `session.context`)."
+            )
+
         from .. import ir
 
         if self._retained_module_op:

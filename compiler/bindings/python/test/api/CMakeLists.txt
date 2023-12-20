@@ -13,6 +13,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    mlir_interop_reference_test
+  SRCS
+    "mlir_interop_reference_test.py"
+)
+
+iree_py_test(
+  NAME
     output_buffer_reference_test
   SRCS
     "output_buffer_reference_test.py"
