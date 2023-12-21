@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -19,7 +19,7 @@
 
 // clang-format off
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -257,7 +257,7 @@ void registerUKernelBufferizationInterface(DialectRegistry &registry) {
       +[](MLIRContext *context, IREE::Codegen::IREECodegenDialect *dialect) {
         RegisterUKernelOpsBufferizationInterface<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.cpp.inc"
             >::registerOpInterface(context);
       });
 }

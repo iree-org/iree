@@ -18,7 +18,7 @@
 #include "mlir/Support/TypeID.h"
 
 // clang-format off: must be included after all LLVM/MLIR eaders
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h.inc" // IWYU pragma: keep
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h.inc" // IWYU pragma: keep
 // clang-format on
 
 namespace mlir::iree_compiler {

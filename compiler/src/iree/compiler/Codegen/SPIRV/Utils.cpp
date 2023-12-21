@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
