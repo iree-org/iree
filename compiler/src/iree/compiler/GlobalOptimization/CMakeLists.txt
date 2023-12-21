@@ -43,10 +43,10 @@ iree_cc_library(
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DecomposeConcat.cpp"
+    "DemoteContractionInputsToBF16.cpp"
     "DetachElementwiseFromNamedOps.cpp"
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
-    "ExpandVectors.cpp"
     "FuseDequantizationMatmul.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
@@ -55,15 +55,19 @@ iree_cc_library(
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
     "Passes.cpp"
+    "PropagateLinalgTranspose.cpp"
+    "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgExtTransforms
     IREELinalgExtUtils
+    IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect
@@ -88,6 +92,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR

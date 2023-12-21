@@ -125,14 +125,18 @@ flow.executable private @nested_bindings {
   builtin.module {
     // CHECK: func.func @dispatch(%[[DIM:.+]]: index, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
     func.func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:tensor<1x?xf32>>, %output: !flow.dispatch.tensor<writeonly:tensor<?xf32>>) {
+      // CHECK-DAG: stream.dispatch.workgroup.size[0] : index
+      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
+      // CHECK-DAG: stream.dispatch.workgroup.id[0] : index
+      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
+      // CHECK-DAG: stream.dispatch.workgroup.count[0] : index
+      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
+
       // CHECK-DAG: %[[TIED_INPUT:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<1x?xf32>>{%[[DIM]]}
-      // CHECK-DAG: %[[TIED_OUTPUT:.+]] = stream.binding.subspan %[[OUTPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
       %tied_input = flow.dispatch.tie_shape %input : !flow.dispatch.tensor<readonly:tensor<1x?xf32>>{%dim}
+      // CHECK-DAG: %[[TIED_OUTPUT:.+]] = stream.binding.subspan %[[OUTPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%[[DIM]]}
       %tied_output = flow.dispatch.tie_shape %output : !flow.dispatch.tensor<writeonly:tensor<?xf32>>{%dim}
 
-      %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
-      %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index
-      %workgroup_count_0 = flow.dispatch.workgroup.count[0] : index
       %5 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_0, %workgroup_id_0]
       %6 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_0, %workgroup_count_0]
       scf.for %arg3 = %5 to %dim step %6 {

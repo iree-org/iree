@@ -27,19 +27,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    buffer_transfer
-  HDRS
-    "buffer_transfer.h"
-  SRCS
-    "buffer_transfer.c"
-  DEPS
-    iree::base
-    iree::hal
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     debug_allocator
   HDRS
     "debug_allocator.h"

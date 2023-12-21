@@ -1,9 +1,9 @@
 // RUN: iree-opt --split-input-file %s \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(iree-hal-preprocess-executables{pipeline=\"builtin.module(iree-codegen-test-executable-preprocessing)\"}))" | \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(iree-hal-preprocess-executables-with-pipeline{pipeline=\"builtin.module(iree-codegen-test-executable-preprocessing)\"}))" | \
 // RUN: FileCheck %s
 
 // RUN: iree-opt --split-input-file %s \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(iree-hal-preprocess-executables{command=\"iree-opt --iree-codegen-test-executable-preprocessing\"}))" | \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(iree-hal-preprocess-executables-with-tool{command=\"iree-opt --iree-codegen-test-executable-preprocessing\"}))" | \
 // RUN: FileCheck %s
 
 // Uses a test pass to simulate an external user pipeline or tool that

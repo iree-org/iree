@@ -25,14 +25,30 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "hip_allocator.c"
+    "hip_allocator.h"
+    "hip_buffer.c"
+    "hip_buffer.h"
+    "hip_device.c"
+    "hip_device.h"
     "hip_driver.c"
+    "memory_pools.c"
+    "memory_pools.h"
+    "native_executable.c"
+    "native_executable.h"
+    "nop_executable_cache.c"
+    "nop_executable_cache.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
     ::dynamic_symbols
     iree::base
     iree::base::core_headers
+    iree::base::internal
+    iree::base::internal::arena
+    iree::base::internal::flatcc::parsing
     iree::hal
+    iree::schemas::rocm_executable_def_c_fbs
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
@@ -47,8 +63,8 @@ iree_cc_library(
   TEXTUAL_HDRS
     "dynamic_symbol_tables.h"
   SRCS
-    "hip_headers.h"
     "dynamic_symbols.c"
+    "hip_headers.h"
     "status_util.c"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-materialize-dispatch-instrumentation{bufferSize=64mib})' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-materialize-dispatch-instrumentation{buffer-size=64mib})' %s | FileCheck %s
 
 module attributes {hal.device.targets = [
   #hal.device.target<"llvm-cpu", {

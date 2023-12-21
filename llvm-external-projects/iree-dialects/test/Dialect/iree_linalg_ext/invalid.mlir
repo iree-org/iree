@@ -723,15 +723,6 @@ func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf
 
 // -----
 
-func.func @illegal_softmax_output_shape(%arg0: tensor<2x16x32xf32>) -> tensor<2x16xf32> {
-  %0 = tensor.empty() : tensor<2x16xf32>
-  // expected-error @+1 {{incompatible output shape}}
-  %1 = linalg.softmax dimension(2) ins(%arg0 : tensor<2x16x32xf32>) outs(%0: tensor<2x16xf32>) -> tensor<2x16xf32>
-  return %1 : tensor<2x16xf32>
-}
-
-// -----
-
 func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
   // expected-error @+1 {{'iree_linalg_ext.attention' op expected query to have rank 3 but found 4}}

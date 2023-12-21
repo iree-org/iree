@@ -21,6 +21,7 @@ declare -a excluded_files_patterns=(
   # Symlinks make grep upset
   "^integrations/tensorflow/iree-dialects$"
   # Generated / Binary files
+  ".onnx"
   ".svg"
 )
 

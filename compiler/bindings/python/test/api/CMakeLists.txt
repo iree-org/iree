@@ -11,3 +11,9 @@ iree_py_test(
     "api_test.py"
 )
 
+iree_py_test(
+  NAME
+    output_buffer_reference_test
+  SRCS
+    "output_buffer_reference_test.py"
+)

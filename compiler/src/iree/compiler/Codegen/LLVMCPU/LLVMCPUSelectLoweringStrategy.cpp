@@ -100,7 +100,6 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   LogicalResult verificationStatus = success();
   switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert:
     verificationStatus =
         verifyLoweringConfiguration(moduleOp, translationInfo.value(),
                                     verifyDoubleTilingExpertPassPipelineConfig);

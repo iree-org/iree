@@ -43,6 +43,9 @@ lookupDeviceFile(llvm::TargetMachine *targetMachine) {
   // machine-agnostic.
   if (triple.isArch32Bit()) {
     return lookupDeviceFile("libdevice_wasm32_generic.bc");
+  } else if (triple.isArch64Bit() &&
+             targetMachine->getTargetFeatureString().contains("+sme")) {
+    return lookupDeviceFile("libdevice_aarch64_sme.bc");
   } else if (triple.isArch64Bit()) {
     return lookupDeviceFile("libdevice_wasm64_generic.bc");
   } else {

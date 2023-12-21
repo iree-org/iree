@@ -15,6 +15,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
@@ -43,20 +44,18 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using mlir::iree_compiler::IREE::LinalgExt::TilingPatterns;
-
 #define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Invocation tiling patterns
+// Invocation tiling utils
 //===----------------------------------------------------------------------===//
 
-/// Patterns for third level tiling to target invocations.
-static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns,
-    const linalg::TileSizeComputationFunction &computeFn) {
+/// Tiles LinalgOp to target invocations.
+static LogicalResult
+tileToInvocation(func::FuncOp funcOp,
+                 const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
@@ -70,55 +69,43 @@ static void populateTilingToInvocationPatterns(
                            .setTileSizeComputationFunction(computeFn)
                            .setDistributionOptions(distributionOptions);
 
-  MLIRContext *context = patterns.getContext();
+  MLIRContext *context = funcOp.getContext();
+  IRRewriter rewriter(context);
   auto marker = StringAttr::get(context, getTileReductionMarker());
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-                    ArrayRef<StringAttr>(), marker)
-                    .setMatchByDefault();
+      ArrayRef<StringAttr>(), marker);
 
-  patterns.add<IREE::LinalgExt::LinalgTilingPattern>(context, tilingOptions,
-                                                     filter);
-  patterns.add<IREE::LinalgExt::TilingInterfaceTilingPattern>(
-      context, tilingOptions, filter);
+  SmallVector<TilingInterface> candidates;
+  funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
+
+  for (auto op : candidates) {
+    FailureOr<IREETilingResult> res =
+        tileDispatchUsingSCFFopOp(rewriter, op, tilingOptions);
+    if (failed(res)) {
+      return failure();
+    }
+    for (auto tiledOp : res->tiledOps) {
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
+  }
+
+  return success();
 }
 
 //====---------------------------------------------------------------------===//
 // Reduction tiling utils
 //====---------------------------------------------------------------------===//
 
-static LogicalResult tileReduction(func::FuncOp funcOp,
-                                   ArrayRef<int64_t> tileSizes) {
+static LogicalResult
+tileReduction(func::FuncOp funcOp,
+              const scf::SCFTileSizeComputationFunction &computeFn) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       StringAttr::get(context, getTileReductionMarker()), std::nullopt);
-
-  SmallVector<Operation *> candidates;
-  funcOp.walk([&](linalg::LinalgOp op) {
-    if (failed(filter.checkAndNotify(rewriter, op))) {
-      return WalkResult::advance();
-    }
-    if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
-            linalg::ConvolutionOpInterface>(op.getOperation())) {
-      candidates.push_back(op);
-      filter.replaceLinalgTransformationFilter(rewriter, op);
-    }
-    return WalkResult::advance();
-  });
-
-  for (auto op : candidates) {
-    auto target = cast<TilingInterface>(op);
-    scf::SCFTilingOptions options;
-    setSCFTileSizes(options, target, tileSizes, /*tileScalableFlags=*/{});
-    FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, target, options);
-    if (failed(tiledResults)) {
-      return failure();
-    }
-    rewriter.replaceOp(op, tiledResults->replacements);
-  };
-
-  return success();
+  auto options =
+      scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
+  return tileLinalgOpsWithFilter(funcOp, options, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -157,17 +144,13 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))
     return signalPassFailure();
-  auto reductionTileSizes = getSPIRVTileSize(funcOp, 2);
-  if (failed(reductionTileSizes))
+  auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
+  if (failed(reductionTileComputeFn))
     return signalPassFailure();
 
   { // Tile and distribute to invocations.
-    RewritePatternSet invocationTilingPatterns(context);
-    populateTilingToInvocationPatterns(invocationTilingPatterns,
-                                       *threadTileComputeFn);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(invocationTilingPatterns)))) {
-      funcOp.emitOpError() << "failure in tiling";
+    if (failed(tileToInvocation(funcOp, *threadTileComputeFn))) {
+      funcOp.emitOpError() << "failed to tile to invocations";
       return signalPassFailure();
     }
 
@@ -203,7 +186,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   }
 
   { // Tile reduction dimensions.
-    if (failed(tileReduction(funcOp, *reductionTileSizes))) {
+    if (failed(tileReduction(funcOp, *reductionTileComputeFn))) {
       funcOp.emitOpError() << "failing in tile reduction";
       return signalPassFailure();
     }

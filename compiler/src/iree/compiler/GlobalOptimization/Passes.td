@@ -32,6 +32,11 @@ def DecomposeConcat :
   ];
 }
 
+def DemoteContractionInputsToBF16 : Pass<"iree-global-opt-demote-contraction-inputs-to-bf16", ""> {
+  let summary = "Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createDemoteContractionInputsToBF16Pass()";
+}
+
 def DetachElementwiseFromNamedOps :
     Pass<"iree-global-opt-detach-elementwise-from-named-ops", ""> {
   let summary = "Detaches elementwise ops from named Linalg ops";
@@ -40,7 +45,7 @@ def DetachElementwiseFromNamedOps :
 
 def EraseUnusedLinalgOperands :
     Pass<"iree-global-opt-erase-unused-linalg-operands", "mlir::ModuleOp"> {
-  let summary = "Erase unused linalg operand and remove dead code.";
+  let summary = "Erases unused linalg operand and remove dead code.";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createEraseUnusedLinalgOperands()";
 }
 
@@ -50,14 +55,9 @@ def ExpandTensorShapes :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandTensorShapesPass()";
 }
 
-def ExpandVectors : Pass<"iree-global-opt-expand-vectors", ""> {
-  let summary = "Expand vector in vector/matrix operations";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandVectorsPass()";
-}
-
 def FuseDequantizationMatmul:
     InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Fuse dequantization and matmul linalg.generic ops";
+  let summary = "Fuses dequantization and matmul linalg.generic ops";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseDequantizationMatmulPass()";
   let options = [
     Option<"enableQuantizedMatmulReassociation", "enable-quantized-matmul-reassociation", "bool",
@@ -67,7 +67,7 @@ def FuseDequantizationMatmul:
 
 def FuseSiluHorizontalMatmul:
     InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
-  let summary = "Fuse matmul ops and silu linalg.generic op";
+  let summary = "Fuses matmul ops and silu linalg.generic op";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseSiluHorizontalMatmulPass()";
 }
 
@@ -85,7 +85,7 @@ def InferNumericNarrowing :
 
 def LiftGenericToTransposeBatchMatmul:
     Pass<"iree-global-opt-lift-generic-to-tranpose-batch-matmul", ""> {
-  let summary = "Convert linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
+  let summary = "Converts linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createLiftGenericToTransposeBatchMatmulPass()";
 }
 
@@ -102,14 +102,30 @@ def OptimizeNumerics :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
+def PropagateLinalgTranspose :
+    InterfacePass<"iree-global-opt-propagate-linalg-transpose", "mlir::FunctionOpInterface"> {
+  let summary = "Propagates linalg.transpose through a restricted set of ops";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createPropagateLinalgTransposePass()";
+  let options = [
+    Option<"enableAggressivePropagation", "enable-aggressive-propagation", "bool",
+           /*default=*/"false", "Enable aggressive propagation to named ops">,
+  ];
+}
+
+def RaiseSpecialOps :
+    Pass<"iree-global-opt-raise-special-ops", ""> {
+  let summary = "Raises special ops like softmax to the high level linalg.ext representation";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createRaiseSpecialOps()";
+}
+
 def RemoveZeroExtentTensors :
     InterfacePass<"iree-global-opt-remove-zero-extent-tensors", "mlir::FunctionOpInterface"> {
-  let summary = "Remove tensors that have 0-extents";
+  let summary = "Removes tensors that have 0-extents";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createRemoveZeroExtentTensorsPass()";
 }
 
 def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
-  let summary = "Introduce tensor encoding for compute operations";
+  let summary = "Introduces tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
 }
 

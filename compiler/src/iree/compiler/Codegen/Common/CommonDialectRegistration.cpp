@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
@@ -19,6 +20,7 @@
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/TransformOps/BufferizationTransformOps.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
@@ -60,6 +62,7 @@ void registerTransformDialectTranslationDependentDialects(
 
   // clang-format off
   registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+                  mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
                   mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::Codegen::IREECodegenDialect,
                   arith::ArithDialect,
@@ -74,9 +77,10 @@ void registerTransformDialectTranslationDependentDialects(
                   scf::SCFDialect,
                   tensor::TensorDialect,
                   transform::TransformDialect,
-                  vector::VectorDialect
-                  // clang-format on
-                  >();
+                  vector::VectorDialect,
+                  arm_sme::ArmSMEDialect
+      // clang-format on
+      >();
 
   // TODO: these should be registered by the extension instead, but there is
   // no support for it in core currently.

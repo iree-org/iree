@@ -117,7 +117,7 @@ func.func private @import(tensor<?x2xi32>, tensor<?x3xi32>) -> (tensor<2x?xi32>,
 // CHECK: func.func private @_import(%[[ARG0_TENSOR:.+]]: tensor<?x2xi32>, %[[ARG1_TENSOR:.+]]: tensor<?x3xi32>) -> (tensor<2x?xi32>, tensor<3x?xi32>) {
 
 // Prepare fences and put a barrier on input arguments:
-// CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device
+// CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK:   %[[WAIT_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
 // CHECK:   %[[ARG_BARRIER:.+]]:2 = hal.tensor.barrier join(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]] : tensor<?x2xi32>, tensor<?x3xi32>) => %[[WAIT_FENCE]] : !hal.fence
 // CHECK:   %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
@@ -186,7 +186,7 @@ func.func private @importI32Effects(tensor<4xf32>) -> i32 attributes {
 // CHECK: func.func private @_importI32Effects(%[[ARG0_TENSOR:.+]]: tensor<4xf32>) -> i32 {
 
 // Wait for the inputs to be ready and create the signal fence to wait on.
-// CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device
+// CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK:   %[[WAIT_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
 // CHECK:   %[[ARG0_BARRIER:.+]] = hal.tensor.barrier join(%[[ARG0_TENSOR]] : tensor<4xf32>) => %[[WAIT_FENCE]] : !hal.fence
 // CHECK:   %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]

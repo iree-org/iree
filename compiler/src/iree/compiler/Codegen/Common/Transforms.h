@@ -42,8 +42,24 @@ FailureOr<IREETileAndFuseResult>
 tileAndFuseDispatchUsingSCFForOp(RewriterBase &rewriter, TilingInterface op,
                                  linalg::LinalgTilingOptions tilingOptions);
 
-/// Populate patterns related to clean up the IR after tile and distribute to
-/// workgroups.
+/// Result of the tiled operation.
+struct IREETilingResult {
+  SmallVector<Operation *> tiledOps;
+  SmallVector<Value> tiledValues;
+  SmallVector<scf::ForOp> loops;
+  SmallVector<Value> workgroupCount;
+  // TODO(ravishankarm): Cleanup the following returns. We should not need
+  // these.
+  llvm::SmallBitVector tiledLoops;
+  SmallVector<OpFoldResult> tileOffsets;
+  SmallVector<OpFoldResult> tileSizes;
+};
+FailureOr<IREETilingResult>
+tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
+                          linalg::LinalgTilingOptions options);
+
+/// Populate patterns related to clean up the IR after tile and distribute
+/// to workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(
     RewritePatternSet &patterns, linalg::LinalgTilingOptions options);
 

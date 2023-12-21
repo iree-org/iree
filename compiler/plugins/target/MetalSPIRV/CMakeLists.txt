@@ -20,8 +20,6 @@ iree_compiler_register_plugin(
 iree_cc_library(
   NAME
     MetalSPIRV
-  HDRS
-    "MetalSPIRVTarget.h"
   SRCS
     "MetalSPIRVTarget.cpp"
   DEPS

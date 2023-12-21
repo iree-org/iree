@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
@@ -32,10 +33,12 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Target/LLVMIR/Dialect/ArmSME/ArmSMEToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -157,6 +160,7 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
+    mlir::registerArmSMEDialectTranslation(registry);
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
@@ -164,7 +168,8 @@ public:
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
-                    arm_neon::ArmNeonDialect>();
+                    arm_neon::ArmNeonDialect,
+                    arm_sme::ArmSMEDialect>();
     // clang-format on
   }
 
@@ -204,7 +209,9 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
-    buildLLVMCPUCodegenPassPipeline(passManager);
+    auto target = variantOp.getTarget();
+    bool enableAArch64SME = isAArch64(target) && hasSMEFeature(target);
+    buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {

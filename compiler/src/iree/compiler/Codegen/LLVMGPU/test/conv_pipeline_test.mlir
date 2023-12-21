@@ -71,7 +71,7 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
           %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
             ins(%3, %4 : tensor<2x4x66x66xf32>, tensor<320x4x3x3xf32>)
             outs(%6 : tensor<2x320x64x64xf32>) -> tensor<2x320x64x64xf32>
-          flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 320, 6, 64], strides = [1, 1, 1, 1] : tensor<2x320x64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf32>>
+          flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [2, 320, 64, 64], strides = [1, 1, 1, 1] : tensor<2x320x64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x320x64x64xf32>>
           return
         }
       }

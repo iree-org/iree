@@ -11,9 +11,6 @@
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.h"
 #endif // IREE_HAVE_LLVM_CPU_TARGET
-#ifdef IREE_HAVE_VMVX_TARGET
-#include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
-#endif // IREE_HAVE_VMVX_TARGET
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 #endif // IREE_HAVE_VULKANSPIRV_TARGET
@@ -31,9 +28,6 @@ void registerHALTargetBackends() {
     IREE::HAL::registerLLVMCPUTargetBackends(
         []() { return IREE::HAL::LLVMTargetOptions::getFromFlags(); });
 #endif // IREE_HAVE_LLVM_CPU_TARGET
-#ifdef IREE_HAVE_VMVX_TARGET
-    IREE::HAL::registerVMVXTargetBackends();
-#endif // IREE_HAVE_VMVX_TARGET
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
     IREE::HAL::registerVulkanSPIRVTargetBackends(
         []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });

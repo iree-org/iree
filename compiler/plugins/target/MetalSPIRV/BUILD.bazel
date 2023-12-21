@@ -20,7 +20,6 @@ iree_compiler_register_plugin(
 iree_compiler_cc_library(
     name = "MetalSPIRV",
     srcs = ["MetalSPIRVTarget.cpp"],
-    hdrs = ["MetalSPIRVTarget.h"],
     deps = [
         ":MSLToMetalLib",
         ":MetalTargetPlatform",

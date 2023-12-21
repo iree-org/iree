@@ -828,12 +828,8 @@ static iree_status_t check_matmul_failure(
   int m_end = iree_min(m_size, row + context);
   int n_start = iree_max(0, (int)col - (int)context);
   int n_end = iree_min(n_size, col + context);
-  // We have a lot more freedom to pick k_start, k_end, since these parameters
-  // only affect which regions of the input lhs and rhs matrices are printed.
-  // If we were only testing random lhs and rhs, we would just pick
-  // k_start = 0 and any reasonable k_end value.
-  int k_start = iree_max(0, iree_min(m_start, n_start));
-  int k_end = iree_min(k_size, iree_max(m_end, n_end));
+  int k_start = 0;
+  int k_end = iree_min(k_size, 2 * context);
   // [k_start, k_end) could be arbitrarily long at this point. Constrain it a
   // bit to avoid huge output.
   k_end = iree_min(k_end, k_start + 4 * context);

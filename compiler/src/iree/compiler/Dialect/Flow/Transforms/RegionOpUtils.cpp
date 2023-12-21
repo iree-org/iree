@@ -504,120 +504,65 @@ Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
-/// Returns true if the operation is an generic op that represents dequant.
-/// This function checks that the genericOp:
-/// 1. Has a body like:
-///      arith.extui
-///      arith.uitofp
-///      arith.subf
-///      arith.mulf
-/// 2. scale, offset and result is f16 or f32, while weight is i4 or i8.
-/// 3. Has 3 parallel dims
-/// 4. Has 2 (weights, scales) or 3 (weights, scales, zero points)
-///    inputs and 1 output
-/// 5. Only weight has same shape as result.
-/// 6. Weight and result have identity indexing map.
-bool Flow::isGroupedDequantizationOp(Operation *op) {
+bool Flow::isDequantizationLikeOp(Operation *op) {
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp)
+  if (!genericOp) {
     return false;
-  if (genericOp.getNumDpsInits() != 1)
+  }
+  if (genericOp.getNumDpsInits() != 1) {
     return false;
-  if (genericOp.getNumDpsInputs() != 2 && genericOp.getNumDpsInputs() != 3)
-    return false;
+  }
 
-  // Check that the rank is at least 3 and all loops are parallel
+  // Check that the all loops are parallel
   unsigned numLoops = genericOp.getNumLoops();
   unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  if (numLoops < 3)
+  if (numLoops != numParallelLoops) {
     return false;
-  if (numLoops != numParallelLoops)
+  }
+
+  // Check that only one input has an identity map, and the rest are projected
+  // permutations and not full permutations
+  OpOperand *identityInput = nullptr;
+  for (OpOperand *input : genericOp.getDpsInputOperands()) {
+    auto inputMap = genericOp.getMatchingIndexingMap(input);
+    if (inputMap.isIdentity()) {
+      if (identityInput) {
+        return false;
+      }
+      identityInput = input;
+    } else if (!inputMap.isProjectedPermutation(true) ||
+               inputMap.isPermutation()) {
+      return false;
+    }
+  }
+
+  if (!identityInput) {
     return false;
+  }
 
-  auto inputs = genericOp.getInputs();
-  auto weight = inputs[0];
-  auto scales = inputs[1];
-  auto init = genericOp.getDpsInits()[0];
-  Type weightElType = getElementTypeOrSelf(weight.getType());
-  Type scaleElType = getElementTypeOrSelf(scales.getType());
-  Type initElType = getElementTypeOrSelf(init.getType());
-
-  // Check that init and weight have parallel indexing maps.
   auto indexingMaps = genericOp.getIndexingMapsArray();
-  const int kWeightIndex = 0;
-  const int kInitIndex = indexingMaps.size() - 1;
-  if (!indexingMaps[kWeightIndex].isIdentity())
-    return false;
-  if (!indexingMaps[kInitIndex].isIdentity())
-    return false;
-
-  // Dequant weight and init need to be same type and shape.
-  auto weightShape = weight.getType().dyn_cast<ShapedType>().getShape();
-  auto initShape = init.getType().dyn_cast<ShapedType>().getShape();
-  if (weightShape != initShape)
-    return false;
-
-  // Scale and init needs to be of same element type.
-  if (scaleElType != initElType)
-    return false;
-
-  // Check weight is i4 or i8.
-  if (!weightElType.isInteger(4) && !weightElType.isInteger(8)) {
+  if (!indexingMaps.back().isIdentity()) {
     return false;
   }
 
-  // Check scales is f16 or f32.
-  Type f32Type = Float32Type::get(op->getContext());
-  Type f16Type = Float16Type::get(op->getContext());
-  if (scaleElType != f32Type && scaleElType != f16Type) {
+  // Check that the identity input element bitwidth is smaller than the output
+  // element bitwidth.
+  Type inputElementType = getElementTypeOrSelf(identityInput->get().getType());
+  Type outputElementType = getElementTypeOrSelf(genericOp->getResultTypes()[0]);
+  if (!inputElementType.isIntOrFloat() || !outputElementType.isIntOrFloat()) {
+    return false;
+  }
+  if (inputElementType.getIntOrFloatBitWidth() >=
+      outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
 
-  // Work back from linalg.yield and check body of genericOp.
-  // The genericOp should yield the result of an arith.mulf,
-  // preceded by an arith.subf, arith.uitofp, and arith.extui
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  Value producerOutput;
-  Operation *producer;
-
-  // Producer of linalg.yield op is arith.mulf
-  {
-    producerOutput = yieldOp->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
+  for (auto &bodyOp : genericOp.getBody()->getOperations()) {
+    if (!isa<arith::ExtUIOp, arith::ExtSIOp, arith::MulFOp, arith::MulIOp,
+             arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
+             arith::SIToFPOp, arith::UIToFPOp, linalg::YieldOp>(bodyOp)) {
       return false;
-    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
-      return false;
-  }
-
-  // Producer of arith.mulf op is arith.subf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::SubFOp>()))
-      return false;
-  }
-
-  // Producer of arith.subf op is arith.uitofp
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::UIToFPOp>()))
-      return false;
-  }
-
-  // Producer of arith.uitofp op is arith.extui
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::ExtUIOp>()))
-      return false;
+    }
   }
 
   return true;
@@ -638,7 +583,7 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (isGroupedDequantizationOp(op)) {
+  if (isDequantizationLikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {

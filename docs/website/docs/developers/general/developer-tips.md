@@ -123,8 +123,8 @@ Module Dependencies:
   hal, version >= 0, required
 
 Imported Functions:
-  [  0] hal.ex.shared_device() -> (!vm.ref<?>)
-  [  1] hal.allocator.allocate(!vm.ref<?>, i32, i32, i64) -> (!vm.ref<?>)
+  [  0] hal.allocator.allocate(!vm.ref<?>, i32, i32, i64) -> (!vm.ref<?>)
+  [  1] hal.devices.get(i32) -> (!vm.ref<?>)
   ...
 
 Exported Functions:

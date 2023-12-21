@@ -73,7 +73,6 @@ iree_cc_library(
     iree::hal::drivers::vulkan::util::arena
     iree::hal::drivers::vulkan::util::intrusive_list
     iree::hal::drivers::vulkan::util::ref_ptr
-    iree::hal::utils::buffer_transfer
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set

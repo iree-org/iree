@@ -82,6 +82,7 @@ iree_cc_library(
     "platform/windows.c"
   DEPS
     iree::base
+    iree::base::internal::memory
   PUBLIC
 )
 

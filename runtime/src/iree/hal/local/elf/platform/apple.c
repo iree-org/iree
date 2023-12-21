@@ -31,37 +31,6 @@
 #endif  // MAC_OS_VERSION_11_0
 
 //==============================================================================
-// Memory subsystem information and control
-//==============================================================================
-
-void iree_memory_query_info(iree_memory_info_t* out_info) {
-  memset(out_info, 0, sizeof(*out_info));
-
-  int page_size = sysconf(_SC_PAGESIZE);
-  out_info->normal_page_size = page_size;
-  out_info->normal_page_granularity = page_size;
-  out_info->large_page_granularity = (2 * 1024 * 1024);  // What V8 uses.
-
-  out_info->can_allocate_executable_pages = true;
-}
-
-void iree_memory_jit_context_begin(void) {
-  IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
-    if (pthread_jit_write_protect_supported_np()) {
-      pthread_jit_write_protect_np(0);
-    }
-  });
-}
-
-void iree_memory_jit_context_end(void) {
-  IREE_APPLE_IF_AT_LEAST_MAC_OS_11_0({
-    if (pthread_jit_write_protect_supported_np()) {
-      pthread_jit_write_protect_np(1);
-    }
-  });
-}
-
-//==============================================================================
 // Virtual address space manipulation
 //==============================================================================
 
@@ -165,13 +134,6 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-void sys_icache_invalidate(void* start, size_t len);
-
-void iree_memory_view_flush_icache(void* base_address,
-                                   iree_host_size_t length) {
-  sys_icache_invalidate(base_address, length);
 }
 
 #endif  // IREE_PLATFORM_APPLE

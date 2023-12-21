@@ -93,6 +93,9 @@ iree_cc_library(
     MLIRArithTransforms
     MLIRArmNeon2dToIntr
     MLIRArmNeonDialect
+    MLIRArmSMEToLLVM
+    MLIRArmSMEToLLVMIRTranslation
+    MLIRArmSMEToSCF
     MLIRArmSMETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
@@ -129,6 +132,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
+    MLIRVectorToArmSME
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms

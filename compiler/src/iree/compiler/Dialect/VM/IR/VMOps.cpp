@@ -789,7 +789,7 @@ static std::string makeSafeIdentifier(StringRef unsafeIdentifier) {
     }
   }
   std::string prefix = os.str().substr(0, 32);
-  if (!StringRef(prefix).endswith("_")) {
+  if (!StringRef(prefix).ends_with("_")) {
     prefix += "_";
   }
   return prefix + llvm::utohexstr(static_cast<uint64_t>(
@@ -805,6 +805,34 @@ void RodataInlineOp::build(OpBuilder &builder, OperationState &result,
         IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext())),
         /*name=*/builder.getStringAttr(safeIdentifier), /*data=*/value,
         /*alignment=*/builder.getI64IntegerAttr(1),
+        /*mimeType=*/nullptr);
+}
+
+void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
+                                StringAttr name, IntegerType tableType,
+                                ArrayAttr value) {
+  // Make an identifier-friendly version of the string so that the value is
+  // more readable in IR (so "I'm some string" becomes "im_some_string", etc).
+  auto safeIdentifier = makeSafeIdentifier(name.getValue());
+  // Make names for the table and data based on the safe identifier.
+  std::string tableName = safeIdentifier + "_table";
+  std::string dataName = safeIdentifier + "_data";
+  auto refType =
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
+  build(builder, result, TypeRange{refType, refType},
+        /*tableName=*/builder.getStringAttr(tableName),
+        /*dataName=*/builder.getStringAttr(dataName), /*tableType=*/tableType,
+        /*dataArray=*/value,
+        /*alignment=*/nullptr, /*dataAlignment=*/nullptr, /*mimeType=*/nullptr);
+}
+
+void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
+                                IntegerType tableType, ArrayAttr value) {
+  auto refType =
+      IREE::VM::RefType::get(IREE::VM::BufferType::get(builder.getContext()));
+  build(builder, result, TypeRange{refType, refType},
+        /*tableName=*/nullptr, /*dataName=*/nullptr, /*tableType=*/tableType,
+        /*dataArray=*/value, /*alignment=*/nullptr, /*dataAlignment=*/nullptr,
         /*mimeType=*/nullptr);
 }
 

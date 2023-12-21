@@ -199,6 +199,78 @@ static inline iree_device_size_t iree_device_size_lcm(iree_device_size_t a,
 }
 
 //===----------------------------------------------------------------------===//
+// Byte and page range manipulation
+//===----------------------------------------------------------------------===//
+
+// Defines a range of bytes with any arbitrary alignment.
+// Most operations will adjust this range by the allocation granularity, meaning
+// that a range that straddles a page boundary will be specifying multiple pages
+// (such as offset=1, length=4096 with a page size of 4096 indicating 2 pages).
+typedef struct iree_byte_range_t {
+  iree_host_size_t offset;
+  iree_host_size_t length;
+} iree_byte_range_t;
+
+// Defines a range of bytes with page-appropriate alignment.
+// Any operation taking page ranges requires that the offset and length respect
+// the size and granularity requirements of the page mode the memory was defined
+// with. For example, if an allocation is using large pages then both offset and
+// length must be multiples of the iree_memory_info_t::large_page_granularity.
+typedef struct iree_page_range_t {
+  iree_host_size_t offset;
+  iree_host_size_t length;
+} iree_page_range_t;
+
+// Aligns |addr| up to |page_alignment|.
+static inline uintptr_t iree_page_align_start(uintptr_t addr,
+                                              iree_host_size_t page_alignment) {
+  return addr & (~(page_alignment - 1));
+}
+
+// Aligns |addr| down to |page_alignment|.
+static inline uintptr_t iree_page_align_end(uintptr_t addr,
+                                            iree_host_size_t page_alignment) {
+  return iree_page_align_start(addr + (page_alignment - 1), page_alignment);
+}
+
+// Unions two page ranges to create the min/max extents of both.
+static inline iree_page_range_t iree_page_range_union(
+    const iree_page_range_t a, const iree_page_range_t b) {
+  iree_host_size_t start = iree_min(a.offset, b.offset);
+  iree_host_size_t end = iree_max(a.offset + a.length, b.offset + b.length);
+  return (iree_page_range_t){
+      /*.offset=*/start,
+      /*.length=*/end - start,
+  };
+}
+
+// Aligns a byte range to page boundaries defined by |page_alignment|.
+static inline iree_page_range_t iree_align_byte_range_to_pages(
+    const iree_byte_range_t byte_range, iree_host_size_t page_alignment) {
+  return (iree_page_range_t){
+      /*.offset=*/iree_host_align(byte_range.offset, page_alignment),
+      /*.length=*/iree_host_align(byte_range.length, page_alignment),
+  };
+}
+
+// Computes a page-aligned range base and total length from a range.
+// This will produce a starting address <= the range offset and a length >=
+// the range length.
+static inline void iree_page_align_range(void* base_address,
+                                         iree_byte_range_t range,
+                                         iree_host_size_t page_alignment,
+                                         void** out_start_address,
+                                         iree_host_size_t* out_aligned_length) {
+  void* range_start = (void*)iree_page_align_start(
+      (uintptr_t)base_address + range.offset, page_alignment);
+  void* range_end = (void*)iree_page_align_end(
+      (uintptr_t)base_address + range.offset + range.length, page_alignment);
+  *out_start_address = range_start;
+  *out_aligned_length =
+      (iree_host_size_t)range_end - (iree_host_size_t)range_start;
+}
+
+//===----------------------------------------------------------------------===//
 // Alignment intrinsics
 //===----------------------------------------------------------------------===//
 

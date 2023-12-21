@@ -24,7 +24,7 @@ iree_compiler_cc_library(
         "SetBlockIdsRangePass.cpp",
     ],
     hdrs = [
-        "LLVMPasses.h",
+        "SetBlockIdsRangePass.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Codegen",

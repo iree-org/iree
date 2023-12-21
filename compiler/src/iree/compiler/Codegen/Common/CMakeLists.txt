@@ -58,6 +58,7 @@ iree_cc_library(
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
+    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -111,12 +112,14 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
+    "VectorLayoutAnalysis.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtTransforms
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect
@@ -189,6 +192,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransformOps
@@ -197,6 +201,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils
+    MLIRArmSMEDialect
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransformOps
