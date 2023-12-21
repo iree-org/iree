@@ -453,6 +453,17 @@ void ConvertToSPIRVPass::runOnOperation() {
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
+
+  typeConverter.addConversion(
+      [typeConverter](FloatType floatType) -> std::optional<Type> {
+        if (floatType.isBF16()) {
+          return typeConverter.convertType(
+              IntegerType::get(floatType.getContext(), 16));
+        }
+
+        return floatType;
+      });
+
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
   RewritePatternSet patterns(&getContext());
