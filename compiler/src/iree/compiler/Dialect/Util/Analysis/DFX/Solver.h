@@ -232,6 +232,12 @@ public:
     return element;
   }
 
+  void forEachElement(std::function<void(const AbstractElement *)> callback) {
+    for (auto [_, element] : elementMap) {
+      callback(element);
+    }
+  }
+
   // Runs the solver until either it converges to a fixed point or exceeds the
   // maximum iteration count. Returns success() if it converges in time.
   LogicalResult run();

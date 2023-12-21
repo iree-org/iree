@@ -31,10 +31,9 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addPass(mlir::createCSEPass());
 
-  FunctionLikeNest(passManager)
       // Simplify util.global accesses; this can help with data flow tracking as
       // redundant store-loads are removed.
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+  passManager.addPass(IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Cleanup and canonicalization of util.global (and other util ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());

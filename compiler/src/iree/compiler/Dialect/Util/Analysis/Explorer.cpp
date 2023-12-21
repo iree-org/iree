@@ -50,6 +50,12 @@ Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction)
       callGraph(rootOp), defaultAction(defaultAction),
       analysisManager(rootOp, /*passInstrumentor=*/nullptr) {}
 
+Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction,
+                   OpPrintingFlags &flags)
+    : rootOp(rootOp), asmState(rootOp, flags), callGraph(rootOp),
+      defaultAction(defaultAction),
+      analysisManager(rootOp, /*passInstrumentor=*/nullptr) {}
+
 Explorer::~Explorer() = default;
 
 TraversalAction Explorer::getTraversalAction(Operation *op) {

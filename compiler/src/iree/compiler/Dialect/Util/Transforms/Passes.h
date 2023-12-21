@@ -30,7 +30,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
-std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createStripAndSplatConstantsPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();

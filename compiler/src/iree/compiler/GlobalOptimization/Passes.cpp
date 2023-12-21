@@ -155,10 +155,9 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
-  FunctionLikeNest(pipeline)
-      // Simplify util.global accesses early on; this can help with dispatch
-      // region formation as redundant store-loads are removed.
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+  // Simplify util.global accesses early on; this can help with dispatch
+  // region formation as redundant store-loads are removed.
+  pipeline.addPass(IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Module level cleanup and canonicalization of util.global (and other
   // util ops).

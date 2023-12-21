@@ -78,6 +78,8 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 class Explorer {
 public:
   Explorer(Operation *rootOp, TraversalAction defaultAction);
+  Explorer(Operation *rootOp, TraversalAction defaultAction,
+           OpPrintingFlags &flags);
   ~Explorer();
 
   Operation *getRootOp() const { return rootOp; }

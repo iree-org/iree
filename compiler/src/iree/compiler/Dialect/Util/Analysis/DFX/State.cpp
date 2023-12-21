@@ -18,6 +18,13 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                       : (state.isAtFixpoint() ? "fix" : ""));
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, DFX::SaturatedInteger s) {
+  if (s.saturated) {
+    return os << "inf";
+  }
+  return os << s.v;
+}
+
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const DFX::PotentialConstantIntValuesState &S) {
   os << "set-state(< {";

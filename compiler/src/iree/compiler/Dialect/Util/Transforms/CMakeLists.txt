@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
+    MLIRLoopLikeInterface
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRPass

@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_UTIL_ANALYSIS_DFX_STATE_H_
 
 #include "iree/compiler/Dialect/Util/Analysis/Position.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Support/LLVM.h"
@@ -412,13 +413,14 @@ struct PotentialValuesState : AbstractState {
   // Returns this set. We should check whether this set is valid or not by
   // isValidState() before calling this function.
   const SetTy &getAssumedSet() const {
-    assert(isValidState() && "This set shoud not be used when it is invalid!");
+    assert(isValidState() && "This set should not be used when it is invalid!");
     return set;
   }
 
   // Returns whether this state contains an undef value or not.
   bool isUndefContained() const {
-    assert(isValidState() && "This flag shoud not be used when it is invalid!");
+    assert(isValidState() &&
+           "This flag should not be used when it is invalid!");
     return undefIsContained;
   }
 
@@ -546,6 +548,203 @@ private:
 using PotentialConstantIntValuesState = PotentialValuesState<APInt>;
 
 //===----------------------------------------------------------------------===//
+// PotentialCountsState<T>
+//===----------------------------------------------------------------------===//
+
+/// Idiomatic saturated integer-like type to represent saturated arithmetic.
+/// Note that the bounds for saturation is determined by the user.
+struct SaturatedInteger {
+  bool operator==(const SaturatedInteger other) const {
+    return (saturated && other.saturated) ||
+           (!saturated && !other.saturated && v == other.v);
+  }
+  bool operator!=(const SaturatedInteger other) const {
+    return !(*this == other);
+  }
+  bool operator==(const int64_t other) const {
+    return !saturated && (v == other);
+  }
+  bool operator!=(const int64_t other) const { return !(*this == other); }
+  SaturatedInteger operator+(const SaturatedInteger other) const {
+    if (saturated || other.saturated)
+      return SaturatedInteger{true, 0};
+    return SaturatedInteger{false, other.v + v};
+  }
+  SaturatedInteger operator*(const SaturatedInteger other) const {
+    if (saturated || other.saturated)
+      return SaturatedInteger{true, 0};
+    return SaturatedInteger{false, other.v * v};
+  }
+  SaturatedInteger operator-(const SaturatedInteger other) const {
+    if (saturated || other.saturated)
+      return SaturatedInteger{true, 0};
+    return SaturatedInteger{false, v - other.v};
+  }
+  SaturatedInteger operator-(const int64_t other) const {
+    return *this - SaturatedInteger{false, other};
+  }
+
+  bool saturated = true;
+  int64_t v = 0;
+};
+
+// A class for a multiset state.
+// The assumed boolean state indicates whether the corresponding multiset is
+// a full multiset or not. If the assumed state is false this is the worst
+// state. The worst state (invalid state) of a set of potential values is when
+// the multiset contains infinite copies of every possible value (i.e. we cannot
+// in any way limit the value that the target position can take) but that never
+// happens naturally and we only ever force it.
+template <typename MemberTy, typename KeyInfo = DenseMapInfo<MemberTy>>
+struct PotentialCountsState : AbstractState {
+  using MapTy = DenseMap<MemberTy, SaturatedInteger, KeyInfo>;
+
+  PotentialCountsState() : validState(true) {}
+  explicit PotentialCountsState(bool isValid) : validState(isValid) {}
+
+  bool isValidState() const override { return validState.isValidState(); }
+
+  bool isAtFixpoint() const override { return validState.isAtFixpoint(); }
+
+  ChangeStatus indicatePessimisticFixpoint() override {
+    return validState.indicatePessimisticFixpoint();
+  }
+
+  ChangeStatus indicateOptimisticFixpoint() override {
+    return validState.indicateOptimisticFixpoint();
+  }
+
+  // Returns the assumed state.
+  PotentialCountsState &getAssumed() { return *this; }
+  const PotentialCountsState &getAssumed() const { return *this; }
+
+  // Returns this set. We should check whether this set is valid or not by
+  // isValidState() before calling this function.
+  const MapTy &getAssumedMultiSet() const {
+    assert(isValidState() &&
+           "This multiset should not be used when it is invalid!");
+    return multiset;
+  }
+
+  // Returns whether this state contains an undef value or not.
+  bool isUndefContained() const {
+    assert(isValidState() &&
+           "This flag should not be used when it is invalid!");
+    return undefIsContained;
+  }
+
+  bool operator==(const PotentialCountsState &rhs) const {
+    if (isValidState() != rhs.isValidState())
+      return false;
+    if (!isValidState() && !rhs.isValidState())
+      return true;
+    if (isUndefContained() != rhs.isUndefContained())
+      return false;
+    return multiset == rhs.getAssumedMultiSet();
+  }
+
+  // Maximum number of potential values to be tracked.
+  static constexpr unsigned maxPotentialValues = 256;
+
+  // Returns empty set as the best state of potential values.
+  static PotentialCountsState getBestState() {
+    return PotentialCountsState(true);
+  }
+  static PotentialCountsState getBestState(PotentialCountsState &state) {
+    return getBestState();
+  }
+
+  // Returns full set as the worst state of potential values.
+  static PotentialCountsState getWorstState() {
+    return PotentialCountsState(false);
+  }
+
+  // Unions assumed multiset with the passed value assuming an infinite count.
+  void unionAssumed(const MemberTy &c) {
+    insert(c, SaturatedInteger{/*saturated=*/true, 0});
+  }
+  // Unions assumed multiset with the passed value and count.
+  void unionAssumed(const MemberTy &c, int64_t s) {
+    insert(c, SaturatedInteger{/*saturated=*/false, s});
+  }
+  // Unions assumed multiset with assumed set of the passed state |rhs|.
+  void unionAssumed(const PotentialCountsState &rhs) { unionWith(rhs); }
+  // Unions assumed multiset with an undef value.
+  void unionAssumedWithUndef() { unionWithUndef(); }
+
+  // "Clamps" this state with |rhs|.
+  PotentialCountsState operator^=(const PotentialCountsState &rhs) {
+    validState ^= rhs.validState;
+    unionAssumed(rhs);
+    return *this;
+  }
+  PotentialCountsState operator&=(const PotentialCountsState &rhs) {
+    validState &= rhs.validState;
+    unionAssumed(rhs);
+    return *this;
+  }
+
+private:
+  // Checks the size of this set and invalidates when the size exceeds the
+  // specified maxPotentialValues threshold.
+  void checkAndInvalidate() {
+    if (multiset.size() >= maxPotentialValues) {
+      indicatePessimisticFixpoint();
+    } else {
+      reduceUndefValue();
+    }
+  }
+
+  // If this state contains both undef and not undef we can reduce
+  // undef to the not undef value.
+  void reduceUndefValue() {
+    undefIsContained = undefIsContained & multiset.empty();
+  }
+
+  // Inserts an element into this set.
+  void insert(const MemberTy &c, SaturatedInteger s) {
+    if (!isValidState())
+      return;
+    multiset[c] = s;
+    checkAndInvalidate();
+  }
+
+  // Takes union with |rhs|.
+  void unionWith(const PotentialCountsState &rhs) {
+    // If this is a full set, do nothing.
+    if (!isValidState())
+      return;
+    // If rhs is full set, change L to a full set.
+    if (!rhs.isValidState()) {
+      indicatePessimisticFixpoint();
+      return;
+    }
+    for (auto &[c, count] : rhs.multiset) {
+      if (multiset.contains(c)) {
+        multiset[c] = multiset[c] + count;
+      } else {
+        multiset[c] = count;
+      }
+    }
+    undefIsContained |= rhs.isUndefContained();
+    checkAndInvalidate();
+  }
+
+  // Takes union with an undef value.
+  void unionWithUndef() {
+    undefIsContained = true;
+    reduceUndefValue();
+  }
+
+  // A helper state which indicate whether this state is valid or not.
+  BooleanState validState;
+  // Container for potential values.
+  MapTy multiset;
+  // Flag for undef value.
+  bool undefIsContained = false;
+};
+
+//===----------------------------------------------------------------------===//
 // State utilities
 //===----------------------------------------------------------------------===//
 
@@ -556,6 +755,17 @@ ChangeStatus clampStateAndIndicateChange(StateType &state,
                                          const StateType &resultState) {
   auto assumed = state.getAssumed();
   state ^= resultState;
+  return assumed == state.getAssumed() ? ChangeStatus::UNCHANGED
+                                       : ChangeStatus::CHANGED;
+}
+
+// Replaces |state| with information in |resultState| and returns an indication
+// as to whether |state| changed (as in an update is required to be run again).
+template <typename StateType>
+ChangeStatus inheritStateAndIndicateChange(StateType &state,
+                                           const StateType &resultState) {
+  auto assumed = state.getAssumed();
+  state = resultState;
   return assumed == state.getAssumed() ? ChangeStatus::UNCHANGED
                                        : ChangeStatus::CHANGED;
 }
@@ -588,6 +798,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ChangeStatus status);
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const DFX::AbstractState &state);
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os, DFX::SaturatedInteger s);
 
 template <typename base_ty, base_ty BestState, base_ty WorstState>
 llvm::raw_ostream &
