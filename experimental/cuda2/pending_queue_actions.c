@@ -789,13 +789,15 @@ static int iree_hal_cuda2_worker_execute(
 
     iree_status_t status = iree_hal_cuda2_worker_process_ready_list(
         working_area->host_allocator, worklist);
-    if (!iree_status_is_ok(status)) {
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       IREE_ASSERT(false && "error when processing ready list");
       iree_atomic_store_int32(&working_area->error_code,
                               iree_status_code(status),
                               iree_memory_order_release);
       iree_atomic_store_int32(state, IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR,
                               iree_memory_order_release);
+      iree_notification_post(&working_area->exit_notification,
+                             IREE_ALL_WAITERS);
       return -1;
     }
 
