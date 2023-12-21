@@ -172,40 +172,42 @@ typedef enum iree_hal_cuda2_worker_state_e {
 // is needed to touch it from both sides.
 //
 // The parent thread should push a list of ready actions to ready_worklist,
-// update working_state, and give notification accordingly.
-// The worker thread waits on the notification and checks working_state, and
-// pops from the ready_worklist to process. The worker thread also monintors
-// exiting_state and stops processing if requested by the parent thread.
+// update worker_state, and give state_notification accordingly.
+// The worker thread waits on the state_notification and checks worker_state,
+// and pops from the ready_worklist to process. The worker thread also monintors
+// worker_state and stops processing if requested by the parent thread.
 typedef struct iree_hal_cuda2_working_area_t {
-  iree_notification_t notification;
+  // Notification from the parent thread to request worker state changes.
+  iree_notification_t state_notification;
+  // Notification to the parent thread to indicate the worker committed exiting.
+  iree_notification_t exit_notification;
   iree_hal_cuda2_ready_action_slist_t ready_worklist;  // atomic
-  iree_atomic_int32_t working_state;                   // atomic
-  iree_atomic_int32_t exiting_state;                   // atomic
+  iree_atomic_int32_t worker_state;                    // atomic
   iree_allocator_t host_allocator;                     // const
 } iree_hal_cuda2_working_area_t;
 
 static void iree_hal_cuda2_working_area_initialize(
     iree_allocator_t host_allocator,
     iree_hal_cuda2_working_area_t* working_area) {
-  iree_notification_initialize(&working_area->notification);
+  iree_notification_initialize(&working_area->state_notification);
+  iree_notification_initialize(&working_area->exit_notification);
   iree_hal_cuda2_ready_action_slist_initialize(&working_area->ready_worklist);
-  iree_atomic_store_int32(&working_area->working_state,
+  iree_atomic_store_int32(&working_area->worker_state,
                           IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING,
-                          iree_memory_order_relaxed);
-  iree_atomic_store_int32(&working_area->exiting_state,
-                          IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING,
-                          iree_memory_order_relaxed);
+                          iree_memory_order_release);
   working_area->host_allocator = host_allocator;
 }
 
 static void iree_hal_cuda2_working_area_deinitialize(
     iree_hal_cuda2_working_area_t* working_area) {
   iree_hal_cuda2_ready_action_slist_deinitialize(&working_area->ready_worklist);
-  iree_notification_deinitialize(&working_area->notification);
+  iree_notification_deinitialize(&working_area->exit_notification);
+  iree_notification_deinitialize(&working_area->state_notification);
 }
 
 // The main function for the ready-list processing worker thread.
-static int iree_hal_cuda2_worker_execute(void* args);
+static int iree_hal_cuda2_worker_execute(
+    iree_hal_cuda2_working_area_t* working_area);
 
 //===----------------------------------------------------------------------===//
 // Pending queue actions
@@ -270,9 +272,9 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_create(
   memset(&params, 0, sizeof(params));
   params.name = IREE_SV("deferred_queue_worker");
   params.create_suspended = false;
-  iree_status_t status =
-      iree_thread_create(iree_hal_cuda2_worker_execute, working_area, params,
-                         actions->host_allocator, &actions->worker_thread);
+  iree_status_t status = iree_thread_create(
+      (iree_thread_entry_t)iree_hal_cuda2_worker_execute, working_area, params,
+      actions->host_allocator, &actions->worker_thread);
 
   if (iree_status_is_ok(status)) {
     *out_actions = actions;
@@ -289,6 +291,9 @@ iree_hal_cuda2_pending_queue_actions_cast(iree_hal_resource_t* base_value) {
   return (iree_hal_cuda2_pending_queue_actions_t*)base_value;
 }
 
+static bool iree_hal_cuda2_worker_committed_exiting(
+    iree_hal_cuda2_working_area_t* working_area);
+
 void iree_hal_cuda2_pending_queue_actions_destroy(
     iree_hal_resource_t* base_actions) {
   iree_hal_cuda2_pending_queue_actions_t* actions =
@@ -299,18 +304,22 @@ void iree_hal_cuda2_pending_queue_actions_destroy(
 
   IREE_ASSERT(iree_hal_cuda2_queue_action_list_is_empty(&actions->action_list));
 
-  iree_atomic_int32_t* exiting_state = &working_area->exiting_state;
-  iree_atomic_store_int32(exiting_state,
+  // Request the worker to exist.
+  iree_atomic_store_int32(&working_area->worker_state,
                           IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED,
-                          iree_memory_order_relaxed);
-  iree_notification_post(&working_area->notification, IREE_ALL_WAITERS);
-  while (iree_atomic_load_int32(exiting_state, iree_memory_order_relaxed) !=
-         IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED) {
-    // Busy wait until the worker thread exits.
-  }
-  iree_thread_release(actions->worker_thread);
+                          iree_memory_order_release);
+  iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
 
+  // Wait until the worker acknowledged exiting.
+  iree_notification_await(
+      &working_area->exit_notification,
+      (iree_condition_fn_t)iree_hal_cuda2_worker_committed_exiting,
+      working_area, iree_infinite_timeout());
+
+  // Now we can delete worker related resources.
+  iree_thread_release(actions->worker_thread);
   iree_hal_cuda2_working_area_deinitialize(working_area);
+
   iree_slim_mutex_deinitialize(&actions->action_mutex);
   iree_allocator_free(host_allocator, actions);
 
@@ -687,10 +696,10 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
   // the GPU.
   iree_hal_cuda2_working_area_t* working_area = &actions->working_area;
   iree_hal_cuda2_ready_action_slist_push(&working_area->ready_worklist, entry);
-  iree_atomic_store_int32(&working_area->working_state,
+  iree_atomic_store_int32(&working_area->worker_state,
                           IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING,
-                          iree_memory_order_relaxed);
-  iree_notification_post(&working_area->notification, IREE_ALL_WAITERS);
+                          iree_memory_order_release);
+  iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -700,15 +709,19 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
 // Worker routines
 //===----------------------------------------------------------------------===//
 
-static bool iree_hal_cuda2_worker_has_incoming_request(void* args) {
-  iree_hal_cuda2_working_area_t* working_area =
-      (iree_hal_cuda2_working_area_t*)args;
-  int value = iree_atomic_load_int32(&working_area->working_state,
-                                     iree_memory_order_relaxed);
-  if (value == IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING) return true;
-  return iree_atomic_load_int32(&working_area->exiting_state,
-                                iree_memory_order_relaxed) ==
-         IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
+static bool iree_hal_cuda2_worker_has_incoming_request(
+    iree_hal_cuda2_working_area_t* working_area) {
+  int32_t value = iree_atomic_load_int32(&working_area->worker_state,
+                                         iree_memory_order_acquire);
+  return value == IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING ||
+         value == IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
+}
+
+static bool iree_hal_cuda2_worker_committed_exiting(
+    iree_hal_cuda2_working_area_t* working_area) {
+  return iree_atomic_load_int32(&working_area->worker_state,
+                                iree_memory_order_acquire) ==
+         IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED;
 }
 
 // Processes all ready actions in the given |worklist|.
@@ -744,22 +757,21 @@ static int iree_hal_cuda2_worker_process_ready_list(
 }
 
 // The main function for the ready-list processing worker thread.
-static int iree_hal_cuda2_worker_execute(void* args) {
-  iree_hal_cuda2_working_area_t* working_area =
-      (iree_hal_cuda2_working_area_t*)args;
-
+static int iree_hal_cuda2_worker_execute(
+    iree_hal_cuda2_working_area_t* working_area) {
   iree_hal_cuda2_ready_action_slist_t* worklist = &working_area->ready_worklist;
-  iree_atomic_int32_t* exiting_state = &working_area->exiting_state;
+  iree_atomic_int32_t* state = &working_area->worker_state;
 
   while (true) {
     // Block waiting for incoming requests.
-    iree_notification_await(&working_area->notification,
-                            iree_hal_cuda2_worker_has_incoming_request, args,
-                            iree_infinite_timeout());
+    iree_notification_await(
+        &working_area->state_notification,
+        (iree_condition_fn_t)iree_hal_cuda2_worker_has_incoming_request,
+        working_area, iree_infinite_timeout());
 
     // Check if we received request to stop processing and exit this thread.
     bool should_exit =
-        iree_atomic_load_int32(exiting_state, iree_memory_order_relaxed) ==
+        iree_atomic_load_int32(state, iree_memory_order_acquire) ==
         IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
 
     int return_value = iree_hal_cuda2_worker_process_ready_list(
@@ -768,16 +780,17 @@ static int iree_hal_cuda2_worker_execute(void* args) {
 
     if (should_exit) {
       // Signal that this thread is committed to exit.
-      iree_atomic_store_int32(exiting_state,
-                              IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED,
-                              iree_memory_order_relaxed);
+      iree_atomic_store_int32(state, IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED,
+                              iree_memory_order_release);
+      iree_notification_post(&working_area->exit_notification,
+                             IREE_ALL_WAITERS);
       return return_value;
     }
 
     // Signal that this thread is done processing and now waiting for more.
-    iree_atomic_store_int32(&working_area->working_state,
+    iree_atomic_store_int32(&working_area->worker_state,
                             IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING,
-                            iree_memory_order_relaxed);
+                            iree_memory_order_release);
   }
   return 0;
 }
