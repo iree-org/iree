@@ -930,21 +930,37 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
   instance_syms->vkGetPhysicalDeviceProperties2(physical_device,
                                                 &physical_device_properties);
 
-  device_properties->compute_f16 = shader_float16_int8_features.shaderFloat16;
-  device_properties->compute_f64 =
-      physical_device_features.features.shaderFloat64;
-  device_properties->compute_i8 = shader_float16_int8_features.shaderInt8;
-  device_properties->compute_i16 =
-      physical_device_features.features.shaderInt16;
-  device_properties->compute_i64 =
-      physical_device_features.features.shaderInt64;
+  if (shader_float16_int8_features.shaderFloat16) {
+    device_properties->compute_float |= 0x1u;
+  }
+  if (physical_device_features.features.shaderFloat64) {
+    device_properties->compute_float |= 0x2u;
+  }
+  if (shader_float16_int8_features.shaderInt8) {
+    device_properties->compute_int |= 0x1u;
+  }
+  if (physical_device_features.features.shaderInt16) {
+    device_properties->compute_int |= 0x2u;
+  }
+  if (physical_device_features.features.shaderInt64) {
+    device_properties->compute_int |= 0x4u;
+  }
   if (supported_8bit_storage_features.storageBuffer8BitAccess &&
       supported_8bit_storage_features.uniformAndStorageBuffer8BitAccess) {
-    device_properties->storage_8bit = true;
+    device_properties->storage |= 0x1u;
   }
   if (supported_16bit_storage_features.storageBuffer16BitAccess &&
       supported_16bit_storage_features.uniformAndStorageBuffer16BitAccess) {
-    device_properties->storage_16bit = true;
+    device_properties->storage |= 0x2u;
+  }
+
+  if (iree_all_bits_set(subgroup_properties.supportedOperations,
+                        VK_SUBGROUP_FEATURE_SHUFFLE_BIT)) {
+    device_properties->subgroup |= 0x1u;
+  }
+  if (iree_all_bits_set(subgroup_properties.supportedOperations,
+                        VK_SUBGROUP_FEATURE_ARITHMETIC_BIT)) {
+    device_properties->subgroup |= 0x2u;
   }
 
   if (dot_product_features.shaderIntegerDotProduct &&
@@ -957,7 +973,7 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
           .integerDotProductAccumulatingSaturating8BitSignedAccelerated &&
       dot_product_properties
           .integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated) {
-    device_properties->dot_product_operations |= 0x1u;
+    device_properties->dot_product |= 0x1u;
   }
 
   if (coop_matrix_features.cooperativeMatrix &&
@@ -978,15 +994,12 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
           p->BType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
         if (p->CType == VK_COMPONENT_TYPE_FLOAT16_KHR) {
           if (p->MSize == 16 && p->NSize == 16 && p->KSize == 16) {
-            device_properties->cooperative_matrix_operations |= 0x1u;
+            device_properties->cooperative_matrix |= 0x1u;
           }
         }
       }
     }
   }
-
-  device_properties->subgroup_operations =
-      subgroup_properties.supportedOperations;
 
   return iree_ok_status();
 }
@@ -1422,67 +1435,31 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
   }
 
   // Note that the device queries used here should match the ones used in
-  // mapToDeviceQuery() on the compiler side.
+  // buildDeviceQueryRegion() on the compiler side.
   if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
-    if (iree_string_view_equal(key, IREE_SV("compute.f16"))) {
-      bool v = device->logical_device->supported_properties().compute_f16;
-      *out_value = v ? 1 : 0;
+    if (iree_string_view_equal(key, IREE_SV("compute.f"))) {
+      *out_value = device->logical_device->supported_properties().compute_float;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("compute.f64"))) {
-      bool v = device->logical_device->supported_properties().compute_f64;
-      *out_value = v ? 1 : 0;
+    if (iree_string_view_equal(key, IREE_SV("compute.i"))) {
+      *out_value = device->logical_device->supported_properties().compute_int;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("compute.i8"))) {
-      bool v = device->logical_device->supported_properties().compute_i8;
-      *out_value = v ? 1 : 0;
+    if (iree_string_view_equal(key, IREE_SV("storage"))) {
+      *out_value = device->logical_device->supported_properties().storage;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("compute.i16"))) {
-      bool v = device->logical_device->supported_properties().compute_i16;
-      *out_value = v ? 1 : 0;
+    if (iree_string_view_equal(key, IREE_SV("subgroup"))) {
+      *out_value = device->logical_device->supported_properties().subgroup;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("compute.i64"))) {
-      bool v = device->logical_device->supported_properties().compute_i64;
-      *out_value = v ? 1 : 0;
+    if (iree_string_view_equal(key, IREE_SV("dotprod"))) {
+      *out_value = device->logical_device->supported_properties().dot_product;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("storage.8bit"))) {
-      bool v = device->logical_device->supported_properties().storage_8bit;
-      *out_value = v ? 1 : 0;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("storage.16bit"))) {
-      bool v = device->logical_device->supported_properties().storage_16bit;
-      *out_value = v ? 1 : 0;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("subgroup.arithmetic"))) {
-      uint32_t ops =
-          device->logical_device->supported_properties().subgroup_operations;
+    if (iree_string_view_equal(key, IREE_SV("coopmatrix"))) {
       *out_value =
-          iree_all_bits_set(ops, VK_SUBGROUP_FEATURE_ARITHMETIC_BIT) ? 1 : 0;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("subgroup.shuffle"))) {
-      uint32_t ops =
-          device->logical_device->supported_properties().subgroup_operations;
-      *out_value =
-          iree_all_bits_set(ops, VK_SUBGROUP_FEATURE_SHUFFLE_BIT) ? 1 : 0;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("dotprod.4xi8.i32"))) {
-      uint32_t ops =
-          device->logical_device->supported_properties().dot_product_operations;
-      *out_value = iree_all_bits_set(ops, 0x1u) ? 1 : 0;
-      return iree_ok_status();
-    }
-    if (iree_string_view_equal(key, IREE_SV("coopmatrix.f16.f16.16x16x16"))) {
-      uint32_t ops = device->logical_device->supported_properties()
-                         .cooperative_matrix_operations;
-      *out_value = iree_all_bits_set(ops, 0x1u) ? 1 : 0;
+          device->logical_device->supported_properties().cooperative_matrix;
       return iree_ok_status();
     }
   }
