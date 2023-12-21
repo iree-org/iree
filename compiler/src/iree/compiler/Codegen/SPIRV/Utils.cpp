@@ -29,7 +29,7 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
   // The spirv.target_env attribute is attached if going down SPIR-V CodeGen
   // pipelines. Later we turn spirv.target_env into iree.spirv.features after
   // materializing device queries.
-  return configuration.contains(spirv::getTargetEnvAttrName()) or
+  return configuration.contains(spirv::getTargetEnvAttrName()) ||
          configuration.contains("iree.spirv.features");
 }
 
