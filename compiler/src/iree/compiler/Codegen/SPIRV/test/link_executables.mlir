@@ -17,10 +17,6 @@
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @spirv target(#vulkan_target) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
@@ -41,10 +37,6 @@ hal.executable private @dispatch_0 {
 }
 hal.executable private @dispatch_1 {
   hal.executable.variant @spirv target(#vulkan_target) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
       %c2 = arith.constant 2 : i32
       hal.return %c2 : i32
@@ -67,10 +59,6 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -121,9 +109,6 @@ util.initializer {
 
 //      CHECK: hal.executable private @link_executables_linked_spirv {
 // CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
-//      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %true = arith.constant true
-// CHECK-NEXT:       hal.return %true : i1
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:       = arith.constant 1
 //      CHECK:     hal.executable.export public @dispatch_0 ordinal(0)
@@ -180,7 +165,7 @@ util.initializer {
 #vulkan_target_0 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   iree.spirv.features = ["vulkan"]}>
 #vulkan_target_1 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup.shuffle"]}>
+  iree.spirv.features = ["vulkan", "subgroup=1"]}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -191,10 +176,6 @@ util.initializer {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @spirv target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
@@ -216,9 +197,13 @@ hal.executable private @dispatch_0 {
 hal.executable private @dispatch_1 {
   hal.executable.variant @spirv target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle") : i1, i1 = false
-      %0 = arith.andi %ok, %value : i1
-      hal.return %0 : i1
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %c0_i32 = arith.constant 0 : i32
+      %c1_i32 = arith.constant 1 : i32
+      %0 = arith.andi %value, %c1_i32 : i32
+      %1 = arith.cmpi ne, %0, %c0_i32 : i32
+      %2 = arith.andi %ok, %1 : i1
+      hal.return %2 : i1
     }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
       %c2 = arith.constant 2 : i32
@@ -240,10 +225,6 @@ hal.executable private @dispatch_1 {
 }
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -261,9 +242,13 @@ hal.executable private @dispatch_2 {
 hal.executable private @dispatch_3 {
   hal.executable.variant @spirv target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle") : i1, i1 = false
-      %0 = arith.andi %ok, %value : i1
-      hal.return %0 : i1
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %c0_i32 = arith.constant 0 : i32
+      %c1_i32 = arith.constant 1 : i32
+      %0 = arith.andi %value, %c1_i32 : i32
+      %1 = arith.cmpi ne, %0, %c0_i32 : i32
+      %2 = arith.andi %ok, %1 : i1
+      hal.return %2 : i1
     }
     hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
@@ -292,13 +277,10 @@ func.func @two_target_environments() -> () {
 }
 
 //  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}
-//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup.shuffle"]}
+//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=1"]}
 
 //      CHECK: hal.executable private @link_executables_linked_spirv_0 {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb target(#[[TARGET0]]) {
-//      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %true = arith.constant true
-// CHECK-NEXT:       hal.return %true : i1
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:       = arith.constant 1 : i32
 //      CHECK:     hal.executable.export public @dispatch_0 ordinal(0)
@@ -320,9 +302,7 @@ func.func @two_target_environments() -> () {
 //      CHECK: hal.executable private @link_executables_linked_spirv_1 {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb target(#[[TARGET1]]) {
 //      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %[[OK:.+]], %[[V:.+]] = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle")
-// CHECK-NEXT:       %[[AND:.+]] = arith.andi %[[OK]], %[[V]] : i1
-// CHECK-NEXT:       hal.return %[[AND]] : i1
+// CHECK-NEXT:       hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup")
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:       = arith.constant 2 : i32
 //      CHECK:     hal.executable.export public @dispatch_1 ordinal(0)
@@ -360,9 +340,9 @@ func.func @two_target_environments() -> () {
 #vulkan_target_0 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
   iree.spirv.features = ["vulkan"]}>
 #vulkan_target_1 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup.shuffle"]}>
+  iree.spirv.features = ["vulkan", "subgroup=1"]}>
 #vulkan_target_2 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup.arithmetic"]}>
+  iree.spirv.features = ["vulkan", "subgroup=2"]}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -373,10 +353,6 @@ func.func @two_target_environments() -> () {
 
 hal.executable private @dispatch_0 {
   hal.executable.variant @spirv_0 target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c1 = arith.constant 1 : i32
       hal.return %c1 : i32
@@ -396,9 +372,13 @@ hal.executable private @dispatch_0 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle") : i1, i1 = false
-      %0 = arith.andi %ok, %value : i1
-      hal.return %0 : i1
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %c0_i32 = arith.constant 0 : i32
+      %c1_i32 = arith.constant 1 : i32
+      %0 = arith.andi %value, %c1_i32 : i32
+      %1 = arith.cmpi ne, %0, %c0_i32 : i32
+      %2 = arith.andi %ok, %1 : i1
+      hal.return %2 : i1
     }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "foo" {
       %c2 = arith.constant 2 : i32
@@ -422,10 +402,6 @@ hal.executable private @dispatch_0 {
 // dispatch_0. So it can link with dispatch_0.
 hal.executable private @dispatch_1 {
   hal.executable.variant @spirv_0 target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
       %c3 = arith.constant 3 : i32
       hal.return %c3 : i32
@@ -445,9 +421,13 @@ hal.executable private @dispatch_1 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle") : i1, i1 = false
-      %0 = arith.andi %ok, %value : i1
-      hal.return %0 : i1
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %c0_i32 = arith.constant 0 : i32
+      %c1_i32 = arith.constant 1 : i32
+      %0 = arith.andi %value, %c1_i32 : i32
+      %1 = arith.cmpi ne, %0, %c0_i32 : i32
+      %2 = arith.andi %ok, %1 : i1
+      hal.return %2 : i1
     }
     hal.executable.constant.block(%device: !hal.device) -> i32 as "baz" {
       %c4 = arith.constant 4 : i32
@@ -471,10 +451,6 @@ hal.executable private @dispatch_1 {
 // dispatch_1, so it can link with neither.
 hal.executable private @dispatch_2 {
   hal.executable.variant @spirv target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.export @dispatch_2 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -493,10 +469,6 @@ hal.executable private @dispatch_2 {
 // requirement. So cannot link either.
 hal.executable private @dispatch_3 {
   hal.executable.variant @spirv_0 target(#vulkan_target_0) {
-    hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %true = arith.constant true
-      hal.return %true : i1
-    }
     hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -512,9 +484,13 @@ hal.executable private @dispatch_3 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_2) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.arithmetic") : i1, i1 = false
-      %0 = arith.andi %ok, %value : i1
-      hal.return %0 : i1
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %c0_i32 = arith.constant 0 : i32
+      %c2_i32 = arith.constant 2 : i32
+      %0 = arith.andi %value, %c2_i32 : i32
+      %1 = arith.cmpi ne, %0, %c0_i32 : i32
+      %2 = arith.andi %ok, %1 : i1
+      hal.return %2 : i1
     }
     hal.executable.export @dispatch_3 ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
@@ -532,14 +508,11 @@ hal.executable private @dispatch_3 {
 }
 
 //  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}
-//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup.shuffle"]}
-//  CHECK-DAG: #[[TARGET2:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup.arithmetic"]}
+//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=1"]}
+//  CHECK-DAG: #[[TARGET2:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=2"]}
 
 //      CHECK: hal.executable private @link_executables_linked_spirv {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb_0 target(#[[TARGET0]]) {
-//      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %true = arith.constant true
-// CHECK-NEXT:       hal.return %true : i1
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:       = arith.constant 1 : i32
 //      CHECK:     hal.executable.export public @dispatch_0 ordinal(0)
@@ -563,9 +536,9 @@ hal.executable private @dispatch_3 {
 //      CHECK:   }
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb_1 target(#[[TARGET1]]) {
 //      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %[[OK:.+]], %[[V:.+]] = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup.shuffle")
-// CHECK-NEXT:       %[[AND:.+]] = arith.andi %[[OK]], %[[V]] : i1
-// CHECK-NEXT:       hal.return %[[AND]] : i1
+// CHECK-NEXT:       %{{.+}}, %[[V:.+]] = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup")
+//      CHECK:       %[[TARGET:.+]] = arith.constant 1 : i32
+// CHECK-NEXT:       %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:       = arith.constant 2 : i32
 //      CHECK:     hal.executable.export public @dispatch_0 ordinal(0)
