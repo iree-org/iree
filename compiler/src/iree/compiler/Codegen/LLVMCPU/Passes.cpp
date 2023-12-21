@@ -382,6 +382,10 @@ void addMultiTilingExpertPassPipeline(
 
   addCPUBufferizePasses(nestedModulePM);
 
+  // Fold unit dims before vector lowering.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass(/*flatten=*/false));
+
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
