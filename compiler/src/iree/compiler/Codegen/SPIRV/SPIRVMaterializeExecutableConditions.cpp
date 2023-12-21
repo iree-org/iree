@@ -169,9 +169,7 @@ struct SPIRVMaterializeExecutableConditionsPass final
     TypedAttr falseAttr = builder.getBoolAttr(false);
     Location loc = device.getLoc();
 
-    std::string category = "hal.device.";
-    StringRef backend = variantOp.getTarget().getBackend().getValue();
-    category += backend;
+    const char *category = "hal.dispatch";
 
     // Build the condition op region.
     Value result = builder.create<arith::ConstantIntOp>(loc, true, 1);
@@ -188,7 +186,7 @@ struct SPIRVMaterializeExecutableConditionsPass final
 
     SmallVector<StringRef> features;
     features.reserve(queries.size() + 1);
-    features.push_back(backend);
+    features.push_back(variantOp.getTarget().getBackend().getValue());
     for (const char *query : queries) {
       features.push_back(query);
     }

@@ -1423,7 +1423,7 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
 
   // Note that the device queries used here should match the ones used in
   // mapToDeviceQuery() on the compiler side.
-  if (iree_string_view_equal(category, IREE_SV("hal.device.vulkan"))) {
+  if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
     if (iree_string_view_equal(key, IREE_SV("compute.f16"))) {
       bool v = device->logical_device->supported_properties().compute_f16;
       *out_value = v ? 1 : 0;
