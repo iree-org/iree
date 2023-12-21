@@ -456,6 +456,7 @@ setup(
             # TODO: We have renamed to iree-compile on 2022-03-18. Remove
             # this alias once no longer needed.
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
+            "iree-import-onnx = iree.compiler.tools.import_onnx.__main__:_cli_main",
             "iree-ir-tool = iree.compiler.tools.ir_tool.__main__:_cli_main",
         ],
     },
@@ -463,4 +464,9 @@ setup(
         "numpy",
         "PyYAML",
     ],
+    extras_require={
+        "onnx": [
+            "onnx>=1.15.0",
+        ],
+    },
 )
