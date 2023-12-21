@@ -24,7 +24,7 @@ def run_tool(*argv: str):
 ONNX_FILE_PATH = os.path.join(os.path.dirname(__file__), "testdata", "LeakyReLU.onnx")
 
 
-class IrToolTest(unittest.TestCase):
+class ImportOnnxTest(unittest.TestCase):
     def setUp(self):
         with tempfile.NamedTemporaryFile(delete=False) as f:
             self.outputPath = f.name

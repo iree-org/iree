@@ -616,6 +616,9 @@ jobs:
         shell: bash
         run: |
           pip install --upgrade pip
+          # Pre-fetch optional deps that iree-compiler needs (but we constrain that
+          # to not consult a package index).
+          pip install onnx>=1.15.0
           pip install --no-index -f $PWD -v iree-compiler[onnx]
           echo "Testing default compiler:"
           python -m iree.compiler._package_test
