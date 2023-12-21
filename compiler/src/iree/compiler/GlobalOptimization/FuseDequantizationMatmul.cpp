@@ -8,12 +8,14 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
@@ -226,22 +228,19 @@ QuantizedMatmulRewriter::getDequantMatmulInputs() {
          "expected `dequant` to be a grouped dequantization");
   OpOperand *scales, *zps, *quantMat, *unquantMat, *dequantMat;
   auto maps = dequant.getIndexingMapsArray();
-  for (auto map :
-       llvm::enumerate(SmallVector<AffineMap>(maps.begin(), maps.end() - 1))) {
-    if (map.value().isIdentity()) {
-      quantMat = dequant.getDpsInputOperand(map.index());
-    } else if (map.value().isProjectedPermutation(true)) {
+  for (auto [idx, map] : enumerate(ArrayRef<AffineMap>(maps).drop_back())) {
+    if (map.isIdentity()) {
+      quantMat = dequant.getDpsInputOperand(idx);
+    } else if (map.isProjectedPermutation(true)) {
       for (Operation &bodyOp : dequant.getBlock()->getOperations()) {
         if (isa<arith::MulFOp>(bodyOp)) {
-          if (bodyOp.getOperand(1) ==
-              dequant.getBlock()->getArgument(map.index())) {
-            scales = dequant.getDpsInputOperand(map.index());
+          if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(idx)) {
+            scales = dequant.getDpsInputOperand(idx);
             break;
           }
         } else if (isa<arith::SubFOp>(bodyOp)) {
-          if (bodyOp.getOperand(1) ==
-              dequant.getBlock()->getArgument(map.index())) {
-            zps = dequant.getDpsInputOperand(map.index());
+          if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(idx)) {
+            zps = dequant.getDpsInputOperand(idx);
             break;
           }
         }
