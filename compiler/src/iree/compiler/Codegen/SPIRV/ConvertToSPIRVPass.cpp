@@ -430,6 +430,20 @@ void ConvertToSPIRVPass::runOnOperation() {
     }
   }
 
+  // Expand any remaining `bf16` `extf` and `trunc` patterns.
+  {
+    RewritePatternSet patterns(context);
+    arith::populateExpandBFloat16Patterns(patterns);
+    arith::BitcastOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsAndFoldGreedily(moduleOp,
+                                            std::move(patterns)))) {
+      moduleOp.emitOpError() << "failed running expansion patterns";
+      return signalPassFailure();
+    }
+    moduleOp.dump();
+
+  }
+
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
   moduleOp->setAttr(spirv::getTargetEnvAttrName(), targetAttr);
 
@@ -453,16 +467,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
-
-  typeConverter.addConversion(
-      [typeConverter](FloatType floatType) -> std::optional<Type> {
-        if (floatType.isBF16()) {
-          return typeConverter.convertType(
-              IntegerType::get(floatType.getContext(), 16));
-        }
-
-        return floatType;
-      });
 
   // Additionally pull in conversion rules for GPU subgroup MMA ops.
   populateMMAToSPIRVCoopMatrixTypeConversion(typeConverter);
