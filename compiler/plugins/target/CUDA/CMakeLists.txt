@@ -52,7 +52,7 @@ iree_cc_library(
     MLIRTransformDialect
     iree::base::internal::flatcc::building
     iree::compiler::Codegen
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
