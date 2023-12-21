@@ -172,9 +172,9 @@ typedef enum iree_hal_cuda2_worker_state_e {
 // is needed to touch it from both sides.
 //
 // The parent thread should push a list of ready actions to ready_worklist,
-// update working_state, and give notification naccordingly.
+// update working_state, and give notification accordingly.
 // The worker thread waits on the notification and checks working_state, and
-// pops from the ready_worklist to process. THe worker thread also monintors
+// pops from the ready_worklist to process. The worker thread also monintors
 // exiting_state and stops processing if requested by the parent thread.
 typedef struct iree_hal_cuda2_working_area_t {
   iree_notification_t notification;
