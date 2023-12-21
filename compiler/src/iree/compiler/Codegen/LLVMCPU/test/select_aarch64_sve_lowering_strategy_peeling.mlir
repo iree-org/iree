@@ -1,9 +1,5 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' \
-// RUN: --iree-codegen-llvmcpu-vector-pproc-strategy=peel --split-input-file %s | FileCheck %s
-
-// FIXME - ATM scalability is not propagated when using vector peeling and
-// hence the expected output represents what the compiler generates rather 
-// what it should generate.
+// RUN: --iree-llvmcpu-vector-pproc-strategy=peel --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -51,7 +47,7 @@ hal.executable private @matmul_tensors_sve  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [128, 128, 0], [0, 0, 0], [8, 16, 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 128, 0], [128, 128, 0], [0, 0, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //       CHECK: hal.executable.export public @matmul_tensors
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -91,7 +87,7 @@ hal.executable private @matmul_static_tensors_sve  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 7, 0], [5, 7, 0], [0, 0, 0], [5, 7, 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 7, 0], [5, 7, 0], [0, 0, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //       CHECK: hal.executable.export public @static_tensors_non_pow_two_sizes
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -133,10 +129,10 @@ hal.executable private @static_tensors_1x1  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 16, 0], [0, 0, 1], [0, 0, 0]]>
+// TODO: FIXME - scalable "16" ([16]) for just 1 element
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, [16], 0], [0, 0, 1], [0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
 //      CHECK: hal.executable.export public @static_tensors_1x1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
-
