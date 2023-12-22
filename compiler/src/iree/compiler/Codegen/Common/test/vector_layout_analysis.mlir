@@ -156,19 +156,19 @@ builtin.module attributes { transform.with_named_sequence } {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d0)>
 
-// Propagate and enforce through vector.contract.
+// Propagate through vector.contract.
 builtin.module attributes { transform.with_named_sequence } {
   func.func @contract(%A : vector<32x64xf16>, %B : vector<128x64xf16>, %C : vector<128x32xf32>) -> vector<128x32xf32> {
-    // to_simd operations are just use to have an operation on which we can put
-    // a layout.
-    %A_l = iree_vector_ext.to_simd %A {"__vector_layout_test_anchor_result_0" = #layoutA} : vector<32x64xf16> -> vector<32x64xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORX], [32]>, <[ VECTORY], [64]>>}}
-    %B_l = iree_vector_ext.to_simd %B {"__vector_layout_test_anchor_result_0" = #layoutB} : vector<128x64xf16> -> vector<128x64xf16>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORX], [128]>, <[ VECTORY], [64]>>}}
-    %C_l = iree_vector_ext.to_simd %C {"__vector_layout_test_anchor_result_0" = #layoutC} : vector<128x32xf32> -> vector<128x32xf32>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [128]>, <[ VECTORX], [32]>>}}
-    %D = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>} %B_l, %A_l, %C_l : vector<128x64xf16>, vector<32x64xf16> into vector<128x32xf32>
-    // expected-remark @above {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [128]>, <[ VECTORX], [32]>>}}
+    // Check if the layout of %C was properly propagated to %D.
+    // expected-remark @below {{layout of result #0 is #iree_vector_ext.layout<<[ VECTORY], [128]>, <[ VECTORX], [32]>>}}
+    %D = vector.contract
+        {indexing_maps = [#map1, #map2, #map3],
+         iterator_types = ["parallel", "parallel", "reduction"],
+         kind = #vector.kind<add>,
+         "__vector_layout_test_anchor_operand_0" = #layoutB,
+         "__vector_layout_test_anchor_operand_1" = #layoutA,
+         "__vector_layout_test_anchor_operand_2" = #layoutC
+        } %B, %A, %C : vector<128x64xf16>, vector<32x64xf16> into vector<128x32xf32>
     func.return %D : vector<128x32xf32>
   }
 
