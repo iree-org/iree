@@ -44,7 +44,10 @@ function(iree_rocm_bitcode_library)
   endif()
 
   set(_ROCM_ARCH "${_RULE_ROCM_ARCH}")
-
+  set (OPT_FLAG "-O0")
+  if (_ROCM_ARCH MATCHES "GFX9")
+    set (OPT_FLAG "-O3")
+  endif()
   set(_COPTS
     "-x" "hip"
     # Target architecture.
@@ -56,7 +59,7 @@ function(iree_rocm_bitcode_library)
     "--offload-device-only"
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
     "-Xclang" "-disable-llvm-optzns"
-    "-O3"
+    "${OPT_FLAG}"
 
     # Object file only in bitcode format:
     "-c"

@@ -130,11 +130,15 @@ LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
                                 << "`: " << ec.message();
   }
   auto setAlwaysInline = [&](llvm::Module &module) {
-    // ROCM/HIP builtin functions are non-inlinable.
-    // if (targetMachine.getTargetTriple().isAMDGCN() ||
-    // targetMachine.getTargetTriple().isAMDGPU()) return;
+    if (targetMachine.getTargetCPU().contains("gfx1")) {
+      // some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
+      // inlined.
+      return;
+    }
     for (auto &func : module.getFunctionList()) {
-      if (func.hasFnAttribute(llvm::Attribute::NoInline)) {
+      // Some ROCM/HIP builtin functions have noninline for default.
+      if (targetMachine.getTargetTriple().isAMDGCN() &&
+          func.hasFnAttribute(llvm::Attribute::NoInline)) {
         func.removeFnAttr(llvm::Attribute::NoInline);
       }
       func.addFnAttr(llvm::Attribute::AlwaysInline);

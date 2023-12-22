@@ -19,16 +19,17 @@ extern "C" __device__ void
 __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size_t input_offset,
                              int32_t *outputBuffer, size_t output_offset,
                              size_t reductionSize, uint32_t flag) {
-  uint laneID = threadIdx.x;
-  uint laneCount = blockDim.x;
+  uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
       laneID >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + laneID];
   int32_t laneResult = laneID;
 
+  // NOTE: On F32 kernels with clang, reductionSize/blockDim.x has numerical
+  // inaccuracy.
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
-    uint idx = laneCount * i + laneID;
+    uint idx = warpSize * i + laneID;
     float new_in =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
@@ -36,7 +37,11 @@ __iree_uk_rocm_argmax_F32I32(float *inputBuffer, size_t input_offset,
   }
 
   // Final reduction with one subgroup
-  float wgMax = __ockl_wfred_max_f32(laneMax);
+  // NOTE: __ockl_wfred_max_f32 has correctness issue on clang.
+  float wgMax = laneMax;
+  for (int i = 1; i < warpSize; i *= 2) {
+    wgMax = __ocml_fmax_f32(__shfl_xor(wgMax, i), wgMax);
+  }
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
   // if there are, find smallest index (argmax semantics).
@@ -52,16 +57,17 @@ extern "C" __device__ void
 __iree_uk_rocm_argmax_F32I64(float *inputBuffer, size_t input_offset,
                              int64_t *outputBuffer, size_t output_offset,
                              size_t reductionSize, uint32_t flag) {
-  uint laneID = threadIdx.x;
-  uint laneCount = blockDim.x;
+  uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
       laneID >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + laneID];
   int64_t laneResult = laneID;
 
+  // NOTE: On F32 kernels with clang, reductionSize/blockDim.x has numerical
+  // inaccuracy.
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
-    uint idx = laneCount * i + laneID;
+    uint idx = warpSize * i + laneID;
     float new_in =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
@@ -69,7 +75,11 @@ __iree_uk_rocm_argmax_F32I64(float *inputBuffer, size_t input_offset,
   }
 
   // Final reduction with one subgroup
-  float wgMax = __ockl_wfred_max_f32(laneMax);
+  // NOTE: __ockl_wfred_max_f32 has correctness issue on clang.
+  float wgMax = laneMax;
+  for (int i = 1; i < warpSize; i *= 2) {
+    wgMax = __ocml_fmax_f32(__shfl_xor(wgMax, i), wgMax);
+  }
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
   // if there are, find smallest index (argmax semantics).
@@ -86,8 +96,7 @@ __iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
                              int32_t *outputBuffer, size_t output_offset,
                              size_t reductionSize, uint32_t flag) {
   half NEG_F16_MAX = __float2half(-65504.0f);
-  uint laneID = threadIdx.x;
-  uint laneCount = blockDim.x;
+  uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   half laneMax = laneID >= reductionSize ? NEG_F16_MAX
                                          : inputBuffer[input_offset + laneID];
@@ -95,7 +104,7 @@ __iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
 
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
-    uint idx = laneCount * i + laneID;
+    uint idx = warpSize * i + laneID;
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
@@ -120,8 +129,7 @@ __iree_uk_rocm_argmax_F16I64(half *inputBuffer, size_t input_offset,
                              int64_t *outputBuffer, size_t output_offset,
                              size_t reductionSize, uint32_t flag) {
   half NEG_F16_MAX = __float2half(-65504.0f);
-  uint laneID = threadIdx.x;
-  uint laneCount = blockDim.x;
+  uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   half laneMax = laneID >= reductionSize ? NEG_F16_MAX
                                          : inputBuffer[input_offset + laneID];
@@ -129,7 +137,7 @@ __iree_uk_rocm_argmax_F16I64(half *inputBuffer, size_t input_offset,
 
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
-    uint idx = laneCount * i + laneID;
+    uint idx = warpSize * i + laneID;
     half new_in =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
     laneResult = new_in > laneMax ? idx : laneResult;
