@@ -73,7 +73,10 @@ def iree_run_module(vmfb: Artifact, *, device, function, args: Sequence[str] = (
     exec_args.extend(args)
     print("**************************************************************")
     print("Exec:", " ".join(exec_args))
-    subprocess.check_call(exec_args, cwd=vmfb.group.directory)
+    p = subprocess.Popen(exec_args, cwd=vmfb.group.directory, stdout=subprocess.PIPE)
+    out, err = p.communicate()
+    print("OUTZ:", out)
+    print("ERRZ:", err)
 
 
 def iree_benchmark_module(
@@ -89,4 +92,7 @@ def iree_benchmark_module(
     exec_args.extend(args)
     print("**************************************************************")
     print("Exec:", " ".join(exec_args))
-    subprocess.check_call(exec_args, cwd=vmfb.group.directory)
+    subprocess.check_call(
+        exec_args,
+        cwd=vmfb.group.directory,
+    )

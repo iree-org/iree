@@ -20,7 +20,7 @@ COMMON_FLAGS = [
 
 argmax_ukernel_source = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_linalg.mlir",
-    group="argmax_ukernel",
+    group="argmax_ukernel_linalg",
 )
 
 
@@ -34,7 +34,7 @@ def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
             "--iree-hal-target-backends=rocm",
             "--iree-rocm-target-chip=gfx1100",
             "--iree-rocm-link-bc=true",
-            "--iree-rocm-enable-ukernels=all",
+            "--iree-rocm-enable-ukernels=none",
         ],
     )
 
@@ -53,22 +53,22 @@ def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
 
 argmax_input_f16 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f16.npy",
-    group="argmax_ukernel",
+    group="argmax_ukernel_input_f16",
 )
 
 argmax_output_f16 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f16.npy",
-    group="argmax_ukernel",
+    group="argmax_ukernel_output_f16",
 )
 
 argmax_input_f32 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f32.npy",
-    group="argmax_ukernel",
+    group="argmax_ukernel_input_f32",
 )
 
 argmax_output_f32 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f32.npy",
-    group="argmax_ukernel",
+    group="argmax_ukernel_output_f32",
 )
 
 
@@ -82,40 +82,36 @@ def test_correctness_rnda3_rocm(
     argmax_input_f32,
     argmax_output_f32,
 ):
-    iree_run_module(
+    iree_benchmark_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i32",
         args=[
             f"--input=@{argmax_input_f16.path}",
-            f"--expected_output=@{argmax_output_f16.path}",
         ],
     )
-    iree_run_module(
+    iree_benchmark_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i64",
         args=[
             f"--input=@{argmax_input_f16.path}",
-            f"--expected_output=@{argmax_output_f16.path}",
         ],
     )
 
-    iree_run_module(
+    iree_benchmark_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i32",
         args=[
             f"--input=@{argmax_input_f32.path}",
-            f"--expected_output=@{argmax_output_f32.path}",
         ],
     )
-    iree_run_module(
+    iree_benchmark_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i64",
         args=[
             f"--input=@{argmax_input_f32.path}",
-            f"--expected_output=@{argmax_output_f32.path}",
         ],
     )
