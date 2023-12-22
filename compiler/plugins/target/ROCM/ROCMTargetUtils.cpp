@@ -45,7 +45,7 @@ bool couldNeedUkernelBitcode(const llvm::Module &module) {
     // The list of prefixes should be in sync with library functions used in
     // target_util.cc.
     if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().startswith("__iree_uk_rocm_"))) {
+        (function.getName().starts_with("__iree_uk_rocm_"))) {
       return true;
     }
   }
