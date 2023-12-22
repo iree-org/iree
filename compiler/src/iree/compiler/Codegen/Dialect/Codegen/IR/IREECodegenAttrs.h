@@ -27,9 +27,9 @@ using ScalableTileFlagsListTypeRef = ArrayRef<SmallVector<bool>>;
 } // namespace mlir::iree_compiler
 
 // clang-format off
-#include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.h.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h.inc"
 // clang-format on
 
 namespace mlir::iree_compiler {

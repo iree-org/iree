@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -14,8 +14,8 @@
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.cpp.inc"
-#include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/LoweringConfigEnums.cpp.inc"
 
 static const char kConfigAttrName[] = "lowering_config";
 static const char kTranslationInfoAttrName[] = "translation_info";
@@ -315,7 +315,7 @@ LogicalResult CompilationInfoAttr::verify(
 void IREECodegenDialect::initializeCodegenAttrs() {
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.cpp.inc" // IWYU pragma: keeep
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.cpp.inc" // IWYU pragma: keeep
       >();
 }
 
