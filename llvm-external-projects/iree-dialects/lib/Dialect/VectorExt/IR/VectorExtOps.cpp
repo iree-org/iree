@@ -36,6 +36,22 @@ LogicalResult LayoutConflictResolutionOp::verify() {
   return failure();
 }
 
+// to_simd -> to_simt
+OpFoldResult ToSIMDOp::fold(FoldAdaptor) {
+  if (auto simtOp = getOperand().getDefiningOp<ToSIMTOp>()) {
+    return simtOp.getOperand();
+  }
+  return {};
+}
+
+// to_simt -> to_simd
+OpFoldResult ToSIMTOp::fold(FoldAdaptor) {
+  if (auto simdOp = getOperand().getDefiningOp<ToSIMDOp>()) {
+    return simdOp.getOperand();
+  }
+  return {};
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.cpp.inc" // IWYU pragma: keep
