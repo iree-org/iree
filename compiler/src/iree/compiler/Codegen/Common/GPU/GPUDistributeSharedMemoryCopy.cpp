@@ -10,7 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -115,7 +115,8 @@ static int getBaseVectorSize(linalg::GenericOp genericOp) {
   // sure we at least read a full byte for the sub-byte-element operands.
   unsigned operandBW = std::numeric_limits<unsigned>::max();
   for (OpOperand *operand : genericOp.getDpsInputOperands()) {
-    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    unsigned b =
+        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand->get()));
     operandBW = std::min(operandBW, b);
   }
   int vectorSize = copyVectorNumBits / resultBW;

@@ -1021,13 +1021,10 @@ func.func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG2]] : tensor<?xi32>{%[[D0]]} -> tensor<1x?xi32>{%[[D0]]}
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG3]], %[[C0]]
 //   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG3]], %[[C1]]
-//       CHECK:   flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[D2]]]
-//  CHECK-SAME:       tensor<?xi32>{%[[D0]]}
-//  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}
-//  CHECK-NEXT:     !flow.dispatch.tensor<readonly:tensor<?xi32>>
-//  CHECK-SAME:     !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>
+//       CHECK:   flow.tensor.update %[[RESHAPE]], %[[ARG3]]{{.*}} : tensor<1x?xi32>{%[[D0]]} -> %[[ARG3]] as tensor<?x?xi32>{%[[D1]], %[[D2]]}
 
 // -----
 

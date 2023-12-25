@@ -221,7 +221,10 @@ if(TRACY_GUI_DEPS_FOUND)
   # Profiler
   #-----------------------------------------------------------------------------
 
-  file(GLOB PROFILER_SRCS ${TRACY_SOURCE_DIR}/profiler/src/*.cpp)
+  file(GLOB PROFILER_SRCS
+       ${TRACY_SOURCE_DIR}/profiler/src/*.c
+       ${TRACY_SOURCE_DIR}/profiler/src/*.cpp
+  )
   # Remove the source files for Wayland backend; right now we just use GLFW.
   list(REMOVE_ITEM PROFILER_SRCS
        "${TRACY_SOURCE_DIR}/profiler/src/BackendWayland.cpp")

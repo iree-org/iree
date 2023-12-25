@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
@@ -11,9 +12,13 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-class ResolveCommandBufferDispatchOrdinals
+#define GEN_PASS_DEF_RESOLVEEXPORTORDINALSPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
+struct ResolveCommandBufferDispatchOrdinals
     : public OpRewritePattern<IREE::HAL::CommandBufferDispatchSymbolOp> {
-public:
   using OpRewritePattern<
       IREE::HAL::CommandBufferDispatchSymbolOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::HAL::CommandBufferDispatchSymbolOp op,
@@ -39,10 +44,9 @@ public:
   }
 };
 
-class ResolveCommandBufferDispatchIndirectOrdinals
+struct ResolveCommandBufferDispatchIndirectOrdinals
     : public OpRewritePattern<
           IREE::HAL::CommandBufferDispatchIndirectSymbolOp> {
-public:
   using OpRewritePattern<
       IREE::HAL::CommandBufferDispatchIndirectSymbolOp>::OpRewritePattern;
   LogicalResult
@@ -69,17 +73,13 @@ public:
   }
 };
 
-class ResolveExportOrdinalsPass
-    : public PassWrapper<ResolveExportOrdinalsPass, OperationPass<ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-hal-resolve-export-ordinals";
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-resolve-export-ordinals
+//===----------------------------------------------------------------------===//
 
-  StringRef getDescription() const override {
-    return "Resolves hal.executable.export references to ordinals";
-  }
-
+struct ResolveExportOrdinalsPass
+    : public IREE::HAL::impl::ResolveExportOrdinalsPassBase<
+          ResolveExportOrdinalsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
@@ -92,10 +92,6 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
-  return std::make_unique<ResolveExportOrdinalsPass>();
-}
-
-static PassRegistration<ResolveExportOrdinalsPass> pass;
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL

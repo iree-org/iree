@@ -12,7 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -151,6 +151,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
 /// SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileToCooperativeOpsPass();
+
+// Trims the SPIR-V target environment of a HAL executable variant to the
+// minimal requirement per the compiled spirv.module op needs.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVTrimExecutableTargetEnvPass();
 
 /// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>

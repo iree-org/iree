@@ -76,6 +76,11 @@ def Util_AnySerializableAttr : Attr<Or<[
   let convertFromStorage = "$_self";
 }
 
+def Util_AnySerializableArrayAttr :
+  TypedArrayAttrBase<Util_AnySerializableAttr,
+                     "array attribute of serializable attributes"
+  >;
+
 class Util_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
                                        "symbol reference attribute"> {
   let storageType = [{ FlatSymbolRefAttr }];

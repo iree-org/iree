@@ -12,7 +12,7 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"

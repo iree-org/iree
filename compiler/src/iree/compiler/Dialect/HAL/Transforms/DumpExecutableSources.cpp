@@ -19,6 +19,11 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+#define GEN_PASS_DEF_DUMPEXECUTABLESOURCESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
 static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
                                    StringRef filePath, llvm::raw_ostream &os) {
   OpPrintingFlags flags;
@@ -27,28 +32,15 @@ static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
   os << "\n"; // newline at end of file
 }
 
-class DumpExecutableSourcesPass
-    : public PassWrapper<DumpExecutableSourcesPass, OperationPass<ModuleOp>> {
-public:
-  DumpExecutableSourcesPass() = default;
-  DumpExecutableSourcesPass(const DumpExecutableSourcesPass &pass) {}
-  DumpExecutableSourcesPass(StringRef path, StringRef prefix) {
-    this->path = path.str();
-    this->prefix = prefix.str();
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-dump-executable-sources
+//===----------------------------------------------------------------------===//
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-dump-executable-sources";
-  }
-
-  StringRef getDescription() const override {
-    return "Dumps individual hal.executable source listings to a path.";
-  }
-
+struct DumpExecutableSourcesPass
+    : public IREE::HAL::impl::DumpExecutableSourcesPassBase<
+          DumpExecutableSourcesPass> {
+  using IREE::HAL::impl::DumpExecutableSourcesPassBase<
+      DumpExecutableSourcesPass>::DumpExecutableSourcesPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
@@ -88,24 +80,8 @@ public:
       executableOp.setVisibility(originalVisibility);
     }
   }
-
-private:
-  Option<std::string> path{
-      *this, "path",
-      llvm::cl::desc("Path to write hal.executable source files into.")};
-
-  Option<std::string> prefix{
-      *this, "prefix",
-      llvm::cl::desc("String to prefix the written files with.")};
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createDumpExecutableSourcesPass(StringRef path, StringRef prefix) {
-  return std::make_unique<DumpExecutableSourcesPass>(path, prefix);
-}
-
-static PassRegistration<DumpExecutableSourcesPass> pass([] {
-  return std::make_unique<DumpExecutableSourcesPass>();
-});
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL

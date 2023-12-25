@@ -27,6 +27,12 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+#define GEN_PASS_DEF_PREPROCESSEXECUTABLESWITHPIPELINEPASS
+#define GEN_PASS_DEF_PREPROCESSEXECUTABLESWITHTOOLPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
 static StringRef fixupArg(StringRef arg) {
   // HACK: pass pipeline parsing doesn't handle strings with spaces and the only
   // way to get them through (I could find) is to double quote them. This
@@ -212,20 +218,16 @@ static LogicalResult preprocessWithCommand(IREE::HAL::ExecutableOp executableOp,
   return success();
 }
 
-class PreprocessExecutablesPass
-    : public PassWrapper<PreprocessExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableOp>> {
-public:
-  PreprocessExecutablesPass() = default;
-  PreprocessExecutablesPass(const PreprocessExecutablesPass &pass) {}
-  PreprocessExecutablesPass(std::optional<std::string> pipeline,
-                            std::optional<std::string> command) {
-    if (pipeline.has_value()) {
-      this->pipeline = std::move(pipeline).value();
-    } else if (command.has_value()) {
-      this->command = std::move(command).value();
-    }
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-preprocess-executables-with-pipeline
+//===----------------------------------------------------------------------===//
+
+struct PreprocessExecutablesWithPipelinePass
+    : public IREE::HAL::impl::PreprocessExecutablesWithPipelinePassBase<
+          PreprocessExecutablesWithPipelinePass> {
+  using IREE::HAL::impl::PreprocessExecutablesWithPipelinePassBase<
+      PreprocessExecutablesWithPipelinePass>::
+      PreprocessExecutablesWithPipelinePassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
@@ -239,79 +241,56 @@ public:
     }
   }
 
-  StringRef getArgument() const override {
-    return "iree-hal-preprocess-executables";
-  }
-
-  StringRef getDescription() const override {
-    return "Preprocesses each executable with a pass pipeline or external "
-           "tool.";
-  }
-
   void runOnOperation() override {
+    if (!pipeline.hasValue())
+      return;
     auto executableOp = getOperation();
-    if (pipeline.hasValue()) {
-      OpPassManager passManager(executableOp.getOperationName());
-      if (failed(buildPassPipeline(pipeline, passManager))) {
-        llvm::errs() << "ERROR: failed to parse preprocessing pipeline `"
-                     << pipeline << "`\n";
-        return signalPassFailure();
-      }
-      if (failed(runPipeline(passManager, executableOp))) {
-        llvm::errs() << "ERROR: failed to preprocess executable `"
-                     << executableOp.getName() << "` using pipeline `"
-                     << pipeline << "`\n";
-        return signalPassFailure();
-      }
-    } else if (command.hasValue()) {
-      if (failed(preprocessWithCommand(executableOp, command))) {
-        llvm::errs() << "ERROR: failed to preprocess executable `"
-                     << executableOp.getName() << "` using command `" << command
-                     << "`\n";
-        return signalPassFailure();
-      }
+    OpPassManager passManager(executableOp.getOperationName());
+    if (failed(buildPassPipeline(pipeline, passManager))) {
+      llvm::errs() << "ERROR: failed to parse preprocessing pipeline `"
+                   << pipeline << "`\n";
+      return signalPassFailure();
+    }
+    if (failed(runPipeline(passManager, executableOp))) {
+      llvm::errs() << "ERROR: failed to preprocess executable `"
+                   << executableOp.getName() << "` using pipeline `" << pipeline
+                   << "`\n";
+      return signalPassFailure();
     }
   }
-
-private:
-  Option<std::string> pipeline{
-      *this,
-      "pipeline",
-      llvm::cl::desc("Pass pipeline used to preprocess the executable."),
-      llvm::cl::init(""),
-  };
-  Option<std::string> command{
-      *this,
-      "command",
-      llvm::cl::desc("Shell command used to preprocess the executable."),
-      llvm::cl::init(""),
-  };
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createPreprocessExecutablesPass(std::string rawCommand) {
+//===----------------------------------------------------------------------===//
+// --iree-hal-preprocess-executables-with-tool
+//===----------------------------------------------------------------------===//
+
+struct PreprocessExecutablesWithToolPass
+    : public IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
+          PreprocessExecutablesWithToolPass> {
+  using IREE::HAL::impl::PreprocessExecutablesWithToolPassBase<
+      PreprocessExecutablesWithToolPass>::PreprocessExecutablesWithToolPassBase;
+  void runOnOperation() override {
+    if (!command.hasValue())
+      return;
+    auto executableOp = getOperation();
+    if (failed(preprocessWithCommand(executableOp, command))) {
+      llvm::errs() << "ERROR: failed to preprocess executable `"
+                   << executableOp.getName() << "` using command `" << command
+                   << "`\n";
+      return signalPassFailure();
+    }
+  }
+};
+
+} // namespace
+
+std::unique_ptr<Pass> createPreprocessExecutablesPass(std::string rawCommand) {
   auto command = fixupArg(rawCommand);
   if (command.starts_with("builtin.module")) {
-    return createPreprocessExecutablesWithPipelinePass(command.str());
+    return createPreprocessExecutablesWithPipelinePass({command.str()});
   } else {
-    return createPreprocessExecutablesWithToolPass(command.str());
+    return createPreprocessExecutablesWithToolPass({command.str()});
   }
 }
-
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createPreprocessExecutablesWithPipelinePass(std::string pipeline) {
-  return std::make_unique<PreprocessExecutablesPass>(std::move(pipeline),
-                                                     std::nullopt);
-}
-
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createPreprocessExecutablesWithToolPass(std::string command) {
-  return std::make_unique<PreprocessExecutablesPass>(std::nullopt,
-                                                     std::move(command));
-}
-
-static PassRegistration<PreprocessExecutablesPass> pass([] {
-  return std::make_unique<PreprocessExecutablesPass>();
-});
 
 } // namespace mlir::iree_compiler::IREE::HAL

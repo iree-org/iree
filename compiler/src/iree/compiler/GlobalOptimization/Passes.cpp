@@ -27,6 +27,18 @@ static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
     llvm::cl::desc(
         "Enables fusing specifically structured matmuls (experimental)."),
     llvm::cl::init(false));
+// TODO(#15973): Make default to true after fixing the CPU DT regression.
+static llvm::cl::opt<bool> clEnableTransposePropagation(
+    "iree-global-opt-propagate-transposes",
+    llvm::cl::desc(
+        "Enables propagation of transpose ops to improve fusion chances."),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
+    "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
+    llvm::cl::desc(
+        "Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16."),
+    llvm::cl::init(false));
 
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
@@ -100,10 +112,26 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
+      .addPredicatedPass(clEnableDemoteContractionInputsToBF16,
+                         createDemoteContractionInputsToBF16Pass)
       .addPass([&]() {
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
       })
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+      // Propagate transposes immediately before set encoding/data tiling
+      // because transpose propagation cannot take an opinion on the preferred
+      // layout of various operations. This simplifies local propagation
+      // decisions as SetEncoding is expected to pick the ideal layout for
+      // that operation anyway, and this way we only need to make such a
+      // decision once.
+      .addPredicatedPass(
+          clEnableTransposePropagation,
+          [&]() {
+            return createPropagateLinalgTransposePass(
+                transformOptions.options.aggressiveTransposePropagation);
+          })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
@@ -114,9 +142,10 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
-    FunctionLikeNest(mainPassManager)
-        .addPass(createGeneralizeLinalgNamedOpsPass);
   }
+  // Generalize transposes and any other remaining named linalg ops that can now
+  // be represented as generics.
+  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)

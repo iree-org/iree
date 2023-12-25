@@ -145,8 +145,7 @@ hal.executable private @i4_dequant_matvec {
 //         CHECK:     %[[ADD:.+]] = arith.addf %[[MUL1]], %[[ARG]] : vector<1x8xf16>
 
 //         CHECK:   %[[SCAST:.+]] = vector.shape_cast %[[FOR]] : vector<1x8xf16> to vector<8xf16>
-//         CHECK:   %[[EXTRACT:.+]] = vector.extract_strided_slice %[[SCAST]] {offsets = [0], sizes = [4], strides = [1]} : vector<8xf16> to vector<4xf16>
-//         CHECK:   vector.reduction <add>, %[[EXTRACT]] : vector<4xf16> into f16
+//         CHECK:   vector.reduction <add>, %[[SCAST]] : vector<8xf16> into f16
 // CHECK-COUNT-6:   gpu.shuffle  xor
 //         CHECK:   scf.if
 //         CHECK:     vector.transfer_write
@@ -259,7 +258,7 @@ hal.executable private @matvec_fp16 {
 //          CHECK:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
 //          CHECK:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
 
-//          CHECK:   vector.reduction <add>, %{{.+}} : vector<4xf16> into f16
+//          CHECK:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
 // CHECK-COUNT-24:   gpu.shuffle xor
 //          CHECK:   scf.if
 //          CHECK:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
@@ -317,7 +316,7 @@ hal.executable private @matvec_fp16 {
 //          CHECK:     %[[MUL:.+]] = arith.mulf %[[VEC]], %[[MAT]] : vector<8x8xf16>
 //          CHECK:     %[[ADD:.+]] = arith.addf %[[ARG]], %[[MUL]] : vector<8x8xf16>
 
-//          CHECK:   vector.reduction <add>, %{{.+}} : vector<4xf16> into f16
+//          CHECK:   vector.reduction <add>, %{{.+}} : vector<8xf16> into f16
 // CHECK-COUNT-24:   gpu.shuffle xor
 //          CHECK:   scf.if
 //          CHECK:     vector.transfer_write {{.+}} : vector<8xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>

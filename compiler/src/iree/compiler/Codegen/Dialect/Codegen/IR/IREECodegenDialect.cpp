@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.cpp.inc"
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
-#include "iree/compiler/Codegen/Dialect/UKernelOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 namespace mlir::iree_compiler::IREE::Codegen {
@@ -37,11 +37,11 @@ void IREECodegenDialect::initialize() {
 
   addOperations<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.cpp.inc"
       >();
   addOperations<
 #define GET_OP_LIST
-#include "iree/compiler/Codegen/Dialect/UKernelOps.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.cpp.inc"
       >();
 }
 
