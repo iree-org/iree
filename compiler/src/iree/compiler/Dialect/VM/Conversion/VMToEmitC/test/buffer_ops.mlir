@@ -236,3 +236,16 @@ vm.module @my_module {
     vm.return
   }
 }
+
+// -----
+
+vm.module @my_module {
+  // CHECK-LABEL: @my_module_buffer_hash
+  vm.func @buffer_hash(%buf : !vm.buffer) {
+    // CHECK: %[[STATUS:.+]] = emitc.call_opaque "iree_vm_buffer_hash"
+    %c0 = vm.const.i64 0
+    %c10 = vm.const.i64 10
+    %v0 = vm.buffer.hash %buf, %c0, %c10 : !vm.buffer -> i64
+    vm.return
+  }
+}

@@ -139,7 +139,7 @@ typedef enum {
   IREE_VM_OP_CORE_MaxI64U = 0x81,
   IREE_VM_OP_CORE_CastAnyRef = 0x82,
   IREE_VM_OP_CORE_BranchTable = 0x83,
-  IREE_VM_OP_CORE_RSV_0x84,
+  IREE_VM_OP_CORE_BufferHash = 0x84,
   IREE_VM_OP_CORE_RSV_0x85,
   IREE_VM_OP_CORE_RSV_0x86,
   IREE_VM_OP_CORE_RSV_0x87,
@@ -398,7 +398,7 @@ typedef enum {
     OPC(0x81, MaxI64U) \
     OPC(0x82, CastAnyRef) \
     OPC(0x83, BranchTable) \
-    RSV(0x84) \
+    OPC(0x84, BufferHash) \
     RSV(0x85) \
     RSV(0x86) \
     RSV(0x87) \

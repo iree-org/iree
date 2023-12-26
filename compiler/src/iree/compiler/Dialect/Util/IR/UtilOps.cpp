@@ -1506,6 +1506,25 @@ void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
   getLengthMutable().assign(operand.length);
 }
 
+SubrangeOperand BufferHashOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 0) {
+    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
+                           getLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void BufferHashOp::setSubrangeOperand(unsigned operandIndex,
+                                      SubrangeOperand operand) {
+  assert(operandIndex == 0 && "only source is a subrange");
+  getSourceMutable().assign(operand.resource);
+  getSourceSizeMutable().assign(operand.resourceSize);
+  getSourceOffsetMutable().assign(operand.offset);
+  getLengthMutable().assign(operand.length);
+}
+
 } // namespace mlir::iree_compiler::IREE::Util
 
 #define GET_OP_CLASSES

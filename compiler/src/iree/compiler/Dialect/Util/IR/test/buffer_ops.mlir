@@ -126,3 +126,14 @@ func.func @buffer_store(%arg0: !util.buffer, %arg1: index, %arg2: i32) {
   util.buffer.store %arg2, %arg0[%c100 for %c4] : i32 -> !util.buffer{%arg1}
   return
 }
+
+// -----
+
+// CHECK-LABEL: @buffer_hash
+func.func @buffer_hash(%arg0: !util.buffer, %arg1: index) -> i64 {
+  %c17 = arith.constant 17 : index
+  %c100 = arith.constant 100 : index
+  // CHECK: = util.buffer.hash %arg0[%c100 for %c17] : !util.buffer{%arg1} -> i64
+  %0 = util.buffer.hash %arg0[%c100 for %c17] : !util.buffer{%arg1} -> i64
+  return %0 : i64
+}

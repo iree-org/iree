@@ -4518,6 +4518,8 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                         DenseSet<size_t>({0}), true);
   ADD_CONTAINER_PATTERN(IREE::VM::BufferStoreI64Op, "vm_buffer_store_i64",
                         DenseSet<size_t>({0}), true);
+  ADD_CONTAINER_PATTERN(IREE::VM::BufferHashOp, "iree_vm_buffer_hash",
+                        DenseSet<size_t>({0}), true);
   ADD_CONTAINER_PATTERN(IREE::VM::ListReserveOp, "iree_vm_list_reserve",
                         DenseSet<size_t>({0}), true);
   ADD_CONTAINER_PATTERN(IREE::VM::ListResizeOp, "iree_vm_list_resize",

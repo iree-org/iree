@@ -199,6 +199,12 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
     iree_host_size_t target_offset, iree_host_size_t element_count,
     iree_host_size_t element_length);
 
+// Computes the SipHash-2-4 of the source buffer along the byte range starting
+// as |source_offset| of |length| bytes. Uses 128-bit key `0x00010203...0e0f`.
+IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
+    const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,
+    iree_host_size_t length, int64_t* result);
+
 // Low-level helper for accessing a typed view of a buffer for read access.
 // The calling function must be safe to return from. Assumes buffer is non-null.
 // Prefer iree_vm_buffer_read_elements for larger reads.

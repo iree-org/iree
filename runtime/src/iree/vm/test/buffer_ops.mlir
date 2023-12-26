@@ -680,4 +680,40 @@ vm.module @buffer_ops {
     vm.return
   }
 
+  //===--------------------------------------------------------------------===//
+  // Hash
+  //===--------------------------------------------------------------------===//
+
+  //vm.rodata private @test_hash_i8_data dense<[0x00, 0x01, 0x7F, 0x80, 0xFF]> : tensor<5xui8>
+  vm.rodata private @test_hash_i8_data dense<[0x00, 0x01, 0x02, 0x03, 0x04,
+                                              0x05, 0x06, 0x07, 0x08, 0x09,
+                                              0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+                                              0x0f, 0x10, 0x11, 0x12, 0x13,
+                                              0x14, 0x15, 0x16, 0x17, 0x18,
+                                              0x19, 0x1a, 0x1b, 0x1c, 0x1d,
+                                              0x1e, 0x1f]> : tensor<32xui8>
+
+  vm.export @test_hash
+  vm.func @test_hash() {
+    %c0 = vm.const.i64 0
+    %c5 = vm.const.i64 5
+    %c16 = vm.const.i64 16
+    %c25 = vm.const.i64 25
+    %c32 = vm.const.i64 32
+    %rodata = vm.const.ref.rodata @test_hash_i8_data : !vm.buffer
+    %h0 = vm.buffer.hash %rodata, %c0, %c5 : !vm.buffer -> i64
+    %e0 = vm.const.i64 0x18765564cd99a68d
+    vm.check.eq %h0, %e0, "0-4: 0x18765564cd99a68d" : i64
+    %h1 = vm.buffer.hash %rodata, %c0, %c16 : !vm.buffer -> i64
+    %e1 = vm.const.i64 0x3f2acc7f57c29bdb
+    vm.check.eq %h1, %e1, "0-15: 0x3f2acc7f57c29bdb" : i64
+    %h2 = vm.buffer.hash %rodata, %c0, %c25 : !vm.buffer -> i64
+    %e2 = vm.const.i64 0xbce192de8a85b8ea
+    vm.check.eq %h2, %e2, "0-24: 0xbce192de8a85b8ea" : i64
+    %h3 = vm.buffer.hash %rodata, %c0, %c32 : !vm.buffer -> i64
+    %e3 = vm.const.i64 0x7127512f72f27cce
+    vm.check.eq %h3, %e3, "0-31: 0x7127512f72f27cce" : i64
+    vm.return
+  }
+
 }
