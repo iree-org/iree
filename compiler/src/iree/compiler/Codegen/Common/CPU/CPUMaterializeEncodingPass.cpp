@@ -9,7 +9,8 @@
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -503,6 +504,25 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
         }
         return result;
       };
+}
+
+static FailureOr<MaterializeEncodingValueInfo>
+chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
+                                          OpBuilder &builder, Location loc) {
+  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
+  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
+      loc, resultTypes, TypeAttr::get(tensorType));
+  MaterializeEncodingValueInfo result;
+  result.innerTileSizes = op.getResults();
+  return result;
+}
+
+static MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
+    return chooseDynamicEncodingInfoVMVXMicrokernels;
+  }
+  return {};
 }
 
 void CPUMaterializeEncodingPass::runOnOperation() {

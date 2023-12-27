@@ -7,6 +7,7 @@
 #include <float.h>
 #include <stdio.h>
 
+#include "iree/hal/buffer_transfer.h"
 #include "iree/runtime/api.h"
 #include "iree/vm/bytecode/module.h"
 #include "mnist_bytecode.h"

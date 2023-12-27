@@ -20,6 +20,7 @@ iree_cc_library(
     torch-mlir::TorchConversionDialectIR
     torch-mlir::TorchDialectIR
     torch-mlir::TorchDialectPasses
+    torch-mlir::TorchOnnxToTorchPasses
     torch-mlir::ConversionPasses
     torch-mlir-dialects::TMTensorDialectIR
   PUBLIC

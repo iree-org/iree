@@ -31,7 +31,7 @@ hal.executable @matmul_4x4096x9216 {
         %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [9216, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<9216x4096xf32>> -> tensor<9216x4096xf32>
         %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4x4096xf32>> -> tensor<4x4096xf32>
         %8 = linalg.matmul ins(%4, %5 : tensor<4x9216xf32>, tensor<9216x4096xf32>) outs(%6 : tensor<4x4096xf32>) -> tensor<4x4096xf32>
-        flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [1, 4096], strides = [1, 1] : tensor<4x4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x4096xf32>>
+        flow.dispatch.tensor.store %8, %3, offsets = [0, 0], sizes = [4, 4096], strides = [1, 1] : tensor<4x4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x4096xf32>>
         return
       }
     }

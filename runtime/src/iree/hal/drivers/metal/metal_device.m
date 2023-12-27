@@ -17,7 +17,6 @@
 #include "iree/hal/drivers/metal/pipeline_layout.h"
 #include "iree/hal/drivers/metal/shared_event.h"
 #include "iree/hal/drivers/metal/staging_buffer.h"
-#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
 #include "iree/hal/utils/resource_set.h"
@@ -563,7 +562,6 @@ static const iree_hal_device_vtable_t iree_hal_metal_device_vtable = {
     .create_pipeline_layout = iree_hal_metal_device_create_pipeline_layout,
     .create_semaphore = iree_hal_metal_device_create_semaphore,
     .query_semaphore_compatibility = iree_hal_metal_device_query_semaphore_compatibility,
-    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_alloca = iree_hal_metal_device_queue_alloca,
     .queue_dealloca = iree_hal_metal_device_queue_dealloca,
     .queue_read = iree_hal_metal_device_queue_read,

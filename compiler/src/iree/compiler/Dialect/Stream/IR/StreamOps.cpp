@@ -2858,7 +2858,45 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
       return failure();
     }
 
-    // TODO(benvanik): verify that the target function has matching operands.
+    // Verify that the exported function, if present, matches the signature of
+    // the dispatch.
+    auto funcOp = exportOp.lookupFunctionRef();
+    if (!funcOp) {
+      return success();
+    }
+
+    TypeRange uniformTypes = getUniformOperands().getTypes();
+    int64_t numResources = getResources().size();
+
+    auto entryPointType = funcOp.getFunctionType();
+    SmallVector<Type> uniformEntryPointTypes;
+    int64_t bindingCounts = 0;
+    for (auto entryPointArg : entryPointType.getInputs()) {
+      if (isa<IREE::Stream::BindingType>(entryPointArg)) {
+        bindingCounts++;
+      } else {
+        uniformEntryPointTypes.push_back(entryPointArg);
+      }
+    }
+    if (uniformTypes.size() != uniformEntryPointTypes.size()) {
+      return emitOpError("function type mismatch; expected ")
+             << uniformTypes.size()
+             << " uniform arguments on exported function, but has "
+             << uniformEntryPointTypes.size();
+    }
+    if (numResources != bindingCounts) {
+      return emitOpError("function type mismatch; expected ")
+             << numResources
+             << " binding arguments on exported function, but has "
+             << bindingCounts;
+    }
+    for (auto [expectedType, actualType] :
+         llvm::zip_equal(uniformTypes, uniformEntryPointTypes)) {
+      if (expectedType != actualType) {
+        return emitOpError("uniform dispatch argument type mismatch: expected ")
+               << expectedType << " but got " << actualType;
+      }
+    }
   }
   return success();
 }
@@ -3713,6 +3751,59 @@ LogicalResult BindingSubspanOp::verify() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.dispatch.workgroup.*
+//===----------------------------------------------------------------------===//
+
+static void getAsmResultNamesForDispatchWorkgroupInfoOp(
+    StringRef prefix, const APInt &dimension, Value result,
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result, (prefix + std::to_string(dimension.getZExtValue())).str());
+}
+
+static LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op,
+                                                   uint64_t dimension) {
+  if (dimension < 0 || dimension >= 3) {
+    return op->emitOpError()
+           << "dimension " << dimension
+           << " out of bounds of dispatch dimensions; expected [0, 3)";
+  }
+  return success();
+}
+
+void DispatchWorkgroupIDOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_id_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupIDOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp(
+      "workgroup_count_", getDimension(), getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupCountOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_size_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupSizeOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
 }
 
 //===----------------------------------------------------------------------===//

@@ -236,8 +236,7 @@ public:
 
 } // namespace mlir::iree_compiler
 
-namespace llvm {
-namespace cl {
+namespace llvm::cl {
 
 struct ByteSize {
   int64_t value = 0;
@@ -276,7 +275,6 @@ public:
   void anchor() override;
 };
 
-} // namespace cl
-} // namespace llvm
+} // namespace llvm::cl
 
 #endif // IREE_COMPILER_UTILS_FLAG_UTILS_H

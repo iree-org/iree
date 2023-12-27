@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// SPIRV passes (keep alphabetical)
+// SPIR-V passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
@@ -131,6 +131,16 @@ def SPIRVTileToCooperativeOps : Pass<
                 "cooperative ops";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
+}
+
+def SPIRVTrimExecutableTargetEnv :
+    Pass<"iree-spirv-trim-executable-target-env",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Trim the SPIR-V target environment of a HAL executable "
+                "variant to the minimal requirement per the compiled "
+                "spirv.module op needs";
+  let constructor =
+    "mlir::iree_compiler::createSPIRVTrimExecutableTargetEnvPass()";
 }
 
 def SPIRVVectorizeLoadStore :

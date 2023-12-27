@@ -54,7 +54,7 @@ hal.executable private @simple_reduce  {
 //   CHECK-DAG:     %[[E:.*]] = vector.extractelement %[[V0]][%[[C0]] : index] : vector<1xf32>
 //   CHECK-DAG:     %[[ID:.*]] = affine.apply
 //   CHECK-DAG:     %[[V1:.*]] = vector.transfer_read %{{.*}}[%{{.*}}, %[[ID]]], %{{.*}} {in_bounds = [true]} : memref<128x384xf32>, vector<1xf32>
-//       CHECK:     %[[S:.*]] = vector.reduction <add>, %[[V1]] : vector<1xf32> into f32
+//       CHECK:     %[[S:.*]] = vector.extract %[[V1]][0] : f32 from vector<1xf32>
 //       CHECK:     %[[S0:.*]], %{{.*}} = gpu.shuffle  xor %[[S]], %[[C1]], %[[C32]] : f32
 //       CHECK:     %[[S1:.*]] = arith.addf %[[S]], %[[S0]] : f32
 //       CHECK:     %[[S2:.*]], %{{.*}} = gpu.shuffle  xor %[[S1]], %[[C2]], %[[C32]] : f32
@@ -141,8 +141,8 @@ hal.executable private @reduce_uniform_buffer_offset  {
 //         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-//         CHECK:     vector.reduction
 // CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
 // -----
@@ -210,8 +210,8 @@ hal.executable private @reduce_storage_buffer_offset  {
 //         CHECK:   hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%[[OFFSET0]])
 //         CHECK:   hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%[[OFFSET1]])
 //         CHECK:   scf.for
-//         CHECK:     vector.reduction
 // CHECK-COUNT-5:     gpu.shuffle
+//         CHECK:     arith.addf
 //         CHECK:     scf.yield
 
 // -----
@@ -257,3 +257,67 @@ hal.executable private @shared_memory_copy  {
 //       CHECK:   vector.transfer_read %[[ALLOC]]{{.*}} : memref<32xf32, #gpu.address_space<workgroup>>, vector<1xf32>
 //       CHECK:   vector.transfer_write {{.*}} : vector<1xf32>, memref<128x32xf32>
 //       CHECK:   return
+
+// -----
+
+// Check that we multi-row matvec gets distributed across subgroup threads.
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @multirow  {
+  hal.executable.variant @rocm target(#executable_target_rocm_hsaco_fb) {
+    hal.executable.export @multirow layout(#pipeline_layout) attributes {
+      workgroup_size = [64 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @multirow() {
+        %cst = arith.constant dense<0.000000e+00> : vector<4x512xf16>
+        %c0 = arith.constant 0 : index
+        %cst_0 = arith.constant dense<0.000000e+00> : vector<1x4xf16>
+        %c4096 = arith.constant 4096 : index
+        %c512 = arith.constant 512 : index
+        %cst_1 = arith.constant 0.000000e+00 : f16
+        %id = gpu.thread_id  x
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>
+        memref.assume_alignment %0, 64 : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>
+        memref.assume_alignment %1, 64 : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+        memref.assume_alignment %2, 64 : memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_x]
+        %4 = scf.for %arg0 = %c0 to %c4096 step %c512 iter_args(%arg1 = %cst) -> (vector<4x512xf16>) {
+          %8 = vector.transfer_read %0[%c0, %arg0], %cst_1 {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (0, d1)>} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x512xf16>
+          %9 = vector.transfer_read %1[%3, %arg0], %cst_1 {in_bounds = [true, true]} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x512xf16>
+          %10 = arith.mulf %8, %9 : vector<4x512xf16>
+          %11 = arith.addf %arg1, %10 : vector<4x512xf16>
+          scf.yield %11 : vector<4x512xf16>
+        }
+        %5 = vector.broadcast %4 : vector<4x512xf16> to vector<1x4x512xf16>
+        %6 = vector.multi_reduction <add>, %5, %cst_0 [2] : vector<1x4x512xf16> to vector<1x4xf16>
+        %7 = vector.extract %6[0] : vector<4xf16> from vector<1x4xf16>
+        vector.transfer_write %7, %2[%c0, %3] {in_bounds = [true]} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+        return
+      }
+    }
+  }
+}
+
+// CHECK-LABEL: func.func @multirow() {
+//       CHECK:   scf.for {{.*}} -> (vector<4x8xf16>) {
+//       CHECK:     vector.transfer_read {{.*}} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
+//       CHECK:     vector.transfer_read {{.*}} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
+//       CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<4x8xf16>
+//       CHECK:     arith.addf %{{.*}}, %{{.*}} : vector<4x8xf16>
+//       CHECK:   }
+// CHECK-COUNT-12: gpu.shuffle xor
+//       CHECK:   scf.if {{.*}} {
+//       CHECK:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+//       CHECK:   }
+//  CHECK-NEXT:   return

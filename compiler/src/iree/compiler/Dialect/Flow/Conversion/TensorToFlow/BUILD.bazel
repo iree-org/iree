@@ -25,6 +25,7 @@ iree_compiler_cc_library(
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:FuncDialect",

@@ -15,6 +15,15 @@ iree_py_test(
 )
 endif()  # IREE_BUILD_BUNDLED_LLVM
 
+if(IREE_INPUT_TORCH)
+  iree_py_test(
+    NAME
+      import_onnx_test
+    SRCS
+      "import_onnx_test.py"
+  )
+endif()
+
 iree_py_test(
   NAME
     ir_tool_test

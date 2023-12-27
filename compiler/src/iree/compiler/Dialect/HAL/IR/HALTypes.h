@@ -125,6 +125,12 @@ struct DeviceType
   using Base::Base;
 
   static constexpr StringLiteral name = "hal.device";
+
+  // Resolves to any device at runtime.
+  // This is unlikely to be what any particular caller wants and should be
+  // avoided outside of testing/debugging passes that don't care about
+  // multi-targeting.
+  static Value resolveAny(Location loc, OpBuilder &builder);
 };
 
 struct EventType : public Type::TypeBase<EventType, Type, TypeStorage> {

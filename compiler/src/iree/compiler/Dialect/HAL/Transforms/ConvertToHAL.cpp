@@ -34,32 +34,18 @@
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_CONVERTTOHALPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
 namespace {
 
-// A pass converting the IREE flow dialect into the IREE HAL dialect.
-class ConvertToHALPass
-    : public PassWrapper<ConvertToHALPass, OperationPass<ModuleOp>> {
-public:
-  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertToHALPass)
+//===----------------------------------------------------------------------===//
+// --iree-hal-conversion
+//===----------------------------------------------------------------------===//
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::scf::SCFDialect>();
-    registry.insert<IREE::HAL::HALDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-
-    // TODO(benvanik): add a registration system for extra dialects?
-    registry.insert<IREE::IO::Parameters::IOParametersDialect>();
-  }
-
-  StringRef getArgument() const override { return "iree-hal-conversion"; }
-
-  StringRef getDescription() const override {
-    return "Convert input stream/std/etc dialects to the IREE HAL dialect.";
-  }
-
+struct ConvertToHALPass
+    : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
   void runOnOperation() override {
     auto *context = &getContext();
 
@@ -105,11 +91,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<ModuleOp>> createConvertToHALPass() {
-  return std::make_unique<ConvertToHALPass>();
-}
-
-static PassRegistration<ConvertToHALPass> pass;
 
 } // namespace mlir::iree_compiler::IREE::HAL

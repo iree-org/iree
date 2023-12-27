@@ -345,6 +345,8 @@ def VM_AnyType : AnyTypeOf<[
   VM_AnyRef,
 ]>;
 
+def VM_AnyIntegerType : AnyIntOfWidths<[32, 64]>;
+
 def VM_PrimitiveType : AnyTypeOf<[
   AnyIntOfWidths<[8, 16, 32, 64]>,
   FloatOfWidths<[16, 32, 64]>,

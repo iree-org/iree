@@ -9,35 +9,6 @@
 #if defined(IREE_PLATFORM_WINDOWS)
 
 //==============================================================================
-// Memory subsystem information and control
-//==============================================================================
-
-void iree_memory_query_info(iree_memory_info_t* out_info) {
-  memset(out_info, 0, sizeof(*out_info));
-
-  SYSTEM_INFO system_info;
-  GetSystemInfo(&system_info);
-  out_info->normal_page_size = system_info.dwPageSize;
-  out_info->normal_page_granularity = system_info.dwAllocationGranularity;
-
-  out_info->large_page_granularity = GetLargePageMinimum();
-
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
-  out_info->can_allocate_executable_pages = true;
-#else
-  // The application can define the `codeGeneration` property to enable use of
-  // PAGE_EXECUTE but cannot use PAGE_EXECUTE_READWRITE - it's still possible to
-  // make that work but it requires aliasing views (one with READWRITE and one
-  // with EXECUTE) and I'm not sure if anyone will ever care.
-  out_info->can_allocate_executable_pages = false;
-#endif  // WINAPI_PARTITION_DESKTOP
-}
-
-void iree_memory_jit_context_begin(void) {}
-
-void iree_memory_jit_context_end(void) {}
-
-//==============================================================================
 // Virtual address space manipulation
 //==============================================================================
 
@@ -139,11 +110,6 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-void iree_memory_view_flush_icache(void* base_address,
-                                   iree_host_size_t length) {
-  FlushInstructionCache(GetCurrentProcess(), base_address, length);
 }
 
 #endif  // IREE_PLATFORM_WINDOWS

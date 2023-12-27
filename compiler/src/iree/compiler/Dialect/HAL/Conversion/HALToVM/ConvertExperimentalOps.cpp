@@ -14,8 +14,6 @@ void populateHALExperimentalToVMPatterns(MLIRContext *context,
                                          SymbolTable &importSymbols,
                                          TypeConverter &typeConverter,
                                          RewritePatternSet &patterns) {
-  patterns.insert<VMImportOpConversion<IREE::HAL::ExSharedDeviceOp>>(
-      context, importSymbols, typeConverter, "hal.ex.shared_device");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExFileFromMemoryOp>>(
       context, importSymbols, typeConverter, "hal.ex.file.from_memory");
 }

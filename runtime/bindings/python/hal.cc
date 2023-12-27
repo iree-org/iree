@@ -768,10 +768,12 @@ HalDevice HalDriver::CreateDeviceByURI(std::string& device_uri,
 // HAL module
 //------------------------------------------------------------------------------
 
+// TODO(multi-device): allow for multiple devices to be passed in.
 VmModule CreateHalModule(VmInstance* instance, HalDevice* device) {
+  iree_hal_device_t* device_ptr = device->raw_ptr();
   iree_vm_module_t* module = NULL;
-  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), device->raw_ptr(),
-                                        IREE_HAL_MODULE_FLAG_NONE,
+  CheckApiStatus(iree_hal_module_create(instance->raw_ptr(), /*device_count=*/1,
+                                        &device_ptr, IREE_HAL_MODULE_FLAG_NONE,
                                         iree_allocator_system(), &module),
                  "Error creating hal module");
   return VmModule::StealFromRawPtr(module);

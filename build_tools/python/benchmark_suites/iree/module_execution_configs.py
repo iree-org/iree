@@ -109,14 +109,3 @@ def get_elf_system_scheduling_local_task_config(thread_num: int):
         driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
         extra_flags=[f"--task_topology_group_count={thread_num}"],
     )
-
-
-def get_vmvx_system_scheduling_local_task_config(thread_num: int):
-    config_id = f"{unique_ids.IREE_MODULE_EXECUTION_CONFIG_VMVX_SYS_SCHED_LOCAL_TASK_BASE}-{thread_num}"
-    return _with_caching_allocator(
-        id=config_id,
-        tags=[f"{thread_num}-thread", "full-inference", "system-scheduling"],
-        loader=iree_definitions.RuntimeLoader.VMVX_MODULE,
-        driver=iree_definitions.RuntimeDriver.LOCAL_TASK,
-        extra_flags=[f"--task_topology_group_count={thread_num}"],
-    )

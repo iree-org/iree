@@ -614,6 +614,7 @@ IREE_VM_ABI_VLA_STRUCT(iCrD, a1_count, a1, {
 //===----------------------------------------------------------------------===//
 
 IREE_VM_ABI_DECLARE_SHIM(irIi, v);
+IREE_VM_ABI_DECLARE_SHIM(i, r);
 IREE_VM_ABI_DECLARE_SHIM(r, i);
 IREE_VM_ABI_DECLARE_SHIM(r, I);
 IREE_VM_ABI_DECLARE_SHIM(r, ii);

@@ -168,7 +168,7 @@ static iree_status_t iree_elf_module_parse_headers(
 
   // Query the host memory information that we can use to verify we are able to
   // meet the alignment requirements of the ELF.
-  iree_memory_query_info(&out_load_state->memory_info);
+  out_load_state->memory_info = iree_memory_query_info();
 
   // Verify the ELF is an ELF and that it's for the current machine.
   // NOTE: this only verifies the ehdr is as expected and nothing else: the ELF
@@ -324,8 +324,8 @@ static iree_status_t iree_elf_module_protect_segments(
 
     // Flush the instruction cache if we are going to execute these pages.
     if (access & IREE_MEMORY_ACCESS_EXECUTE) {
-      iree_memory_view_flush_icache(module->vaddr_bias + phdr->p_vaddr,
-                                    phdr->p_memsz);
+      iree_memory_flush_icache(module->vaddr_bias + phdr->p_vaddr,
+                               phdr->p_memsz);
     }
   }
 

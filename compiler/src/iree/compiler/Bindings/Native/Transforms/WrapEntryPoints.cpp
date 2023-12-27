@@ -130,8 +130,12 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     // HACK: this is relying on the fact that there's only one HAL device.
     // We should instead have a way of creating fences on the device that
     // is used to produce the tensors we're wrapping.
-    auto device =
-        entryBuilder.create<IREE::HAL::ExSharedDeviceOp>(importOp.getLoc());
+    //
+    // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
+    // could always say device 0 for now but could instead look for an
+    // iree.abi.affinity/iree.abi.device/etc.
+    Value device =
+        IREE::HAL::DeviceType::resolveAny(importOp.getLoc(), entryBuilder);
 
     // When exporting a fence we need to put a barrier between the rest of the
     // program and the tensors consumed by the import.

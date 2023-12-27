@@ -6,8 +6,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -173,12 +173,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
                                      /*enablePeeling=*/false,
                                      enableVectorMasking, lowerToAVX2);
-    break;
-  }
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert: {
-    TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addDoubleTilingPadExpertPassPipeline(pipeline, tilingConfig,
-                                         enableVectorMasking);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::

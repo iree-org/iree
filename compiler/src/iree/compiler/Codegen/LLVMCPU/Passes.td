@@ -25,7 +25,7 @@ def ConvertToLLVM :
   ];
 }
 
-def ExpandArithF16ToF32 :
+def ExpandF16OpToF32 :
     Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
   let summary =
       "Preform f16 opertaions by expanding them to f32.";

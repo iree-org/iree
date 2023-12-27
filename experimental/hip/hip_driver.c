@@ -9,6 +9,7 @@
 
 #include "experimental/hip/api.h"
 #include "experimental/hip/dynamic_symbols.h"
+#include "experimental/hip/hip_device.h"
 #include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/assert.h"
@@ -34,6 +35,9 @@ typedef struct iree_hal_hip_driver_t {
   // HIP driver API dynamic symbols to interact with the HIP system.
   iree_hal_hip_dynamic_symbols_t hip_symbols;
 
+  // The default parameters for creating devices using this driver.
+  iree_hal_hip_device_params_t device_params;
+
   // The index of the default HIP device to use if multiple ones are available.
   int default_device_index;
 } iree_hal_hip_driver_t;
@@ -55,6 +59,7 @@ IREE_API_EXPORT void iree_hal_hip_driver_options_initialize(
 
 static iree_status_t iree_hal_hip_driver_create_internal(
     iree_string_view_t identifier, const iree_hal_hip_driver_options_t* options,
+    const iree_hal_hip_device_params_t* device_params,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   iree_hal_hip_driver_t* driver = NULL;
   iree_host_size_t total_size = iree_sizeof_struct(*driver) + identifier.size;
@@ -71,6 +76,8 @@ static iree_status_t iree_hal_hip_driver_create_internal(
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
       host_allocator, &driver->hip_symbols);
 
+  memcpy(&driver->device_params, device_params, sizeof(driver->device_params));
+
   if (iree_status_is_ok(status)) {
     *out_driver = (iree_hal_driver_t*)driver;
   } else {
@@ -81,13 +88,15 @@ static iree_status_t iree_hal_hip_driver_create_internal(
 
 IREE_API_EXPORT iree_status_t iree_hal_hip_driver_create(
     iree_string_view_t identifier, const iree_hal_hip_driver_options_t* options,
+    const iree_hal_hip_device_params_t* device_params,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(options);
+  IREE_ASSERT_ARGUMENT(device_params);
   IREE_ASSERT_ARGUMENT(out_driver);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_hip_driver_create_internal(
-      identifier, options, host_allocator, out_driver);
+      identifier, options, device_params, host_allocator, out_driver);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -315,7 +324,6 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
     iree_host_size_t param_count, const iree_string_pair_t* params,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
-  IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(out_device);
 
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
@@ -335,10 +343,16 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   } else {
     device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
   }
-  (void)device;
+
+  iree_string_view_t device_name = iree_make_cstring_view("hip");
+
+  // Attempt to create the device now.
+  iree_status_t status = iree_hal_hip_device_create(
+      base_driver, device_name, &driver->device_params, &driver->hip_symbols,
+      device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_status_from_code(IREE_STATUS_UNIMPLEMENTED);
+  return status;
 }
 
 static iree_status_t iree_hal_hip_driver_create_device_by_uuid(
@@ -437,7 +451,6 @@ static iree_status_t iree_hal_hip_driver_create_device_by_path(
     const iree_string_pair_t* params, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(base_driver);
-  IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(out_device);
 
   if (iree_string_view_is_empty(device_path)) {

@@ -20,3 +20,19 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 // CHECK-SAME:         sourceLayout = #[[LAYOUT1]]
 
 // -----
+
+func.func @to_simd_op(%simt: vector<4x4x4xf16>) -> vector<64x64xf16> {
+  %simd = iree_vector_ext.to_simd %simt : vector<4x4x4xf16> -> vector<64x64xf16>
+  func.return %simd : vector<64x64xf16>
+}
+// CHECK-LABEL: func.func @to_simd_op
+// CHECK:      iree_vector_ext.to_simd
+
+// -----
+
+func.func @to_simt_op(%simd: vector<64x64xf32>) -> vector<4x4x4xf32> {
+  %simt = iree_vector_ext.to_simd %simd : vector<64x64xf32> -> vector<4x4x4xf32>
+  func.return %simt : vector<4x4x4xf32>
+}
+// CHECK-LABEL: func.func @to_simt_op
+// CHECK:      iree_vector_ext.to_simd

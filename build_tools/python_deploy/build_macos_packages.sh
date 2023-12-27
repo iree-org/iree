@@ -29,9 +29,6 @@ packages="${packages:-iree-runtime iree-compiler}"
 # Python distributed is built at.
 export MACOSX_DEPLOYMENT_TARGET=13.0
 
-# cpuinfo is incompatible with universal builds.
-export IREE_ENABLE_CPUINFO=OFF
-
 # Canonicalize paths.
 mkdir -p "$output_dir"
 output_dir="$(cd $output_dir && pwd)"

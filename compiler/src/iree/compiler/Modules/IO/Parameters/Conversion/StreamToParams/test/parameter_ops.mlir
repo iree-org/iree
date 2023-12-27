@@ -7,7 +7,7 @@ func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
   %c101 = arith.constant 101 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: %[[BUFFERS:.+]]:2 = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -30,7 +30,7 @@ func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant
 func.func @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: %[[BUFFER:.+]] = io_parameters.load<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -53,7 +53,7 @@ func.func @parameterRead(%wait: !stream.timepoint, %target: !stream.resource<tra
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: io_parameters.gather<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -73,7 +73,7 @@ func.func @parameterWrite(%wait: !stream.timepoint, %source: !stream.resource<tr
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: io_parameters.scatter<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -99,7 +99,7 @@ func.func @parameterGather(%wait: !stream.timepoint, %target: !stream.resource<t
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
   %c300 = arith.constant 300 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: io_parameters.gather<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -128,7 +128,7 @@ func.func @parameterGatherNoScope(%wait: !stream.timepoint, %target: !stream.res
   %c200 = arith.constant 200 : index
   %c201 = arith.constant 201 : index
   %c300 = arith.constant 300 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: io_parameters.gather<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])
@@ -158,7 +158,7 @@ func.func @parameterScatter(%wait: !stream.timepoint, %source: !stream.resource<
   %c201 = arith.constant 201 : index
   %c202 = arith.constant 202 : index
   %c300 = arith.constant 300 : index
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   // CHECK-DAG: %[[SIGNAL:.+]] = hal.fence.create device(%[[DEVICE]] : !hal.device)
   // CHECK: io_parameters.scatter<%[[DEVICE]] : !hal.device> affinity(%[[AFFINITY]])

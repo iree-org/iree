@@ -25,7 +25,7 @@ static llvm::cl::opt<std::string> clBitcodeFiles(
 bool anyRequiredSymbols(const llvm::Module &module, StringRef prefix) {
   for (const auto &function : module.functions()) {
     if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().startswith(prefix))) {
+        (function.getName().starts_with(prefix))) {
       return true;
     }
   }

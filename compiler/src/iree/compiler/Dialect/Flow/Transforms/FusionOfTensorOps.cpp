@@ -360,7 +360,7 @@ struct FusionOfTensorOpsPass
             }
 
             // Do not fuse by expand if consumer is dequant.
-            if (isGroupedDequantizationOp(consumer)) {
+            if (isDequantizationLikeOp(consumer)) {
               return false;
             }
 

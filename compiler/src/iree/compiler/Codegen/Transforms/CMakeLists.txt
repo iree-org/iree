@@ -20,6 +20,7 @@ iree_cc_library(
     "RemoveSingleIterationLoop.cpp"
     "Transforms.cpp"
   DEPS
+    IREELinalgExtTransforms
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -31,15 +32,15 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRPass
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::VMVX::IR
   PUBLIC
 )
 
