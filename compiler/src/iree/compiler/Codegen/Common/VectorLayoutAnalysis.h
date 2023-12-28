@@ -126,6 +126,12 @@ public:
     return cast<T>(layout);
   }
 
+  void print(raw_ostream &os);
+  void dump() {
+    print(llvm::errs());
+    llvm::errs() << "\n";
+  };
+
 private:
   VectorLayoutInterface getLayout(Value val);
 

@@ -925,3 +925,33 @@ VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
   }
   return layout->getLayout();
 }
+
+void VectorLayoutAnalysis::print(raw_ostream &os) {
+  // Annotate each operation with the layout of it's result.
+  root->walk([&](Operation *op) {
+    if (op->getNumResults() == 0) {
+      return;
+    }
+
+    for (auto [index, result] : llvm::enumerate(op->getResults())) {
+      if (!isa<VectorType>(result.getType())) {
+        continue;
+      }
+
+      // Do not annotate resolve_conflict operations since they already have
+      // this information in their attributes.
+      if (isa<IREE::VectorExt::LayoutConflictResolutionOp>(op)) {
+        continue;
+      }
+
+      Attribute layout = getLayout<Attribute>(result);
+      if (!layout) {
+        continue;
+      }
+
+      op->setAttr("layout_result_" + std::to_string(index), layout);
+    }
+  });
+
+  root->dump();
+}
