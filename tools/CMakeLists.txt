@@ -346,18 +346,23 @@ if(IREE_BUILD_COMPILER)
     INSTALL_COMPONENT IREETools-Compiler
   )
 
-  iree_cc_binary(
-    NAME
-      iree-lld
-    SRCS
-      "iree-lld-main.cc"
-    DEPS
-      iree::compiler::bindings::c::headers
-      iree::compiler::API::Impl
-    HOSTONLY
-    SETUP_INSTALL_RPATH
-    INSTALL_COMPONENT IREETools-Compiler
-  )
+  # Only build IREE's busybox lld if the backing LLVM has LLD enabled.
+  # Otherwise, it will build but fail at runtime saying that it is not
+  # supported, and this fouls up tools search heuristics.
+  if(IREE_LLD_TARGET)
+    iree_cc_binary(
+      NAME
+        iree-lld
+      SRCS
+        "iree-lld-main.cc"
+      DEPS
+        iree::compiler::bindings::c::headers
+        iree::compiler::API::Impl
+      HOSTONLY
+      SETUP_INSTALL_RPATH
+      INSTALL_COMPONENT IREETools-Compiler
+    )
+  endif()
 
   iree_cc_binary(
     NAME
