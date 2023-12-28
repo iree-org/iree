@@ -260,6 +260,16 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-tracy-print
+  SRCS
+    "iree-tracy-print.cc"
+  DEPS
+    iree::base::internal::flags
+    tracy::worker
+)
+
+iree_cc_binary(
+  NAME
     iree-e2e-matmul-test
   SRCS
     "iree-e2e-matmul-test.c"

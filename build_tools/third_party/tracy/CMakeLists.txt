@@ -149,6 +149,24 @@ target_link_libraries(IREETracyServer
     IREETracyCommon
 )
 
+external_cc_library(
+  PACKAGE
+    tracy
+  NAME
+    worker
+  ROOT
+    "${IREE_ROOT_DIR}/third_party/tracy/server"
+  HDRS
+    "TracyFileRead.hpp"
+    "TracyFileWrite.hpp"
+    "TracyWorker.hpp"
+  INCLUDES
+    "${IREE_ROOT_DIR}/third_party/tracy/server"
+  DEPS
+    IREETracyCommon
+    IREETracyServer
+)
+
 #-------------------------------------------------------------------------------
 # Standalone capture server
 #-------------------------------------------------------------------------------
