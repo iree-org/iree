@@ -1,14 +1,17 @@
-// RUN: iree-opt -iree-transform-dialect-interpreter --split-input-file %s --verify-diagnostics
+// RUN: iree-opt -iree-transform-dialect-interpreter --split-input-file --cse %s | FileCheck %s
 
-#layout = #iree_vector_ext.layout<<[VECTORY], [16]>, <[VECTORX], [16]>>
+#layout = #iree_vector_ext.layout<<[VECTORY, LANEY], [4, 4]>, <[VECTORX, LANEX], [4, 4]>>
 
-// Propagate the layout from transfer_read to everyone.
 builtin.module attributes { transform.with_named_sequence } {
-  func.func @propagate_simple(%arr: memref<16x16xf16>, %a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
+  // CHECK-LABEL: @distribute_elementwise
+  func.func @distribute_elementwise(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant 0.0 : f16
-    %root = arith.constant 0.0 : vector<16x16xf16>
+    // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<4x4xf16>
+    %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0.0> : vector<16x16xf16>
+    // CHECK: %[[C:.*]] = arith.mulf %{{.*}}, %{{.*}} : vector<4x4xf16>
     %c = arith.mulf %root, %b : vector<16x16xf16>
+    // CHECK: %[[D:.*]] = arith.addf %{{.*}}, %{{.*}} : vector<4x4xf16>
     %d = arith.addf %c, %a : vector<16x16xf16>
     func.return %d : vector<16x16xf16>
   }
