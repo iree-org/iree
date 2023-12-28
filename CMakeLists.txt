@@ -957,6 +957,11 @@ endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS Vulkan-Headers
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
