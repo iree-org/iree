@@ -7,8 +7,8 @@
 #ifndef IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_
 #define IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.h"
 #include "mlir/Bytecode/BytecodeImplementation.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Attributes.h"
