@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "mlir/Bytecode/BytecodeImplementation.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/IR/Attributes.h"
@@ -16,18 +17,6 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
-
-// clang-format off
-
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.h.inc" // IWYU pragma: export
-
-#define GET_ATTRDEF_CLASSES
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.h.inc" // IWYU pragma: export
-
-#define GET_OP_CLASSES
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h.inc" // IWYU pragma: export
-
-// clang-format on
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 

@@ -11,7 +11,9 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/GPU/VectorLayoutProvider.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
@@ -929,8 +931,8 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                       func::FuncOp funcOp) {
-  funcOp.walk([&](Operation *op) {
+                                       Operation *root) {
+  root->walk([&](Operation *op) {
     for (NamedAttribute attr : op->getAttrs()) {
       StringRef name = attr.getName().strref();
       if (name.find("__vector_layout_test_anchor_operand_") !=
@@ -992,6 +994,46 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
 }
 
 void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// TestGpuVectorDistribution
+//===----------------------------------------------------------------------===//
+
+class TestLayoutProvider : public HigherDimLayoutProvider {
+public:
+  TestLayoutProvider(VectorLayoutAnalysis &analysis, Operation *root)
+      : HigherDimLayoutProvider(analysis, root) {}
+
+  virtual SmallVector<Value> getThreadGrid(RewriterBase &rewriter) override {
+    return {
+        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::x),
+        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::y),
+        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::z),
+    };
+  }
+
+  virtual void setAnchorOps() override {
+    setAnchorOpsFromAttributes(analysis, root);
+  }
+};
+
+DiagnosedSilenceableFailure
+transform_dialect::TestGpuVectorDistribution::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  VectorLayoutAnalysis analysis(target);
+  TestLayoutProvider layoutProvider(analysis, target);
+  VectorDistribution distribution(target, analysis, &layoutProvider);
+  distribution.distribute();
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestGpuVectorDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

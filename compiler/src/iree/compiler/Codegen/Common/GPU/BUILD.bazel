@@ -59,14 +59,18 @@ iree_compiler_cc_library(
         "GPUTensorAlloc.cpp",
         "GPUTensorTile.cpp",
         "GPUTileReduction.cpp",
+        "GPUVectorDistribution.cpp",
         "Passes.cpp",
+        "VectorLayoutProvider.cpp",
         "VectorReductionToGPU.cpp",
         "WorkGroupSwizzle.cpp",
         "WorkgroupSpecializationPass.cpp",
     ],
     hdrs = [
         "GPUPatterns.h",
+        "GPUVectorDistribution.h",
         "Passes.h",
+        "VectorLayoutProvider.h",
     ],
     deps = [
         ":PassHeaders",

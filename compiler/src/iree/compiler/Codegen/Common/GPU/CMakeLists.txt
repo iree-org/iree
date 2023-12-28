@@ -44,7 +44,9 @@ iree_cc_library(
     CommonGPUPasses
   HDRS
     "GPUPatterns.h"
+    "GPUVectorDistribution.h"
     "Passes.h"
+    "VectorLayoutProvider.h"
   SRCS
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
@@ -57,7 +59,9 @@ iree_cc_library(
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTileReduction.cpp"
+    "GPUVectorDistribution.cpp"
     "Passes.cpp"
+    "VectorLayoutProvider.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"
     "WorkgroupSpecializationPass.cpp"
