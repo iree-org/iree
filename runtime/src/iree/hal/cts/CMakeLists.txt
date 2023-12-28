@@ -62,6 +62,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -74,6 +75,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -86,6 +88,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -98,6 +101,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -110,6 +114,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -122,6 +127,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -134,6 +140,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -146,6 +153,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -158,6 +166,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -170,6 +179,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -182,6 +192,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -194,6 +205,7 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )
 
 iree_cc_library(
@@ -206,4 +218,5 @@ iree_cc_library(
     iree::base
     iree::hal
     iree::testing::gtest
+  TESTONLY
 )

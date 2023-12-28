@@ -116,7 +116,7 @@ function(flatbuffer_c_library)
   add_dependencies(${_NAME} ${_GEN_TARGET})
   target_include_directories(${_NAME} SYSTEM
     INTERFACE
-      ${CMAKE_CURRENT_BINARY_DIR}
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     )
   target_link_libraries(${_NAME}
     INTERFACE
@@ -127,10 +127,13 @@ function(flatbuffer_c_library)
       "-I${IREE_ROOT_DIR}/third_party/flatcc/include/"
       "-I${IREE_ROOT_DIR}/third_party/flatcc/include/flatcc/reflection/"
   )
-
+  iree_install_targets(
+    TARGETS ${_NAME}
+  )
+  
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
   iree_package_ns(_PACKAGE_NS)
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 endfunction()

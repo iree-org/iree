@@ -76,7 +76,6 @@ BUILD_REQUIREMENTS_TXT = os.path.join(
 )
 CI_REQUIREMENTS_TXT = os.path.join(THIS_DIR, "ci_requirements.txt")
 CONFIGURE_BAZEL_PY = os.path.join(IREESRC_DIR, "configure_bazel.py")
-INSTALL_TARGET = "install" if platform.system() == "Windows" else "install/strip"
 
 
 # Load version info.
@@ -147,6 +146,9 @@ def build_main_dist():
             f"-DIREE_BUILD_COMPILER=ON",
             f"-DIREE_BUILD_PYTHON_BINDINGS=OFF",
             f"-DIREE_BUILD_SAMPLES=OFF",
+            # cpuinfo is set to be removed and is problematic from an 
+            # installed/bundled library perspective.
+            f"-DIREE_ENABLE_CPUINFO=OFF",
         ],
         check=True,
     )
@@ -159,7 +161,22 @@ def build_main_dist():
             "--build",
             BUILD_DIR,
             "--target",
-            INSTALL_TARGET,
+            "all",
+        ],
+        check=True,
+    )
+
+    # TODO: Get proper dependency management on install targets so we don't
+    # have to build all first.
+    subprocess.run(
+        [
+            sys.executable,
+            CMAKE_CI_SCRIPT,
+            "--build",
+            BUILD_DIR,
+            "--target",
+            "iree-install-dev-libraries-stripped",
+            "iree-install-tools-stripped",
         ],
         check=True,
     )
@@ -168,6 +185,7 @@ def build_main_dist():
     dist_entries = [
         "bin",
         "lib",
+        "include",
     ]
     dist_archive = os.path.join(
         BINDIST_DIR,

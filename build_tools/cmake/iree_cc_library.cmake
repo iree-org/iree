@@ -292,13 +292,20 @@ function(iree_cc_library)
     )
   endif()
 
+  if(NOT _RULE_TESTONLY)
+    iree_install_targets(
+      TARGETS ${_NAME}
+      HDRS ${_RULE_HDRS} ${_RULE_TEXTUAL_HDRS}
+    )
+  endif()
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
   if(_DEBUG_IREE_PACKAGE_NAME)
     message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
   endif()
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # If the library name matches the final component of the package then treat
@@ -306,7 +313,7 @@ function(iree_cc_library)
     # 'foo::bar'.
     iree_package_dir(_PACKAGE_DIR)
     if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
-      add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+      iree_add_alias_library(${_PACKAGE_NS} ${_NAME})
     endif()
   endif()
 endfunction()
@@ -428,17 +435,21 @@ function(iree_cc_unified_library)
       $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_LINK_LIBRARIES>
   )
 
+  iree_install_targets(
+    TARGETS ${_NAME}
+  )
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 
   # If the library name matches the final component of the package then treat
   # it as a default. For example, foo/bar/ library 'bar' would end up as
   # 'foo::bar'.
   iree_package_dir(_PACKAGE_DIR)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
-    add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+    iree_add_alias_library(${_PACKAGE_NS} ${_NAME})
   endif()
 endfunction()
 

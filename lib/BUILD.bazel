@@ -24,7 +24,6 @@ iree_compiler_cc_binary(
     linkshared = 1,
     deps = [
         "//compiler/bindings/c:headers",
-        "//compiler/src/iree/compiler/API:MLIRInteropHeaders",
         "//compiler/src/iree/compiler/API:StaticImpl",
         "//compiler/src/iree/compiler/API:api_exports.ld",
     ],
