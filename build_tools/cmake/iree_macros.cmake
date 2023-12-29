@@ -455,6 +455,10 @@ function(iree_link_js_library)
         ${_DUMMY_LIB_NAME}
     )
 
+    iree_install_targets(
+      TARGETS ${_DUMMY_LIB_NAME}
+    )
+
     # Link the js-library to the target.
     # When a linked library starts with a "-" cmake will just add it to the
     # linker command line as it is. The advantage of doing it this way is

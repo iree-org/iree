@@ -8,9 +8,18 @@ iree_cc_library(
   NAME
     defs
   INCLUDES
-    ${CMAKE_CURRENT_SOURCE_DIR}/../..
-    ${CMAKE_CURRENT_BINARY_DIR}/../..
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../..>
   PUBLIC
+)
+
+iree_install_targets(
+  TARGETS
+    iree_compiler_defs
+  COMPONENT
+    IREERuntimeLibraries-Compiler
+  EXPORT_SET
+    Compiler
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_ABOVE_THIS_LINE ###
