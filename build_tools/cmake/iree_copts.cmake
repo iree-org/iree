@@ -213,6 +213,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Werror"
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
 
+    "-Wno-address"  # https://github.com/openxla/iree/issues/16016
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
