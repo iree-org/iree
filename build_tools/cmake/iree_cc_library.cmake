@@ -184,12 +184,9 @@ function(iree_cc_library)
     # We also forward link libraries -- not because the OBJECT libraries do
     # linking but because they get transitive compile definitions from them.
     # Yes. This is state of the art.
-    # Note that SYSTEM scope matches here, in the property name and in the
-    # include directories below on the main rule. If ever removing this,
-    # remove it from all places.
-    target_include_directories(${_OBJECTS_NAME} SYSTEM
+    target_include_directories(${_OBJECTS_NAME}
       PUBLIC
-        $<TARGET_PROPERTY:${_NAME},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
     )
     target_include_directories(${_OBJECTS_NAME}
       PUBLIC
@@ -208,7 +205,7 @@ function(iree_cc_library)
         $<TARGET_PROPERTY:${_NAME},INTERFACE_LINK_LIBRARIES>
     )
 
-    target_include_directories(${_NAME} SYSTEM
+    target_include_directories(${_NAME}
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
@@ -269,7 +266,7 @@ function(iree_cc_library)
   else()
     # Generating header-only library.
     add_library(${_NAME} INTERFACE)
-    target_include_directories(${_NAME} SYSTEM
+    target_include_directories(${_NAME}
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
@@ -411,12 +408,9 @@ function(iree_cc_unified_library)
   )
 
   # Forward compile usage requirements from the root library.
-  # Note that SYSTEM scope matches here, in the property name and in the
-  # include directories below on the main rule. If ever removing this,
-  # remove it from all places.
-  target_include_directories(${_NAME} SYSTEM
+  target_include_directories(${_NAME}
     PUBLIC
-      $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+      $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_INCLUDE_DIRECTORIES>
   )
   target_include_directories(${_NAME}
     PUBLIC
