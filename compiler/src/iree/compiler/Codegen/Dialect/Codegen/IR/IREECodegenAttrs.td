@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
 #define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
 
-include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "mlir/IR/EnumAttr.td"
 
 // List of pre-existing pipelines for translating executables.

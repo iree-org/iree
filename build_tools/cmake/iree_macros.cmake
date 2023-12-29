@@ -190,6 +190,91 @@ endfunction()
 # Packages and Paths
 #-------------------------------------------------------------------------------
 
+# Performs a variety of setup tasks for a directory that forms the root
+# of a C source tree. Many of our build macros use directory-scoped CMake
+# variables to drive default behavior, and this sets those up in a consolidated
+# way.
+# Arguments:
+# DEFAULT_EXPORT_SET: 
+#   The export set to use by default. If linking any static libraries
+#   that are to be installed as dev libraries, then this is mandatory
+#   (or each target must specify it). Typically this must be set in
+#   runtime directories.
+# DEFAULT_INSTALL_COMPONENT:
+#   The default install component for libraries.
+# IMPLICIT_DEFS_TARGET:
+#   A new target to create and export/install which includes the current
+#   source and binary directory as an include dir. It will be added to
+#   every cc library created after this in this directory tree.
+# IMPLICIT_DEFS_INSTALL_COMPONENT:
+#   Install component for *just* the implicit defs target.
+# IMPLICIT_DEFS_EXPORT_SET:
+#   Export set for *just* the implicit defs target.
+# PACKAGE_ROOT_PREFIX:
+#   Explicitly set the package root prefix (as something like "iree::foobar").
+#   Default is empty.
+# See runtime/src/CMakeLists.txt for typical usage in a directory tree
+# that installs static dev libraries.
+#
+# See compiler/src/CMakeLists.txt for typical usage that does not install
+# static dev libraries.
+function(iree_setup_c_src_root)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "PACKAGE_ROOT_PREFIX;DEFAULT_EXPORT_SET;DEFAULT_INSTALL_COMPONENT;IMPLICIT_DEFS_TARGET;IMPLICIT_DEFS_INSTALL_COMPONENT;IMPLICIT_DEFS_EXPORT_SET"
+    ""
+    ${ARGN}
+  )
+
+  # Make C++ library package names start here unless if told not to.
+  set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}" PARENT_SCOPE)
+  set(IREE_PACKAGE_ROOT_PREFIX "${_RULE_PACKAGE_ROOT_PREFIX}" PARENT_SCOPE)
+
+  # Instruct install support that headers are installable from this root
+  # directory.
+  set(IREE_HDRS_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}" PARENT_SCOPE)
+
+  # Export and install by default.
+  if(_RULE_DEFAULT_EXPORT_SET)
+    set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_EXPORT_SET
+      "${_RULE_DEFAULT_EXPORT_SET}"
+      PARENT_SCOPE)
+  endif()
+  if(_RULE_DEFAULT_INSTALL_COMPONENT)
+    set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT
+      "${_RULE_DEFAULT_INSTALL_COMPONENT}"
+      PARENT_SCOPE)
+  endif()
+
+  # Tell tablegen to include from here.
+  set(IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}" PARENT_SCOPE)
+
+  # Create an implicit defs target that adds this include directory.
+  if(_RULE_IMPLICIT_DEFS_TARGET)
+    add_library(${_RULE_IMPLICIT_DEFS_TARGET} INTERFACE)
+    target_include_directories(${_RULE_IMPLICIT_DEFS_TARGET}
+      INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    )
+    if(NOT _RULE_IMPLICIT_DEFS_INSTALL_COMPONENT)
+      set(_RULE_IMPLICIT_DEFS_INSTALL_COMPONENT ${_RULE_DEFAULT_INSTALL_COMPONENT})
+    endif()
+    if(NOT _RULE_IMPLICIT_DEFS_EXPORT_SET)
+      set(_RULE_IMPLICIT_DEFS_EXPORT_SET ${_RULE_DEFAULT_EXPORT_SET})
+    endif()
+    iree_install_targets(
+      TARGETS ${_RULE_IMPLICIT_DEFS_TARGET}
+      COMPONENT "${_RULE_IMPLICIT_DEFS_INSTALL_COMPONENT}"
+      EXPORT_SET "${_RULE_IMPLICIT_DEFS_EXPORT_SET}"
+    )
+
+    # Include this target in all cc_libraries.
+    set(IREE_IMPLICIT_DEFS_CC_DEPS ${_RULE_IMPLICIT_DEFS_TARGET} PARENT_SCOPE)
+  endif()
+endfunction()
+
 # Sets ${PACKAGE_NS} to the IREE-root relative package name in C++ namespace
 # format (::).
 #
@@ -453,6 +538,10 @@ function(iree_link_js_library)
     target_link_libraries(${_RULE_TARGET}
       PUBLIC
         ${_DUMMY_LIB_NAME}
+    )
+
+    iree_install_targets(
+      TARGETS ${_DUMMY_LIB_NAME}
     )
 
     # Link the js-library to the target.

@@ -20,18 +20,6 @@ exports_files([
     "api_exports.lst",
 ])
 
-# All headers for APIs exported by the library.
-iree_compiler_cc_library(
-    name = "MLIRInteropHeaders",
-    hdrs = [
-        "MLIRInterop.h",
-    ],
-    deps = [
-        "//compiler/bindings/c:headers",
-        "@llvm-project//mlir:CAPIIRHeaders",
-    ],
-)
-
 # IMPORTANT: If modifying the list of dependencies, mirror the changes
 # manually into:
 #   1. CMakeLists.txt _EXPORT_OBJECT_LIBS

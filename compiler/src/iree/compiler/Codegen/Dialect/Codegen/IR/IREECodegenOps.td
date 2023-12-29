@@ -7,7 +7,7 @@
 #ifndef IREE_CODEGEN_DIALECT_IREECODEGENOPS
 #define IREE_CODEGEN_DIALECT_IREECODEGENOPS
 
-include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 

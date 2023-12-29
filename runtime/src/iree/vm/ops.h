@@ -393,7 +393,7 @@ static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
 static inline int64_t vm_fma_i64(int64_t a, int64_t b, int64_t c) {
   return a * b + c;
 }
-static inline int64_t vm_abs_i64(int64_t operand) { return labs(operand); }
+static inline int64_t vm_abs_i64(int64_t operand) { return llabs(operand); }
 static inline int64_t vm_min_i64s(int64_t lhs, int64_t rhs) {
   return rhs < lhs ? rhs : lhs;
 }

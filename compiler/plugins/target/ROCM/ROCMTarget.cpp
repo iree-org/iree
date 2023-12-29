@@ -9,7 +9,7 @@
 #include <cstdint>
 #include <mutex>
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -46,6 +46,7 @@ struct ROCMOptions {
   std::string targetChip = "gfx908";
   bool linkBitcode = false;
   std::string bitcodeDirectory;
+  int wavesPerEu = 0;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
@@ -57,6 +58,10 @@ struct ROCMOptions {
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             llvm::cl::cat(category),
                             llvm::cl::desc("Directory of ROCM Bitcode"));
+    binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu,
+                    llvm::cl::cat(category),
+                    llvm::cl::desc("Optimization hint specifying minimum "
+                                   "number of waves per execution unit"));
   }
 };
 } // namespace
@@ -254,6 +259,9 @@ public:
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
       std::string wgSizeRange = std::string("1, ") + std::to_string(flatWgSize);
       llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
+      if (options.wavesPerEu > 0)
+        llvmFunc->addFnAttr("amdgpu-waves-per-eu",
+                            std::to_string(options.wavesPerEu));
     }
 
     std::unique_ptr<llvm::TargetMachine> targetMachine;

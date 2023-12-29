@@ -60,6 +60,7 @@ def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
   );
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let hasFolder = 1;
 }
 
 def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
@@ -78,6 +79,7 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
   );
   let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let hasFolder = 1;
 }
 
 #endif  // IREE_DIALECT_VECTOREXT_OPS

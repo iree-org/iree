@@ -7,7 +7,7 @@
 #ifndef IREE_CODEGEN_DIALECT_UKERNEL_OPS
 #define IREE_CODEGEN_DIALECT_UKERNEL_OPS
 
-include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 

@@ -185,6 +185,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.pdl
+  MLIRPythonSources.Dialects.scf
   MLIRPythonSources.Dialects.shape
   MLIRPythonSources.Dialects.structured_transform
   MLIRPythonSources.Dialects.tensor

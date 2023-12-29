@@ -544,6 +544,7 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_import_binary)
+include(iree_install_support)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -854,10 +855,16 @@ else()
   # Also add a library that can be depended on to get LLVM includes setup
   # properly. bazel_to_cmake targets this for some header only pseudo deps.
   add_library(IREELLVMIncludeSetup INTERFACE)
-  target_include_directories(IREELLVMIncludeSetup INTERFACE
-    ${LLVM_INCLUDE_DIRS}
-    ${MLIR_INCLUDE_DIRS}
-    ${LLD_INCLUDE_DIRS}
+  foreach(_d ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS} ${LLD_INCLUDE_DIRS})
+    # BUILD_INTERFACE only works one at a time.
+    target_include_directories(IREELLVMIncludeSetup INTERFACE
+      $<BUILD_INTERFACE:${_d}>
+    )
+  endforeach()
+  iree_install_targets(
+    TARGETS IREELLVMIncludeSetup
+    COMPONENT IREEPublicLibraries-Compiler
+    EXPORT_SET Compiler
   )
 
   # Splice the includes setup into base LLVM libraries so that using them
@@ -895,12 +902,25 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Other dependencies
+# By default we bundle a number of dependencies needed to build the project.
+# When bundled like this, they are installed into the IREEBundledLibraries
+# component and exported to their subsystem which requires them (if a static
+# dep from the public API): "Runtime" or "Compiler".
+#
+# Some deps have a usable CMake build, and we add_subdirectory these, manually
+# using iree_install_targets to include them in our installation. Others require
+# custom CMake and these are in the build_tools/third_party directory.
+#
+# TODO: We should have a mode that purely uses find_package for OS friendly
+# packaging/externalizing deps.
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+# libyaml
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
+
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 
@@ -908,11 +928,23 @@ iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
 if(IREE_ENABLE_THREADING)
+  # Benchmark.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS benchmark
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
+
   if(IREE_ENABLE_CPUINFO)
     iree_set_cpuinfo_cmake_options()
     add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    iree_install_targets(
+      TARGETS cpuinfo
+      COMPONENT IREEBundledLibraries
+      EXPORT_SET Runtime
+    )
   endif()
 endif()
 
@@ -925,6 +957,11 @@ endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS Vulkan-Headers
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
@@ -1056,3 +1093,71 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+#-------------------------------------------------------------------------------
+# Install/exports
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/cmake ${IREE_BINARY_DIR}/lib/cmake/IREE)
+
+# See runtime/src/CMakeLists.txt
+iree_generate_export_targets(
+  EXPORT_SET Runtime
+)
+
+# See compiler/bindings/c/CMakeLists.txt
+iree_generate_export_targets(
+  EXPORT_SET Compiler
+)
+
+# Convenience installation targets.
+iree_add_install_target(NAME iree-install-dev-libraries)
+iree_add_install_target(NAME iree-install-runtime-libraries)
+iree_add_install_target(NAME iree-install-tools)
+
+iree_add_install_target(
+  NAME iree-install-cmake-exports
+  COMPONENT IREECMakeExports
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-dev-libraries-runtime
+  COMPONENT IREEDevLibraries-Runtime
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-bundled-libraries
+  COMPONENT IREEBundledLibraries
+  ADD_TO iree-install-dev-libraries-runtime
+)
+
+if(IREE_BUILD_COMPILER)
+  iree_add_install_target(
+    NAME iree-install-dev-libraries-compiler
+    COMPONENT IREEDevLibraries-Compiler
+    ADD_TO iree-install-dev-libraries
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler
+    COMPONENT IREETools-Compiler
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-runtime-libraries-compiler
+    COMPONENT IREERuntimeLibraries-Compiler
+    ADD_TO 
+      iree-install-runtime-libraries
+      iree-install-tools-compiler
+      iree-install-dev-libraries-compiler
+  )
+endif()
+
+iree_add_install_target(
+  NAME iree-install-tools-runtime
+  COMPONENT IREETools-Runtime
+  ADD_TO iree-install-tools
+)

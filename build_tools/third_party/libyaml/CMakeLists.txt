@@ -6,6 +6,13 @@
 
 set(LIBYAML_ROOT "${IREE_ROOT_DIR}/third_party/libyaml/")
 
+# We don't install any headers because their only use is in built code
+# (not public).
+set(IREE_HDRS_ROOT_PATH OFF)
+# Considered part of the runtime. See runtime/src/CMakeLists.txt.
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT IREEBundledLibraries)
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_EXPORT_SET Runtime)
+
 external_cc_library(
   PACKAGE
     yaml

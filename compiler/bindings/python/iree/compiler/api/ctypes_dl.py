@@ -100,7 +100,7 @@ def _init_dylib():
         c_void_p,
         [c_void_p, c_int, c_void_p],
     )
-    # From MLIRInterop.h.
+    # From mlir_interop.h.
     _setsig(
         _dylib.ireeCompilerSessionStealContext,
         c_void_p,
