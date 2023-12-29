@@ -219,6 +219,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
     "-Wno-sign-compare"
     "-Wno-unused-function"
+    "-Wno-unknown-pragmas"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).
