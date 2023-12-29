@@ -926,7 +926,7 @@ VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
   return layout->getLayout();
 }
 
-void VectorLayoutAnalysis::print(raw_ostream &os) {
+void VectorLayoutAnalysis::debugAnnotateLayouts() {
   // Annotate each operation with the layout of it's result.
   root->walk([&](Operation *op) {
     if (op->getNumResults() == 0) {
@@ -952,6 +952,14 @@ void VectorLayoutAnalysis::print(raw_ostream &os) {
       op->setAttr("layout_result_" + std::to_string(index), layout);
     }
   });
+}
 
-  root->dump();
+void VectorLayoutAnalysis::print(raw_ostream &os) {
+  debugAnnotateLayouts();
+  root->print(os);
+}
+
+void VectorLayoutAnalysis::dump() {
+  print(llvm::dbgs());
+  llvm::dbgs() << "\n";
 }
