@@ -82,36 +82,40 @@ def test_correctness_rnda3_rocm(
     argmax_input_f32,
     argmax_output_f32,
 ):
-    iree_benchmark_module(
+    iree_run_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i32",
         args=[
             f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
         ],
     )
-    iree_benchmark_module(
+    iree_run_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i64",
         args=[
             f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
         ],
     )
 
-    iree_benchmark_module(
+    iree_run_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i32",
         args=[
             f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
         ],
     )
-    iree_benchmark_module(
+    iree_run_module(
         argmax_ukernel_rdna3_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i64",
         args=[
             f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
         ],
     )
