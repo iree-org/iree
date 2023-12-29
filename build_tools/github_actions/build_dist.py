@@ -175,8 +175,7 @@ def build_main_dist():
             "--build",
             BUILD_DIR,
             "--target",
-            "iree-install-dev-libraries-stripped",
-            "iree-install-tools-stripped",
+            "iree-install-dist-stripped",
         ],
         check=True,
     )

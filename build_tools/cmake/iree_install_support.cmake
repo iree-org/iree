@@ -113,7 +113,7 @@ function(iree_generate_export_targets)
   cmake_parse_arguments(
     _RULE
     ""
-    "COMPONENT;EXPORT_SET"
+    "COMPONENT;EXPORT_SET;INSTALL_DESTINATION"
     ""
     ${ARGN}
   )
@@ -134,13 +134,13 @@ function(iree_generate_export_targets)
   endif()
 
   export(TARGETS ${_export_targets}
-    FILE "${IREE_BINARY_DIR}/lib/cmake/IREE/IREETargets-${_RULE_EXPORT_SET}.cmake")
+    FILE "${CMAKE_CURRENT_BINARY_DIR}/IREETargets-${_RULE_EXPORT_SET}.cmake")
 
   install(
     EXPORT "IREEExported-${_RULE_EXPORT_SET}"
     COMPONENT "${_component}"
     FILE "IREETargets-${_RULE_EXPORT_SET}.cmake"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/IREE"
+    DESTINATION "${_RULE_INSTALL_DESTINATION}"
   )
 
   # Clear the export targets so that innocent aggregating projects don't
