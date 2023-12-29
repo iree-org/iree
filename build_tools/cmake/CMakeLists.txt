@@ -6,6 +6,19 @@
 
 set(_cmake_installdir "${CMAKE_INSTALL_LIBDIR}/cmake/IREE")
 
+# Generate export sets.
+# See runtime/src/CMakeLists.txt
+iree_generate_export_targets(
+  EXPORT_SET Runtime
+  INSTALL_DESTINATION ${_cmake_installdir}
+)
+
+# See compiler/bindings/c/CMakeLists.txt
+iree_generate_export_targets(
+  EXPORT_SET Compiler
+  INSTALL_DESTINATION ${_cmake_installdir}
+)
+
 if(IREE_BUILD_COMPILER)
   configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/IREECompilerConfig.cmake.in

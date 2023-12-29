@@ -1096,24 +1096,31 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Install/exports
+# Note that with no further options, install convenience targets install to
+# CMAKE_INSTALL_PREFIX. Per usual, this can be further prefixed with an 
+# environment variable "DESTDIST" on a per invocation basis (i.e. to place under
+# a versioned path, etc).
+#
+# The `iree-install-dist` target includes everthing that is typically included in
+# a distribution tarball.
 #-------------------------------------------------------------------------------
 
 add_subdirectory(build_tools/cmake ${IREE_BINARY_DIR}/lib/cmake/IREE)
 
-# See runtime/src/CMakeLists.txt
-iree_generate_export_targets(
-  EXPORT_SET Runtime
-)
-
-# See compiler/bindings/c/CMakeLists.txt
-iree_generate_export_targets(
-  EXPORT_SET Compiler
-)
-
 # Convenience installation targets.
-iree_add_install_target(NAME iree-install-dev-libraries)
-iree_add_install_target(NAME iree-install-runtime-libraries)
-iree_add_install_target(NAME iree-install-tools)
+iree_add_install_target(NAME iree-install-dist)
+iree_add_install_target(
+  NAME iree-install-dev-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-runtime-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-tools
+  ADD_TO iree-install-dist
+)
 
 iree_add_install_target(
   NAME iree-install-cmake-exports
@@ -1143,6 +1150,12 @@ if(IREE_BUILD_COMPILER)
   iree_add_install_target(
     NAME iree-install-tools-compiler
     COMPONENT IREETools-Compiler
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler-dev
+    COMPONENT IREETools-CompilerDev
     ADD_TO iree-install-tools
   )
 

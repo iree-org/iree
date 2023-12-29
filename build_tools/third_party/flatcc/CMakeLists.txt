@@ -131,7 +131,7 @@ target_include_directories(iree-flatcc-cli SYSTEM
 )
 install(
   TARGETS iree-flatcc-cli
-  COMPONENT iree-flatcc-cli
+  COMPONENT IREETools-Runtime
   RUNTIME DESTINATION bin
   BUNDLE DESTINATION bin
 )
