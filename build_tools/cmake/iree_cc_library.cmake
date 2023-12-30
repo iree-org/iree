@@ -55,6 +55,8 @@ endfunction()
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
+# SYSTEM_INCLUDES: Include directories that should be used with "SYSTEM" scope,
+#   which makes them more tolerant to certain classes of warnings and issues.
 # LINKOPTS: List of link options
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
@@ -97,7 +99,7 @@ function(iree_cc_library)
     _RULE
     "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB"
     "PACKAGE;NAME;WINDOWS_DEF_FILE"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;SYSTEM_INCLUDES"
     ${ARGN}
   )
 
@@ -146,6 +148,8 @@ function(iree_cc_library)
   # generator.
   list(TRANSFORM _RULE_INCLUDES PREPEND "$<BUILD_INTERFACE:")
   list(TRANSFORM _RULE_INCLUDES APPEND ">")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES PREPEND "$<BUILD_INTERFACE:")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES APPEND ">")
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
@@ -188,6 +192,10 @@ function(iree_cc_library)
       PUBLIC
         $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
     )
+    target_include_directories(${_OBJECTS_NAME} SYSTEM
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+    )
     target_include_directories(${_OBJECTS_NAME}
       PUBLIC
         $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
@@ -213,6 +221,10 @@ function(iree_cc_library)
     target_include_directories(${_NAME}
       PUBLIC
         ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM PUBLIC
+        ${_RULE_SYSTEM_INCLUDES}
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -271,6 +283,10 @@ function(iree_cc_library)
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
         ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM INTERFACE
+        ${_RULE_SYSTEM_INCLUDES}
     )
     target_link_options(${_NAME}
       INTERFACE

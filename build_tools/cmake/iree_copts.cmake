@@ -280,11 +280,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4065"  # allow: switch statement contains 'default' but no 'case' labels
     "/wd4141"  # allow: inline used more than once
     "/wd4624"  # allow: destructor was implicitly defined as deleted
+    "/wd4576"  # allow: a parenthesized type followed by an initializer list is a non-standard explicit type conversion syntax
 
     # TODO(benvanik): confirm these are all still required and document:
     "/wd4146"  # operator applied to unsigned type, result still unsigned
     "/wd4244"  # possible loss of data
-    "/wd4267"  # initializing: possible loss of data
+    "/wd4267"  # initializing: possible loss of data    
     "/wd5105"  # allow: macro expansion producing 'defined' has undefined behavior
 )
 

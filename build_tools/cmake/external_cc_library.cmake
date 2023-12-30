@@ -23,6 +23,8 @@ include(CMakeParseArguments)
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
+# SYSTEM_INCLUDES: Include directories that should be used with "SYSTEM" scope,
+#   which makes them more tolerant to certain classes of warnings and issues.
 # LINKOPTS: List of link options
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 # Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
@@ -72,7 +74,7 @@ function(external_cc_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "PACKAGE;NAME;ROOT"
-    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;SYSTEM_INCLUDES"
     ${ARGN}
   )
 
@@ -83,6 +85,13 @@ function(external_cc_library)
   # Prefix the library with the package name.
   string(REPLACE "::" "_" _PACKAGE_NAME ${_RULE_PACKAGE})
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+
+  # Wrap user specified INCLUDES in the $<BUILD_INTERFACE:>
+  # generator.
+  list(TRANSFORM _RULE_INCLUDES PREPEND "$<BUILD_INTERFACE:")
+  list(TRANSFORM _RULE_INCLUDES APPEND ">")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES PREPEND "$<BUILD_INTERFACE:")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES APPEND ">")
 
   # Prefix paths with the root.
   list(TRANSFORM _RULE_HDRS PREPEND ${_RULE_ROOT})
@@ -115,7 +124,11 @@ function(external_cc_library)
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
-        "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+        ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM PUBLIC
+        ${_RULE_SYSTEM_INCLUDES}
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -156,8 +169,19 @@ function(external_cc_library)
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
-        "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
     )
+    foreach(_include ${_RULE_INCLUDES})
+      target_include_directories(${_NAME}
+        INTERFACE
+          "$<BUILD_INTERFACE:${_include}>"
+      )
+    endforeach()
+    foreach(_include ${_RULE_SYSTEM_INCLUDES})
+      target_include_directories(${_NAME}
+        SYSTEM INTERFACE
+          "$<BUILD_INTERFACE:${_include}>"
+      )
+    endforeach()
     target_link_libraries(${_NAME}
       INTERFACE
         ${_RULE_DEPS}
