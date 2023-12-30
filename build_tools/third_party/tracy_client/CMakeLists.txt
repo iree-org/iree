@@ -21,7 +21,7 @@ external_cc_library(
   HDRS
     "tracy/Tracy.hpp"
     "tracy/TracyC.h"
-  INCLUDES
+  SYSTEM_INCLUDES
     "${IREE_ROOT_DIR}/third_party/tracy/public"
   DEPS
     ${CMAKE_DL_LIBS}
