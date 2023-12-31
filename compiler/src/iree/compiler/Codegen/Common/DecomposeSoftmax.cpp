@@ -34,7 +34,7 @@ namespace {
 /// 4. Divide z and l. This gives the N-dimensional softmax.
 ///    softmax = z / l
 ///
-static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
+static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp, bool useFusion) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;
   SmallVector<Operation *> softmaxOpsToDecompose;
@@ -60,6 +60,33 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     // Replace the result of linalg::softmax with the `result` generated via
     // the decomposition above.
     rewriter.replaceOp(decomposableSoftmaxOp, *result);
+
+    if (useFusion) {
+      // Fusion later depends on couple of Ops/Values - we try to obtain the same
+      // by backtracking through the generated value's def-chain.
+      Operation *resultOp = (*result)[0].getDefiningOp();
+      Value numerator = resultOp->getOperand(0);
+      Operation *numeratorOp = numerator.getDefiningOp();
+
+      // Rematerialize operands that are marked for this.
+      SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
+          numerator.getUses(), [](OpOperand &use) { return &use; }));
+      for (OpOperand *use : uses) {
+        Operation *consumer = use->getOwner();
+        OpBuilder::InsertionGuard g(rewriter);
+        rewriter.setInsertionPoint(consumer);
+        FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
+            linalg::fuseElementwiseOps(rewriter, use);
+        if (succeeded(fusionResult)) {
+          SmallVector<Value> replacements = llvm::to_vector(
+              llvm::map_range(consumer->getResults(), [&](Value oldValue) {
+                return fusionResult->replacements.lookup(oldValue);
+              }));
+          rewriter.replaceOp(consumer, replacements);
+        }
+      }
+      toDelete.push_back(numeratorOp);
+    }
   }
   for (Operation *op : toDelete) {
     rewriter.eraseOp(op);
@@ -69,21 +96,27 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
 }
 
 struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
+  DecomposeSoftmaxPass() = default;
+  DecomposeSoftmaxPass(bool useFusion) {
+    this->useFusion = useFusion;
+  }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-    if (failed(convertSoftmaxToGenerics(getOperation())))
+    if (failed(convertSoftmaxToGenerics(getOperation(), useFusion)))
       return signalPassFailure();
   }
 };
 
 } // namespace
 
-std::unique_ptr<Pass> createDecomposeSoftmaxPass() {
-  return std::make_unique<DecomposeSoftmaxPass>();
+std::unique_ptr<Pass> createDecomposeSoftmaxPass(
+    bool useFusion) {
+  return std::make_unique<DecomposeSoftmaxPass>(useFusion);
 }
 
 } // namespace mlir::iree_compiler
