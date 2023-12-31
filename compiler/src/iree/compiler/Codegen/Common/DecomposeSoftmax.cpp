@@ -34,7 +34,8 @@ namespace {
 /// 4. Divide z and l. This gives the N-dimensional softmax.
 ///    softmax = z / l
 ///
-static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp, bool useFusion) {
+static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp,
+                                              bool useFusion) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;
   SmallVector<Operation *> softmaxOpsToDecompose;
@@ -62,8 +63,8 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp, bool useFusio
     rewriter.replaceOp(decomposableSoftmaxOp, *result);
 
     if (useFusion) {
-      // Fusion later depends on couple of Ops/Values - we try to obtain the same
-      // by backtracking through the generated value's def-chain.
+      // Fusion later depends on couple of Ops/Values - we try to obtain the
+      // same by backtracking through the generated value's def-chain.
       Operation *resultOp = (*result)[0].getDefiningOp();
       Value numerator = resultOp->getOperand(0);
       Operation *numeratorOp = numerator.getDefiningOp();
@@ -97,9 +98,7 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp, bool useFusio
 
 struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
   DecomposeSoftmaxPass() = default;
-  DecomposeSoftmaxPass(bool useFusion) {
-    this->useFusion = useFusion;
-  }
+  DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
@@ -114,8 +113,7 @@ struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
 
 } // namespace
 
-std::unique_ptr<Pass> createDecomposeSoftmaxPass(
-    bool useFusion) {
+std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion) {
   return std::make_unique<DecomposeSoftmaxPass>(useFusion);
 }
 
