@@ -16,9 +16,13 @@ cc_library(
         "iree/compiler/api_support.h",
         "iree/compiler/embedding_api.h",
         "iree/compiler/loader.h",
+        "iree/compiler/mlir_interop.h",
         "iree/compiler/tool_entry_points_api.h",
     ],
     includes = ["."],
+    deps = [
+        "@llvm-project//mlir:CAPIIRHeaders",
+    ],
 )
 
 cc_library(

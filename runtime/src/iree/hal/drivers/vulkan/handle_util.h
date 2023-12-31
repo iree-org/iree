@@ -44,8 +44,8 @@ class VkDeviceHandle : public RefObject<VkDeviceHandle> {
                  iree_hal_vulkan_device_extensions_t enabled_extensions,
                  bool owns_device, iree_allocator_t host_allocator,
                  const VkAllocationCallbacks* allocator = nullptr)
-      : syms_(add_ref(syms)),
-        physical_device_(physical_device),
+      : physical_device_(physical_device),
+        syms_(add_ref(syms)),
         enabled_features_(enabled_features),
         enabled_extensions_(enabled_extensions),
         owns_device_(owns_device),

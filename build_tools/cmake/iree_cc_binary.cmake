@@ -27,7 +27,7 @@ include(CMakeParseArguments)
 # HOSTONLY: host only; compile using host toolchain when cross-compiling
 # SETUP_INSTALL_RPATH: Sets an install RPATH which assumes the standard
 #   directory layout (to be used if linking against installed shared libs).
-#
+# INSTALL_COMPONENT: CMake install component (Defaults to "IREETool-${_RULE_NAME}").
 # Note:
 # iree_cc_binary will create a binary called ${PACKAGE_NAME}_${NAME}, e.g.
 # iree_base_foo with an alias to ${PACKAGE_NS}::${NAME}.
@@ -55,7 +55,7 @@ function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
     "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY;SETUP_INSTALL_RPATH;DISABLE_LLVM_LINK_LLVM_DYLIB"
-    "NAME"
+    "NAME;INSTALL_COMPONENT"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
@@ -155,18 +155,23 @@ function(iree_cc_binary)
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
+  set(_INSTALL_COMPONENT "${_RULE_INSTALL_COMPONENT}")
+  if(NOT _INSTALL_COMPONENT)
+    set(_INSTALL_COMPONENT "IREETool-${_RULE_NAME}")
+  endif()
+
   if(_RULE_EXCLUDE_FROM_ALL)
     set_property(TARGET ${_NAME} PROPERTY EXCLUDE_FROM_ALL ON)
     install(TARGETS ${_NAME}
             RENAME ${_RULE_NAME}
-            COMPONENT ${_RULE_NAME}
+            COMPONENT ${_INSTALL_COMPONENT}
             RUNTIME DESTINATION bin
             BUNDLE DESTINATION bin
             EXCLUDE_FROM_ALL)
   else()
     install(TARGETS ${_NAME}
       RENAME ${_RULE_NAME}
-      COMPONENT ${_RULE_NAME}
+      COMPONENT ${_INSTALL_COMPONENT}
       RUNTIME DESTINATION bin
       BUNDLE DESTINATION bin)
   endif()
