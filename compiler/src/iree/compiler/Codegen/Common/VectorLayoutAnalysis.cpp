@@ -224,7 +224,7 @@ ChangeResult DistributionLayout::resolveWithPossibleConflict(
   resolvedLayout->subscribeEnforcement(enforcement);
 
   // We can now resolve this resolved value to the required layout.
-  resolvedLayout->resolve(rhs);
+  (void)resolvedLayout->resolve(rhs);
 
   // No change actually needs to be propagated after a conflict resolution.
   // TODO: Ideally, there should be another state in the lattice which says
