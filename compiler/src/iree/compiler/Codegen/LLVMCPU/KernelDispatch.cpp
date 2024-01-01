@@ -993,29 +993,6 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
                              matmulScalableFlags.end());
   }
 
-  // For proper 2-D or higher order matmuls, make sure we don't use a tile size
-  // greater than the static dim size for dims that are only unrolled, i.e., N
-  // and batch dims.
-
-  int numScalableDims = llvm::count(scalableTileFlags, true);
-  SmallVector<int64_t> staticShape = op.getStaticLoopRanges();
-  if (numLoops >= 3) {
-    for (int i = 0; i < (numLoops - 2); ++i) {
-      int64_t dimSize = staticShape[i];
-      int64_t tileSize = tileSizes[i];
-      if (tileSize == 0 || ShapedType::isDynamic(dimSize)) {
-        continue;
-      }
-      // Ad-hoc: Don't attempt to resize scalable tiles when numScalableDims
-      // >= 2. For ArmSME (the only current user of 2D scalable vectors), tile
-      // sizes must match SME tiles (and cannot be arbitrarily resized).
-      if (numScalableDims >= 2 && scalableTileFlags[i]) {
-        continue;
-      }
-      tileSizes[i] = std::min<int64_t>(tileSize, dimSize);
-    }
-  }
-
   LLVM_DEBUG(KD_DBGS() << "Matmul vector sizes: " << tileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Matmul vector scalable flags: " << scalableTileFlags
                        << "\n");
