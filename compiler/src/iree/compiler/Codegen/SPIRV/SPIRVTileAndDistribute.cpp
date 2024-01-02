@@ -16,7 +16,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -96,39 +96,16 @@ tileToInvocation(func::FuncOp funcOp,
 // Reduction tiling utils
 //====---------------------------------------------------------------------===//
 
-static LogicalResult tileReduction(func::FuncOp funcOp,
-                                   ArrayRef<int64_t> tileSizes) {
+static LogicalResult
+tileReduction(func::FuncOp funcOp,
+              const scf::SCFTileSizeComputationFunction &computeFn) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
       StringAttr::get(context, getTileReductionMarker()), std::nullopt);
-
-  SmallVector<Operation *> candidates;
-  funcOp.walk([&](linalg::LinalgOp op) {
-    if (failed(filter.checkAndNotify(rewriter, op))) {
-      return WalkResult::advance();
-    }
-    if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
-            linalg::ConvolutionOpInterface>(op.getOperation())) {
-      candidates.push_back(op);
-      filter.replaceLinalgTransformationFilter(rewriter, op);
-    }
-    return WalkResult::advance();
-  });
-
-  for (auto op : candidates) {
-    auto target = cast<TilingInterface>(op);
-    scf::SCFTilingOptions options;
-    setSCFTileSizes(options, target, tileSizes, /*tileScalableFlags=*/{});
-    FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, target, options);
-    if (failed(tiledResults)) {
-      return failure();
-    }
-    rewriter.replaceOp(op, tiledResults->replacements);
-  };
-
-  return success();
+  auto options =
+      scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
+  return tileLinalgOpsWithFilter(funcOp, options, filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -167,8 +144,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))
     return signalPassFailure();
-  auto reductionTileSizes = getSPIRVTileSize(funcOp, 2);
-  if (failed(reductionTileSizes))
+  auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
+  if (failed(reductionTileComputeFn))
     return signalPassFailure();
 
   { // Tile and distribute to invocations.
@@ -209,7 +186,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   }
 
   { // Tile reduction dimensions.
-    if (failed(tileReduction(funcOp, *reductionTileSizes))) {
+    if (failed(tileReduction(funcOp, *reductionTileComputeFn))) {
       funcOp.emitOpError() << "failing in tile reduction";
       return signalPassFailure();
     }

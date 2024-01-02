@@ -11,7 +11,7 @@
 
 namespace mlir::iree_compiler {
 
-// Register all interfaces needed for hoisting constant expressions.
+/// Registers all interfaces needed for hoisting constant expressions.
 void registerHoistableTypeInterfaces(DialectRegistry &registry);
 
 } // namespace mlir::iree_compiler

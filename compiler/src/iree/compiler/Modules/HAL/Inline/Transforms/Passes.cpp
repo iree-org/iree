@@ -61,9 +61,9 @@ void buildHALInlineStaticTransformPassPipeline(
 
   // Translate each executable down to common MLIR dialects.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createConfigureExecutablesPass(targetRegistry));
+      IREE::HAL::createConfigureExecutablesPass({targetRegistry}));
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass(targetRegistry));
+      IREE::HAL::createTranslateExecutablesPass({targetRegistry}));
 
   // Inline the translated executable functions.
   // We preserve the executables for their metadata used during conversion.

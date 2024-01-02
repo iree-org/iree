@@ -14,6 +14,7 @@
 #include "experimental/hip/hip_allocator.h"
 #include "experimental/hip/hip_buffer.h"
 #include "experimental/hip/memory_pools.h"
+#include "experimental/hip/nop_executable_cache.h"
 #include "experimental/hip/status_util.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
@@ -352,8 +353,10 @@ static iree_status_t iree_hal_hip_device_import_file(
 static iree_status_t iree_hal_hip_device_create_executable_cache(
     iree_hal_device_t* base_device, iree_string_view_t identifier,
     iree_loop_t loop, iree_hal_executable_cache_t** out_executable_cache) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "executable cache not yet implmeneted");
+  iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
+  return iree_hal_hip_nop_executable_cache_create(
+      identifier, device->hip_symbols, device->hip_device,
+      device->host_allocator, out_executable_cache);
 }
 
 static iree_status_t iree_hal_hip_device_create_pipeline_layout(

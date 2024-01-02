@@ -89,12 +89,13 @@ public:
   struct ConstValueInfo {
     ConstValueInfo(Value constValue) : constValue(constValue) {}
 
+    // UNANALYZED: The value hasn't been analyzed.
     // UNKNOWN: Not all producers have been validated.
     // CONSTANT: Producers have all been validated as constants.
     // NON_CONSTANT: The op is not eligible to be treated as a constant or
     //   one or more producers is non constant.
-    enum State { UNKNOWN, CONSTANT, NON_CONSTANT };
-    State state = UNKNOWN;
+    enum State { UNANALYZED, UNKNOWN, CONSTANT, NON_CONSTANT };
+    State state = UNANALYZED;
 
     // The presumed constant value.
     Value constValue;

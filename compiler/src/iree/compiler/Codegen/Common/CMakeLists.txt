@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
   PUBLIC
@@ -58,6 +58,7 @@ iree_cc_library(
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
+    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -111,6 +112,7 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
+    "VectorLayoutAnalysis.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
@@ -162,7 +164,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
@@ -233,7 +235,7 @@ iree_cc_library(
     MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies

@@ -22,9 +22,9 @@ LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
   for (int i = 0; i < argc; ++i) {
     llvm::StringRef arg(argv[i]);
     llvm::StringRef nameVal;
-    if (arg.startswith("--")) {
+    if (arg.starts_with("--")) {
       nameVal = arg.drop_front(2);
-    } else if (arg.startswith("-")) {
+    } else if (arg.starts_with("-")) {
       nameVal = arg.drop_front(1);
     } else {
       // Pure positional options not supported.
@@ -122,12 +122,10 @@ static int64_t ParseByteSize(llvm::StringRef value) {
   return size * scale;
 }
 
-namespace llvm {
-namespace cl {
+namespace llvm::cl {
 template class basic_parser<ByteSize>;
 template class basic_parser<PowerOf2ByteSize>;
-} // namespace cl
-} // namespace llvm
+} // namespace llvm::cl
 
 using ByteSize = llvm::cl::ByteSize;
 using PowerOf2ByteSize = llvm::cl::PowerOf2ByteSize;

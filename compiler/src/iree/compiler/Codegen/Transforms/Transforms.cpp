@@ -12,7 +12,7 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"
@@ -759,9 +759,43 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
 }
 
 LogicalResult
-tileLinalgOpsWithFilter(func::FuncOp funcOp,
-                        linalg::LinalgTilingOptions tilingOptions,
+tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
                         IREE::LinalgExt::LinalgTransformationFilter filter) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<Operation *> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) {
+    if (succeeded(filter.checkAndNotify(rewriter, op))) {
+      candidates.push_back(op);
+    }
+  });
+
+  for (auto op : candidates) {
+    auto target = cast<TilingInterface>(op);
+
+    // tileUsingSCFForOp requires the op is not able to tile op with no
+    // iteration domain. Skip the tiling on the op. Otherwise it returns a
+    // failure.
+    if (target.getLoopIteratorTypes().empty()) {
+      continue;
+    }
+
+    FailureOr<scf::SCFTilingResult> tiledResults =
+        scf::tileUsingSCFForOp(rewriter, target, options);
+    if (failed(tiledResults)) {
+      return failure();
+    }
+    for (auto tiledOp : tiledResults->tiledOps) {
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
+    rewriter.replaceOp(op, tiledResults->replacements);
+  }
+
+  return success();
+}
+
+LogicalResult distributeLinalgOpsWithFilter(
+    func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<linalg::LinalgOp> candidates;
   funcOp.walk([&](linalg::LinalgOp op) {
@@ -771,6 +805,7 @@ tileLinalgOpsWithFilter(func::FuncOp funcOp,
   });
 
   for (auto op : candidates) {
+    // TODO: Tile and distribute LinalgOps using interface methods.
     FailureOr<linalg::TiledLinalgOp> res =
         linalg::tileLinalgOp(rewriter, op, tilingOptions);
     if (failed(res)) {

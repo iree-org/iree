@@ -547,7 +547,7 @@ func.func @linalg_ext_reverse_dim0() {
       %7 = tensor.empty() : tensor<2x3xf32>
       %8 = iree_linalg_ext.reverse dimensions(dense<0> : tensor<1xi64>) ins(%6 : tensor<2x3xf32>) outs(%7 : tensor<2x3xf32>) : tensor<2x3xf32>
       %9 = affine.apply affine_map<()[s0] -> (-s0)>()[%arg0]
-      flow.dispatch.tensor.store %8, %1, offsets = [%9, %arg1], sizes = [%c2, %c3], strides = [%c1, %c1] : tensor<2x3xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x3xf32>>
+      flow.dispatch.tensor.store %8, %1, offsets = [%9, %arg1], sizes = [2, 3], strides = [%c1, %c1] : tensor<2x3xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x3xf32>>
     }
   }
   return

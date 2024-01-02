@@ -145,7 +145,7 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
 }
 
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("vmvx");
 }
 
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,

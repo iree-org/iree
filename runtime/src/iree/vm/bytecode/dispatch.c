@@ -1645,8 +1645,8 @@ static iree_status_t iree_vm_bytecode_dispatch(
         // In-bounds index; decode until we hit the case and branch as the
         // cases are all variable length and we can't directly index.
         for (uint16_t i = 0; i < index; ++i) {
-          VM_DecBranchTarget("case_dest");
-          VM_DecBranchOperands("case_operands");
+          (void)VM_DecBranchTarget("case_dest");
+          (void)VM_DecBranchOperands("case_operands");
         }
         int32_t case_block_pc = VM_DecBranchTarget("case_dest");
         const iree_vm_register_remap_list_t* case_remap_list =

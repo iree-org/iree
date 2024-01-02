@@ -20,7 +20,7 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -295,6 +295,25 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp)
       continue;
+
+    Block *body = exportOp.getWorkgroupCountBody();
+    if (!body) {
+      exportOp.emitOpError("unexpected empty workgroup count region");
+      return signalPassFailure();
+    }
+
+    // If the function has already lowered the workgroup count region, infer
+    // that tiling + distribution has already occurred.
+    WalkResult res = body->walk([&](Operation *op) {
+      if (isa<IREE::Flow::DispatchWorkgroupCountFromSliceOp,
+              IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(op)) {
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
+    if (!res.wasInterrupted()) {
+      continue;
+    }
 
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     SmallVector<int64_t> tileSizes, staticLoopRanges, interchange;

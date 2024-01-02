@@ -29,7 +29,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   auto opcodes = recordKeeper.getAllDerivedDefinitions("VM_OPC");
   for (const auto *opcode : opcodes) {
     auto symbol = opcode->getValueAsString("symbol");
-    if (symbol.startswith("Prefix")) {
+    if (symbol.starts_with("Prefix")) {
       prefixOpcodes[symbol] = opcode->getValueAsInt("value");
     }
   }

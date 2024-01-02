@@ -177,32 +177,13 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         ("f32", "f32"),
         ("f16", "f16"),
         ("f16", "f32"),
-    ] + ([
-        # TODO(#15258): enable bf16 tests for !use_uk when that bug is fixed.
         ("bf16", "bf16"),
         ("bf16", "f32"),
-    ] if use_uk else [])
+    ]
 ) for size in [
     "small",
     "large",
 ]]
-
-# Some e2e testing for --iree-codegen-enable-vector-padding=false.
-iree_generated_trace_runner_test(
-    name = "e2e_matmul_nondt_f32_small_no_padding",
-    compiler_flags = [
-        "--iree-codegen-enable-vector-padding=false",
-    ],
-    generator = ":generate_e2e_matmul_tests",
-    generator_args = [
-        "--lhs_rhs_type=f32",
-        "--shapes=small",
-    ],
-    target_backends_and_drivers = [
-        ("llvm-cpu", "local-task"),
-    ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
-)
 
 ###########################################################################
 ##

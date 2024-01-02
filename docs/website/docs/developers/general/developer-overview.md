@@ -121,12 +121,12 @@ $ ../iree-build/tools/iree-compile \
 ### iree-run-module
 
 The `iree-run-module` program takes an already translated IREE module as input
-and executes an exported main function using the provided inputs.
+and executes an exported function using the provided inputs.
 
 This program can be used in sequence with `iree-compile` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
 that executes the simple `simple_abs_vmvx.vmfb` compiled from `simple_abs.mlir`
-above on IREE's VMVX driver:
+above on IREE's local-task CPU device:
 
 ```shell
 $ ../iree-build/tools/iree-run-module \
@@ -135,6 +135,57 @@ $ ../iree-build/tools/iree-run-module \
   --function=abs \
   --input=f32=-2
 ```
+
+Input scalars are passed as `value` and input buffers are passed as
+`[shape]xtype=[value]`.
+
+* Input buffers may also be read from raw binary files or Numpy npy files.
+
+MLIR type | Description | Input example
+-- | -- | --
+`i32` | Scalar | `--input=1234`
+`tensor<i32>` | 0-D tensor | `--input=i32=1234`
+`tensor<1xi32>` | 1-D tensor (shape [1]) | `--input=1xi32=1234`
+`tensor<2xi32>` | 1-D tensor (shape [2]) | `--input="2xi32=12 34"`
+`tensor<2x3xi32>` | 2-D tensor (shape [2, 3]) | `--input="2x3xi32=[1 2 3][4 5 6]"`
+
+???+ example "Other usage examples"
+
+    See these test files for advanced usage examples:
+
+    <!-- TODO(scotttodd): switch these to 'mlir' syntax when available -->
+
+    === "Basic tests"
+
+        Source file: [`tools/test/iree-run-module.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module.mlir)
+
+        ```c++ title="tools/test/iree-run-module.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module.mlir"
+        ```
+
+    === "Inputs"
+
+        Source file: [`tools/test/iree-run-module-inputs.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-inputs.mlir)
+
+        ```c++ title="tools/test/iree-run-module-inputs.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-inputs.mlir"
+        ```
+
+    === "Outputs"
+
+        Source file: [`tools/test/iree-run-module-outputs.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-outputs.mlir)
+
+        ```c++ title="tools/test/iree-run-module-outputs.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-outputs.mlir"
+        ```
+
+    === "Expected"
+
+        Source file: [`tools/test/iree-run-module-expected.mlir`](https://github.com/openxla/iree/tree/main/tools/test/iree-run-module-expected.mlir)
+
+        ```c++ title="tools/test/iree-run-module-expected.mlir" linenums="1"
+        --8<-- "tools/test/iree-run-module-expected.mlir"
+        ```
 
 ### iree-check-module
 
@@ -147,7 +198,7 @@ runner for the IREE [check framework](./testing-guide.md#end-to-end-tests).
 $ ../iree-build/tools/iree-compile \
   --iree-input-type=stablehlo \
   --iree-hal-target-backends=vmvx \
-  $PWD/tests/e2e/xla_ops/abs.mlir \
+  $PWD/tests/e2e/stablehlo_ops/abs.mlir \
   -o /tmp/abs.vmfb
 ```
 

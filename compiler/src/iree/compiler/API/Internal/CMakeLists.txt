@@ -26,7 +26,6 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRSupport
-    iree::compiler::API::MLIRInteropHeaders
     iree::compiler::ConstEval
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::C

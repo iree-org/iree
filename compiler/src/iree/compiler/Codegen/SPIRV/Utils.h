@@ -15,6 +15,7 @@
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 
@@ -40,6 +41,11 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
 /// compute ops in `funcOp`.
 FailureOr<linalg::TileSizeComputationFunction>
 getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
+
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<scf::SCFTileSizeComputationFunction>
+getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.

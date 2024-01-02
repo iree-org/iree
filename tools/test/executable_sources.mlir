@@ -36,7 +36,7 @@ func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   return %result : tensor<f32>
 }
 
-// CHECK: IR Dump Before mlir::iree_compiler::IREE::HAL::SerializeExecutablesPass
+// CHECK: IR Dump Before SerializeExecutablesPass
 // CHECK: hal.executable public @abs_dispatch_0
 // CHECK:   hal.executable.variant public @vmvx_bytecode_fb
 // CHECK:     vm.func private @abs_dispatch_0_generic

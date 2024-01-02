@@ -12,7 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -134,10 +134,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                TilingConfig &tilingConfig,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE = false);
-
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
-                                          TilingConfig &tilingConfig,
-                                          bool enableVectorMasking);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.

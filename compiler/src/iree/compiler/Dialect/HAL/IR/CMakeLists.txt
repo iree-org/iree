@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "HALDialect.h"
     "HALOps.h"
-    "HALTraits.h"
     "HALTypes.h"
   TEXTUAL_HDRS
     "HALAttrInterfaces.cpp.inc"
