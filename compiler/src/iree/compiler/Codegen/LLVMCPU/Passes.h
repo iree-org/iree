@@ -62,11 +62,6 @@ createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Pass to pad operations on tensors in top-down order.
-enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
-    LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
-
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);

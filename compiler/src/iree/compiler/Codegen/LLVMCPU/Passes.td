@@ -112,13 +112,6 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTensorPad :
-    Pass<"iree-llvmcpu-tensor-pad", "func::FuncOp"> {
-  let summary = "Pass to pad operations on tensors in top-down order.";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
-}
-
 def LLVMCPUTile :
     Pass<"iree-llvmcpu-tile", "func::FuncOp"> {
   let summary = "Pass to tile TilingInterface operations.";
