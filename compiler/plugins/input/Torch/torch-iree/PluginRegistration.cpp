@@ -11,6 +11,7 @@
 #include "torch-iree/InputConversion/Passes.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorDialect.h"
 #include "torch-mlir/Conversion/Passes.h"
+#include "torch-mlir/Conversion/TorchOnnxToTorch/Passes.h"
 #include "torch-mlir/Dialect/Torch/IR/TorchDialect.h"
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionDialect.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
@@ -39,6 +40,7 @@ struct TorchSession
     mlir::torch::registerTorchPasses();
     mlir::torch::registerTorchConversionPasses();
     mlir::torch::registerConversionPasses();
+    mlir::torch::onnx_c::registerTorchOnnxToTorchPasses();
     TorchInput::registerTMTensorConversionPasses();
   }
 
@@ -51,7 +53,13 @@ struct TorchSession
 
   bool extendCustomInputConversionPassPipeline(
       OpPassManager &passManager, std::string_view typeMnemonic) override {
-    if (typeMnemonic == "torch") {
+    if (typeMnemonic == "onnx") {
+      // ONNX input is a pre-processing step to torch.
+      passManager.addNestedPass<func::FuncOp>(
+          mlir::torch::onnx_c::createTorchOnnxToTorchPass());
+    }
+
+    if (typeMnemonic == "torch" || typeMnemonic == "onnx") {
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
@@ -59,6 +67,7 @@ struct TorchSession
           TorchInput::createConvertTMTensorToLinalgExtPass());
       return true;
     }
+
     // TODO: Retire the tm_tensor input pipeline once we are fully switched
     // to the 'torch' pipeline, which handles everything from the 'torch'
     // dialect down (vs just 'tm_tensor' which was converting a couple of
@@ -74,6 +83,7 @@ struct TorchSession
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     typeMnemonics.insert("tm_tensor");
     typeMnemonics.insert("torch");
+    typeMnemonics.insert("onnx");
   }
 
   void populateDetectedCustomInputConversionTypes(

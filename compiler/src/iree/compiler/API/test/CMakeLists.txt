@@ -18,7 +18,6 @@ iree_cc_test(
   DEPS
     IREELLVMIncludeSetup
     iree::compiler::API::Impl
-    iree::compiler::API::MLIRInteropHeaders
     iree::compiler::bindings::c::headers
 )
 

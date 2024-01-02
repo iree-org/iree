@@ -16,7 +16,7 @@
 
 // clang-format off
 #define GET_OP_CLASSES
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h.inc" // IWYU pragma: export
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h.inc" // IWYU pragma: export
 // clang-format on
 
 #endif // #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENOPS_H_

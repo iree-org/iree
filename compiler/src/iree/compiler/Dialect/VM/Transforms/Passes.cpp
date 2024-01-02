@@ -92,6 +92,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createConversionPass(targetOptions));
 
   // Hoist globals and get the final set that need to be initialized.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createReifyRodataTablesPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createDeduplicateRodataPass());
   addCleanupPatterns(passManager);

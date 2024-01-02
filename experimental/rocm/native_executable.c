@@ -134,7 +134,9 @@ iree_status_t iree_hal_rocm_native_executable_create(
           status = ROCM_RESULT_TO_STATUS(
               context->syms,
               hipFuncSetAttribute(
-                  function, HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                  function,
+                  (hipFuncAttribute)
+                      HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
                   shared_memory_sizes[i]),
               "hipFuncSetAttribute");
         }

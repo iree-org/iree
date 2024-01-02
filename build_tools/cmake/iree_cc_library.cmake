@@ -55,6 +55,8 @@ endfunction()
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
+# SYSTEM_INCLUDES: Include directories that should be used with "SYSTEM" scope,
+#   which makes them more tolerant to certain classes of warnings and issues.
 # LINKOPTS: List of link options
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
@@ -97,7 +99,7 @@ function(iree_cc_library)
     _RULE
     "PUBLIC;TESTONLY;SHARED;DISABLE_LLVM_LINK_LLVM_DYLIB"
     "PACKAGE;NAME;WINDOWS_DEF_FILE"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES;SYSTEM_INCLUDES"
     ${ARGN}
   )
 
@@ -146,6 +148,8 @@ function(iree_cc_library)
   # generator.
   list(TRANSFORM _RULE_INCLUDES PREPEND "$<BUILD_INTERFACE:")
   list(TRANSFORM _RULE_INCLUDES APPEND ">")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES PREPEND "$<BUILD_INTERFACE:")
+  list(TRANSFORM _RULE_SYSTEM_INCLUDES APPEND ">")
 
   # Implicit deps.
   if(IREE_IMPLICIT_DEFS_CC_DEPS)
@@ -184,9 +188,10 @@ function(iree_cc_library)
     # We also forward link libraries -- not because the OBJECT libraries do
     # linking but because they get transitive compile definitions from them.
     # Yes. This is state of the art.
-    # Note that SYSTEM scope matches here, in the property name and in the
-    # include directories below on the main rule. If ever removing this,
-    # remove it from all places.
+    target_include_directories(${_OBJECTS_NAME}
+      PUBLIC
+        $<TARGET_PROPERTY:${_NAME},INTERFACE_INCLUDE_DIRECTORIES>
+    )
     target_include_directories(${_OBJECTS_NAME} SYSTEM
       PUBLIC
         $<TARGET_PROPERTY:${_NAME},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
@@ -208,7 +213,7 @@ function(iree_cc_library)
         $<TARGET_PROPERTY:${_NAME},INTERFACE_LINK_LIBRARIES>
     )
 
-    target_include_directories(${_NAME} SYSTEM
+    target_include_directories(${_NAME}
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
@@ -216,6 +221,10 @@ function(iree_cc_library)
     target_include_directories(${_NAME}
       PUBLIC
         ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM PUBLIC
+        ${_RULE_SYSTEM_INCLUDES}
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -269,11 +278,15 @@ function(iree_cc_library)
   else()
     # Generating header-only library.
     add_library(${_NAME} INTERFACE)
-    target_include_directories(${_NAME} SYSTEM
+    target_include_directories(${_NAME}
       INTERFACE
         "$<BUILD_INTERFACE:${IREE_SOURCE_DIR}>"
         "$<BUILD_INTERFACE:${IREE_BINARY_DIR}>"
         ${_RULE_INCLUDES}
+    )
+    target_include_directories(${_NAME}
+      SYSTEM INTERFACE
+        ${_RULE_SYSTEM_INCLUDES}
     )
     target_link_options(${_NAME}
       INTERFACE
@@ -292,13 +305,20 @@ function(iree_cc_library)
     )
   endif()
 
+  if(NOT _RULE_TESTONLY)
+    iree_install_targets(
+      TARGETS ${_NAME}
+      HDRS ${_RULE_HDRS} ${_RULE_TEXTUAL_HDRS}
+    )
+  endif()
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
   if(_DEBUG_IREE_PACKAGE_NAME)
     message(STATUS "  + alias ${_PACKAGE_NS}::${_RULE_NAME}")
   endif()
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 
   if(NOT "${_PACKAGE_NS}" STREQUAL "")
     # If the library name matches the final component of the package then treat
@@ -306,7 +326,7 @@ function(iree_cc_library)
     # 'foo::bar'.
     iree_package_dir(_PACKAGE_DIR)
     if("${_RULE_NAME}" STREQUAL "${_PACKAGE_DIR}")
-      add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+      iree_add_alias_library(${_PACKAGE_NS} ${_NAME})
     endif()
   endif()
 endfunction()
@@ -404,12 +424,9 @@ function(iree_cc_unified_library)
   )
 
   # Forward compile usage requirements from the root library.
-  # Note that SYSTEM scope matches here, in the property name and in the
-  # include directories below on the main rule. If ever removing this,
-  # remove it from all places.
-  target_include_directories(${_NAME} SYSTEM
+  target_include_directories(${_NAME}
     PUBLIC
-      $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_SYSTEM_INCLUDE_DIRECTORIES>
+      $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_INCLUDE_DIRECTORIES>
   )
   target_include_directories(${_NAME}
     PUBLIC
@@ -428,17 +445,21 @@ function(iree_cc_unified_library)
       $<TARGET_PROPERTY:${_RULE_ROOT},INTERFACE_LINK_LIBRARIES>
   )
 
+  iree_install_targets(
+    TARGETS ${_NAME}
+  )
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  iree_add_alias_library(${_PACKAGE_NS}::${_RULE_NAME} ${_NAME})
 
   # If the library name matches the final component of the package then treat
   # it as a default. For example, foo/bar/ library 'bar' would end up as
   # 'foo::bar'.
   iree_package_dir(_PACKAGE_DIR)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
-    add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+    iree_add_alias_library(${_PACKAGE_NS} ${_NAME})
   endif()
 endfunction()
 

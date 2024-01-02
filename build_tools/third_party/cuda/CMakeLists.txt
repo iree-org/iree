@@ -108,6 +108,13 @@ endif()
 # Targets that IREE depends on which encapsulate access to CUDA.
 ################################################################################
 
+# We don't install any headers because their only use is in built code
+# (not public).
+set(IREE_HDRS_ROOT_PATH OFF)
+# Considered part of the runtime. See runtime/src/CMakeLists.txt.
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT IREEDevLibraries)
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_EXPORT_SET Runtime)
+
 iree_c_embed_data(
   PACKAGE
     iree_cuda
@@ -121,10 +128,15 @@ iree_c_embed_data(
     "iree_cuda/libdevice_embedded.h"
   INCLUDES
     # Allows an include like "iree_cuda/libdevice_embedded.h"
-    "${CMAKE_CURRENT_BINARY_DIR}"
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   FLATTEN
   PUBLIC
 )
+
+# Make include dirs only for the BUILD_INTERFACE
+set(_include_dirs ${CUDAToolkit_INCLUDE_DIRS})
+list(TRANSFORM _include_dirs PREPEND "$<BUILD_INTERFACE:")
+list(TRANSFORM _include_dirs APPEND ">")
 
 iree_cc_library(
   PACKAGE
@@ -132,5 +144,5 @@ iree_cc_library(
   NAME
     headers
   INCLUDES
-    ${CUDAToolkit_INCLUDE_DIRS}
+    ${_include_dirs}
 )

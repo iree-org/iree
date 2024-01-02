@@ -74,8 +74,8 @@ stream.executable private @subspanStoreI4 {
       %cst = arith.constant dense<[5, 15, 0, 3, 1, 7, 8, 4]> : tensor<8xi4>
       // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
       %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
-      // CHECK: flow.dispatch.tensor.store %[[TILE_I4]], %[[BINDING]], offsets = [0], sizes = [4], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
-      flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [4], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
+      // CHECK: flow.dispatch.tensor.store %[[TILE_I4]], %[[BINDING]], offsets = [0], sizes = [8], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
+      flow.dispatch.tensor.store %cst, %binding, offsets = [0], sizes = [8], strides = [1] : tensor<8xi4> -> !flow.dispatch.tensor<writeonly:tensor<8xi4>>
       return
     }
   }

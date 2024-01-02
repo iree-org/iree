@@ -228,7 +228,9 @@ iree_status_t iree_hal_hip_native_executable_create(
         status = IREE_HIP_RESULT_TO_STATUS(
             symbols,
             hipFuncSetAttribute(
-                function, HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                function,
+                (hipFuncAttribute)
+                    HIP_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
                 shared_memory_sizes_vec[i]),
             "hipFuncSetAttribute");
       }

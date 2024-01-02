@@ -4,7 +4,10 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(IREE_PACKAGE_ROOT_PREFIX "")
+iree_setup_c_src_root(
+  DEFAULT_EXPORT_SET Runtime
+  DEFAULT_INSTALL_COMPONENT IREEDevLibraries-Runtime
+  IMPLICIT_DEFS_TARGET iree_defs
+)
 
 add_subdirectory(iree)

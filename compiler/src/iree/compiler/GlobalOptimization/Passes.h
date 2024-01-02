@@ -17,9 +17,9 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-// We have a layer of indirection around the GlobalOptimizationOptions because
-// we also need a reference to the const-eval builder, which is injected
-// in by callers.
+/// We have a layer of indirection around the GlobalOptimizationOptions because
+/// we also need a reference to the const-eval builder, which is injected
+/// in by callers.
 struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   GlobalOptimizationOptions options;
 
@@ -30,9 +30,9 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   std::function<void(OpPassManager &passManager)> buildConstEvalPassPipeline;
 };
 
-// Subset of the overall pass pipeline for optimizing globals and numerics.
-// We may ultimately break this out separately so creating a syntactic
-// distinction to keep that as an option.
+/// Subset of the overall pass pipeline for optimizing globals and numerics.
+/// We may ultimately break this out separately so creating a syntactic
+/// distinction to keep that as an option.
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions);
 
@@ -40,74 +40,75 @@ void buildGlobalOptimizationPassPipeline(
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Cleans up any numeric narrowing ops inserted by
-// iree-global-opt-infer-numeric-narrowing.
+/// Cleans up any numeric narrowing ops inserted by
+/// iree-global-opt-infer-numeric-narrowing.
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 
-// Creates a pass to convert linalg convolution ops with 1x1 kernels into
-// linalg.matmul
+/// Converts linalg convolution ops with 1x1 kernels into linalg.matmul.
 std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
-// A pass to fuse dequantization and matmul linalg.generic ops
+/// Fuses dequantization and matmul linalg.generic ops
 std::unique_ptr<Pass>
 createDecomposeConcatPass(bool enableConcatTransposition = false);
 
-// Create a pass to detach elementwise ops from named Linalg ops.
+/// Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.
+std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass();
+
+/// Detaches elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();
 
-// Apply patterns to erase unused linalg operands and remove dead code
-// associated.
+/// Applies patterns to erase unused linalg operands and remove dead code
+/// associated.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createEraseUnusedLinalgOperands();
 
-// Expands tensor shape dimensions into SSA values across the program.
+/// Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
-// A pass to fuse dequantization and matmul linalg.generic ops
+/// Fuses dequantization and matmul linalg.generic ops
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
     bool enableQuantizedMatmulReassociation = false);
 
-// A pass to fuse two matmul ops and a linalg.generic Silu op
+/// Fuses two matmul ops and a linalg.generic Silu op
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseSiluHorizontalMatmulPass();
 
-// Create a pass that generalizes some named Linalg ops into `linalg.generic`
-// operations since the IREE compiler can handle that better.
+/// Generalizes some named Linalg ops into `linalg.generic` operations since the
+/// compiler can handle that better.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGeneralizeLinalgNamedOpsPass();
 
-// Infers and inserts util.numeric.optional_narrow ops at points that may be
-// beneficial.
+/// Infers and inserts util.numeric.optional_narrow ops at points that may be
+/// beneficial.
 std::unique_ptr<Pass> createInferNumericNarrowingPass();
 
-// Materializes logical encodings to physical encodings if there is a single
-// device target.
+/// Materializes logical encodings to physical encodings if there is a single
+/// device target.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createMaterializeHomogeneousEncodingsPass();
 
-// Optimizes numerics given annotations added via
-// iree-global-opt-infer-numeric-narrowing.
+/// Optimizes numerics given annotations added via
+/// iree-global-opt-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
-// Create a pass that propagates linalg.transpose ops to a restricted set of
-// operations.
+/// Propagates linalg.transpose ops to a restricted set of operations.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation = false);
 
-// Create a pass to raise sequence of ops to higher level linalg.ext
-// representation.
+/// Performs specialized raisings of various sequences of ops to a
+/// representation easier for the compiler to handle.
 std::unique_ptr<Pass> createRaiseSpecialOps();
 
-// Removes tensors that have 0-extents.
+/// Removes tensors that have 0-extents.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
-// Sets encoding for tensors to allow tiled execution of operations.
+/// Sets encoding for tensors to allow tiled execution of operations.
 std::unique_ptr<Pass> createSetEncodingPass();
 
-// Convert linalg.generic ops to linalg.batch_matmul, possibly with transposes
-// on operands/result.
+/// Converts linalg.generic ops to linalg.batch_matmul, possibly with transposes
+/// on operands/result.
 std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
 
 void registerGlobalOptimizationPipeline();

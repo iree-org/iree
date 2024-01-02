@@ -54,3 +54,21 @@ vm.module @my_module {
     vm.return %0 : !vm.buffer
   }
 }
+
+// -----
+
+#table_data = [
+  dense<[2, 3]> : vector<2xi8>,
+  "hello",
+  dense<4> : tensor<3xi8>
+]
+
+vm.module @my_module {
+  // CHECK-LABEL: @rodata_table_inline
+  vm.func @rodata_table_inline() -> !vm.buffer {
+    // CHECK-NEXT: = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer
+    // CHECK-SAME: = [dense<[2, 3]> : vector<2xi8>, "hello", dense<4> : tensor<3xi8>]
+    %0:2 = vm.rodata.table.inline i32 : !vm.buffer, !vm.buffer = #table_data
+    vm.return %0#1 : !vm.buffer
+  }
+}

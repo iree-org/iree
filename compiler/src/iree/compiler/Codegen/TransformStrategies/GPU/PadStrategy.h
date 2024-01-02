@@ -23,7 +23,7 @@ public:
   PadStrategy(MLIRContext *context,
               const transform_ext::MatchedPadCaptures &captures,
               const PadConfig &config, const GPUModel &gpuModel)
-      : ctx(context), GPUStrategy(gpuModel), captures(captures) {
+      : GPUStrategy(gpuModel), ctx(context), captures(captures) {
     initDefaultValues();
     (void)config;
   }

@@ -200,6 +200,41 @@ iree_tablegen_library(
 )
 
 ###############################################################################
+# TorchOnnxToTorch
+###############################################################################
+
+file(GLOB _TorchOnnxToTorchPasses_SRCS
+  "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchOnnxToTorch/*.cpp"
+)
+iree_cc_library(
+  NAME
+    TorchOnnxToTorchPasses
+  SRCS
+    "${TORCH_MLIR_ROOT_DIR}/lib/Conversion/TorchOnnxToTorch/Passes.cpp"
+    ${_TorchOnnxToTorchPasses_SRCS}
+  DEPS
+    ::defs
+    ::TorchConversionDialectIR
+    ::TorchDialectIR
+    ::TorchOnnxToTorchPassesGen
+    MLIRArithDialect
+    MLIRFuncDialect
+    MLIRIR
+    MLIRPass
+)
+
+iree_tablegen_library(
+  NAME
+    TorchOnnxToTorchPassesGen
+  TD_FILE
+    "${TORCH_MLIR_ROOT_DIR}/include/torch-mlir/Conversion/TorchOnnxToTorch/Passes.td"
+  OUTS
+    -gen-pass-decls Conversion/TorchOnnxToTorch/Passes.h.inc
+    -gen-pass-capi-header Conversion/TorchOnnxToTorch/Passes.capi.h.inc
+    -gen-pass-capi-impl Conversion/TorchOnnxToTorch/Passes.capi.cpp.inc
+)
+
+###############################################################################
 # CAPI
 ###############################################################################
 

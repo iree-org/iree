@@ -476,6 +476,27 @@ static void propagateLayoutToTransposeOp(
   update(result, changed);
 }
 
+static void propagateLayoutToContractionOp(
+    vector::ContractionOp contraction,
+    ArrayRef<const DistributionLayout *> operandLattices,
+    ArrayRef<DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Contraction has only one vector result.
+  DistributionLayout *result = resultLattices[0];
+  // Get the init value of the contraction.
+  const DistributionLayout *init = operandLattices[2];
+
+  // If result lattice already has a layout, we cannot do anything. We do not
+  // impose layout conflicts on results.
+  if (result->hasLayout()) {
+    return;
+  }
+
+  // True to resolve result with init.
+  ChangeResult changed = result->resolve(init);
+  update(result, changed);
+}
+
 void propagationTransferFunction(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
     ArrayRef<DistributionLayout *> resultLattices,
@@ -496,6 +517,12 @@ void propagationTransferFunction(
   if (auto transpose = dyn_cast<vector::TransposeOp>(op)) {
     propagateLayoutToTransposeOp(transpose, operandLattices, resultLattices,
                                  update);
+    return;
+  }
+
+  if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
+    propagateLayoutToContractionOp(contraction, operandLattices, resultLattices,
+                                   update);
     return;
   }
 
@@ -620,6 +647,27 @@ static void enforceLayoutToBroadcastOp(
   update(value, changed);
 }
 
+static void enforceLayoutToContractionOp(
+    vector::ContractionOp contraction,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Contraction has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+  // Contraction has init value at position 2.
+  DistributionLayout *value = operandLattices[2];
+
+  // Cannot enforce layout if result is uninitialized.
+  if (result->isUninitialized()) {
+    return;
+  }
+
+  // True to resolve the init value with the result layout.
+  ChangeResult changed =
+      value->resolveWithPossibleConflict(result, getOpOperand(contraction, 2));
+  update(value, changed);
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -646,6 +694,12 @@ void enforcementTransferFunction(
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op)) {
     enforceLayoutToBroadcastOp(broadcast, operandLattices, resultLattices,
                                update);
+    return;
+  }
+
+  if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
+    enforceLayoutToContractionOp(contraction, operandLattices, resultLattices,
+                                 update);
     return;
   }
 }
@@ -763,7 +817,8 @@ void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Propagate the layouts.
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      inputLattice->resolve(forwardedLattice);
+      ChangeResult changed = inputLattice->resolve(forwardedLattice);
+      propagateIfChanged(inputLattice, changed);
     }
   }
 }
@@ -887,8 +942,9 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     int64_t curr = 0;
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      forwardedLattice->resolveWithPossibleConflict(inputLattice,
-                                                    *forwardedOperands[curr]);
+      ChangeResult changed = forwardedLattice->resolveWithPossibleConflict(
+          inputLattice, *forwardedOperands[curr]);
+      propagateIfChanged(forwardedLattice, changed);
       curr++;
     }
   }
@@ -924,4 +980,42 @@ VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
     return VectorLayoutInterface();
   }
   return layout->getLayout();
+}
+
+void VectorLayoutAnalysis::debugAnnotateLayouts() {
+  // Annotate each operation with the layout of it's result.
+  root->walk([&](Operation *op) {
+    if (op->getNumResults() == 0) {
+      return;
+    }
+
+    for (auto [index, result] : llvm::enumerate(op->getResults())) {
+      if (!isa<VectorType>(result.getType())) {
+        continue;
+      }
+
+      // Do not annotate resolve_conflict operations since they already have
+      // this information in their attributes.
+      if (isa<IREE::VectorExt::LayoutConflictResolutionOp>(op)) {
+        continue;
+      }
+
+      Attribute layout = getLayout<Attribute>(result);
+      if (!layout) {
+        continue;
+      }
+
+      op->setAttr("layout_result_" + std::to_string(index), layout);
+    }
+  });
+}
+
+void VectorLayoutAnalysis::print(raw_ostream &os) {
+  debugAnnotateLayouts();
+  root->print(os);
+}
+
+void VectorLayoutAnalysis::dump() {
+  print(llvm::dbgs());
+  llvm::dbgs() << "\n";
 }

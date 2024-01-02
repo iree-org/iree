@@ -126,6 +126,15 @@ public:
     return cast<T>(layout);
   }
 
+  /// Annotate each operation with "vector_result_x" attributes that specify
+  /// the layout of each result of the operation. 'x' here is the x^th result.
+  /// This is only for debugging purposes, to understand the result of the
+  /// analysis better.
+  void debugAnnotateLayouts();
+
+  void print(raw_ostream &os);
+  void dump();
+
 private:
   VectorLayoutInterface getLayout(Value val);
 
