@@ -63,7 +63,6 @@ iree_cc_library(
     "LLVMCPUSelectLoweringStrategy.cpp"
     "LLVMCPUSplitReduction.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
-    "LLVMCPUTensorPad.cpp"
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
