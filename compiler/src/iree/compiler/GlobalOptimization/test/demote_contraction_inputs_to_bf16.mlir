@@ -127,3 +127,95 @@ func.func @nonmatch_matmul_f32f32f64(%arg0 : tensor<100x250xf32>, %arg1 : tensor
 // CHECK: linalg.matmul
 // CHECK-SAME: ins(%[[ARG0]], %[[ARG1]] : tensor<100x250xf32>, tensor<250x500xf32>)
 // CHECK-SAME: outs(%[[ARG2]] : tensor<100x500xf64>)
+
+// -----
+
+func.func @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<4x250x100xf32>, %arg1 : tensor<4x250x500xf32>,
+    %arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32> {
+  %0 = linalg.batch_matmul_transpose_a ins(%arg0, %arg1 : tensor<4x250x100xf32>, tensor<4x250x500xf32>)
+      outs(%arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32>
+  return %0 : tensor<4x100x500xf32>
+}
+
+// CHECK: @batch_matmul_transpose_a_f32f32f32
+// CHECK-SAME: %[[ARG0:.+]]: tensor<4x250x100xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<4x250x500xf32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<4x100x500xf32>
+// CHECK: %[[DEMOTED0:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG0]] : tensor<4x250x100xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: %[[DEMOTED1:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG1]] : tensor<4x250x500xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: linalg.batch_matmul_transpose_a
+// CHECK-SAME: ins(%[[DEMOTED0]], %[[DEMOTED1]] : tensor<4x250x100xbf16>, tensor<4x250x500xbf16>)
+// CHECK-SAME: outs(%[[ARG2]] : tensor<4x100x500xf32>)
+
+// -----
+
+func.func @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<4x500x250xf32>,
+    %arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32> {
+  %0 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<4x100x250xf32>, tensor<4x500x250xf32>)
+      outs(%arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32>
+  return %0 : tensor<4x100x500xf32>
+}
+
+// CHECK: @batch_matmul_transpose_b_f32f32f32
+// CHECK-SAME: %[[ARG0:.+]]: tensor<4x100x250xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<4x500x250xf32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<4x100x500xf32>
+// CHECK: %[[DEMOTED0:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG0]] : tensor<4x100x250xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: %[[DEMOTED1:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG1]] : tensor<4x500x250xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: linalg.batch_matmul_transpose_b
+// CHECK-SAME: ins(%[[DEMOTED0]], %[[DEMOTED1]] : tensor<4x100x250xbf16>, tensor<4x500x250xbf16>)
+// CHECK-SAME: outs(%[[ARG2]] : tensor<4x100x500xf32>)
+
+// -----
+
+func.func @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg1 : tensor<250x500xf32>,
+    %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
+  %0 = linalg.matmul_transpose_a ins(%arg0, %arg1 : tensor<250x100xf32>, tensor<250x500xf32>)
+      outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
+  return %0 : tensor<100x500xf32>
+}
+
+// CHECK: @matmul_transpose_a_f32f32f32
+// CHECK-SAME: %[[ARG0:.+]]: tensor<250x100xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<250x500xf32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<100x500xf32>
+// CHECK: %[[DEMOTED0:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG0]] : tensor<250x100xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: %[[DEMOTED1:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG1]] : tensor<250x500xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: linalg.matmul_transpose_a
+// CHECK-SAME: ins(%[[DEMOTED0]], %[[DEMOTED1]] : tensor<250x100xbf16>, tensor<250x500xbf16>)
+// CHECK-SAME: outs(%[[ARG2]] : tensor<100x500xf32>)
+
+// -----
+
+func.func @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<500x250xf32>,
+    %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
+  %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<500x250xf32>)
+      outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
+  return %0 : tensor<100x500xf32>
+}
+
+// CHECK: @matmul_transpose_b_f32f32f32
+// CHECK-SAME: %[[ARG0:.+]]: tensor<100x250xf32>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<500x250xf32>
+// CHECK-SAME: %[[ARG2:.+]]: tensor<100x500xf32>
+// CHECK: %[[DEMOTED0:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG0]] : tensor<100x250xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: %[[DEMOTED1:.+]] = linalg.generic
+// CHECK-SAME: ins(%[[ARG1]] : tensor<500x250xf32>)
+// CHECK: arith.truncf {{.*}} : f32 to bf16
+// CHECK: linalg.matmul_transpose_b
+// CHECK-SAME: ins(%[[DEMOTED0]], %[[DEMOTED1]] : tensor<100x250xbf16>, tensor<500x250xbf16>)
+// CHECK-SAME: outs(%[[ARG2]] : tensor<100x500xf32>)
