@@ -47,8 +47,6 @@ func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
 // CHECK-FUSE:        return %[[D7]] : tensor<2x16x32xf32>
 // CHECK-FUSE:      }
 
-// --------------
-
 // CHECK-NO-FUSE-DAG:  #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK-NO-FUSE-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-NO-FUSE:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
