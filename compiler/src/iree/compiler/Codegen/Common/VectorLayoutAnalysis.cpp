@@ -19,30 +19,49 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 class DistributionLayout;
 class PropagateLayout;
 class EnforceLayout;
+class VectorLayoutSolver;
 
-class DistributionLayout : public AnalysisState {
+using VectorValue = TypedValue<VectorType>;
+
+/// The result of a resolution.
+/// Change: The layout was changed.
+/// Conflict: The layout was not changed because there was a conflict.
+/// NoChange: The layout was not changed because it was already the same.
+enum class ResolutionResult {
+  Change,
+  Conflict,
+  NoChange,
+};
+
+enum class TransitionKind {
+  Forward,
+  Backward,
+};
+
+class DistributionLayout {
 public:
-  explicit DistributionLayout(Value val) : AnalysisState(val) {}
+  explicit DistributionLayout(VectorValue val, VectorLayoutSolver &solver)
+      : val(val), solver(solver) {}
 
-  TypedValue<VectorType> getValue() const {
-    ProgramPoint point = getPoint();
-    assert(isa<Value>(point) && "expected program point to be a value");
-    Value val = cast<Value>(point);
-    assert(isa<VectorType>(val.getType()) &&
-           "expected value to be of vector type");
-    return cast<TypedValue<VectorType>>(val);
-  }
+  VectorValue getValue() const { return val; }
 
-  /// TODO: This currently, creates a new value but doesn't replace it with the
-  /// current value, because that would be wrong. Find a way to take care of
-  /// that better.
-  ChangeResult resolveWithPossibleConflict(const DistributionLayout *rhs,
-                                           OpOperand &operand);
-  ChangeResult resolveWithPossibleConflict(const VectorLayoutInterface &rhs,
-                                           OpOperand &operand);
+  /// Resolve the current lattice with the given layout. Creates a conflict
+  /// resolution if there is a conflict between the two layouts. When a conflict
+  /// resolution is created, the layout of the current lattice is resolved,
+  /// but all users of the current lattice are updated to use the old layout.
+  void resolve(const DistributionLayout *rhs);
+  void resolve(const VectorLayoutInterface &rhs);
 
-  ChangeResult resolve(const DistributionLayout *rhs);
-  ChangeResult resolve(const VectorLayoutInterface &rhs);
+  /// Resolve the current lattice with the given layout. Creates a conflict
+  /// resolution if there is a conflict between the two layouts. When a conflict
+  /// resolution is created, the given "use" is updated to use the resolved
+  /// layout.
+  ///
+  /// Returns the lattice element for the use after resolution.
+  [[nodiscard]] DistributionLayout *resolveValUse(const DistributionLayout *rhs,
+                                                  OpOperand &use);
+  [[nodiscard]] DistributionLayout *
+  resolveValUse(const VectorLayoutInterface &rhs, OpOperand &use);
 
   VectorLayoutInterface getLayout() const { return vectorLayout; }
 
@@ -57,30 +76,19 @@ public:
     return !(*this == rhs);
   }
 
-  void print(raw_ostream &os) const override;
+  void print(raw_ostream &os) const;
+  void dump() const;
 
-  /// Subscribe an analysis to updates of the lattice. When the lattice
-  /// changes, subscribed analyses are re-invoked. This is more efficient than
-  /// relying on the dependency map.
-  void subscribePropagation(PropagateLayout *analysis) {
-    propagation = analysis;
+  friend raw_ostream &operator<<(raw_ostream &os,
+                                 const DistributionLayout &layout) {
+    layout.print(os);
+    return os;
   }
-  void subscribeEnforcement(EnforceLayout *analysis) { enforcement = analysis; }
 
 private:
-  /// When the lattice gets updated, propagate an update to users of the value
-  /// using its use-def chain to subscribed analyses.
-  void onUpdate(DataFlowSolver *solver) const override;
-
-  /// The result of a resolution.
-  /// Change: The layout was changed.
-  /// Conflict: The layout was not changed because there was a conflict.
-  /// NoChange: The layout was not changed because it was already the same.
-  enum ResolutionResult {
-    Change,
-    Conflict,
-    NoChange,
-  };
+  /// When the lattice gets updated, broadcast it's changes to all potential
+  /// users of this lattice.
+  void broadcastChanges() const;
 
   /// Attempt to resolve the current lattice with the given lattice. Returns if
   /// the current layout was not changed, changed or if there was a layout
@@ -95,78 +103,83 @@ private:
     vectorLayout = layout;
   }
 
+  /// The vector value that this lattice element represents.
+  VectorValue val;
+
   /// The layout of the vector SSA Value.
   VectorLayoutInterface vectorLayout;
 
-  /// Each lattice element stores a pointer to the analysis that work on it so
-  /// it can notify them when it changes.
-  PropagateLayout *propagation = nullptr;
-  EnforceLayout *enforcement = nullptr;
+  VectorLayoutSolver &solver;
 };
 
-class EnforceLayout : public DataFlowAnalysis {
+class EnforceLayout {
 public:
-  explicit EnforceLayout(DataFlowSolver &solver, MLIRContext *ctx)
-      : DataFlowAnalysis(solver), ctx(ctx) {}
+  explicit EnforceLayout(VectorLayoutSolver &solver) : solver(solver) {}
 
-  LogicalResult initialize(Operation *root) override;
-
-  LogicalResult visit(ProgramPoint point) override;
-
-  void registerNewValue(Value val, const VectorLayoutInterface &layout);
-
-  friend class DistributionLayout;
+  void visit(Operation *op);
 
 private:
-  void visitOperation(Operation *op);
-
   void visitRegionSuccessors(RegionBranchOpInterface branch,
                              RegionBranchPoint branchPoint,
                              MutableArrayRef<OpOperand> operands);
 
-  DistributionLayout *getLatticeElement(Value val);
+  DistributionLayout *getLatticeElement(VectorValue val);
 
-  MLIRContext *ctx;
+  VectorLayoutSolver &solver;
 };
 
-class PropagateLayout : public DataFlowAnalysis {
+class PropagateLayout {
 public:
-  explicit PropagateLayout(
-      DataFlowSolver &solver,
-      DenseMap<TypedValue<VectorType>, VectorLayoutInterface> &anchors,
-      MLIRContext *ctx)
-      : DataFlowAnalysis(solver), anchors(anchors), ctx(ctx) {}
+  explicit PropagateLayout(VectorLayoutSolver &solver) : solver(solver) {}
 
-  LogicalResult initialize(Operation *root) override;
-
-  LogicalResult visit(ProgramPoint point) override;
-
-  /// Register a new value to be part of the dataflow analysis. The value should
-  /// not be part of the analysis already. This is used for new values that are
-  /// created.
-  void registerNewValue(Value val, const VectorLayoutInterface &layout);
-
-  friend class DistributionLayout;
+  void visit(Operation *op);
 
 private:
-  void visitOperation(Operation *op);
-
   void visitRegionSuccessors(RegionBranchOpInterface branch,
                              RegionBranchPoint branchPoint,
                              OperandRange operands);
 
-  DistributionLayout *getLatticeElement(Value val);
+  DistributionLayout *getLatticeElement(VectorValue val);
 
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
+  VectorLayoutSolver &solver;
+};
 
+class VectorLayoutSolver {
+public:
+  VectorLayoutSolver(MLIRContext *ctx)
+      : ctx(ctx), propagation(*this), enforcement(*this) {}
+
+  DistributionLayout *getLatticeElement(VectorValue val);
+
+  void enqueueLowPriority(Operation *op, TransitionKind kind) {
+    worklist.emplace_back(op, kind);
+  }
+
+  void enqueueHighPriority(Operation *op, TransitionKind kind) {
+    worklist.emplace_front(op, kind);
+  }
+
+  void solve();
+
+private:
   MLIRContext *ctx;
+
+  PropagateLayout propagation;
+  EnforceLayout enforcement;
+
+  /// The lattice for each value.
+  DenseMap<VectorValue, std::unique_ptr<DistributionLayout>> lattices;
+
+  /// The solver's work queue. Work items can be inserted to the front of the
+  /// queue to be processed greedily.
+  std::deque<std::pair<Operation *, TransitionKind>> worklist;
 };
 
 /// ==========================================================================
 ///        DistributionLayout
 /// ==========================================================================
 
-DistributionLayout::ResolutionResult
+ResolutionResult
 DistributionLayout::doResolution(const VectorLayoutInterface &rhs) {
   VectorLayoutInterface &lhs = vectorLayout;
 
@@ -183,6 +196,8 @@ DistributionLayout::doResolution(const VectorLayoutInterface &rhs) {
   // Take the other layout if the current layout is empty.
   if (!lhs && rhs) {
     setInnerLayout(rhs);
+    // Broadcast changes to all users of this lattice.
+    broadcastChanges();
     return ResolutionResult::Change;
   }
 
@@ -190,78 +205,78 @@ DistributionLayout::doResolution(const VectorLayoutInterface &rhs) {
   return ResolutionResult::Conflict;
 }
 
-ChangeResult DistributionLayout::resolveWithPossibleConflict(
-    const VectorLayoutInterface &rhs, OpOperand &opOperand) {
+DistributionLayout *
+DistributionLayout::resolveValUse(const VectorLayoutInterface &rhs,
+                                  OpOperand &opOperand) {
   ResolutionResult result = doResolution(rhs);
 
   // If there is no conflict, simply return.
-  if (result == ResolutionResult::NoChange) {
-    return ChangeResult::NoChange;
-  }
-  if (result == ResolutionResult::Change) {
-    return ChangeResult::Change;
+  if (result != ResolutionResult::Conflict) {
+    return this;
   }
 
-  // Resolve conflict by create an operation that takes the input the conflicted
-  // value and returns the resolved value.
+  // Resolve conflict by create an operation that takes the input the
+  // conflicted value and returns the resolved value.
   OpBuilder builder(opOperand.getOwner());
   Value input = opOperand.get();
   // Create a resolution operation. This conflict should be handeled later by
   // someone else, not this analysis.
   Operation *resolveOp =
-      builder.create<IREE ::VectorExt::LayoutConflictResolutionOp>(
+      builder.create<IREE::VectorExt::LayoutConflictResolutionOp>(
           input.getLoc(), input.getType(), input, vectorLayout, rhs);
-  Value resolvedValue = resolveOp->getResult(0);
+  VectorValue resolvedValue = cast<VectorValue>(resolveOp->getResult(0));
   opOperand.set(resolvedValue);
 
-  // Create a new value for the resolved value and subscribe it to propagation
-  // and enforcement.
-  // We possibly don't need to subscribe this since this value has already
-  // reached the top of the lattice and shouldn't do anything else. But it's
-  // nicer to do it to have consistency.
-  DistributionLayout *resolvedLayout =
-      propagation->getLatticeElement(resolvedValue);
-  resolvedLayout->subscribeEnforcement(enforcement);
-
   // We can now resolve this resolved value to the required layout.
+  DistributionLayout *resolvedLayout = solver.getLatticeElement(resolvedValue);
   resolvedLayout->resolve(rhs);
 
-  // No change actually needs to be propagated after a conflict resolution.
-  // TODO: Ideally, there should be another state in the lattice which says
-  // "Fixed", which would say that there is no way you can change this layout
-  // anymore, and it should be override any other layout used.
-  return ChangeResult::NoChange;
+  return resolvedLayout;
 }
 
-ChangeResult
-DistributionLayout::resolveWithPossibleConflict(const DistributionLayout *rhs,
-                                                OpOperand &opOperand) {
+DistributionLayout *
+DistributionLayout::resolveValUse(const DistributionLayout *rhs,
+                                  OpOperand &opOperand) {
   assert(rhs && "layout to resolve with should not be null");
-  return resolveWithPossibleConflict(rhs->vectorLayout, opOperand);
+  return resolveValUse(rhs->vectorLayout, opOperand);
 }
 
-ChangeResult DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
+void DistributionLayout::resolve(const VectorLayoutInterface &rhs) {
   ResolutionResult result = doResolution(rhs);
 
-  switch (result) {
-  case ResolutionResult::NoChange:
-    return ChangeResult::NoChange;
-  case ResolutionResult::Change:
-    return ChangeResult::Change;
-  case ResolutionResult::Conflict: {
-    llvm::errs() << "Layout conflict at: " << *this << "\n";
-    llvm::errs() << "With: " << rhs << "\n";
-    llvm::report_fatal_error("Layout conflict should have been handled with "
-                             "resolveWithPossibleConflict instead");
-  }
+  if (result != ResolutionResult::Conflict) {
+    return;
   }
 
-  // This return will never be reached, but it's here to make the compiler
-  // happy.
-  return ChangeResult::NoChange;
+  // Resolve conflict by create an operation that takes the input the
+  // resolved value and returns the conflicted value.
+  OpBuilder builder(getValue().getContext());
+
+  // Save the conflicted layout for the users.
+  VectorLayoutInterface conflictedLayout = getLayout();
+
+  // Set the layout of this value to the resolved layout.
+  setInnerLayout(rhs);
+
+  // Create a resolution operation. This conflict should be handeled later by
+  // someone else, not this analysis.
+  VectorValue resolvedValue = getValue();
+  Operation *resolveOp =
+      builder.create<IREE::VectorExt::LayoutConflictResolutionOp>(
+          resolvedValue.getLoc(), resolvedValue.getType(), resolvedValue, rhs,
+          conflictedLayout);
+  VectorValue conflictedValue = cast<VectorValue>(resolveOp->getResult(0));
+
+  // Replace all uses of the resolved value with the conflicted value.
+  resolvedValue.replaceAllUsesWith(conflictedValue);
+
+  // We can now give the conflicted value the old layout.
+  DistributionLayout *conflictedLattice =
+      solver.getLatticeElement(conflictedValue);
+  conflictedLattice->resolve(conflictedLayout);
 }
 
-ChangeResult DistributionLayout::resolve(const DistributionLayout *rhs) {
+void DistributionLayout::resolve(const DistributionLayout *rhs) {
   assert(rhs && "layout to resolve with should not be null");
   return resolve(rhs->vectorLayout);
 }
@@ -274,37 +289,47 @@ void DistributionLayout::print(raw_ostream &os) const {
   }
 }
 
-void DistributionLayout::onUpdate(DataFlowSolver *solver) const {
-  AnalysisState::onUpdate(solver);
+void DistributionLayout::broadcastChanges() const {
+  VectorValue value = getValue();
 
-  Value value = point.get<Value>();
-
-  if (propagation) {
-    // Make propagation run again on all users of this value.
-    for (Operation *user : value.getUsers()) {
-      solver->enqueue({user, propagation});
-    }
-    // TODO: Maybe we need to run it on the parent operation as well to give
-    // layout to other results? Seems unlikely though as results usually
-    // don't need the same layout?
+  // Forward analyse all users of this value.
+  // We give high priority to this forward analysis.
+  for (Operation *user : value.getUsers()) {
+    solver.enqueueHighPriority(user, TransitionKind::Forward);
   }
 
-  if (enforcement) {
-    // Make enforcement run on the parent.
-    if (Operation *definingOp = value.getDefiningOp()) {
-      solver->enqueue({definingOp, enforcement});
-    } else {
-      // TODO: This is not always correct. Ideally, we should enqueue all
-      // predecessors of these block arguements.
-      solver->enqueue({value.getParentBlock()->getParentOp(), enforcement});
-    }
-
-    // Enforce users of this value also, as some other operands may need to
-    // be updated.
-    for (Operation *user : value.getUsers()) {
-      solver->enqueue({user, enforcement});
+  // Backward analyse all users of this value with atleast 2 operands. This is
+  // done to enforce layout changes on other operands of the same operation.
+  // We give high priority to this backward analysis.
+  for (Operation *user : value.getUsers()) {
+    if (user->getNumOperands() >= 2) {
+      solver.enqueueHighPriority(user, TransitionKind::Backward);
     }
   }
+
+  // Backward analyse the parent operation of this value.
+  // We give low priority to this backward analysis, since this generates
+  // conflicts and we prefer to resolve conflicts as late as possible, as
+  // so that we have as much information as possible.
+  if (Operation *definingOp = value.getDefiningOp()) {
+    solver.enqueueLowPriority(definingOp, TransitionKind::Backward);
+  } else {
+    // TODO(Groverkss): This may not always be correct (I cannot prove it right
+    // now). Ideally, we should enqueue all predecessors of these block
+    // arguements. The expectation here is that the parent op will recursively
+    // enqueue all its predecessors.
+    solver.enqueueLowPriority(value.getParentBlock()->getParentOp(),
+                              TransitionKind::Backward);
+  }
+
+  // TODO(Groverkss): Ideally, we should also enqueue forward analysis on
+  // the parent operation of this value. But, usually, there are no constraints
+  // on two results of the same operation. If in future we have such
+  // constraints, we should add an enqueue here.
+}
+
+DistributionLayout *EnforceLayout::getLatticeElement(VectorValue val) {
+  return solver.getLatticeElement(val);
 }
 
 /// ==========================================================================
@@ -326,8 +351,8 @@ static OpOperand &getOpOperand(Operation *op, unsigned operandLatticeIndex) {
   llvm::report_fatal_error("No vector operand found");
 }
 
-/// Get a layout if all the given layouts are same. If all layouts are not same,
-/// return nullptr.
+/// Get a layout if all the given layouts are same. If all layouts are not
+/// same, return nullptr.
 static const DistributionLayout *
 getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
   if (layouts.empty())
@@ -344,7 +369,7 @@ getAgreedLayout(ArrayRef<const DistributionLayout *> layouts) {
 /// Hueristic to use to choose the best layout when enforcing the same layout
 /// to all operands. Current hueristic is to simply choose the first operand
 /// which has a layout.
-/// TODO: Use a better hueristic.
+/// TODO(Groverkss): Use a better hueristic.
 static DistributionLayout *
 enforceSameLayoutHueristic(ArrayRef<DistributionLayout *> operands) {
   DistributionLayout *chosenOperandLayout = nullptr;
@@ -359,21 +384,18 @@ enforceSameLayoutHueristic(ArrayRef<DistributionLayout *> operands) {
 
 /// Given a list of layouts for operands, enforce a single layout for all of
 /// them.
-static void enforceSameLayoutForOperands(
-    Operation *op, ArrayRef<DistributionLayout *> operands,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+static void
+enforceSameLayoutForOperands(Operation *op,
+                             MutableArrayRef<DistributionLayout *> operands) {
   DistributionLayout *chosenOperandLayout =
       enforceSameLayoutHueristic(operands);
 
   // Enforce the layout to other operands.
   if (chosenOperandLayout) {
-    // Note that the operand lattice is not updated. So using the operand
-    // lattice again can cause bugs.
     for (auto [index, lattice] : llvm::enumerate(operands)) {
       OpOperand &opOperand = getOpOperand(op, index);
-      ChangeResult changed =
-          lattice->resolveWithPossibleConflict(chosenOperandLayout, opOperand);
-      update(lattice, changed);
+      // Update the lattice with the resolved layout.
+      lattice = lattice->resolveValUse(chosenOperandLayout, opOperand);
     }
   }
 }
@@ -384,8 +406,7 @@ static void enforceSameLayoutForOperands(
 
 static void propagateLayoutToElementwiseOp(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
-    ArrayRef<DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    ArrayRef<DistributionLayout *> resultLattices) {
   // All operands and results must agree on the same layout.
 
   // We do not support multiple results yet.
@@ -396,7 +417,7 @@ static void propagateLayoutToElementwiseOp(
 
   // If result lattice already has a layout, we cannot do
   // anything. We do not impose layout conflicts on results.
-  // TODO: Explore if this is actually needed.
+  // TODO(Groverkss): Explore if this is actually needed.
   if (result->hasLayout()) {
     return;
   }
@@ -408,15 +429,13 @@ static void propagateLayoutToElementwiseOp(
     return;
   }
 
-  ChangeResult changed = result->resolve(chosenOperandLayout);
-  update(result, changed);
+  result->resolve(chosenOperandLayout);
 }
 
 static void propagateLayoutToMultiReductionOp(
     vector::MultiDimReductionOp multiReduce,
     ArrayRef<const DistributionLayout *> operandLattices,
-    ArrayRef<DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    ArrayRef<DistributionLayout *> resultLattices) {
   // Multi reduce has only one vector result.
   DistributionLayout *result = resultLattices[0];
   // Multi reduce has first vector operands as the value being reduced.
@@ -430,26 +449,22 @@ static void propagateLayoutToMultiReductionOp(
     return;
   }
 
-  // If the vector begin reduced has a layout, then propagate it to the result.
-  // by projecting
+  // If the vector begin reduced has a layout, then propagate it to the
+  // result. by projecting
   if (vector->hasLayout()) {
     SmallVector<bool> reductionMask = multiReduce.getReductionMask();
-    ChangeResult changed =
-        result->resolve(vector->getLayout().project(reductionMask));
-    update(result, changed);
+    result->resolve(vector->getLayout().project(reductionMask));
     return;
   }
 
   // Otherwise, try resolving with init.
-  ChangeResult changed = result->resolve(init);
-  update(result, changed);
+  result->resolve(init);
 }
 
 static void propagateLayoutToTransposeOp(
     vector::TransposeOp transpose,
     ArrayRef<const DistributionLayout *> operandLattices,
-    ArrayRef<DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    ArrayRef<DistributionLayout *> resultLattices) {
   // Transpose has only one vector result.
   DistributionLayout *result = resultLattices[0];
   // Transpose has only one vector operand.
@@ -472,15 +487,13 @@ static void propagateLayoutToTransposeOp(
   VectorLayoutInterface permutedLayout = value->getLayout().permute(perm);
 
   // Try to resolve with the transposed layout.
-  ChangeResult changed = result->resolve(permutedLayout);
-  update(result, changed);
+  result->resolve(permutedLayout);
 }
 
 static void propagateLayoutToContractionOp(
     vector::ContractionOp contraction,
     ArrayRef<const DistributionLayout *> operandLattices,
-    ArrayRef<DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    ArrayRef<DistributionLayout *> resultLattices) {
   // Contraction has only one vector result.
   DistributionLayout *result = resultLattices[0];
   // Get the init value of the contraction.
@@ -493,36 +506,33 @@ static void propagateLayoutToContractionOp(
   }
 
   // True to resolve result with init.
-  ChangeResult changed = result->resolve(init);
-  update(result, changed);
+  result->resolve(init);
 }
 
 void propagationTransferFunction(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
-    ArrayRef<DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    ArrayRef<DistributionLayout *> resultLattices) {
 
   // Propagate layout to elementwise operations.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
-    propagateLayoutToElementwiseOp(op, operandLattices, resultLattices, update);
+    propagateLayoutToElementwiseOp(op, operandLattices, resultLattices);
     return;
   }
 
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
     propagateLayoutToMultiReductionOp(multiReduce, operandLattices,
-                                      resultLattices, update);
+                                      resultLattices);
     return;
   }
 
   if (auto transpose = dyn_cast<vector::TransposeOp>(op)) {
-    propagateLayoutToTransposeOp(transpose, operandLattices, resultLattices,
-                                 update);
+    propagateLayoutToTransposeOp(transpose, operandLattices, resultLattices);
     return;
   }
 
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
-    propagateLayoutToContractionOp(contraction, operandLattices, resultLattices,
-                                   update);
+    propagateLayoutToContractionOp(contraction, operandLattices,
+                                   resultLattices);
     return;
   }
 
@@ -534,9 +544,8 @@ void propagationTransferFunction(
 /// ==========================================================================
 
 static void enforceLayoutToElementwiseOp(
-    Operation *op, ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    Operation *op, MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
   // All operands and results must agree on the same layout.
 
   // We do not support multiple results yet.
@@ -546,40 +555,35 @@ static void enforceLayoutToElementwiseOp(
   // Try to enforce the layout of the result on operands.
   const DistributionLayout *result = resultLattices[0];
   if (result->hasLayout()) {
-    // Note that the operand lattice is not updated. So using the operand
-    // lattice again can cause bugs.
     for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
-      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
-          result, getOpOperand(op, index));
-      update(operandLattice, changed);
+      // Update the operand lattice with the resolved layout.
+      operandLattice =
+          operandLattice->resolveValUse(result, getOpOperand(op, index));
     }
   } else {
     // Enforce the same layout on all operands.
-    enforceSameLayoutForOperands(op, operandLattices, update);
+    enforceSameLayoutForOperands(op, operandLattices);
   }
 }
 
 static void enforceLayoutToMultiReductionOp(
     vector::MultiDimReductionOp multiReduce,
-    ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
   // Reductions should always propagate value layout to result. Result can
   // enforce it's layout on init.
   const DistributionLayout *result = resultLattices[0];
   DistributionLayout *init = operandLattices[1];
 
   // Enforce the result layout on init.
-  ChangeResult changedDueToResult =
-      init->resolveWithPossibleConflict(result, getOpOperand(multiReduce, 1));
-  update(init, changedDueToResult);
+  init = init->resolveValUse(result, getOpOperand(multiReduce, 1));
+  operandLattices[1] = init;
 }
 
 static void enforceLayoutToTransposeOp(
     vector::TransposeOp transpose,
-    ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
   // Transpose has only one vector result.
   const DistributionLayout *result = resultLattices[0];
   // Transpose has only one vector operand.
@@ -596,16 +600,15 @@ static void enforceLayoutToTransposeOp(
   VectorLayoutInterface permutedLayout = result->getLayout().permute(perm);
 
   // Try to resolve with the transposed layout.
-  ChangeResult changed = value->resolveWithPossibleConflict(
-      permutedLayout, getOpOperand(transpose, 0));
-  update(value, changed);
+  value = value->resolveValUse(permutedLayout, getOpOperand(transpose, 0));
+  // Update the operand lattice.
+  operandLattices[0] = value;
 }
 
 static void enforceLayoutToBroadcastOp(
     vector::BroadcastOp broadcast,
-    ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
   // Broadcast has only one vector result.
   const DistributionLayout *result = resultLattices[0];
   // Broadcast has only one vector operand.
@@ -642,16 +645,14 @@ static void enforceLayoutToBroadcastOp(
 
   VectorLayoutInterface resultLayout =
       result->getLayout().project(reductionMask);
-  ChangeResult changed = value->resolveWithPossibleConflict(
-      resultLayout, getOpOperand(broadcast, 0));
-  update(value, changed);
+  value = value->resolveValUse(resultLayout, getOpOperand(broadcast, 0));
+  operandLattices[0] = value;
 }
 
 static void enforceLayoutToContractionOp(
     vector::ContractionOp contraction,
-    ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
   // Contraction has only one vector result.
   const DistributionLayout *result = resultLattices[0];
   // Contraction has init value at position 2.
@@ -663,43 +664,39 @@ static void enforceLayoutToContractionOp(
   }
 
   // True to resolve the init value with the result layout.
-  ChangeResult changed =
-      value->resolveWithPossibleConflict(result, getOpOperand(contraction, 2));
-  update(value, changed);
+  value = value->resolveValUse(result, getOpOperand(contraction, 2));
+  // Update the operand lattice.
+  operandLattices[2] = value;
 }
 
 void enforcementTransferFunction(
-    Operation *op, ArrayRef<DistributionLayout *> operandLattices,
-    ArrayRef<const DistributionLayout *> resultLattices,
-    std::function<void(DistributionLayout *, ChangeResult)> update) {
+    Operation *op, MutableArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices) {
 
   // Propagate layout to elementwise operations.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
-    enforceLayoutToElementwiseOp(op, operandLattices, resultLattices, update);
+    enforceLayoutToElementwiseOp(op, operandLattices, resultLattices);
     return;
   }
 
   if (auto multiReduce = dyn_cast<vector::MultiDimReductionOp>(op)) {
     enforceLayoutToMultiReductionOp(multiReduce, operandLattices,
-                                    resultLattices, update);
+                                    resultLattices);
     return;
   }
 
   if (auto transpose = dyn_cast<vector::TransposeOp>(op)) {
-    enforceLayoutToTransposeOp(transpose, operandLattices, resultLattices,
-                               update);
+    enforceLayoutToTransposeOp(transpose, operandLattices, resultLattices);
     return;
   }
 
   if (auto broadcast = dyn_cast<vector::BroadcastOp>(op)) {
-    enforceLayoutToBroadcastOp(broadcast, operandLattices, resultLattices,
-                               update);
+    enforceLayoutToBroadcastOp(broadcast, operandLattices, resultLattices);
     return;
   }
 
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
-    enforceLayoutToContractionOp(contraction, operandLattices, resultLattices,
-                                 update);
+    enforceLayoutToContractionOp(contraction, operandLattices, resultLattices);
     return;
   }
 }
@@ -708,32 +705,9 @@ void enforcementTransferFunction(
 ///        PropagateLayout
 /// ==========================================================================
 
-LogicalResult PropagateLayout::initialize(Operation *root) {
-  // Set layout for anchor ops.
-  for (auto [val, layout] : anchors) {
-    DistributionLayout *latticeEl = getLatticeElement(val);
-    ChangeResult changed = latticeEl->resolve(layout);
-    propagateIfChanged(latticeEl, changed);
-  }
-
-  root->walk([&](Operation *traversed) { visitOperation(traversed); });
-
-  return success();
-}
-
-LogicalResult PropagateLayout::visit(ProgramPoint point) {
-  if (Operation *op = dyn_cast_or_null<Operation *>(point)) {
-    visitOperation(op);
-    return success();
-  }
-
-  // Do not expect anything other than an operation.
-  return failure();
-}
-
-void PropagateLayout::visitOperation(Operation *op) {
+void PropagateLayout::visit(Operation *op) {
   // Handle region branching control flow.
-  // TODO: Write more about what we are doing here.
+  // TODO(Groverkss): Write more about what we are doing here.
   if (auto branch = dyn_cast<RegionBranchOpInterface>(op)) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOperands());
@@ -748,17 +722,18 @@ void PropagateLayout::visitOperation(Operation *op) {
     }
   }
 
-  // TODO: Handle BranchOpInterface also.
+  // TODO(Groverkss): Handle BranchOpInterface also.
 
   // Grab the lattice elements of the operands.
   SmallVector<const DistributionLayout *> operandLattices;
   operandLattices.reserve(op->getNumOperands());
   for (Value operand : op->getOperands()) {
-    if (!isa<VectorType>(operand.getType())) {
+    auto opValue = dyn_cast<VectorValue>(operand);
+    if (!opValue) {
       continue;
     }
 
-    DistributionLayout *operandLattice = getLatticeElement(operand);
+    DistributionLayout *operandLattice = getLatticeElement(opValue);
     operandLattices.push_back(operandLattice);
   }
 
@@ -766,11 +741,12 @@ void PropagateLayout::visitOperation(Operation *op) {
   SmallVector<DistributionLayout *> resultLattices;
   resultLattices.reserve(op->getNumResults());
   for (Value result : op->getResults()) {
-    if (!isa<VectorType>(result.getType())) {
+    auto resValue = dyn_cast<VectorValue>(result);
+    if (!resValue) {
       continue;
     }
 
-    DistributionLayout *resultLattice = getLatticeElement(result);
+    DistributionLayout *resultLattice = getLatticeElement(resValue);
     resultLattices.push_back(resultLattice);
   }
 
@@ -779,11 +755,7 @@ void PropagateLayout::visitOperation(Operation *op) {
     return;
   }
 
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
-
-  propagationTransferFunction(op, operandLattices, resultLattices, changeFunc);
+  propagationTransferFunction(op, operandLattices, resultLattices);
 }
 
 void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
@@ -797,16 +769,16 @@ void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Get vector layouts for forwarded operands.
     SmallVector<const DistributionLayout *> forwardedLattices;
     for (Value operand : operands) {
-      if (isa<VectorType>(operand.getType())) {
-        forwardedLattices.push_back(getLatticeElement(operand));
+      if (auto opValue = dyn_cast<VectorValue>(operand)) {
+        forwardedLattices.push_back(getLatticeElement(opValue));
       }
     }
 
     // Get vector layouts for input operands.
     SmallVector<DistributionLayout *> inputLattices;
     for (Value operand : inputs) {
-      if (isa<VectorType>(operand.getType())) {
-        inputLattices.push_back(getLatticeElement(operand));
+      if (auto opValue = dyn_cast<VectorValue>(operand)) {
+        inputLattices.push_back(getLatticeElement(opValue));
       }
     }
 
@@ -817,44 +789,22 @@ void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Propagate the layouts.
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      ChangeResult changed = inputLattice->resolve(forwardedLattice);
-      propagateIfChanged(inputLattice, changed);
+      inputLattice->resolve(forwardedLattice);
     }
   }
 }
 
-DistributionLayout *PropagateLayout::getLatticeElement(Value val) {
-  // Add dependency of operation on the analysis state.
-  assert(isa<VectorType>(val.getType()) && "Lattice value should be a vector");
-  DistributionLayout *layout =
-      DataFlowAnalysis::getOrCreate<DistributionLayout>(val);
-  // Subscribe this analysis to updates of the lattice.
-  layout->subscribePropagation(this);
-  return layout;
+DistributionLayout *PropagateLayout::getLatticeElement(VectorValue val) {
+  return solver.getLatticeElement(val);
 }
 
 /// ==========================================================================
 ///        Enforce Layout
 /// ==========================================================================
 
-LogicalResult EnforceLayout::initialize(Operation *root) {
-  root->walk([&](Operation *traversed) { visitOperation(traversed); });
-  return success();
-}
-
-LogicalResult EnforceLayout::visit(ProgramPoint point) {
-  if (Operation *op = dyn_cast_or_null<Operation *>(point)) {
-    visitOperation(op);
-    return success();
-  }
-
-  // Do not expect anything else.
-  return failure();
-}
-
-void EnforceLayout::visitOperation(Operation *op) {
+void EnforceLayout::visit(Operation *op) {
   // Handle region branching control flow.
-  // TODO: Write more about what we are doing here.
+  // TODO(Groverkss): Write more about what we are doing here.
   if (auto branch = dyn_cast<RegionBranchOpInterface>(op)) {
     visitRegionSuccessors(branch, RegionBranchPoint::parent(),
                           branch->getOpOperands());
@@ -869,17 +819,18 @@ void EnforceLayout::visitOperation(Operation *op) {
     }
   }
 
-  // TODO: Handle BranchOpInterface also.
+  // TODO(Groverkss): Handle BranchOpInterface also.
 
   // Grab the lattice elements of the operands.
   SmallVector<DistributionLayout *> operandLattices;
   operandLattices.reserve(op->getNumOperands());
   for (Value operand : op->getOperands()) {
-    if (!isa<VectorType>(operand.getType())) {
+    auto opValue = dyn_cast<VectorValue>(operand);
+    if (!opValue) {
       continue;
     }
 
-    DistributionLayout *operandLattice = getLatticeElement(operand);
+    DistributionLayout *operandLattice = getLatticeElement(opValue);
     operandLattices.push_back(operandLattice);
   }
 
@@ -892,19 +843,16 @@ void EnforceLayout::visitOperation(Operation *op) {
   SmallVector<const DistributionLayout *> resultLattices;
   resultLattices.reserve(op->getNumResults());
   for (Value result : op->getResults()) {
-    if (!isa<VectorType>(result.getType())) {
+    auto resValue = dyn_cast<VectorValue>(result);
+    if (!resValue) {
       continue;
     }
 
-    DistributionLayout *resultLattice = getLatticeElement(result);
+    DistributionLayout *resultLattice = getLatticeElement(resValue);
     resultLattices.push_back(resultLattice);
   }
 
-  auto changeFunc = [&](DistributionLayout *lattice, ChangeResult changed) {
-    this->propagateIfChanged(lattice, changed);
-  };
-
-  enforcementTransferFunction(op, operandLattices, resultLattices, changeFunc);
+  enforcementTransferFunction(op, operandLattices, resultLattices);
 }
 
 void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
@@ -920,8 +868,8 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     SmallVector<OpOperand *> forwardedOperands;
     for (OpOperand &use : operands) {
       Value operand = use.get();
-      if (isa<VectorType>(operand.getType())) {
-        forwardedLattices.push_back(getLatticeElement(operand));
+      if (auto opValue = dyn_cast<VectorValue>(operand)) {
+        forwardedLattices.push_back(getLatticeElement(opValue));
         forwardedOperands.push_back(&use);
       }
     }
@@ -929,8 +877,8 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Get vector layouts for input operands.
     SmallVector<const DistributionLayout *> inputLattices;
     for (Value operand : inputs) {
-      if (isa<VectorType>(operand.getType())) {
-        inputLattices.push_back(getLatticeElement(operand));
+      if (auto opValue = dyn_cast<VectorValue>(operand)) {
+        inputLattices.push_back(getLatticeElement(opValue));
       }
     }
 
@@ -942,43 +890,92 @@ void EnforceLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     int64_t curr = 0;
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
-      ChangeResult changed = forwardedLattice->resolveWithPossibleConflict(
+      // Update the lattice for the forwarded operand with the resolved layout.
+      forwardedLattice = forwardedLattice->resolveValUse(
           inputLattice, *forwardedOperands[curr]);
-      propagateIfChanged(forwardedLattice, changed);
       curr++;
     }
   }
 }
 
-DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
-  // Add dependency of operation on the analysis state.
-  assert(isa<VectorType>(val.getType()) && "Lattice value should be a vector");
-  DistributionLayout *layout =
-      DataFlowAnalysis::getOrCreate<DistributionLayout>(val);
-  // Subscribe this analysis to updates of the lattice.
-  layout->subscribeEnforcement(this);
-  return layout;
+/// ==========================================================================
+///        VectorLayoutSolver
+/// ==========================================================================
+
+DistributionLayout *VectorLayoutSolver::getLatticeElement(VectorValue val) {
+  auto it = lattices.find(val);
+  if (it == lattices.end()) {
+    // Create a new lattice element for the value.
+    lattices[val] = std::make_unique<DistributionLayout>(val, *this);
+    return lattices[val].get();
+  }
+  return it->second.get();
+}
+
+void VectorLayoutSolver::solve() {
+  while (!worklist.empty()) {
+    auto [op, kind] = worklist.front();
+    worklist.pop_front();
+
+    switch (kind) {
+    case TransitionKind::Forward:
+      propagation.visit(op);
+      break;
+    case TransitionKind::Backward:
+      enforcement.visit(op);
+      break;
+    }
+  }
 }
 
 /// ==========================================================================
 ///        VectorLayoutAnalysis
 /// ==========================================================================
 
-LogicalResult VectorLayoutAnalysis::run() {
-  // The order of loading matters here, because propagateLayout does anchoring
-  // initialization which needs the lattice to know both enforcement and
-  // propagation.
-  solver.load<EnforceLayout>(root->getContext());
-  solver.load<PropagateLayout>(anchors, root->getContext());
-  return solver.initializeAndRun(root);
+VectorLayoutAnalysis::VectorLayoutAnalysis(Operation *root) : root(root) {
+  solver = new VectorLayoutSolver(root->getContext());
 }
 
-VectorLayoutInterface VectorLayoutAnalysis::getLayout(Value val) {
-  const DistributionLayout *layout =
-      solver.lookupState<DistributionLayout>(val);
-  if (!layout) {
-    return VectorLayoutInterface();
+VectorLayoutAnalysis::~VectorLayoutAnalysis() {
+  delete (VectorLayoutSolver *)(solver);
+}
+
+void VectorLayoutAnalysis::setAnchorForResult(VectorValue val,
+                                              Attribute layout) {
+  VectorLayoutSolver *layoutSolver = (VectorLayoutSolver *)solver;
+  DistributionLayout *lattice = layoutSolver->getLatticeElement(val);
+  VectorLayoutInterface vectorLayout =
+      dyn_cast_or_null<VectorLayoutInterface>(layout);
+  if (!vectorLayout) {
+    llvm::report_fatal_error(
+        "Layouts used in layout analysis must be vector layouts");
   }
+  lattice->resolve(vectorLayout);
+  layoutSolver->solve();
+}
+
+void VectorLayoutAnalysis::setAnchorForOperand(OpOperand &operand,
+                                               Attribute layout) {
+  VectorLayoutSolver *layoutSolver = (VectorLayoutSolver *)solver;
+  VectorValue opValue = dyn_cast<VectorValue>(operand.get());
+  if (!opValue) {
+    llvm::report_fatal_error(
+        "Operands used in layout analysis must be vector values");
+  }
+  DistributionLayout *lattice = layoutSolver->getLatticeElement(opValue);
+  VectorLayoutInterface vectorLayout =
+      dyn_cast_or_null<VectorLayoutInterface>(layout);
+  if (!vectorLayout) {
+    llvm::report_fatal_error(
+        "Layouts used in layout analysis must be vector layouts");
+  }
+  (void)lattice->resolveValUse(vectorLayout, operand);
+  layoutSolver->solve();
+}
+
+VectorLayoutInterface VectorLayoutAnalysis::getLayout(VectorValue val) {
+  VectorLayoutSolver *layoutSolver = (VectorLayoutSolver *)solver;
+  const DistributionLayout *layout = layoutSolver->getLatticeElement(val);
   return layout->getLayout();
 }
 
@@ -990,7 +987,8 @@ void VectorLayoutAnalysis::debugAnnotateLayouts() {
     }
 
     for (auto [index, result] : llvm::enumerate(op->getResults())) {
-      if (!isa<VectorType>(result.getType())) {
+      auto resVal = dyn_cast<VectorValue>(result);
+      if (!resVal) {
         continue;
       }
 
@@ -1000,7 +998,7 @@ void VectorLayoutAnalysis::debugAnnotateLayouts() {
         continue;
       }
 
-      Attribute layout = getLayout<Attribute>(result);
+      auto layout = getLayout<VectorLayoutInterface>(resVal);
       if (!layout) {
         continue;
       }

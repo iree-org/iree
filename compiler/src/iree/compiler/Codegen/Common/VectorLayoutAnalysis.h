@@ -8,7 +8,6 @@
 #define IREE_COMPILER_CODEGEN_VECTOR_LAYOUT_ANALYSIS_H
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "mlir/Analysis/DataFlowFramework.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -96,27 +95,18 @@ using VectorLayoutInterface = IREE::VectorExt::VectorLayoutInterface;
 /// leaves it to the user to resolve the conflict.
 class VectorLayoutAnalysis {
 public:
-  VectorLayoutAnalysis(Operation *root) : root(root) {}
+  VectorLayoutAnalysis(Operation *root);
 
-  /// Fix the layout for a specific value. The layout must implement
-  /// VectorLayoutInterface.
-  template <typename T>
-  void setAnchor(Value val, T layout) {
-    assert(isa<VectorLayoutInterface>(layout) &&
-           "expected layout to implement VectorLayoutInterface");
-    auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
-    assert(typedVal && "expected value to be a vector type");
-    anchors[typedVal] = cast<VectorLayoutInterface>(layout);
-  }
+  ~VectorLayoutAnalysis();
 
-  /// Run the analysis. The analysis expects that the user has set some anchor
-  /// points and is trying to infer the layout of other values.
-  LogicalResult run();
+  /// Fix the layout for a specific result or operand.
+  void setAnchorForResult(TypedValue<VectorType> val, Attribute layout);
+  void setAnchorForOperand(OpOperand &operand, Attribute layout);
 
   /// Get the infered layout of a specific value. This should only be called
   /// after the analysis has been run.
   template <typename T>
-  T getLayout(Value val) {
+  T getLayout(TypedValue<VectorType> val) {
     VectorLayoutInterface layout = getLayout(val);
     if (!layout) {
       return T();
@@ -136,11 +126,10 @@ public:
   void dump();
 
 private:
-  VectorLayoutInterface getLayout(Value val);
+  VectorLayoutInterface getLayout(TypedValue<VectorType> val);
 
   Operation *root;
-  DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
-  DataFlowSolver solver;
+  void *solver;
 };
 
 }; // namespace iree_compiler
