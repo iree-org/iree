@@ -266,6 +266,7 @@ iree_cc_binary(
   DEPS
     iree::base::internal::flags
     tracy::worker
+    tsl::xplane
 )
 
 iree_cc_binary(
