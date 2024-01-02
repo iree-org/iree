@@ -113,6 +113,20 @@ SmallVector<int64_t> TilingConfig::getFusableLevels() {
   }
 }
 
+SmallVector<int64_t> TilingConfig::getCacheLevels() {
+  switch (getNumTilingLevels()) {
+  case 0:
+  case 1:
+  case 4:
+    return {};
+  case 6:
+    // Cache parallel and cache reduction levels.
+    return {1, 2};
+  default:
+    llvm_unreachable("Unexpected number of tiling levels");
+  }
+}
+
 /// Returns the actual level in the configuration for this level of tiling.
 unsigned TilingConfig::getActualLevel(TilingLevel level) {
   assert(level < InvalidLevel && "Unexpected invalid tiling level");

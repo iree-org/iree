@@ -480,26 +480,56 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
+  SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
+  SmallVector<int64_t> allCacheLevels(tilingConfig.getCacheLevels());
+  llvm::SmallSetVector<int64_t, 4> fusableLevels(allFusableLevels.begin(),
+                                                 allFusableLevels.end());
+  llvm::SmallSetVector<int64_t, 4> cacheLevels(allCacheLevels.begin(),
+                                               allCacheLevels.end());
+  for (auto i : allCacheLevels) {
+    if (fusableLevels.contains(i)) {
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMCPUTileAndFusePass(i));
+    } else {
+      nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
+    }
+  }
+
   if (enableMicrokernels) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createDecomposeBatchMmt4DOpsPass());
     nestedModulePM.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
+
+  // Apply tile and fuse to all the non-distribution and non-cache fusable
+  // levels. They are skipped because those levels have been fused already.
+  //
   // We still run codegen pipeline because we want a better fallback when
   // ukernels are not available. They are nop if the mmt4d op is convereted to
   // ukernels. If ukernels are not implemented, the lowering config is still
   // carried by compute ops, so we can use it as a fallback solution.
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
-  nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+  if (allFusableLevels.size() > 1) {
+    for (int i = 0; i < tilingConfig.getNumTilingLevels(); ++i) {
+      if (i == tilingConfig.getDistributionLevel() || cacheLevels.contains(i))
+        continue;
+      if (fusableLevels.contains(i)) {
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUTileAndFusePass(i));
+      } else {
+        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
+      }
+    }
+  }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistRedundantVectorTransfersPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   addCPUBufferizePasses(nestedModulePM);
 

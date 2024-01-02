@@ -1184,6 +1184,14 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   int64_t M0 = lhsShape[mmt4dDimBase + 2];
   int64_t N0 = rhsShape[mmt4dDimBase + 2];
   int64_t K0 = lhsShape[mmt4dDimBase + 3];
+
+  distConfig.maxTileSizes[mmt4dDimBase + 0] =
+      llvm::divideCeil(defaultDistTileSize, M0);
+  distConfig.maxTileSizes[mmt4dDimBase + 1] =
+      llvm::divideCeil(defaultDistTileSize, N0);
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(op, distConfig);
+
   // Unfortunately we have to compute some tile size at compile-time, even
   // though that can't be done meaningfully in general, unless specializing the
   // compilation to fine details of the runtime workload including number of
@@ -1201,17 +1209,20 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   };
   int64_t tileBytes =
       (M1 == 1 || N1 == 1) ? clNarrowMatmulTileBytes : clGeneralMatmulTileBytes;
-  distConfig.maxTileSizes[mmt4dDimBase + 0] =
+  SmallVector<int64_t> parallelCacheTileSizes(distTileSizes.size());
+  if (isa<linalg::BatchMmt4DOp>(op)) {
+    parallelCacheTileSizes[0] = 1;
+  }
+  parallelCacheTileSizes[mmt4dDimBase + 0] =
       M1 == 1 ? 1
               : getMatmulTileSize(tileBytes, lhsType.getElementTypeBitWidth(),
                                   reductionSize, M0);
-  distConfig.maxTileSizes[mmt4dDimBase + 1] =
+  parallelCacheTileSizes[mmt4dDimBase + 1] =
       N1 == 1 ? 1
               : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
                                   reductionSize, N0);
+  SmallVector<int64_t> reductionCacheTileSizes(op.getNumLoops(), 0);
 
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, distConfig);
   SmallVector<int64_t> parallelTileSizes(op.getNumLoops(), 1);
   assert(parallelTileSizes.size() == mmt4dDimBase + 6);
   parallelTileSizes[mmt4dDimBase + 3] = M0;
@@ -1219,7 +1230,13 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   parallelTileSizes[mmt4dDimBase + 5] = K0;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
-  return {distTileSizes, parallelTileSizes, reductionTileSizes};
+
+  TileSizesListType tileSizesList = {distTileSizes, parallelCacheTileSizes,
+                                     reductionCacheTileSizes, parallelTileSizes,
+                                     reductionTileSizes};
+  // No further tiling for inner parallel vectors.
+  tileSizesList.emplace_back(op.getNumLoops(), 0);
+  return tileSizesList;
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d

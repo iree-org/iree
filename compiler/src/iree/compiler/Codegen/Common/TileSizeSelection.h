@@ -25,7 +25,7 @@ using SizesAndScalableFlags =
 ///   3. [[distribution], [vector-common-parallel], [vector-reduction],
 ///       [vector-inner-parallel]]
 ///   4. [[distribution], [cache-parallel], [cache-reduction],
-///       [vector-parallel], [vector-reduction]]
+///       [vector-parallel], [vector-reduction], [vector-inner-parallel]]
 class TilingConfig {
 public:
   TilingConfig(IREE::Codegen::LoweringConfigAttr lc);
@@ -116,6 +116,9 @@ public:
   /// Returns a list with the tiling levels that can be fused for this
   /// configuration.
   SmallVector<int64_t> getFusableLevels();
+
+  /// Returns a list with the tiling levels about cache.
+  SmallVector<int64_t> getCacheLevels();
 
   // TODO(dcaballe): Revisit if these features are ever used.
   SmallVector<int64_t> getTileInterchangeSizes(unsigned level) {
