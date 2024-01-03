@@ -14,6 +14,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/CommonFolders.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -1068,7 +1069,7 @@ struct ZeroExtentTensorCanon final : RewritePattern {
                                 PatternRewriter &rewriter) const override {
     auto loc = op->getLoc();
 
-    if (!dyn_cast<::mlir::stablehlo::StablehloDialect>(op->getDialect())) {
+    if (!isa_and_present<mlir::stablehlo::StablehloDialect>(op->getDialect())) {
       return rewriter.notifyMatchFailure(op, "not stablehlo");
     }
 
