@@ -68,6 +68,26 @@ public:
       return failure();
     if (!extractOp.hasUnitStride())
       return failure();
+    // When there's more than 1 use of the result of tensor.extract_slice,
+    // folding extractOp + xferOp won't eliminate the need for the former. So
+    // this transformation wouldn't be beneficial. It would, however, generate
+    // another "user" of the original tensor, which then would prevent the
+    // hoisting logic to hoist the following pair in the example below:
+    //  * "tensor.extract_slice" + "tensor.insert_slice"
+    // ```mlir
+    // %res = scf.for {{.*}} iter_args(%loop_arg = %extracted_slice) -> {{.*}} {
+    //     %extracted_slice = tensor.extract_slice %loop_arg
+    //     %read = vector.transfer_read %extracted_slice
+    //     // Some opeeration using %read that generates %res
+    //     %write = vector.transfer_write %res, %extracted_slice
+    //     %inserted_slice = tensor.insert_slice %write into %loop_arg
+    //     scf.yield %inserted_slice
+    //  }
+    //```
+    for (auto user : extractOp.getResult().getUsers()) {
+      if (user != xferOp)
+        return failure();
+    }
 
     // Bail on illegal rank-reduction: we need to check that the rank-reduced
     // dims are exactly the leading dims. I.e. the following is illegal:
