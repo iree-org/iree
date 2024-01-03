@@ -1256,12 +1256,12 @@ static SmallVector<int64_t> getPackVectorTileSizes(func::FuncOp entryPointFn,
                                                    tensor::PackOp op) {
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+  //int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
   auto elemType = op.getSourceType().getElementType();
   // TODO(#15421): Improve tile sizes selection for non f32/f16 cases.
   if ((elemType.isF32() || elemType.isF16()) && hasAVX512fFeature(targetAttr) &&
       isPackMatmulLHS(op)) {
-    tileSizes.back() = vectorSize;
+    tileSizes.back() = 16;
   }
   return tileSizes;
 }
