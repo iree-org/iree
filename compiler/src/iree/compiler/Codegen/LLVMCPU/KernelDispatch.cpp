@@ -742,39 +742,21 @@ static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
     ArrayRef<int64_t> vecTileSizes, int vectorSize) {
-  // The tiling for parallel dims and reduction dims should be separated.
-  SmallVector<int64_t> parallelTileSizes(vecTileSizes.begin(),
-                                         vecTileSizes.end());
-  parallelTileSizes.back() = 0;
-
-  // Clamp inner tiling sizes to avoid masking. The vector masking takes the
-  // last level of tiling to create masks. It would lead to incorrect masking if
-  // the inner tiling sizes are not clamped. Because padding won't be applied
-  // along those dimensions.
-  for (const auto &[index, size] : llvm::enumerate(distTileSizes)) {
-    if (!size)
-      continue;
-    parallelTileSizes[index] = std::min(parallelTileSizes[index], size);
-  }
-
-  // TODO(hanchung): Make logic more heuristic. Peeling hurts performance a lot
-  // if the dim size is small (e.g., K=24).
   int64_t numTilingDims = vecTileSizes.size();
-  SmallVector<int64_t> reductionTileSizes(numTilingDims - 1, 0);
-  auto lhsShapedType = llvm::cast<ShapedType>(op.lhs().getType());
-  int64_t K = lhsShapedType.getShape().back();
-  reductionTileSizes.push_back(
-      getMaxVectorTileSize(K, vecTileSizes.back(), vectorSize));
-
   SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
                                               cacheTileSizes.end());
   SmallVector<int64_t> cacheReductionTileSizes(numTilingDims, 0);
   std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
 
+  SmallVector<int64_t> vectorParallelTileSizes(vecTileSizes.begin(),
+                                               vecTileSizes.end());
+  SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
+  std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
+
   TileSizesListType tileSizes = {
       SmallVector<int64_t>(distTileSizes), cacheParallelTileSizes,
-      cacheReductionTileSizes, parallelTileSizes, reductionTileSizes};
-
+      cacheReductionTileSizes, vectorParallelTileSizes,
+      vectorReductionTileSizes};
   // No need for tiling inner parallel dims.
   tileSizes.emplace_back(numTilingDims, 0);
 
