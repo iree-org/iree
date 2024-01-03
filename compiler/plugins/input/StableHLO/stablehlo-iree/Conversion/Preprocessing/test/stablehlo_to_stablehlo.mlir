@@ -355,7 +355,7 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
      padding = dense<0> : tensor<1x2xi64>,
      precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
      rhs_dilation = dense<1> : tensor<1xi64>,
-     window_strides = dense<1> : tensor<1xi64>
+     window_strides = array<i64: 1>
    } : (tensor<16x32x256xf32>, tensor<1x256x256xbf16>) -> tensor<16x32x256xf32>
   // CHECK: return %[[CONV]]
   func.return %0 : tensor<16x32x256xf32>
@@ -413,8 +413,8 @@ func.func @iota_sort_slice_is_topk(%in : tensor<16x16xf32>) -> (tensor<16x8xf32>
     %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
     "stablehlo.return"(%7) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<16x16xf32>, tensor<16x16xi32>) -> (tensor<16x16xf32>, tensor<16x16xi32>)
-  %1 = "stablehlo.slice"(%0#0) { start_indices = dense<[0, 0]> : tensor<2xi64>, limit_indices = dense<[16, 8]> : tensor<2xi64>, strides = dense<[1, 1]> : tensor<2xi64> } : (tensor<16x16xf32>) -> tensor<16x8xf32>
-  %2 = "stablehlo.slice"(%0#1) { start_indices = dense<[0, 0]> : tensor<2xi64>, limit_indices = dense<[16, 8]> : tensor<2xi64>, strides = dense<[1, 1]> : tensor<2xi64> } : (tensor<16x16xi32>) -> tensor<16x8xi32>
+  %1 = "stablehlo.slice"(%0#0) { start_indices = array<i64: 0, 0>, limit_indices = array<i64: 16, 8>, strides = array<i64: 1, 1> } : (tensor<16x16xf32>) -> tensor<16x8xf32>
+  %2 = "stablehlo.slice"(%0#1) { start_indices = array<i64: 0, 0>, limit_indices = array<i64: 16, 8>, strides = array<i64: 1, 1> } : (tensor<16x16xi32>) -> tensor<16x8xi32>
   return %1, %2 : tensor<16x8xf32>, tensor<16x8xi32>
 }
 
@@ -434,8 +434,8 @@ func.func @broadcast_iota_sort_slice_is_topk(%in : tensor<16x16x16xf32>) -> (ten
     %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
     "stablehlo.return"(%7) : (tensor<i1>) -> ()
   }) {dimension = 2 : i64, is_stable = true} : (tensor<16x16x16xf32>, tensor<16x16x16xi32>) -> (tensor<16x16x16xf32>, tensor<16x16x16xi32>)
-  %1 = "stablehlo.slice"(%0#0) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32>
-  %2 = "stablehlo.slice"(%0#1) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
+  %1 = "stablehlo.slice"(%0#0) { start_indices = array<i64: 0, 0, 0>, limit_indices = array<i64: 16, 16, 8>, strides = array<i64: 1, 1, 1> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32>
+  %2 = "stablehlo.slice"(%0#1) { start_indices = array<i64: 0, 0, 0>, limit_indices = array<i64: 16, 16, 8>, strides = array<i64: 1, 1, 1> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
   return %1, %2 : tensor<16x16x8xf32>, tensor<16x16x8xi32>
 }
 
@@ -455,8 +455,8 @@ func.func @broadcast_iota_sort_slice_incorrect_dims(%in : tensor<16x16x16xf32>) 
     %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
     "stablehlo.return"(%7) : (tensor<i1>) -> ()
   }) {dimension = 2 : i64, is_stable = true} : (tensor<16x16x16xf32>, tensor<16x16x16xi32>) -> (tensor<16x16x16xf32>, tensor<16x16x16xi32>)
-  %1 = "stablehlo.slice"(%0#0) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32>
-  %2 = "stablehlo.slice"(%0#1) { start_indices = dense<[0, 0, 0]> : tensor<3xi64>, limit_indices = dense<[16, 16, 8]> : tensor<3xi64>, strides = dense<[1, 1, 1]> : tensor<3xi64> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
+  %1 = "stablehlo.slice"(%0#0) { start_indices = array<i64: 0, 0, 0>, limit_indices = array<i64: 16, 16, 8>, strides = array<i64: 1, 1, 1> } : (tensor<16x16x16xf32>) -> tensor<16x16x8xf32>
+  %2 = "stablehlo.slice"(%0#1) { start_indices = array<i64: 0, 0, 0>, limit_indices = array<i64: 16, 16, 8>, strides = array<i64: 1, 1, 1> } : (tensor<16x16x16xi32>) -> tensor<16x16x8xi32>
   return %1, %2 : tensor<16x16x8xf32>, tensor<16x16x8xi32>
 }
 

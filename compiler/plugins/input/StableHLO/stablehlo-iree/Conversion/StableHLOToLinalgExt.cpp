@@ -374,10 +374,10 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
     if (!operandType || !operandType.hasStaticShape()) {
       return failure();
     }
-    if (!op.getFftLength().isSplat()) {
+    if (!llvm::all_equal(op.getFftLength())) {
       return rewriter.notifyMatchFailure(op, "non-splat length");
     }
-    int fftLength = op.getFftLength().getSplatValue<IntegerAttr>().getInt();
+    int fftLength = op.getFftLength().front();
     if (fftLength & (fftLength - 1)) {
       return rewriter.notifyMatchFailure(
           op, "expected FFT length to be a power of two");
@@ -442,7 +442,7 @@ struct ReverseOpConversion final
         rewriter.create<tensor::EmptyOp>(loc, mixedSizes, ty.getElementType());
     rewriter.replaceOpWithNewOp<IREE::LinalgExt::ReverseOp>(
         op, typeConverter->convertType(op.getType()), adaptor.getOperands(),
-        emptyTensor, op.getDimensions());
+        emptyTensor, rewriter.getI64TensorAttr(op.getDimensions()));
     return success();
   }
 };
