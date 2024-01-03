@@ -32,9 +32,8 @@ struct IREECheckIllegalDialectsPass
   void runOnOperation() override {
     auto operation = getOperation();
     llvm::DenseSet<Operation *> errors;
-    llvm::DenseSet<StringRef> invalid {
-        "tf", "torch", "stablehlo", "mhlo", "chlo"
-    };
+    llvm::DenseSet<StringRef> invalid{"tf", "torch", "stablehlo", "mhlo",
+                                      "chlo"};
 
     operation.walk([&](Operation *op) {
       if (invalid.contains(op->getName().getDialectNamespace())) {
@@ -42,7 +41,8 @@ struct IREECheckIllegalDialectsPass
       }
     });
 
-    if (errors.empty()) return;
+    if (errors.empty())
+      return;
 
     InFlightDiagnostic errorDiag =
         emitError(getOperation().getLoc())
