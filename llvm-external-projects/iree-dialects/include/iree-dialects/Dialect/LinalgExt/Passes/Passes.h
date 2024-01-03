@@ -84,8 +84,6 @@ private:
   bool matchByDefault;
 };
 
-std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
-
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
