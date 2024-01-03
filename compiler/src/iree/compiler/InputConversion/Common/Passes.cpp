@@ -20,7 +20,7 @@ namespace {
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
-  passManager.addPass(createIREECheckKnownDialectsPass());
+  passManager.addPass(createIREECheckIllegalDialectsPass());
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());

@@ -27,21 +27,22 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct IREECheckKnownDialectsPass
-    : public IREECheckKnownDialectsBase<IREECheckKnownDialectsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Input::IREEInputDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, IREE::Util::UtilDialect,
-                    mlir::func::FuncDialect, mlir::arith::ArithDialect>();
-  }
+struct IREECheckIllegalDialectsPass
+    : public IREECheckIllegalDialectsBase<IREECheckIllegalDialectsPass> {
   void runOnOperation() override {
     auto operation = getOperation();
     llvm::DenseSet<Operation *> errors;
+    llvm::DenseSet<StringRef> invalid {
+        "tf", "torch", "stablehlo", "mhlo", "chlo"
+    };
+
     operation.walk([&](Operation *op) {
-      if (!op->getDialect()) {
+      if (invalid.contains(op->getName().getDialectNamespace())) {
         errors.insert(op);
       }
     });
+
+    if (errors.empty()) return;
 
     InFlightDiagnostic errorDiag =
         emitError(getOperation().getLoc())
@@ -59,8 +60,8 @@ struct IREECheckKnownDialectsPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createIREECheckKnownDialectsPass() {
-  return std::make_unique<IREECheckKnownDialectsPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createIREECheckIllegalDialectsPass() {
+  return std::make_unique<IREECheckIllegalDialectsPass>();
 }
 
 } // namespace mlir::iree_compiler

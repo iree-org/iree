@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-check-known-dialects --allow-unregistered-dialect --verify-diagnostics %s
+// RUN: iree-opt --iree-check-illegal-dialects --allow-unregistered-dialect --verify-diagnostics %s
 
 // expected-error@+1 {{one or more unknown operations were found in the compiler input (did you mean to pre-process through an IREE importer frontend?)}}
 module {

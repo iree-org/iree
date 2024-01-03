@@ -9,10 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
-def IREECheckKnownDialects :
-    Pass<"iree-check-known-dialects", "ModuleOp"> {
-  let summary = "Checks that all ops are from known dialects.";
-  let constructor = "mlir::iree_compiler::createIREECheckKnownDialectsPass()";
+def IREECheckIllegalDialects :
+    Pass<"iree-check-illegal-dialects", "ModuleOp"> {
+  let summary = "Checks that no known illegal dialects are contained.";
+  let constructor = "mlir::iree_compiler::createIREECheckIllegalDialectsPass()";
 }
 
 def IREEImportPublic :

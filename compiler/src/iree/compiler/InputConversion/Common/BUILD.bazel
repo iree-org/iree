@@ -44,7 +44,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "Common",
     srcs = [
-        "IREECheckKnownDialects.cpp",
+        "IREECheckIllegalDialects.cpp",
         "IREEImportPublic.cpp",
         "ImportMLProgram.cpp",
         "Passes.cpp",
