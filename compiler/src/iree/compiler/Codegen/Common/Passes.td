@@ -163,6 +163,11 @@ def DecomposeSoftmax :
   let summary =
       "Decomposes softmax op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::createDecomposeSoftmaxPass()";
+  let options = [
+    Option<"useFusion", "use-fusion",
+           "bool", /*default=*/"true",
+           "Whether to use the internal pass fusion logic for the exp function. See #15862.">
+  ];
 }
 
 def ReplaceSlowMinMaxOps

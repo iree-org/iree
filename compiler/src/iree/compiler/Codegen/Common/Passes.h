@@ -28,7 +28,8 @@ void registerTransformDialectTranslationDependentDialects(
 
 /// Passes that are done on all backends before target-specific code-generation
 /// kicks in.
-void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);
+void addCommonTargetExecutablePreprocessingPasses(
+    OpPassManager &passManager, bool useDecomposeSoftmaxFusion = true);
 
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
@@ -100,7 +101,7 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
 /// Creates a pass to convert the softmax op into a sequence of linalg generic
 /// ops.
-std::unique_ptr<Pass> createDecomposeSoftmaxPass();
+std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion = true);
 
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
