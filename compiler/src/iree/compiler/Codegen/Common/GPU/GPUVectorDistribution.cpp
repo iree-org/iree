@@ -152,26 +152,12 @@ private:
   VectorLayoutOptions &options;
 };
 
-VectorDistribution::VectorDistribution(func::FuncOp root,
-                                       VectorLayoutAnalysis &analysis,
-                                       VectorLayoutOptions &options)
-    : root(root), analysis(analysis), options(options) {
-  options.setAnchorOps();
-  if (failed(analysis.run()))
-    return;
-  LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Completed Successfully :\n");
-  LLVM_DEBUG(analysis.print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n\n");
-}
-
 /// A rewriter for the pattern rewriting driver.
 class VectorDistributionRewriter : public PatternRewriter,
                                    RewriterBase::Listener {
 public:
-  VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps,
-                             SmallVectorImpl<Operation *> &worklist)
-      : PatternRewriter(context, this), erasedOps(erasedOps),
-        worklist(worklist) {}
+  VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps)
+      : PatternRewriter(context, this), erasedOps(erasedOps) {}
 
   /// We need to keep track of erased operations so that we never try to
   /// distribute them again.
@@ -180,7 +166,6 @@ public:
 private:
   // Reference to operations to be erased and the worklist of the driver.
   DenseSet<Operation *> &erasedOps;
-  SmallVectorImpl<Operation *> &worklist;
 };
 
 static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
@@ -219,7 +204,7 @@ static void applyVectorDistributionDriver(
   DenseSet<Operation *> erasedOps;
   SmallVector<Operation *> worklist;
 
-  VectorDistributionRewriter rewriter(root->getContext(), erasedOps, worklist);
+  VectorDistributionRewriter rewriter(root->getContext(), erasedOps);
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
@@ -257,9 +242,19 @@ static void applyVectorDistributionDriver(
   LLVM_DEBUG(debugPrintUniqueOperationNames(worklist, erasedOps));
 }
 
-void VectorDistribution::distribute() {
-  RewritePatternSet patterns(root.getContext());
-  patterns.add<DistributeConstants, DistributeElementwise>(root.getContext(),
+void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
+  // Run the analysis and determine the layouts.
+  VectorLayoutAnalysis analysis(root);
+  options.setAnchorOps();
+  if (failed(analysis.run()))
+    return;
+  LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Completed Successfully :\n");
+  LLVM_DEBUG(analysis.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n\n");
+
+  // Run the distribution patterns.
+  RewritePatternSet patterns(root->getContext());
+  patterns.add<DistributeConstants, DistributeElementwise>(root->getContext(),
                                                            analysis, options);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
   return applyVectorDistributionDriver(root, frozenPatterns, analysis, options);

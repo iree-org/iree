@@ -65,18 +65,7 @@ protected:
   Operation *root;
 }; // namespace iree_compiler
 
-class VectorDistribution {
-public:
-  VectorDistribution(func::FuncOp root, VectorLayoutAnalysis &analysis,
-                     VectorLayoutOptions &options);
-
-  void distribute();
-
-private:
-  func::FuncOp root;
-  VectorLayoutAnalysis &analysis;
-  VectorLayoutOptions &options;
-};
+void distributeVectorOps(Operation *root, VectorLayoutOptions &options);
 
 } // namespace mlir::iree_compiler
 
