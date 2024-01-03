@@ -1160,9 +1160,21 @@ if(IREE_BUILD_COMPILER)
   )
 
   iree_add_install_target(
+    NAME iree-install-tools-compiler-extra
+    COMPONENT IREETools-CompilerExtra
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-generate-embed-data
+    COMPONENT generate_embed_data
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
     NAME iree-install-runtime-libraries-compiler
     COMPONENT IREERuntimeLibraries-Compiler
-    ADD_TO 
+    ADD_TO
       iree-install-runtime-libraries
       iree-install-tools-compiler
       iree-install-dev-libraries-compiler
