@@ -17,17 +17,17 @@ namespace mlir::iree_compiler {
 /// distributed yet, wrap it in a ToSIMTOp.
 TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
                                       TypedValue<VectorType> value,
-                                      LayoutProvider *provider);
+                                      LayoutProvider &provider);
 
 /// Replace an op with it's distributed replacement values.
 void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
-                                    LayoutProvider *provider,
+                                    LayoutProvider &provider,
                                     ValueRange values);
 
 /// Replace an op with a new distributed op. The results of the distributed op
 /// must be distributed vector values.
 template <typename OpTy, typename... Args>
-OpTy replaceOpWithNewDistributedOp(LayoutProvider *provider,
+OpTy replaceOpWithNewDistributedOp(LayoutProvider &provider,
                                    RewriterBase &rewriter, Operation *op,
                                    Args &&...args) {
   auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
@@ -38,18 +38,14 @@ OpTy replaceOpWithNewDistributedOp(LayoutProvider *provider,
 class VectorDistribution {
 public:
   VectorDistribution(func::FuncOp root, VectorLayoutAnalysis &analysis,
-                     LayoutProvider *provider);
+                     LayoutProvider &provider);
 
-  void distribute();
+  LogicalResult distribute();
 
 private:
-  LogicalResult distributeElementwise(RewriterBase &rewriter, Operation *op);
-
-  LogicalResult distributeConstants(RewriterBase &rewriter, arith::ConstantOp);
-
   func::FuncOp root;
   VectorLayoutAnalysis &analysis;
-  LayoutProvider *provider;
+  LayoutProvider &provider;
 };
 
 } // namespace mlir::iree_compiler
