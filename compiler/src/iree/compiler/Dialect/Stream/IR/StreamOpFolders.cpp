@@ -1796,7 +1796,8 @@ void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
-  if (getUpdateSize() == getTargetSize()) {
+  if (getUpdateSize() == getTargetSize() &&
+      getUpdate().getType() == getType()) {
     // If updating the entire target then just replace with the update.
     // Note that this breaks copy-on-write semantics but will be fixed up during
     // canonicalization if needed.
