@@ -1028,7 +1028,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
   TestLayoutProvider layoutProvider(analysis, target);
-  VectorDistribution distribution(target, analysis, &layoutProvider);
+  VectorDistribution distribution(target, analysis, layoutProvider);
   distribution.distribute();
   return DiagnosedSilenceableFailure::success();
 }

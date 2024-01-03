@@ -40,7 +40,7 @@ public:
   VectorDistribution(func::FuncOp root, VectorLayoutAnalysis &analysis,
                      LayoutProvider &provider);
 
-  LogicalResult distribute();
+  void distribute();
 
 private:
   func::FuncOp root;

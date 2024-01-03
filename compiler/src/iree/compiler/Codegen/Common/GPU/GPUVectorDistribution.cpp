@@ -161,23 +161,25 @@ VectorDistribution::VectorDistribution(func::FuncOp root,
     return;
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Completed Successfully :\n");
   LLVM_DEBUG(analysis.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n\n");
 }
 
 /// A rewriter for the pattern rewriting driver.
 class VectorDistributionRewriter : public PatternRewriter,
                                    RewriterBase::Listener {
 public:
-  VectorDistributionRewriter(MLIRContext *ctx,
-                             DenseSet<Operation *> &opsToErase,
+  VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps,
                              SmallVector<Operation *> &worklist)
-      : PatternRewriter(context, this), opsToErase(opsToErase),
+      : PatternRewriter(context, this), erasedOps(erasedOps),
         worklist(worklist) {}
 
-  void notifyOperationRemoved(Operation *op) override { opsToErase.insert(op); }
+  /// We need to keep track of erased operations so that we never try to
+  /// distribute them again.
+  void notifyOperationRemoved(Operation *op) override { erasedOps.insert(op); }
 
 private:
   // Reference to operations to be erased and the worklist of the driver.
-  DenseSet<Operation *> &opsToErase;
+  DenseSet<Operation *> &erasedOps;
   SmallVector<Operation *> &worklist;
 };
 
@@ -208,36 +210,67 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   return needsDistribution;
 }
 
-static LogicalResult applyVectorDistributionDriver(
+static void debugPrintUniqueOperationNames(SmallVector<Operation *> &worklist,
+                                           DenseSet<Operation *> &exclude) {
+  DenseSet<StringRef> uniqueNames;
+  for (Operation *op : worklist) {
+    if (exclude.contains(op))
+      continue;
+    uniqueNames.insert(op->getName().getStringRef());
+  }
+
+  for (StringRef name : uniqueNames) {
+    llvm::dbgs().indent(2) << "* " << name << "\n";
+  }
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+}
+
+static void applyVectorDistributionDriver(
     Operation *root, const FrozenRewritePatternSet &patterns,
     VectorLayoutAnalysis &analysis, LayoutProvider &provider) {
 
-  DenseSet<Operation *> opsToErase;
+  DenseSet<Operation *> erasedOps;
   SmallVector<Operation *> worklist;
 
-  VectorDistributionRewriter rewriter(root->getContext(), opsToErase, worklist);
+  VectorDistributionRewriter rewriter(root->getContext(), erasedOps, worklist);
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
   // Collect all the operations to be distributed.
+  LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
   root->walk([&](Operation *op) {
-    if (canDistribute(op, analysis))
+    if (canDistribute(op, analysis)) {
       worklist.push_back(op);
+    }
   });
+  LLVM_DEBUG(debugPrintUniqueOperationNames(worklist, erasedOps));
 
+  // Note that the pattern application here never runs on a newly created
+  // operation. It always runs on an existing operation. This ensures that no
+  // invalidated state of the analysis is ever used.
   for (Operation *op : worklist) {
-    if (opsToErase.contains(op))
+    if (erasedOps.contains(op))
       continue;
 
+    LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
+    LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
+    LLVM_DEBUG(llvm::dbgs() << "\n");
     if (failed(applicator.matchAndRewrite(op, rewriter))) {
-      return failure();
+      LLVM_DEBUG(llvm::dbgs().indent(2)
+                 << ": Failed to distribute operation:\n");
+      continue;
     }
+
+    LLVM_DEBUG(llvm::dbgs().indent(2)
+               << ": Successfully distributed operation:\n");
   }
 
-  return success();
+  LLVM_DEBUG(llvm::dbgs() << "\nDistribution complete:\n\n");
+  LLVM_DEBUG(llvm::dbgs() << "Operation names of ops not distributed:\n");
+  LLVM_DEBUG(debugPrintUniqueOperationNames(worklist, erasedOps));
 }
 
-LogicalResult VectorDistribution::distribute() {
+void VectorDistribution::distribute() {
   RewritePatternSet patterns(root.getContext());
   patterns.add<DistributeConstants, DistributeElementwise>(root.getContext(),
                                                            analysis, provider);
