@@ -81,7 +81,9 @@ public:
     auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
-    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+    auto attr = dyn_cast<DenseElementsAttr>(constantOp.getValue());
+    if (!attr)
+      return failure();
     if (!attr.isSplat())
       return failure();
 
