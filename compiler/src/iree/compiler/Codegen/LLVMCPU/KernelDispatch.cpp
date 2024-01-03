@@ -335,7 +335,7 @@ static void reduceDistributionWorkgroups(
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
     unsigned index = currDim - 1;
     int64_t currSize = distributedTileSizes[index];
-    if (ShapedType::isDynamic(workload[index]) ||
+    if (ShapedType::isDynamic(workload[index]) || currSize == 0 ||
         (maxTileSizes && currSize >= maxTileSizes.value()[index]) ||
         currSize >= workload[index]) {
       currDim--;
