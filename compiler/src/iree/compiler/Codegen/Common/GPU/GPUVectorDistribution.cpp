@@ -24,13 +24,13 @@ using namespace mlir::iree_compiler::IREE::VectorExt;
 
 namespace mlir::iree_compiler {
 
-TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
-                                      TypedValue<VectorType> value,
-                                      VectorLayoutOptions &options) {
+using VectorValue = TypedValue<VectorType>;
+
+VectorValue getDistributed(RewriterBase &rewriter, VectorValue value,
+                           VectorLayoutOptions &options) {
   // If this is a result of a "to_simd" op, use the source value of it.
   if (auto toSIMD = value.getDefiningOp<IREE::VectorExt::ToSIMDOp>()) {
-    value = cast<TypedValue<VectorType>>(toSIMD.getInput());
-    return value;
+    return cast<VectorValue>(toSIMD.getInput());
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
   SmallVector<int64_t> distributedShape = options.getDistributedShape(value);
@@ -50,16 +50,15 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
     Value replacement = values[opResult.getResultNumber()];
     // If this value is a vector type, it must be converted back to simd.
     if (isa<VectorType>(replacement.getType())) {
-      auto oldResult = cast<TypedValue<VectorType>>(opResult);
+      auto oldResult = cast<VectorValue>(opResult);
       // Create a toSIMD op to convert the value back to the simd.
       rewriter.setInsertionPointAfterValue(oldResult);
-      auto toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+      Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
           oldResult.getLoc(), oldResult.getType(), replacement);
       // Clone the layout to the new value.
-      options.getAnalysis().cloneLayoutInformationToNewValue(
-          oldResult, toSIMD.getResult());
+      options.getAnalysis().cloneLayoutInformationToNewValue(oldResult, toSIMD);
       // Add to replacements.
-      replacement = toSIMD.getResult();
+      replacement = toSIMD;
     }
     replacements.push_back(replacement);
   }
@@ -79,10 +78,10 @@ public:
     Value constantResult = constantOp.getResult();
     if (!isa<VectorType>(constantResult.getType()))
       return failure();
-    auto constant = cast<TypedValue<VectorType>>(constantResult);
-    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
+    auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
+    auto attr = llvm::cast<DenseElementsAttr>(constantOp.getValue());
     if (!attr.isSplat())
       return failure();
 
@@ -92,7 +91,7 @@ public:
         VectorType::get(options.getDistributedShape(constant), elementType);
     replaceOpWithNewDistributedOp<arith::ConstantOp>(
         options, rewriter, constantOp, vectorType,
-        DenseElementsAttr::get(vectorType, attr.getSplatValue<APFloat>()));
+        SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
     return success();
   }
 
@@ -118,7 +117,7 @@ public:
     // Get the distributed operands.
     SmallVector<Value> operands;
     for (Value operand : op->getOperands()) {
-      if (auto vectorOperand = dyn_cast<TypedValue<VectorType>>(operand)) {
+      if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         operand = getDistributed(rewriter, vectorOperand, options);
       }
       operands.push_back(operand);
@@ -127,15 +126,14 @@ public:
     // Get the new distributed vector types for the operation.
     SmallVector<Type> resultTypes;
     for (Value result : op->getResults()) {
-      if (auto vectorResult = dyn_cast<TypedValue<VectorType>>(result)) {
-        // Distribute vector result types.
-        auto newType =
-            VectorType::get(options.getDistributedShape(vectorResult),
-                            vectorResult.getType().getElementType());
-        resultTypes.push_back(newType);
-      } else {
-        resultTypes.push_back(result.getType());
+      Type resultType = result.getType();
+
+      // Distribute vector result types.
+      if (auto vectorResult = dyn_cast<VectorValue>(result)) {
+        resultType = VectorType::get(options.getDistributedShape(vectorResult),
+                                     vectorResult.getType().getElementType());
       }
+      resultTypes.push_back(resultType);
     }
 
     // Replace the original op with the distributed op.
@@ -169,7 +167,7 @@ class VectorDistributionRewriter : public PatternRewriter,
                                    RewriterBase::Listener {
 public:
   VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps,
-                             SmallVector<Operation *> &worklist)
+                             SmallVectorImpl<Operation *> &worklist)
       : PatternRewriter(context, this), erasedOps(erasedOps),
         worklist(worklist) {}
 
@@ -180,38 +178,25 @@ public:
 private:
   // Reference to operations to be erased and the worklist of the driver.
   DenseSet<Operation *> &erasedOps;
-  SmallVector<Operation *> &worklist;
+  SmallVectorImpl<Operation *> &worklist;
 };
 
 static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
-  bool needsDistribution = false;
-  // Check if this operation has any operands with a vector type. If so,
-  // then they need to have a layout.
-  for (Value operand : op->getOperands()) {
-    if (isa<VectorType>(operand.getType())) {
-      needsDistribution = true;
-      if (!analysis.getLayout<Attribute>(operand)) {
-        return false;
-      }
-    }
-  }
+  auto values = llvm::to_vector_of<Value>(op->getOperands());
+  llvm::append_range(values, op->getResults());
 
-  // Check if this operation has any results with a vector type. If so,
-  // then they need to have a layout.
-  for (OpResult result : op->getResults()) {
-    if (isa<VectorType>(result.getType())) {
-      needsDistribution = true;
-      if (!analysis.getLayout<Attribute>(result)) {
-        return false;
-      }
+  // Check if all operands and results of this operation have a layout.
+  return llvm::all_of(values, [&](Value value) -> bool {
+    if (auto vectorValue = dyn_cast<VectorValue>(value)) {
+      return analysis.getLayout<Attribute>(vectorValue) != nullptr;
     }
-  }
-
-  return needsDistribution;
+    return false;
+  });
 }
 
-static void debugPrintUniqueOperationNames(SmallVector<Operation *> &worklist,
-                                           DenseSet<Operation *> &exclude) {
+static void
+debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist,
+                               DenseSet<Operation *> &exclude) {
   DenseSet<StringRef> uniqueNames;
   for (Operation *op : worklist) {
     if (exclude.contains(op))

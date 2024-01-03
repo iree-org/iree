@@ -1018,14 +1018,6 @@ public:
         simtLabels);
   }
 
-  SmallVector<Value> getThreadGrid(RewriterBase &rewriter) override {
-    return {
-        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::x),
-        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::y),
-        rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::z),
-    };
-  }
-
   void setAnchorOps() override { setAnchorOpsFromAttributes(analysis, root); }
 };
 

@@ -25,7 +25,7 @@ TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
                                       TypedValue<VectorType> value,
                                       VectorLayoutOptions &options);
 
-/// Replace an op with it's distributed replacement values.
+/// Replace an op with its distributed replacement values.
 void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
                                     VectorLayoutOptions &options,
                                     ValueRange values);
@@ -44,7 +44,9 @@ OpTy replaceOpWithNewDistributedOp(VectorLayoutOptions &options,
 class VectorLayoutOptions {
 public:
   VectorLayoutOptions(VectorLayoutAnalysis &analysis, Operation *root)
-      : analysis(analysis), root(root) {}
+      : analysis(analysis), root(root) {
+    assert(root && "root operation must be non-null");
+  }
 
   virtual ~VectorLayoutOptions() = default;
 
@@ -54,11 +56,9 @@ public:
   virtual void setAnchorOps() = 0;
 
   /// Given a Value of type VectorType, return the distributed shape of the
-  /// value, based on it's layout in the analysis.
+  /// value, based on its layout in the analysis.
   virtual SmallVector<int64_t>
   getDistributedShape(TypedValue<VectorType> val) = 0;
-
-  virtual SmallVector<Value> getThreadGrid(RewriterBase &rewriter) = 0;
 
 protected:
   VectorLayoutAnalysis &analysis;

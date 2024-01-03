@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-transform-dialect-interpreter --split-input-file --cse %s | FileCheck %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --cse %s | FileCheck %s
 
 #layout = #iree_vector_ext.layout<<[VECTORY, LANEY], [4, 4]>, <[VECTORX, LANEX], [4, 4]>>
 
@@ -19,6 +19,6 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
