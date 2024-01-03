@@ -14,12 +14,11 @@
 #include "torch-mlir/Conversion/TorchToLinalg/TorchToLinalg.h"
 #include "torch-mlir/Conversion/TorchToSCF/TorchToSCF.h"
 #include "torch-mlir/Conversion/TorchToTMTensor/TorchToTMTensor.h"
+#include "torch-mlir/Conversion/TorchToTensor/TorchToTensor.h"
 #include "torch-mlir/Dialect/Torch/Transforms/Passes.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 #define GEN_PASS_REGISTRATION
@@ -48,6 +47,7 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
+  pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToArithPass());
@@ -84,6 +84,4 @@ void registerTMTensorConversionPasses() {
       createTorchToIREEPipeline);
 }
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput

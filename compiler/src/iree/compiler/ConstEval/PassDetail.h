@@ -10,15 +10,11 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace ConstEval {
+namespace mlir::iree_compiler::ConstEval {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/ConstEval/Passes.h.inc"
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval
 
 #endif // IREE_COMPILER_CONSTEVAL_PASSDETAIL_H_

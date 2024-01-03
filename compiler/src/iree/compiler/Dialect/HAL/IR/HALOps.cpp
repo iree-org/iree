@@ -20,10 +20,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // custom<DescriptorType>($descriptor_type)
@@ -194,6 +191,85 @@ static void printTargetConditionRegion(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
+static ParseResult parseTargetConditionObjects(
+    OpAsmParser &parser, ArrayAttr &targetsAttr, ArrayAttr &targetOrdinalsAttr,
+    ArrayAttr &targetObjectsAttr,
+    SmallVector<std::unique_ptr<Region>, 2> &targetRegions) {
+  SmallVector<Attribute> targetsAttrs;
+  SmallVector<Attribute> targetOrdinalsAttrs;
+  SmallVector<Attribute> targetObjectsAttrs;
+  do {
+    // #hal.executable.target<...>
+    Attribute targetAttr;
+    if (failed(parser.parseAttribute(targetAttr)))
+      return failure();
+    targetsAttrs.push_back(targetAttr);
+
+    // if(...) -> i1 { ... }
+    auto region = std::make_unique<Region>();
+    if (succeeded(parser.parseOptionalKeyword("if"))) {
+      if (failed(parseTargetConditionRegion(parser, *region)))
+        return failure();
+    }
+    targetRegions.push_back(std::move(region));
+
+    // ordinal(#)
+    Attribute targetOrdinalAttr;
+    if (failed(parser.parseKeyword("ordinal")) ||
+        failed(parser.parseLParen()) ||
+        failed(parser.parseAttribute(targetOrdinalAttr,
+                                     IndexType::get(parser.getContext()))) ||
+        failed(parser.parseRParen()))
+      return failure();
+    targetOrdinalsAttrs.push_back(targetOrdinalAttr);
+
+    // = [#hal.executable.object<...>, ...]
+    ArrayAttr targetObjectsAttr;
+    if (failed(parser.parseEqual()) ||
+        failed(parser.parseAttribute(targetObjectsAttr)))
+      return failure();
+    targetObjectsAttrs.push_back(targetObjectsAttr);
+  } while (succeeded(parser.parseOptionalComma()));
+  targetsAttr = ArrayAttr::get(parser.getContext(), targetsAttrs);
+  targetOrdinalsAttr = ArrayAttr::get(parser.getContext(), targetOrdinalsAttrs);
+  targetObjectsAttr = ArrayAttr::get(parser.getContext(), targetObjectsAttrs);
+  return success();
+}
+
+static void printTargetConditionObjects(OpAsmPrinter &p, Operation *op,
+                                        ArrayAttr targetsAttr,
+                                        ArrayAttr targetOrdinalsAttr,
+                                        ArrayAttr targetObjectsAttr,
+                                        MutableArrayRef<Region> targetRegions) {
+  p.increaseIndent();
+  p.printNewline();
+
+  llvm::interleave(
+      llvm::zip_equal(targetsAttr, targetOrdinalsAttr, targetObjectsAttr,
+                      targetRegions),
+      [&](auto it) {
+        auto &[targetAttr, targetOrdinalAttr, targetObjectsAttr, targetRegion] =
+            it;
+        p.printAttribute(targetAttr);
+        if (!targetRegion.empty()) {
+          p << " if";
+          printTargetConditionRegion(p, op, targetRegion);
+        }
+        p << " ordinal(";
+        p.printAttributeWithoutType(targetOrdinalAttr);
+        p << ")";
+        p << " = ";
+        p.printAttribute(targetObjectsAttr);
+      },
+      [&]() {
+        p << ",";
+        p.printNewline();
+      });
+
+  p.decreaseIndent();
+  p.printNewline();
+}
+
 //===----------------------------------------------------------------------===//
 // custom<WorkgroupCountRegion>($body)
 //===----------------------------------------------------------------------===//
@@ -255,11 +331,6 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 // hal.ex.*
 //===----------------------------------------------------------------------===//
-
-void ExSharedDeviceOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "device");
-}
 
 void ExFileFromMemoryOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -467,6 +538,7 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
                              ValueRange resultDims, ValueRange arguments,
                              ValueRange argumentDims,
                              ArrayRef<int64_t> tiedOperands,
+                             IREE::HAL::ExecutableObjectsAttr targetObjects,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(workload);
@@ -477,6 +549,8 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
   state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
                      builder.getIndexArrayAttr(tiedOperands));
+  state.addAttribute("targets", targetObjects.getTargets());
+  state.addAttribute("target_objects", targetObjects.getTargetObjects());
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
                      builder.getDenseI32ArrayAttr({
@@ -488,6 +562,10 @@ void DispatchExternOp::build(OpBuilder &builder, OperationState &state,
 
   // NOTE: workgroup count region is empty; callers are expected to populate it.
   state.addRegion();
+
+  // Add one empty region per target.
+  for (size_t i = 0; i < targetObjects.getTargets().size(); ++i)
+    state.addRegion();
 }
 
 // Verifies that |dynamicDims| contains the appropriate number of dims for all
@@ -567,6 +645,19 @@ LogicalResult DispatchExternOp::verify() {
   if (failed(
           verifyWorkgroupCountRegion(op, getWorkload(), getWorkgroupCount()))) {
     return failure();
+  }
+
+  if (getTargets().size() != getTargetObjects().size()) {
+    return op->emitOpError() << "target and objects arrays must match";
+  }
+  if (getTargets().size() != getTargetRegions().size()) {
+    return op->emitOpError()
+           << "target and condition regions must match (but they may be empty)";
+  }
+  for (auto &targetRegion : getTargetRegions()) {
+    if (failed(verifyTargetConditionRegion(op, targetRegion))) {
+      return failure();
+    }
   }
 
   return success();
@@ -825,6 +916,27 @@ LogicalResult DeviceQueueWriteOp::verify() {
 
 LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.devices.*
+//===----------------------------------------------------------------------===//
+
+void DevicesCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "device_count");
+}
+
+void DevicesGetOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  APInt index;
+  if (matchPattern(getIndex(), m_ConstantInt(&index))) {
+    llvm::SmallString<16> str("device_");
+    index.toStringUnsigned(str);
+    setNameFn(getResult(), str);
+  } else {
+    setNameFn(getResult(), "device_n");
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1110,9 +1222,17 @@ DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
 
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
-  auto matchAttr =
-      cast<IREE::HAL::MatchAttrInterface>(getTarget().getMatchExpression());
-  auto selected = matchAttr.buildConditionExpression(getLoc(), device, builder);
+  // TODO(multi-device): condition on device target ID and other queries that
+  // may be useful for disambiguating two devices that support the same
+  // executable targets. Today executable targets are unique per device target
+  // but that need not always be the case.
+  auto i1Type = builder.getI1Type();
+  Value selected = builder
+                       .create<IREE::HAL::DeviceQueryOp>(
+                           getLoc(), i1Type, i1Type, device,
+                           builder.getStringAttr("hal.executable.format"),
+                           getTarget().getFormat(), builder.getZeroAttr(i1Type))
+                       .getValue();
 
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();
@@ -1512,10 +1632,7 @@ void FenceAwaitOp::getAsmResultNames(
   setNameFn(getStatus(), "status");
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

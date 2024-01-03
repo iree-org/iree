@@ -1,3 +1,11 @@
+function(_add_interfaces)
+  set(LLVM_TARGET_DEFINITIONS VectorExtInterfaces.td)
+  mlir_tablegen(VectorExtAttrInterfaces.h.inc -gen-attr-interface-decls)
+  mlir_tablegen(VectorExtAttrInterfaces.cpp.inc -gen-attr-interface-defs)
+  add_public_tablegen_target(IREEVectorExtInterfacesIncGen)
+  add_dependencies(IREEVectorExtIncGen IREEVectorExtInterfacesIncGen)
+endfunction()
+
 function(_add_dialect)
   set(LLVM_TARGET_DEFINITIONS VectorExtOps.td)
   mlir_tablegen(VectorExtAttrs.h.inc -gen-attrdef-decls)
@@ -32,5 +40,5 @@ function(_add_doc)
 endfunction()
 
 _add_dialect()
+_add_interfaces()
 _add_doc()
-

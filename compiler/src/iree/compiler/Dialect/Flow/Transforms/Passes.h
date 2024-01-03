@@ -16,10 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -49,15 +46,8 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
-// Expands tensor shape dimensions into SSA values across the program.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
-
 // Cleans up any remaining shape metadata ops after lowering.
 std::unique_ptr<Pass> createCleanupTensorShapesPass();
-
-// Cleans up any numeric narrowing ops inserted by
-// iree-flow-infer-numeric-narrowing.
-std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 
 // Creates a pass to convert dispatch.region ops to dispatch.workgroups ops.
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
@@ -77,15 +67,6 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
                             unsigned multiUseFusionIteration = 2);
 
-// Create a pass that generalizes some named Linalg ops into `linalg.generic`
-// operations since the IREE compiler can handle that better.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGeneralizeLinalgNamedOpsPass();
-
-// Infers and inserts util.numeric.optional_narrow ops at points that may be
-// beneficial.
-std::unique_ptr<Pass> createInferNumericNarrowingPass();
-
 // Create a pass to initialize all empty tensors after dispatch formation to
 // zero or uninitialized allocations.
 std::unique_ptr<Pass> createInitializeEmptyTensorsPass(bool zeroFill = false);
@@ -102,10 +83,6 @@ std::unique_ptr<Pass> createInterchangeTransposeGenericOpsPass();
 // only used for testing, since the conversion to Flow ops happens within
 // dispatch region formation.
 std::unique_ptr<Pass> createConvertToFlowPass();
-
-// Optimizes numerics given annotations added via
-// iree-flow-infer-numeric-narrowing.
-std::unique_ptr<Pass> createOptimizeNumericsPass();
 
 // Decomposes top-level SCF operations to CFG.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -173,6 +150,10 @@ createDispatchWithTransformDialect(
 // Captures dynamic shape dimensions required by dispatch operands.
 std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 
+// Outlines external dispatches into executables.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOutlineDispatchExternsPass();
+
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineDispatchRegionsPass();
@@ -209,10 +190,6 @@ createOutlineLargeConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
 
-// Create a pass to raise sequence of ops to higher level linalg.ext
-// representation.
-std::unique_ptr<Pass> createRaiseSpecialOps();
-
 // Create a pass to split reduction dimension.
 std::unique_ptr<Pass> createSplitReductionPass();
 
@@ -237,9 +214,6 @@ createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
 
 void registerFlowPasses();
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_

@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
@@ -18,8 +18,7 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
@@ -78,6 +77,24 @@ getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
   return computeFn;
 }
 
+FailureOr<scf::SCFTileSizeComputationFunction>
+getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
+  FailureOr<SmallVector<int64_t>> tileSizes =
+      getSPIRVTileSize(funcOp, tilingLevel);
+  if (failed(tileSizes))
+    return failure();
+  scf::SCFTileSizeComputationFunction computeFn =
+      [tileSizes](OpBuilder &builder,
+                  Operation *op) -> SmallVector<OpFoldResult> {
+    auto tileSizesOfr = getAsIndexOpFoldResult(op->getContext(), *tileSizes);
+    auto zeroAttr = builder.getIndexAttr(0);
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    tileSizesOfr.resize(numLoops, zeroAttr);
+    return tileSizesOfr;
+  };
+  return computeFn;
+}
+
 template <typename GPUIdOp, typename GPUCountOp>
 static linalg::ProcInfo
 getGPUProcessorIdAndCountImpl(OpBuilder &builder, Location loc, unsigned dim) {
@@ -116,5 +133,4 @@ template SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
     OpBuilder &builder, Location loc, unsigned numDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,8 +10,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Appends memref dialect to vm dialect patterns to the given pattern list.
 // Because these patterns are often used in A->B->C lowerings, we allow the
@@ -23,7 +22,6 @@ void populateMemRefToUtilPatterns(MLIRContext *context,
                                   RewritePatternSet &patterns,
                                   Type convertedBufferType = {});
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_UTIL_CONVERSION_MEMREFTOUTIL_PATTERN_H_

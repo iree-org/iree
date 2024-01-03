@@ -12,10 +12,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 //===----------------------------------------------------------------------===//
 // Pipelines
@@ -72,9 +69,6 @@ inline void registerPasses() {
   createWrapEntryPointsPass();
 }
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI
 
 #endif // IREE_COMPILER_BINDINGS_NATIVE_TRANSFORMS_PASSES_H_

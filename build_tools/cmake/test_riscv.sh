@@ -32,7 +32,7 @@ ctest_args=(
 )
 
 declare -a label_exclude_args=(
-  "^nokokoro$"
+  "^nodocker$"
   "^driver=vulkan$"
   "^driver=cuda$"
   "^vulkan_uses_vk_khr_shader_float16_int8$"
@@ -97,7 +97,6 @@ test_exclude_args+=(
   "iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_dot.mlir"
   "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_llvm-cpu_local-task"
   "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_llvm-cpu_local-task"
-  "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_no_padding_llvm-cpu_local-task"
   "iree/tests/e2e/regression/check_regression_llvm-cpu_strided_slice.mlir"
 )
 

@@ -11,8 +11,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Operation.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct VectorTransforms {
   static const StringLiteral kVectorTransformMarker;
@@ -68,5 +67,4 @@ void setMarker(Operation *op, StringRef marker) {
               StringAttr::get(op->getContext(), marker));
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

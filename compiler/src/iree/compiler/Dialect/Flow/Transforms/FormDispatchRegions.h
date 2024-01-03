@@ -12,7 +12,9 @@
 #include "mlir/IR/Dominance.h"
 
 namespace mlir {
+
 class Operation;
+
 /// A rewriter that keeps track of all tensor::DimOps.
 class TensorDimTrackingRewriter : public IRRewriter, IRRewriter::Listener {
 public:
@@ -29,9 +31,9 @@ private:
   SmallPtrSet<Operation *, 16> dimOps;
 };
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+} // namespace mlir
+
+namespace mlir ::iree_compiler::IREE::Flow {
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
@@ -46,9 +48,7 @@ FailureOr<Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 ///   value.
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps);
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_

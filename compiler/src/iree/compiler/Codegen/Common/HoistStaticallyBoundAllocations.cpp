@@ -14,8 +14,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -37,5 +36,4 @@ createHoistStaticallyBoundAllocationsPass() {
   return std::make_unique<HoistStaticallyBoundAllocationsPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

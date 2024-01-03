@@ -79,8 +79,8 @@ hal.executable @i4_dequant_matvec_f32 {
 //         CHECK:     %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xf32> to vector<1x4xf32>
 //         CHECK:     scf.yield %[[BCAST]] : vector<1x4xf32>
 
-//         CHECK:   %[[SCAST:.+]] = vector.shape_cast %[[FOR]] : vector<1x4xf32> to vector<4xf32>
-//         CHECK:   %[[REDUCE:.+]] = vector.reduction <add>, %[[SCAST]] : vector<4xf32> into f32
+//         CHECK:   %[[EXTRACT3:.+]] = vector.extract %[[FOR]][0] : vector<4xf32> from vector<1x4xf32>
+//         CHECK:   %[[REDUCE:.+]] = vector.reduction <add>, %[[EXTRACT3]] : vector<4xf32> into f32
 //         CHECK:   gpu.subgroup_reduce add %[[REDUCE]] : (f32) -> f32
 //         CHECK:   scf.if
 //         CHECK:     vector.transfer_write

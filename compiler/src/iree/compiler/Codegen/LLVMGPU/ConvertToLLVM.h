@@ -9,11 +9,11 @@
 
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 
-namespace mlir {
-namespace gpu {
+namespace mlir::gpu {
 enum class AddressSpace : uint32_t;
-}
-namespace iree_compiler {
+} // namespace mlir::gpu
+
+namespace mlir::iree_compiler {
 
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     RewritePatternSet &patterns,
@@ -34,7 +34,6 @@ using MemorySpaceMapping =
 void populateGpuMemorySpaceAttributeConversions(
     TypeConverter &typeConverter, const MemorySpaceMapping &mapping);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_

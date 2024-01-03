@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -23,8 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
@@ -71,7 +69,7 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
 
   SmallVector<OpFoldResult> result(staticTileSizes.size());
   for (size_t i = 0; i < result.size(); ++i) {
-    if (staticTileSizes[i] == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(staticTileSizes[i])) {
       result[i] = innerTileSizeValues[i];
     } else if (tensorType.isDynamicDim(i)) {
       result[i] =
@@ -82,6 +80,93 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
     }
   }
   return result;
+}
+
+RankedTensorType getExpandedType(RankedTensorType type, bool isBatched,
+                                 bool isTransposed,
+                                 SmallVectorImpl<ReassociationIndices> &ri) {
+  if (!isBatched) {
+    ri.assign({{0, 1}, {2, 3}});
+    if (!isTransposed) {
+      return RankedTensorType::get(
+          {1, type.getDimSize(0), 1, type.getDimSize(1)},
+          type.getElementType());
+    }
+    return RankedTensorType::get({type.getDimSize(0), 1, type.getDimSize(1), 1},
+                                 type.getElementType());
+  }
+
+  ri.assign({{0}, {1, 2}, {3, 4}});
+  if (!isTransposed) {
+    return RankedTensorType::get(
+        {type.getDimSize(0), 1, type.getDimSize(1), 1, type.getDimSize(2)},
+        type.getElementType());
+  }
+  return RankedTensorType::get(
+      {type.getDimSize(0), type.getDimSize(1), 1, type.getDimSize(2), 1},
+      type.getElementType());
+}
+
+Value getMmt4dLhs(Value value, linalg::ContractionOpInterface op,
+                  RewriterBase &rewriter,
+                  SmallVectorImpl<ReassociationIndices> &ri) {
+  RankedTensorType type = value.getType().cast<RankedTensorType>();
+  RankedTensorType newType;
+  if (op.isVecmat()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/false, ri);
+  } else if (op.isBatchVecmat()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/false, ri);
+  } else {
+    return value;
+  }
+  return rewriter
+      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
+      .getResult();
+}
+
+Value getMmt4dRhs(Value value, linalg::ContractionOpInterface op,
+                  RewriterBase &rewriter,
+                  SmallVectorImpl<ReassociationIndices> &ri) {
+  RankedTensorType type = value.getType().cast<RankedTensorType>();
+  RankedTensorType newType;
+  if (op.isMatvec()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/false, ri);
+  } else if (op.isBatchMatvec()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/false, ri);
+  } else {
+    return value;
+  }
+  return rewriter
+      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
+      .getResult();
+}
+
+Value getMmt4dResult(Value value, linalg::ContractionOpInterface op,
+                     RewriterBase &rewriter,
+                     SmallVectorImpl<ReassociationIndices> &ri) {
+  // For vecmat/batch_vecmat we can rely on the same functionality as LHS.
+  if (op.isVecmat() || op.isBatchVecmat()) {
+    return getMmt4dLhs(value, op, rewriter, ri);
+  }
+
+  auto type = value.getType().cast<RankedTensorType>();
+  RankedTensorType newType;
+  if (op.isMatvec()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/true, ri);
+  } else if (op.isBatchMatvec()) {
+    newType =
+        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/true, ri);
+  } else {
+    return value;
+  }
+  return rewriter
+      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
+      .getResult();
 }
 
 //===---------------------------------------------------------------------===//
@@ -209,32 +294,38 @@ static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
   return results;
 }
 
-/// Utility method to convert from `linalg.matmul` with
+/// Utility method to convert from linalg contraction ops with
 /// - lhs encoding with role=LHS
 /// - rhs encoding with role=RHS
 /// - result encoding with role=RESULT
-/// to linalg.mmt4d op.
+/// to linalg.mmt4d or linalg.batch_mmt4d ops.
 static FailureOr<Operation *> lowerOpWithEncoding(
-    RewriterBase &rewriter, linalg::MatmulOp matmulOp,
-    ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
-    MaterializeEncodingFn materializeEncodingFn, MaterializeEncodingValueFn) {
-  if (!matmulOp.hasTensorSemantics()) {
+    RewriterBase &rewriter, mlir::linalg::ContractionOpInterface op,
+    ArrayRef<Value> operands, MaterializeEncodingFn materializeEncodingFn,
+    MaterializeEncodingValueFn) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+  if (!linalgOp.hasTensorSemantics())
     return failure();
-  }
-  auto inputs = matmulOp.getDpsInputOperands();
-  auto outputs = matmulOp.getDpsInits();
-  auto lhsEncoding =
-      getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
-  auto rhsEncoding =
-      getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
-  auto resultEncoding =
-      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
+
+  auto inputs = linalgOp.getDpsInputOperands();
+  auto outputs = linalgOp.getDpsInits();
+
+  auto lhsType = inputs[0]->get().getType().cast<RankedTensorType>();
+  auto rhsType = inputs[1]->get().getType().cast<RankedTensorType>();
+  auto resultType = outputs[0].getType().cast<RankedTensorType>();
+  auto lhsEncoding = getEncodingAttr(lhsType);
+  auto rhsEncoding = getEncodingAttr(rhsType);
+  auto resultEncoding = getEncodingAttr(resultType);
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
-  if (!isMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-      !isMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-      !isMatmulEncodingUser(resultEncoding.getUser().getValue()) ||
+
+  if (((!isMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
+        !isMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
+        !isMatmulEncodingUser(resultEncoding.getUser().getValue())) &&
+       (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
+        !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
+        !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()))) ||
       lhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
@@ -246,62 +337,34 @@ static FailureOr<Operation *> lowerOpWithEncoding(
 
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(getOriginalTypeWithEncoding(
-          matmulOp.getResultTypes()[0].cast<RankedTensorType>()));
+          linalgOp->getResultTypes()[0].cast<RankedTensorType>()));
+
   Operation *result;
   if (failed(materializeEncodingInfo)) {
-    result = dropEncodingAndCloneOp(rewriter, matmulOp, convertedInputOperands,
-                                    convertedOutputOperands);
+    result = dropEncodingAndCloneOp(rewriter, linalgOp,
+                                    operands.take_front(inputs.size()),
+                                    operands.drop_front(inputs.size()));
   } else {
-    result = rewriter.create<linalg::Mmt4DOp>(
-        matmulOp.getLoc(), convertedOutputOperands[0].getType(),
-        convertedInputOperands, convertedOutputOperands);
-  }
-  return result;
-}
+    SmallVector<ReassociationIndices> ri;
+    Value newLhs = getMmt4dLhs(operands[0], op, rewriter, ri);
+    Value newRhs = getMmt4dRhs(operands[1], op, rewriter, ri);
+    Value newResult = getMmt4dResult(operands[2], op, rewriter, ri);
 
-/// Utility method to convert from `linalg.batch_matmul` with
-/// - lhs encoding with user=BATCH_MATMUL_*, role=LHS
-/// - rhs encoding with user=BATCH_MATMUL_*, role=RHS
-/// - result encoding with user=BATCH_MATMUL_*, role=RESULT
-/// to linalg.batch_mmt4d op.
-static FailureOr<Operation *> lowerOpWithEncoding(
-    RewriterBase &rewriter, linalg::BatchMatmulOp batchMatmulOp,
-    ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
-    MaterializeEncodingFn materializeEncodingFn, MaterializeEncodingValueFn) {
-  if (!batchMatmulOp.hasTensorSemantics())
-    return failure();
-  auto inputs = batchMatmulOp.getDpsInputOperands();
-  auto outputs = batchMatmulOp.getDpsInits();
-  auto lhsEncoding =
-      getEncodingAttr(inputs[0]->get().getType().cast<RankedTensorType>());
-  auto rhsEncoding =
-      getEncodingAttr(inputs[1]->get().getType().cast<RankedTensorType>());
-  auto resultEncoding =
-      getEncodingAttr(outputs[0].getType().cast<RankedTensorType>());
-  if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
-    return failure();
-  }
+    Type newResultType = newResult.getType();
 
-  if (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-      !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-      !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()) ||
-      lhsEncoding.getRole().getValue() != EncodingRole::LHS ||
-      rhsEncoding.getRole().getValue() != EncodingRole::RHS ||
-      resultEncoding.getRole().getValue() != EncodingRole::RESULT) {
-    return failure();
-  }
-  FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(getOriginalTypeWithEncoding(
-          batchMatmulOp.getResultTypes()[0].cast<RankedTensorType>()));
-  Operation *result;
-  if (failed(materializeEncodingInfo)) {
-    result =
-        dropEncodingAndCloneOp(rewriter, batchMatmulOp, convertedInputOperands,
-                               convertedOutputOperands);
-  } else {
-    result = rewriter.create<linalg::BatchMmt4DOp>(
-        batchMatmulOp.getLoc(), convertedOutputOperands[0].getType(),
-        convertedInputOperands, convertedOutputOperands);
+    if (isMatmulEncodingUser(resultEncoding.getUser().getValue())) {
+      result = rewriter.create<linalg::Mmt4DOp>(
+          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+          ValueRange{newResult});
+    } else {
+      result = rewriter.create<linalg::BatchMmt4DOp>(
+          linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
+          ValueRange{newResult});
+    }
+    if (!ri.empty()) {
+      result = rewriter.create<tensor::CollapseShapeOp>(
+          linalgOp->getLoc(), operands[2].getType(), result->getResult(0), ri);
+    }
   }
   return result;
 }
@@ -770,26 +833,42 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
   }
 };
 
-} // namespace
+/// Pattern to convert contraction operations.
+class MaterializeContractionOp : public OpInterfaceConversionPattern<
+                                     mlir::linalg::ContractionOpInterface> {
+public:
+  MaterializeContractionOp(
+      MLIRContext *context,
+      const MaterializeEncodingTypeConverter &typeConverter,
+      MaterializeEncodingValueFn materializeEncodingValueFn = {},
+      PatternBenefit benefit = 1)
+      : OpInterfaceConversionPattern<mlir::linalg::ContractionOpInterface>(
+            typeConverter, context, benefit),
+        materializeEncodingValueFn(materializeEncodingValueFn) {}
 
-static FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
-  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getResults();
-  return result;
-}
-
-MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
-    return chooseDynamicEncodingInfoVMVXMicrokernels;
+  LogicalResult
+  matchAndRewrite(mlir::linalg::ContractionOpInterface op,
+                  ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    MaterializeEncodingFn materializeEncodingFn =
+        static_cast<const MaterializeEncodingTypeConverter *>(
+            this->getTypeConverter())
+            ->getMaterializeEncodingFn();
+    FailureOr<Operation *> convertedOp =
+        lowerOpWithEncoding(rewriter, op, operands, materializeEncodingFn,
+                            this->materializeEncodingValueFn);
+    if (failed(convertedOp)) {
+      return failure();
+    }
+    rewriter.replaceOp(op.getOperation(), convertedOp.value()->getResult(0));
+    return success();
   }
-  return {};
-}
+
+protected:
+  const MaterializeEncodingValueFn materializeEncodingValueFn;
+};
+
+} // namespace
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
@@ -821,11 +900,9 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
   // Add all patterns for converting from encoded type to the materialized
   // type.
   patterns.insert<MaterializeDPSOperation<linalg::FillOp>,
-                  MaterializeDPSOperation<linalg::MatmulOp>,
-                  MaterializeDPSOperation<linalg::BatchMatmulOp>,
                   MaterializeDPSOperation<linalg::GenericOp>,
                   MaterializeOperation<tensor::EmptyOp>,
-                  SetEncodingOpToPackOpConversion,
+                  MaterializeContractionOp, SetEncodingOpToPackOpConversion,
                   UnsetEncodingOpToUnPackOpConversion>(
       patterns.getContext(), typeConverter, materializeEncodingValueFn);
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -842,5 +919,4 @@ void populateMaterializeUpperBoundTileSizePatterns(
       patterns.getContext(), materializeEncodingFn);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

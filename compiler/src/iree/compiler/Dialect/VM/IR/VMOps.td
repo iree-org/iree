@@ -16,6 +16,7 @@ include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 // Trial ops do not have any memory effects but may invoke Undefine Behavior on
@@ -45,8 +46,8 @@ let opDocGroup = OpGroupStructuralOps in {
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::VM::ModuleTerminatorOp">,
-    NativeOpTrait<"SymbolTable">,
     Symbol,
+    SymbolTable,
   ]> {
   let summary = [{module containing VM functions and variables}];
   let description = [{
@@ -1193,6 +1194,48 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
       $_state.addAttribute("value", value);
     }]>,
     OpBuilder<(ins "StringAttr":$value)>
+  ];
+}
+
+def VM_RodataTableInlineOp : VM_PureOp<"rodata.table.inline", [
+    VM_PseudoOp,
+  ]> {
+  let summary = [{inlined constant rodata table}];
+  let description = [{
+    vm.rodata with another associated vm.rodata table specifying byte offsets
+    and sizes as a subview into the flattened data. The table is a flat array
+    of 32 or 64-bit integers storing (offset, size) in element order.
+
+    The optional alignment attribute applies to both the table and data rodata.
+    The data_alignment attribute can be used to specify an alignment for the
+    elements of the table, padding to the data alignment with zeros. The element
+    sizes reflect the unpadded attribute storage sizes.
+
+    See vm.rodata for more information.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$table_name,
+    OptionalAttr<StrAttr>:$data_name,
+    TypeAttrOf<VM_AnyIntegerType>:$table_type,
+    Util_AnySerializableArrayAttr:$data_array,
+    OptionalAttr<I64Attr>:$alignment,
+    OptionalAttr<I64Attr>:$data_alignment,
+    OptionalAttr<StrAttr>:$mime_type
+  );
+
+  let results = (outs
+    VM_RefOf<VM_BufferType>:$table_result,
+    VM_RefOf<VM_BufferType>:$data_result
+  );
+
+  let assemblyFormat = [{
+    $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+  }];
+
+  let builders = [
+    OpBuilder<(ins "IntegerType":$table_type, "ArrayAttr":$value)>,
+    OpBuilder<(ins "StringAttr":$name, "IntegerType":$table_type, "ArrayAttr":$value)>
   ];
 }
 

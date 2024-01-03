@@ -20,8 +20,6 @@ iree_compiler_register_plugin(
 iree_cc_library(
   NAME
     MetalSPIRV
-  HDRS
-    "MetalSPIRVTarget.h"
   SRCS
     "MetalSPIRVTarget.cpp"
   DEPS
@@ -37,7 +35,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRVectorDialect
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target

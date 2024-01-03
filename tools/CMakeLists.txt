@@ -65,6 +65,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util
     iree::vm
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
@@ -87,6 +88,7 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
+  INSTALL_COMPONENT IREETools-Runtime  
 )
 
 iree_cc_binary(
@@ -111,6 +113,23 @@ iree_cc_binary(
 
 iree_cc_binary(
   NAME
+    iree-convert-parameters
+  SRCS
+    "iree-convert-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::hal
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::tooling::parameter_util
+  INSTALL_COMPONENT IREETools-Runtime    
+)
+
+iree_cc_binary(
+  NAME
     iree-cpuinfo
   SRCS
     "iree-cpuinfo.c"
@@ -118,6 +137,24 @@ iree_cc_binary(
     iree::base
     iree::base::internal::cpu
     iree::schemas::cpu_data
+  INSTALL_COMPONENT IREETools-Runtime    
+)
+
+iree_cc_binary(
+  NAME
+    iree-create-parameters
+  SRCS
+    "iree-create-parameters-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::file_io
+    iree::base::internal::flags
+    iree::hal
+    iree::io::formats::irpa
+    iree::io::parameter_index
+    iree::io::scope_map
+    iree::io::stream
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
@@ -132,6 +169,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::schemas::instruments
     iree::schemas::instruments::dispatch_def_c_fbs
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
@@ -148,6 +186,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
@@ -162,6 +201,7 @@ iree_cc_binary(
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 # Only enable fatelf tool when we're compiling it in.
@@ -179,6 +219,7 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::path
     iree::hal::local::elf::elf_module
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
@@ -194,6 +235,7 @@ iree_cc_binary(
     iree::tooling::context_util
     iree::tooling::run_module
     iree::vm
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -213,6 +255,7 @@ iree_cc_binary(
     iree::tooling::yaml_util
     iree::vm
     yaml
+  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
@@ -236,20 +279,10 @@ iree_cc_binary(
 )
 
 if(IREE_BUILD_COMPILER)
-  # If a target backend that requires LLD to link codegen executables is
-  # enabled, install the target.
-  if(IREE_LLD_TARGET)
-    install(
-      TARGETS lld
-      COMPONENT Compiler
-      RUNTIME DESTINATION bin
-    )
-  endif()
-
   if(IREE_LLVM_LINK_TARGET)
     install(
       TARGETS llvm-link
-      COMPONENT Compiler
+      COMPONENT IREETools-CompilerExtra
       RUNTIME DESTINATION bin
     )
   endif()
@@ -257,7 +290,7 @@ if(IREE_BUILD_COMPILER)
   if(IREE_CLANG_TARGET)
     install(
       TARGETS clang
-      COMPONENT Compiler
+      COMPONENT IREETools-CompilerExtra
       RUNTIME DESTINATION bin
     )
   endif()
@@ -280,6 +313,7 @@ if(IREE_BUILD_COMPILER)
       MLIRTblgenLib
     HOSTONLY
     DISABLE_LLVM_LINK_LLVM_DYLIB
+    INSTALL_COMPONENT IREETools-CompilerDev
   )
 
   iree_cc_binary(
@@ -294,6 +328,7 @@ if(IREE_BUILD_COMPILER)
       ${IREE_LLD_TARGET}
     HOSTONLY
     SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
   )
 
   iree_cc_binary(
@@ -308,7 +343,26 @@ if(IREE_BUILD_COMPILER)
       ${IREE_LLD_TARGET}
     HOSTONLY
     SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
   )
+
+  # Only build IREE's busybox lld if the backing LLVM has LLD enabled.
+  # Otherwise, it will build but fail at runtime saying that it is not
+  # supported, and this fouls up tools search heuristics.
+  if(IREE_LLD_TARGET)
+    iree_cc_binary(
+      NAME
+        iree-lld
+      SRCS
+        "iree-lld-main.cc"
+      DEPS
+        iree::compiler::bindings::c::headers
+        iree::compiler::API::Impl
+      HOSTONLY
+      SETUP_INSTALL_RPATH
+      INSTALL_COMPONENT IREETools-Compiler
+    )
+  endif()
 
   iree_cc_binary(
     NAME
@@ -322,6 +376,7 @@ if(IREE_BUILD_COMPILER)
       ${IREE_LLD_TARGET}
     HOSTONLY
     SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
   )
 
   iree_cc_binary(
@@ -333,6 +388,7 @@ if(IREE_BUILD_COMPILER)
       iree::compiler::bindings::c::headers
       iree::compiler::API::Impl
     SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
   )
 
   iree_cc_binary(
@@ -354,6 +410,7 @@ if(IREE_BUILD_COMPILER)
       ${IREE_LLD_TARGET}
     HOSTONLY
     SETUP_INSTALL_RPATH
+    INSTALL_COMPONENT IREETools-Compiler
   )
 
   # Ensure FileCheck and associated binaries get built. Tests don't have

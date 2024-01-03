@@ -28,10 +28,7 @@
 
 #define DEBUG_TYPE "iree-util-dfx"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 // TODO(benvanik): pick a policy for whether we want to favor copying external
 // values into transients or try to reuse the external values. In very loopy
@@ -881,7 +878,4 @@ LogicalResult ResourceUsageAnalysis::run() {
   return solver.run();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

@@ -23,10 +23,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -349,12 +346,6 @@ void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldCommandBufferPushDescriptorSetBufferSubspan>(context);
 }
-
-//===----------------------------------------------------------------------===//
-// hal.device.match.id
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): fold matches that are known true based on device config.
 
 //===----------------------------------------------------------------------===//
 // hal.device.queue.execute
@@ -1049,7 +1040,4 @@ void FenceAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<DeduplicateFenceAwaitFences>(context);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

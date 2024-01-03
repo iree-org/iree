@@ -16,8 +16,7 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-vector-lowering"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool has16x16Transpose(func::FuncOp funcOp) {
   bool res = false;
@@ -77,11 +76,25 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
           .setVectorTransformsOptions(vectorContractLowering)
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
+
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorGatherLoweringPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After applying patterns for vector.gather Ops ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Lower high level vector operations like contract or multidim reduce ops
   // to lower level vector ops.
   {
     RewritePatternSet patterns(ctx);
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorTransferDropUnitDimsPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(
         patterns, vectorTransformOptions,
         /*benefit=*/1,
@@ -110,6 +123,8 @@ void LLVMCPUVectorLoweringPass::runOnOperation() {
   // TODO (dcaballe): We should run full canonicalization here.
   {
     RewritePatternSet patterns(ctx);
+    vector::BroadcastOp::getCanonicalizationPatterns(patterns, ctx);
+    vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
     vector::TransposeOp::getCanonicalizationPatterns(patterns, ctx);
     (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   }
@@ -177,5 +192,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options) {
   return std::make_unique<LLVMCPUVectorLoweringPass>(options);
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

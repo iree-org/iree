@@ -16,10 +16,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 class DeduplicateRodataPass
     : public PassWrapper<DeduplicateRodataPass,
@@ -107,7 +104,4 @@ createDeduplicateRodataPass() {
 
 static PassRegistration<DeduplicateRodataPass> pass;
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

@@ -122,7 +122,17 @@ FALCON7B_1X100XI64_GPTQ_TORCH = common_definitions.Model(
     name="Falcon7bGptqPT",
     tags=["gptq", "transformer"],
     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon7b_gptq_linalg_zeroed_weights_1698708010.mlirbc",
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_1702432230.mlirbc",
+    entry_function="forward",
+    input_types=["1x100xi64"],
+)
+
+FALCON7B_INT4_1X100XI64_GPTQ_TORCH = common_definitions.Model(
+    id=unique_ids.MODEL_FALCON7B_INT4_1X100XI64_GPTQ_TORCH,
+    name="Falcon7bInt4GptqPT",
+    tags=["gptq", "transformer", "int4"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc",
     entry_function="forward",
     input_types=["1x100xi64"],
 )

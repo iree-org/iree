@@ -6,14 +6,15 @@
 //  CHECK-SAME:   !hal.buffer_view, !hal.buffer_view
 //  CHECK-SAME: ) attributes {
 //  CHECK-SAME:   iree.abi.stub
-//  CHECK-SAME:   iree.reflection = {iree.abi.model = "coarse-fences"}
+//  CHECK-SAME:   iree.reflection =
+//  CHECK-SAME:       iree.abi.model = "coarse-fences"
 //  CHECK-SAME: } {
-//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<4xf32>
-//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
+//  CHECK-NEXT:   %[[ARG1_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG1]] "input1" : !hal.buffer_view -> tensor<4xf32>
 //  CHECK-NEXT:   %[[RESULT_TENSORS:.+]]:2 = call @_asyncEntry(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]])
 //  CHECK-NEXT:   %[[READY_TENSORS:.+]]:2 = hal.tensor.barrier join(%[[RESULT_TENSORS]]#0, %[[RESULT_TENSORS]]#1 : tensor<4xf32>, tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
-//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#0 "output 0" : tensor<4xf32> -> !hal.buffer_view
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#1 "output 1" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#0 "output0" : tensor<4xf32> -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[READY_TENSORS]]#1 "output1" : tensor<4xf32> -> !hal.buffer_view
 //  CHECK-NEXT:   return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
@@ -56,7 +57,7 @@ func.func @primitiveArgOnly(%arg0: i32) {
 
 // CHECK-LABEL: func.func @tensorArgOnly
 //  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
-//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<4xf32>
+//       CHECK:   %[[ARG0_TENSOR:.+]] = hal.tensor.import wait(%[[WAIT]]) => %[[ARG0]] "input0" : !hal.buffer_view -> tensor<4xf32>
 //  CHECK-NEXT:   call @_tensorArgOnly(%[[ARG0_TENSOR]])
 //  CHECK-NEXT:   hal.fence.signal<%[[SIGNAL]] : !hal.fence>
 //  CHECK-NEXT:   return
@@ -116,7 +117,7 @@ func.func private @import(tensor<?x2xi32>, tensor<?x3xi32>) -> (tensor<2x?xi32>,
 // CHECK: func.func private @_import(%[[ARG0_TENSOR:.+]]: tensor<?x2xi32>, %[[ARG1_TENSOR:.+]]: tensor<?x3xi32>) -> (tensor<2x?xi32>, tensor<3x?xi32>) {
 
 // Prepare fences and put a barrier on input arguments:
-// CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device
+// CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK:   %[[WAIT_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
 // CHECK:   %[[ARG_BARRIER:.+]]:2 = hal.tensor.barrier join(%[[ARG0_TENSOR]], %[[ARG1_TENSOR]] : tensor<?x2xi32>, tensor<?x3xi32>) => %[[WAIT_FENCE]] : !hal.fence
 // CHECK:   %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
@@ -185,7 +186,7 @@ func.func private @importI32Effects(tensor<4xf32>) -> i32 attributes {
 // CHECK: func.func private @_importI32Effects(%[[ARG0_TENSOR:.+]]: tensor<4xf32>) -> i32 {
 
 // Wait for the inputs to be ready and create the signal fence to wait on.
-// CHECK:   %[[DEVICE:.+]] = hal.ex.shared_device
+// CHECK:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK:   %[[WAIT_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]
 // CHECK:   %[[ARG0_BARRIER:.+]] = hal.tensor.barrier join(%[[ARG0_TENSOR]] : tensor<4xf32>) => %[[WAIT_FENCE]] : !hal.fence
 // CHECK:   %[[SIGNAL_FENCE:.+]] = hal.fence.create device(%[[DEVICE]]

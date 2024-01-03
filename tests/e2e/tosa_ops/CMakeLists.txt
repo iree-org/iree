@@ -165,7 +165,6 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-sync"
   COMPILER_FLAGS
-    "--iree-opt-data-tiling=false"
     "--iree-vmvx-enable-microkernels"
   INPUT_TYPE
     "tosa"
@@ -328,6 +327,60 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
+  COMPILER_FLAGS
+    "--iree-input-type=tosa"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm-rocm
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "equal.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
+    "matmul.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    # "mul_shift.mlir"  # missing `LLVMTranslationDialectInterface` registration for dialect for op: tosa.apply_scale
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "rocm"
+  # Only test compilation for now, the ROCm driver is experimental.
+  # DRIVER
+  #   "rocm"
   COMPILER_FLAGS
     "--iree-input-type=tosa"
 )

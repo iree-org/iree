@@ -84,38 +84,11 @@ func.func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:ten
 
 // -----
 
-func.func @canonicalizeStaticOperandsForStore(%arg0: !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>,
-    %arg1 : tensor<3x?xf32>, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index) {
-  %c1 = arith.constant 1 : index
-  %c2 = arith.constant 2 : index
-  %c3 = arith.constant 3 : index
-  %c4 = arith.constant 4 : index
-  %d = tensor.dim %arg1, %c1 : tensor<3x?xf32>
-  flow.dispatch.tensor.store %arg1, %arg0, offsets = [%c2, %c4, %arg2], sizes = [%c3, 1, %d], strides = [%c1, %c2, %c1]
-      : tensor<3x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%arg3, %arg4, %arg5}
-  return
-}
-//      CHECK: func @canonicalizeStaticOperandsForStore
-// CHECK-SAME:     %[[ARG0:.+]]: !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>
-// CHECK-SAME:     %[[ARG1:.+]]: tensor<3x?xf32>
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG4:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG5:[a-zA-Z0-9]+]]: index
-//      CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK:   %[[D:.+]] = tensor.dim %[[ARG1]], %[[C1]]
-//      CHECK:   flow.dispatch.tensor.store %[[ARG1]], %[[ARG0]]
-// CHECK-SAME:       offsets = [2, 4, %[[ARG2]]]
-// CHECK-SAME:       sizes = [3, 1, %[[D]]]
-// CHECK-SAME:       strides = [1, 2, 1]
-// CHECK-SAME:       tensor<3x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%[[ARG3]], %[[ARG4]], %[[ARG5]]}
-
-// -----
-
 func.func @foldCastIntoStore(%arg0: !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>,
     %arg1 : tensor<3x?xf32>, %arg2 : index, %arg3 : index, %arg4 : index, %arg5 : index) {
+  %c3 = arith.constant 3 : index
   %0 = tensor.cast %arg1 : tensor<3x?xf32> to tensor<?x?xf32>
-  flow.dispatch.tensor.store %0, %arg0, offsets = [3, 4, 5], sizes = [3, 1, %arg2], strides = [1, 1, 1]
+  flow.dispatch.tensor.store %0, %arg0, offsets = [3, 4, 5], sizes = [%c3, 1, %arg2], strides = [1, 1, 1]
       : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x?xf32>>{%arg3, %arg4, %arg5}
   return
 }

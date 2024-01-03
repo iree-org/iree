@@ -173,3 +173,96 @@ flow.executable private @ex {
   // CHECK: flow.executable.export public @dispatch
   flow.executable.export public @dispatch
 }
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_pack_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<384x512xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<384x512xf32>> -> tensor<384x512xf32>
+      %1 = tensor.empty() : tensor<24x512x16x1xf32>
+      %pack = tensor.pack %0 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %1 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
+      flow.dispatch.tensor.store %pack, %arg1, offsets = [0, 0, 0, 0], sizes = [24, 512, 16, 1], strides = [1, 1, 1, 1] : tensor<24x512x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_unpack_f32
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>>, %arg1: !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0, 0], sizes = [24, 32, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>> -> tensor<24x32x16x16xf32>
+      %1 = tensor.empty() : tensor<384x512xf32>
+      %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %1 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
+      flow.dispatch.tensor.store %unpack, %arg1, offsets = [0, 0], sizes = [384, 512], strides = [1, 1] : tensor<384x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_unpack_generic_384x512_f32_pack
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<512xf32>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0, 0], sizes = [24, 32, 16, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<24x32x16x16xf32>> -> tensor<24x32x16x16xf32>
+      %1 = flow.dispatch.tensor.load %arg1, offsets = [0], sizes = [512], strides = [1] : !flow.dispatch.tensor<readonly:tensor<512xf32>> -> tensor<512xf32>
+      %2 = tensor.empty() : tensor<24x512x16x1xf32>
+      %3 = tensor.empty() : tensor<384x512xf32>
+      %unpack = tensor.unpack %0 inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %3 : tensor<24x32x16x16xf32> -> tensor<384x512xf32>
+      %4 = linalg.generic {indexing_maps = [#map, #map1, #map1], iterator_types = ["parallel", "parallel"]} ins(%1, %unpack : tensor<512xf32>, tensor<384x512xf32>) outs(%3 : tensor<384x512xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %5 = arith.addf %in, %in_0 : f32
+        linalg.yield %5 : f32
+      } -> tensor<384x512xf32>
+      %pack = tensor.pack %4 inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %2 : tensor<384x512xf32> -> tensor<24x512x16x1xf32>
+      flow.dispatch.tensor.store %pack, %arg2, offsets = [0, 0, 0, 0], sizes = [24, 512, 16, 1], strides = [1, 1, 1, 1] : tensor<24x512x16x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<24x512x16x1xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @ex_slow_memcpy
+  flow.executable.export public @ex
+  builtin.module {
+    func.func @ex(%arg0: !flow.dispatch.tensor<readonly:tensor<2x3xi32>>, %arg1: !flow.dispatch.tensor<readwrite:tensor<3x9xi32>>) {
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2x3xi32>> -> tensor<2x3xi32>
+      flow.dispatch.tensor.store %0, %arg1, offsets = [0, 1], sizes = [2, 3], strides = [1, 1] : tensor<2x3xi32> -> !flow.dispatch.tensor<readwrite:tensor<3x9xi32>>
+      return
+    }
+  }
+}
+
+// -----
+
+// Dispatch with only a yield and having indexing_maps only as permutations are transposes.
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_transpose_8x4_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>) {
+      %0 = tensor.empty() : tensor<4x8xf32>
+      %1 = tensor.empty() : tensor<8x4xf32>
+      %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%0 : tensor<4x8xf32>) outs(%1 : tensor<8x4xf32>) {
+      ^bb0(%in: f32, %out: f32):
+        linalg.yield %in : f32
+      } -> tensor<8x4xf32>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [8, 4], strides = [1, 1] : tensor<8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>
+      return
+    }
+  }
+}

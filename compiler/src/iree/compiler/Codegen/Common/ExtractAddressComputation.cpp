@@ -18,8 +18,7 @@
 
 using namespace mlir;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Helper functions for the `load base[off0...]`
@@ -115,5 +114,4 @@ void ExtractAddressComputationPass::runOnOperation() {
 std::unique_ptr<Pass> createExtractAddressComputationPass() {
   return std::make_unique<ExtractAddressComputationPass>();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

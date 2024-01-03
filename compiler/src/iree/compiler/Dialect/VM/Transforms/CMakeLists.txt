@@ -23,6 +23,7 @@ iree_cc_library(
     "HoistInlinedRodata.cpp"
     "OrdinalAllocation.cpp"
     "Passes.cpp"
+    "ReifyRodataTables.cpp"
     "ResolveRodataLoads.cpp"
     "SinkDefiningOps.cpp"
   DEPS

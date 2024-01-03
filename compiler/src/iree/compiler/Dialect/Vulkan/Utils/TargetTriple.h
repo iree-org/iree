@@ -13,10 +13,7 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "mlir/IR/MLIRContext.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 /// GPU triple definitions to describe GPU targets for compilers.
 ///
@@ -65,9 +62,6 @@ private:
   TargetTripleOS os;
 };
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan
 
 #endif // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETTRIPLE_H_

@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertChannelOps.cpp"
     "ConvertCommandBufferOps.cpp"
     "ConvertDeviceOps.cpp"
+    "ConvertDevicesOps.cpp"
     "ConvertExecutableOps.cpp"
     "ConvertExperimentalOps.cpp"
     "ConvertFenceOps.cpp"

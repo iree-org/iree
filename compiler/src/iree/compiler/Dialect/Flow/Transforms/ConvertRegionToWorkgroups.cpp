@@ -17,10 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -40,7 +37,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (dim.value() != ShapedType::kDynamic)
+    if (!ShapedType::isDynamic(dim.value()))
       continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
@@ -277,13 +274,11 @@ struct ConvertRegionToWorkgroupsPass
     }
   }
 };
+
 } // namespace
 
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass() {
   return std::make_unique<ConvertRegionToWorkgroupsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

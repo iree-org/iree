@@ -18,8 +18,7 @@
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -199,7 +198,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
         continue;
       }
       int64_t numElements = ShapedType::getNumElements(iterType.getShape());
-      int64_t bitWidth = iterType.getElementType().getIntOrFloatBitWidth();
+      int64_t bitWidth = IREE::Util::getTypeBitWidth(iterType.getElementType());
       int64_t totalBits = numElements * bitWidth;
       if (numElements > 4 && totalBits <= 128 &&
           llvm::isPowerOf2_64(totalBits)) {
@@ -321,5 +320,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -19,6 +19,7 @@ iree_compiler_cc_library(
     srcs = [
         "ConversionUtils.cpp",
         "ElementPackingUtils.cpp",
+        "EquivalenceUtils.cpp",
         "FlatbufferUtils.cpp",
         "ModuleUtils.cpp",
         "OptionUtils.cpp",
@@ -30,6 +31,7 @@ iree_compiler_cc_library(
     hdrs = [
         "ConversionUtils.h",
         "ElementPackingUtils.h",
+        "EquivalenceUtils.h",
         "FlatbufferUtils.h",
         "IndexSet.h",
         "ModuleUtils.h",

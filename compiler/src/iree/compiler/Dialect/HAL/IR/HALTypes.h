@@ -31,10 +31,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 #include "iree/compiler/Dialect/HAL/IR/HALAttrInterfaces.h.inc" // IWYU pragma: export
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterfaces.h.inc" // IWYU pragma: export
@@ -76,6 +73,8 @@ std::optional<uint64_t> lookupOffsetOrAlignment(Value value);
 
 struct AllocatorType : public Type::TypeBase<AllocatorType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.allocator";
 };
 
 struct BufferType
@@ -83,6 +82,8 @@ struct BufferType
                             IREE::Util::InferTypeSizeInterface::Trait,
                             IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.buffer";
 
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
@@ -93,53 +94,81 @@ struct BufferViewType
                             IREE::Util::ReferenceTypeInterface::Trait> {
   using Base::Base;
 
+  static constexpr StringLiteral name = "hal.buffer_view";
+
   Value inferSizeFromValue(Location loc, Value value, OpBuilder &builder) const;
 };
 
 struct ChannelType : public Type::TypeBase<ChannelType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.channel";
 };
 
 struct CommandBufferType
     : public Type::TypeBase<CommandBufferType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.command_buffer";
 };
 
 struct DescriptorSetLayoutType
     : public Type::TypeBase<DescriptorSetLayoutType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.descriptor_set_layout";
 };
 
 struct DeviceType
     : public Type::TypeBase<DeviceType, Type, TypeStorage,
                             mlir::OpTrait::IREE::Util::ImplicitlyCaptured> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.device";
+
+  // Resolves to any device at runtime.
+  // This is unlikely to be what any particular caller wants and should be
+  // avoided outside of testing/debugging passes that don't care about
+  // multi-targeting.
+  static Value resolveAny(Location loc, OpBuilder &builder);
 };
 
 struct EventType : public Type::TypeBase<EventType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.event";
 };
 
 struct ExecutableType
     : public Type::TypeBase<ExecutableType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.executable";
 };
 
 struct FenceType : public Type::TypeBase<FenceType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.fence";
 };
 
 struct FileType : public Type::TypeBase<FileType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.file";
 };
 
 struct PipelineLayoutType
     : public Type::TypeBase<PipelineLayoutType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.pipeline_layout";
 };
 
 struct SemaphoreType : public Type::TypeBase<SemaphoreType, Type, TypeStorage> {
   using Base::Base;
+
+  static constexpr StringLiteral name = "hal.semaphore";
 };
 
 //===----------------------------------------------------------------------===//
@@ -164,10 +193,7 @@ struct StaticRange {
   StaticRange(T min, T max) : min(min), max(max) {}
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 // It's unfortunate this is required.
 namespace mlir {

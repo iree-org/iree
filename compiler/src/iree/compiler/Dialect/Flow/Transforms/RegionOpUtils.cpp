@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -503,6 +504,70 @@ Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
+bool Flow::isDequantizationLikeOp(Operation *op) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) {
+    return false;
+  }
+  if (genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+
+  // Check that the all loops are parallel
+  unsigned numLoops = genericOp.getNumLoops();
+  unsigned numParallelLoops = genericOp.getNumParallelLoops();
+  if (numLoops != numParallelLoops) {
+    return false;
+  }
+
+  // Check that only one input has an identity map, and the rest are projected
+  // permutations and not full permutations
+  OpOperand *identityInput = nullptr;
+  for (OpOperand *input : genericOp.getDpsInputOperands()) {
+    auto inputMap = genericOp.getMatchingIndexingMap(input);
+    if (inputMap.isIdentity()) {
+      if (identityInput) {
+        return false;
+      }
+      identityInput = input;
+    } else if (!inputMap.isProjectedPermutation(true) ||
+               inputMap.isPermutation()) {
+      return false;
+    }
+  }
+
+  if (!identityInput) {
+    return false;
+  }
+
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  if (!indexingMaps.back().isIdentity()) {
+    return false;
+  }
+
+  // Check that the identity input element bitwidth is smaller than the output
+  // element bitwidth.
+  Type inputElementType = getElementTypeOrSelf(identityInput->get().getType());
+  Type outputElementType = getElementTypeOrSelf(genericOp->getResultTypes()[0]);
+  if (!inputElementType.isIntOrFloat() || !outputElementType.isIntOrFloat()) {
+    return false;
+  }
+  if (inputElementType.getIntOrFloatBitWidth() >=
+      outputElementType.getIntOrFloatBitWidth()) {
+    return false;
+  }
+
+  for (auto &bodyOp : genericOp.getBody()->getOperations()) {
+    if (!isa<arith::ExtUIOp, arith::ExtSIOp, arith::MulFOp, arith::MulIOp,
+             arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
+             arith::SIToFPOp, arith::UIToFPOp, linalg::YieldOp>(bodyOp)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 //===---------------------------------------------------------------------===//
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
@@ -516,6 +581,9 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
+    return true;
+  }
+  if (isDequantizationLikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
@@ -576,9 +644,8 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
   return false;
 }
 
-/// Collect all ops that should be cloned into the given dispatch region op.
-static SmallVector<Operation *>
-getCloneableOps(Flow::DispatchRegionOp regionOp) {
+SmallVector<Operation *>
+Flow::getCloneableOps(Flow::DispatchRegionOp regionOp) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;

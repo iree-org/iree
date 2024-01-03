@@ -15,13 +15,13 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-vector-reduction-to-gpu"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void debugPrint(func::FuncOp funcOp, const char *message) {
   LLVM_DEBUG({
@@ -277,13 +277,19 @@ public:
         return AffineMap::get(vecRank, 0,
                               builder.getAffineDimExpr(vecRank - 1));
       };
+
       RewritePatternSet patterns(ctx);
       vector::populatePropagateWarpVectorDistributionPatterns(
           patterns, distributionFn, simpleWarpShuffleFunction);
       vector::populateDistributeReduction(patterns, groupReductionFn);
-      vector::populateDistributeTransferWriteOpPatterns(patterns,
-                                                        distributionFn);
+
+      // We don't want to sink large transfer writes to a single lane -- pick a
+      // conservative value based on the group size.
+      unsigned maxWriteElementsToExtract = std::max(groupSize / 4, 1);
+      vector::populateDistributeTransferWriteOpPatterns(
+          patterns, distributionFn, maxWriteElementsToExtract);
       patterns.add<WarpOpBarrier>(patterns.getContext(), 3);
+      vector::ReductionOp::getCanonicalizationPatterns(patterns, ctx);
       (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
     }
 
@@ -310,7 +316,7 @@ private:
   std::function<int(func::FuncOp)> getWarpSize;
 };
 
-} // anonymous namespace
+} // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertVectorReductionToGPUPass(
@@ -320,5 +326,4 @@ createConvertVectorReductionToGPUPass(
                                                     getWarpSize);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

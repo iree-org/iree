@@ -31,7 +31,6 @@ iree_cc_library(
   SRCS
     "AnnotateDispatches.cpp"
     "CaptureDispatchDynamicDims.cpp"
-    "CleanupNumericNarrowing.cpp"
     "CleanupTensorShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
@@ -41,25 +40,21 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
-    "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
     "FusionOfTensorOps.cpp"
-    "GeneralizeLinalgNamedOps.cpp"
-    "InferNumericNarrowing.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
-    "OptimizeNumerics.cpp"
+    "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
     "PassDetail.h"
     "Passes.cpp"
-    "RaiseSpecialOps.cpp"
     "RegionOpUtils.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
@@ -81,7 +76,6 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRComplexDialect
-    MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
@@ -111,8 +105,6 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::Analysis
-    iree::compiler::Dialect::Util::Analysis::Attributes
-    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

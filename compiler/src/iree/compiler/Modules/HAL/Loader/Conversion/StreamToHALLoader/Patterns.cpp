@@ -19,8 +19,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -89,9 +88,6 @@ struct CmdDispatchOpPattern
                << entryPointAttr;
       }
       auto exportOp = *exportIt;
-
-      // TODO(benvanik): check variant target:
-      //   if (variantOp.target().getMatchExpression()) { dispatch }
       dispatchVariant(dispatchOp, adaptor, executableOp, variantOp, exportOp,
                       lookupOp.getResult(), rewriter);
     }
@@ -156,5 +152,4 @@ void populateStreamToHALLoaderPatterns(MLIRContext *context,
   patterns.insert<CmdDispatchOpPattern>(typeConverter, context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

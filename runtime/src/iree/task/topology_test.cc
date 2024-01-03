@@ -139,7 +139,8 @@ TEST(TopologyTest, FromPhysicalCores) {
   iree_task_topology_t topology;
   iree_task_topology_initialize(&topology);
   IREE_ASSERT_OK(iree_task_topology_initialize_from_physical_cores(
-      IREE_TASK_TOPOLOGY_NODE_ID_ANY, kMaxGroupCount, &topology));
+      IREE_TASK_TOPOLOGY_NODE_ID_ANY, IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY,
+      kMaxGroupCount, &topology));
   EnsureTopologyValid(kMaxGroupCount, &topology);
   iree_task_topology_deinitialize(&topology);
 }

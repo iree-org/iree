@@ -199,7 +199,7 @@ hal.executable @generic_batch_matmul_32x8x512x64 {
           %9 = arith.addf %arg2, %8 : f16
           linalg.yield %9 : f16
         } -> tensor<32x128x512xf16>
-        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 2, 512], strides = [1, 1, 1] : tensor<32x128x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [32, 128, 512], strides = [1, 1, 1] : tensor<32x128x512xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x128x512xf16>>
         return
       }
     }

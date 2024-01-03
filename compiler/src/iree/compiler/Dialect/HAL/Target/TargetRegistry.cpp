@@ -8,10 +8,7 @@
 
 #include <algorithm>
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Returns the static registry of translator names to translation functions.
 static TargetBackendRegistry &getMutableTargetRegistry() {
@@ -132,7 +129,35 @@ SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
   return targetNames;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
+
+namespace llvm::cl {
+template class basic_parser<TargetBackendRegistryRef>;
+} // namespace llvm::cl
+
+using TargetBackendRegistryRef = llvm::cl::TargetBackendRegistryRef;
+
+// Return true on error.
+bool llvm::cl::parser<TargetBackendRegistryRef>::parse(
+    Option &O, StringRef ArgName, StringRef Arg,
+    TargetBackendRegistryRef &Val) {
+  // We ignore Arg here and just use the global registry. We could parse a list
+  // of target backends and create a new registry with just that subset but
+  // ownership gets tricky.
+  if (Arg != "global")
+    return true;
+  Val.value =
+      &mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal();
+  return false;
+}
+
+void llvm::cl::parser<TargetBackendRegistryRef>::printOptionDiff(
+    const Option &O, TargetBackendRegistryRef V, const OptVal &Default,
+    size_t GlobalWidth) const {
+  printOptionName(O, GlobalWidth);
+  std::string Str = "global";
+  outs() << "= " << Str;
+  outs().indent(2) << " (default: global)\n";
+}
+
+void llvm::cl::parser<TargetBackendRegistryRef>::anchor() {}

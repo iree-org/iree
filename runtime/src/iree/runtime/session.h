@@ -116,6 +116,8 @@ IREE_API_EXPORT iree_vm_context_t* iree_runtime_session_context(
 //
 // NOTE: this device will not be available until initialized by a user module
 // and will return NULL if queried prior.
+//
+// NOTE: this API does not support multiple devices.
 IREE_API_EXPORT iree_hal_device_t* iree_runtime_session_device(
     const iree_runtime_session_t* session);
 
@@ -125,6 +127,8 @@ IREE_API_EXPORT iree_hal_device_t* iree_runtime_session_device(
 //
 // NOTE: this device allocator will not be available until initialized by a
 // user module and will return NULL if queried prior.
+//
+// NOTE: this API does not support multiple devices.
 IREE_API_EXPORT iree_hal_allocator_t* iree_runtime_session_device_allocator(
     const iree_runtime_session_t* session);
 

@@ -32,10 +32,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Folding utilities
@@ -639,8 +636,23 @@ struct FoldCastOpIntoDispatchStoreOp
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     auto parentOp = storeOp.getValue().getDefiningOp<tensor::CastOp>();
-    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp))
+    if (!parentOp || !tensor::canFoldIntoConsumerOp(parentOp)) {
       return failure();
+    }
+
+    // Only fold a cast when the (rank-reduced) type is consistent with the
+    // static sizes.
+    auto sourceTensorType =
+        dyn_cast<RankedTensorType>(parentOp.getSource().getType());
+    if (!sourceTensorType) {
+      return failure();
+    }
+    auto inferredType = RankedTensorType::get(
+        storeOp.getStaticSizes(), sourceTensorType.getElementType());
+    if (isRankReducedType(inferredType, sourceTensorType) !=
+        SliceVerificationResult::Success) {
+      return failure();
+    }
 
     rewriter.replaceOpWithNewOp<DispatchTensorStoreOp>(
         storeOp, parentOp.getSource(), storeOp.getTarget(),
@@ -1334,7 +1346,4 @@ void ChannelSplitOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ElideUnusedOp<ChannelSplitOp>>(context);
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -137,7 +137,7 @@ module attributes { transform.with_named_sequence } {
     } : !transform.any_op
     transform.iree.apply_licm %func_op_3 : !transform.any_op
     transform.iree.apply_cse %func_op_3 : !transform.any_op
-    
-    transform.yield 
+
+    transform.yield
   }
 } // module

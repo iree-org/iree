@@ -147,6 +147,8 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Werror"
     "-Wall"
 
+    "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
+
     # Disable warnings we don't care about or that generally have a low
     # signal/noise ratio.
     "-Wno-ambiguous-member-template"
@@ -174,6 +176,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-local-typedef"
     "-Wno-unused-private-field"
     "-Wno-user-defined-warnings"
+    "-Wno-missing-braces"  # Inconsistently triggers between C++/C headers.
 
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
@@ -208,15 +211,21 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   GCC
     "-Wall"
     "-Werror"
+    "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
+
+    "-Wno-address"  # https://github.com/openxla/iree/issues/16016
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
     "-Wno-uninitialized"
+    # gcc complains more than clang, see #15631 and #15638
+    $<$<COMPILE_LANGUAGE:CXX>:-Wno-overloaded-virtual>
     # Technically UB but needed for intrusive ptrs
     $<$<COMPILE_LANGUAGE:CXX>:-Wno-invalid-offsetof>
     $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
     "-Wno-sign-compare"
     "-Wno-unused-function"
+    "-Wno-unknown-pragmas"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).
@@ -271,11 +280,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4065"  # allow: switch statement contains 'default' but no 'case' labels
     "/wd4141"  # allow: inline used more than once
     "/wd4624"  # allow: destructor was implicitly defined as deleted
+    "/wd4576"  # allow: a parenthesized type followed by an initializer list is a non-standard explicit type conversion syntax
 
     # TODO(benvanik): confirm these are all still required and document:
     "/wd4146"  # operator applied to unsigned type, result still unsigned
     "/wd4244"  # possible loss of data
-    "/wd4267"  # initializing: possible loss of data
+    "/wd4267"  # initializing: possible loss of data    
     "/wd5105"  # allow: macro expansion producing 'defined' has undefined behavior
 )
 

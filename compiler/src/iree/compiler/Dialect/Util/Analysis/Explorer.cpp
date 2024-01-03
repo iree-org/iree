@@ -13,8 +13,7 @@
 
 #define DEBUG_TYPE "iree-util-explorer"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static StringRef getOpName(Operation *op) {
   auto symbol = dyn_cast<mlir::SymbolOpInterface>(op);
@@ -1101,5 +1100,4 @@ TraversalResult Explorer::walkTransitiveUsers(Value value, OperationWalkFn fn) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

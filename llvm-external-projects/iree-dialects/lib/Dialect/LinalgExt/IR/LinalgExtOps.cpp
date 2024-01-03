@@ -114,8 +114,8 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
       llvm::zip(sourceShape, limitShape), [](std::tuple<int64_t, int64_t> it) {
         int64_t sourceExtent = std::get<0>(it);
         int64_t limit = std::get<1>(it);
-        return sourceExtent == ShapedType::kDynamic ||
-               limit == ShapedType::kDynamic || sourceExtent <= limit;
+        return ShapedType::isDynamic(sourceExtent) ||
+               ShapedType::isDynamic(limit) || sourceExtent <= limit;
       });
 }
 
@@ -142,7 +142,7 @@ LogicalResult ScatterOp::verify() {
         "expected indices to be of rank 2 of i32 element type");
   }
   auto indexDepth = getIndexDepth();
-  if (indexDepth == ShapedType::kDynamic) {
+  if (ShapedType::isDynamic(indexDepth)) {
     return op->emitOpError("expected index depth is static");
   }
 
@@ -612,7 +612,7 @@ LogicalResult FftOp::verify() {
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (length == ShapedType::kDynamic)
+  if (ShapedType::isDynamic(length))
     return success();
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
@@ -649,7 +649,7 @@ SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
-    if (en.value() == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(en.value())) {
       size = getDimValue(builder, loc, getReal(), en.index());
     } else {
       size = builder.create<arith::ConstantIndexOp>(loc, en.value());
@@ -886,8 +886,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamic &&
-                            std::get<1>(s) != ShapedType::kDynamic &&
+                     return !ShapedType::isDynamic(std::get<0>(s)) &&
+                            !ShapedType::isDynamic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/accumulator shapes");
@@ -901,8 +901,8 @@ LogicalResult ScanOp::verify() {
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamic &&
-                            std::get<1>(s) != ShapedType::kDynamic &&
+                     return !ShapedType::isDynamic(std::get<0>(s)) &&
+                            !ShapedType::isDynamic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1108,8 +1108,8 @@ LogicalResult ReverseOp::verify() {
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
-                     return std::get<0>(s) != ShapedType::kDynamic &&
-                            std::get<1>(s) != ShapedType::kDynamic &&
+                     return !ShapedType::isDynamic(std::get<0>(s)) &&
+                            !ShapedType::isDynamic(std::get<1>(s)) &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
     return op->emitOpError("incompatible input/output shapes");
@@ -1509,7 +1509,7 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
                 DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (inputShape[dim] == ShapedType::kDynamic)
+    if (ShapedType::isDynamic(inputShape[dim]))
       continue;
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
@@ -1656,9 +1656,9 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
             if (!constTileSize) {
               // If specified tile size is dynamic, output shape should
               // be dynamic too.
-              return shape == ShapedType::kDynamic;
+              return ShapedType::isDynamic(shape);
             } else {
-              if (shape == ShapedType::kDynamic) {
+              if (ShapedType::isDynamic(shape)) {
                 // For the shape being dynamic when tile size is
                 // specified, return true. In canonical form a constant
                 // tile size should lead to constant shape of the tiled

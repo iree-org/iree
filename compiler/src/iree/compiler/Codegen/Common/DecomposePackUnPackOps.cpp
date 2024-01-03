@@ -24,15 +24,18 @@
 
 #define DEBUG_TYPE "iree-codegen-decompose-pack-unpack-ops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
+
 static llvm::cl::opt<bool> enableUnPackDecomposition(
     "iree-codegen-enable-unpack-decomposition",
     llvm::cl::desc("Enable Decomposition of tensor.unpack Operation. Disable "
                    "to vectorize tensor.unpack"),
     llvm::cl::init(true));
-/// A warpper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
+
+/// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
+
 /// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
@@ -139,6 +142,7 @@ struct DecomposePackUnPackOpsPass
 
   void runOnOperation() override;
 };
+
 } // namespace
 
 void DecomposePackUnPackOpsPass::runOnOperation() {
@@ -287,5 +291,4 @@ createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
   return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

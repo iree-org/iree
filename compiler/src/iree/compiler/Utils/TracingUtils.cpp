@@ -12,8 +12,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // PassTracing (PassInstrumentation)
@@ -108,8 +107,7 @@ createTraceFrameMarkEndPass(llvm::StringRef name) {
   return std::make_unique<TraceFrameMarkEndPass>(name);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 //===----------------------------------------------------------------------===//
 // Allocation tracking

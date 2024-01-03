@@ -38,6 +38,9 @@ IREE_API_EXPORT iree_status_t iree_io_scope_map_lookup(
     iree_io_scope_map_t* scope_map, iree_string_view_t scope,
     iree_io_parameter_index_t** out_index);
 
+IREE_API_EXPORT iree_status_t iree_io_scope_map_dump(
+    iree_io_scope_map_t* scope_map, iree_string_builder_t* builder);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

@@ -82,64 +82,8 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[8]
     ),
-]
-
-# A subset of `x86_64_MODELS_AND_THREADS`.
-X86_64_BENCHMARK_CONFIG_EXPERIMENTAL = [
-    # Tiny models.
     common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.PERSON_DETECT_INT8, threads=[1]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V3SMALL, threads=[1]
-    ),
-    # Small models.
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.DEEPLABV3_FP32, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.EFFICIENTNET_INT8, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V2, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V2_INT8, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILESSD_FP32, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.POSENET_FP32, threads=[8]
-    ),
-    # Medium models.
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_FP32, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_INT8, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128, threads=[8]
-    ),
-    # Large models.
-    common_definitions.CpuBenchmarkConfig(
-        model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tf_models.GPT2_117M_1x4_FP32_TF, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tf_models.GPT2_117M_1x1_FP32_TF, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[8]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.VIT_INT8_TFL, threads=[8]
+        model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[8]
     ),
 ]
 

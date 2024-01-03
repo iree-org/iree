@@ -18,9 +18,7 @@
 #include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.h"
 #include "torch-mlir/Dialect/TorchConversion/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 
@@ -132,6 +130,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createBitCastQuantTensorPass() {
   return std::make_unique<BitCastQuantTensorPass>();
 }
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput

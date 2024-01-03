@@ -12,9 +12,7 @@
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 
-// TODO(#13038): Remove this dependency on VMVX dialect.
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
-#include "iree/compiler/Dialect/VMVX/IR/VMVXOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Analysis/Presburger/IntegerRelation.h"
@@ -28,8 +26,7 @@
 
 #define DEBUG_TYPE "iree-codegen-transforms"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static bool sliceFilter(Operation *op, ValueRange nonIndexComputationOperands,
                         Operation *baseOp) {
@@ -761,5 +758,68 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+LogicalResult
+tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
+                        IREE::LinalgExt::LinalgTransformationFilter filter) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<Operation *> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) {
+    if (succeeded(filter.checkAndNotify(rewriter, op))) {
+      candidates.push_back(op);
+    }
+  });
+
+  for (auto op : candidates) {
+    auto target = cast<TilingInterface>(op);
+
+    // tileUsingSCFForOp requires the op is not able to tile op with no
+    // iteration domain. Skip the tiling on the op. Otherwise it returns a
+    // failure.
+    if (target.getLoopIteratorTypes().empty()) {
+      continue;
+    }
+
+    FailureOr<scf::SCFTilingResult> tiledResults =
+        scf::tileUsingSCFForOp(rewriter, target, options);
+    if (failed(tiledResults)) {
+      return failure();
+    }
+    for (auto tiledOp : tiledResults->tiledOps) {
+      filter.replaceLinalgTransformationFilter(rewriter, tiledOp);
+    }
+    rewriter.replaceOp(op, tiledResults->replacements);
+  }
+
+  return success();
+}
+
+LogicalResult distributeLinalgOpsWithFilter(
+    func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,
+    IREE::LinalgExt::LinalgTransformationFilter filter) {
+  IRRewriter rewriter(funcOp.getContext());
+  SmallVector<linalg::LinalgOp> candidates;
+  funcOp.walk([&](linalg::LinalgOp op) {
+    if (succeeded(filter.checkAndNotify(rewriter, op))) {
+      candidates.push_back(op);
+    }
+  });
+
+  for (auto op : candidates) {
+    // TODO: Tile and distribute LinalgOps using interface methods.
+    FailureOr<linalg::TiledLinalgOp> res =
+        linalg::tileLinalgOp(rewriter, op, tilingOptions);
+    if (failed(res)) {
+      return failure();
+    }
+    filter.replaceLinalgTransformationFilter(rewriter, res->op);
+    if (res->tensorResults.empty()) {
+      rewriter.eraseOp(op);
+    } else {
+      rewriter.replaceOp(op, res->tensorResults);
+    }
+  }
+
+  return success();
+}
+
+} // namespace mlir::iree_compiler

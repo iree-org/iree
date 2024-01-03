@@ -17,8 +17,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -63,8 +62,7 @@ struct BytecodeVersionParser : public llvm::cl::parser<std::optional<int64_t>> {
 
 } // namespace
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");

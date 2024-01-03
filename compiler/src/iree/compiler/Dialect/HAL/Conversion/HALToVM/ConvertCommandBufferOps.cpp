@@ -11,8 +11,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 // TODO(benvanik): import op handling of optional values.
@@ -347,5 +347,4 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
           "hal.command_buffer.dispatch.indirect");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

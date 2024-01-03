@@ -71,8 +71,10 @@ EXPORT_FN("device.queue.flush", iree_hal_module_device_queue_flush, rI, v)
 EXPORT_FN("device.queue.read", iree_hal_module_device_queue_read, rIrrrIrIIi, v)
 EXPORT_FN("device.queue.write", iree_hal_module_device_queue_write, rIrrrIrIIi, v)
 
+EXPORT_FN("devices.count", iree_hal_module_devices_count, v, i)
+EXPORT_FN("devices.get", iree_hal_module_devices_get, i, r)
+
 EXPORT_FN("ex.file.from_memory", iree_hal_module_ex_file_from_memory, rIirIIi, r)
-EXPORT_FN("ex.shared_device", iree_hal_module_ex_shared_device, v, r)
 
 EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)
 

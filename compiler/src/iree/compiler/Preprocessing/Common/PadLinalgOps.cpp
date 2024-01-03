@@ -14,9 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 /// A pattern to pad statically shaped matmul operands to the next integer
@@ -177,6 +175,4 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass() {
   return std::make_unique<PadLinalgOpsPass>();
 }
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing

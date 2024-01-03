@@ -8,10 +8,7 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 void DebugDatabaseBuilder::addFunctionSourceMap(IREE::VM::FuncOp funcOp,
                                                 FunctionSourceMap sourceMap) {
@@ -140,7 +137,4 @@ DebugDatabaseBuilder::build(FlatbufferBuilder &fbb) {
   return iree_vm_DebugDatabaseDef_end(fbb);
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

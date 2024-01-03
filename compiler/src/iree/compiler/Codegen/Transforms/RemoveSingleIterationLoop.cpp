@@ -22,8 +22,7 @@
 
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Compose map with apply affine ops and try to simplify it.
 static void combineAndSimplifyMap(AffineMap &map, SmallVectorImpl<Value> &dims,
@@ -199,5 +198,4 @@ void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
   patterns.add<SimplifyTrivialLoops>(patterns.getContext(), getMinMaxFn);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

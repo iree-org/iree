@@ -12,11 +12,10 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Passes
@@ -132,7 +131,6 @@ void registerCodegenLLVMGPUPasses();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_

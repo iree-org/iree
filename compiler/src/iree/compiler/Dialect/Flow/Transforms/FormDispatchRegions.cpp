@@ -41,11 +41,11 @@
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
-namespace mlir {
-
 //===----------------------------------------------------------------------===//
 // Definition of TensorDimTrackingRewriter
 //===----------------------------------------------------------------------===//
+
+namespace mlir {
 
 TensorDimTrackingRewriter::TensorDimTrackingRewriter(Operation *op)
     : IRRewriter(op->getContext()) {
@@ -70,9 +70,9 @@ void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
     dimOps.insert(op);
 }
 
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+} // namespace mlir
+
+namespace mlir::iree_compiler::IREE::Flow {
 
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
@@ -146,7 +146,7 @@ static bool hasFusionGroupsAttribute(Operation *op) {
 static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
   SmallVector<int64_t, 1> fusionGroups = {};
   if (auto fusionGroupsAttr = op->getAttrOfType<ArrayAttr>(kFusionGroupsAttr)) {
-    fusionGroups = llvm::map_to_vector<1>(fusionGroupsAttr, [](Attribute attr) {
+    fusionGroups = llvm::map_to_vector(fusionGroupsAttr, [](Attribute attr) {
       return llvm::cast<IntegerAttr>(attr).getInt();
     });
   }
@@ -154,7 +154,7 @@ static SmallVector<int64_t, 1> getFusionGroups(Operation *op) {
 }
 /// Appends the given `op` to the `newGroups` fusion groups.
 static void appendToFusionGroup(Operation *op, ArrayRef<int64_t> newGroups) {
-  SmallVector<int64_t, 1> fusionGroups = getFusionGroups(op);
+  SmallVector<int64_t> fusionGroups = getFusionGroups(op);
   fusionGroups.append(newGroups.begin(), newGroups.end());
   op->setAttr(kFusionGroupsAttr, Builder(op).getI64ArrayAttr(fusionGroups));
 }
@@ -167,6 +167,50 @@ static void removeFusionGroupsAttribute(Operation *op) {
 // Op property charecterizations
 //===----------------------------------------------------------------------===//
 
+/// Returns true if the reduced dimensions in the linalgOp of the unpack result
+/// are not unpacked by the producer tensor::UnPackOp. This means the reduced
+/// dimensions of the unpack result are not part of the inner_dims_pos.
+static bool hasNoPackedReductionDimensions(linalg::LinalgOp linalgOp,
+                                           Operation *producer) {
+  auto unpack = dyn_cast<tensor::UnPackOp>(producer);
+  if (!unpack) {
+    return false;
+  }
+  AffineMap map;
+  for (auto &use : producer->getResult(0).getUses()) {
+    if (use.getOwner() == linalgOp) {
+      map = linalgOp.getMatchingIndexingMap(&use);
+      break;
+    }
+  }
+  if (!map) {
+    return false;
+  }
+  auto iterators = linalgOp.getIteratorTypesArray();
+  auto reduction = utils::IteratorType::reduction;
+  for (auto expr : llvm::enumerate(map.getResults())) {
+    auto dim = dyn_cast<AffineDimExpr>(expr.value());
+    if (!dim) {
+      return false;
+    }
+    unsigned pos = dim.getPosition();
+    if (iterators[pos] == reduction &&
+        llvm::any_of(unpack.getInnerDimsPos(),
+                     [expr](int64_t idp) { return expr.index() == idp; })) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Returns true if the linalgOp is fusable with an unpack producer
+static bool hasFusableUnpackProducer(linalg::LinalgOp linalgOp) {
+  return llvm::any_of(linalgOp->getOperands(), [&](Value operand) {
+    auto producer = operand.getDefiningOp<tensor::UnPackOp>();
+    return producer && hasNoPackedReductionDimensions(linalgOp, producer);
+  });
+}
+
 /// Operations that are treated as root operations for dispatch region
 /// formation.
 static bool isRootOp(Operation *op) {
@@ -177,7 +221,8 @@ static bool isRootOp(Operation *op) {
   // op.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
     if (isa<linalg::GenericOp>(op)) {
-      return linalgOp.getNumReductionLoops() != 0;
+      return linalgOp.getNumReductionLoops() != 0 &&
+             !hasFusableUnpackProducer(linalgOp);
     }
     return !isa<linalg::FillOp>(op);
   }
@@ -491,9 +536,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
                return isConstantIntValue(ofr, 1);
              });
     }
-    // Fuse `unset_encoding/unpack` -> elementwise operations for now. This
-    // could be generalized, but unpack fusion code-generation is harder.
+    // Fuse `unset_encoding/unpack` -> elementwise operations. Fuse unpack with
+    // non-overlapping reductions (i.e., the reduction dimension is not packed).
     if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+      if (hasNoPackedReductionDimensions(consumerLinalgOp, producer)) {
+        return true;
+      }
       return linalg::isElementwise(consumerLinalgOp) &&
              consumerLinalgOp.getNumLoops() ==
                  llvm::cast<RankedTensorType>(producer->getResult(0).getType())
@@ -757,10 +805,12 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
         continue;
       // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
       // fused with anything else into their own dispatches since it is better
-      // to convert them to splats.
+      // to convert them to splats. Also avoid moving dequantization-like ops
+      // into their own dispatch since it is better to clone these ops and avoid
+      // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::LinalgExt::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op)) {
+          isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
         continue;
       }
 
@@ -927,7 +977,4 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
   return std::make_unique<FormDispatchRegionsPass>(options);
 }
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

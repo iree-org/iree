@@ -6,8 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Position.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // static
 const Position Position::EmptyKey(ENC_BLOCK,
@@ -118,5 +117,4 @@ SmallVector<Position> getReturnedValuePositions(Region &region) {
   return {};
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

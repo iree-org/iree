@@ -59,6 +59,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/FlowBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/flow.py
   DIALECT_NAME flow
 )
@@ -67,6 +68,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/HALBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/hal.py
   DIALECT_NAME hal
 )
@@ -75,6 +77,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/StreamBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/stream.py
   DIALECT_NAME stream
 )
@@ -83,6 +86,7 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/UtilBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/util.py
   DIALECT_NAME util
 )
@@ -91,22 +95,56 @@ declare_mlir_dialect_python_bindings(
   ADD_TO_PARENT IREEPythonSources.Dialects
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   TD_FILE dialects/VMBinding.td
+  GEN_ENUM_BINDINGS
   SOURCES dialects/vm.py
   DIALECT_NAME vm
 )
 
+declare_mlir_python_sources(IREECompilerAPIPythonCore
+  ADD_TO_PARENT IREEPythonSources
+  ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
+  SOURCES
+    _package_test.py
+    api/__init__.py
+    api/ctypes_dl.py
+)
+
+# Note that some tools rely on optional features but we unconditionally
+# include them because they are referenced from console scripts and
+# other package metadata. They will detect mis-configuration and error
+# accordingly at runtime.
 declare_mlir_python_sources(IREECompilerAPIPythonTools
+  ADD_TO_PARENT IREEPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
     __init__.py
     tf.py
     tflite.py
-    xla.py
-  SOURCES_GLOB
-    api/*.py
-    tools/*.py
-    tools/ir_tool/*.py
+    tools/__init__.py
+    tools/binaries.py
+    tools/core.py
+    tools/debugging.py
+    tools/tf.py
+    tools/tflite.py
+    tools/import_onnx/__main__.py
+    tools/ir_tool/__main__.py
+    tools/scripts/ireec/__main__.py
 )
+
+# The Python bindings are monolithic and we don't have a good way for the
+# torch plugin to contribute Python sources, so we just gate it here
+# versus having more complicated indirection. May want to rethink this
+# if others need it.
+if(IREE_INPUT_TORCH)
+
+  declare_mlir_python_sources(IREEPythonSources.Torch.Importers
+    ADD_TO_PARENT IREEPythonSources
+    ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir/python/torch_mlir"
+    SOURCES
+      extras/onnx_importer.py
+  )
+
+endif()
 
 ################################################################################
 # Extensions
@@ -147,6 +185,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.pdl
+  MLIRPythonSources.Dialects.scf
   MLIRPythonSources.Dialects.shape
   MLIRPythonSources.Dialects.structured_transform
   MLIRPythonSources.Dialects.tensor

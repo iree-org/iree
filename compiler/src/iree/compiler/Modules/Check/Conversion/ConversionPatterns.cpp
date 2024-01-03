@@ -14,10 +14,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Check {
+namespace mlir::iree_compiler::IREE::Check {
 
 // Converts check ops to vm.call ops with handling for when the check module is
 // not compiled in (we just ignore them). This allows us to run benchmarks on
@@ -71,7 +68,8 @@ static LogicalResult applyDefaultCheckBufferRewrite(
   state.addAttributes(srcOp->getAttrs());
 
   // Add device argument.
-  Value device = rewriter.create<IREE::HAL::ExSharedDeviceOp>(srcOp->getLoc());
+  // TODO(multi-device): support multiple devices in check tests .
+  Value device = IREE::HAL::DeviceType::resolveAny(srcOp->getLoc(), rewriter);
   state.addOperands({device});
 
   for (auto [srcOperand, dstOperand] :
@@ -148,7 +146,4 @@ void populateCheckToHALPatterns(MLIRContext *context,
                                                            typeConverter);
 }
 
-} // namespace Check
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Check

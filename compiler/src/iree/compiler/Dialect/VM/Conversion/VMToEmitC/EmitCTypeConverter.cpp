@@ -8,10 +8,7 @@
 
 #include <functional>
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 EmitCTypeConverter::EmitCTypeConverter() {
   // Return the incoming type in the default case.
@@ -166,7 +163,4 @@ std::optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   return applyOp.getResult();
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

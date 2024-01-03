@@ -28,7 +28,6 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
-#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
@@ -138,7 +137,6 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(host_allocator, total_size, (void**)&device));
-  memset(device, 0, total_size);
 
   iree_hal_resource_initialize(&iree_hal_cuda2_device_vtable,
                                &device->resource);
@@ -441,10 +439,10 @@ static iree_status_t iree_hal_cuda2_device_create_channel(
   if (!device->nccl_symbols || !device->nccl_symbols->dylib) {
     return iree_make_status(
         IREE_STATUS_UNAVAILABLE,
-        "NCCL runtime library (%d.%d.%d) not available; ensure installed and "
-        "the shared library is on your PATH/LD_LIBRARY_PATH "
-        "(nccl.dll/libnccl.so)",
-        NCCL_MAJOR, NCCL_MINOR, NCCL_PATCH);
+        "NCCL runtime library version %d.%d and greater not available; "
+        "ensure installed and the shared library (nccl.dll/libnccl.so) "
+        "is on your PATH/LD_LIBRARY_PATH.",
+        NCCL_MAJOR, NCCL_MINOR);
   }
 
   // Today we only allow a single logical device per channel.
@@ -826,7 +824,6 @@ static const iree_hal_device_vtable_t iree_hal_cuda2_device_vtable = {
     .create_semaphore = iree_hal_cuda2_device_create_semaphore,
     .query_semaphore_compatibility =
         iree_hal_cuda2_device_query_semaphore_compatibility,
-    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_alloca = iree_hal_cuda2_device_queue_alloca,
     .queue_dealloca = iree_hal_cuda2_device_queue_dealloca,
     .queue_read = iree_hal_cuda2_device_queue_read,

@@ -24,18 +24,12 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 /// Generic method for verifying VM fail ops.
 LogicalResult verifyFailOp(Operation *op, Value statusVal);
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/VM/IR/VMOps.h.inc" // IWYU pragma: export

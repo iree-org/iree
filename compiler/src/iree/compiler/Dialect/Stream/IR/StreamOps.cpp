@@ -28,10 +28,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Op utilities used within the stream dialect
@@ -365,6 +362,81 @@ static void printEncodedResourceOperands(OpAsmPrinter &p, Operation *op,
       },
       [&]() {
         p << ",";
+        p.printNewline();
+      });
+  p.decreaseIndent();
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ParameterLoadOperations>(
+//     $source_scope, $source_keys, $source_offsets,
+//     type($results), $result_sizes)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseParameterLoadOperations(
+    OpAsmParser &parser, StringAttr &sourceScopeAttr, ArrayAttr &sourceKeysAttr,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sourceOffsets,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes) {
+  auto builder = parser.getBuilder();
+  SmallVector<Attribute> sourceKeyAttrs;
+  do {
+    StringAttr rowSourceScopeAttr;
+    StringAttr sourceKeyAttr;
+    OpAsmParser::UnresolvedOperand sourceOffset;
+    Type resultType;
+    OpAsmParser::UnresolvedOperand resultSize;
+    if (failed(parseParameterReference(parser, rowSourceScopeAttr,
+                                       sourceKeyAttr)) ||
+        failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(sourceOffset)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.parseColonType(resultType)) ||
+        failed(parser.parseLBrace()) ||
+        failed(parser.parseOperand(resultSize)) ||
+        failed(parser.parseRBrace())) {
+      return failure();
+    }
+    if (!sourceScopeAttr) {
+      sourceScopeAttr = rowSourceScopeAttr;
+    } else if (rowSourceScopeAttr != sourceScopeAttr) {
+      return parser.emitError(parser.getCurrentLocation(),
+                              "each operation must use the same scope");
+    }
+    sourceKeyAttrs.push_back(sourceKeyAttr);
+    sourceOffsets.push_back(sourceOffset);
+    resultTypes.push_back(resultType);
+    resultSizes.push_back(resultSize);
+  } while (succeeded(parser.parseOptionalComma()));
+  sourceKeysAttr = builder.getArrayAttr(sourceKeyAttrs);
+  return success();
+}
+
+static void printParameterLoadOperations(OpAsmPrinter &p, Operation *op,
+                                         StringAttr sourceScopeAttr,
+                                         ArrayAttr sourceKeysAttr,
+                                         ValueRange sourceOffsets,
+                                         TypeRange resultTypes,
+                                         ValueRange resultSizes) {
+  p.increaseIndent();
+  p.printNewline();
+  llvm::interleave(
+      llvm::zip_equal(sourceKeysAttr.getAsRange<StringAttr>(), sourceOffsets,
+                      resultTypes, resultSizes),
+      [&](std::tuple<StringAttr, Value, Type, Value> it) {
+        auto [sourceKeyAttr, sourceOffset, resultType, resultSize] = it;
+        printParameterReference(p, op, sourceScopeAttr, sourceKeyAttr);
+        p << "[";
+        p.printOperand(sourceOffset);
+        p << "] : ";
+        p.printType(resultType);
+        p << "{";
+        p.printOperand(resultSize);
+        p << "}";
+      },
+      [&]() {
+        p << ',';
         p.printNewline();
       });
   p.decreaseIndent();
@@ -1183,6 +1255,17 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
 //===----------------------------------------------------------------------===//
 // stream.parameter.load
 //===----------------------------------------------------------------------===//
+
+LogicalResult ParameterLoadOp::verify() {
+  ParameterLoadOp op = *this;
+  size_t expectedCount = op.getSourceKeys().size();
+  if (op.getSourceOffsets().size() != expectedCount ||
+      op.getResultSizes().size() != expectedCount) {
+    return op.emitOpError() << "requires that the source keys, source offsets, "
+                               "and result sizes are all 1:1";
+  }
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // stream.parameter.read
@@ -2775,7 +2858,45 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
       return failure();
     }
 
-    // TODO(benvanik): verify that the target function has matching operands.
+    // Verify that the exported function, if present, matches the signature of
+    // the dispatch.
+    auto funcOp = exportOp.lookupFunctionRef();
+    if (!funcOp) {
+      return success();
+    }
+
+    TypeRange uniformTypes = getUniformOperands().getTypes();
+    int64_t numResources = getResources().size();
+
+    auto entryPointType = funcOp.getFunctionType();
+    SmallVector<Type> uniformEntryPointTypes;
+    int64_t bindingCounts = 0;
+    for (auto entryPointArg : entryPointType.getInputs()) {
+      if (isa<IREE::Stream::BindingType>(entryPointArg)) {
+        bindingCounts++;
+      } else {
+        uniformEntryPointTypes.push_back(entryPointArg);
+      }
+    }
+    if (uniformTypes.size() != uniformEntryPointTypes.size()) {
+      return emitOpError("function type mismatch; expected ")
+             << uniformTypes.size()
+             << " uniform arguments on exported function, but has "
+             << uniformEntryPointTypes.size();
+    }
+    if (numResources != bindingCounts) {
+      return emitOpError("function type mismatch; expected ")
+             << numResources
+             << " binding arguments on exported function, but has "
+             << bindingCounts;
+    }
+    for (auto [expectedType, actualType] :
+         llvm::zip_equal(uniformTypes, uniformEntryPointTypes)) {
+      if (expectedType != actualType) {
+        return emitOpError("uniform dispatch argument type mismatch: expected ")
+               << expectedType << " but got " << actualType;
+      }
+    }
   }
   return success();
 }
@@ -3633,6 +3754,59 @@ LogicalResult BindingSubspanOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.dispatch.workgroup.*
+//===----------------------------------------------------------------------===//
+
+static void getAsmResultNamesForDispatchWorkgroupInfoOp(
+    StringRef prefix, const APInt &dimension, Value result,
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result, (prefix + std::to_string(dimension.getZExtValue())).str());
+}
+
+static LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op,
+                                                   uint64_t dimension) {
+  if (dimension < 0 || dimension >= 3) {
+    return op->emitOpError()
+           << "dimension " << dimension
+           << " out of bounds of dispatch dimensions; expected [0, 3)";
+  }
+  return success();
+}
+
+void DispatchWorkgroupIDOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_id_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupIDOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp(
+      "workgroup_count_", getDimension(), getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupCountOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+void DispatchWorkgroupSizeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  getAsmResultNamesForDispatchWorkgroupInfoOp("workgroup_size_", getDimension(),
+                                              getResult(), setNameFn);
+}
+
+LogicalResult DispatchWorkgroupSizeOp::verify() {
+  return verifyDispatchWorkgroupInfoOp(getOperation(),
+                                       getDimension().getZExtValue());
+}
+
+//===----------------------------------------------------------------------===//
 // stream.yield
 //===----------------------------------------------------------------------===//
 
@@ -3641,10 +3815,7 @@ YieldOp::getMutableSuccessorOperands(RegionBranchPoint point) {
   return getResourceOperandsMutable();
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

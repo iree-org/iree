@@ -22,9 +22,7 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-dequantization-matmul"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -160,61 +158,6 @@ static LogicalResult isGroupedDequantizationOp(linalg::GenericOp genericOp) {
   return success();
 }
 
-// Creates a new flow.dipatch.region op and places the
-// passed ops inside as long as the dequant op is a
-// producer for the matmul op
-static LogicalResult fuseDequantAndMatmul(RewriterBase &rewriter,
-                                          Operation *dequant, Operation *matmul,
-                                          std::optional<Operation *> fill) {
-
-  auto regionOp = matmul->getParentOfType<IREE::Flow::DispatchRegionOp>();
-  if (!regionOp) {
-    FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
-        IREE::Flow::wrapOpInDispatchRegion(rewriter, matmul);
-    if (failed(maybeRegionOp))
-      return failure();
-    regionOp = maybeRegionOp.value();
-  }
-
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedRegionOp =
-      IREE::Flow::clonePrecedingOpIntoDispatchRegion(rewriter, dequant,
-                                                     regionOp);
-  if (failed(maybeFusedRegionOp))
-    return failure();
-
-  if (fill && *fill) {
-    FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedFillRegionOp =
-        IREE::Flow::clonePrecedingOpIntoDispatchRegion(rewriter, fill.value(),
-                                                       regionOp);
-    if (failed(maybeFusedFillRegionOp))
-      return failure();
-  }
-
-  return success();
-}
-
-static FailureOr<IREE::Flow::DispatchRegionOp>
-wrapConsecutiveOpsInDispatchRegion(RewriterBase &rewriter,
-                                   SmallVector<Operation *> ops) {
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeRegionOp =
-      IREE::Flow::wrapOpInDispatchRegion(rewriter, ops.back());
-  if (failed(maybeRegionOp)) {
-    return failure();
-  }
-  IREE::Flow::DispatchRegionOp regionOp = maybeRegionOp.value();
-
-  SmallVector<Operation *> precedingOps(ops.begin(), ops.end() - 1);
-  FailureOr<IREE::Flow::DispatchRegionOp> maybeFusedRegionOp =
-      IREE::Flow::movePrecedingOpsIntoDispatchRegion(rewriter, precedingOps,
-                                                     regionOp);
-  if (failed(maybeFusedRegionOp)) {
-    return failure();
-  }
-  regionOp = maybeFusedRegionOp.value();
-
-  return regionOp;
-}
-
 static SmallVector<utils::IteratorType>
 getParallelAndReductionIterators(unsigned nLoops, unsigned nReduction) {
   SmallVector<utils::IteratorType> res(nLoops - nReduction,
@@ -226,7 +169,7 @@ getParallelAndReductionIterators(unsigned nLoops, unsigned nReduction) {
 struct QuantizedMatmulRewriter {
   QuantizedMatmulRewriter(RewriterBase &rewriter, linalg::GenericOp dequant,
                           linalg::GenericOp matmul, int quantizedBitWidth);
-  std::optional<SmallVector<OpOperand *>> getDequantMatmulInputs_f32();
+  std::optional<SmallVector<OpOperand *>> getDequantMatmulInputs();
   std::pair<SmallVector<AffineMap>, SmallVector<utils::IteratorType>>
   getGroupReductionMapsAndIterators(OpOperand *inputOperand);
   Value getGroupReductionInit(Value input);
@@ -276,37 +219,28 @@ private:
 // TODO(#) Have stricter matching on inputs. There may be cases where
 // the current matching fails
 std::optional<SmallVector<OpOperand *>>
-QuantizedMatmulRewriter::getDequantMatmulInputs_f32() {
+QuantizedMatmulRewriter::getDequantMatmulInputs() {
   assert(!failed(isContractionWithTwoReductions(matmul)) &&
          "expected `matmul` to be a contraction with two reduction dimensions");
   assert(!failed(isGroupedDequantizationOp(dequant)) &&
          "expected `dequant` to be a grouped dequantization");
   OpOperand *scales, *zps, *quantMat, *unquantMat, *dequantMat;
-  for (int operandIdx = 0; operandIdx < dequant.getNumDpsInputs();
-       operandIdx++) {
-    OpOperand *operand = dequant.getDpsInputOperand(operandIdx);
-    Value input = operand->get();
-    RankedTensorType inputType =
-        llvm::dyn_cast<RankedTensorType>(input.getType());
-    if (!inputType) {
-      continue;
-    }
-    if (inputType.getElementTypeBitWidth() != 32) {
-      quantMat = operand;
-      continue;
-    }
-    for (Operation &bodyOp : dequant.getBlock()->getOperations()) {
-      if (isa<arith::MulFOp>(bodyOp)) {
-        if (bodyOp.getOperand(1) ==
-            dequant.getBlock()->getArgument(operandIdx)) {
-          scales = operand;
-          break;
-        }
-      } else if (isa<arith::SubFOp>(bodyOp)) {
-        if (bodyOp.getOperand(1) ==
-            dequant.getBlock()->getArgument(operandIdx)) {
-          zps = operand;
-          break;
+  auto maps = dequant.getIndexingMapsArray();
+  for (auto [idx, map] : enumerate(ArrayRef<AffineMap>(maps).drop_back())) {
+    if (map.isIdentity()) {
+      quantMat = dequant.getDpsInputOperand(idx);
+    } else if (map.isProjectedPermutation(true)) {
+      for (Operation &bodyOp : dequant.getBlock()->getOperations()) {
+        if (isa<arith::MulFOp>(bodyOp)) {
+          if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(idx)) {
+            scales = dequant.getDpsInputOperand(idx);
+            break;
+          }
+        } else if (isa<arith::SubFOp>(bodyOp)) {
+          if (bodyOp.getOperand(1) == dequant.getBlock()->getArgument(idx)) {
+            zps = dequant.getDpsInputOperand(idx);
+            break;
+          }
         }
       }
     }
@@ -335,7 +269,7 @@ QuantizedMatmulRewriter::QuantizedMatmulRewriter(RewriterBase &rewriter,
   accType = rewriter.getI32Type();
   mulType = rewriter.getI32Type();
   quantType = rewriter.getIntegerType(quantizedBitWidth);
-  std::optional<SmallVector<OpOperand *>> inputs = getDequantMatmulInputs_f32();
+  std::optional<SmallVector<OpOperand *>> inputs = getDequantMatmulInputs();
   if (inputs) {
     ins = *inputs;
   }
@@ -376,11 +310,13 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
     return rewriter.notifyMatchFailure(
         matmul, "inner shape of input expected to be reduced in matmul");
   }
-  if (!unquantizedInputType.getElementType().isa<FloatType>()) {
-    return rewriter.notifyMatchFailure(matmul, "expected float type");
-  }
   Value scales = ins[2]->get();
   Value zps = ins[3]->get();
+  if (!unquantizedInputType.getElementType().isa<FloatType>() ||
+      !getElementTypeOrSelf(scales).isa<FloatType>() ||
+      !getElementTypeOrSelf(zps).isa<FloatType>()) {
+    return rewriter.notifyMatchFailure(matmul, "expected float type");
+  }
   OpOperand *matmulDequantizedOperand = ins[4];
   auto matmulDequantizedInputExprs =
       matmul.getMatchingIndexingMap(matmulDequantizedOperand).getResults();
@@ -686,8 +622,7 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
                                   outputExprs.front().getContext());
   maps.push_back(outputMap);
 
-  Type i32Type = rewriter.getI32Type();
-  Type f32Type = rewriter.getF32Type();
+  Type floatType = getElementTypeOrSelf(scales);
   Value output = matmulOutputOperand->get();
   auto reassociatedDequantizationOp = rewriter.create<linalg::GenericOp>(
       loc, output.getType(),
@@ -695,12 +630,7 @@ QuantizedMatmulRewriter::generateReassociatedDequantizationGeneric(
       output, maps, iterators,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value dq;
-        if (accType == i32Type) {
-          dq = b.create<arith::SIToFPOp>(loc, f32Type, args[0]);
-        } else {
-          Value ext = b.create<arith::ExtSIOp>(loc, i32Type, args[0]);
-          dq = b.create<arith::SIToFPOp>(loc, f32Type, ext);
-        }
+        dq = b.create<arith::SIToFPOp>(loc, floatType, args[0]);
         Value scaledRes0 = b.create<arith::MulFOp>(loc, dq, args[1]);
         Value scaledRes1 = b.create<arith::MulFOp>(loc, scaledRes0, args[3]);
         Value scaledZp0 = b.create<arith::MulFOp>(loc, args[4], args[3]);
@@ -836,59 +766,6 @@ static LogicalResult reassociateDequantMatmul(RewriterBase &rewriter,
   return success();
 }
 
-//----------------------------------------------------------------------------//
-//                                Patterns
-//----------------------------------------------------------------------------//
-
-// This pattern does a basic fusion of dequantization + matmul `linalg.generic`
-// ops, moving them into a single `flow.dispatch.region` op.
-class FuseDequantizationMatmulPattern final
-    : public OpRewritePattern<linalg::GenericOp> {
-public:
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
-                                PatternRewriter &rewriter) const override {
-    // Fail if matmul is already in a dispatch
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
-      return failure();
-    }
-    // Match first generic op as matmul
-    if (failed(isContractionWithTwoReductions(genericOp))) {
-      return failure();
-    }
-
-    Value genericOpResult = genericOp->getResult(0);
-    Operation *matmulOp = genericOpResult.getDefiningOp();
-
-    // Match operands to dequantizations and fuse if matched
-    Value lhs = genericOp->getOperand(0);
-    Value rhs = genericOp->getOperand(1);
-    auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>();
-    auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>();
-
-    std::optional<Operation *> maybeFill = std::nullopt;
-    if (auto fill = genericOp.getDpsInitOperand(0)
-                        ->get()
-                        .getDefiningOp<linalg::FillOp>()) {
-      maybeFill = fill;
-    }
-
-    if (lhsOp)
-      if (!failed(isGroupedDequantizationOp(
-              llvm::dyn_cast<linalg::GenericOp>(*lhsOp)))) {
-        return fuseDequantAndMatmul(rewriter, lhsOp, matmulOp, maybeFill);
-      }
-    if (rhsOp)
-      if (!failed(isGroupedDequantizationOp(
-              llvm::dyn_cast<linalg::GenericOp>(*rhsOp)))) {
-        return fuseDequantAndMatmul(rewriter, rhsOp, matmulOp, maybeFill);
-      }
-
-    return failure();
-  }
-};
-
 struct FuseDequantizationMatmulPass
     : public FuseDequantizationMatmulBase<FuseDequantizationMatmulPass> {
 
@@ -956,16 +833,6 @@ void FuseDequantizationMatmulPass::runOnOperation() {
       }
     }
   }
-
-  // Normal fusion pattern.
-  {
-    RewritePatternSet patterns(context);
-    patterns.insert<FuseDequantizationMatmulPattern>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -974,6 +841,4 @@ createFuseDequantizationMatmulPass(bool enableQuantizedMatmulReassociation) {
       enableQuantizedMatmulReassociation);
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

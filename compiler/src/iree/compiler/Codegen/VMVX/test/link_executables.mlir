@@ -72,7 +72,8 @@ func.func @basic_linking() -> () attributes {
   testing.func.b = @dispatch_0::@vmvx,
   testing.func.c = @dispatch_0::@vmvx::@dispatch_0
 } {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer attributes {
     testing.op.a = @dispatch_0,
     testing.op.b = @dispatch_0::@vmvx,
@@ -85,7 +86,8 @@ func.func @basic_linking() -> () attributes {
   return
 }
 util.initializer {
-  %device = hal.ex.shared_device : !hal.device
+  %c0 = arith.constant 0 : index
+  %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@vmvx::@dispatch_0) workgroups([%c1, %c1, %c1])
@@ -104,7 +106,8 @@ util.initializer {
 // CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"
 // CHECK-NEXT:        = arith.constant 1
 //      CHECK:      hal.executable.export public @dispatch_0 ordinal(0)
-// CHECK-NEXT:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
+//      CHECK:        hal.return %c1, %c1, %c1
+//      CHECK:      hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:        = arith.constant 2
 //      CHECK:      hal.executable.export public @dispatch_1 ordinal(1)
 //      CHECK:      hal.executable.export public @dispatch_2 ordinal(2)

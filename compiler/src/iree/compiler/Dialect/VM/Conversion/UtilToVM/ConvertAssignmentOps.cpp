@@ -15,8 +15,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -63,5 +63,4 @@ void populateUtilAssignmentToVMPatterns(MLIRContext *context,
   patterns.insert<SwitchOpConversion>(typeConverter, context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

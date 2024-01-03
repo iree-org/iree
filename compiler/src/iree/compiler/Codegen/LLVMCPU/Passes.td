@@ -25,7 +25,7 @@ def ConvertToLLVM :
   ];
 }
 
-def ExpandArithF16ToF32 :
+def ExpandF16OpToF32 :
     Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
   let summary =
       "Preform f16 opertaions by expanding them to f32.";
@@ -110,13 +110,6 @@ def LLVMCPUSynchronizeSymbolVisibility :
     Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
   let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
-}
-
-def LLVMCPUTensorPad :
-    Pass<"iree-llvmcpu-tensor-pad", "func::FuncOp"> {
-  let summary = "Pass to pad operations on tensors in top-down order.";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
 }
 
 def LLVMCPUTile :

@@ -65,12 +65,9 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]
-//       CHECK:         %[[T_UPDATE_CAST:.+]] = memref.cast %[[T_UPDATE]]
 //       CHECK:         %[[T_INDEX:.+]] = memref.subview %[[WG_INDEX]][%[[IV_Y]], 0] [1, 1] [1, 1]
-//       CHECK:         %[[T_INDEX_CAST:.+]] = memref.cast %[[T_INDEX]]
 //       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
-//       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
 //       CHECK:         iree_linalg_ext.scatter
 //  CHECK-SAME:           unique_indices(true)
-//  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX_CAST]]
-//  CHECK-SAME:           outs(%[[T_TARGET_CAST]]
+//  CHECK-SAME:           ins(%[[T_UPDATE]], %[[T_INDEX]]
+//  CHECK-SAME:           outs(%[[T_TARGET]]

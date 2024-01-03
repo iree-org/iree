@@ -13,10 +13,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/raw_ostream.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Alignment applied to each segment of the archive.
 // All embedded file contents (FlatBuffers, rodata, etc) are aligned to this
@@ -685,7 +682,4 @@ LogicalResult ZIPArchiveWriter::flush(FlatbufferBuilder &fbb) {
   return success();
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

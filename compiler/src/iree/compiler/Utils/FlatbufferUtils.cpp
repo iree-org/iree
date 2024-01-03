@@ -14,8 +14,7 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Combines all pages of the FlatBuffer builder into a single contiguous byte
 // buffer and returns the result.
@@ -124,5 +123,4 @@ LogicalResult FlatbufferBuilder::printJsonToStream(bool pretty,
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

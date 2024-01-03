@@ -633,7 +633,7 @@ struct ScatterCollapseBatch final
     for (int i = 0, s = batchCount; i < s; i++) {
       reassociationMap.front().push_back(rewriter.getAffineDimExpr(i));
       bool isDynamic =
-          valueTy.isDynamicDim(i) || batchSize == ShapedType::kDynamic;
+          valueTy.isDynamicDim(i) || ShapedType::isDynamic(batchSize);
       batchSize =
           isDynamic ? ShapedType::kDynamic : valueTy.getDimSize(i) * batchSize;
     }
@@ -1589,7 +1589,7 @@ struct CustomCallIsTopK final
     }
 
     int64_t k = topVTy.getDimSize(1);
-    if (k == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(k)) {
       return rewriter.notifyMatchFailure(op, "dynamic top-k k value");
     }
 

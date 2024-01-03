@@ -126,15 +126,15 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-Falcon7bGptqPT"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon7b_gptq_linalg_zeroed_weights_1698708010.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_1702432230.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
-  NAME "model-Vit_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
+  NAME "model-Falcon7bInt4GptqPT"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Falcon7bInt4GptqPT.mlirbc"
   UNPACK
 )
 
@@ -268,5 +268,12 @@ iree_fetch_artifact(
   NAME "model-matmul_128x256x8192_f32t_tile_config_default"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-Vit_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
   UNPACK
 )

@@ -8,6 +8,9 @@
 #define IREE_DIALECT_VECTOREXT_OPS
 
 include "iree-dialects/Dialect/VectorExt/IR/VectorExtBase.td"
+include "iree-dialects/Dialect/VectorExt/IR/VectorExtInterfaces.td"
+include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -30,17 +33,53 @@ def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conf
   }];
   let arguments = (ins
     AnyVector:$input,
-    LayoutAttr:$sourceLayout,
-    LayoutAttr:$desiredLayout
+    VectorLayoutInterface:$sourceLayout,
+    VectorLayoutInterface:$desiredLayout
   );
   let results = (outs
     AnyVector:$output
   );
-  let extraClassDeclaration = [{
-
-  }];
+  let extraClassDeclaration = [{}];
   let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
   let hasVerifier = 1;
+}
+
+def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
+    [SameOperandsAndResultElementType, Pure]> {
+  let summary = "SIMT to SIMD conversion operation";
+  let description = [{
+    This operation is a temporary operation useful for source/target
+    materializations when doing type conversions between distributed and not
+    distributed vectors.
+  }];
+  let arguments = (ins
+    AnyVector:$input
+  );
+  let results = (outs
+    AnyVector:$output
+  );
+  let extraClassDeclaration = [{}];
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let hasFolder = 1;
+}
+
+def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
+    [SameOperandsAndResultElementType, Pure]> {
+  let summary = "SIMD to SIMT conversion operation";
+  let description = [{
+    This operation is a temporary operation useful for source/target
+    materializations when doing type conversions between distributed and not
+    distributed vectors.
+  }];
+  let arguments = (ins
+    AnyVector:$input
+  );
+  let results = (outs
+    AnyVector:$output
+  );
+  let extraClassDeclaration = [{}];
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let hasFolder = 1;
 }
 
 #endif  // IREE_DIALECT_VECTOREXT_OPS

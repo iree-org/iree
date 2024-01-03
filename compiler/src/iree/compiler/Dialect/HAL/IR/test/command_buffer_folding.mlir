@@ -1,18 +1,17 @@
 // RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @skip_command_buffer_device
-func.func @skip_command_buffer_device() -> !hal.executable {
-  // CHECK: %[[DEVICE:.+]] = hal.ex.shared_device
-  %dev = hal.ex.shared_device : !hal.device
-  %cmd = hal.command_buffer.create device(%dev : !hal.device)
+// CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
+func.func @skip_command_buffer_device(%device: !hal.device) -> !hal.executable {
+  %cmd = hal.command_buffer.create device(%device : !hal.device)
                                      mode(OneShot)
-                                     categories("Transfer|Dispatch") : !hal.command_buffer
+                               categories("Transfer|Dispatch") : !hal.command_buffer
 
   // CHECK-NOT: hal.command_buffer.device
   //      CHECK: = hal.executable.lookup device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:     executable(@executable_name) : !hal.executable
-  %0 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
-  %exe = hal.executable.lookup device(%dev : !hal.device)
+  %device2 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
+  %exe = hal.executable.lookup device(%device2 : !hal.device)
                            executable(@executable_name) : !hal.executable
 
   return %exe : !hal.executable

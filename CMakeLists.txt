@@ -62,7 +62,7 @@ set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT ON)
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
   set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 endif()
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
@@ -544,6 +544,7 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_import_binary)
+include(iree_install_support)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -604,6 +605,22 @@ iree_register_external_hal_driver(
     iree::experimental::rocm::registration
   REGISTER_FN
     iree_hal_rocm_driver_module_register
+)
+
+#-------------------------------------------------------------------------------
+# Experimental HIP HAL driver
+# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
+#-------------------------------------------------------------------------------
+
+iree_register_external_hal_driver(
+  NAME
+    hip
+  SOURCE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
+  DRIVER_TARGET
+    iree::experimental::hip::registration
+  REGISTER_FN
+    iree_hal_hip_driver_module_register
 )
 
 #-------------------------------------------------------------------------------
@@ -838,10 +855,16 @@ else()
   # Also add a library that can be depended on to get LLVM includes setup
   # properly. bazel_to_cmake targets this for some header only pseudo deps.
   add_library(IREELLVMIncludeSetup INTERFACE)
-  target_include_directories(IREELLVMIncludeSetup INTERFACE
-    ${LLVM_INCLUDE_DIRS}
-    ${MLIR_INCLUDE_DIRS}
-    ${LLD_INCLUDE_DIRS}
+  foreach(_d ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS} ${LLD_INCLUDE_DIRS})
+    # BUILD_INTERFACE only works one at a time.
+    target_include_directories(IREELLVMIncludeSetup INTERFACE
+      $<BUILD_INTERFACE:${_d}>
+    )
+  endforeach()
+  iree_install_targets(
+    TARGETS IREELLVMIncludeSetup
+    COMPONENT IREEPublicLibraries-Compiler
+    EXPORT_SET Compiler
   )
 
   # Splice the includes setup into base LLVM libraries so that using them
@@ -879,12 +902,25 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Other dependencies
+# By default we bundle a number of dependencies needed to build the project.
+# When bundled like this, they are installed into the IREEBundledLibraries
+# component and exported to their subsystem which requires them (if a static
+# dep from the public API): "Runtime" or "Compiler".
+#
+# Some deps have a usable CMake build, and we add_subdirectory these, manually
+# using iree_install_targets to include them in our installation. Others require
+# custom CMake and these are in the build_tools/third_party directory.
+#
+# TODO: We should have a mode that purely uses find_package for OS friendly
+# packaging/externalizing deps.
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+# libyaml
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
+
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 
@@ -892,11 +928,23 @@ iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
 if(IREE_ENABLE_THREADING)
+  # Benchmark.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS benchmark
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
+
   if(IREE_ENABLE_CPUINFO)
     iree_set_cpuinfo_cmake_options()
     add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    iree_install_targets(
+      TARGETS cpuinfo
+      COMPONENT IREEBundledLibraries
+      EXPORT_SET Runtime
+    )
   endif()
 endif()
 
@@ -909,6 +957,11 @@ endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS Vulkan-Headers
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
@@ -1040,3 +1093,84 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+#-------------------------------------------------------------------------------
+# Install/exports
+# Note that with no further options, install convenience targets install to
+# CMAKE_INSTALL_PREFIX. Per usual, this can be further prefixed with an 
+# environment variable "DESTDIST" on a per invocation basis (i.e. to place under
+# a versioned path, etc).
+#
+# The `iree-install-dist` target includes everthing that is typically included in
+# a distribution tarball.
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/cmake ${IREE_BINARY_DIR}/lib/cmake/IREE)
+
+# Convenience installation targets.
+iree_add_install_target(NAME iree-install-dist)
+iree_add_install_target(
+  NAME iree-install-dev-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-runtime-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-tools
+  ADD_TO iree-install-dist
+)
+
+iree_add_install_target(
+  NAME iree-install-cmake-exports
+  COMPONENT IREECMakeExports
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-dev-libraries-runtime
+  COMPONENT IREEDevLibraries-Runtime
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-bundled-libraries
+  COMPONENT IREEBundledLibraries
+  ADD_TO iree-install-dev-libraries-runtime
+)
+
+if(IREE_BUILD_COMPILER)
+  iree_add_install_target(
+    NAME iree-install-dev-libraries-compiler
+    COMPONENT IREEDevLibraries-Compiler
+    ADD_TO iree-install-dev-libraries
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler
+    COMPONENT IREETools-Compiler
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler-dev
+    COMPONENT IREETools-CompilerDev
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-runtime-libraries-compiler
+    COMPONENT IREERuntimeLibraries-Compiler
+    ADD_TO 
+      iree-install-runtime-libraries
+      iree-install-tools-compiler
+      iree-install-dev-libraries-compiler
+  )
+endif()
+
+iree_add_install_target(
+  NAME iree-install-tools-runtime
+  COMPONENT IREETools-Runtime
+  ADD_TO iree-install-tools
+)

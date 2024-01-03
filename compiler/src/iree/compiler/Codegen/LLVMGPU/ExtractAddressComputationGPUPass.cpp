@@ -17,8 +17,7 @@
 
 using namespace mlir;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Helper functions for the `load base[off0...]`
@@ -100,5 +99,4 @@ void ExtractAddressComputationGPUPass::runOnOperation() {
 std::unique_ptr<Pass> createExtractAddressComputationGPUPass() {
   return std::make_unique<ExtractAddressComputationGPUPass>();
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

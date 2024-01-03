@@ -1,0 +1,61 @@
+# Copyright 2021 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "hal_target_rocm",
+    target = ":ROCM",
+)
+
+iree_compiler_cc_library(
+    name = "ROCM",
+    srcs = [
+        "ROCMTarget.cpp",
+        "ROCMTargetUtils.cpp",
+    ],
+    hdrs = [
+        "ROCMTargetUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/LLVMGPU",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/compiler/Utils",
+        "//runtime/src/iree/schemas:rocm_executable_def_c_fbs",
+        "@llvm-project//llvm:AMDGPUCodeGen",
+        "@llvm-project//llvm:Analysis",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:IRReader",
+        "@llvm-project//llvm:Linker",
+        "@llvm-project//llvm:MC",
+        "@llvm-project//llvm:Passes",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:TransformUtils",
+        "@llvm-project//mlir:AMDGPUDialect",
+        "@llvm-project//mlir:AMDGPUToROCDL",
+        "@llvm-project//mlir:AMDGPUTransforms",
+        "@llvm-project//mlir:AMDGPUUtils",
+        "@llvm-project//mlir:BuiltinToLLVMIRTranslation",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LLVMToLLVMIRTranslation",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:ROCDLDialect",
+        "@llvm-project//mlir:ROCDLTarget",
+        "@llvm-project//mlir:ROCDLToLLVMIRTranslation",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
+    ],
+)

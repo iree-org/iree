@@ -130,20 +130,20 @@ class BuildFileFunctions(object):
         # ':') or in other packages (leading '//'). We map that to paths by:
         # - dropping any leading ':' as in:
         #      ':generated.c' -> 'generated.c'
-        # - replacing any leading '//' by '${CMAKE_SOURCE_DIR}/' or
-        #   '${CMAKE_BINARY_DIR}/' and any internal ':' by '/', as in:
+        # - replacing any leading '//' by '${PROJECT_SOURCE_DIR}/' or
+        #   '${PROJECT_BINARY_DIR}/' and any internal ':' by '/', as in:
         #      '//path/to/package:source.c'
-        #      -> '${CMAKE_SOURCE_DIR}/path/to/package/source.c'
+        #      -> '${PROJECT_SOURCE_DIR}/path/to/package/source.c'
         #      '//path/to/package:generated.c'
-        #      -> '${CMAKE_BINARY_DIR}/path/to/package/generated.c'
+        #      -> '${PROJECT_BINARY_DIR}/path/to/package/generated.c'
         pkg_root_relative_label = src.startswith("//")
         src = src.lstrip("/").lstrip(":").replace(":", "/")
         if not pkg_root_relative_label:
             return src
         elif os.path.exists(os.path.join(self._build_dir, src)):
-            return f"${{CMAKE_SOURCE_DIR}}/{src}"
+            return f"${{PROJECT_SOURCE_DIR}}/{src}"
         else:
-            return f"${{CMAKE_BINARY_DIR}}/{src}"
+            return f"${{PROJECT_BINARY_DIR}}/{src}"
 
     def _convert_srcs_block(self, srcs, is_generated=False, block_name="SRCS"):
         if not srcs:
@@ -394,6 +394,7 @@ class BuildFileFunctions(object):
         testonly=None,
         linkopts=None,
         includes=None,
+        system_includes=None,
         **kwargs,
     ):
         if self._should_skip_target(**kwargs):
@@ -412,6 +413,9 @@ class BuildFileFunctions(object):
         deps_block = self._convert_target_list_block("DEPS", deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
         includes_block = self._convert_includes_block(includes)
+        system_includes_block = self._convert_string_list_block(
+            "SYSTEM_INCLUDES", system_includes
+        )
 
         self._converter.body += (
             f"iree_cc_library(\n"
@@ -425,6 +429,7 @@ class BuildFileFunctions(object):
             f"{defines_block}"
             f"{testonly_block}"
             f"{includes_block}"
+            f"{system_includes_block}"
             f"  PUBLIC\n)\n\n"
         )
 

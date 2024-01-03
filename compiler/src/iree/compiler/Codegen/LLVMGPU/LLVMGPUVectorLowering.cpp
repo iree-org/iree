@@ -13,8 +13,7 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
 // Patterns for late vector op lowering.
@@ -75,5 +74,4 @@ std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass() {
   return std::make_unique<LLVMGPUVectorLoweringPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

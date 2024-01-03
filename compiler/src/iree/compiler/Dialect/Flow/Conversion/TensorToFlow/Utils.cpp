@@ -8,14 +8,12 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Gets the list of non-static values from a list of `OpFoldResult`.
 static SmallVector<Value>
@@ -41,14 +39,37 @@ getShapeFromSizes(ArrayRef<OpFoldResult> valueOrAttrList) {
       });
 }
 
-/// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
-/// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
-/// eventually map to DMA operations if the offsets/sizes/strides represent a
-/// contiguous memory.
-static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
-                                                ArrayRef<OpFoldResult> sizes,
-                                                ArrayRef<OpFoldResult> strides,
-                                                ArrayRef<int64_t> baseShape) {
+// This is not a complete heuristic for whether a particular index value
+// depends on something expected to require a host-device sync to use, but
+// works for most inputs we can expect today.
+static bool producedByValueExtract(OpFoldResult index) {
+  Value indexVal = dyn_cast<Value>(index);
+  if (!indexVal) {
+    return false;
+  }
+
+  BackwardSliceOptions options;
+  bool hasExtract = false;
+  options.inclusive = false;
+  options.omitBlockArguments = true;
+  options.filter = [&](Operation *op) {
+    if (isa<tensor::ExtractOp, TensorLoadOp>(op)) {
+      hasExtract = true;
+      return false;
+    }
+    return true;
+  };
+
+  // Get the backward slice of the index.
+  SetVector<Operation *> backwardSlice;
+  getBackwardSlice(indexVal, &backwardSlice, options);
+  return hasExtract;
+}
+
+bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
+                                         ArrayRef<OpFoldResult> sizes,
+                                         ArrayRef<OpFoldResult> strides,
+                                         ArrayRef<int64_t> baseShape) {
   if (offsets.size() != baseShape.size()) {
     // Unhanded rank-reducing case.
     return false;
@@ -64,28 +85,35 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
 
   bool fullSlices = true;
   for (size_t dim = offsets.size(); dim > 0; dim--) {
-    int64_t staticOffset = getVal(offsets[dim - 1], ShapedType::kDynamic);
-    int64_t staticSize = getVal(sizes[dim - 1], ShapedType::kDynamic);
-    int64_t staticStride = getVal(strides[dim - 1], ShapedType::kDynamic);
+    OpFoldResult offset = offsets[dim - 1];
+    OpFoldResult size = sizes[dim - 1];
+    OpFoldResult stride = strides[dim - 1];
 
-    if (staticStride != 1)
-      return false;
     // The offsets and sizes dont have to be static for all dimensions. When
-    // `fullSlices` is true, the offset and sizes can be dynamic. But many
+    // `fullSlices` is true, the offset and sizes can be dynamic. But in some
     // cases, the dynamic offset/size value is obtained by computing from
     // another tensor which lives on the device. To avoid host-round tripping
-    // enforce that offset/size is also static.
-    if (staticSize == ShapedType::kDynamic)
+    // try to infer when a value is extracted from a tensor.
+    if (producedByValueExtract(offset) || producedByValueExtract(stride) ||
+        producedByValueExtract(size)) {
       return false;
-    if (staticOffset == ShapedType::kDynamic)
+    }
+
+    int64_t staticOffset = getVal(offset, ShapedType::kDynamic);
+    int64_t staticSize = getVal(size, ShapedType::kDynamic);
+    int64_t staticStride = getVal(stride, ShapedType::kDynamic);
+
+    if (staticStride != 1)
       return false;
 
     if (fullSlices == false) {
       if (staticSize != 1)
         return false;
     } else {
-      if (!(staticOffset == 0 && staticSize != ShapedType::kDynamic &&
-            baseShape[dim - 1] != ShapedType::kDynamic &&
+      // TODO: Use ValueBoundsAnalysis to check whether two dynamic values
+      // are equal.
+      if (!(staticOffset == 0 && !ShapedType::isDynamic(staticSize) &&
+            !ShapedType::isDynamic(baseShape[dim - 1]) &&
             staticSize == baseShape[dim - 1])) {
         fullSlices = false;
       }
@@ -186,7 +214,4 @@ convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
   return success();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

@@ -8,10 +8,7 @@
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 void registerToCTranslation() {
   TranslateFromMLIRRegistration toCModule(
@@ -22,7 +19,4 @@ void registerToCTranslation() {
       });
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

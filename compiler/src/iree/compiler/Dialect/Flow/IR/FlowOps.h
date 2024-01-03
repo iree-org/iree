@@ -26,21 +26,19 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
+
 class DispatchRegionOp;
 
 // Populates flow.dispatch.* canonicalization patterns.
-void populateFlowDispatchCanonicalizationPatterns(
-    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context);
+void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context);
 
 // Patterns to fold tensor.extract_slice/insert_slice with
 // flow.dispatch.tensor.load/store. These patterns may not be canonicalizers,
 // since they might change the parallelism semantics in non-obvious ways.
 void populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-    mlir::RewritePatternSet &results, MLIRContext *context);
+    RewritePatternSet &results, MLIRContext *context);
 
 // Verifies the flow.dispatch.workgroup.size/id/count operations.
 LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);
@@ -50,10 +48,7 @@ LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);
 bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
                                      Flow::DispatchRegionOp regionOp);
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc" // IWYU pragma: export

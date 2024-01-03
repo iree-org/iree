@@ -10,8 +10,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Populates conversion patterns that perform standard/builtin->stream
 // conversion. These patterns ensure that nested types are run through the
@@ -20,7 +19,6 @@ void populateStandardToStreamConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_STREAM_CONVERSION_STANDARDTOSTREAM_PATTERNS_H_

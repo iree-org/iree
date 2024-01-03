@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-canonicalize --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-stablehlo-canonicalize --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @add
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xi32>, [[ARG1:%.+]]: tensor<f32>)
@@ -655,7 +655,7 @@ func.func @add_zero_ext(%arg0 : tensor<5x0xi32>, %arg1 : tensor<5x0xi32>) -> ten
   func.return %0 : tensor<5x0xi32>
 }
 // CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<5x0xi32>
-// CHECK:   return %[[EMPTY]] 
+// CHECK:   return %[[EMPTY]]
 
 // -----
 
@@ -689,7 +689,7 @@ func.func @scatter_zero_ext(%arg0 : tensor<f32>, %arg1 : tensor<1x0xi32>, %arg2 
 
 // CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<1x0xi32>
 // CHECK:   %[[SCATTER:.+]] = "stablehlo.scatter"(%arg0, %0, %arg2)
-// CHECK:   return %[[SCATTER]] 
+// CHECK:   return %[[SCATTER]]
 
 // -----
 
@@ -777,6 +777,19 @@ func.func @do_not_reorder_with_other_uses(%arg0: tensor<2x2xf64>, %arg1: tensor<
   return %3, %2 : tensor<f64>, tensor<4xf32>
 }
 
-// CHECK-LABEL: do_not_reorder_with_other_uses
+// CHECK-LABEL: @do_not_reorder_with_other_uses
 // CHECK: %[[RESHAPE:.+]] = stablehlo.reshape %arg0 : (tensor<2x2xf64>) -> tensor<4xf64>
 // CHECK: %[[CONVERT:.+]] = stablehlo.convert %[[RESHAPE]] : (tensor<4xf64>) -> tensor<4xf32>
+
+// -----
+
+// Make sure we do not crash on unregistered dialects.
+
+func.func @generic_op(%arg0: tensor<2xf32>, %arg1: tensor<2xf32>) -> tensor<2xf32> {
+  %0 = "test_dialect.op"(%arg0, %arg1) : (tensor<2xf32>, tensor<2xf32>) -> (tensor<2xf32>)
+  return %0 : tensor<2xf32>
+}
+
+// CHECK-LABEL: func.func @generic_op
+// CHECK-NEXT:    "test_dialect.op"
+// CHECK-NEXT:    return

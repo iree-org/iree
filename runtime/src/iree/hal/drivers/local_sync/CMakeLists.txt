@@ -32,7 +32,6 @@ iree_cc_library(
     iree::hal
     iree::hal::local
     iree::hal::local::executable_environment
-    iree::hal::utils::buffer_transfer
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file

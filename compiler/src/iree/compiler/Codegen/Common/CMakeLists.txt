@@ -32,7 +32,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRTransforms
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Utils
   PUBLIC
@@ -58,6 +58,7 @@ iree_cc_library(
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
+    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -73,6 +74,7 @@ iree_cc_library(
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
+    "DecomposeSoftmax.cpp"
     "EmulateNarrowType.cpp"
     "EncodingUtils.cpp"
     "EraseDeadAllocAndStores.cpp"
@@ -110,14 +112,14 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
+    "VectorLayoutAnalysis.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREELinalgExtDialect
-    IREELinalgExtPasses
     IREELinalgExtTransforms
-    IREELinalgExtUtils
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
     MLIRAffineDialect
@@ -162,7 +164,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
@@ -190,6 +192,7 @@ iree_cc_library(
     IREELinalgExtDialect
     IREELinalgExtTransformOps
     IREELinalgTransformDialect
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineTransformOps
@@ -198,6 +201,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithTransforms
     MLIRArithUtils
+    MLIRArmSMEDialect
     MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRBufferizationTransformOps
@@ -231,7 +235,7 @@ iree_cc_library(
     MLIRVectorTransformOps
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies

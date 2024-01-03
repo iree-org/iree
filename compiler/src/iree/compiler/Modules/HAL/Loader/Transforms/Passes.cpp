@@ -16,10 +16,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Loader {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
@@ -69,9 +66,9 @@ void buildHALInlineDynamicTransformPassPipeline(
   // After this point the executables are opaque blobs and we cannot change
   // their interfaces.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createConfigureExecutablesPass(targetRegistry));
+      IREE::HAL::createConfigureExecutablesPass({targetRegistry}));
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
-      IREE::HAL::createTranslateExecutablesPass(targetRegistry));
+      IREE::HAL::createTranslateExecutablesPass({targetRegistry}));
 
   //----------------------------------------------------------------------------
   // Conversion
@@ -85,7 +82,7 @@ void buildHALInlineDynamicTransformPassPipeline(
   //----------------------------------------------------------------------------
 
   // Link executables together.
-  passManager.addPass(IREE::HAL::createLinkExecutablesPass(targetRegistry));
+  passManager.addPass(IREE::HAL::createLinkExecutablesPass({targetRegistry}));
 
   // Resolve export ordinals from nested symbol references prior to
   // serialization.
@@ -94,9 +91,9 @@ void buildHALInlineDynamicTransformPassPipeline(
   // Serialize executables to their binary forms.
   passManager.addNestedPass<IREE::HAL::ExecutableOp>(
       IREE::HAL::createSerializeExecutablesPass(
-          targetRegistry, targetOptions.debugLevel,
-          targetOptions.executableIntermediatesPath,
-          targetOptions.executableBinariesPath));
+          {&targetRegistry, targetOptions.debugLevel,
+           targetOptions.executableIntermediatesPath,
+           targetOptions.executableBinariesPath}));
 
   // NOTE: symbol DCE will destroy executable target contents.
   passManager.addPass(mlir::createSymbolDCEPass());
@@ -135,7 +132,4 @@ void registerHALLoaderPasses() {
 }
 
 } // namespace Loader
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

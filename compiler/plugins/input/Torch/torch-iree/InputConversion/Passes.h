@@ -10,9 +10,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace TorchInput {
+namespace mlir::iree_compiler::TorchInput {
 
 struct TorchToIREELoweringPipelineOptions
     : public PassPipelineOptions<TorchToIREELoweringPipelineOptions> {
@@ -41,8 +39,6 @@ void createTorchToIREEPipeline(
 
 void registerTMTensorConversionPasses();
 
-} // namespace TorchInput
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::TorchInput
 
 #endif // TORCH_IREE_INPUTCONVERSION_PASSES_H_

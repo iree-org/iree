@@ -21,39 +21,28 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
-class AssignTargetDevicesPass
-    : public PassWrapper<AssignTargetDevicesPass, OperationPass<ModuleOp>> {
-public:
-  AssignTargetDevicesPass()
-      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
-  AssignTargetDevicesPass(const AssignTargetDevicesPass &pass)
-      : targetRegistry(pass.targetRegistry) {}
-  AssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
-                          ArrayRef<std::string> targets)
-      : targetRegistry(targetRegistry) {
-    this->targets = targets;
-  }
+#define GEN_PASS_DEF_ASSIGNTARGETDEVICESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
+namespace {
+
+//===----------------------------------------------------------------------===//
+// --iree-hal-assign-target-devices
+//===----------------------------------------------------------------------===//
+
+struct AssignTargetDevicesPass
+    : public IREE::HAL::impl::AssignTargetDevicesPassBase<
+          AssignTargetDevicesPass> {
+  using IREE::HAL::impl::AssignTargetDevicesPassBase<
+      AssignTargetDevicesPass>::AssignTargetDevicesPassBase;
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    for (auto &targetBackend : targetRegistry.getTargetBackends(
-             targetRegistry.getRegisteredTargetBackends())) {
+    for (auto &targetBackend : targetRegistry->getTargetBackends(
+             targetRegistry->getRegisteredTargetBackends())) {
       targetBackend->getDependentDialects(registry);
     }
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-assign-target-devices";
-  }
-
-  StringRef getDescription() const override {
-    return "Assigns the HAL devices the module will target to the given list "
-           "of targets.";
   }
 
   void runOnOperation() override {
@@ -76,15 +65,16 @@ public:
       return;
     }
 
+    llvm::SmallDenseSet<Attribute> targetAttrSet;
     SmallVector<Attribute> targetAttrs;
     for (const auto &targetName : targets) {
-      auto targetBackend = targetRegistry.getTargetBackend(targetName);
+      auto targetBackend = targetRegistry->getTargetBackend(targetName);
       if (!targetBackend) {
         std::string backends;
         llvm::raw_string_ostream os(backends);
         llvm::interleaveComma(
-            targetRegistry.getTargetBackends(
-                targetRegistry.getRegisteredTargetBackends()),
+            targetRegistry->getTargetBackends(
+                targetRegistry->getRegisteredTargetBackends()),
             os,
             [&os](const std::shared_ptr<
                   mlir::iree_compiler::IREE::HAL::TargetBackend>
@@ -99,32 +89,17 @@ public:
       // Ask the target backend for its default device specification attribute.
       auto targetAttr =
           targetBackend->getDefaultDeviceTarget(moduleOp.getContext());
-      targetAttrs.push_back(targetAttr);
+      if (!targetAttrSet.contains(targetAttr)) {
+        targetAttrSet.insert(targetAttr);
+        targetAttrs.push_back(targetAttr);
+      }
     }
 
     moduleOp->setAttr("hal.device.targets",
                       ArrayAttr::get(moduleOp.getContext(), targetAttrs));
   }
-
-private:
-  ListOption<std::string> targets{*this, "targets",
-                                  llvm::cl::desc("List of devices to target."),
-                                  llvm::cl::ZeroOrMore};
-
-  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createAssignTargetDevicesPass(const TargetBackendRegistry &targetRegistry,
-                              ArrayRef<std::string> targets) {
-  return std::make_unique<AssignTargetDevicesPass>(targetRegistry, targets);
-}
+} // namespace
 
-static PassRegistration<AssignTargetDevicesPass> pass([] {
-  return std::make_unique<AssignTargetDevicesPass>();
-});
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

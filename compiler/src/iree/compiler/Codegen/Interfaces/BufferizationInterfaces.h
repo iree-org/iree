@@ -11,8 +11,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct IREEOneShotBufferizationOptions
     : public mlir::bufferization::OneShotBufferizationOptions {
@@ -23,7 +22,6 @@ struct IREEOneShotBufferizationOptions
 // Register all interfaces needed for bufferization.
 void registerBufferizationInterfaces(DialectRegistry &registry);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_

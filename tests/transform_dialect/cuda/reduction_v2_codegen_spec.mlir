@@ -18,7 +18,7 @@ module attributes { transform.with_named_sequence } {
 
     // Step 2. Split the reduction to get meatier parallelism.
     // ===========================================================================
-    %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2, %forall = 
+    %block_more_parallel_fill_op_2, %block_more_parallel_op_2, %block_combiner_op_2, %forall =
       transform.structured.tile_reduction_using_for %grid_reduction by tile_sizes = [0, 128]
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     %_1:2 =
@@ -36,7 +36,7 @@ module attributes { transform.with_named_sequence } {
     // 2nd op is [parallel, reduction] of 1x128, map the 1-dim to threadIdx.y to
     // trigger mapping of the reduction to threadIdx.x via predication via `if (x==0)`.
     %_3:2 =
-      transform.structured.tile_using_forall %block_combiner_op_2 tile_sizes [1] 
+      transform.structured.tile_using_forall %block_combiner_op_2 tile_sizes [1]
       ( mapping = [#gpu.thread<y>] )
       : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
@@ -87,7 +87,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.memref.fold_memref_alias_ops
       transform.apply_patterns.vector.cast_away_vector_leading_one_dim
     } : !transform.any_op
-    %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 
+    %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3
       : (!transform.any_op) -> !transform.any_op
     %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
     transform.iree.vector.warp_distribute %func_7
@@ -102,7 +102,7 @@ module attributes { transform.with_named_sequence } {
     } : !transform.any_op
     transform.iree.apply_licm %func_7 : !transform.any_op
     transform.iree.apply_cse %func_7 : !transform.any_op
-  
-    transform.yield 
+
+    transform.yield
   }
 } // module

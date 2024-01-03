@@ -493,6 +493,7 @@ def HAL_BufferType : AnyTypeOf<[
 ]>;
 
 def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
+def HAL_OrdinalArrayAttr : TypedArrayAttrBase<HAL_OrdinalAttr, "Array of index ordinal attributes">;
 
 def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
@@ -711,10 +712,6 @@ def HAL_DeviceTargetAttr :
     // target. Callers must perform deduplication when required.
     std::string getSymbolNameFragment();
 
-    // Returns a hal.match.* expression tree that specifically matches this
-    // target device.
-    Attribute getMatchExpression();
-
     // Returns true if there's an attribute with the given name in the
     // configuration dictionary.
     bool hasConfigurationAttr(StringRef name);
@@ -807,11 +804,7 @@ def HAL_ExecutableTargetAttr :
   let extraClassDeclaration = [{
     // Returns a symbol-compatible name that pseudo-uniquely identifies this
     // target. Callers must perform deduplication when required.
-    std::string getSymbolNameFragment();
-
-    // Returns a hal.match.* expression tree that specifically matches a
-    // device that can load an executable of this target.
-    Attribute getMatchExpression();
+    std::string getSymbolNameFragment() const;
 
     // Returns true if there's an attribute with the given name in the
     // configuration dictionary.
@@ -973,175 +966,6 @@ def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
   let parameters = (ins
     AttrParameter<"int64_t", "">:$mask
   );
-
-  let hasCustomAssemblyFormat = 1;
-}
-
-//===----------------------------------------------------------------------===//
-// Expression matching attributes
-//===----------------------------------------------------------------------===//
-
-def HAL_DeviceQuery : NativeOpTrait<"IREE::HAL::DeviceQuery">;
-
-def HAL_MatchAlwaysAttr :
-    AttrDef<HAL_Dialect, "MatchAlways", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "match.always";
-  let summary = [{always matches}];
-  let description = [{
-    Returns true (constant true).
-  }];
-}
-
-def HAL_MatchAnyAttr :
-    AttrDef<HAL_Dialect, "MatchAny", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "match.any";
-  let summary = [{matches if any subexpression matches}];
-  let description = [{
-    Returns true if any subexpression matches (logical OR) and not empty.
-  }];
-  let parameters = (ins
-    AttrParameter<"ArrayAttr", "">:$conditions
-  );
-  let builders = [
-    AttrBuilder<(ins "ArrayRef<Attribute>":$conditions), [{
-      return $_get(context, ArrayAttr::get(context, conditions));
-    }]>,
-  ];
-  let hasCustomAssemblyFormat = 1;
-}
-
-def HAL_MatchAllAttr :
-    AttrDef<HAL_Dialect, "MatchAll", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "match.all";
-  let summary = [{matches if all subexpressions match}];
-  let description = [{
-    Returns true only if all subexpressions return true (logical AND) or empty.
-  }];
-  let parameters = (ins
-    AttrParameter<"ArrayAttr", "">:$conditions
-  );
-  let builders = [
-    AttrBuilder<(ins "ArrayRef<Attribute>":$conditions), [{
-      return $_get(context, ArrayAttr::get(context, conditions));
-    }]>,
-  ];
-  let hasCustomAssemblyFormat = 1;
-}
-
-def HAL_DeviceMatchIDAttr :
-    AttrDef<HAL_Dialect, "DeviceMatchID", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "device.match.id";
-  let summary = [{matches against a device ID pattern}];
-  let description = [{
-    Matches a device by its canonical compiler/runtime ID.
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$pattern
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$pattern), [{
-      return $_get(context, StringAttr::get(context, pattern));
-    }]>,
-    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
-      return $_get(pattern.getContext(), pattern);
-    }]>,
-    AttrBuilderWithInferredContext<(ins "IREE::HAL::DeviceTargetAttr":$target), [{
-      return $_get(target.getContext(), target.getDeviceID());
-    }]>,
-  ];
-  let hasCustomAssemblyFormat = 1;
-}
-
-def HAL_DeviceMatchFeatureAttr :
-    AttrDef<HAL_Dialect, "DeviceMatchFeature", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "device.match.feature";
-  let summary = [{matches against a supported device feature pattern}];
-  let description = [{
-    Matches a device that supports the given feature. The format of the feature
-    pattern is device-dependent.
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$pattern
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$pattern), [{
-      return $_get(context, StringAttr::get(context, pattern));
-    }]>,
-    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
-      return $_get(pattern.getContext(), pattern);
-    }]>,
-  ];
-  let hasCustomAssemblyFormat = 1;
-}
-
-def HAL_DeviceMatchArchitectureAttr :
-    AttrDef<HAL_Dialect, "DeviceMatchArchitecture", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "device.match.architecture";
-  let summary = [{matches against a device architecture pattern}];
-  let description = [{
-    Matches a device by its runtime architecture. The format of the architecture
-    pattern is device-dependent.
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$pattern
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$pattern), [{
-      return $_get(context, StringAttr::get(context, pattern));
-    }]>,
-    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
-      return $_get(pattern.getContext(), pattern);
-    }]>,
-  ];
-  let hasCustomAssemblyFormat = 1;
-}
-
-def HAL_DeviceMatchExecutableFormatAttr :
-    AttrDef<HAL_Dialect, "DeviceMatchExecutableFormat", [
-      DeclareAttrInterfaceMethods<HAL_MatchAttrInterface>,
-    ]> {
-  let mnemonic = "device.match.executable.format";
-  let summary = [{matches when a device supports the given executable format}];
-  let description = [{
-    Matches a device only if it claims to support the given executable format
-    pattern. It's still possible that the executable cannot be loaded such as if
-    it uses unavailable device features. This is used for queries such as
-    "can you load ELF libraries?" to quickly get to a set of executables to
-    attempt without needing to try dozens that definitely cannot be loaded.
-
-    Note that different devices may share the same executable formats: for
-    example a local synchronous CPU executor and a remote asynchronous CPU
-    executor can both load ELF libraries. It's also possible for the same device
-    to support multiple formats such as being able to load both
-    platform-agnostic ELF libraries and platform-specific DLL/MachO/etc
-    libraries.
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$pattern
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$pattern), [{
-      return $_get(context, StringAttr::get(context, pattern));
-    }]>,
-    AttrBuilderWithInferredContext<(ins "StringAttr":$pattern), [{
-      return $_get(pattern.getContext(), pattern);
-    }]>,
-    AttrBuilderWithInferredContext<(ins "IREE::HAL::ExecutableTargetAttr":$target), [{
-      return $_get(target.getContext(), target.getFormat());
-    }]>,
-  ];
 
   let hasCustomAssemblyFormat = 1;
 }

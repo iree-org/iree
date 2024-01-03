@@ -987,6 +987,98 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::HoistableTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Util_HoistableType : TypeInterface<"HoistableTypeInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to control hoisting of variables into globals. It can be
+    used to insert IR immediately before storing a global and after loading it
+    to control the type/layout of the stored global.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this type is valid to hoist as a transient value in the
+        global initializer.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isHoistableType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if this type is valid to hoist as a leaf value in the
+        global initializer.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isHoistableLeafType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the preferred type to use for the global the value of this type
+        is being hoisted into.
+      }],
+      /*retTy=*/"mlir::Type",
+      /*methodName=*/"getPreferredStorageType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_type;
+      }]
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/[{
+        Materializes the cast from the original type to the preferred type,
+        inside the initializer and immediately before storing the global.
+      }],
+      /*retTy=*/"mlir::Value",
+      /*methodName=*/"encodeStorageType",
+      /*args=*/(ins
+        "OpBuilder &":$builder,
+        "Location":$loc,
+        "Type":$storageType,
+        "Value":$init
+      ),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return init;
+      }]
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/[{
+        Materializes the cast from the preferred storage type after loading
+        the global back to the original type.
+      }],
+      /*retTy=*/"mlir::Value",
+      /*methodName=*/"decodeStorageType",
+      /*args=*/(ins
+        "OpBuilder &":$builder,
+        "Location":$loc,
+        "Type":$originalType,
+        "Value":$loadedGlobal
+      ),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return loadedGlobal;
+      }]
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::Subrange*Interface
 //===----------------------------------------------------------------------===//
 

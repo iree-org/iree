@@ -24,10 +24,7 @@
 
 #define DEBUG_TYPE "iree-util-combine-initializers"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 namespace {
 
 class CombineInitializersPass
@@ -83,7 +80,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass() {
   return std::make_unique<CombineInitializersPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

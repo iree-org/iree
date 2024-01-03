@@ -23,8 +23,8 @@
 
 #define DEBUG_TYPE "iree-codegen-erase-hal-descriptor-type"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -44,7 +44,6 @@ struct MemRefTypeConverter final : public TypeConverter {
       auto dtAttr = llvm::dyn_cast<IREE::HAL::DescriptorTypeAttr>(spaceAttr);
       if (!dtAttr)
         return std::nullopt;
-
 
       // Erase the #hal.descriptor_type memory space.
       if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
@@ -218,5 +217,4 @@ std::unique_ptr<Pass> createConvertHALDescriptorTypeToGPUAddressSpacePass() {
   return std::make_unique<ConvertHALDescriptorTypeToGPUAddressSpacePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

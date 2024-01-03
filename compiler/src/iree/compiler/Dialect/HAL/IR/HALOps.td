@@ -37,24 +37,6 @@ def OpGroupExperimentalOps : OpDocGroup {
 
 let opDocGroup = OpGroupExperimentalOps in {
 
-def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let results = (outs
-    HAL_Device:$result
-  );
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins),
-    [{
-      $_state.addTypes({DeviceType::get($_builder.getContext())});
-    }]>,
-  ];
-}
-
 def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -362,6 +344,13 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     E.g., in the above example, `-> %0` would tie the first argument to the
     result. In that case, there would be no separate block argument for the
     result.
+
+    Objects for multiple targets can be specified and the ones used are selected
+    based on their target and an optional condition region that returns true if
+    the variant is valid for use on the provided runtime `!hal.device`. If no
+    variants within an executable are valid then loading will fail at runtime.
+    If multiple variants are valid the first valid one found will be loaded and
+    used for execution.
   }];
 
   let arguments = (ins
@@ -371,7 +360,9 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     HAL_ShapeDynamicDims:$argument_dims,
     HAL_ShapeDynamicDims:$result_dims,
     HAL_PipelineLayoutAttr:$layout,
-    HAL_ExecutableObjectsAttr:$objects,
+    ArrayAttr:$targets,
+    HAL_OrdinalArrayAttr:$target_ordinals,
+    ArrayAttr:$target_objects,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory,
@@ -383,7 +374,8 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
   );
 
   let regions = (region
-    AnyRegion:$workgroup_count
+    AnyRegion:$workgroup_count,
+    VariadicRegion<AnyRegion>:$target_regions
   );
 
   let assemblyFormat = [{
@@ -397,7 +389,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     `count` `` custom<WorkgroupCountRegion>($workgroup_count)
     `layout` `(` $layout `)`
     (`bindings` `(` $bindings^ `)`)?
-    `objects` `(` $objects `)`
+    `objects` `(` `{` custom<TargetConditionObjects>($targets,
+                                                     $target_ordinals,
+                                                     $target_objects,
+                                                     $target_regions) `}` `)`
     attr-dict-with-keyword
   }];
 
@@ -408,6 +403,7 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
       "TypeRange":$resultTypes, "ValueRange":$resultDims,
       "ValueRange":$arguments, "ValueRange":$argumentDims,
       "ArrayRef<int64_t>":$tiedOperands,
+      "IREE::HAL::ExecutableObjectsAttr":$targetObjects,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -428,6 +424,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     }
     ValueRange getResultDynamicDims(unsigned idx) {
       return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+    }
+
+    IREE::HAL::ExecutableObjectsAttr getObjectsAttr() {
+      return IREE::HAL::ExecutableObjectsAttr::get(getContext(), getTargets(), getTargetObjects());
     }
   }];
 
@@ -1559,7 +1559,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
 }
 
 def HAL_DeviceQueryOp :
-    HAL_PureOp<"device.query", [HAL_DeviceQuery]> {
+    HAL_PureOp<"device.query", []> {
   let summary = [{returns a runtime configuration parameter from the device}];
   let description = [{
     Queries a device configuration parameter with the given key.
@@ -1569,11 +1569,7 @@ def HAL_DeviceQueryOp :
 
     This is roughly equivalent to the `sysconf` linux syscall
     (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-    set of keys available and their interpretation is target-dependent. If there
-    is a HAL match attribute (`#hal.device.match.*`) or op
-    (`hal.device.match.*`) prefer to use that in order to get compile-time
-    propagation when the target is specified and elide the runtime query and
-    get compile-time verification when a runtime query is required.
+    set of keys available and their interpretation is target-dependent.
 
     Users of the op must check the `ok` result before using the value as what
     set of keys is available may change over time. If in doubt: don't use this.
@@ -1846,6 +1842,57 @@ def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
 } // OpGroupDeviceOps
 
 //===----------------------------------------------------------------------===//
+// !hal.device management
+//===----------------------------------------------------------------------===//
+
+def OpGroupDeviceManagementOps : OpDocGroup {
+  let summary = "Device management ops";
+  let description = "Device availability and selection support.";
+}
+
+let opDocGroup = OpGroupDeviceManagementOps in {
+
+def HAL_DevicesCountOp : HAL_PureOp<"devices.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the number of available devices}];
+  let description = [{
+    Returns the total number of available devices registered at runtime.
+  }];
+
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
+
+def HAL_DevicesGetOp : HAL_PureOp<"devices.get", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the device with the given index}];
+  let description = [{
+    Returns the device with the given index in the [0, hal.devices.count) range.
+    Devices may be lazily initialized upon first use.
+  }];
+
+  let arguments = (ins
+    Index:$index
+  );
+  let results = (outs
+    HAL_Device:$result
+  );
+
+  let assemblyFormat = [{
+    $index attr-dict `:` type($result)
+  }];
+}
+
+}  // OpGroupDeviceManagementOps
+
+//===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
@@ -1930,6 +1977,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
     Symbol,
     SymbolTable,
+    Util_ObjectLike,
   ]> {
   let summary = [{target-specific executable module}];
   let description = [{

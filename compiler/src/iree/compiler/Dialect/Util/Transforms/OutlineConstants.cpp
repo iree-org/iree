@@ -18,10 +18,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Returns true if |value| is worth outlining (large, etc).
 static bool isOutlinableValue(Attribute value) {
@@ -127,7 +124,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass() {
   return std::make_unique<OutlineConstantsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

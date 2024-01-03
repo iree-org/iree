@@ -26,10 +26,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilAttrs.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 static llvm::cl::opt<bool> clZeroFillElidedAttrs(
     "iree-util-zero-fill-elided-attrs",
@@ -445,14 +442,18 @@ static LogicalResult serializeGenericResourceElementData(
     return emitError(loc) << "the endian of the "
                              "DenseResourceElementsAttr is not supported";
   }
-  if (llvm::isa<IntegerType>(resourceElementsAttr.getType().getElementType())) {
-    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
-    // element type is not integer or floating-point.
+  // For complex resource types, we can just serialize based on the bit width of
+  // the underlying integer or floating point type.
+  Type elementType = resourceElementsAttr.getType().getElementType();
+  if (auto complexType = llvm::dyn_cast<ComplexType>(elementType)) {
+    elementType = complexType.getElementType();
+  }
+  if (auto integerType = llvm::dyn_cast<IntegerType>(elementType)) {
     // At the time of writing, DenseResourceElementsAttr byte aligned physical
     // element types only with the exception of i1, which is stored as a full
     // byte. This is in contrast to DenseElementsAttr which has an exception for
     // i1 where it is bit-packed.
-    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+    unsigned bitWidth = integerType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 1:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
@@ -469,12 +470,9 @@ static LogicalResult serializeGenericResourceElementData(
              << "unhandled integer element bit width " << bitWidth
              << " for type " << resourceElementsAttr.getType();
     }
-  } else if (llvm::isa<FloatType>(
-                 resourceElementsAttr.getType().getElementType())) {
-    // Don't hoist bitWidth given `getElementTypeBitWidth()` asserts if the
-    // element type is not integer or floating-point.
-    // TODO(saienduri): implement float64 support (not neccesary now)
-    unsigned bitWidth = resourceElementsAttr.getType().getElementTypeBitWidth();
+  } else if (auto floatType = llvm::dyn_cast<FloatType>(elementType)) {
+    // TODO(saienduri): implement float64 support (not necessary now)
+    unsigned bitWidth = floatType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 16:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
@@ -923,7 +921,4 @@ void UtilDialect::registerAttributes() {
                               SerializableStringAttrModel>(context);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util

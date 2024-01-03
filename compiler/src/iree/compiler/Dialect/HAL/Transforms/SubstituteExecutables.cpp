@@ -16,10 +16,12 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_SUBSTITUTEEXECUTABLESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
 
 // Scans |searchPath| for all child files and appends them to |substitutions|.
 // The file basename will be treated as an executable name and the path will be
@@ -203,31 +205,15 @@ substituteExecutableOp(IREE::HAL::ExecutableOp executableOp,
   }
 }
 
-class SubstituteExecutablesPass
-    : public PassWrapper<SubstituteExecutablesPass, OperationPass<ModuleOp>> {
-public:
-  SubstituteExecutablesPass() = default;
-  SubstituteExecutablesPass(const SubstituteExecutablesPass &pass) {}
-  SubstituteExecutablesPass(ArrayRef<std::string> substitutions) {
-    this->substitutions = substitutions;
-  }
-  SubstituteExecutablesPass(std::string searchPath) {
-    this->searchPath = std::move(searchPath);
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-substitute-executables
+//===----------------------------------------------------------------------===//
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-substitute-executables";
-  }
-
-  StringRef getDescription() const override {
-    return "Substitutes hal.executable ops by parsing |substitutions| in "
-           "`executable_name=file.xxx` strings.";
-  }
-
+struct SubstituteExecutablesPass
+    : public IREE::HAL::impl::SubstituteExecutablesPassBase<
+          SubstituteExecutablesPass> {
+  using IREE::HAL::impl::SubstituteExecutablesPassBase<
+      SubstituteExecutablesPass>::SubstituteExecutablesPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
@@ -285,32 +271,8 @@ public:
       }
     }
   }
-
-private:
-  ListOption<std::string> substitutions{
-      *this, "substitutions",
-      llvm::cl::desc(
-          "Substitution `executable_name=file.xxx` key-value pairs.")};
-  Option<std::string> searchPath{
-      *this, "search-path",
-      llvm::cl::desc("Path to source executable substitutions from.")};
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSubstituteExecutablesPass(ArrayRef<std::string> substitutions) {
-  return std::make_unique<SubstituteExecutablesPass>(substitutions);
-}
+} // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSubstituteExecutablesPass(std::string searchPath) {
-  return std::make_unique<SubstituteExecutablesPass>(std::move(searchPath));
-}
-
-static PassRegistration<SubstituteExecutablesPass> pass([] {
-  return std::make_unique<SubstituteExecutablesPass>();
-});
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

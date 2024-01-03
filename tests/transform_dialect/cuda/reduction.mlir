@@ -72,6 +72,6 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   //         CHECK:   vector.reduction <add>
   //         CHECK:   vector.transfer_write
   //         CHECK: gpu.barrier
-  
+
 //      EXEC: result[0]: hal.buffer_view
 // EXEC-NEXT: 8xf32=64 64 64 64 64 64 64 64

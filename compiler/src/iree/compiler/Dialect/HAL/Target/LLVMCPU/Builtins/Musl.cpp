@@ -11,10 +11,7 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static const iree_file_toc_t *lookupMuslFile(StringRef filename) {
   for (size_t i = 0; i < iree_builtins_libmusl_size(); ++i) {
@@ -58,7 +55,4 @@ loadMuslBitcode(llvm::TargetMachine *targetMachine,
   return llvm::parseBitcodeFile(bitcodeBufferRef, context);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

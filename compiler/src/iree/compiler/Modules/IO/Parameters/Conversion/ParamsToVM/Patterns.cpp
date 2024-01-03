@@ -33,66 +33,11 @@ static Value getStringRodata(Location loc, StringAttr attr,
   return builder.create<IREE::VM::RodataInlineOp>(loc, attr);
 }
 
-struct LoadOpConversion
-    : public OpConversionPattern<IREE::IO::Parameters::LoadOp> {
-  LoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
-                   TypeConverter &typeConverter, StringRef importName)
-      : OpConversionPattern(context) {
-    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
-    assert(importOp);
-  }
-  LogicalResult
-  matchAndRewrite(IREE::IO::Parameters::LoadOp loadOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        loadOp, importOp.getSymNameAttr(),
-        IREE::VM::RefType::get(loadOp.getResult().getType()),
-        ValueRange{
-            adaptor.getDevice(),
-            adaptor.getQueueAffinity(),
-            adaptor.getWaitFence(),
-            adaptor.getSignalFence(),
-            getStringRodata(loadOp.getLoc(), adaptor.getSourceScopeAttr(),
-                            rewriter),
-            getStringRodata(loadOp.getLoc(), adaptor.getSourceKeyAttr(),
-                            rewriter),
-            adaptor.getSourceOffset(),
-            adaptor.getQueueAffinity(),
-            rewriter.create<IREE::VM::ConstI32Op>(
-                loadOp.getLoc(), (uint32_t)adaptor.getMemoryTypes()),
-            rewriter.create<IREE::VM::ConstI32Op>(
-                loadOp.getLoc(), (uint32_t)adaptor.getBufferUsage()),
-            adaptor.getLength(),
-        });
-    copyImportAttrs(importOp, callOp);
-    return success();
-  }
-
-private:
-  mutable IREE::VM::ImportOp importOp;
-};
-
-// TODO(benvanik): make a vm.rodata.table or something that returns the
-// offset/length and data buffers. We could then do a whole-program analysis to
-// build a single data table with multiple views into it.
 static std::pair<Value, Value> buildKeyTable(Location loc, ArrayAttr keysAttr,
                                              OpBuilder &builder) {
-  SmallVector<int32_t> table;
-  SmallVector<Attribute> dataAttrs;
-  size_t dataSize = 0;
-  for (auto key : keysAttr.getAsRange<StringAttr>()) {
-    table.push_back(dataSize);
-    table.push_back(key.size());
-    dataAttrs.push_back(key);
-    dataSize += key.size();
-  }
-  Value tableRodata = builder.create<IREE::VM::RodataInlineOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
-      builder.getI32VectorAttr(table));
-  Value stringRodata = builder.create<IREE::VM::RodataInlineOp>(
-      loc, IREE::VM::RefType::get(builder.getType<IREE::VM::BufferType>()),
-      IREE::Util::CompositeAttr::get(builder.getContext(), dataAttrs));
-  return {tableRodata, stringRodata};
+  auto tableOp = builder.create<IREE::VM::RodataTableInlineOp>(
+      loc, builder.getIntegerType(32), keysAttr);
+  return {tableOp.getTableResult(), tableOp.getDataResult()};
 }
 
 static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
@@ -144,6 +89,65 @@ static Value buildIndirectSpans(Location loc, ValueRange parameterOffsets,
 
   return clonedBuffer;
 }
+
+struct LoadOpConversion
+    : public OpConversionPattern<IREE::IO::Parameters::LoadOp> {
+  LoadOpConversion(MLIRContext *context, SymbolTable &importSymbols,
+                   TypeConverter &typeConverter, StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+  LogicalResult
+  matchAndRewrite(IREE::IO::Parameters::LoadOp loadOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto [keyTable, keyData] =
+        buildKeyTable(loadOp.getLoc(), adaptor.getSourceKeysAttr(), rewriter);
+    SmallVector<Value> targetOffsets(
+        adaptor.getSourceOffsets().size(),
+        rewriter.create<IREE::VM::ConstI64Op>(loadOp.getLoc(), 0));
+    auto spans =
+        buildIndirectSpans(loadOp.getLoc(), adaptor.getSourceOffsets(),
+                           targetOffsets, adaptor.getLengths(), rewriter);
+    auto bufferType =
+        IREE::VM::RefType::get(rewriter.getType<IREE::HAL::BufferType>());
+    auto listType = IREE::VM::RefType::get(IREE::VM::ListType::get(bufferType));
+    auto callOp = rewriter.create<IREE::VM::CallOp>(
+        loadOp.getLoc(), importOp.getSymNameAttr(),
+        TypeRange{
+            listType,
+        },
+        ValueRange{
+            adaptor.getDevice(),
+            adaptor.getQueueAffinity(),
+            adaptor.getWaitFence(),
+            adaptor.getSignalFence(),
+            getStringRodata(loadOp.getLoc(), adaptor.getSourceScopeAttr(),
+                            rewriter),
+            adaptor.getQueueAffinity(),
+            rewriter.create<IREE::VM::ConstI32Op>(
+                loadOp.getLoc(), (uint32_t)adaptor.getMemoryTypes()),
+            rewriter.create<IREE::VM::ConstI32Op>(
+                loadOp.getLoc(), (uint32_t)adaptor.getBufferUsage()),
+            keyTable,
+            keyData,
+            spans,
+        });
+    copyImportAttrs(importOp, callOp);
+    SmallVector<Value> buffers;
+    buffers.reserve(targetOffsets.size());
+    for (size_t i = 0; i < targetOffsets.size(); ++i) {
+      buffers.push_back(rewriter.create<IREE::VM::ListGetRefOp>(
+          loadOp.getLoc(), bufferType, callOp.getResult(0),
+          rewriter.create<IREE::VM::ConstI32Op>(loadOp.getLoc(), (int32_t)i)));
+    }
+    rewriter.replaceOp(loadOp, buffers);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
 
 struct GatherOpConversion
     : public OpConversionPattern<IREE::IO::Parameters::GatherOp> {

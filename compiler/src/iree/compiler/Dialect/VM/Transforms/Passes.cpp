@@ -22,10 +22,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
@@ -95,6 +92,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createConversionPass(targetOptions));
 
   // Hoist globals and get the final set that need to be initialized.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(createReifyRodataTablesPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createHoistInlinedRodataPass());
   passManager.addNestedPass<IREE::VM::ModuleOp>(createDeduplicateRodataPass());
   addCleanupPatterns(passManager);
@@ -138,7 +136,4 @@ void registerVMTransformPassPipeline() {
       });
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

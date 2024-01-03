@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -33,10 +32,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_CONVERTTOSTREAMPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 // Builds a stream.tensor.import op that imports an external tensor value into
@@ -183,16 +183,12 @@ struct GenericResourcePattern : public ConversionPattern {
   }
 };
 
-class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::tensor::TensorDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// --iree-stream-conversion
+//===----------------------------------------------------------------------===//
 
+struct ConvertToStreamPass final
+    : public IREE::Stream::impl::ConvertToStreamPassBase<ConvertToStreamPass> {
   void runOnOperation() override {
     auto *context = &getContext();
 
@@ -271,11 +267,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass() {
-  return std::make_unique<ConvertToStreamPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

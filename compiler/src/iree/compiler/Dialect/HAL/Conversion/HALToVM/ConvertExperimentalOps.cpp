@@ -8,18 +8,14 @@
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void populateHALExperimentalToVMPatterns(MLIRContext *context,
                                          SymbolTable &importSymbols,
                                          TypeConverter &typeConverter,
                                          RewritePatternSet &patterns) {
-  patterns.insert<VMImportOpConversion<IREE::HAL::ExSharedDeviceOp>>(
-      context, importSymbols, typeConverter, "hal.ex.shared_device");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExFileFromMemoryOp>>(
       context, importSymbols, typeConverter, "hal.ex.file.from_memory");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

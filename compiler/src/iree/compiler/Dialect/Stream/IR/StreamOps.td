@@ -644,6 +644,8 @@ def OpGroupParameterOps : OpDocGroup {
 let opDocGroup = OpGroupParameterOps in {
 
 def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
+  AttrSizedOperandSegments,
+  AllTypesMatch<["results"]>,
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
     "getAffinity",
     "setAffinity",
@@ -652,34 +654,36 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
   Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
-  let summary = [{reads a resource from a parameter scope}];
+  let summary = [{reads one or more resources from a parameter scope}];
   let description = [{
-    Asynchronously reads a resource from an external parameter provider and
-    returns the resulting stream resource. Depending on the resource type this
-    may alias existing cached storage or be directly mapped to the parameter
-    origin or result in a copy as if `stream.resource.alloca` and
-    `stream.parameter.read` had been used.
+    Asynchronously reads one or more resources from an external parameter
+    provider and returns the resulting stream resources. Depending on the
+    resource type this may alias existing cached storage or be directly mapped
+    to the parameter origin or result in a copy as if `stream.resource.alloca`
+    and `stream.parameter.read` had been used per parameter.
   }];
 
   let arguments = (ins
     OptionalAttr<StrAttr>:$source_scope,
-    StrAttr:$source_key,
-    I64:$source_offset,
-    Stream_Size:$result_size,
+    StrArrayAttr:$source_keys,
+    Variadic<I64>:$source_offsets,
+    Variadic<Stream_Size>:$result_sizes,
     Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
-    Stream_AnyStreamResource:$result,
+    Variadic<Stream_AnyStreamResource>:$results,
     Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
     (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
-    custom<ParameterReference>($source_scope, $source_key)
-    `` `[` $source_offset `]` `:`
-    type($result) `` `{` $result_size `}`
+    `{`
+    custom<ParameterLoadOperations>(
+        $source_scope, $source_keys, $source_offsets,
+        type($results), $result_sizes)
+    `}`
     `=` `` `>`
     type($result_timepoint)
     attr-dict-with-keyword
@@ -687,11 +691,13 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
-    Value getResultSize(unsigned idx) { return getResultSize(); }
+    Value getResultSize(unsigned idx) { return getResultSizes()[idx]; }
     SmallVector<Value> getAwaitTimepoints() {
       if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
     }
   }];
+
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -3965,8 +3971,9 @@ let opDocGroup = OpGroupExecutableOps in {
 def Stream_ExecutableOp : Stream_Op<"executable", [
   IsolatedFromAbove,
   SingleBlockImplicitTerminator<"IREE::Stream::ExecutableEndOp">,
-  NativeOpTrait<"SymbolTable">,
   Symbol,
+  SymbolTable,
+  Util_ObjectLike,
 ]> {
   let summary = [{generic executable module}];
   let description = [{
@@ -4059,8 +4066,8 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
-    Util_ShapeAwareOp,
-  ]> {
+  Util_ShapeAwareOp,
+]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
     Returns a subview to a tensor or memref-like type from a binding. The same
@@ -4087,6 +4094,113 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return getDynamicDims(); }
   }];
+}
+
+def Stream_DispatchWorkgroupIDOp : Stream_PureOp<"dispatch.workgroup.id", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID of the current workgroup in the range of
+    `[0, stream.dispatch.workgroup.count)` along each dimension.
+
+    Represented as a 3D grid classically written as XYZ.
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = stream.dispatch.workgroup.id[0] : index
+    %y = stream.dispatch.workgroup.id[1] : index
+    %z = stream.dispatch.workgroup.id[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs Stream_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let hasVerifier = 1;
+}
+
+def Stream_DispatchWorkgroupCountOp : Stream_PureOp<"dispatch.workgroup.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+
+    Represented as a 3D grid classically written as XYZ.
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = stream.dispatch.workgroup.count[0] : index
+    %y = stream.dispatch.workgroup.count[1] : index
+    %z = stream.dispatch.workgroup.count[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs Stream_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let hasVerifier = 1;
+}
+
+def Stream_DispatchWorkgroupSizeOp : Stream_PureOp<"dispatch.workgroup.size", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the size of each workgroup in invocations}];
+  let description = [{
+    The number of local invocations within the current workgroup along each
+    dimension. Depending on backend this may map to the SIMT thread count or
+    inner loop nest parameters.
+
+    Workgroup sizes are not determined at the stream dialect level as they are
+    dependent on the target backend determined when lowering into the HAL. It's
+    still possible to use the symbolic workgroup size inside of dispatch
+    executables as a placeholder for the resolved value once in the HAL.
+
+    Represented as a 3D grid classically written as XYZ.
+    Corresponds to the `WorkgroupSize` SPIR-V built-in and the `blockDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = stream.dispatch.workgroup.size[0] : index
+    %y = stream.dispatch.workgroup.size[1] : index
+    %z = stream.dispatch.workgroup.size[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs Stream_Dim:$result);
+
+  let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupExecutableOps

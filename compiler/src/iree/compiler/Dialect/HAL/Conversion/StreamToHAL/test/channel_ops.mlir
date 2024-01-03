@@ -3,7 +3,7 @@
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: () -> !hal.channel
 func.func @channel_create() -> !stream.channel {
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
+  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}} : !hal.device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"

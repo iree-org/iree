@@ -12,36 +12,28 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
-class VerifyTargetEnvironmentPass
-    : public PassWrapper<VerifyTargetEnvironmentPass, OperationPass<ModuleOp>> {
-public:
-  VerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry)
-      : targetRegistry(targetRegistry) {}
+#define GEN_PASS_DEF_VERIFYTARGETENVIRONMENTPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-  }
+namespace {
 
-  StringRef getArgument() const override {
-    return "iree-hal-verify-target-environment";
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-verify-target-environment
+//===----------------------------------------------------------------------===//
 
-  StringRef getDescription() const override {
-    return "Verifies that the target execution environment is valid.";
-  }
-
+struct VerifyTargetEnvironmentPass
+    : public IREE::HAL::impl::VerifyTargetEnvironmentPassBase<
+          VerifyTargetEnvironmentPass> {
+  using IREE::HAL::impl::VerifyTargetEnvironmentPassBase<
+      VerifyTargetEnvironmentPass>::VerifyTargetEnvironmentPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -67,7 +59,7 @@ public:
       diagnostic
           << "no HAL target devices specified on the module (available = [ ";
       for (const auto &targetName :
-           targetRegistry.getRegisteredTargetBackends()) {
+           targetRegistry->getRegisteredTargetBackends()) {
         diagnostic << "'" << targetName << "' ";
       }
       diagnostic << "])";
@@ -85,14 +77,14 @@ public:
       }
 
       auto targetBackend =
-          targetRegistry.getTargetBackend(targetAttr.getDeviceID().getValue());
+          targetRegistry->getTargetBackend(targetAttr.getDeviceID().getValue());
       if (!targetBackend) {
         auto diagnostic = moduleOp.emitError();
         diagnostic
             << "unregistered target backend " << targetAttr.getDeviceID()
             << "; ensure it is linked in to the compiler (available = [ ";
         for (const auto &targetName :
-             targetRegistry.getRegisteredTargetBackends()) {
+             targetRegistry->getRegisteredTargetBackends()) {
           diagnostic << "'" << targetName << "' ";
         }
         diagnostic << "])";
@@ -101,21 +93,8 @@ public:
       }
     }
   }
-
-  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createVerifyTargetEnvironmentPass(const TargetBackendRegistry &targetRegistry) {
-  return std::make_unique<VerifyTargetEnvironmentPass>(targetRegistry);
-}
+} // namespace
 
-static PassRegistration<VerifyTargetEnvironmentPass> pass([] {
-  return std::make_unique<VerifyTargetEnvironmentPass>(
-      TargetBackendRegistry::getGlobal());
-});
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

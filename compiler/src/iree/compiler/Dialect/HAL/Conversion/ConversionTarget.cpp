@@ -12,8 +12,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 HALConversionTarget::HALConversionTarget(MLIRContext *context,
                                          TypeConverter &typeConverter)
@@ -41,5 +40,4 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

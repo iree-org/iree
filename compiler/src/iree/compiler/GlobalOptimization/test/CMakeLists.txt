@@ -14,15 +14,25 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
+    "demote_contraction_inputs_to_bf16.mlir"
     "detach_elementwise_from_named_ops.mlir"
-    "expand_vectors.mlir"
+    "expand_tensor_shapes.mlir"
+    "flow_hoist_into_globals.mlir"
     "fuse_dequantization_matmul.mlir"
+    "fuse_silu_horizontal_matmul.mlir"
+    "generalize_named_ops.mlir"
+    "infer_numeric_narrowing.mlir"
     "lift_generic_to_transpose_batch_matmul.mlir"
     "materialize_homogeneous_encodings.mlir"
+    "optimize_numerics.mlir"
+    "propagate_linalg_transpose.mlir"
+    "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
     "set_encoding.mlir"
     "transformation_pipeline.mlir"
+    "transpose_and_decompose_concat.mlir"
   TOOLS
     FileCheck
     iree-opt

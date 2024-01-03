@@ -10,10 +10,7 @@
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Vulkan {
+namespace mlir::iree_compiler::IREE::Vulkan {
 
 /// Returns the Vulkan target environment attribute for the given GPU triple.
 Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
@@ -34,9 +31,6 @@ Vulkan::TargetEnvAttr getTargetEnvForTriple(MLIRContext *context,
 /// domains.
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv);
 
-} // namespace Vulkan
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Vulkan
 
 #endif // IREE_COMPILER_DIALECT_VULKAN_UTILS_TARGETENVIRONMENT_H_

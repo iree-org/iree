@@ -15,10 +15,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser/Parser.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 namespace Loader {
 
 namespace {
@@ -58,7 +55,4 @@ HALLoaderDialect::HALLoaderDialect(MLIRContext *context)
 }
 
 } // namespace Loader
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

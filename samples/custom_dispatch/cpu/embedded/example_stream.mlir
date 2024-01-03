@@ -131,7 +131,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
         // particular workgroup is in the grid. In this example we use a
         // workgroup size of 64x1x1 (which is exceedingly small for CPUs but
         // useful for demonstration).
-        %workgroup_id_x = flow.dispatch.workgroup.id[0] : index
+        %workgroup_id_x = stream.dispatch.workgroup.id[0] : index
         %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
         // Bindings are accessed by reference.
@@ -165,7 +165,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
           %dim: index) {
         %c0 = arith.constant 0 : index
 
-        %workgroup_id_x = flow.dispatch.workgroup.id[0] : index
+        %workgroup_id_x = stream.dispatch.workgroup.id[0] : index
         %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
         // Same as above but note that we're treating %binding1 as read/write.

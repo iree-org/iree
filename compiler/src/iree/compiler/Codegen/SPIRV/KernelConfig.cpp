@@ -7,11 +7,12 @@
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -40,8 +41,7 @@ constexpr unsigned numTilesPerSubgroupDimK = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clSPIRVEnableTransformDialectJit(
     "iree-spirv-enable-transform-dialect-jit",
@@ -64,10 +64,14 @@ bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
   // They should go down different pipelines.
   int nonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  SmallVector<utils::IteratorType, 4> kinds = linalgOp.getIteratorTypesArray();
-  for (auto [kind, bound] : llvm::zip(kinds, bounds)) {
-    if (kind == utils::IteratorType::parallel)
-      nonUnitParallelDimCount += bound != 1;
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  assert(succeeded(contractionDims) && "Could not infer contraction dims");
+  for (auto mDim : contractionDims->m) {
+    nonUnitParallelDimCount += bounds[mDim] != 1;
+  }
+  for (auto nDim : contractionDims->n) {
+    nonUnitParallelDimCount += bounds[nDim] != 1;
   }
   return nonUnitParallelDimCount > 1;
 }
@@ -82,7 +86,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
 
   auto getResultBits = [](linalg::LinalgOp linalgOp) {
     auto shapedType = llvm::cast<ShapedType>(linalgOp->getResult(0).getType());
-    return shapedType.getElementType().getIntOrFloatBitWidth();
+    return IREE::Util::getTypeBitWidth(shapedType.getElementType());
   };
   auto matmulResultBits = getResultBits(matmul);
 
@@ -633,7 +637,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   auto lhsType = llvm::cast<ShapedType>(lhs->get().getType());
   auto rhsType = llvm::cast<ShapedType>(rhs->get().getType());
   auto elementBits =
-      static_cast<int>(lhsType.getElementType().getIntOrFloatBitWidth());
+      static_cast<int>(IREE::Util::getTypeBitWidth(lhsType.getElementType()));
   if (!llvm::is_contained({8, 16, 32}, elementBits))
     return failure();
 
@@ -1087,7 +1091,7 @@ LogicalResult setCooperativeMatrixConfig(
   auto usedBytes =
       getTileBytes(workgroupTileSizes[mIndex], workgroupTileSizes[nIndex],
                    reductionTileSizes[kIndex],
-                   getElementType(lhs).getIntOrFloatBitWidth(), promoteC);
+                   IREE::Util::getTypeBitWidth(getElementType(lhs)), promoteC);
 
   while (pipelineDepth > 0 &&
          getMultiBufferMemoryUsage(usedBytes, pipelineDepth, storeStage) >
@@ -1165,7 +1169,7 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
-                                        linalg::GenericOp op) {
+                                        linalg::LinalgOp op) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce config as reduction...\n");
 
   // This pipeline eventually generates non-uniform group shuffle ops, which
@@ -1273,10 +1277,10 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     return failure();
 
   const Type elementType =
-      llvm::cast<ShapedType>(op.getOutputs()[0].getType()).getElementType();
+      llvm::cast<ShapedType>(op.getDpsInits()[0].getType()).getElementType();
   if (!elementType.isIntOrFloat())
     return failure();
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
+  unsigned bitWidth = IREE::Util::getTypeBitWidth(elementType);
   // Reduction distribution only supports 8/16/32 bit types now.
   if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
     return failure();
@@ -1396,11 +1400,12 @@ static int getReductionTilingFactor(int64_t dimSize) {
 static int64_t getMinElementBitwidth(linalg::LinalgOp linalgOp) {
   unsigned bitwidth = std::numeric_limits<unsigned>::max();
   for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
-    unsigned b = getElementTypeOrSelf(operand->get()).getIntOrFloatBitWidth();
+    unsigned b =
+        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(operand->get()));
     bitwidth = std::min(bitwidth, b);
   }
   for (Value result : linalgOp.getDpsInits()) {
-    unsigned b = getElementTypeOrSelf(result).getIntOrFloatBitWidth();
+    unsigned b = IREE::Util::getTypeBitWidth(getElementTypeOrSelf(result));
     bitwidth = std::min(bitwidth, b);
   }
   return bitwidth;
@@ -1472,7 +1477,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto elementHasPowerOfTwoBitwidth = [](Value operand) {
     Type elementType = getElementTypeOrSelf(operand.getType());
     return isa<IntegerType, FloatType>(elementType) &&
-           llvm::isPowerOf2_64(elementType.getIntOrFloatBitWidth());
+           llvm::isPowerOf2_64(IREE::Util::getTypeBitWidth(elementType));
   };
 
   // Whether we can try to use the vectorization pipeline.
@@ -1726,13 +1731,13 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   // distributes/vectorizes.
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([&](auto op) {
         // Try to tile and vectorize first. It's common to see 32 threads
         // per subgroup for GPUs.
         std::array<int64_t, 2> workgroupXY = {32, 2};
         std::array<int64_t, 3> threadMNK;
         auto inputType = llvm::cast<ShapedType>(op.getInputs()[0].getType());
-        if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+        if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
           threadMNK = {8, 8, 8};
         } else {
           threadMNK = {8, 8, 4};
@@ -1740,6 +1745,11 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
         auto result =
             detail::setMatmulOpConfig(limits, op, workgroupXY, threadMNK);
         if (succeeded(result))
+          return success();
+
+        LLVM_DEBUG(llvm::dbgs()
+                   << "failed to set matmul op config, trying reduction\n");
+        if (succeeded(setReductionConfig(targetEnv, op)))
           return success();
 
         // If unsuccessful, try to tile and distribute.
@@ -1870,5 +1880,4 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

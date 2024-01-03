@@ -11,8 +11,7 @@
 #include "mlir/IR/DialectInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // An interface for dialects to expose HAL conversion functionality.
 // The HAL conversion pass will query used dialects via this interface to find
@@ -43,7 +42,6 @@ public:
   }
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_CONVERSIONDIALECTINTERFACE_H_

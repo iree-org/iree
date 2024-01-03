@@ -13,8 +13,8 @@
 #include "mlir/TableGen/GenInfo.h"
 #include "mlir/TableGen/Operator.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 using ::llvm::formatv;
@@ -29,7 +29,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   auto opcodes = recordKeeper.getAllDerivedDefinitions("VM_OPC");
   for (const auto *opcode : opcodes) {
     auto symbol = opcode->getValueAsString("symbol");
-    if (symbol.startswith("Prefix")) {
+    if (symbol.starts_with("Prefix")) {
       prefixOpcodes[symbol] = opcode->getValueAsInt("value");
     }
   }
@@ -100,5 +100,5 @@ static GenRegistration
                        });
 
 } // namespace
-} // namespace iree_compiler
-} // namespace mlir
+
+} // namespace mlir::iree_compiler

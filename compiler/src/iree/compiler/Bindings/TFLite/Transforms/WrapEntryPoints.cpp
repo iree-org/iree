@@ -22,10 +22,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace TFLite {
+namespace mlir::iree_compiler::IREE::TFLite {
 
 // Wraps each model entry point in a "_tflite_xx" function that matches the
 // expectations of the IREE TFLite C bindings and materializes shape query and
@@ -652,7 +649,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createWrapEntryPointsPass() {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-} // namespace TFLite
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::TFLite

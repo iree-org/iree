@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
@@ -20,8 +20,7 @@
 
 #define DEBUG_TYPE "iree-codegen-remove-trivial-loops"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Converts a symbolic GPU processor dimension to its numeric one.
 static unsigned dimToIndex(gpu::Dimension dim) {
@@ -131,5 +130,4 @@ createRemoveSingleIterationLoopPass() {
   return std::make_unique<RemoveSingleIterationLoopPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

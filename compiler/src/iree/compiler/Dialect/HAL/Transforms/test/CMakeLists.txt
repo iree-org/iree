@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "assign_target_devices.mlir"
-    "benchmark_batch_dispatches.mlir"
     "convert_to_hal.mlir"
     "dump_executable_benchmarks.mlir"
     "dump_executable_sources.mlir"
@@ -26,7 +25,9 @@ iree_lit_test_suite(
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
     "preprocess_executables.mlir"
+    "repeat_dispatches.mlir"
     "resolve_export_ordinals.mlir"
+    "strip_executable_contents.mlir"
     "substitute_executables.mlir"
     "verify_target_environment.mlir"
   TOOLS

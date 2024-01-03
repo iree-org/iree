@@ -15,11 +15,11 @@
 
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
@@ -42,13 +42,17 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
 FailureOr<linalg::TileSizeComputationFunction>
 getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
 
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<scf::SCFTileSizeComputationFunction>
+getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
+
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.
 template <typename GPUIdOp, typename GPUCountOp>
 SmallVector<linalg::ProcInfo, 2>
 getGPUProcessorIdsAndCounts(OpBuilder &builder, Location loc, unsigned numDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif //  IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_

@@ -81,3 +81,8 @@ iree_runtime_cc_library(
     name = "cpu_data",
     hdrs = cpu_data_headers,
 )
+
+iree_runtime_cc_library(
+    name = "parameter_archive",
+    hdrs = ["parameter_archive.h"],
+)

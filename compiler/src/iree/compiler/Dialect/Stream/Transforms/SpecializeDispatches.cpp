@@ -8,7 +8,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/ADT/BitVector.h"
@@ -25,10 +24,11 @@
 
 #define DEBUG_TYPE "iree-stream-specialize-dispatches"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_SPECIALIZEDISPATCHESPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -326,20 +326,12 @@ specializeDispatches(IREE::Stream::ExecutableOp executableOp,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-specialize-dispatches
+// --iree-stream-specialize-dispatches
 //===----------------------------------------------------------------------===//
 
-class SpecializeDispatchesPass
-    : public SpecializeDispatchesBase<SpecializeDispatchesPass> {
-public:
-  SpecializeDispatchesPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::tensor::TensorDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-  }
-
+struct SpecializeDispatchesPass
+    : public IREE::Stream::impl::SpecializeDispatchesPassBase<
+          SpecializeDispatchesPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
@@ -369,12 +361,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSpecializeDispatchesPass() {
-  return std::make_unique<SpecializeDispatchesPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

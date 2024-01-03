@@ -27,10 +27,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // Enum utilities
@@ -221,6 +218,13 @@ Value BufferViewType::inferSizeFromValue(Location loc, Value value,
           loc, builder.getType<IREE::HAL::BufferType>(), value));
 }
 
+// static
+Value DeviceType::resolveAny(Location loc, OpBuilder &builder) {
+  Value deviceIndex = builder.create<arith::ConstantIndexOp>(loc, 0);
+  return builder.create<IREE::HAL::DevicesGetOp>(
+      loc, builder.getType<IREE::HAL::DeviceType>(), deviceIndex);
+}
+
 //===----------------------------------------------------------------------===//
 // #hal.device.target
 //===----------------------------------------------------------------------===//
@@ -267,10 +271,6 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
 
 std::string DeviceTargetAttr::getSymbolNameFragment() {
   return sanitizeSymbolName(getDeviceID().getValue().lower());
-}
-
-Attribute DeviceTargetAttr::getMatchExpression() {
-  return DeviceMatchIDAttr::get(*this);
 }
 
 bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
@@ -508,12 +508,8 @@ void ExecutableTargetAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-std::string ExecutableTargetAttr::getSymbolNameFragment() {
+std::string ExecutableTargetAttr::getSymbolNameFragment() const {
   return sanitizeSymbolName(getFormat().getValue().lower());
-}
-
-Attribute ExecutableTargetAttr::getMatchExpression() {
-  return DeviceMatchExecutableFormatAttr::get(getContext(), getFormat());
 }
 
 bool ExecutableTargetAttr::hasConfigurationAttr(StringRef name) {
@@ -882,213 +878,6 @@ AffinityQueueAttr::joinAND(IREE::Stream::AffinityAttr other) const {
 }
 
 //===----------------------------------------------------------------------===//
-// #hal.match.*
-//===----------------------------------------------------------------------===//
-
-Value MatchAlwaysAttr::buildConditionExpression(Location loc, Value value,
-                                                OpBuilder builder) const {
-  // #hal.match.always -> true
-  return builder.createOrFold<arith::ConstantIntOp>(loc, /*value=*/1,
-                                                    /*width=*/1);
-}
-
-static ArrayAttr parseMultiMatchAttrArray(AsmParser &p) {
-  auto b = p.getBuilder();
-  SmallVector<Attribute> conditionAttrs;
-  if (failed(p.parseLess()) || failed(p.parseLSquare())) {
-    return {};
-  }
-  do {
-    Attribute conditionAttr;
-    if (failed(p.parseAttribute(conditionAttr))) {
-      return {};
-    }
-    conditionAttrs.push_back(conditionAttr);
-  } while (succeeded(p.parseOptionalComma()));
-  if (failed(p.parseRSquare()) || failed(p.parseGreater())) {
-    return {};
-  }
-  return b.getArrayAttr(conditionAttrs);
-}
-
-static void printMultiMatchAttrList(ArrayAttr conditionAttrs, AsmPrinter &p) {
-  auto &os = p.getStream();
-  os << "<[";
-  interleaveComma(conditionAttrs, os,
-                  [&](Attribute condition) { os << condition; });
-  os << "]>";
-}
-
-// static
-Attribute MatchAnyAttr::parse(AsmParser &p, Type type) {
-  return get(p.getContext(), parseMultiMatchAttrArray(p));
-}
-
-void MatchAnyAttr::print(AsmPrinter &p) const {
-  printMultiMatchAttrList(getConditions(), p);
-}
-
-Value MatchAnyAttr::buildConditionExpression(Location loc, Value value,
-                                             OpBuilder builder) const {
-  // #hal.match.any<[a, b, c]> -> or(or(a, b), c)
-  if (getConditions().empty()) {
-    // Empty returns false (no conditions match).
-    return builder.create<arith::ConstantIntOp>(loc, /*value=*/0, /*width=*/1);
-  }
-  auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
-    return llvm::cast<MatchAttrInterface>(attr).buildConditionExpression(
-        loc, value, builder);
-  });
-  Value resultValue;
-  for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<arith::OrIOp>(
-                                    loc, resultValue, conditionValue)
-                              : conditionValue;
-  }
-  return resultValue;
-}
-
-// static
-Attribute MatchAllAttr::parse(AsmParser &p, Type type) {
-  return get(p.getContext(), parseMultiMatchAttrArray(p));
-}
-
-void MatchAllAttr::print(AsmPrinter &p) const {
-  printMultiMatchAttrList(getConditions(), p);
-}
-
-Value MatchAllAttr::buildConditionExpression(Location loc, Value value,
-                                             OpBuilder builder) const {
-  // #hal.match.all<[a, b, c]> -> and(and(a, b), c)
-  if (getConditions().empty()) {
-    // Empty returns true (all 0 conditions match).
-    return builder.create<arith::ConstantIntOp>(loc, /*value=*/1, /*width=*/1);
-  }
-  auto conditionValues = llvm::map_range(getConditions(), [&](Attribute attr) {
-    return llvm::cast<MatchAttrInterface>(attr).buildConditionExpression(
-        loc, value, builder);
-  });
-  Value resultValue;
-  for (auto conditionValue : conditionValues) {
-    resultValue = resultValue ? builder.createOrFold<arith::AndIOp>(
-                                    loc, resultValue, conditionValue)
-                              : conditionValue;
-  }
-  return resultValue;
-}
-
-// static
-Attribute DeviceMatchIDAttr::parse(AsmParser &p, Type type) {
-  StringAttr patternAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), patternAttr);
-}
-
-void DeviceMatchIDAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(getPattern());
-  os << ">";
-}
-
-Value DeviceMatchIDAttr::buildConditionExpression(Location loc, Value device,
-                                                  OpBuilder builder) const {
-  auto i1Type = builder.getI1Type();
-  return builder
-      .create<IREE::HAL::DeviceQueryOp>(
-          loc, i1Type, i1Type, device, builder.getStringAttr("hal.device.id"),
-          getPattern(), builder.getZeroAttr(i1Type))
-      .getValue();
-}
-
-// static
-Attribute DeviceMatchFeatureAttr::parse(AsmParser &p, Type type) {
-  StringAttr patternAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), patternAttr);
-}
-
-void DeviceMatchFeatureAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(getPattern());
-  os << ">";
-}
-
-Value DeviceMatchFeatureAttr::buildConditionExpression(
-    Location loc, Value device, OpBuilder builder) const {
-  auto i1Type = builder.getI1Type();
-  return builder
-      .create<IREE::HAL::DeviceQueryOp>(
-          loc, i1Type, i1Type, device,
-          builder.getStringAttr("hal.device.feature"), getPattern(),
-          builder.getZeroAttr(i1Type))
-      .getValue();
-}
-
-// static
-Attribute DeviceMatchArchitectureAttr::parse(AsmParser &p, Type type) {
-  StringAttr patternAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), patternAttr);
-}
-
-void DeviceMatchArchitectureAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(getPattern());
-  os << ">";
-}
-
-Value DeviceMatchArchitectureAttr::buildConditionExpression(
-    Location loc, Value device, OpBuilder builder) const {
-  auto i1Type = builder.getI1Type();
-  return builder
-      .create<IREE::HAL::DeviceQueryOp>(
-          loc, i1Type, i1Type, device,
-          builder.getStringAttr("hal.device.architecture"), getPattern(),
-          builder.getZeroAttr(i1Type))
-      .getValue();
-}
-
-// static
-Attribute DeviceMatchExecutableFormatAttr::parse(AsmParser &p, Type type) {
-  StringAttr patternAttr;
-  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(p.getContext(), patternAttr);
-}
-
-void DeviceMatchExecutableFormatAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  p.printAttribute(getPattern());
-  os << ">";
-}
-
-Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
-    Location loc, Value device, OpBuilder builder) const {
-  auto i1Type = builder.getI1Type();
-  return builder
-      .create<IREE::HAL::DeviceQueryOp>(
-          loc, i1Type, i1Type, device,
-          builder.getStringAttr("hal.executable.format"), getPattern(),
-          builder.getZeroAttr(i1Type))
-      .getValue();
-}
-
-//===----------------------------------------------------------------------===//
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
@@ -1202,7 +991,4 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   }
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -11,8 +11,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Populates conversion patterns from the hal_loader dialect to the VM dialect.
 void populateHALLoaderToVMPatterns(MLIRContext *context,
@@ -21,7 +20,6 @@ void populateHALLoaderToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    RewritePatternSet &patterns);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_MODULES_HAL_LOADER_CONVERSION_HALLOADERTOVM_PATTERNS_H_

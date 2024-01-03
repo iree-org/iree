@@ -44,9 +44,9 @@ class CheckTest : public ::testing::Test {
     }
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
         hal_driver, iree_allocator_system(), &device_));
-    IREE_ASSERT_OK(
-        iree_hal_module_create(instance_, device_, IREE_HAL_MODULE_FLAG_NONE,
-                               iree_allocator_system(), &hal_module_));
+    IREE_ASSERT_OK(iree_hal_module_create(
+        instance_, /*device_count=*/1, &device_, IREE_HAL_MODULE_FLAG_NONE,
+        iree_allocator_system(), &hal_module_));
     iree_hal_driver_release(hal_driver);
 
     IREE_ASSERT_OK(iree_check_module_create(instance_, iree_allocator_system(),

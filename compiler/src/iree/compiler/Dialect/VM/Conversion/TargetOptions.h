@@ -10,10 +10,7 @@
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Controls VM translation targets.
 struct TargetOptions {
@@ -36,9 +33,6 @@ struct TargetOptions {
   using FromFlags = OptionsFromFlags<TargetOptions>;
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_TARGETOPTIONS_H_

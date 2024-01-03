@@ -18,10 +18,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 class SinkDefiningOpsPass
     : public PassWrapper<SinkDefiningOpsPass, OperationPass<ModuleOp>> {
@@ -90,7 +87,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createSinkDefiningOpsPass() {
 
 static PassRegistration<SinkDefiningOpsPass> pass;
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

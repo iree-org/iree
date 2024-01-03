@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 //===---------------------------------------------------------------------===//
-// SPIRV passes (keep alphabetical)
+// SPIR-V passes (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
 def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
@@ -56,6 +56,24 @@ def SPIRVEraseStorageBufferStaticShape :
     Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
   let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
   let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
+}
+
+def SPIRVFinalVectorLowering : Pass<
+    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
+}
+
+def SPIRVInitialVectorLowering : Pass<
+    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
+  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
+  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
+}
+
+def SPIRVLinkExecutables :
+    Pass<"iree-spirv-link-executables", "mlir::ModuleOp"> {
+  let summary = "Links SPIR-V HAL executables within the top-level program module.";
+  let constructor = "mlir::iree_compiler::createSPIRVLinkExecutablesPass()";
 }
 
 def SPIRVLowerExecutableTarget :
@@ -115,16 +133,14 @@ def SPIRVTileToCooperativeOps : Pass<
     "mlir::iree_compiler::createSPIRVTileToCooperativeOpsPass()";
 }
 
-def SPIRVInitialVectorLowering : Pass<
-    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
-  let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
-  let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
-}
-
-def SPIRVFinalVectorLowering : Pass<
-    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
-  let summary = "Perform final lowering of vectors ops to fit SPIR-V";
-  let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
+def SPIRVTrimExecutableTargetEnv :
+    Pass<"iree-spirv-trim-executable-target-env",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Trim the SPIR-V target environment of a HAL executable "
+                "variant to the minimal requirement per the compiled "
+                "spirv.module op needs";
+  let constructor =
+    "mlir::iree_compiler::createSPIRVTrimExecutableTargetEnvPass()";
 }
 
 def SPIRVVectorizeLoadStore :

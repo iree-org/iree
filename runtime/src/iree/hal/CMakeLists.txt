@@ -23,6 +23,8 @@ iree_cc_library(
     "buffer.h"
     "buffer_heap.c"
     "buffer_heap_impl.h"
+    "buffer_transfer.c"
+    "buffer_transfer.h"
     "buffer_view.c"
     "buffer_view.h"
     "buffer_view_util.c"

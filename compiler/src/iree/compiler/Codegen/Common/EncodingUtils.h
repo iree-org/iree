@@ -11,8 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Container of information needed to materialize the pack operation.
 struct MaterializeEncodingInfo {
@@ -83,11 +82,29 @@ RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
 /// Returns the RankedTensorType without encodings.
 RankedTensorType dropEncoding(RankedTensorType type);
 
+/// Returns the integer contained in an IntegerAttr, or zero if it has none.
+int64_t getIntOrZero(IntegerAttr a);
+
 /// Returns true if encoding user is one of matmul encodings.
 bool isMatmulEncodingUser(IREE::LinalgExt::EncodingUser user);
 
-/// Returns if encoding user is one of batch matmul encodings.
+/// Returns true if encoding user is one of batch matmul encodings.
 bool isBatchMatmulEncodingUser(IREE::LinalgExt::EncodingUser user);
+
+/// Returns true if the encoding is a vecmat.
+bool isVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a matvec.
+bool isMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a batch_vecmat.
+bool isBatchVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoding is a batch_matvec.
+bool isBatchMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns true if the encoded type is a vector.
+bool isVectorEncoding(int64_t rank, IREE::LinalgExt::EncodingUser user);
 
 struct TileMxNxK {
   int64_t M = 1;
@@ -96,12 +113,8 @@ struct TileMxNxK {
 };
 
 MaterializeEncodingInfo
-getEncodingInfoForMatmul(IREE::LinalgExt::EncodingUser user,
-                         IREE::LinalgExt::EncodingRole role,
+getEncodingInfoForMatmul(IREE::LinalgExt::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
-
-MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
@@ -111,6 +124,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 void populateMaterializeUpperBoundTileSizePatterns(
     RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
+
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_

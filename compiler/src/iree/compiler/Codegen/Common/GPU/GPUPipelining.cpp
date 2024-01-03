@@ -26,8 +26,7 @@
 // Pass to pipeline copy to shared memory for matmul op.
 //====---------------------------------------------------------------------===//
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
 static const StringLiteral kPipeliningFirstStage = "__pipelining_first_stage__";
@@ -718,5 +717,4 @@ createGPUPipeliningPass(bool epiloguePeeling, unsigned depth,
   return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth, schedule);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

@@ -10,10 +10,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "tint/tint.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 std::optional<std::string>
 compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary) {
@@ -55,7 +52,4 @@ compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary) {
   return result.wgsl;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

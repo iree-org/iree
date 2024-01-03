@@ -14,10 +14,13 @@
 #include "./vm.h"
 #include "iree/base/internal/file_io.h"
 #include "iree/base/internal/path.h"
-#include "iree/io/formats/gguf/gguf_format.h"
-#include "iree/io/formats/safetensors/safetensors_format.h"
+#include "iree/io/formats/gguf/gguf_parser.h"
+#include "iree/io/formats/irpa/irpa_builder.h"
+#include "iree/io/formats/irpa/irpa_parser.h"
+#include "iree/io/formats/safetensors/safetensors_parser.h"
 #include "iree/io/parameter_index_provider.h"
 #include "iree/modules/io/parameters/module.h"
+#include "iree/schemas/parameter_archive.h"
 
 namespace iree::python {
 
@@ -101,13 +104,18 @@ void ParameterIndexParseFileHandle(ParameterIndex &self,
     CheckApiStatus(
         iree_io_parse_gguf_index(file_handle.raw_ptr(), self.raw_ptr()),
         "Could not parse gguf file into index");
+  } else if (format == "irpa") {
+    CheckApiStatus(
+        iree_io_parse_irpa_index(file_handle.raw_ptr(), self.raw_ptr()),
+        "Could not parse IREE parameter archive file into index");
   } else if (format == "safetensors") {
     CheckApiStatus(
         iree_io_parse_safetensors_index(file_handle.raw_ptr(), self.raw_ptr()),
         "Could not parse safetensors file into index");
   } else {
     throw std::invalid_argument(
-        "Unrecognized file format. Expected one of: 'gguf', 'safetensors'");
+        "Unrecognized file format. Expected one of: 'gguf', 'irpa', "
+        "'safetensors'");
   }
 }
 
@@ -261,7 +269,74 @@ void SetupIoBindings(py::module_ &m) {
             return ParameterProvider::StealFromRawPtr(created);
           },
           py::arg("scope") = std::string(),
-          py::arg("max_concurrent_operations") = py::none());
+          py::arg("max_concurrent_operations") = py::none())
+      .def(
+          "create_archive_file",
+          [](ParameterIndex &self, std::string file_path,
+             iree_io_physical_offset_t file_offset,
+             ParameterIndex *explicit_target_index) {
+            // If no target index was given, RAII manage a local target index.
+            iree_io_parameter_index_t *target_index = nullptr;
+            ParameterIndex default_target_index;
+            if (explicit_target_index) {
+              target_index = explicit_target_index->raw_ptr();
+            } else {
+              iree_io_parameter_index_t *created;
+              CheckApiStatus(iree_io_parameter_index_create(
+                                 iree_allocator_system(), &created),
+                             "Could not create IO parameter index");
+              default_target_index = ParameterIndex::StealFromRawPtr(created);
+              target_index = default_target_index.raw_ptr();
+            }
+
+            // Open the file via callback.
+            struct OpenParams {
+              const char *path;
+            };
+            OpenParams file_open_user_data{file_path.c_str()};
+            auto file_open_callback =
+                +[](void *user_data, iree_io_physical_offset_t archive_offset,
+                    iree_io_physical_size_t archive_length,
+                    iree_io_file_handle_t **out_file_handle) -> iree_status_t {
+              OpenParams *params = static_cast<OpenParams *>(user_data);
+              iree_file_contents_t *file_contents = NULL;
+              IREE_RETURN_IF_ERROR(iree_file_create_mapped(
+                  params->path, archive_offset + archive_length, archive_offset,
+                  (iree_host_size_t)archive_length, iree_allocator_system(),
+                  &file_contents));
+              iree_io_file_handle_release_callback_t release_callback;
+              memset(&release_callback, 0, sizeof(release_callback));
+              release_callback.fn =
+                  +[](void *user_data,
+                      iree_io_file_handle_primitive_t handle_primitive) {
+                    iree_file_contents_free(
+                        static_cast<iree_file_contents_t *>(user_data));
+                  };
+              release_callback.user_data = file_contents;
+              iree_status_t status = iree_io_file_handle_wrap_host_allocation(
+                  IREE_IO_FILE_ACCESS_WRITE, file_contents->buffer,
+                  release_callback, iree_allocator_system(), out_file_handle);
+              if (!iree_status_is_ok(status)) {
+                iree_file_contents_free(file_contents);
+              }
+              return status;
+            };
+
+            // Write the archive.
+            CheckApiStatus(iree_io_build_parameter_archive(
+                               self.raw_ptr(), target_index,
+                               iree_io_parameter_archive_file_open_callback_t{
+                                   file_open_callback,
+                                   &file_open_user_data,
+                               },
+                               file_offset, iree_allocator_system()),
+                           "Error building parameter archive");
+
+            // Return the target index.
+            return ParameterIndex::BorrowFromRawPtr(target_index);
+          },
+          py::arg("file_path"), py::arg("file_offset") = 0,
+          py::arg("target_index") = nullptr);
 }
 
 }  // namespace iree::python

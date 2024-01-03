@@ -12,7 +12,7 @@
 
 #include "experimental/webgpu/webgpu_device.h"
 #include "iree/base/api.h"
-#include "iree/hal/utils/buffer_transfer.h"
+#include "iree/hal/buffer_transfer.h"
 
 // TODO(benvanik): decouple via injection.
 #include "experimental/webgpu/simple_allocator.h"

@@ -20,10 +20,7 @@
 #include "llvm/TargetParser/X86TargetParser.h"
 #include "mlir/IR/Builders.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
@@ -515,7 +512,4 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
   return targetOptions;
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

@@ -49,7 +49,6 @@ iree_compiler_cc_library(
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
-        "HALTraits.h",
         "HALTypes.h",
     ],
     textual_hdrs = [

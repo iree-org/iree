@@ -11,10 +11,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 class DropCompilerHintsPass
     : public DropCompilerHintsBase<DropCompilerHintsPass> {
@@ -33,7 +30,4 @@ std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
