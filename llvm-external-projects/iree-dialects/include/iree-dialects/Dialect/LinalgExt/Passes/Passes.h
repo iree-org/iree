@@ -118,19 +118,21 @@ createTileAndDecomposeWinogradTransformPass();
 std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 
 // Transform dialect version of tile and decompose attention wrapper.
+// The optional tile size specifies the step for the innermost for loop.
 void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                SmallVectorImpl<Operation *> &ops,
                                RewriterBase &rewriter, bool onlyTile = false,
-                               uint64_t tileSize = 0);
+                               std::optional<uint64_t> tileSize = std::nullopt);
 
-IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
-                                           SmallVectorImpl<Operation *> &ops,
-                                           RewriterBase &rewriter,
-                                           uint64_t tileSize = 0);
+IREE::LinalgExt::AttentionOp
+tileAttention(IREE::LinalgExt::AttentionOp attnOp,
+              SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
+              std::optional<uint64_t> tileSize = std::nullopt);
 
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
-                             RewriterBase &rewriter, uint64_t tileSize = 0);
+                             RewriterBase &rewriter,
+                             std::optional<uint64_t> tileSize = std::nullopt);
 
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.

@@ -338,7 +338,7 @@ static Value insertOutputSlice(Value src, Value dst,
 IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
                                            SmallVectorImpl<Operation *> &ops,
                                            RewriterBase &rewriter,
-                                           uint64_t tileSize) {
+                                           std::optional<uint64_t> tileSize) {
   Location loc = attnOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(attnOp);
@@ -353,10 +353,10 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   OpFoldResult sequenceTileLength = queryDimValues[1];
   OpFoldResult keyValueTileLength = sequenceTileLength;
   SmallVector<int64_t> keyShape{queryShape};
-  if (tileSize > 0) {
-    keyValueTileLength = rewriter.getIndexAttr(tileSize);
+  if (tileSize) {
+    keyValueTileLength = rewriter.getIndexAttr(tileSize.value());
     for (auto it : llvm::enumerate(attnOp.getKeyType().getShape())) {
-      keyShape[it.index()] = it.index() == 1 ? tileSize : it.value();
+      keyShape[it.index()] = it.index() == 1 ? tileSize.value() : it.value();
     }
   }
 
@@ -463,7 +463,8 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 /// TODO: Adopt decomposeOperation with this.
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
-                             RewriterBase &rewriter, uint64_t tileSize) {
+                             RewriterBase &rewriter,
+                             std::optional<uint64_t> tileSize) {
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();
@@ -482,7 +483,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   OpFoldResult headDimension = queryDimValues[1];
   OpFoldResult sequenceTileLength = queryDimValues[0];
   OpFoldResult keyValueTileLength =
-      tileSize == 0 ? sequenceTileLength : rewriter.getIndexAttr(tileSize);
+      tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
   auto [result, newMax, newSum] =
@@ -498,7 +499,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                SmallVectorImpl<Operation *> &ops,
                                RewriterBase &rewriter, bool onlyTile,
-                               uint64_t tileSize) {
+                               std::optional<uint64_t> tileSize) {
   IREE::LinalgExt::AttentionOp tiledAttentionOp =
       tileAttention(attnOp, ops, rewriter, tileSize);
   if (onlyTile)
@@ -536,7 +537,7 @@ namespace {
 ///
 ///
 LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile,
-                                      uint64_t tileSize) {
+                                      std::optional<uint64_t> tileSize) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
     SmallVector<Operation *> ops;
@@ -572,7 +573,11 @@ struct TileAndDecomposeAttentionPass
 void TileAndDecomposeAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
-  if (failed(reifyAttentionTransform(getOperation(), onlyTile, tileSize)))
+  std::optional<uint64_t> optionalTileSize{std::nullopt};
+  if (tileSize.hasValue())
+    optionalTileSize = tileSize.getValue();
+  if (failed(
+          reifyAttentionTransform(getOperation(), onlyTile, optionalTileSize)))
     return signalPassFailure();
 }
 
