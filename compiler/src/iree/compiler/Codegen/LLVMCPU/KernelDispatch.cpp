@@ -246,6 +246,8 @@ static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   if (!elementType.isIntOrFloat())
     return 1;
   unsigned byteWidth = IREE::Util::getRoundedElementByteWidth(elementType);
+  if (elementType.isF16())
+    byteWidth /= 2;
   return getVectorSize(entryPointFn, byteWidth);
 }
 
