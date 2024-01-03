@@ -43,6 +43,7 @@
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -229,6 +230,11 @@ void transform_dialect::ApplyBubblePackUnpackPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
       patterns, [](Operation *op) { return true; });
+}
+
+void transform_dialect::ApplyFoldArithExtIntoContractionOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  vector::populateFoldArithExtensionPatterns(patterns);
 }
 
 void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
