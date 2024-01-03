@@ -57,6 +57,20 @@ def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyFoldArithExtIntoContractionOp : Op<Transform_Dialect,
+    "apply_patterns.iree.fold_arith_ext_into_contraction",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate pattern to fold arithmetic extensions on floating point data types into
+    vector contraction operations. linalg.matmul introduces arithmetic
+    extensions on its operands.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.fold_fill_into_pad",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
