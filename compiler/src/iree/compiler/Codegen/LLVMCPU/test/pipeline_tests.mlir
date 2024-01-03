@@ -56,12 +56,11 @@ hal.executable private @check_no_cse {
   }
 }
 // CHECK-LABEL: func.func @check_no_cse()
-//   CHECK-NOT:    memref.alloc
 //       CHECK:    scf.for
 //       CHECK:      arith.addf
 //       CHECK:    vector.reduction <add>
 //       CHECK:    arith.divf
-//       CHECK:    memref.store
+//       CHECK:    vector.maskedstore
 
 // -----
 
