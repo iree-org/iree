@@ -41,6 +41,12 @@ OpTy replaceOpWithNewDistributedOp(VectorLayoutOptions &options,
   return newOp;
 }
 
+/// Options that control how vector values are distributed.
+///
+/// The way to use these options is to derive from this class and implement
+/// methods to control how VectorLayoutAnalysis is initialized by passing it
+/// initial anchors and how to get the distributed shape of a given vector
+/// value.
 class VectorLayoutOptions {
 public:
   VectorLayoutOptions(VectorLayoutAnalysis &analysis, Operation *root)
@@ -65,6 +71,18 @@ protected:
   Operation *root;
 }; // namespace iree_compiler
 
+/// Distribute vector operations in the IR rooted at `root`.
+///
+/// The flow of distribution looks like:
+///   - Make `options` set some initial information about how to distribute
+///     some vector values. This is usually done on operations like
+///     vector.contract, vector.transfer_read/vector.transfer_write,
+///     vector.multi_reduction, where we are trying to target a specific
+///     hardware instructions. This information is provided in the form of a
+///     layout for the value.
+///   - Run a global analysis to determine how to distribute rest of the vector
+///     values keeping the initial anchors in mind.
+///   - Use the analysis information to distribute each operation.
 void distributeVectorOps(Operation *root, VectorLayoutOptions &options);
 
 } // namespace mlir::iree_compiler
