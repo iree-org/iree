@@ -36,6 +36,7 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions);
+std::unique_ptr<OperationPass<ModuleOp>> createIREECheckKnownDialectsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
