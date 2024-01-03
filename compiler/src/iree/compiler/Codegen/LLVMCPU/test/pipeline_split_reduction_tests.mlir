@@ -50,7 +50,7 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 // CHECK:                 %[[RES:.+]] = arith.addi
 // CHECK:                 scf.yield %[[RES]] : vector<1x1x4xi32>
 // CHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
-// CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<4xi32>
+// CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<1x4xi32>
 
 // -----
 
@@ -106,7 +106,7 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 // REORDERCHECK:                 %[[RES:.+]] = arith.addf
 // REORDERCHECK:                 scf.yield %[[RES]] : vector<1x1x4xf32>
 // REORDERCHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xf32> into f32
-// REORDERCHECK:             arith.addf %{{.+}}, %{{.+}} : vector<4xf32>
+// REORDERCHECK:             arith.addf %{{.+}}, %{{.+}} : vector<1x4xf32>
 
 // -----
 
