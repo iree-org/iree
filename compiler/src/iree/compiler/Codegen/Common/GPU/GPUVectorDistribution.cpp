@@ -46,8 +46,8 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
                                     ValueRange values) {
   // Replace all OpResults with the given values.
   SmallVector<Value> replacements;
-  for (OpResult opResult : op->getOpResults()) {
-    Value replacement = values[opResult.getResultNumber()];
+  for (auto [opResult, replacement] :
+       llvm::zip_equal(op->getOpResults(), values)) {
     // If this value is a vector type, it must be converted back to simd.
     if (isa<VectorType>(replacement.getType())) {
       auto oldResult = cast<VectorValue>(opResult);
