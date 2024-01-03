@@ -13,7 +13,6 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
-#include "iree/compiler/Codegen/Common/GPU/VectorLayoutProvider.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
@@ -1003,12 +1002,23 @@ void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
 // TestGpuVectorDistribution
 //===----------------------------------------------------------------------===//
 
-class TestLayoutProvider : public HigherDimLayoutProvider {
+class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestLayoutProvider(VectorLayoutAnalysis &analysis, Operation *root)
-      : HigherDimLayoutProvider(analysis, root) {}
+  TestVectorLayoutOptions(VectorLayoutAnalysis &analysis, Operation *root)
+      : VectorLayoutOptions(analysis, root) {}
 
-  virtual SmallVector<Value> getThreadGrid(RewriterBase &rewriter) override {
+  SmallVector<int64_t>
+  getDistributedShape(TypedValue<VectorType> val) override {
+    constexpr VectorExt::LayoutDimension simtLabels[] = {
+        VectorExt::LayoutDimension::BATCHY,
+        VectorExt::LayoutDimension::BATCHX,
+        VectorExt::LayoutDimension::VECTORX,
+    };
+    return analysis.getLayout<VectorExt::LayoutAttr>(val).getSIMTVectorShape(
+        simtLabels);
+  }
+
+  SmallVector<Value> getThreadGrid(RewriterBase &rewriter) override {
     return {
         rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::x),
         rewriter.create<gpu::ThreadIdOp>(root->getLoc(), gpu::Dimension::y),
@@ -1016,9 +1026,7 @@ public:
     };
   }
 
-  virtual void setAnchorOps() override {
-    setAnchorOpsFromAttributes(analysis, root);
-  }
+  void setAnchorOps() override { setAnchorOpsFromAttributes(analysis, root); }
 };
 
 DiagnosedSilenceableFailure
@@ -1027,8 +1035,8 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
-  TestLayoutProvider layoutProvider(analysis, target);
-  VectorDistribution distribution(target, analysis, layoutProvider);
+  TestVectorLayoutOptions options(analysis, target);
+  VectorDistribution distribution(target, analysis, options);
   distribution.distribute();
   return DiagnosedSilenceableFailure::success();
 }

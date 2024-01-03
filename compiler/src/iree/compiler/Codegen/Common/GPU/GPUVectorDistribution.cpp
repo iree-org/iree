@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
-#include "iree/compiler/Codegen/Common/GPU/VectorLayoutProvider.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -27,14 +26,14 @@ namespace mlir::iree_compiler {
 
 TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
                                       TypedValue<VectorType> value,
-                                      LayoutProvider &provider) {
+                                      VectorLayoutOptions &options) {
   // If this is a result of a "to_simd" op, use the source value of it.
   if (auto toSIMD = value.getDefiningOp<IREE::VectorExt::ToSIMDOp>()) {
     value = cast<TypedValue<VectorType>>(toSIMD.getInput());
     return value;
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
-  SmallVector<int64_t> distributedShape = provider.getDistributedShape(value);
+  SmallVector<int64_t> distributedShape = options.getDistributedShape(value);
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(
@@ -43,7 +42,7 @@ TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
 }
 
 void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
-                                    LayoutProvider &provider,
+                                    VectorLayoutOptions &options,
                                     ValueRange values) {
   // Replace all OpResults with the given values.
   SmallVector<Value> replacements;
@@ -57,7 +56,7 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
       auto toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
           oldResult.getLoc(), oldResult.getType(), replacement);
       // Clone the layout to the new value.
-      provider.getAnalysis().cloneLayoutInformationToNewValue(
+      options.getAnalysis().cloneLayoutInformationToNewValue(
           oldResult, toSIMD.getResult());
       // Add to replacements.
       replacement = toSIMD.getResult();
@@ -71,9 +70,9 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
 class DistributeConstants : public OpRewritePattern<arith::ConstantOp> {
 public:
   DistributeConstants(MLIRContext *context, VectorLayoutAnalysis &analysis,
-                      LayoutProvider &provider, PatternBenefit benefit = 1)
+                      VectorLayoutOptions &options, PatternBenefit benefit = 1)
       : OpRewritePattern<arith::ConstantOp>(context, benefit),
-        analysis(analysis), provider(provider) {}
+        analysis(analysis), options(options) {}
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
@@ -90,25 +89,26 @@ public:
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
     auto vectorType =
-        VectorType::get(provider.getDistributedShape(constant), elementType);
+        VectorType::get(options.getDistributedShape(constant), elementType);
     replaceOpWithNewDistributedOp<arith::ConstantOp>(
-        provider, rewriter, constantOp, vectorType,
+        options, rewriter, constantOp, vectorType,
         DenseElementsAttr::get(vectorType, attr.getSplatValue<APFloat>()));
     return success();
   }
 
 private:
   VectorLayoutAnalysis &analysis;
-  LayoutProvider &provider;
+  VectorLayoutOptions &options;
 };
 
 class DistributeElementwise
     : public OpTraitRewritePattern<OpTrait::Elementwise> {
 public:
   DistributeElementwise(MLIRContext *context, VectorLayoutAnalysis &analysis,
-                        LayoutProvider &provider, PatternBenefit benefit = 1)
+                        VectorLayoutOptions &options,
+                        PatternBenefit benefit = 1)
       : OpTraitRewritePattern<OpTrait::Elementwise>(context, benefit),
-        analysis(analysis), provider(provider) {}
+        analysis(analysis), options(options) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
@@ -119,7 +119,7 @@ public:
     SmallVector<Value> operands;
     for (Value operand : op->getOperands()) {
       if (auto vectorOperand = dyn_cast<TypedValue<VectorType>>(operand)) {
-        operand = getDistributed(rewriter, vectorOperand, provider);
+        operand = getDistributed(rewriter, vectorOperand, options);
       }
       operands.push_back(operand);
     }
@@ -130,7 +130,7 @@ public:
       if (auto vectorResult = dyn_cast<TypedValue<VectorType>>(result)) {
         // Distribute vector result types.
         auto newType =
-            VectorType::get(provider.getDistributedShape(vectorResult),
+            VectorType::get(options.getDistributedShape(vectorResult),
                             vectorResult.getType().getElementType());
         resultTypes.push_back(newType);
       } else {
@@ -142,21 +142,21 @@ public:
     Operation *distributedOp =
         rewriter.create(op->getLoc(), op->getName().getIdentifier(), operands,
                         resultTypes, op->getAttrs());
-    replaceOpWithDistributedValues(rewriter, op, provider,
+    replaceOpWithDistributedValues(rewriter, op, options,
                                    distributedOp->getResults());
     return success();
   }
 
 private:
   VectorLayoutAnalysis &analysis;
-  LayoutProvider &provider;
+  VectorLayoutOptions &options;
 };
 
 VectorDistribution::VectorDistribution(func::FuncOp root,
                                        VectorLayoutAnalysis &analysis,
-                                       LayoutProvider &provider)
-    : root(root), analysis(analysis), provider(provider) {
-  provider.setAnchorOps();
+                                       VectorLayoutOptions &options)
+    : root(root), analysis(analysis), options(options) {
+  options.setAnchorOps();
   if (failed(analysis.run()))
     return;
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Completed Successfully :\n");
@@ -227,7 +227,7 @@ static void debugPrintUniqueOperationNames(SmallVector<Operation *> &worklist,
 
 static void applyVectorDistributionDriver(
     Operation *root, const FrozenRewritePatternSet &patterns,
-    VectorLayoutAnalysis &analysis, LayoutProvider &provider) {
+    VectorLayoutAnalysis &analysis, VectorLayoutOptions &options) {
 
   DenseSet<Operation *> erasedOps;
   SmallVector<Operation *> worklist;
@@ -273,10 +273,9 @@ static void applyVectorDistributionDriver(
 void VectorDistribution::distribute() {
   RewritePatternSet patterns(root.getContext());
   patterns.add<DistributeConstants, DistributeElementwise>(root.getContext(),
-                                                           analysis, provider);
+                                                           analysis, options);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  return applyVectorDistributionDriver(root, frozenPatterns, analysis,
-                                       provider);
+  return applyVectorDistributionDriver(root, frozenPatterns, analysis, options);
 }
 
 } // namespace mlir::iree_compiler

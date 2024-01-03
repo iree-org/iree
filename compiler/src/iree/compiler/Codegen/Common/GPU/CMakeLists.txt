@@ -46,7 +46,6 @@ iree_cc_library(
     "GPUPatterns.h"
     "GPUVectorDistribution.h"
     "Passes.h"
-    "VectorLayoutProvider.h"
   SRCS
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
@@ -61,7 +60,6 @@ iree_cc_library(
     "GPUTileReduction.cpp"
     "GPUVectorDistribution.cpp"
     "Passes.cpp"
-    "VectorLayoutProvider.cpp"
     "VectorReductionToGPU.cpp"
     "WorkGroupSwizzle.cpp"
     "WorkgroupSpecializationPass.cpp"
