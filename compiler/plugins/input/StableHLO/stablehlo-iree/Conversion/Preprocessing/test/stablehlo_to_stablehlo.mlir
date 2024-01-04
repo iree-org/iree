@@ -355,7 +355,7 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
      padding = dense<0> : tensor<1x2xi64>,
      precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
      rhs_dilation = dense<1> : tensor<1xi64>,
-     window_strides = array<i64: 1>
+     window_strides = dense<[1]> : tensor<1xi64>
    } : (tensor<16x32x256xf32>, tensor<1x256x256xbf16>) -> tensor<16x32x256xf32>
   // CHECK: return %[[CONV]]
   func.return %0 : tensor<16x32x256xf32>
