@@ -117,7 +117,8 @@ def TileAttentionOp : Op<Transform_Dialect, "tile_attention",
   }];
 
   let arguments = (
-      ins TransformHandleTypeInterface:$target
+      ins TransformHandleTypeInterface:$target,
+          OptionalAttr<I64Attr>:$tile_size
   );
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
@@ -153,7 +154,8 @@ def DecomposeTiledAttentionOp : Op<Transform_Dialect, "decompose_tiled_attention
   }];
 
   let arguments = (
-      ins TransformHandleTypeInterface:$target
+      ins TransformHandleTypeInterface:$target,
+          OptionalAttr<I64Attr>:$tile_size
   );
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 

@@ -80,6 +80,8 @@ def TileAndDecomposeAttention :
   let options = [
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
+    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
+           "Tile size for sequential for loop in attention">,
   ];
 }
 
