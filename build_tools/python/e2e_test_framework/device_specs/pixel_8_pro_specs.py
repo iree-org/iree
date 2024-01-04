@@ -16,8 +16,7 @@ BIG_CORES = common_definitions.DeviceSpec.build(
     architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
     host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
     device_parameters=common_definitions.DeviceParameters(
-        # TODO
-        cpu_params=common_definitions.CPUParameters(pinned_cores=[6, 7])
+        cpu_params=common_definitions.CPUParameters(pinned_cores=[4, 5, 6, 7, 8])
     ),
     tags=["big-cores"],
 )

@@ -32,13 +32,52 @@ class Android_ARMv8_A_Benchmarks(object):
         target_abi=iree_definitions.TargetABI.LINUX_ANDROID29,
     )
 
+    PIXEL_8_CPU_FLAGS = "--iree-llvmcpu-target-cpu-features=" + ",".join(
+        [
+            "v9a",
+            "+fullfp16",
+            "fp-armv8",
+            "+neon",
+            "+aes",
+            "+sha2",
+            "+crc",
+            "+lse",
+            "+rdm",
+            "+complxnum",
+            "+rcpc",
+            "+sha3",
+            "+sm4",
+            "+dotprod",
+            "+fp16fml",
+            "+dit",
+            "+flagm",
+            "+ssbs",
+            "+sb",
+            "+sve2-aes",
+            "+sve2-bitperm",
+            "+sve2-sha3",
+            "+sve2-sm4",
+            "+altnzcv",
+            "+fptoint",
+            "+bf16",
+            "+i8mm",
+            "+bti",
+            "+mte",
+            "+pauth",
+            "+perfmon",
+            "+predres",
+            "+spe",
+            "+ras",
+        ]
+    )
+
     NO_DT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_NO_DT,
         tags=["experimental-flags", "no-dt"],
         compile_targets=[ARMV8_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
     DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -48,7 +87,7 @@ class Android_ARMv8_A_Benchmarks(object):
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=none",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
     DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
@@ -58,7 +97,7 @@ class Android_ARMv8_A_Benchmarks(object):
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
 
@@ -86,7 +125,7 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs.get_elf_system_scheduling_local_task_config(
                 thread_num
             )
-            for thread_num in [1, 2]
+            for thread_num in [1, 5]
         ]
 
         no_dt_gen_confings = [

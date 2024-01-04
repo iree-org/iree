@@ -1458,7 +1458,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1472,7 +1472,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1486,7 +1486,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1500,7 +1500,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1514,7 +1514,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1528,7 +1528,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
@@ -1543,7 +1543,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1558,7 +1558,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1573,7 +1573,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1588,7 +1588,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1603,7 +1603,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1618,7 +1618,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
@@ -1633,7 +1633,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "DeepLabV3_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1648,7 +1648,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_fp32(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1663,7 +1663,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X4XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1678,7 +1678,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1693,7 +1693,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "MobileBertSquad_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -1708,7 +1708,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
   FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
@@ -3644,7 +3644,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3662,7 +3662,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3680,7 +3680,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3698,7 +3698,7 @@ iree_bytecode_module(
     "--iree-input-type=stablehlo"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3716,7 +3716,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3734,7 +3734,7 @@ iree_bytecode_module(
     "--iree-input-type=tosa"
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3753,7 +3753,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3772,7 +3772,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3791,7 +3791,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3810,7 +3810,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3829,7 +3829,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3848,7 +3848,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3867,7 +3867,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3886,7 +3886,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3905,7 +3905,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3924,7 +3924,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3943,7 +3943,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -3962,7 +3962,7 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-llvmcpu-target-cpu-features=v9a,+fullfp16,fp-armv8,+neon,+aes,+sha2,+crc,+lse,+rdm,+complxnum,+rcpc,+sha3,+sm4,+dotprod,+fp16fml,+dit,+flagm,+ssbs,+sb,+sve2-aes,+sve2-bitperm,+sve2-sha3,+sve2-sm4,+altnzcv,+fptoint,+bf16,+i8mm,+bti,+mte,+pauth,+perfmon,+predres,+spe,+ras"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
