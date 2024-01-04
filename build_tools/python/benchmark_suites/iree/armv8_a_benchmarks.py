@@ -34,7 +34,7 @@ class Android_ARMv8_A_Benchmarks(object):
 
     PIXEL_8_CPU_FLAGS = "--iree-llvmcpu-target-cpu-features=" + ",".join(
         [
-            "v9a",
+            "+v9a",
             "+fullfp16",
             "fp-armv8",
             "+neon",
