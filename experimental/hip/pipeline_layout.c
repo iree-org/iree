@@ -83,9 +83,8 @@ static void iree_hal_hip_descriptor_set_layout_destroy(
     iree_hal_descriptor_set_layout_t* base_descriptor_set_layout) {
   iree_hal_hip_descriptor_set_layout_t* descriptor_set_layout =
       iree_hal_hip_descriptor_set_layout_cast(base_descriptor_set_layout);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_allocator_t host_allocator = descriptor_set_layout->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_free(host_allocator, descriptor_set_layout);
 
@@ -195,9 +194,8 @@ static void iree_hal_hip_pipeline_layout_destroy(
     iree_hal_pipeline_layout_t* base_pipeline_layout) {
   iree_hal_hip_pipeline_layout_t* pipeline_layout =
       iree_hal_hip_pipeline_layout_cast(base_pipeline_layout);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
   iree_allocator_t host_allocator = pipeline_layout->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < pipeline_layout->set_layout_count; ++i) {
     iree_hal_descriptor_set_layout_release(
@@ -235,7 +233,7 @@ static const iree_hal_pipeline_layout_vtable_t
 // iree_hal_hip_dispatch_layout_t
 //===----------------------------------------------------------------------===//
 
-iree_hal_hip_dispatch_layout_t iree_hal_hip_pipeline_layout_dispatch_parameters(
+iree_hal_hip_dispatch_layout_t iree_hal_hip_pipeline_layout_dispatch_layout(
     const iree_hal_pipeline_layout_t* base_pipeline_layout) {
   const iree_hal_hip_pipeline_layout_t* pipeline_layout =
       iree_hal_hip_pipeline_layout_const_cast(base_pipeline_layout);

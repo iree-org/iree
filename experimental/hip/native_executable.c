@@ -9,7 +9,6 @@
 #include <stddef.h>
 
 #include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/pipeline_layout.h"
 #include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 

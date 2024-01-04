@@ -41,11 +41,11 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
 
   hipCtx_t hip_context;
   // The HIP graph under construction.
-  hipGraph_t graph;
-  hipGraphExec_t exec;
+  hipGraph_t hip_graph;
+  hipGraphExec_t hip_exec;
 
   // A node acting as a barrier for all commands added to the command buffer.
-  hipGraphNode_t barrier_node;
+  hipGraphNode_t hip_barrier_node;
 
   // Nodes added to the command buffer after the last barrier.
   hipGraphNode_t hip_graph_nodes[IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT];
@@ -76,6 +76,8 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -100,9 +102,9 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
   command_buffer->symbols = hip_symbols;
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->hip_context = context;
-  command_buffer->graph = NULL;
-  command_buffer->exec = NULL;
-  command_buffer->barrier_node = NULL;
+  command_buffer->hip_graph = NULL;
+  command_buffer->hip_exec = NULL;
+  command_buffer->hip_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
   iree_status_t status =
@@ -125,17 +127,17 @@ static void iree_hal_hip_graph_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (command_buffer->graph != NULL) {
+  if (command_buffer->hip_graph != NULL) {
     IREE_HIP_IGNORE_ERROR(command_buffer->symbols,
-                          hipGraphDestroy(command_buffer->graph));
-    command_buffer->graph = NULL;
+                          hipGraphDestroy(command_buffer->hip_graph));
+    command_buffer->hip_graph = NULL;
   }
-  if (command_buffer->exec != NULL) {
+  if (command_buffer->hip_exec != NULL) {
     IREE_HIP_IGNORE_ERROR(command_buffer->symbols,
-                          hipGraphExecDestroy(command_buffer->exec));
-    command_buffer->exec = NULL;
+                          hipGraphExecDestroy(command_buffer->hip_exec));
+    command_buffer->hip_exec = NULL;
   }
-  command_buffer->barrier_node = NULL;
+  command_buffer->hip_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
   iree_hal_resource_set_free(command_buffer->resource_set);
@@ -155,7 +157,7 @@ hipGraphExec_t iree_hal_hip_graph_command_buffer_handle(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
-  return command_buffer->exec;
+  return command_buffer->hip_exec;
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_begin(
@@ -163,15 +165,16 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
 
-  if (command_buffer->graph != NULL) {
+  if (command_buffer->hip_graph != NULL) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "command buffer cannot be re-recorded");
   }
 
   // Create a new empty graph to record into.
-  IREE_HIP_RETURN_IF_ERROR(command_buffer->symbols,
-                           hipGraphCreate(&command_buffer->graph, /*flags=*/0),
-                           "hipGraphCreate");
+  IREE_HIP_RETURN_IF_ERROR(
+      command_buffer->symbols,
+      hipGraphCreate(&command_buffer->hip_graph, /*flags=*/0),
+      "hipGraphCreate");
 
   return iree_ok_status();
 }
@@ -182,22 +185,22 @@ static iree_status_t iree_hal_hip_graph_command_buffer_end(
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
 
   // Reset state used during recording.
-  command_buffer->barrier_node = NULL;
+  command_buffer->hip_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
   // Compile the graph.
   hipGraphNode_t error_node = NULL;
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       command_buffer->symbols,
-      hipGraphInstantiate(&command_buffer->exec, command_buffer->graph,
+      hipGraphInstantiate(&command_buffer->hip_exec, command_buffer->hip_graph,
                           &error_node,
                           /*logBuffer=*/NULL,
                           /*bufferSize=*/0));
   if (iree_status_is_ok(status)) {
     // No longer need the source graph used for construction.
     IREE_HIP_IGNORE_ERROR(command_buffer->symbols,
-                          hipGraphDestroy(command_buffer->graph));
-    command_buffer->graph = NULL;
+                          hipGraphDestroy(command_buffer->hip_graph));
+    command_buffer->hip_graph = NULL;
   }
 
   iree_hal_resource_set_freeze(command_buffer->resource_set);
@@ -235,7 +238,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_execution_barrier(
 
   // Use the last node as a barrier to avoid creating redundant empty nodes.
   if (IREE_LIKELY(command_buffer->graph_node_count == 1)) {
-    command_buffer->barrier_node = command_buffer->hip_graph_nodes[0];
+    command_buffer->hip_barrier_node = command_buffer->hip_graph_nodes[0];
     command_buffer->graph_node_count = 0;
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
@@ -243,9 +246,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_execution_barrier(
 
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      hipGraphAddEmptyNode(&command_buffer->barrier_node, command_buffer->graph,
-                           command_buffer->hip_graph_nodes,
-                           command_buffer->graph_node_count),
+      hipGraphAddEmptyNode(
+          &command_buffer->hip_barrier_node, command_buffer->hip_graph,
+          command_buffer->hip_graph_nodes, command_buffer->graph_node_count),
       "hipGraphAddEmptyNode");
 
   command_buffer->graph_node_count = 0;
@@ -325,9 +328,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
   uint32_t pattern_4byte = iree_hal_hip_splat_pattern(pattern, pattern_length);
   hipMemsetParams params = {
-      .dst =
-          (hipDeviceptr_t)((iree_device_size_t)(uintptr_t)target_device_buffer +
-                           target_offset),
+      .dst = (uint8_t*)target_device_buffer + target_offset,
       .elementSize = pattern_length,
       .pitch = 0,                        // unused if height == 1
       .width = length / pattern_length,  // element count
@@ -341,12 +342,12 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
                             "exceeded max concurrent node limit");
   }
 
-  size_t dependency_count = command_buffer->barrier_node ? 1 : 0;
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       hipGraphAddMemsetNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
-          command_buffer->graph, &command_buffer->barrier_node,
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
           dependency_count, &params),
       "hipGraphAddMemsetNode");
 
@@ -398,12 +399,12 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
                             "exceeded max concurrent node limit");
   }
 
-  size_t dependency_count = command_buffer->barrier_node ? 1 : 0;
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       hipDrvGraphAddMemcpyNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
-          command_buffer->graph, &command_buffer->barrier_node,
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
@@ -450,12 +451,12 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
                             "exceeded max concurrent node limit");
   }
 
-  size_t dependency_count = command_buffer->barrier_node ? 1 : 0;
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       hipDrvGraphAddMemcpyNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
-          command_buffer->graph, &command_buffer->barrier_node,
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
           dependency_count, &params, command_buffer->hip_context),
       "hipDrvGraphAddMemcpyNode");
 
@@ -477,11 +478,17 @@ static iree_status_t iree_hal_hip_graph_command_buffer_push_constants(
     const void* values, iree_host_size_t values_length) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
-  iree_host_size_t constant_base_index = offset / sizeof(int32_t);
-  for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
-    command_buffer->push_constants[i + constant_base_index] =
-        ((uint32_t*)values)[i];
+
+  if (IREE_UNLIKELY(offset + values_length >=
+                    sizeof(command_buffer->push_constants))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "push constant range [%zu, %zu) out of range",
+                            offset, offset + values_length);
   }
+
+  memcpy((uint8_t*)&command_buffer->push_constants + offset, values,
+         values_length);
+
   return iree_ok_status();
 }
 
@@ -501,13 +508,12 @@ static iree_status_t iree_hal_hip_graph_command_buffer_push_descriptor_set(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
-  uint64_t blah = 0;
   hipDeviceptr_t* current_bindings =
       command_buffer->descriptor_sets[set].bindings;
   for (iree_host_size_t i = 0; i < binding_count; i++) {
     const iree_hal_descriptor_set_binding_t* binding = &bindings[i];
     hipDeviceptr_t device_ptr = NULL;
-    if (binding->buffer + blah) {
+    if (binding->buffer) {
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                            &binding->buffer));
@@ -515,8 +521,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_push_descriptor_set(
       hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
           iree_hal_buffer_allocated_buffer(binding->buffer));
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
-      device_ptr =
-          (hipDeviceptr_t)((uintptr_t)device_buffer + offset + binding->offset);
+      device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
     }
 
     current_bindings[binding->binding] = device_ptr;
@@ -545,7 +550,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &executable));
   iree_hal_hip_dispatch_layout_t dispatch_params =
-      iree_hal_hip_pipeline_layout_dispatch_parameters(kernel_info.layout);
+      iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info.layout);
   // The total number of descriptors across all descriptor sets.
   iree_host_size_t descriptor_count = dispatch_params.total_binding_count;
   // The total number of push constants.
@@ -614,12 +619,12 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
                             "exceeded max concurrent node limit");
   }
 
-  size_t dependency_count = command_buffer->barrier_node ? 1 : 0;
+  size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
       hipGraphAddKernelNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
-          command_buffer->graph, &command_buffer->barrier_node,
+          command_buffer->hip_graph, &command_buffer->hip_barrier_node,
           dependency_count, &params),
       "hipGraphAddKernelNode");
 

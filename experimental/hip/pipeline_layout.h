@@ -74,22 +74,6 @@ iree_hal_hip_pipeline_layout_descriptor_set_layout(
 iree_host_size_t iree_hal_hip_pipeline_layout_base_binding_index(
     const iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set);
 
-// Returns the total number of descriptor bindings across all sets.
-iree_host_size_t iree_hal_hip_pipeline_layout_total_binding_count(
-    const iree_hal_pipeline_layout_t* pipeline_layout);
-
-// Returns the kernel argument index for push constant data.
-iree_host_size_t iree_hal_hip_pipeline_layout_push_constant_index(
-    const iree_hal_pipeline_layout_t* pipeline_layout);
-
-// Returns the number of push constants in the pipeline layout.
-iree_host_size_t iree_hal_hip_pipeline_layout_push_constant_count(
-    const iree_hal_pipeline_layout_t* pipeline_layout);
-
-//===----------------------------------------------------------------------===//
-// iree_hal_hip_dispatch_layout_t
-//===----------------------------------------------------------------------===//
-
 typedef struct iree_hal_hip_dispatch_layout_t {
   iree_host_size_t push_constant_base_index;
   iree_host_size_t push_constant_count;
@@ -97,7 +81,8 @@ typedef struct iree_hal_hip_dispatch_layout_t {
   iree_host_size_t total_binding_count;
 } iree_hal_hip_dispatch_layout_t;
 
-iree_hal_hip_dispatch_layout_t iree_hal_hip_pipeline_layout_dispatch_parameters(
+// Returns dispatch layout parameters in a struct form for pipeline layout.
+iree_hal_hip_dispatch_layout_t iree_hal_hip_pipeline_layout_dispatch_layout(
     const iree_hal_pipeline_layout_t* base_pipeline_layout);
 
 #ifdef __cplusplus

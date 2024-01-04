@@ -39,8 +39,6 @@ IREE_HIP_PFN_DECL(hipGraphAddKernelNode, hipGraphNode_t *, hipGraph_t,
                   const hipGraphNode_t *, size_t, const hipKernelNodeParams *)
 IREE_HIP_PFN_DECL(hipGraphAddMemsetNode, hipGraphNode_t *, hipGraph_t,
                   const hipGraphNode_t *, size_t, const hipMemsetParams *)
-IREE_HIP_PFN_DECL(hipGraphAddMemcpyNode, hipGraphNode_t *, hipGraph_t,
-                  const hipGraphNode_t *, size_t, const hipMemcpy3DParms *)
 IREE_HIP_PFN_DECL(hipGraphCreate, hipGraph_t *, unsigned int)
 IREE_HIP_PFN_DECL(hipGraphDestroy, hipGraph_t)
 IREE_HIP_PFN_DECL(hipGraphExecDestroy, hipGraphExec_t)
@@ -80,7 +78,6 @@ IREE_HIP_PFN_DECL(hipModuleLoadData, hipModule_t *, const void *)
 IREE_HIP_PFN_DECL(hipModuleLoadDataEx, hipModule_t *, const void *,
                   unsigned int, hipJitOption *, void **)
 IREE_HIP_PFN_DECL(hipModuleUnload, hipModule_t)
-IREE_HIP_PFN_DECL(hipSetDevice, int)
 IREE_HIP_PFN_DECL(hipStreamCreateWithFlags, hipStream_t *, unsigned int)
 IREE_HIP_PFN_DECL(hipStreamDestroy, hipStream_t)
 IREE_HIP_PFN_DECL(hipStreamSynchronize, hipStream_t)
