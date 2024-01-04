@@ -76,7 +76,8 @@ protected:
 /// Otherwise, returns null.
 IREE::LinalgExt::EncodingAttr getEncodingAttr(RankedTensorType type);
 
-///
+/// Get the permutation that permutes the input shape to the canonical
+/// matmul input shape based on the IndexingMaps encoding attribute.
 std::optional<SmallVector<int64_t>>
 getPermutationToCanonicalMatmulShape(IREE::LinalgExt::EncodingAttr encoding);
 

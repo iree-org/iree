@@ -72,7 +72,7 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
   return type.getEncoding().dyn_cast_or_null<EncodingAttr>();
 }
 
-AffineMap getMapForRole(EncodingAttr encoding) {
+static AffineMap getMapForRole(EncodingAttr encoding) {
   EncodingRole role = encoding.getRole().getValue();
   if (role == EncodingRole::LHS)
     return cast<AffineMapAttr>(encoding.getIndexingMaps()[0]).getAffineMap();
@@ -82,7 +82,7 @@ AffineMap getMapForRole(EncodingAttr encoding) {
     return cast<AffineMapAttr>(encoding.getIndexingMaps()[2]).getAffineMap();
 }
 
-FailureOr<linalg::ContractionDimensions>
+static FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
   auto indexingMapsAttr = encoding.getIndexingMaps();
   SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
@@ -92,12 +92,6 @@ getEncodingContractionDims(EncodingAttr encoding) {
   return linalg::inferContractionDims(indexingMaps);
 }
 
-unsigned getResultIndex(AffineMap m, int64_t idx) {
-  return m.getResultPosition(getAffineDimExpr(idx, m.getContext())).value();
-}
-
-/// Get the permutation that permutes the input shape to the canonical
-/// matmul input shape based on the IndexingMaps encoding attribute.
 std::optional<SmallVector<int64_t>>
 getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
   FailureOr<linalg::ContractionDimensions> cDims =
@@ -109,23 +103,25 @@ getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
   EncodingRole role = encoding.getRole().getValue();
   EncodingUser user = encoding.getUser().getValue();
   AffineMap map = getMapForRole(encoding);
+  auto getResultIndex = [map](int64_t idx) {
+    return map.getResultPosition(getAffineDimExpr(idx, map.getContext()))
+        .value();
+  };
   // Add batch dim
   if (user == EncodingUser::BATCH_MATMUL) {
-    perm.push_back(getResultIndex(map, cDims->batch[0]));
+    perm.push_back(getResultIndex(cDims->batch[0]));
   }
   // Add M dim
-  if (role != EncodingRole::RHS && !isVecmatEncoding(encoding) &&
-      !isBatchVecmatEncoding(encoding)) {
-    perm.push_back(getResultIndex(map, cDims->m[0]));
+  if (role != EncodingRole::RHS && cDims->m.size() == 1) {
+    perm.push_back(getResultIndex(cDims->m[0]));
   }
   // Add K dim
   if (role != EncodingRole::RESULT) {
-    perm.push_back(getResultIndex(map, cDims->k[0]));
+    perm.push_back(getResultIndex(cDims->k[0]));
   }
   // Add N dim
-  if (role != EncodingRole::LHS && !isMatvecEncoding(encoding) &&
-      !isBatchMatvecEncoding(encoding)) {
-    perm.push_back(getResultIndex(map, cDims->n[0]));
+  if (role != EncodingRole::LHS && cDims->n.size() == 1) {
+    perm.push_back(getResultIndex(cDims->n[0]));
   }
   return perm;
 }

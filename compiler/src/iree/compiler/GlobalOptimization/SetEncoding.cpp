@@ -25,7 +25,6 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
-#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -35,7 +34,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "llvm/Support/Debug.h"
@@ -101,19 +99,6 @@ enum class ContractionOpType {
 
 static ContractionOpType
 getContractionOpType(linalg::ContractionOpInterface op) {
-  // if (op.isRowMajorMatmul() || op.isColumnMajorMatmul())
-  //   return ContractionOpType::kMatmul;
-  // if (op.isRowMajorBatchMatmul())
-  //   return ContractionOpType::kBatchMatmul;
-  // if (op.isVecmat())
-  //   return ContractionOpType::kVecmat;
-  // if (op.isBatchVecmat())
-  //   return ContractionOpType::kBatchVecmat;
-  // if (op.isMatvec())
-  //   return ContractionOpType::kMatvec;
-  // if (op.isBatchMatvec())
-  //   return ContractionOpType::kBatchMatvec;
-
   FailureOr<linalg::ContractionDimensions> cDims =
       linalg::inferContractionDims(cast<linalg::LinalgOp>(op.getOperation()));
   if (failed(cDims))
