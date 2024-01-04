@@ -2149,11 +2149,11 @@ hal.executable private @batch_mmt4d {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable private @mmt4d {
+hal.executable private @mmt4d_with_large_reduction {
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64_) {
-    hal.executable.export public @mmt4d ordinal(0) layout(#pipeline_layout)
+    hal.executable.export public @mmt4d_with_large_reduction ordinal(0) layout(#pipeline_layout)
     builtin.module {
-      func.func @mmt4d() {
+      func.func @mmt4d_with_large_reduction() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<7x18176x16x1xf32>>
@@ -2172,7 +2172,7 @@ hal.executable private @mmt4d {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 0, 0, 0, 0], [1, 1, 0, 16, 16, 0], [0, 0, 1, 0, 0, 1]]>
-//      CHECK: func.func @mmt4d()
+//      CHECK: func.func @mmt4d_with_large_reduction()
 //      CHECK:   linalg.mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
