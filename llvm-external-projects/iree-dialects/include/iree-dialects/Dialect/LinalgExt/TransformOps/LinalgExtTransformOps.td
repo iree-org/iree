@@ -12,23 +12,6 @@ include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def FuseProducersOp : Op<Transform_Dialect, "fuse_producers",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{Fuses the producers for the operands to fuse.}];
-
-  let arguments = (ins TransformHandleTypeInterface:$target,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$operands_to_fuse);
-  let results = (outs TransformHandleTypeInterface:$transformed,
-                      Variadic<TransformHandleTypeInterface>:$fused_ops);
-
-  let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
-  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
-}
-
 def RewriteForallToAsyncOp :
   Op<Transform_Dialect, "forall_to_async",
     [FunctionalStyleTransformOpTrait,
