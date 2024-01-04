@@ -71,7 +71,7 @@ iree_bitcode_library(
     "pack_x86_64_internal.h"
     "unpack_x86_64_internal.h"
   SRCS
-    "mmt4d_x86_64_avx512_base.c"
+    "gen/mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
     "unpack_x86_64_avx512_base.c"
   COPTS
@@ -314,7 +314,7 @@ iree_cc_library(
   NAME
     x86_64_avx512_base
   SRCS
-    "mmt4d_x86_64_avx512_base.c"
+    "gen/mmt4d_x86_64_avx512_base.c"
     "pack_x86_64_avx512_base.c"
     "unpack_x86_64_avx512_base.c"
   COPTS

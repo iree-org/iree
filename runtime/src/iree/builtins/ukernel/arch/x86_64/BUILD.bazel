@@ -85,7 +85,7 @@ UKERNEL_X86_64_AVX512_BASE_COPTS = UKERNEL_X86_64_AVX2_FMA_COPTS + [
 iree_bitcode_library(
     name = "ukernel_bitcode_x86_64_avx512_base",
     srcs = [
-        "mmt4d_x86_64_avx512_base.c",
+        "gen/mmt4d_x86_64_avx512_base.c",
         "pack_x86_64_avx512_base.c",
         "unpack_x86_64_avx512_base.c",
     ],
