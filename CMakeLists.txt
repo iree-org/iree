@@ -1097,7 +1097,7 @@ endif()
 #-------------------------------------------------------------------------------
 # Install/exports
 # Note that with no further options, install convenience targets install to
-# CMAKE_INSTALL_PREFIX. Per usual, this can be further prefixed with an 
+# CMAKE_INSTALL_PREFIX. Per usual, this can be further prefixed with an
 # environment variable "DESTDIST" on a per invocation basis (i.e. to place under
 # a versioned path, etc).
 #
@@ -1160,9 +1160,17 @@ if(IREE_BUILD_COMPILER)
   )
 
   iree_add_install_target(
+    NAME iree-install-tools-compiler-extra
+    COMPONENT IREETools-CompilerExtra
+    # TODO: Remove the ADD_TO here and include the component in the iree-dist
+    # tarball build stage.
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
     NAME iree-install-runtime-libraries-compiler
     COMPONENT IREERuntimeLibraries-Compiler
-    ADD_TO 
+    ADD_TO
       iree-install-runtime-libraries
       iree-install-tools-compiler
       iree-install-dev-libraries-compiler
