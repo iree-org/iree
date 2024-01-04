@@ -30,6 +30,7 @@ class TargetABI(Enum):
     VMVX = "vmvx"
     LINUX_GNU = "linux-gnu"
     LINUX_ANDROID29 = "linux-android29"
+    LINUX_ANDROID34 = "linux-android34"
     # IREE defined OS name for vulkan target. See:
     # compiler/src/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
     VULKAN_ANDROID30 = "android30"

@@ -29,7 +29,7 @@ class Android_ARMv8_A_Benchmarks(object):
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
         target_architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
         target_backend=iree_definitions.TargetBackend.LLVM_CPU,
-        target_abi=iree_definitions.TargetABI.LINUX_ANDROID29,
+        target_abi=iree_definitions.TargetABI.LINUX_ANDROID34,
     )
 
     PIXEL_8_CPU_FLAGS = "--iree-llvmcpu-target-cpu-features=" + ",".join(
