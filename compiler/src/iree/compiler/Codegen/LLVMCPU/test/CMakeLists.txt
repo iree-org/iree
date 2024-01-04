@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "convert_to_llvm.mlir"
     "emit_vectorization_remarks.mlir"
     "expand_f16_op_to_f32.mlir"
+    "fold_extract_into_transfer_read.mlir"
     "hal_executable_constants.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"

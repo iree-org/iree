@@ -84,10 +84,8 @@ public:
     //     scf.yield %inserted_slice
     //  }
     //```
-    for (auto user : extractOp.getResult().getUsers()) {
-      if (user != xferOp)
-        return failure();
-    }
+    if (!extractOp.getResult().hasOneUse())
+      return failure();
 
     // Bail on illegal rank-reduction: we need to check that the rank-reduced
     // dims are exactly the leading dims. I.e. the following is illegal:

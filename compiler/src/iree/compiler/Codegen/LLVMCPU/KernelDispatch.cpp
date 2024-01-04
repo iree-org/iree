@@ -207,7 +207,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
     if (hasAnySVEFeature(targetAttr)) {
-      return VectorPreProcStrategy::Masking;
+      return VectorPreProcStrategy::Peeling;
     }
 
     if (enableVectorPeeling) {
