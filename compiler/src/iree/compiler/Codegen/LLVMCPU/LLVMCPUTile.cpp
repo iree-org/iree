@@ -60,8 +60,8 @@ void LLVMCPUTilePass::runOnOperation() {
   }
 
   for (auto computeOp : computeOps) {
-    auto op = cast<TilingInterface>(computeOp);
-    if (op.getLoopIteratorTypes().empty())
+    auto op = dyn_cast<TilingInterface>(computeOp);
+    if (!op || op.getLoopIteratorTypes().empty())
       continue;
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
