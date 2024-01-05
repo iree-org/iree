@@ -28,28 +28,6 @@ namespace mlir::iree_compiler::IREE::Codegen {
 // Helpers
 //===---------------------------------------------------------------------===//
 
-static void getEffectsImpl(
-    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
-        &effects,
-    ValueRange inputOperands, ValueRange outputOperands) {
-  for (Value value : inputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
-      continue;
-    }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
-                         SideEffects::DefaultResource::get());
-  }
-  for (Value value : outputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
-      continue;
-    }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
-                         SideEffects::DefaultResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), value,
-                         SideEffects::DefaultResource::get());
-  }
-}
-
 /// Helper method to generate a function declaration at a module scope,
 /// and a call to that function
 static FailureOr<func::CallOp>
@@ -204,16 +182,28 @@ UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
                                            getStridedOuterDimsAttr());
 }
 
-#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
-  void OP_NAME::getEffects(                                                    \
-      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
-          &effects) {                                                          \
-    getEffectsImpl(effects, getDpsInputs(), getDpsInits());                    \
+void UKernelGenericOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> readOnlyOperands = getDpsInputs();
+  readOnlyOperands.append(getOtherOperands().begin(), getOtherOperands().end());
+  for (Value value : readOnlyOperands) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
   }
-
-DEFINE_OP_GET_EFFECTS(UKernelGenericOp)
-
-#undef DEFINE_OP_GET_EFFECTS
+  for (Value value : getDpsInits()) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+}
 
 } // namespace mlir::iree_compiler::IREE::Codegen
 
