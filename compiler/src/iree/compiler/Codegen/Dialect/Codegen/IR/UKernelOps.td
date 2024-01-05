@@ -10,12 +10,14 @@
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
 include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> : 
   Op<IREECodegen_Dialect, mnemonic, !listconcat(traits,
     [DeclareOpInterfaceMethods<UKernelOpInterface,
         ["lowerToFunctionCall"]>,
-     DeclareOpInterfaceMethods<DestinationStyleOpInterface>])> {}
+     DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>])> {}
   
 def IREECodegen_UKernelGenericOp :
     IREECodegen_UKernelOp<"ukernel.generic", [
