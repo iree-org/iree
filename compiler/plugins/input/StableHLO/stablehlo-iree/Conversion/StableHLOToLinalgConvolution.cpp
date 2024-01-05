@@ -55,9 +55,6 @@ Value applyConvolutionPadding(Location loc, Value input,
     }
   }
 
-  IntegerType indexType = rewriter.getIntegerType(64);
-  auto attrType = RankedTensorType::get({rank}, indexType);
-
   Value zero;
   if (auto complexType = dyn_cast<ComplexType>(inputType.getElementType())) {
     auto zeroElement = rewriter.getZeroAttr(complexType.getElementType());
@@ -72,9 +69,9 @@ Value applyConvolutionPadding(Location loc, Value input,
   }
 
   return rewriter.create<mlir::stablehlo::PadOp>(
-      loc, input, zero, DenseIntElementsAttr::get(attrType, padLow),
-      DenseIntElementsAttr::get(attrType, padHigh),
-      DenseIntElementsAttr::get(attrType, padInterior));
+      loc, input, zero, rewriter.getDenseI64ArrayAttr(padLow),
+      rewriter.getDenseI64ArrayAttr(padHigh),
+      rewriter.getDenseI64ArrayAttr(padInterior));
 }
 
 /// If the ConvolutionOp has a window reversal, applies it to the filter.
@@ -95,10 +92,7 @@ Value applyConvolutionReversal(Location loc, OpBuilder &b,
   }
 
   return b.create<mlir::stablehlo::ReverseOp>(
-      loc, filter,
-      mlir::DenseIntElementsAttr::get(
-          RankedTensorType::get(reversedDims.size(), b.getI64Type()),
-          reversedDims));
+      loc, filter, b.getDenseI64ArrayAttr(reversedDims));
 }
 
 /// Returns true if the given `dimensionNumbers` from a stablehlo.convolution op
