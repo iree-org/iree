@@ -1325,7 +1325,7 @@ void ireeCompilerInvocationSetCrashHandler(
     iree_compiler_error_t *(*onCrashCallback)(
         iree_compiler_output_t **outOutput, void *userData),
     void *userData) {
-  struct StreamImpl : public mlir::PassManager::ReproducerStream {
+  struct StreamImpl : public mlir::ReproducerStream {
     StreamImpl(iree_compiler_output_t *output) : output(output) {
       unwrap(output)->keep();
     }
@@ -1344,7 +1344,7 @@ void ireeCompilerInvocationSetCrashHandler(
       [=](mlir::PassManager &passManager) {
         passManager.enableCrashReproducerGeneration(
             [=](std::string &errorMessage)
-                -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
+                -> std::unique_ptr<mlir::ReproducerStream> {
               iree_compiler_output_t *output = nullptr;
               auto error = onCrashCallback(&output, userData);
               if (error) {
