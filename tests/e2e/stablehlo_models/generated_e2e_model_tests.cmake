@@ -34,7 +34,7 @@ iree_benchmark_suite_module_test(
   DRIVER "local-sync"
   EXPECTED_OUTPUT "https://storage.googleapis.com/iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy"
   MODULES
-    "arm_64-Android=iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android34-llvm_cpu__default-flags_dt-uk_/module.vmfb"
+    "arm_64-Android=iree_module_DeepLabV3_fp32_tflite___armv9-a-generic-linux_android34-llvm_cpu__default-flags_dt-uk_/module.vmfb"
     "x86_64-Linux=iree_module_DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
   RUNNER_ARGS
     "--function=main"

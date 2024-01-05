@@ -499,7 +499,7 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
             "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
             "--riscv-v-fixed-length-vector-lmul-max=8",
         ]
-    elif arch_info.architecture == "armv8.2-a":
+    elif arch_info.architecture in ["armv8.2-a", "armv9-a"]:
         flags = [
             f"--iree-llvmcpu-target-triple=aarch64-none-{target.target_abi.value}",
         ]
