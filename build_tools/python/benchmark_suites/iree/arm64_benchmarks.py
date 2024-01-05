@@ -36,7 +36,7 @@ class Android_ARM64_Benchmarks(object):
         [
             "+v9a",
             "+fullfp16",
-            "fp-armv8",
+            "+fp-armv8",
             "+neon",
             "+aes",
             "+sha2",
