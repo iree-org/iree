@@ -374,7 +374,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -447,7 +447,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
@@ -546,7 +546,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
 
   // Create a struct for the arguments and results.
-  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.constant"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
+  // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
   // CHECK-NEXT: %[[ARGSTRUCTFN:.+]] = emitc.apply "*"(%arg1) : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.opaque<"iree_vm_function_t">
   // CHECK-NEXT: emitc.call_opaque "EMITC_STRUCT_MEMBER_ASSIGN"(%[[ARGSTRUCT]], %[[ARGSTRUCTFN]]) {args = [0 : index, #emitc.opaque<"function">, 1 : index]}
 
