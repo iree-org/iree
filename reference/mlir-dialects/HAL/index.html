@@ -5428,7 +5428,7 @@ input.</p>
 <p>Allocates a buffer of the given size from the allocator.
 The size of the buffer returned may be larger than the requested size if the
 allocator has specific alignment requirements or minimum allocation sizes.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5490,7 +5490,7 @@ device accessible <code>!hal.buffer</code>. The returned buffer may be host-only
 not directly usable on devices. If the mapping cannot be completed (such as
 trying to map the host memory as device-local on devices with discrete
 memory) then <code>did_import</code> will indicate that the returned buffer is null.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5610,9 +5610,9 @@ ignored).</p>
 <p>Returns the allocated size of a buffer in bytes.
 May be less than the underlying buffer allocation if this is a subspan or
 view into another buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5652,9 +5652,9 @@ view into another buffer.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Loads a value from a buffer by mapping it.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5730,9 +5730,9 @@ view into another buffer.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a reference to a subspan of the buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SizeAwareOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5827,9 +5827,9 @@ used.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the buffer backing this view's contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5875,9 +5875,9 @@ used.</p>
 The buffer is not copied and both the original and view references must be
 synchronized. This makes it easier to associate commonly-carried metadata
 along with the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5937,9 +5937,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the value of the given dimension.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5984,9 +5984,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the element type of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6025,9 +6025,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the encoding type of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6066,9 +6066,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the rank of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6151,7 +6151,7 @@ compatible queues.</p>
 <p>The group and ID are optional and may be null. A rank or count of -1 can be
 used to indicate a default inherited from the environment or device
 configuration.</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6217,9 +6217,9 @@ configuration.</p>
 </code></pre></div>
 <p>Returns the rank the channel represents as a participant in a collective
 group in <code>[0, count)</code> and the total participant count.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6271,7 +6271,7 @@ is used to define the rank order. When multiple participants in a group
 use the same key the tie will be broken using their rank in the parent
 group. A color of -1 indicates that the rank does not participate in any
 subgroup and will return a null channel.</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6365,7 +6365,7 @@ given label.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches a collective operation defined by op using the given buffers.</p>
-<p>Traits: AttrSizedOperandSegments</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6481,7 +6481,7 @@ given label.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a command buffer from the device pool ready to begin recording.</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6531,9 +6531,9 @@ given label.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Used during conversion to access the device used to create a command buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6931,7 +6931,7 @@ they may be bit-casted floats, bit-packed booleans, etc.</p>
 <p>Pushes an inline-defined descriptor set to the command buffer.
 The provided buffers may either be HAL buffers or indirect references into
 the command buffer binding table.</p>
-<p>Traits: SameVariadicOperandSize</p>
+<p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6986,9 +6986,9 @@ the command buffer binding table.</p>
 The same descriptor set layout may be shared with many different executable
 layouts and by doing so some runtime binding overhead when switching between
 executables that use the same set layouts can be reduced.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7037,9 +7037,9 @@ executables that use the same set layouts can be reduced.</p>
 </code></pre></div>
 <p>Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized descriptor set layout.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7085,9 +7085,9 @@ possibly lazy-initialized descriptor set layout.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.devices.count` attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns the total number of available devices registered at runtime.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7110,9 +7110,9 @@ possibly lazy-initialized descriptor set layout.</p>
 </code></pre></div>
 <p>Returns the device with the given index in the [0, hal.devices.count) range.
 Devices may be lazily initialized upon first use.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_35">Operands:<a class="headerlink" href="#operands_35" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7152,9 +7152,9 @@ Devices may be lazily initialized upon first use.</p>
 </code></pre></div>
 <p>Returns the allocator that can be used to allocate buffers compatible with
 the device.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_36">Operands:<a class="headerlink" href="#operands_36" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7227,9 +7227,9 @@ forever; all non-experimental keys should be vetted.</p>
   The actual concurrency available may be less depending on device state.</p>
 </li>
 </ul>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7293,7 +7293,7 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 <p>The buffer handle will remain live so long as there are retainers but the
 contents are undefined before the allocation signal fence has been signaled
 and after the deallocation wait fence has been reached.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7626,7 +7626,7 @@ result in propagated semaphore failure or device loss.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.return` ($operands^ `:` type($operands))? attr-dict
 </code></pre></div>
 <p>Returns the given values from the region and back to the host code.</p>
-<p>Traits: Terminator</p>
+<p>Traits: <code>Terminator</code></p>
 <h5 id="operands_44">Operands:<a class="headerlink" href="#operands_44" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7653,8 +7653,8 @@ result in propagated semaphore failure or device loss.</p>
 </code></pre></div>
 <p>A compiled executable binary with an optional nested module containing the
 IR prior to serialization (for debugging).</p>
-<p>Traits: HasParent<IREE::HAL::ExecutableOp></p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7677,9 +7677,9 @@ IR prior to serialization (for debugging).</p>
 <p>Calculates the workgroup count (grid XYZ) based on the given workload using
 the workgroup count calculation region of the target
 <code>hal.executable.export</code> op.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7735,8 +7735,8 @@ op that returns true if the variant is valid for use on the provided
 runtime <code>!hal.device</code>. If no variants within an executable are valid then
 loading will fail at runtime. If multiple variants are valid the first valid
 one found will be loaded and used for execution.</p>
-<p>Traits: IsolatedFromAbove</p>
-<p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7780,8 +7780,8 @@ a way compatible with its execution model. Examples:
 - SPIR-V: specialization constants
 - Metal: function constants
 - WebGPU: pipeline-overridable constants</p>
-<p>Traits: HasParent<IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp>, IsolatedFromAbove</p>
-<p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7802,9 +7802,9 @@ bitcast (possibly with truncation or zero-extension) to the result type.</p>
 <p>Note that backends are allowed to implement their own mechanisms for
 referencing constant block values and this is provided only as a default for
 those not needing special behavior.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7845,9 +7845,9 @@ can issue preparation requests from multiple threads - even for the same
 executables - and calls will block until preparation completes.</p>
 <p>Optional constants provide for specialization of the executable based on
 runtime-derived parameters.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7897,7 +7897,7 @@ runtime-derived parameters.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable_end` attr-dict
 </code></pre></div>
-<p>Traits: HasParent<IREE::HAL::ExecutableOp>, Terminator</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutableexport-halexecutableexportop"><code>hal.executable.export</code> (HAL::ExecutableExportOp)<a class="headerlink" href="#halexecutableexport-halexecutableexportop" title="Permanent link">link</a></h4>
 <p><em>Executable entry point declaration</em></p>
 <p>An entry point exported by the executable with statically-available
@@ -7906,8 +7906,8 @@ information describing the IO interface it uses and other dispatch metadata.</p>
 returns the number of workgroups to use in the 3D grid dispatch.
 The arguments to the region represents the workload as captured by each
 dispatch. It returns the number of workgroups along x, y, and z.</p>
-<p>Traits: HasParent<IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp>, IsolatedFromAbove</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp, IREE::HAL::ExecutableVariantOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7930,9 +7930,9 @@ dispatch. It returns the number of workgroups along x, y, and z.</p>
 </code></pre></div>
 <p>Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized executable.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7979,8 +7979,8 @@ possibly lazy-initialized executable.</p>
 </code></pre></div>
 <p>An executable module representing a target-specific compiled
 kernel/shader/etc.</p>
-<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableEndOp>, SymbolTable, Util_ObjectLike</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code>, <code>Util_ObjectLike</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7993,7 +7993,7 @@ kernel/shader/etc.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.source_end` attr-dict
 </code></pre></div>
-<p>Traits: HasParent<IREE::HAL::ExecutableSourceOp>, Terminator</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableSourceOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutablesource-halexecutablesourceop"><code>hal.executable.source</code> (HAL::ExecutableSourceOp)<a class="headerlink" href="#halexecutablesource-halexecutablesourceop" title="Permanent link">link</a></h4>
 <p><em>Generic source contents of an executable op</em></p>
 <p>Syntax:</p>
@@ -8006,8 +8006,8 @@ kernel/shader/etc.</p>
 <p>This is an unspecialized source representation of an executable
 module without an assigned target. This is useful for hand-authoring
 executables prior to device specification.</p>
-<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableSourceEndOp>, SymbolTable</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableSourceEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8021,7 +8021,7 @@ executables prior to device specification.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `hal.executable.variant_end` attr-dict
 </code></pre></div>
-<p>Traits: HasParent<IREE::HAL::ExecutableVariantOp>, Terminator</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableVariantOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="halexecutablevariant-halexecutablevariantop"><code>hal.executable.variant</code> (HAL::ExecutableVariantOp)<a class="headerlink" href="#halexecutablevariant-halexecutablevariantop" title="Permanent link">link</a></h4>
 <p><em>Target-specific variant of an executable op</em></p>
 <p>Syntax:</p>
@@ -8039,8 +8039,8 @@ op that returns true if the variant is valid for use on the provided
 runtime <code>!hal.device</code>. If no variants within an executable are valid then
 loading will fail at runtime. If multiple variants are valid the first valid
 one found will be loaded and used for execution.</p>
-<p>Traits: HasParent<IREE::HAL::ExecutableOp>, IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::HAL::ExecutableVariantEndOp>, SymbolTable</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::HAL::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::HAL::ExecutableVariantEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8076,7 +8076,7 @@ sketchy and likely slow. Instead we should probably have a way to query for
 a file handle derived from the calling module by stack-walking and asking
 the VM module for its handle. Until we can figure this out this method will
 be marked epxerimental.</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8145,8 +8145,8 @@ be marked epxerimental.</p>
 </code></pre></div>
 <p>Yields the caller until all fences is reached. Returns the <code>status</code> of the
 fence after the wait, with a non-zero value indicating failure.</p>
-<p>Traits: Util_YieldPoint</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Traits: <code>Util_YieldPoint</code></p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="operands_49">Operands:<a class="headerlink" href="#operands_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8193,8 +8193,8 @@ fence after the wait, with a non-zero value indicating failure.</p>
 unsignaled unless they are explicitly signaled with <code>hal.fence.signal</code> or
 asynchronously signaled by the device by passing them as an operand to
 queue submission ops.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8268,7 +8268,7 @@ for the lifetime of each semaphore.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a fence that joins the input fences as a wait-all operation.</p>
-<p>Interfaces: OpAsmOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code></p>
 <h5 id="operands_52">Operands:<a class="headerlink" href="#operands_52" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8373,9 +8373,9 @@ reached. Waiting work may begin immediately.</p>
 </code></pre></div>
 <p>Emits a workgroup-specific memory load event indicating that a number of
 bytes from the given resolved pointer have been loaded by the workgroup.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_55">Operands:<a class="headerlink" href="#operands_55" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8431,9 +8431,9 @@ bytes from the given resolved pointer have been loaded by the workgroup.</p>
 </code></pre></div>
 <p>Emits a workgroup-specific memory store event indicating that a number of
 bytes have been stored to the given resolved pointer by the workgroup.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_56">Operands:<a class="headerlink" href="#operands_56" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8647,9 +8647,9 @@ the result type (tensor, memref, etc).</p>
 <p>An optional alignment indicates the byte alignment of the base binding
 resource. Note that the byte offset is added to the base and the alignment
 will be the minimum of the two.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8714,9 +8714,9 @@ index into binding resources.</p>
 to the constant from all dispatch sites in the program. If omitted the value
 may be from an unanalyzable source (outside of the program, indirect, etc)
 and must be assumed to have any value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8754,9 +8754,9 @@ built-in variable.</p>
 %y = hal.interface.workgroup.count[1] : index
 %z = hal.interface.workgroup.count[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8791,9 +8791,9 @@ built-in variable.</p>
 %y = hal.interface.workgroup.id[1] : index
 %z = hal.interface.workgroup.id[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8829,9 +8829,9 @@ built-in variable.</p>
 %y = hal.interface.workgroup.size[1] : index
 %z = hal.interface.workgroup.size[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8871,9 +8871,9 @@ the layout between executables will reduce runtime binding overhead and it
 is often worth the cost to allow a small number of unused bindings in one
 executable such that it can share layouts with others that will be scheduled
 adjacent to it.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8924,9 +8924,9 @@ adjacent to it.</p>
 </code></pre></div>
 <p>Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized pipeline layout.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9046,9 +9046,9 @@ the variant is valid for use on the provided runtime <code>!hal.device</code>. I
 variants within an executable are valid then loading will fail at runtime.
 If multiple variants are valid the first valid one found will be loaded and
 used for execution.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, IsolatedFromAbove</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9116,7 +9116,7 @@ used for execution.</p>
 </code></pre></div>
 <p>Defines a barrier that is used to indicate availability of an entire set of
 tensors by signaling a fence. The source tensors are returned for chaining.</p>
-<p>Interfaces: TiedOpInterface</p>
+<p>Interfaces: <code>TiedOpInterface</code></p>
 <h5 id="operands_64">Operands:<a class="headerlink" href="#operands_64" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -9174,9 +9174,9 @@ types, etc.</p>
 result. The export will fail at runtime if the storage is null or if it has
 insufficient capacity to store the output. The storage must be
 device-visible and defined for transfer-target and dispatch usage.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9242,9 +9242,9 @@ representation. The types must be bitcastable (same storage size) and
 dynamically shaped values must have the same number of dynamic dimensions.
 This allows for casting between rank-0 and rank-N types, different element
 types, etc.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

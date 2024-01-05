@@ -3451,7 +3451,7 @@ restrictions.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Dispatches execution to an executable entry point with the given parameters.</p>
-<p>Traits: AttrSizedOperandSegments</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3522,8 +3522,8 @@ restrictions.</p>
 </code></pre></div>
 <p>Dispatches execution to an executable entry point with the given parameters.
 The entry point is a symbolic reference to an exported entry point.</p>
-<p>Traits: AttrSizedOperandSegments</p>
-<p>Interfaces: SymbolUserOpInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>SymbolUserOpInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3585,9 +3585,9 @@ The entry point is a symbolic reference to an exported entry point.</p>
 <p>Creates, loads, and dynamically links an executable.</p>
 <p>Optional constants provide for specialization of the executable based on
 runtime-derived parameters.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3637,9 +3637,9 @@ runtime-derived parameters.</p>
 </code></pre></div>
 <p>Used during conversion to provide a placeholder for a globally cached and
 possibly lazy-initialized executable.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SymbolUserOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3671,9 +3671,9 @@ possibly lazy-initialized executable.</p>
 <p>Returns true if the given format is supported by the device loader. This
 does not guarantee that loading will succeed as the executable may require
 functionality that cannot be met my the hosting runtime environment.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

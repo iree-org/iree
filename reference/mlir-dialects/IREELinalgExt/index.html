@@ -3796,8 +3796,8 @@ KC_to_CKkc example the tiled loops.</p>
 <div class="highlight"><pre><span></span><code>iree_linalg_ext.pack %arg padding_value(%pad : f32) inner_dims_pos = [0, 1]
   inner_tiles = [8, 2] into %arg1 : (memref&lt;13x15xf32&gt; memref&lt;2x8x8x2xf32&gt;)
 </code></pre></div>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3857,9 +3857,9 @@ KC_to_CKkc example the tiled loops.</p>
 does not change the rank or extent of a tensor. Instead it
 adds an encoding attribute to the tensor type to represent
 a change in layout.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), ReifyRankedShapedTypeOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3918,8 +3918,8 @@ also supports permuting the tiled loops.</p>
 <div class="highlight"><pre><span></span><code>iree_linalg_ext.unpack %arg1 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1]
   inner_tiles = [32, 8] into %arg0 : (memref&lt;32x4x32x8xf32&gt; memref&lt;128x256xf32&gt;)
 </code></pre></div>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3974,9 +3974,9 @@ also supports permuting the tiled loops.</p>
 <p>Operation to convert an tensor with encoding that represents
 its data layout into a tensor with default layout (i.e. no encoding).
 For now in IREE the default layout is row-major.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), ReifyRankedShapedTypeOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>ReifyRankedShapedTypeOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4017,9 +4017,9 @@ of the given encoding. This can be used outside of target-specific code, so
 there may be multiple targets, and this will return the maximum tile size
 from iterating over all of them. The evaluation happens in the
 MaterializeUpperBoundTileSize pass.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4061,8 +4061,8 @@ have the same shape (BxNxd), while the key and value differ in sequence length
 (they have shape BxLxd, where L != N).
 This operator after tiling results in a tiled result as per flash attention and results
 in the current <code>max</code> and <code>sum</code> statistics while processing the current tile.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4113,8 +4113,8 @@ https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm</p>
 <p>The size of innermost dim is expected to be a power of 2.</p>
 <p>It is optional to carry coefficient tensors/buffers as inputs. In this
 context, they will be the second and third inputs.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4160,8 +4160,8 @@ context, they will be the second and third inputs.</p>
 <p>A temporary solution for lowering reverse ops into IREE, allowing IREE to
 tile and distribute them.
 }</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4213,8 +4213,8 @@ tile and distribute them.
               $region (`-&gt;` type($results)^)?
 </code></pre></div>
 <p>Computes the inclusive/exclusive scan along a given dimension.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4294,8 +4294,8 @@ marked as reduction.</p>
 <p>The shapes definition follows tensorflow operations execept that it force
 batch dims to be 1D. See more information in
   https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4349,8 +4349,8 @@ batch dims to be 1D. See more information in
 <p>Based on XLA operation semantics, sorts the given <code>operands</code> at the given
 <code>dimension</code> with the given <code>comparator</code>.</p>
 <p>See https://www.tensorflow.org/xla/operation_semantics#sort.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4414,8 +4414,8 @@ i1. If true, the two values are swapped:
   - For Top-K compoarision: &gt;
   - For Min-K comparision: &lt;
 Note: when the two values are equal, the first occurence is always selected.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, LinalgExtOp, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4490,9 +4490,9 @@ since the op does not implement any transform interface.</p>
 </code></pre></div>
 <p><code>iree_linalg_ext.yield</code> is a special terminator operation for blocks inside
 regions in <code>iree_linalg_ext</code> ops.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, ReturnLike, Terminator</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4530,8 +4530,8 @@ The input to the operator is an image of shape (N, H, W, C) or (N, C, H, W)
 and the output is an operator of shape (m + r - 1, m + r - 1, N, H', W', C)
 where H' = ceil((H - m + 1)/r) and W' = ceil((W - m + 1)/r). The result
 of this operator is first collapsed and then fed to a batch matmul op.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4599,8 +4599,8 @@ shape (m + r - 1, m + r - 1, N, H', W', C) and the output is a
 tensor of shape (N, H, W, C) or (N, C, H, W) where H = r H' and W = r W'.
 This operator is followed by a tensor.extract_slice which extracts
 only the non-padded part of the output.</p>
-<p>Traits: AttrSizedOperandSegments, SingleBlock, SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</p>
-<p>Interfaces: DestinationStyleOpInterface, LinalgExtInterface, MemoryEffectOpInterface, ReifyRankedShapedTypeOpInterface, TilingInterface</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

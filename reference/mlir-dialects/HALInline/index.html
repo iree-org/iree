@@ -3648,7 +3648,7 @@ carries the same usage restrictions.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Allocates a buffer with a copy of the provided contents.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3705,7 +3705,7 @@ carries the same usage restrictions.</p>
 <p>Allocates a buffer of the given size.
 The size of the buffer returned may be larger than the requested size if the
 allocator has specific alignment requirements or minimum allocation sizes.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3754,9 +3754,9 @@ allocator has specific alignment requirements or minimum allocation sizes.</p>
 <p>Returns the allocated size of a buffer in bytes.
 May be less than the underlying buffer allocation if this is a subspan or
 view into another buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3797,9 +3797,9 @@ view into another buffer.</p>
 <p>Returns the host backing storage of the HAL buffer as a subspan limited to
 to the buffer's logical range (meaning that byte 0 of the returned buffer is
 byte 0 of the HAL buffer).</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3839,9 +3839,9 @@ byte 0 of the HAL buffer).</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a reference to a subspan of the buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SizeAwareOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3889,7 +3889,7 @@ byte 0 of the HAL buffer).</p>
 </code></pre></div>
 <p>Tries wrapping a !hal.buffer around host memory backed by the given byte
 buffer.</p>
-<p>Interfaces: OpAsmOpInterface, SizeAwareOpInterface</p>
+<p>Interfaces: <code>OpAsmOpInterface</code>, <code>SizeAwareOpInterface</code></p>
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3984,9 +3984,9 @@ used.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the buffer backing this view's contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4032,9 +4032,9 @@ used.</p>
 The buffer is not copied and both the original and view references must be
 synchronized. This makes it easier to associate commonly-carried metadata
 along with the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4094,9 +4094,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the value of the given dimension.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4141,9 +4141,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the element type of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4182,9 +4182,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the encoding type of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4223,9 +4223,9 @@ along with the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the rank of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4312,9 +4312,9 @@ much care as a binary file format change. Keys should be prefixed with <code>ex.
 when experimental indicating that they are not expected to be present
 forever; all non-experimental keys should be vetted.</p>
 <p>Well-known keys: (none yet)</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

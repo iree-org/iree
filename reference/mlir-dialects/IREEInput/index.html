@@ -4523,9 +4523,9 @@ LLVM/MLIR's API surface is itself unstable.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a reference to a subspan of the buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4579,9 +4579,9 @@ LLVM/MLIR's API surface is itself unstable.</p>
 The buffer is not copied and both the original and view references must be
 synchronized. This makes it easier to associate commonly-carried metadata
 along with the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_1">Operands:<a class="headerlink" href="#operands_1" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4638,9 +4638,9 @@ along with the contents.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.buffer_view.dim` $buffer_view `,` $index attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns the value of the given dimension.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4683,9 +4683,9 @@ along with the contents.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.buffer_view.rank` $buffer_view attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns the rank of the buffer view.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4725,9 +4725,9 @@ along with the contents.</p>
 <p>Defines a compile-time byte buffer based on the given attribute value.
 The attribute will be serialized into the canonical IREE format for the
 chosen host target.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4762,7 +4762,7 @@ chosen host target.</p>
 <p>Wraps any operands in an unoptimizable identity to prevent its results from
 being folded. It will be dropped during the final step in compilation and
 has no effect at runtime.</p>
-<p>Traits: SameOperandsAndResultType</p>
+<p>Traits: <code>SameOperandsAndResultType</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4805,9 +4805,9 @@ has no effect at runtime.</p>
               type($results), $result_dims,
               $tied_operands)
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), SymbolUserOpInterface, TiedOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4867,8 +4867,8 @@ has no effect at runtime.</p>
               `layout` `(` $layout `)`
               attr-dict-with-keyword
 </code></pre></div>
-<p>Traits: HasParent<IREE::Input::ExecutableSourceOp>, IsolatedFromAbove</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::Input::ExecutableSourceOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4886,7 +4886,7 @@ has no effect at runtime.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.executable.source_end` attr-dict
 </code></pre></div>
-<p>Traits: HasParent<IREE::Input::ExecutableSourceOp>, Terminator</p>
+<p>Traits: <code>HasParent&lt;IREE::Input::ExecutableSourceOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="iree_inputexecutablesource-inputexecutablesourceop"><code>iree_input.executable.source</code> (Input::ExecutableSourceOp)<a class="headerlink" href="#iree_inputexecutablesource-inputexecutablesourceop" title="Permanent link">link</a></h4>
 <p><em>Generic source contents of an executable op</em></p>
 <p>Syntax:</p>
@@ -4896,8 +4896,8 @@ has no effect at runtime.</p>
               ``
               regions
 </code></pre></div>
-<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::Input::ExecutableSourceEndOp>, SymbolTable</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Input::ExecutableSourceEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4914,9 +4914,9 @@ has no effect at runtime.</p>
 </code></pre></div>
 <p>Returns the address of a global as a typed reference. Can be used with the
 global load and store indirect ops.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4980,7 +4980,7 @@ global load and store indirect ops.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.global.load` $global attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns a copy of the global value.</p>
-<p>Interfaces: SymbolUserOpInterface</p>
+<p>Interfaces: <code>SymbolUserOpInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5015,7 +5015,7 @@ global load and store indirect ops.</p>
 <p>Declares a global variable that maintains its value across invocations.
 The value is tied to the execution context of the module and different
 contexts will have different global storage.</p>
-<p>Interfaces: Symbol</p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5058,7 +5058,7 @@ contexts will have different global storage.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.global.store` $value `,` $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Stores a copy of the value into a global.</p>
-<p>Interfaces: SymbolUserOpInterface</p>
+<p>Interfaces: <code>SymbolUserOpInterface</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5087,9 +5087,9 @@ contexts will have different global storage.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.list.create` ($initial_capacity^)? attr-dict `:` type($result)
 </code></pre></div>
 <p>Creates a new empty list with an optional initial capacity.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5127,8 +5127,8 @@ contexts will have different global storage.</p>
 </code></pre></div>
 <p>Returns the value of the element at the given index. Note that the value
 may be null if the element is null or the type does not match.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5171,8 +5171,8 @@ may be null if the element is null or the type does not match.</p>
 <p>Resizes the list to contain <code>new_size</code> elements. This will either truncate
 the list if the existing size is greater than <code>new_size</code> or extend the list
 with the default list value of the element type.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5198,8 +5198,8 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.list.set` $list `[` $index `]` `,` $value attr-dict `:` type($list) `,` type($value)
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5229,8 +5229,8 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.list.size` operands attr-dict `:` type($list)
 </code></pre></div>
 <p>Returns the current size of the list in elements.</p>
-<p>Interfaces: InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5268,9 +5268,9 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.tensor.export` $source `:` type($source) (`{` $source_dims^ `}`)? `-&gt;` type($target)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5311,9 +5311,9 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.tensor.import` $source `:` type($source) `-&gt;` type($target) (`{` $target_dims^ `}`)?
               attr-dict-with-keyword
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5358,9 +5358,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Bitcasts a tensor to a new shape without modifying the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5406,9 +5406,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Clones the input tensor into an identical output tensor.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5451,9 +5451,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the element at the given location from within the tensor.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5501,9 +5501,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Reshapes a tensor to a new shape without modifying the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5551,9 +5551,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Clones a subregion of a tensor.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5607,9 +5607,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a tensor initialized to the given primitive value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5652,9 +5652,9 @@ with the default list value of the element type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a tensor with the element at the given index set to the given value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5707,7 +5707,7 @@ with the default list value of the element type.</p>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given
 tensors. The key is arbitrary and can be used for identifying the set of
 values being traced.</p>
-<p>Traits: AttrSizedOperandSegments</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5743,9 +5743,9 @@ values being traced.</p>
 </code></pre></div>
 <p>Updates the target tensor with the contents of the update tensor at the
 given offset indices.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5799,9 +5799,9 @@ given offset indices.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.align` $value `,` $alignment attr-dict `:` type($result)
 </code></pre></div>
 <p>Aligns |value| up to the given power-of-two |alignment| if required.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5842,9 +5842,9 @@ given offset indices.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `iree_input.null` attr-dict `:` type($result)
 </code></pre></div>
 <p>Initializes reference and variant types with a null value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5873,9 +5873,9 @@ restricted to 3 (XYZ).</p>
 <div class="highlight"><pre><span></span><code>%x = iree_input.dispatch.workgroup.count[0] : index
 %y = iree_input.dispatch.workgroup.count[1] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5910,9 +5910,9 @@ restricted to 3 (XYZ).</p>
 <div class="highlight"><pre><span></span><code>%x = iree_input.dispatch.workgroup.id[0] : index
 %y = iree_input.dispatch.workgroup.id[1] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5952,9 +5952,9 @@ restricted to 3 (XYZ).</p>
 <div class="highlight"><pre><span></span><code>%x = iree_input.dispatch.workgroup.size[0] : index
 %y = iree_input.dispatch.workgroup.size[1] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

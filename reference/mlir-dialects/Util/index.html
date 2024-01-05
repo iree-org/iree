@@ -4333,9 +4333,9 @@
 <div class="highlight"><pre><span></span><code>operation ::= `util.align` $value `,` $alignment attr-dict `:` type($result)
 </code></pre></div>
 <p>Aligns |value| up to the given power-of-two |alignment| if required.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands">Operands:<a class="headerlink" href="#operands" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4382,9 +4382,9 @@ later.</p>
 <p>Returns the size in bytes, rounded up to the next whole byte of the
 specified type. This op will fold to a constant index value for IntegerType
 and FloatType. All others are not folded.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4417,9 +4417,9 @@ and FloatType. All others are not folded.</p>
 </code></pre></div>
 <p>Allocates a buffer with undefined contents. Consumers of the allocated
 result must assume nothing of the contents.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4467,9 +4467,9 @@ result must assume nothing of the contents.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns true if the two ranges are bitwise equivalent, somewhat like memcmp.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_2">Operands:<a class="headerlink" href="#operands_2" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4532,9 +4532,9 @@ result must assume nothing of the contents.</p>
 <p>Defines a compile-time byte buffer based on the given attribute value.
 The attribute will be serialized into the canonical IREE format for the
 chosen host target.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4570,8 +4570,8 @@ chosen host target.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Copies a range of bytes as with memcpy (no overlapping).</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource, MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource, MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4619,9 +4619,9 @@ chosen host target.</p>
 </code></pre></div>
 <p>Hints that the buffer contents can be discarded. Buffers are reference
 counted and other owners may keep it live beyond the dealloc.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Free on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Free on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4652,8 +4652,8 @@ counted and other owners may keep it live beyond the dealloc.</p>
 </code></pre></div>
 <p>Fills the contents of the buffer in the given byte range with a pattern.
 The offset and length must match the natural alignment of the pattern type.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4694,8 +4694,8 @@ The offset and length must match the natural alignment of the pattern type.</p>
 </code></pre></div>
 <p>Loads a value at a byte offset. Must be aligned to the natural size of the
 result type.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4746,9 +4746,9 @@ result type.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the total length of the buffer in bytes from its base offset.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4787,9 +4787,9 @@ result type.</p>
               type($result) `` `{` $result_size `}`
 </code></pre></div>
 <p>Returns a copy of the contents from the source buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource, MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource, MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4849,9 +4849,9 @@ result type.</p>
 the returned range. The memref may be of any type and the user is
 responsible for ensuring that the reinterpret_cast-like behavior makes sense
 for the data they are accessing.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4900,8 +4900,8 @@ for the data they are accessing.</p>
 </code></pre></div>
 <p>Stores a value at a byte offset. Must be aligned to the natural size of the
 source type.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -4947,9 +4947,9 @@ buffer storage.</p>
 <p>Subspans are a compiler-only concept and are propagated by an analysis pass
 to result in absolute offsets on accesses any place the subrange would have
 been used.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SubrangeOperandOpInterface, TiedOpInterface, Util_SizeAwareOp, Util_SubrangeOp, ViewLikeOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SubrangeOperandOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code>, <code>Util_SubrangeOp</code>, <code>ViewLikeOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5002,7 +5002,7 @@ been used.</p>
 <p>Wraps any operands in an unoptimizable identity to prevent its results from
 being folded. It will be dropped during the final step in compilation and
 has no effect at runtime.</p>
-<p>Traits: SameOperandsAndResultType</p>
+<p>Traits: <code>SameOperandsAndResultType</code></p>
 <h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5076,9 +5076,9 @@ stripped during translation.</p>
 ^bb2:
   ...
 </code></pre></div>
-<p>Traits: ReturnLike, Terminator</p>
-<p>Interfaces: NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5107,9 +5107,9 @@ possible narrowing of an IndexType to a specific integer).</p>
 <code>semantic_type</code> constrains the element type.</p>
 <p>Optionally, the minimum and maximum integer values (for integer semantic
 types) are tracked if known.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5156,9 +5156,9 @@ types) are tracked if known.</p>
 </code></pre></div>
 <p>Returns the address of a global as a typed reference. Can be used with the
 global load and store indirect ops.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, SymbolUserOpInterface, Util_GlobalAddressOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalAddressOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5186,7 +5186,7 @@ global load and store indirect ops.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.load.indirect` $global attr-dict `:` qualified(type($global)) `-&gt;` type($result)
 </code></pre></div>
 <p>Returns a copy of the global variable value.</p>
-<p>Interfaces: Util_GlobalLoadIndirectOpInterface</p>
+<p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code></p>
 <h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5223,7 +5223,7 @@ global load and store indirect ops.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.load` $global attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns a global variable value.</p>
-<p>Interfaces: MemoryEffectOpInterface, OpAsmOpInterface, SymbolUserOpInterface, Util_GlobalLoadOpInterface</p>
+<p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5257,7 +5257,7 @@ global load and store indirect ops.</p>
 <p>Declares a global variable that maintains its value across invocations.
 The value is tied to the execution context of the module and different
 contexts will have different variable storage.</p>
-<p>Interfaces: Symbol, Util_GlobalOpInterface</p>
+<p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5274,7 +5274,7 @@ contexts will have different variable storage.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.store.indirect` $value `,` $global attr-dict `:` type($value) `-&gt;` qualified(type($global))
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
-<p>Interfaces: Util_GlobalStoreIndirectOpInterface</p>
+<p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code></p>
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5300,7 +5300,7 @@ contexts will have different variable storage.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.global.store` $value `,` $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
-<p>Interfaces: SymbolUserOpInterface, Util_GlobalStoreOpInterface</p>
+<p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5330,9 +5330,9 @@ contexts will have different variable storage.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.create` ($initial_capacity^)? attr-dict `:` qualified(type($result))
 </code></pre></div>
 <p>Creates a new empty list with an optional initial capacity.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5370,8 +5370,8 @@ contexts will have different variable storage.</p>
 </code></pre></div>
 <p>Returns the value of the element at the given index. Note that the value
 may be null if the element is null or the type does not match.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5414,8 +5414,8 @@ may be null if the element is null or the type does not match.</p>
 <p>Resizes the list to contain <code>new_size</code> elements. This will either truncate
 the list if the existing size is greater than <code>new_size</code> or extend the list
 with the default list value of the element type.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5441,8 +5441,8 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.set` $list `[` $index `]` `,` $value attr-dict `:` custom&lt;ListTypeSet&gt;(type($list), type($value))
 </code></pre></div>
 <p>Sets the element at the given index to the new value.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5472,8 +5472,8 @@ with the default list value of the element type.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.list.size` operands attr-dict `:` qualified(type($list))
 </code></pre></div>
 <p>Returns the current size of the list in elements.</p>
-<p>Interfaces: InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5513,9 +5513,9 @@ with the default list value of the element type.</p>
 <p>Computes min(offsets) and max(offsets + lengths). Though it's possible to
 express this with standard arithmetic this op enables more semantically
 meaningful folding/optimizations.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType, SameVariadicOperandSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5562,9 +5562,9 @@ meaningful folding/optimizations.</p>
 <p>Computes the max of a variadic list of operands. Though it's possible to
 express this with standard arithmetic this op enables more semantically
 meaningful folding/optimizations.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType, SameVariadicOperandSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5603,9 +5603,9 @@ meaningful folding/optimizations.</p>
 <p>Computes the min of a variadic list of operands. Though it's possible to
 express this with standard arithmetic this op enables more semantically
 meaningful folding/optimizations.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameOperandsAndResultType, SameVariadicOperandSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_24">Operands:<a class="headerlink" href="#operands_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5678,8 +5678,8 @@ or pending when the failure occurs will complete.</p>
 <p>A function that is called in definition order upon module initialization.
 Must not load any globals that are defined or initialized after it in the
 module.</p>
-<p>Traits: IsolatedFromAbove</p>
-<p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol, Util_InitializerOpInterface</p>
+<p>Traits: <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
 <h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5694,9 +5694,9 @@ module.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.initializer.return` attr-dict
 </code></pre></div>
 <p>Returns control from an initializer function.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, HasParent<IREE::Util::InitializerOp>, ReturnLike, Terminator</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::Util::InitializerOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h3 id="type-manipulation-ops">Type manipulation ops<a class="headerlink" href="#type-manipulation-ops" title="Permanent link">link</a></h3>
 <h4 id="utilcast-utilcastop"><code>util.cast</code> (Util::CastOp)<a class="headerlink" href="#utilcast-utilcastop" title="Permanent link">link</a></h4>
 <p><em>Casts one util type to another ala static_cast/dynamic_cast</em></p>
@@ -5704,9 +5704,9 @@ module.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.cast` $operand attr-dict `:` type($operand) `to` type($result)
 </code></pre></div>
 <p>Performs a type cast between object types known to the util dialect.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: CastOpInterface, ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>CastOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5744,9 +5744,9 @@ module.</p>
 </code></pre></div>
 <p>Compares two operands for equality. This is intended for comparing IREE
 reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Commutative</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5788,9 +5788,9 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </code></pre></div>
 <p>Defines an SSA value that is lowered into dialects supporting
 null/undefined/optional/etc values.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5823,9 +5823,9 @@ the index is out of bounds.</p>
 // If %index is out of range (&lt;0 or &gt;2) then default to %c5.
 %0 = util.switch %index[%c100, %c200, %c300] else %c5 : i32
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>

@@ -5330,8 +5330,8 @@ host logic is required to compute the size (avoid at all costs!) a separate
 func.call can be used outside of the stream to do so. If sizes are
 unknownable until the operation is performed it should be made as a normal
 asynchronous host call with 'coarse-fences' instead.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, CallOpInterface, Stream_AffinityOp, Stream_StreamableOp, SymbolUserOpInterface, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>CallOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5432,8 +5432,8 @@ only ready once all nested ops complete execution.</p>
     stream.yield %1, %2
   }
 </code></pre></div></p>
-<p>Traits: AttrSizedOperandSegments, HasParent<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, ClosureOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>HasParent&lt;IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp&gt;</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>ClosureOpInterface</code>, <code>RegionBranchOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5500,8 +5500,8 @@ results are only ready once all nested ops complete execution and the
 returned timepoint is reached. Zero or more timepoints may be provided to
 block execution until they are all reached; zero timepoints indicates that
 execution may begin immediately.</p>
-<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, ClosureOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_TimelineOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>ClosureOpInterface</code>, <code>RegionBranchOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5571,8 +5571,8 @@ execution may begin immediately.</p>
 <p>Declares a function that can be called as an asynchronous streaming
 operation via <code>stream.async.call</code>. Today only external functions are
 allowed.</p>
-<p>Traits: IsolatedFromAbove, Stream_AsyncPhaseOp</p>
-<p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5592,9 +5592,9 @@ allowed.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the total participant count in the collective communicator group.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_3">Operands:<a class="headerlink" href="#operands_3" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5642,9 +5642,9 @@ compatible affinities.</p>
 <p>The group and ID are optional and may be null. The rank and count can be
 omitted to indicate a default inherited from the environment or device
 configuration at runtime.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_4">Attributes:<a class="headerlink" href="#attributes_4" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5698,9 +5698,9 @@ configuration at runtime.</p>
 </code></pre></div>
 <p>Returns the rank the channel represents as a participant in a collective
 group in <code>[0, count)</code>.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_5">Operands:<a class="headerlink" href="#operands_5" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5745,9 +5745,9 @@ is used to define the rank order. When multiple participants in a group
 use the same key the tie will be broken using their rank in the parent
 group. A color of -1 indicates that the rank does not participate in any
 subgroup and will return a null channel.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5795,9 +5795,9 @@ subgroup and will return a null channel.</p>
 </code></pre></div>
 <p>Returns a subview to a tensor or memref-like type from a binding. The same
 binding may have multiple subviews at different byte offsets.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5849,9 +5849,9 @@ built-in variable.</p>
 %y = stream.dispatch.workgroup.count[1] : index
 %z = stream.dispatch.workgroup.count[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5887,9 +5887,9 @@ built-in variable.</p>
 %y = stream.dispatch.workgroup.id[1] : index
 %z = stream.dispatch.workgroup.id[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5930,9 +5930,9 @@ built-in variable.</p>
 %y = stream.dispatch.workgroup.size[1] : index
 %z = stream.dispatch.workgroup.size[2] : index
 </code></pre></div>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_7">Attributes:<a class="headerlink" href="#attributes_7" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5959,7 +5959,7 @@ built-in variable.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.executable.end` attr-dict
 </code></pre></div>
-<p>Traits: HasParent<IREE::Stream::ExecutableOp>, Terminator</p>
+<p>Traits: <code>HasParent&lt;IREE::Stream::ExecutableOp&gt;</code>, <code>Terminator</code></p>
 <h4 id="streamexecutableexport-streamexecutableexportop"><code>stream.executable.export</code> (Stream::ExecutableExportOp)<a class="headerlink" href="#streamexecutableexport-streamexecutableexportop" title="Permanent link">link</a></h4>
 <p><em>Defines an executable entry point for dispatch operations</em></p>
 <p>Syntax:</p>
@@ -5973,8 +5973,8 @@ exports can reference the same internal function.</p>
 <p>Each entry point can have a unique workgroup count calculation region.
 This region takes the workload parameters passed to each flow.dispatch and
 produces an XYZ workgroup count for the 3D grid dispatch.</p>
-<p>Traits: HasParent<IREE::Stream::ExecutableOp>, IsolatedFromAbove</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>HasParent&lt;IREE::Stream::ExecutableOp&gt;</code>, <code>IsolatedFromAbove</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -5994,8 +5994,8 @@ produces an XYZ workgroup count for the 3D grid dispatch.</p>
 <p>An executable module containing one or more public functions. The contents
 of the functions are safe to dispatch and can be lowered further to
 target-specific backend IR representations.</p>
-<p>Traits: IsolatedFromAbove, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::ExecutableEndOp>, SymbolTable, Util_ObjectLike</p>
-<p>Interfaces: Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::ExecutableEndOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code>, <code>Util_ObjectLike</code></p>
+<p>Interfaces: <code>Symbol</code></p>
 <h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6025,9 +6025,9 @@ explicitly.</p>
 // Returns a HAL allocator and (optional) queue affinity.
 = stream.context.resolve on(#something) : !hal.allocator, i64
 </code></pre></div></p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6067,8 +6067,8 @@ explicitly.</p>
 </code></pre></div>
 <p>Calls a function operating on resource values with stream semantics.
 Asynchronous calls must have no side-effects.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: CallOpInterface, Stream_StreamableOp, Stream_SubviewEffectOp, SymbolUserOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>CallOpInterface</code>, <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>SymbolUserOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6138,8 +6138,8 @@ Asynchronous calls must have no side-effects.</p>
 <p>Dispatches a collective operation specified against the device. If grouped
 with other collectives in a <code>stream.cmd.concurrent</code> region the collective
 operations may fuse and execute more efficiently.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6219,8 +6219,8 @@ same time).</p>
     }
   }
 </code></pre></div></p>
-<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
-<p>Interfaces: RegionBranchOpInterface, Stream_StreamableOp</p>
+<p>Traits: <code>HasParent&lt;IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp&gt;</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>RegionBranchOpInterface</code>, <code>Stream_StreamableOp</code></p>
 <h4 id="streamcmdcopy-streamcmdcopyop"><code>stream.cmd.copy</code> (Stream::CmdCopyOp)<a class="headerlink" href="#streamcmdcopy-streamcmdcopyop" title="Permanent link">link</a></h4>
 <p><em>Copies a subview of a stream resource to another</em></p>
 <p>Syntax:</p>
@@ -6234,8 +6234,8 @@ same time).</p>
 <p>Copies a subview of a resource into a subview of another.
 As with memcpy this does not support overlapping updates into the same
 resource.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6285,8 +6285,8 @@ resource.</p>
 <p>Discards a subview of a resource, indicating that after this command the
 specified contents are no longer needed. This can be used to trim memory
 or invalidate caches.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6329,8 +6329,8 @@ or invalidate caches.</p>
 <p>Calls the specified entry point function once for each element in the
 specified workgroup count. Each workgroup has access to the same operands
 and results and is able to load/store at will.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, SymbolUserOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>SymbolUserOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6393,8 +6393,8 @@ results are only ready once all nested ops complete execution and the
 returned timepoint is reached. Zero or more timepoints may be provided to
 block execution until they are all reached; zero timepoints indicates that
 execution may begin immediately.</p>
-<p>Traits: AttrSizedOperandSegments, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
-<p>Interfaces: ClosureOpInterface, InferTypeOpInterface, RegionBranchOpInterface, Stream_AffinityOp, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>ClosureOpInterface</code>, <code>InferTypeOpInterface</code>, <code>RegionBranchOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6450,8 +6450,8 @@ execution may begin immediately.</p>
 </code></pre></div>
 <p>Splats a value into a subview of the given stream resource and returns the
 resource with the update applied.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6494,8 +6494,8 @@ resource with the update applied.</p>
 <p>Transfers a resource to an external target. The resource memory is made
 available to the target and can be made visible there using
 <code>stream.cmd.invalidate</code>.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6543,8 +6543,8 @@ available to the target and can be made visible there using
 <p>Declares a function that can be called as an asynchronous streaming
 operation via <code>stream.cmd.call</code>. Today only external functions are
 allowed.</p>
-<p>Traits: IsolatedFromAbove, Stream_CmdPhaseOp</p>
-<p>Interfaces: CallableOpInterface, FunctionOpInterface, Symbol</p>
+<p>Traits: <code>IsolatedFromAbove</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code></p>
 <h5 id="attributes_16">Attributes:<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6566,8 +6566,8 @@ allowed.</p>
 <p>Transfers a resource from an external source into the current target. The
 resource memory is assumed to have been made available at the source via
 <code>stream.cmd.flush</code>.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: Stream_StreamableOp, Stream_SubviewEffectOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>Stream_StreamableOp</code>, <code>Stream_SubviewEffectOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_17">Attributes:<a class="headerlink" href="#attributes_17" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6638,8 +6638,8 @@ after the other).</p>
     }
   }
 </code></pre></div></p>
-<p>Traits: HasParent<IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, RecursiveMemoryEffects, SingleBlock, SingleBlockImplicitTerminator<IREE::Stream::YieldOp>, Stream_CmdPhaseOp</p>
-<p>Interfaces: RegionBranchOpInterface, Stream_StreamableOp</p>
+<p>Traits: <code>HasParent&lt;IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp&gt;</code>, <code>RecursiveMemoryEffects</code>, <code>SingleBlockImplicitTerminator&lt;IREE::Stream::YieldOp&gt;</code>, <code>SingleBlock</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>RegionBranchOpInterface</code>, <code>Stream_StreamableOp</code></p>
 <h3 id="file-ops">File ops<a class="headerlink" href="#file-ops" title="Permanent link">link</a></h3>
 <p>File ops.</p>
 <h4 id="streamfileconstant-streamfileconstantop"><code>stream.file.constant</code> (Stream::FileConstantOp)<a class="headerlink" href="#streamfileconstant-streamfileconstantop" title="Permanent link">link</a></h4>
@@ -6654,9 +6654,9 @@ after the other).</p>
 </code></pre></div>
 <p>Synchronously wraps a host heap buffer into a stream-accessible file handle.
 Changing the source buffer after definition has undefined behavior.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp, SubrangeOperandOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6723,8 +6723,8 @@ Changing the source buffer after definition has undefined behavior.</p>
 <p>Some implementations can stream directly from the source file into
 device-local memory and file ops should be preferred to manually staging
 memory through host buffers.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6805,8 +6805,8 @@ grow the underlying file storage.</p>
 <p>Some implementations can stream directly from device-local memory into the
 target file and file ops should be preferred to manually staging memory
 through host buffers.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -6875,9 +6875,9 @@ through host buffers.</p>
               $operands `:` type($operands)
 </code></pre></div>
 <p>The values returned are copied by-value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, HasParent<IREE::Stream::ExecutableExportOp>, ReturnLike, Terminator</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::Stream::ExecutableExportOp&gt;</code>, <code>ReturnLike</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6903,9 +6903,9 @@ through host buffers.</p>
 </code></pre></div>
 <p>The values returned represent the asynchronous value at the point in time
 the SSA value is defined (or tied).</p>
-<p>Traits: AlwaysSpeculatableImplTrait, HasParent<IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp, IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp>, SameVariadicOperandSize, Terminator</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), RegionBranchTerminatorOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>HasParent&lt;IREE::Stream::AsyncExecuteOp, IREE::Stream::AsyncConcurrentOp, IREE::Stream::CmdExecuteOp, IREE::Stream::CmdSerialOp, IREE::Stream::CmdConcurrentOp&gt;</code>, <code>SameVariadicOperandSize</code>, <code>Terminator</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>RegionBranchTerminatorOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -6943,9 +6943,9 @@ the SSA value is defined (or tied).</p>
 is resolved during lowering into the stream dialect. This can be used to
 interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, TiedOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7007,9 +7007,9 @@ types and those that prior to lowering do not handle them.</p>
 is resolved during lowering into the stream dialect. This can be used to
 interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, TiedOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7078,9 +7078,9 @@ separate allocations may be fused into one or more slab allocations in order
 to reduce overheads. How many allocations can be fused is based on the size
 of the individual resources and the target constraints (how large any single
 buffer may be, etc).</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7134,9 +7134,9 @@ current computation) with undefined contents. Consumers of the allocated
 result must assume nothing of the contents and use <code>discard</code> access.</p>
 <p>The resource returned is not valid for use until the timepoint is reached;
 execution using this resource must await on the timepoint.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), Stream_TimelineOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7208,9 +7208,9 @@ for a mutable resource. By modeling these together it's not required that
 variable initializers first be allocated, copied to the target, and then
 copied into the variable storage if the target is capable of doing a direct
 upload or mapping.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_TimelineOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameVariadicResultSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_25">Attributes:<a class="headerlink" href="#attributes_25" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7266,8 +7266,8 @@ current computation) previously allocated using <code>stream.resource.alloca</co
 <p>The resource is considered live and valid until the provided timepoint is
 reached and the memory is only made available for future requests after
 the result timepoint is reached.</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, MemoryEffectOpInterface (MemoryEffectOpInterface), Stream_TimelineOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Free on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Free on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="attributes_26">Attributes:<a class="headerlink" href="#attributes_26" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7324,7 +7324,7 @@ the result timepoint is reached.</p>
 <p>Returns the element(s) at the given offset in the staging resource.
 The operation will complete synchronously against the resource though it may
 introduce a yield point if the staging resource needs to be transferred.</p>
-<p>Interfaces: Util_SizeAwareOp</p>
+<p>Interfaces: <code>Util_SizeAwareOp</code></p>
 <h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7408,9 +7408,9 @@ acquire storage. The individual slice offsets are 0-based and as such if are
 directly used as buffer offsets may need additional offsetting. This can
 either be applied via the optional <code>offset</code> operand or slicing of the
 underlying allocation buffer.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_27">Attributes:<a class="headerlink" href="#attributes_27" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7467,9 +7467,9 @@ underlying allocation buffer.</p>
 storage. This may differ from the logical storage size of a value based on
 the alignment requirements of the target as well as encoding of higher level
 values such as sparse tensor formats.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7518,8 +7518,8 @@ values such as sparse tensor formats.</p>
 </code></pre></div>
 <p>The operation will complete synchronously against the resource though it may
 introduce a yield point if the staging resource needs to be acquired.</p>
-<p>Interfaces: MemoryEffectOpInterface (MemoryEffectOpInterface), Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_31">Operands:<a class="headerlink" href="#operands_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7556,9 +7556,9 @@ introduce a yield point if the staging resource needs to be acquired.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Aliases a byte subrange of a resource.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), StreamableOpInterface, TiedOpInterface, Util_SizeAwareOp, Util_SubrangeOp, ViewLikeOpInterface</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>StreamableOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code>, <code>Util_SubrangeOp</code>, <code>ViewLikeOpInterface</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_32">Operands:<a class="headerlink" href="#operands_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -7616,9 +7616,9 @@ with the requested lifetime. If the given source cannot be mapped the
 <code>did_map</code> result will be 0 and users must find another route into memory
 (such as file I/O). The resulting resource is not coherent with the source
 and behavior is undefined if the underlying contents change.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}, MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7687,8 +7687,8 @@ and behavior is undefined if the underlying contents change.</p>
 resource. This is equivalent to one <code>stream.parameter.read</code> per parameter
 but allows implementations that can batch operations to do so without
 additional timeline overhead.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7766,9 +7766,9 @@ provider and returns the resulting stream resources. Depending on the
 resource type this may alias existing cached storage or be directly mapped
 to the parameter origin or result in a copy as if <code>stream.resource.alloca</code>
 and <code>stream.parameter.read</code> had been used per parameter.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_TimelineOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7834,8 +7834,8 @@ and <code>stream.parameter.read</code> had been used per parameter.</p>
 </code></pre></div>
 <p>Asynchronously reads a resource from an external parameter provider into the
 provided target resource range.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7912,8 +7912,8 @@ provided target resource range.</p>
 into one or more parameters. This is equivalent to one
 <code>stream.parameter.write</code> per parameter but allows implementations that can
 batch operations to do so without additional overhead.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -7987,8 +7987,8 @@ batch operations to do so without additional overhead.</p>
 </code></pre></div>
 <p>Asynchronously writes a resource to an external parameter provider from
 the provided source resource range.</p>
-<p>Traits: Stream_CmdPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, InferTypeOpInterface, Stream_TimelineOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_CmdPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_TimelineOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8057,9 +8057,9 @@ the provided source resource range.</p>
 <p>Allocates a transient value (one that is short-lived and local to the
 current computation) with undefined contents. Consumers of the allocated
 result must assume nothing of the contents and use <code>discard</code> access.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AffinityOpInterface, ConditionallySpeculatable, MemoryEffectOpInterface (MemoryEffectOpInterface), StreamableOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AffinityOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>StreamableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8107,8 +8107,8 @@ result must assume nothing of the contents and use <code>discard</code> access.<
 </code></pre></div>
 <p>Clones the contents of a value at a snapshot in time. Future changes to the
 cloned value will not effect the result. Acts as a copy-on-write operation.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, Stream_AffinityOp, StreamableOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8172,8 +8172,8 @@ future to better ensure in-place operations (where send/recv is a subset of
 recv/send). We may have dedicated operations for the send and recv verbs as
 they have sequencing implications - or we could add optional sequencing to
 this base op.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8270,9 +8270,9 @@ this base op.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a new resource with the given constant value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp, StreamableOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8326,8 +8326,8 @@ As with memcpy this does not support overlapping updates into the same
 resource. Unlike <code>stream.async.update</code> copy sources cannot be allocated
 in-place.</p>
 <p>Equivalent to a stream.async.slice + stream.async.update.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8414,8 +8414,8 @@ in-place.</p>
 <p>Calls the specified entry point function once for each element in the
 specified workgroup count. Each workgroup has access to the same operands
 and results and is able to load/store at will.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, Stream_AffinityOp, Stream_StreamableOp, SymbolUserOpInterface, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>SymbolUserOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8491,8 +8491,8 @@ and results and is able to load/store at will.</p>
 <p>Splats a value into a subview of the given stream resource and returns the
 resource with the update applied.</p>
 <p>Equivalent to a stream.async.splat + stream.async.update.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8559,9 +8559,9 @@ resource with the update applied.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the element at the given location from within the resource.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_AsyncPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_46">Operands:<a class="headerlink" href="#operands_46" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8611,9 +8611,9 @@ resource with the update applied.</p>
 </code></pre></div>
 <p>Slices a subrange of a stream resource based on a byte range. Acts as a
 copy-on-write operation.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_StreamableOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8675,8 +8675,8 @@ copy-on-write operation.</p>
 </code></pre></div>
 <p>Returns a new resource with the given primitive value splatted out to fill
 the entire contents.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, Stream_AffinityOp, StreamableOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8729,9 +8729,9 @@ the entire contents.</p>
 </code></pre></div>
 <p>Returns a resource with the element at the given offset set to the given
 value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_AsyncPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_49">Operands:<a class="headerlink" href="#operands_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -8788,8 +8788,8 @@ value.</p>
 to a <code>local</code> lifetime) or different affinities. This is roughly equivalent
 to a cast but may have special semantics when later lowered to one or more
 devices with discrete memory spaces or pools.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, Stream_AffinityOp, Stream_StreamableOp, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8848,8 +8848,8 @@ devices with discrete memory spaces or pools.</p>
 <p>Copies a value into a resource based on a byte range. The returned value
 is the entire updated target value. Updates can be turned into placement
 allocations and avoid copies.</p>
-<p>Traits: Stream_AsyncPhaseOp</p>
-<p>Interfaces: AsyncAccessOpInterface, InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>Stream_AsyncPhaseOp</code></p>
+<p>Interfaces: <code>AsyncAccessOpInterface</code>, <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8923,9 +8923,9 @@ resolving the version of a resource after a particular point in the
 timeline. As timepoints transitively chain the timepoint must only cover the
 resource availability but not be limited to its original production
 timepoint.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_TimelineOp, TiedOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_46">Attributes:<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -8985,9 +8985,9 @@ identifying when the version of a resource after a particular point in the
 timeline is available. As timepoints transitively chain the timepoint must
 only cover the resource availability but not be limited to its original
 production timepoint.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_TimelineOp, TiedOpInterface, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_TimelineOp</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_47">Attributes:<a class="headerlink" href="#attributes_47" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9045,7 +9045,7 @@ production timepoint.</p>
 that is resolved during lowering into the stream dialect. This can be used
 to interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
-<p>Interfaces: Stream_AffinityOp</p>
+<p>Interfaces: <code>Stream_AffinityOp</code></p>
 <h5 id="attributes_48">Attributes:<a class="headerlink" href="#attributes_48" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9084,9 +9084,9 @@ types and those that prior to lowering do not handle them.</p>
 that is resolved during lowering into the stream dialect. This can be used
 to interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_49">Attributes:<a class="headerlink" href="#attributes_49" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9133,9 +9133,9 @@ types and those that prior to lowering do not handle them.</p>
 used to get a placeholder representing the start of the timeline. Any waits
 on the returned timepoint will resolve immediately. This generally folds
 away but can be useful if needing to initialize globals or branch args.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, ConstantLike</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_TimelineOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ConstantLike</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="results_49">Results:<a class="headerlink" href="#results_49" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -9164,9 +9164,9 @@ away but can be useful if needing to initialize globals or branch args.</p>
 that is resolved during lowering into the stream dialect. This can be used
 to interoperate between levels of the stack that require specifying stream
 types and those that prior to lowering do not handle them.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_50">Attributes:<a class="headerlink" href="#attributes_50" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9211,9 +9211,9 @@ types and those that prior to lowering do not handle them.</p>
 </code></pre></div>
 <p>Returns a timepoint that indicates that all of the input timepoints have
 been reached.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_TimelineOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_TimelineOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_57">Operands:<a class="headerlink" href="#operands_57" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -9261,9 +9261,9 @@ been reached.</p>
 </code></pre></div>
 <p>Clones the contents of a value at a snapshot in time. Future changes to the
 cloned value will not effect the result. Acts as a copy-on-write operation.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_StreamableOp, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_51">Attributes:<a class="headerlink" href="#attributes_51" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9331,9 +9331,9 @@ cloned value will not effect the result. Acts as a copy-on-write operation.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a typed resource initialized to the given constant value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp, Stream_StreamableOp, Util_ShapeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_52">Attributes:<a class="headerlink" href="#attributes_52" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9387,9 +9387,9 @@ shape metadata and may encode to a non-empty resource such as in cases
 where the empty representation still has data (e.g. sparse tensors).
 Subsequent writes must populate any ranges of the tensor that are later
 read.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), OpAsmOpInterface, Stream_AffinityOp, StreamableOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_53">Attributes:<a class="headerlink" href="#attributes_53" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9446,8 +9446,8 @@ read.</p>
 <p>Splats a value into a subview of the given stream resource and returns the
 resource with the update applied.</p>
 <p>Equivalent to a stream.tensor.splat + stream.tensor.update.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_54">Attributes:<a class="headerlink" href="#attributes_54" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9517,9 +9517,9 @@ resource with the update applied.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns the element at the given location from within the tensor.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_55">Attributes:<a class="headerlink" href="#attributes_55" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9580,9 +9580,9 @@ While within the stream dialect the storage size of a value is left as a
 placeholder using this op. The requisite target-specific parameters for
 expanding the size calculation are only available after affinities have been
 assigned.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_56">Attributes:<a class="headerlink" href="#attributes_56" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9636,9 +9636,9 @@ assigned.</p>
 </code></pre></div>
 <p>Slices a subrange of a stream resource based on a tensor encoding. Acts as a
 copy-on-write operation.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, Stream_StreamableOp, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_57">Attributes:<a class="headerlink" href="#attributes_57" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9714,9 +9714,9 @@ copy-on-write operation.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a typed resource initialized to the given primitive value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface), Stream_AffinityOp, StreamableOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>StreamableOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_58">Attributes:<a class="headerlink" href="#attributes_58" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9775,9 +9775,9 @@ copy-on-write operation.</p>
               attr-dict-with-keyword
 </code></pre></div>
 <p>Returns a tensor with the element at the given index set to the given value.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: ConditionallySpeculatable, InferTypeOpInterface, NoMemoryEffect (MemoryEffectOpInterface), TiedOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_59">Attributes:<a class="headerlink" href="#attributes_59" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9842,8 +9842,8 @@ copy-on-write operation.</p>
 <p>Traces out to a runtime trace sink (console, log file, etc) the given
 tensors. The key is arbitrary and can be used for identifying the set of
 values being traced.</p>
-<p>Traits: AttrSizedOperandSegments</p>
-<p>Interfaces: ShapeAwareOpInterface, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code></p>
+<p>Interfaces: <code>ShapeAwareOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_60">Attributes:<a class="headerlink" href="#attributes_60" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -9890,8 +9890,8 @@ values being traced.</p>
 </code></pre></div>
 <p>Copies a value into a resource based on tensor encodings. The returned value
 is the entire updated target value.</p>
-<p>Traits: AttrSizedOperandSegments, Stream_TensorPhaseOp</p>
-<p>Interfaces: InferTypeOpInterface, Stream_AffinityOp, Stream_StreamableOp, TiedOpInterface, Util_ShapeAwareOp, Util_SizeAwareOp</p>
+<p>Traits: <code>AttrSizedOperandSegments</code>, <code>Stream_TensorPhaseOp</code></p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>Stream_AffinityOp</code>, <code>Stream_StreamableOp</code>, <code>TiedOpInterface</code>, <code>Util_ShapeAwareOp</code>, <code>Util_SizeAwareOp</code></p>
 <h5 id="attributes_61">Attributes:<a class="headerlink" href="#attributes_61" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>

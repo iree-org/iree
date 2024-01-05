@@ -3485,7 +3485,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <div class="highlight"><pre><span></span><code>  OUT = OP(LHS, RHS)
 </code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
-<p>Traits: SameVariadicOperandSize</p>
+<p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes">Attributes:<a class="headerlink" href="#attributes" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3553,7 +3553,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
               `:` $element_type
               attr-dict
 </code></pre></div>
-<p>Traits: SameVariadicOperandSize</p>
+<p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes_1">Attributes:<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3656,7 +3656,7 @@ map (roughly) 1:1 with the exported functions in the runtime module.</p>
 <div class="highlight"><pre><span></span><code>  OUT = OP(IN)
 </code></pre></div></p>
 <p>Where <code>OP</code> is a concrete operation name as defined in ukernel/elementwise.h</p>
-<p>Traits: SameVariadicOperandSize</p>
+<p>Traits: <code>SameVariadicOperandSize</code></p>
 <h5 id="attributes_2">Attributes:<a class="headerlink" href="#attributes_2" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -3716,9 +3716,9 @@ combined).</p>
 <p>This op has canonicalization rules which will bubble it up through the
 view stack. A final reconciliation pass is used explicitly to bind it to
 concrete sources.</p>
-<p>Traits: AlwaysSpeculatableImplTrait, SameVariadicResultSize</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameVariadicResultSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="operands_4">Operands:<a class="headerlink" href="#operands_4" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -3773,9 +3773,9 @@ will offset the memref automatically to make it consistent.</p>
 <p>This op is used in situations where earlier in a lowering, we have fully
 resolved the binding to a buffer and would just like the raw backing
 buffer as passed to the interface.</p>
-<p>Traits: AlwaysSpeculatableImplTrait</p>
-<p>Interfaces: ConditionallySpeculatable, NoMemoryEffect (MemoryEffectOpInterface)</p>
-<p>Effects: MemoryEffects::Effect{}</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
