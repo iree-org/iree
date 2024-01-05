@@ -163,54 +163,6 @@ func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128
   return %109 : tensor<12x128x128xf32>
 }
 
-func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
-    %arg1 : tensor<40x20xf32>) -> tensor<10x40xf32> {
-  %0 = tensor.empty() : tensor<20x40xf32>
-  %1 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
-      iterator_types = ["parallel", "parallel"]}
-      ins(%arg1 : tensor<40x20xf32>) outs(%0 : tensor<20x40xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32):
-      linalg.yield %b0 : f32
-  } -> tensor<20x40xf32>
-  %2 = tensor.empty() : tensor<10x40xf32>
-  %3 = arith.constant 0.0 : f32
-  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<10x40xf32>) -> tensor<10x40xf32>
-  %5 = linalg.matmul ins(%arg0, %1 : tensor<10x20xf32>, tensor<20x40xf32>)
-      outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
-  return %5 : tensor<10x40xf32>
-}
-// CHECK-LABEL: func @aTransposeBMatmul
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
-//  CHECK-SAME:     %[[ARG1:.+]]: tensor<40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
-//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
-//       CHECK:   return %[[RESULT]]
-
-func.func @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
-    %arg1 : tensor<5x40x20xf32>) -> tensor<5x10x40xf32> {
-  %0 = tensor.empty() : tensor<5x20x40xf32>
-  %1 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d2, d1)>],
-      iterator_types = ["parallel", "parallel", "parallel"]}
-      ins(%arg1 : tensor<5x40x20xf32>) outs(%0 : tensor<5x20x40xf32>) {
-    ^bb0(%b0 : f32, %b1 : f32):
-      linalg.yield %b0 : f32
-  } -> tensor<5x20x40xf32>
-  %2 = tensor.empty() : tensor<5x10x40xf32>
-  %3 = arith.constant 0.0 : f32
-  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
-  %5 = linalg.batch_matmul ins(%arg0, %1 : tensor<5x10x20xf32>, tensor<5x20x40xf32>)
-      outs(%4 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
-  return %5 : tensor<5x10x40xf32>
-}
-// CHECK-LABEL: func @aTransposeBBatchMatmul
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<5x10x20xf32>
-//  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x40x20xf32>
-//       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul_transpose_b
-//  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
-//       CHECK:   return %[[RESULT]]
-
 func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index

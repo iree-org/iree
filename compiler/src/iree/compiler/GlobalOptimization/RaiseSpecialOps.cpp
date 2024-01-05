@@ -29,75 +29,6 @@ namespace {
 // Generic to Named Op Conversions
 //===----------------------------------------------------------------------===//
 
-// Method to match a transpose operation on the two most minor dimensions of the
-// specified rank.
-static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
-  // Only makes sense for minimum rank 2.
-  if (rank < 2) {
-    return false;
-  }
-  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
-    return false;
-  }
-  // Check only for ops of the specified rank.
-  if (genericOp.getNumLoops() != rank ||
-      genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-    return false;
-  }
-  // Check for transpose map.
-  SmallVector<AffineExpr> exprList(rank);
-  MLIRContext *context = genericOp.getContext();
-  bindDimsList(context, MutableArrayRef{exprList});
-  SmallVector<AffineExpr> transposeExprList(exprList);
-  std::swap(transposeExprList[rank - 1], transposeExprList[rank - 2]);
-  SmallVector<AffineMap> expectedMaps = {
-      AffineMap::get(rank, 0, exprList, context),
-      AffineMap::get(rank, 0, transposeExprList, context)};
-  if (genericOp.getIndexingMapsArray() != expectedMaps) {
-    return false;
-  }
-
-  Block *body = genericOp.getBlock();
-  if (!llvm::hasSingleElement(*body)) {
-    return false;
-  }
-  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
-  auto blockArg = yieldOp.getOperand(0).dyn_cast<BlockArgument>();
-  if (!blockArg || blockArg.getOwner() != body ||
-      blockArg.getArgNumber() != 0) {
-    return false;
-  }
-  return true;
-}
-
-// Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
-// success.
-std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
-  if (!isa<linalg::MatmulOp>(matmulOp.getOperation())) {
-    return std::nullopt;
-  }
-  auto rhs = matmulOp.getDpsInputOperand(1);
-  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchInner2DTranspose(genericOp, 2)) {
-    return genericOp.getDpsInputOperand(0)->get();
-  }
-  return std::nullopt;
-}
-
-// Method to match a linalg.batch_matmul(a, linalg.transpose(b)). Returns `b` on
-// success.
-std::optional<Value> matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
-  if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
-    return std::nullopt;
-  }
-  auto rhs = bmmOp.getDpsInputOperand(1);
-  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchInner2DTranspose(genericOp, 3)) {
-    return genericOp.getDpsInputOperand(0)->get();
-  }
-  return std::nullopt;
-}
-
 // Method to match a linalg.generic op representing a linalg.fill op. Returns
 // the fill value (input operand to linalg.fill) on success.
 std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
@@ -712,9 +643,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
     });
 
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
-    SmallVector<std::pair<linalg::MatmulOp, Value>> transposeMatmulRoots;
-    SmallVector<std::pair<linalg::BatchMatmulOp, Value>>
-        transposeBatchMatmulRoots;
     SmallVector<std::pair<linalg::GenericOp, Value>> genericFills;
     getOperation()->walk([&](linalg::LinalgOp op) {
       {
@@ -725,14 +653,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
         if (matchPattern(op, *softmaxroot)) {
           Value src = maxReduction->getCaptured()->getOperand(0);
           softmaxRoots.push_back(std::make_pair(op, src));
-        }
-        if (std::optional<Value> newRhs = matchATransposeBMatmul(op)) {
-          transposeMatmulRoots.push_back(std::make_pair(
-              cast<linalg::MatmulOp>(op.getOperation()), newRhs.value()));
-        }
-        if (std::optional<Value> newRhs = matchATransposeBBatchMatmul(op)) {
-          transposeBatchMatmulRoots.push_back(std::make_pair(
-              cast<linalg::BatchMatmulOp>(op.getOperation()), newRhs.value()));
         }
         if (std::optional<Value> fillInput = matchGenericFill(op)) {
           genericFills.push_back(
@@ -764,23 +684,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
           softmaxOp, softmaxOp->getResultTypes(), src,
           softmaxOp.getDpsInitOperand(0)->get(), softmaxOp.getNumLoops() - 1);
-    }
-
-    for (auto [matmulOp, newRhs] : transposeMatmulRoots) {
-      Value lhs = matmulOp.getDpsInputOperand(0)->get();
-      Value init = matmulOp.getDpsInitOperand(0)->get();
-      rewriter.setInsertionPoint(matmulOp);
-      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
-      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
-          matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
-    }
-    for (auto [bmmOp, newRhs] : transposeBatchMatmulRoots) {
-      Value lhs = bmmOp.getDpsInputOperand(0)->get();
-      Value init = bmmOp.getDpsInitOperand(0)->get();
-      rewriter.setInsertionPoint(bmmOp);
-      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
-          bmmOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
     for (auto [genericOp, fillInput] : genericFills) {
       Value init = genericOp.getDpsInitOperand(0)->get();
