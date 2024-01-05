@@ -81,7 +81,7 @@ GPT2_117M_1x1_FP32_TF = common_definitions.Model(
     input_types=["1x1xi32", "12x2x1x12x4x64xf32"],
 )
 
-TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975"
+TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975j"
 
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")
