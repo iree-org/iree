@@ -766,7 +766,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
           softmaxOp.getDpsInitOperand(0)->get(), softmaxOp.getNumLoops() - 1);
     }
 
-#if 0
     for (auto [matmulOp, newRhs] : transposeMatmulRoots) {
       Value lhs = matmulOp.getDpsInputOperand(0)->get();
       Value init = matmulOp.getDpsInitOperand(0)->get();
@@ -783,7 +782,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
           bmmOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
     }
-#endif
     for (auto [genericOp, fillInput] : genericFills) {
       Value init = genericOp.getDpsInitOperand(0)->get();
       rewriter.setInsertionPoint(genericOp);
