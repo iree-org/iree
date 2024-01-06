@@ -35,7 +35,6 @@ static llvm::cl::opt<bool> enableUnPackDecomposition(
     llvm::cl::init(true));
 
 /// A wrapper pattern that calls linalg::lowerPack on tensor::PackOp. It lowers
-
 /// a tensor.pack op to tensor.pad + tensor.expand_shape + linalg.transpose ops.
 struct LowerPackPattern : public OpRewritePattern<tensor::PackOp> {
   using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
@@ -131,8 +130,10 @@ struct FoldTrailingUnitTranspose
 
 struct DecomposePackUnPackOpsPass
     : public DecomposePackUnPackOpsBase<DecomposePackUnPackOpsPass> {
-  DecomposePackUnPackOpsPass(bool tileOuterToOne) {
+  DecomposePackUnPackOpsPass(bool tileOuterToOne,
+                             bool enableUnPackDecomposition) {
     this->tileOuterToOne = tileOuterToOne;
+    this->enableUnPackDecomposition = enableUnPackDecomposition;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -238,7 +239,6 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
         rewriter.replaceOp(op, tilingResult->replacements);
       });
     }
-
     LLVM_DEBUG({
       llvm::dbgs()
           << "--- After applying tiling that makes outer dims be all 1s ---\n";
@@ -287,8 +287,10 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
-  return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
+createDecomposePackUnPackOpsPass(bool tileOuterToOne,
+                                 bool enableUnPackDecomposition) {
+  return std::make_unique<DecomposePackUnPackOpsPass>(
+      tileOuterToOne, enableUnPackDecomposition);
 }
 
 } // namespace mlir::iree_compiler

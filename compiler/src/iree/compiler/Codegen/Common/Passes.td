@@ -154,7 +154,9 @@ def DecomposePackUnPackOps :
   let constructor = "mlir::iree_compiler::createDecomposePackUnPackOpsPass()";
   let options = [
     Option<"tileOuterToOne", "tile-outer-to-one", "bool", "false",
-           "Always apply tiling to make outer dimension be ones">
+           "Always apply tiling to make outer dimension be ones">,
+    Option<"enableUnPackDecomposition", "enable-unpack-decomposition", "bool", "true",
+          "Enable Decomposition of tensor.unpack Operation. Disable to vectorize tensor.unpack">
   ];
 }
 

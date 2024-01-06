@@ -90,4 +90,3 @@ llvm-external-projects/iree-dialects/.cache
 
 # pkgci artifacts
 artifacts/
-third_party/llvm-diff.txt

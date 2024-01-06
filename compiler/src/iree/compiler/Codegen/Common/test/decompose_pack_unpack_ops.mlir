@@ -1,5 +1,5 @@
-// RUN: iree-opt --iree-codegen-decompose-pack-unpack-ops --iree-codegen-enable-unpack-decomposition=true --split-input-file %s | FileCheck %s
-// RUN: iree-opt --iree-codegen-decompose-pack-unpack-ops --iree-codegen-enable-unpack-decomposition=false --split-input-file %s | FileCheck %s --check-prefix=NO-DECOMP
+// RUN: iree-opt --iree-codegen-decompose-pack-unpack-ops  --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-decompose-pack-unpack-ops=enable-unpack-decomposition=false --split-input-file %s | FileCheck %s --check-prefix=NO-DECOMP
 func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x1x1x8x32xf32>) -> tensor<1x1x1x1x8x32xf32> {
   %0 = tensor.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
   return %0 : tensor<1x1x1x1x8x32xf32>
