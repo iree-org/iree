@@ -45,20 +45,6 @@ DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
-DiagnosedSilenceableFailure LinalgExt::RewriteForallToScfForOp::applyToOne(
-    transform::TransformRewriter &rewriter, scf::ForallOp target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  LinalgExt::ForallOpToScfForRewriter pattern(this->getContext());
-  SimplePatternRewriter patternRewriter(target);
-  FailureOr<Operation *> result =
-      pattern.returningMatchAndRewrite(target, patternRewriter);
-  if (failed(result))
-    return emitDefaultDefiniteFailure(target);
-  results.push_back(*result);
-  return DiagnosedSilenceableFailure::success();
-}
-
 //===---------------------------------------------------------------------===//
 // TileAndDecomposeAttention
 //===---------------------------------------------------------------------===//
