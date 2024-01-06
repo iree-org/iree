@@ -157,15 +157,7 @@ class VectorDistributionRewriter : public PatternRewriter,
                                    RewriterBase::Listener {
 public:
   VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps)
-      : PatternRewriter(context, this), erasedOps(erasedOps) {}
-
-  /// We need to keep track of erased operations so that we never try to
-  /// distribute them again.
-  void notifyOperationRemoved(Operation *op) override { erasedOps.insert(op); }
-
-private:
-  // Reference to operations to be erased and the worklist of the driver.
-  DenseSet<Operation *> &erasedOps;
+      : PatternRewriter(context, this) {}
 };
 
 static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
@@ -197,9 +189,10 @@ debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist,
   LLVM_DEBUG(llvm::dbgs() << "\n");
 }
 
-static void applyVectorDistributionDriver(
-    Operation *root, const FrozenRewritePatternSet &patterns,
-    VectorLayoutAnalysis &analysis, VectorLayoutOptions &options) {
+static void applyVectorDistribution(Operation *root,
+                                    const FrozenRewritePatternSet &patterns,
+                                    VectorLayoutAnalysis &analysis,
+                                    VectorLayoutOptions &options) {
 
   DenseSet<Operation *> erasedOps;
   SmallVector<Operation *> worklist;

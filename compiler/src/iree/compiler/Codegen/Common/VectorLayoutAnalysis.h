@@ -126,6 +126,9 @@ public:
     return cast<T>(layout);
   }
 
+  /// Return the operation this on which this analysis was rooted on.
+  Operation *getRootOperation() const;
+
   /// Duplicate layout information from the old value to the new value. This
   /// is only expected to be used when cloning values. It is the job of the user
   /// to ensure that there are no conflicts when cloning.
@@ -148,6 +151,32 @@ private:
   Operation *root;
   DenseMap<TypedValue<VectorType>, VectorLayoutInterface> anchors;
   DataFlowSolver solver;
+};
+
+/// The layout fetcher class contains information on how to store and fetch
+/// analysis information stored in IR. The analysis should have been computed
+/// before this fetcher is used.It automatically cleans up the attribute
+/// information when the fetcher is destroyed.
+///
+/// The fetcher is only a storage mechanism, it does not perform any checks or
+/// analysis on the stored information.
+class VectorLayoutFetcher {
+public:
+  VectorLayoutFetcher(VectorLayoutAnalysis &analysis);
+  ~VectorLayoutFetcher();
+
+  /// Get the layout of a vector value.
+  VectorLayoutInterface getLayout(TypedValue<VectorType> val);
+
+  /// Set the layout of a vector value.
+  void setLayout(TypedValue<VectorType> val, VectorLayoutInterface layout);
+
+  /// Notify the fetcher that the layout is no longer needed and can be cleaned
+  /// up from the IR.
+  void consumeLayout(Operation *op);
+
+private:
+  Operation *root;
 };
 
 }; // namespace iree_compiler
