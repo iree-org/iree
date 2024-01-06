@@ -50,44 +50,6 @@ def RewriteForallToAsyncOp :
   }];
 }
 
-def RewriteForallToScfForOp :
-  Op<Transform_Dialect, "forall_to_scf_for",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-
-  let description = [{
-    Rewrite a bufferized scf.forall to a sequential scf.for.
-
-    Return modes:
-    =============
-    This operation ignores non-Linalg ops and drops them in the return.
-    This transform is currently only implemented for 1-D scf.forall that
-    have been bufferized and definitely fail for the rest.
-
-    If all the operations referred to by the `target` operand lower
-    properly, the transform succeeds. Otherwise the transform silently fails.
-
-    The returned handle points to only the subset of successfully produced
-    scf.for operations, which can all be empty.
-  }];
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs TransformHandleTypeInterface:$transformed);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::scf::ForallOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def TileAttentionOp : Op<Transform_Dialect, "tile_attention",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,

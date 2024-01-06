@@ -40,20 +40,6 @@ struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
   }
 };
 
-/// Pattern to rewrite a ForallOp to an scf::ForOp.
-struct ForallOpToScfForRewriter : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<scf::ForOp>
-  returningMatchAndRewrite(scf::ForallOp forallOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(forallOp, rewriter);
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.

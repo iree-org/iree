@@ -1,6 +1,5 @@
 add_mlir_library(IREELinalgExtTransforms
   ForeachThreadToAsync.cpp
-  ForeachThreadToSequentialFor.cpp
   Utils.cpp
 
   PARTIAL_SOURCES_INTENDED
