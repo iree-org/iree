@@ -49,6 +49,11 @@ def LLVMCPUCheckIRBeforeLLVMConversion :
     Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
   let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
+  let options = [
+    Option<"failOnOutOfBounds", "fail-on-out-of-bounds", "bool", "true",
+           "Fails if the upper bound of dynamic stack allocation cannot be"
+           "resolved or is more than the limit.">
+  ];
 }
 
 def LLVMCPUEmitVectorizationRemarks :
