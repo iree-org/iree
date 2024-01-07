@@ -10,8 +10,8 @@
 // Stability: This API, like the MLIR C-API, offers no ABI stability guarantees,
 // and API stability is best effort.
 
-#ifndef IREE_COMPILER_API_MLIR_INTEROP_H
-#define IREE_COMPILER_API_MLIR_INTEROP_H
+#ifndef IREE_COMPILER_MLIR_INTEROP_H
+#define IREE_COMPILER_MLIR_INTEROP_H
 
 #include "iree/compiler/embedding_api.h"
 #include "mlir-c/IR.h"
@@ -80,4 +80,4 @@ ireeCompilerInvocationExportStealModule(iree_compiler_invocation_t *inv);
 }
 #endif
 
-#endif // IREE_COMPILER_API_MLIR_INTEROP_H
+#endif // IREE_COMPILER_MLIR_INTEROP_H

@@ -13,6 +13,7 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo-iree/Conversion/Rewriters.h"
@@ -448,7 +449,7 @@ static Value emitTranspose(ConversionPatternRewriter &rewriter, Location loc,
       llvm::to_vector(llvm::seq<int64_t>(0, inputShape.size()));
   std::swap(permutation[srcDim], permutation[dstDim]);
   std::swap(inputShape[srcDim], inputShape[dstDim]);
-  DenseIntElementsAttr permutationAttr = rewriter.getI64VectorAttr(permutation);
+  auto permutationAttr = rewriter.getDenseI64ArrayAttr(permutation);
   return rewriter.create<mlir::stablehlo::TransposeOp>(
       loc, RankedTensorType::get(inputShape, inputType.getElementType()), input,
       permutationAttr);
@@ -705,7 +706,7 @@ Value splitAndConcatForAllToAll(ConversionPatternRewriter &rewriter,
   result = rewriter.create<mlir::stablehlo::TransposeOp>(
       loc,
       RankedTensorType::get(transposeResultShape, inputType.getElementType()),
-      result, rewriter.getI64VectorAttr(permutation));
+      result, rewriter.getDenseI64ArrayAttr(permutation));
 
   // Reshape
   llvm::SmallVector<int64_t> finalShape(inputShape);
@@ -852,7 +853,7 @@ struct ReduceScatterOpConversion final
     auto inputType = cast<RankedTensorType>(op.getOperand().getType());
     SmallVector<int64_t> reduceInputShape(inputType.getShape());
     Value reduceInput = adaptor.getOperand();
-    DenseIntElementsAttr permutationAttr;
+    DenseI64ArrayAttr permutationAttr;
 
     SmallVector<int64_t> scatterResultShape(resultType.getShape());
     auto elemType = getElementTypeOrSelf(reduceInput.getType());
@@ -861,7 +862,7 @@ struct ReduceScatterOpConversion final
       auto permutation =
           llvm::to_vector(llvm::seq<int64_t>(0, scatterResultShape.size()));
       std::swap(permutation[0], permutation[scatterDim]);
-      permutationAttr = rewriter.getI64VectorAttr(permutation);
+      permutationAttr = rewriter.getDenseI64ArrayAttr(permutation);
       std::swap(reduceInputShape[0], reduceInputShape[scatterDim]);
       std::swap(scatterResultShape[0], scatterResultShape[scatterDim]);
       // Transpose the input.

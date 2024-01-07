@@ -21,14 +21,6 @@ namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
-template <typename OpType>
-void rewriteOpWithNewInputs(PatternRewriter &rewriter, linalg::LinalgOp op,
-                            ValueRange newInputs) {
-  auto namedOp = cast<OpType>(op);
-  rewriter.replaceOpWithNewOp<OpType>(op, newInputs, op.getDpsInits(),
-                                      linalg::getPrunedAttributeList(namedOp));
-}
-
 // For narrowable inputs, selects
 struct DemoteContractionInputsToBF16Pattern
     : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
@@ -72,24 +64,33 @@ struct DemoteContractionInputsToBF16Pattern
               ->getResults()[0]);
     }
 
-    if (isa<linalg::MatmulOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::MatmulOp>(rewriter, linalgOp,
-                                               demotedInputs);
-    } else if (isa<linalg::MatvecOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::MatvecOp>(rewriter, linalgOp,
-                                               demotedInputs);
-    } else if (isa<linalg::VecmatOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::VecmatOp>(rewriter, linalgOp,
-                                               demotedInputs);
-    } else if (isa<linalg::BatchMatmulOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::BatchMatmulOp>(rewriter, linalgOp,
-                                                    demotedInputs);
-    } else if (isa<linalg::BatchMatvecOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::BatchMatvecOp>(rewriter, linalgOp,
-                                                    demotedInputs);
-    } else if (isa<linalg::BatchVecmatOp>(linalgOp)) {
-      rewriteOpWithNewInputs<linalg::BatchVecmatOp>(rewriter, linalgOp,
-                                                    demotedInputs);
+    auto replaceOpInputs = [&](auto *typePtr) {
+      auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(op);
+      rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
+          linalgOp, demotedInputs, linalgOp.getDpsInits(),
+          linalg::getPrunedAttributeList(namedOp));
+    };
+
+    if (isa<linalg::MatmulOp>(op)) {
+      replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
+    } else if (isa<linalg::MatvecOp>(op)) {
+      replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
+    } else if (isa<linalg::VecmatOp>(op)) {
+      replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
+    } else if (isa<linalg::BatchMatmulOp>(op)) {
+      replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
+    } else if (isa<linalg::BatchMatvecOp>(op)) {
+      replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
+    } else if (isa<linalg::BatchVecmatOp>(op)) {
+      replaceOpInputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
+    } else if (isa<linalg::MatmulTransposeAOp>(op)) {
+      replaceOpInputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
+    } else if (isa<linalg::MatmulTransposeBOp>(op)) {
+      replaceOpInputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
+    } else if (isa<linalg::BatchMatmulTransposeAOp>(op)) {
+      replaceOpInputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
+    } else if (isa<linalg::BatchMatmulTransposeBOp>(op)) {
+      replaceOpInputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
     } else {
       return failure();
     }

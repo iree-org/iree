@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/PatternMatch.h"
@@ -39,11 +40,8 @@ bool isIota(ArrayRef<int64_t> array) {
   return true;
 }
 
-DenseIntElementsAttr make1DElementsAttr(OpBuilder &b,
-                                        ArrayRef<int64_t> integers) {
-  auto type = RankedTensorType::get({static_cast<int64_t>(integers.size())},
-                                    b.getIntegerType(64));
-  return DenseIntElementsAttr::get(type, integers);
+DenseI64ArrayAttr make1DElementsAttr(OpBuilder &b, ArrayRef<int64_t> integers) {
+  return b.getDenseI64ArrayAttr(integers);
 }
 
 Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
@@ -90,7 +88,7 @@ struct ReorderConvOpInputDimensions final
     auto transposed = rewriter.create<mlir::stablehlo::TransposeOp>(
         op.getLoc(),
         RankedTensorType::get(transposeShape, lhsType.getElementType()),
-        op.getLhs(), rewriter.getI64TensorAttr(permutations));
+        op.getLhs(), rewriter.getDenseI64ArrayAttr(permutations));
 
     llvm::SmallVector<int64_t> newSpatialDimensions(spatialDims.size());
     std::iota(newSpatialDimensions.begin(), newSpatialDimensions.end(), 1);
@@ -158,7 +156,7 @@ struct ReorderConvOpKernelDimensions final
     auto transposeKernel = rewriter.create<mlir::stablehlo::TransposeOp>(
         op.getLoc(),
         RankedTensorType::get(transposeShape, kernelType.getElementType()),
-        kernel, rewriter.getI64TensorAttr(permutation));
+        kernel, rewriter.getDenseI64ArrayAttr(permutation));
 
     auto newDimensionNumbers = mlir::stablehlo::ConvDimensionNumbersAttr::get(
         op.getContext(), dimensionNumbers.getInputBatchDimension(),
@@ -246,7 +244,7 @@ struct ReorderConvOpOutputDimensions final
 
     auto transposed = rewriter.create<mlir::stablehlo::TransposeOp>(
         op.getLoc(), resultType, newConv,
-        rewriter.getI64TensorAttr(invertPermutation));
+        rewriter.getDenseI64ArrayAttr(invertPermutation));
 
     rewriter.replaceOp(op, transposed.getResult());
     return success();
@@ -286,7 +284,7 @@ struct TransposeReshapeGenericDotGeneral final
     }
     return b.create<mlir::stablehlo::TransposeOp>(
         loc, RankedTensorType::get(transposeShape, type.getElementType()), src,
-        b.getI64TensorAttr(targetOrder));
+        b.getDenseI64ArrayAttr(targetOrder));
   }
 
   Value ReshapeIfNonStandard(OpBuilder &b, Location loc, Value src,
@@ -748,7 +746,8 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
       }
 
       indices = builder.create<mlir::stablehlo::TransposeOp>(
-          indicesTy.clone(newShape), indices, builder.getI64TensorAttr(perm));
+          indicesTy.clone(newShape), indices,
+          builder.getDenseI64ArrayAttr(perm));
       indicesTy = llvm::cast<RankedTensorType>(indices.getType());
       indexVectorDim = indicesTy.getRank() - 1;
     }
@@ -792,7 +791,7 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
           newShape.push_back(updateTy.getDimSize(updatePerm[i]));
         update = builder.create<mlir::stablehlo::TransposeOp>(
             updateTy.clone(newShape), update,
-            builder.getI64TensorAttr(updatePerm));
+            builder.getDenseI64ArrayAttr(updatePerm));
       }
     }
 
@@ -1025,7 +1024,7 @@ struct MulCastOfBool final : OpRewritePattern<mlir::stablehlo::MulOp> {
           llvm::seq<int64_t>(resultRank - valueTy.getRank(), resultRank));
       return rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
           op.getLoc(), newTy, value, lhsShape,
-          rewriter.getI64TensorAttr(dimensions));
+          rewriter.getDenseI64ArrayAttr(dimensions));
     };
 
     zero = broadcast(zero);
@@ -1184,7 +1183,7 @@ struct ReorderBroadcastInDimOpAndElementwiseOp final
     Value result =
         rewriter.create<ElementwiseOpT>(op.getLoc(), resultType, bcastOperands);
     rewriter.replaceOpWithNewOp<mlir::stablehlo::BroadcastInDimOp>(
-        op, op.getType(), result, bcastOps[0].getBroadcastDimensions());
+        op, op.getType(), result, bcastOps[0].getBroadcastDimensionsAttr());
 
     for (auto bcastOp : bcastOps) {
       if (bcastOp.getOperation()->use_empty()) {
@@ -1283,11 +1282,11 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
 
     lhs = rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
         op.getLoc(), resultTy.clone(lhsTy.getElementType()), lhs, outSize,
-        rewriter.getI64TensorAttr({0, 1}));
+        rewriter.getDenseI64ArrayAttr({0, 1}));
 
     rhs = rewriter.create<mlir::stablehlo::DynamicBroadcastInDimOp>(
         op.getLoc(), resultTy.clone(rhsTy.getElementType()), rhs, outSize,
-        rewriter.getI64TensorAttr({0, 1}));
+        rewriter.getDenseI64ArrayAttr({0, 1}));
 
     auto computeETy = lhsTy.getElementType();
     if (computeETy.getIntOrFloatBitWidth() < rhsTy.getElementTypeBitWidth())
@@ -1451,12 +1450,12 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
     // Transpose the left hand side and the right hand side.
     lhs = builder.create<mlir::stablehlo::TransposeOp>(
         RankedTensorType::get(lhsTransposeShape, lhsTy.getElementType()), lhs,
-        builder.getI64TensorAttr(permLhs));
+        builder.getDenseI64ArrayAttr(permLhs));
     lhsTy = llvm::cast<RankedTensorType>(lhs.getType());
 
     rhs = builder.create<mlir::stablehlo::TransposeOp>(
         RankedTensorType::get(rhsTransposeShape, rhsTy.getElementType()), rhs,
-        builder.getI64TensorAttr(permRhs));
+        builder.getDenseI64ArrayAttr(permRhs));
     rhsTy = llvm::cast<RankedTensorType>(rhs.getType());
 
     auto dimI32Ty = RankedTensorType::get({1}, builder.getI32Type());
@@ -1512,7 +1511,7 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
         RankedTensorType::get(resultTy.getShape(), lhsTy.getElementType());
     lhs = builder.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
         lhsBroadcastTy, lhs, outputShape,
-        rewriter.getI64TensorAttr(lhsDimMapping));
+        rewriter.getDenseI64ArrayAttr(lhsDimMapping));
 
     // Broadcast the right hand side to match the expected output shape.
     llvm::SmallVector<int64_t> rhsDimMapping(rhsTy.getRank());
@@ -1524,7 +1523,7 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
         RankedTensorType::get(resultTy.getShape(), rhsTy.getElementType());
     rhs = builder.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
         rhsBroadcastTy, rhs, outputShape,
-        rewriter.getI64TensorAttr(rhsDimMapping));
+        rewriter.getDenseI64ArrayAttr(rhsDimMapping));
 
     lhs = builder.createOrFold<mlir::stablehlo::ConvertOp>(resultTy, lhs);
     rhs = builder.createOrFold<mlir::stablehlo::ConvertOp>(resultTy, rhs);
@@ -1651,7 +1650,7 @@ bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
       return true;
     }
 
-    (void)rewriter.notifyMatchFailure(iotaOp, "Iota must be on last dimension");
+    (void)rewriter.notifyMatchFailure(iotaOp, "iota must be on last dimension");
     return false;
   }
 
@@ -1659,11 +1658,9 @@ bool isIotaOrIotaBroadcast(PatternRewriter &rewriter, Value input) {
           input.getDefiningOp())) {
     auto broadcastLastDim =
         cast<ShapedType>(broadcastOp.getType()).getRank() - 1;
-    SmallVector<int64_t> broadcastDimensions = llvm::to_vector(
-        broadcastOp.getBroadcastDimensions().getValues<int64_t>());
-    if (broadcastDimensions.back() != broadcastLastDim) {
+    if (broadcastOp.getBroadcastDimensions().back() != broadcastLastDim) {
       (void)rewriter.notifyMatchFailure(
-          broadcastOp, "Last dimension must be maintained in broadcast");
+          broadcastOp, "last dimension must be maintained in broadcast");
       return false;
     }
     return isIotaOrIotaBroadcast(rewriter, broadcastOp.getOperand());
@@ -1682,7 +1679,7 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     Value topKInput;
     if (opOperands.size() != 2 || opResults.size() != 2) {
       return rewriter.notifyMatchFailure(
-          op, "Slice that maps to TopK must have exactly two inputs/outputs");
+          op, "slice that maps to TopK must have exactly two inputs/outputs");
     }
 
     Value inputIota;
@@ -1697,7 +1694,7 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     }
 
     if (!inputIota) {
-      return rewriter.notifyMatchFailure(op, "Sort isn't called from Iota.");
+      return rewriter.notifyMatchFailure(op, "sort isn't called from Iota");
     }
 
     Block &block = op.getRegion().front();
@@ -1713,7 +1710,7 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
 
     if (!getTop) {
       return rewriter.notifyMatchFailure(op,
-                                         "Unsupported comparison direction");
+                                         "unsupported comparison direction");
     }
 
     Value topV, topI;
@@ -1722,27 +1719,25 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
     for (auto [idx, result] : llvm::enumerate(opResults)) {
       if (result.getUsers().empty())
         return rewriter.notifyMatchFailure(
-            op, "Sort isn't calling into a slice op.");
+            op, "sort isn't calling into a slice op");
       auto sliceOp =
           dyn_cast<mlir::stablehlo::SliceOp>(*result.getUsers().begin());
       if (!sliceOp) {
         return rewriter.notifyMatchFailure(
-            op, "Sort isn't calling into a slice op.");
+            op, "sort isn't calling into a slice op");
       }
 
-      for (auto stride : sliceOp.getStrides().getValues<int64_t>()) {
+      for (auto stride : sliceOp.getStrides()) {
         if (stride != 1) {
           return rewriter.notifyMatchFailure(
-              op, "All slice strides must be 1 in order to match to TopK.");
+              op, "all slice strides must be 1 in order to match to TopK");
         }
       }
 
       // Treat the first slice as inputs, the second as indices.
       if (idx == 0) {
         topV = sliceOp.getResult();
-        SmallVector<int64_t> limitIndices =
-            llvm::to_vector(sliceOp.getLimitIndices().getValues<int64_t>());
-        k = limitIndices.back();
+        k = sliceOp.getLimitIndices().back();
       } else {
         topI = sliceOp.getResult();
       }

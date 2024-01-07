@@ -42,7 +42,7 @@ from typing import List
 LOCAL_HEADER_FILES = [
     "../../../../bindings/c/iree/compiler/embedding_api.h",
     "../../../../bindings/c/iree/compiler/tool_entry_points_api.h",
-    "MLIRInterop.h",
+    "../../../../bindings/c/iree/compiler/mlir_interop.h",
 ]
 
 MLIR_C_HEADER_FILES = [
