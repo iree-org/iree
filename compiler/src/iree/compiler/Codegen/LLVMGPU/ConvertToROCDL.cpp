@@ -137,6 +137,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      // These patterns only convert a subset of arith that target specific
+      // rocdl intrinsics (e.g. fp8 conversions).
       arith::populateArithToAMDGPUConversionPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);

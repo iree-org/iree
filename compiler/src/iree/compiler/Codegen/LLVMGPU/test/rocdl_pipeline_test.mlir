@@ -103,10 +103,12 @@ hal.executable @dot_dispatch_0 {
 
 // -----
 
+#map = affine_map<(d0) -> (d0)>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
 hal.executable @ext_fp8_dispatch {
@@ -120,16 +122,22 @@ hal.executable @ext_fp8_dispatch {
       func.func @ext_fp8_dispatch() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
-        %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>> -> tensor<4096xf8E4M3FNUZ>
-        %3 = tensor.empty() : tensor<4096xf32>
-        %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
-                            ins(%2 : tensor<4096xf8E4M3FNUZ>) outs(%3 : tensor<4096xf32>) {
-        ^bb0(%in: f8E4M3FNUZ, %out: f32):
-          %5 = arith.extf %in : f8E4M3FNUZ to f32 
-          linalg.yield %5 : f32 
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>> -> tensor<4096xf8E4M3FNUZ>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E5M2FNUZ>> -> tensor<4096xf8E5M2FNUZ>
+        %5 = tensor.empty() : tensor<4096xf32>
+        %6 = linalg.generic {indexing_maps = [#map, #map, #map],
+                             iterator_types = ["parallel"]}
+                             ins(%3, %4 : tensor<4096xf8E4M3FNUZ>, tensor<4096xf8E5M2FNUZ>)
+                             outs(%5 : tensor<4096xf32>) {
+        ^bb0(%in0: f8E4M3FNUZ, %in1: f8E5M2FNUZ, %out: f32):
+          %7 = arith.extf %in0 : f8E4M3FNUZ to f32 
+          %8 = arith.extf %in1 : f8E5M2FNUZ to f32 
+          %9 = arith.addf %7, %8 : f32
+          linalg.yield %9 : f32 
         } -> tensor<4096xf32>
-        flow.dispatch.tensor.store %4, %1, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+        flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
         return
       }
     }
@@ -138,5 +146,7 @@ hal.executable @ext_fp8_dispatch {
 
 //   CHECK-LABEL: hal.executable public @ext_fp8_dispatch
 //         CHECK:   hal.executable.variant public @rocm
-//         CHECK:     %[[EXTF8:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
-//         CHECK:     llvm.store %[[EXTF8]], %{{.*}} : f32, !llvm.ptr<1>
+//     CHECK-DAG:     %[[EXTF8E4M3:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
+//     CHECK-DAG:     %[[EXTF8E5M2:.+]] = rocdl.cvt.f32.bf8 %{{.*}} : f32
+//         CHECK:     %[[ADD:.+]] = llvm.fadd %[[EXTF8E4M3]], %[[EXTF8E5M2]] : f32
+//         CHECK:     llvm.store %[[ADD]], %{{.*}} : f32, !llvm.ptr<1>
