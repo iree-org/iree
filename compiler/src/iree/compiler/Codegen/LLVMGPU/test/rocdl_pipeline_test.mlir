@@ -100,3 +100,43 @@ hal.executable @dot_dispatch_0 {
 //  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
 // CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
 //   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @ext_fp8_dispatch {
+  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>) {
+    hal.executable.export @ext_fp8_dispatch layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @ext_fp8_dispatch() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4096], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4096xf8E4M3FNUZ>> -> tensor<4096xf8E4M3FNUZ>
+        %3 = tensor.empty() : tensor<4096xf32>
+        %4 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
+                            ins(%2 : tensor<4096xf8E4M3FNUZ>) outs(%3 : tensor<4096xf32>) {
+        ^bb0(%in: f8E4M3FNUZ, %out: f32):
+          %5 = arith.extf %in : f8E4M3FNUZ to f32 
+          linalg.yield %5 : f32 
+        } -> tensor<4096xf32>
+        flow.dispatch.tensor.store %4, %1, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: hal.executable public @ext_fp8_dispatch
+//         CHECK:   hal.executable.variant public @rocm
+//         CHECK:     %[[EXTF8:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
+//         CHECK:     llvm.store %[[EXTF8]], %{{.*}} : f32, !llvm.ptr<1>

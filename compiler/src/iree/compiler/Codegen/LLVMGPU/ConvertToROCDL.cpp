@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
+#include "mlir/Conversion/ArithToAMDGPU/ArithToAMDGPU.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
@@ -33,6 +34,10 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+
+#define DEBUG_TYPE "iree-convert-to-rocdl"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -132,10 +137,11 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
       RewritePatternSet patterns(&getContext());
+      arith::populateArithToAMDGPUConversionPatterns(patterns);
       populateConvertGPUToAMDGPUPatterns(patterns);
+      populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);
       populateScalarizeMathOps(patterns);
-      populateConvertSharedMemoryAllocOps(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
@@ -157,6 +163,9 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
         return signalPassFailure();
       }
     }
+
+    LDBG("After applying in-dialect conversions\n" << m);
+
     {
       RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
@@ -164,6 +173,9 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
         return signalPassFailure();
       }
     }
+
+    LDBG("After applying GPU rewrite patterns\n" << m);
+
     {
       // Convert arith::maximumf/minimumf ops on AMD gpus since the lowering
       // is faulty for them.
@@ -175,6 +187,9 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
         return signalPassFailure();
       }
     }
+
+    LDBG("After converting maximumf/minimumf ops\n" << m);
+
     {
       RewritePatternSet llvmPatterns(&getContext());
       populateLowerHALInterfaceOp(llvmPatterns);
@@ -199,7 +214,11 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
         signalPassFailure();
     }
+
+    LDBG("After converting to rocdl\n" << m);
     ConvertToDynamicSharedMemory(m);
+
+    LDBG("After converting to dynamic shared memory\n" << m);
   }
 };
 
