@@ -25,7 +25,7 @@ createConvertToLLVMPass(bool reassociateFpReordering = false);
 
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUCheckIRBeforeLLVMConversionPass();
+createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds = true);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
