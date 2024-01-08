@@ -106,7 +106,7 @@ def EncodingAttr :
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
     OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_M,
     OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_N,
-    OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$indexing_maps
+    OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps
   );
 
   let genVerifyDecl = 0;

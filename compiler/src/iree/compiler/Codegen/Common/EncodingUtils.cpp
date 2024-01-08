@@ -75,21 +75,33 @@ EncodingAttr getEncodingAttr(RankedTensorType type) {
 static AffineMap getMapForRole(EncodingAttr encoding) {
   EncodingRole role = encoding.getRole().getValue();
   if (role == EncodingRole::LHS)
-    return cast<AffineMapAttr>(encoding.getIndexingMaps()[0]).getAffineMap();
+    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[0])
+        .getAffineMap();
   else if (role == EncodingRole::RHS)
-    return cast<AffineMapAttr>(encoding.getIndexingMaps()[1]).getAffineMap();
+    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[1])
+        .getAffineMap();
   else
-    return cast<AffineMapAttr>(encoding.getIndexingMaps()[2]).getAffineMap();
+    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[2])
+        .getAffineMap();
 }
 
 static FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getIndexingMaps();
+  auto indexingMapsAttr = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
       indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
         return cast<AffineMapAttr>(m).getAffineMap();
       });
   return linalg::inferContractionDims(indexingMaps);
+}
+
+/// Given the dim position of the encoding `user_indexing_maps`, return the
+/// matching index of the given encoding's tensor
+static unsigned mapDimToRoleIndex(int64_t dimPos, EncodingAttr encoding) {
+  AffineMap map = getMapForRole(encoding);
+  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, map.getContext()));
+  assert(idx.has_value());
+  return idx.value();
 }
 
 std::optional<SmallVector<int64_t>>
@@ -102,26 +114,21 @@ getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
   SmallVector<int64_t> perm;
   EncodingRole role = encoding.getRole().getValue();
   EncodingUser user = encoding.getUser().getValue();
-  AffineMap map = getMapForRole(encoding);
-  auto getResultIndex = [map](int64_t idx) {
-    return map.getResultPosition(getAffineDimExpr(idx, map.getContext()))
-        .value();
-  };
   // Add batch dim
   if (user == EncodingUser::BATCH_MATMUL) {
-    perm.push_back(getResultIndex(cDims->batch[0]));
+    perm.push_back(mapDimToRoleIndex(cDims->batch[0], encoding));
   }
   // Add M dim
   if (role != EncodingRole::RHS && cDims->m.size() == 1) {
-    perm.push_back(getResultIndex(cDims->m[0]));
+    perm.push_back(mapDimToRoleIndex(cDims->m[0], encoding));
   }
   // Add K dim
   if (role != EncodingRole::RESULT) {
-    perm.push_back(getResultIndex(cDims->k[0]));
+    perm.push_back(mapDimToRoleIndex(cDims->k[0], encoding));
   }
   // Add N dim
   if (role != EncodingRole::LHS && cDims->n.size() == 1) {
-    perm.push_back(getResultIndex(cDims->n[0]));
+    perm.push_back(mapDimToRoleIndex(cDims->n[0], encoding));
   }
   return perm;
 }
@@ -199,74 +206,37 @@ bool isVectorEncoding(int64_t rank, EncodingUser user) {
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {
-  EncodingUser user = encoding.getUser().getValue();
   EncodingRole role = encoding.getRole().getValue();
-  auto perm = getPermutationToCanonicalMatmulShape(encoding).value();
-  bool isVector = isVectorEncoding(rank, user);
-  bool isVecmatVector = (isVector && (isVecmatEncoding(encoding) ||
-                                      isBatchVecmatEncoding(encoding)));
-  bool isMatvecVector = (isVector && (isMatvecEncoding(encoding) ||
-                                      isBatchMatvecEncoding(encoding)));
-  // Start dim of the MxK (LHS), KxN (RHS), or MxN (RESULT) 2D matrix.
-  int64_t matmulDimBase = isBatchMatmulEncodingUser(user) ? 1 : 0;
   MaterializeEncodingInfo encodingInfo;
-  encodingInfo.innerDimsPos = {perm[matmulDimBase]};
-  if (!isVector) {
-    encodingInfo.innerDimsPos.push_back(perm[matmulDimBase + 1]);
-    encodingInfo.outerDimsPerm =
-        llvm::to_vector(llvm::seq<int64_t>(0, matmulDimBase));
-    encodingInfo.outerDimsPerm.push_back(matmulDimBase);
-    encodingInfo.outerDimsPerm.push_back(matmulDimBase + 1);
-    encodingInfo.outerDimsPerm =
-        applyPermutation(perm, encodingInfo.outerDimsPerm);
-  } else if (matmulDimBase > 0) {
-    encodingInfo.outerDimsPerm =
-        llvm::to_vector(llvm::seq<int64_t>(0, matmulDimBase));
-    encodingInfo.outerDimsPerm.push_back(matmulDimBase);
-    encodingInfo.outerDimsPerm =
-        applyPermutation(perm, encodingInfo.outerDimsPerm);
+  auto cDims = getEncodingContractionDims(encoding);
+  // The following expects M, N, K, and Batch sizes of at most 1 for now
+  assert(cDims->m.size() <= 1 && cDims->n.size() <= 1 && cDims->k.size() <= 1 &&
+         cDims->batch.size() <= 1 &&
+         "Expected at most one M, N, K, and Batch dimension");
+  if (!cDims->batch.empty()) {
+    encodingInfo.outerDimsPerm.push_back(
+        mapDimToRoleIndex(cDims->batch[0], encoding));
   }
-
-  switch (role) {
-  case (EncodingRole::LHS): {
-    if (isVecmatVector) {
-      encodingInfo.innerTileSizes = {tileMxNxK.K};
-      break;
-    }
-    encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.K};
-    break;
+  if (role != EncodingRole::RHS && !cDims->m.empty()) {
+    encodingInfo.outerDimsPerm.push_back(
+        mapDimToRoleIndex(cDims->m[0], encoding));
+    encodingInfo.innerDimsPos.push_back(
+        mapDimToRoleIndex(cDims->m[0], encoding));
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
   }
-  case (EncodingRole::RHS): {
-    if (isMatvecVector) {
-      encodingInfo.innerTileSizes = {tileMxNxK.K};
-      break;
-    }
-    encodingInfo.innerTileSizes = {tileMxNxK.N, tileMxNxK.K};
-    encodingInfo.innerDimsPos = {perm[matmulDimBase + 1], perm[matmulDimBase]};
-    encodingInfo.outerDimsPerm =
-        llvm::to_vector(llvm::seq<int64_t>(0, matmulDimBase));
-    encodingInfo.outerDimsPerm.push_back(matmulDimBase + 1);
-    encodingInfo.outerDimsPerm.push_back(matmulDimBase);
-    encodingInfo.outerDimsPerm =
-        applyPermutation(perm, encodingInfo.outerDimsPerm);
-    break;
+  if (role != EncodingRole::LHS && !cDims->n.empty()) {
+    encodingInfo.outerDimsPerm.push_back(
+        mapDimToRoleIndex(cDims->n[0], encoding));
+    encodingInfo.innerDimsPos.push_back(
+        mapDimToRoleIndex(cDims->n[0], encoding));
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
   }
-  case (EncodingRole::RESULT): {
-    if (isVecmatVector) {
-      encodingInfo.innerTileSizes = {tileMxNxK.N};
-      break;
-    }
-    if (isMatvecVector) {
-      encodingInfo.innerTileSizes = {tileMxNxK.M};
-      break;
-    }
-    encodingInfo.innerTileSizes = {tileMxNxK.M, tileMxNxK.N};
-    break;
-  }
-  default: {
-    assert(false);
-    return {};
-  }
+  if (role != EncodingRole::RESULT) {
+    encodingInfo.outerDimsPerm.push_back(
+        mapDimToRoleIndex(cDims->k[0], encoding));
+    encodingInfo.innerDimsPos.push_back(
+        mapDimToRoleIndex(cDims->k[0], encoding));
+    encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;
 }
