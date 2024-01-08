@@ -106,4 +106,40 @@ iree_hal_vulkan_device_extensions_t
 iree_hal_vulkan_infer_enabled_device_extensions(
     const iree::hal::vulkan::DynamicSymbols* device_syms);
 
+// Struct for supported device properties.
+//
+// Note that the fields used here should match the ones used in KernelFeatures
+// on the compiler side.
+typedef struct iree_hal_vulkan_device_properties_t {
+  // Floating-point compute related feature bitfield:
+  // * 0b01: f16
+  // * 0b10: f64
+  // Note that f32 is assumed to always exist and does not appear in this
+  // bitfield.
+  uint32_t compute_float : 8;
+  // Integer compute related feature bitfield:
+  // * 0b001: i8
+  // * 0b010: i16
+  // * 0b100: i64
+  // Note that i32 or i1 is assumed to always exist and does not appear in
+  // this bitfield.
+  uint32_t compute_int : 8;
+  // Storage bitwidth requirement bitfiled:
+  // * 0b01: 8-bit
+  // * 0b10: 16-bit
+  uint32_t storage : 8;
+  // Subgroup operation requirement bitfield:
+  // * 0b01: subgroup shuffle operations
+  // * 0b10: subgroup arithmetic operations
+  uint32_t subgroup : 8;
+  // Dot product operation requirement bitfield:
+  // ("dotprod.<input-type>.<output-type>")
+  // * 0b01: dotprod.4xi8.i32
+  uint32_t dot_product : 8;
+  // Cooperative matrix requirement bitfield:
+  // ("coopmatrix.<input-element-type>.<output-element-type>.<m>x<n>x<k>")
+  // * 0b01: coopmatrix.f16.f16.16x16x16
+  uint32_t cooperative_matrix : 8;
+} iree_hal_vulkan_iree_hal_vulkan_device_properties_t;
+
 #endif  // IREE_HAL_DRIVERS_VULKAN_EXTENSIBILITY_UTIL_H_
