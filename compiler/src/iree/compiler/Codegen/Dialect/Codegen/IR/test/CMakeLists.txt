@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "invalid.mlir"
     "lowering_config_attr.mlir"
     "ukernel_ops.mlir"
+    "ukernel_ops_cse.mlir"
   TOOLS
     FileCheck
     iree-opt
