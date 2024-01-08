@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
