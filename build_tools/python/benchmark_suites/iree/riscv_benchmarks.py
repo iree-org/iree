@@ -82,7 +82,8 @@ class Linux_RV32_Benchmarks(object):
         tflite_models.EFFICIENTNET_INT8,
         tflite_models.MOBILEBERT_INT8,
         tflite_models.PERSON_DETECT_INT8,
-        tflite_models.MOBILENET_V2_INT8,
+        # Disabled because of https://github.com/openxla/iree/issues/16061
+        # tflite_models.MOBILENET_V2_INT8,
     ]
 
     def generate(
