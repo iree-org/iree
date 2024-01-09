@@ -54,8 +54,9 @@ def compile_mm_test():
     global MM_TEST_COMPILED
     if not MM_TEST_COMPILED:
         MM_TEST_COMPILED = iree.compiler.compile_str(
-            MM_TEST_ASM, target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
-            extra_args=["--iree-opt-const-eval=false"]
+            MM_TEST_ASM,
+            target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
+            extra_args=["--iree-opt-const-eval=false"],
         )
     return MM_TEST_COMPILED
 
