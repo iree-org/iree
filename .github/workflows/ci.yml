@@ -790,6 +790,62 @@ jobs:
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
 
+  debug_windows:
+    needs: setup
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'debug_windows')
+    runs-on: windows-2022-64core
+    defaults:
+      run:
+        shell: bash
+    env:
+      BUILD_DIR: build-windows-debug
+      IREE_VULKAN_DISABLE: 1
+    steps:
+      # actions/checkout is for some reason unusably slow on the large managed
+      # Windows GitHub runners so we roll our own. See
+      # https://github.com/actions/checkout/issues/1186
+      # TODO(gcmn): Factor this out into something reusable across jobs. Can't
+      # be a script because we haven't done the checkout yet :-)
+      - name: "Checking out repository"
+        env:
+          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          mkdir -p ${GITHUB_WORKSPACE}
+          cd ${GITHUB_WORKSPACE}
+          git init
+          git fetch --depth 1 "${REMOTE_URL}" "${GITHUB_SHA}"
+          git checkout "${GITHUB_SHA}"
+          git submodule update --init --jobs 8 --depth 1
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        if: needs.setup.outputs.write-caches == 1
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
+      - name: "Setting up Python"
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        with:
+          python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
+      - name: "Installing Python packages"
+        run: |
+          python3 -m venv .venv
+          .venv/Scripts/activate.bat
+          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Installing requirements"
+        run: choco install ccache --yes
+      - name: "Configuring MSVC"
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+      - name: "Building IREE in Debug configuration"
+        env:
+          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
+          CCACHE_NAMESPACE: github-windows-2022-64core
+          CMAKE_BUILD_TYPE: Debug
+        run: |
+          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+
   byo_llvm:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'byo_llvm')
@@ -1170,6 +1226,7 @@ jobs:
       - gcc
       - tracing
       - debug
+      - debug_windows
       - byo_llvm
 
       # Crosscompilation
