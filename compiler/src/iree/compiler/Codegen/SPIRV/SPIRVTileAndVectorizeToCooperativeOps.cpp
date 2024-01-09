@@ -27,9 +27,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -40,7 +38,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
-#include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -68,17 +65,23 @@ static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
   return getTileSizes(op, 3); // For native vector sizes
 }
 
-constexpr char coopMatShapeAttrName[] = "iree.spirv.coop_mat_shape";
+constexpr char coopMatTypeAttrName[] = "iree.spirv.coopmatrix.type";
+constexpr char coopMatShapeAttrName[] = "iree.spirv.coopmatrix.shape";
 
-/// Sets the chosen cooperative matrix shape for CodeGen onto the
+/// Sets the chosen cooperative matrix type/shape for CodeGen onto the
 /// hal.executable.export op for the given `funcOp`.
-void setSPIRVCooperativeMatrixShape(func::FuncOp funcOp,
-                                    ArrayRef<int64_t> shape) {
+void setSPIRVCooperativeMatrixInfo(func::FuncOp funcOp, linalg::LinalgOp rootOp,
+                                   ArrayRef<int64_t> shape) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
 
   Builder b(funcOp.getContext());
   exportOp->setAttr(coopMatShapeAttrName, b.getDenseI64ArrayAttr(shape));
+  auto inputType = cast<ShapedType>(rootOp.getDpsInputs().front().getType());
+  auto outputType = cast<ShapedType>(rootOp.getDpsInits().front().getType());
+  auto elementTypes = b.getTypeArrayAttr(
+      {inputType.getElementType(), outputType.getElementType()});
+  exportOp->setAttr(coopMatTypeAttrName, elementTypes);
 }
 
 /// Returns the chosen cooperative matrix shape for CodeGen from the
@@ -357,7 +360,7 @@ public:
     // given that after tiling and vectorization we won't have the root Linalg
     // op anymore.
     SmallVector<int64_t> cooperativeOpSize = getTargetCooperativeOpSize(rootOp);
-    setSPIRVCooperativeMatrixShape(funcOp, cooperativeOpSize);
+    setSPIRVCooperativeMatrixInfo(funcOp, rootOp, cooperativeOpSize);
 
     SmallVector<int64_t> subgroupCounts = deduceSubgroupCounts(rootOp);
 
