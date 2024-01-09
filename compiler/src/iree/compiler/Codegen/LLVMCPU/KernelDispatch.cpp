@@ -2292,8 +2292,10 @@ setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                   continue;
                 tileSizes[pos] = tileSizes[pos] / size;
               }
-              if (!outerDimsPerm.empty())
+              if (!outerDimsPerm.empty()) {
+                tileSizes.resize(numLoops, 0);
                 applyPermutationToVector(tileSizes, outerDimsPerm);
+              }
             }
           })
           .Default([&](auto) {
