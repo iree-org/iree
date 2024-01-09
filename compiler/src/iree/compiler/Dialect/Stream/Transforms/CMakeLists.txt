@@ -15,7 +15,6 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
-    "Passes.h.inc"
   SRCS
     "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
@@ -31,8 +30,8 @@ iree_cc_library(
     "MaterializeCopyOnWrite.cpp"
     "PackConstants.cpp"
     "PackDispatchOperands.cpp"
-    "PassDetail.h"
     "Passes.cpp"
+    "Passes.h.inc"
     "PropagateTimepoints.cpp"
     "RefineUsage.cpp"
     "ScheduleAllocation.cpp"
@@ -63,7 +62,6 @@ iree_cc_library(
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::Builtins

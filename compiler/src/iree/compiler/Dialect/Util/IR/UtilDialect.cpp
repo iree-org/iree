@@ -121,7 +121,7 @@ struct FoldDimOp : public OpRewritePattern<DimOp> {
     // If it's a static dim then just fold to that.
     auto type = llvm::cast<ShapedType>(op.getSource().getType());
     int64_t staticDim = type.getDimSize(index.getZExtValue());
-    if (staticDim != ShapedType::kDynamic) {
+    if (!ShapedType::isDynamic(staticDim)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op, staticDim);
       return success();
     }

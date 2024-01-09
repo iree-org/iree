@@ -566,13 +566,13 @@ MemRefConversionPattern<OpTy>::getVectorizedMemRefType(
   MemRefLayoutAttrInterface layout = {};
   if (auto stridedLayout = dyn_cast<StridedLayoutAttr>(type.getLayout())) {
     auto offset = stridedLayout.getOffset();
-    if (offset != ShapedType::kDynamic) {
+    if (!ShapedType::isDynamic(offset)) {
       offset = offset / ratio;
     }
 
     auto strides = llvm::to_vector(stridedLayout.getStrides());
     for (auto [index, stride] : llvm::enumerate(llvm::drop_end(strides))) {
-      if (index == strides.size() - 1 || stride == ShapedType::kDynamic) {
+      if (index == strides.size() - 1 || ShapedType::isDynamic(stride)) {
         continue;
       }
       strides[index] = stride / ratio;

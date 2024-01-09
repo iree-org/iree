@@ -16,6 +16,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+using IREE::Codegen::LoweringConfigAttr;
+
 /// Returns true if:
 ///    1. `genericOp` is element-wise with all identity indexing maps
 ///    2. `genericOp` has only one input and one output with the same shape
@@ -43,6 +45,25 @@ static LogicalResult reduceDefiningOp(PatternRewriter &rewriter, Value input) {
     return {0};
   };
   return linalg::dropUnitDims(rewriter, producer, options);
+}
+
+/// Drops the first element from all the tile sizes list. The first element is
+/// for the batch dimension.
+static LoweringConfigAttr
+dropBatchTileSize(IREE::Codegen::LoweringConfigAttr config) {
+  TileSizesListType tileSizesList = config.getTileSizeVals();
+  ScalableTileFlagsListType scalableTileFlagsList =
+      config.getScalableTileFlagVals();
+  for (auto &tileSizes : tileSizesList) {
+    tileSizes.erase(tileSizes.begin());
+  }
+  for (auto &scalableTileFlags : scalableTileFlagsList) {
+    if (!scalableTileFlags.empty()) {
+      scalableTileFlags.erase(scalableTileFlags.begin());
+    }
+  }
+  return IREE::Codegen::LoweringConfigAttr::get(
+      config.getContext(), tileSizesList, scalableTileFlagsList);
 }
 
 /// Pattern to convert linalg.batch_mmt4d with batch dim = 1 into mmt4d.
@@ -77,6 +98,13 @@ struct ConvertBatchMmt4DtoMmt4DPattern
               .create<linalg::FillOp>(loc, ValueRange{oldFillOp.value()},
                                       ValueRange{newInit})
               .result();
+
+      IREE::Codegen::LoweringConfigAttr loweringConfig =
+          getLoweringConfig(oldFillOp);
+      if (loweringConfig) {
+        auto config = dropBatchTileSize(loweringConfig);
+        setLoweringConfig(reducedOut.getDefiningOp(), config);
+      }
     } else {
       reducedOut = tensor::createCanonicalRankReducingExtractSliceOp(
           rewriter, loc, out, reducedOutType);
@@ -106,6 +134,12 @@ struct ConvertBatchMmt4DtoMmt4DPattern
     auto mmt4DOp = rewriter.create<linalg::Mmt4DOp>(
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
+
+    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    if (loweringConfig) {
+      auto config = dropBatchTileSize(loweringConfig);
+      setLoweringConfig(mmt4DOp, config);
+    }
 
     auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, mmt4DOp.getResult(0), initTensor);

@@ -167,6 +167,50 @@ static void removeFusionGroupsAttribute(Operation *op) {
 // Op property charecterizations
 //===----------------------------------------------------------------------===//
 
+/// Returns true if the reduced dimensions in the linalgOp of the unpack result
+/// are not unpacked by the producer tensor::UnPackOp. This means the reduced
+/// dimensions of the unpack result are not part of the inner_dims_pos.
+static bool hasNoPackedReductionDimensions(linalg::LinalgOp linalgOp,
+                                           Operation *producer) {
+  auto unpack = dyn_cast<tensor::UnPackOp>(producer);
+  if (!unpack) {
+    return false;
+  }
+  AffineMap map;
+  for (auto &use : producer->getResult(0).getUses()) {
+    if (use.getOwner() == linalgOp) {
+      map = linalgOp.getMatchingIndexingMap(&use);
+      break;
+    }
+  }
+  if (!map) {
+    return false;
+  }
+  auto iterators = linalgOp.getIteratorTypesArray();
+  auto reduction = utils::IteratorType::reduction;
+  for (auto expr : llvm::enumerate(map.getResults())) {
+    auto dim = dyn_cast<AffineDimExpr>(expr.value());
+    if (!dim) {
+      return false;
+    }
+    unsigned pos = dim.getPosition();
+    if (iterators[pos] == reduction &&
+        llvm::any_of(unpack.getInnerDimsPos(),
+                     [expr](int64_t idp) { return expr.index() == idp; })) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/// Returns true if the linalgOp is fusable with an unpack producer
+static bool hasFusableUnpackProducer(linalg::LinalgOp linalgOp) {
+  return llvm::any_of(linalgOp->getOperands(), [&](Value operand) {
+    auto producer = operand.getDefiningOp<tensor::UnPackOp>();
+    return producer && hasNoPackedReductionDimensions(linalgOp, producer);
+  });
+}
+
 /// Operations that are treated as root operations for dispatch region
 /// formation.
 static bool isRootOp(Operation *op) {
@@ -177,7 +221,8 @@ static bool isRootOp(Operation *op) {
   // op.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
     if (isa<linalg::GenericOp>(op)) {
-      return linalgOp.getNumReductionLoops() != 0;
+      return linalgOp.getNumReductionLoops() != 0 &&
+             !hasFusableUnpackProducer(linalgOp);
     }
     return !isa<linalg::FillOp>(op);
   }
@@ -491,9 +536,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
                return isConstantIntValue(ofr, 1);
              });
     }
-    // Fuse `unset_encoding/unpack` -> elementwise operations for now. This
-    // could be generalized, but unpack fusion code-generation is harder.
+    // Fuse `unset_encoding/unpack` -> elementwise operations. Fuse unpack with
+    // non-overlapping reductions (i.e., the reduction dimension is not packed).
     if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+      if (hasNoPackedReductionDimensions(consumerLinalgOp, producer)) {
+        return true;
+      }
       return linalg::isElementwise(consumerLinalgOp) &&
              consumerLinalgOp.getNumLoops() ==
                  llvm::cast<RankedTensorType>(producer->getResult(0).getType())
@@ -524,6 +572,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
       return isa<linalg::LinalgOp>(producer);
     }
+    return false;
+  }
+
+  // TODO(#16025): Enable mmt4d fusion. It is disabled because the backends
+  // can not set multi lowering_config properly. See the issue for more details.
+  if (isa<linalg::Mmt4DOp>(producer)) {
     return false;
   }
 
@@ -762,7 +816,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
                IREE::LinalgExt::SetEncodingOp>(op) ||
-          isa<linalg::FillOp>(op) || isGroupedDequantizationOp(&op)) {
+          isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
         continue;
       }
 

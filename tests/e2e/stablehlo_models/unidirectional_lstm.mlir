@@ -79,18 +79,18 @@ func.func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%
   %62 = stablehlo.dot %61, %45, precision = [DEFAULT] : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
   %63 = stablehlo.reshape %43 : (tensor<40xf32>) -> tensor<1x40xf32>
   %64 = stablehlo.add %62, %63 : tensor<1x40xf32>
-  %65 = "stablehlo.slice"(%64) {limit_indices = dense<[1, 30]> : tensor<2xi64>, start_indices = dense<[0, 20]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
+  %65 = "stablehlo.slice"(%64) {limit_indices = array<i64: 1, 30>, start_indices = array<i64: 0, 20>, strides = array<i64: 1, 1>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
   %66 = stablehlo.multiply %65, %8 : tensor<1x10xf32>
   %67 = stablehlo.tanh %66 : tensor<1x10xf32>
   %68 = stablehlo.multiply %67, %8 : tensor<1x10xf32>
   %69 = stablehlo.add %68, %8 : tensor<1x10xf32>
   %70 = stablehlo.multiply %69, %47 : tensor<1x10xf32>
-  %71 = "stablehlo.slice"(%64) {limit_indices = dense<[1, 20]> : tensor<2xi64>, start_indices = dense<[0, 10]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
+  %71 = "stablehlo.slice"(%64) {limit_indices = array<i64: 1, 20>, start_indices = array<i64: 0, 10>, strides = array<i64: 1, 1>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
   %72 = stablehlo.multiply %71, %8 : tensor<1x10xf32>
   %73 = stablehlo.tanh %72 : tensor<1x10xf32>
   %74 = stablehlo.multiply %73, %8 : tensor<1x10xf32>
   %75 = stablehlo.add %74, %8 : tensor<1x10xf32>
-  %76 = "stablehlo.slice"(%64) {limit_indices = dense<[1, 10]> : tensor<2xi64>, start_indices = dense<0> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
+  %76 = "stablehlo.slice"(%64) {limit_indices = array<i64: 1, 10>, start_indices = array<i64: 0, 0>, strides = array<i64: 1, 1>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
   %77 = stablehlo.tanh %76 : tensor<1x10xf32>
   %78 = stablehlo.multiply %75, %77 : tensor<1x10xf32>
   %79 = stablehlo.add %70, %78 : tensor<1x10xf32>
@@ -100,7 +100,7 @@ func.func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%
   %83 = stablehlo.reshape %56 : (tensor<1x1xf32>) -> tensor<1xf32>
   %84 = stablehlo.broadcast_in_dim %83, dims = [0] : (tensor<1xf32>) -> tensor<1x10xf32>
   %85 = stablehlo.compare  GT, %84, %7 : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
-  %86 = "stablehlo.slice"(%64) {limit_indices = dense<[1, 40]> : tensor<2xi64>, start_indices = dense<[0, 30]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
+  %86 = "stablehlo.slice"(%64) {limit_indices = array<i64: 1, 40>, start_indices = array<i64: 0, 30>, strides = array<i64: 1, 1>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
   %87 = stablehlo.multiply %86, %8 : tensor<1x10xf32>
   %88 = stablehlo.tanh %87 : tensor<1x10xf32>
   %89 = stablehlo.multiply %88, %8 : tensor<1x10xf32>

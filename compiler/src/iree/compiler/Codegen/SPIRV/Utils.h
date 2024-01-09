@@ -13,12 +13,17 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 
 namespace mlir::iree_compiler {
+
+// Returns true if the given variant op uses SPIR-V CodeGen.
+bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
@@ -40,6 +45,11 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
 /// compute ops in `funcOp`.
 FailureOr<linalg::TileSizeComputationFunction>
 getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
+
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<scf::SCFTileSizeComputationFunction>
+getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.

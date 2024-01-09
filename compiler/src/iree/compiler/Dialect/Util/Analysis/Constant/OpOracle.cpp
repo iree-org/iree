@@ -41,13 +41,6 @@ void populateEscapingProducers(Operation *parentOp, ConstExprOpInfo &info) {
   });
 }
 
-ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
-  ConstExprOpInfo info;
-  info.isEligible = true;
-  populateEscapingProducers(op, info);
-  return info;
-}
-
 // Enforce a limited allow-list of types that are legal to consider
 // constexpr operand or result types. Given MLIR's open type system,
 // it is best to be conservative here, and we limit to known value
@@ -78,16 +71,8 @@ bool isLegalConstExprType(Type t) {
   return false;
 }
 
-} // namespace
-
-void registerConstExprDependentDialects(DialectRegistry &registry) {
-  registry.insert<IREE::Util::UtilDialect>();
-  registry.insert<linalg::LinalgDialect>();
-}
-
-bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
-
-ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
+// Check if the op can be an eligible const expr.
+bool isEligibleConstExpr(Operation *op) {
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
   if (op->getDialect() ==
@@ -97,39 +82,38 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     // dependency to the iterator and is non-const.
     if (llvm::isa<linalg::LinalgOp>(op) || llvm::isa<tensor::PadOp>(op) ||
         llvm::isa<tensor::EmptyOp>(op)) {
-      return getInfoForDefaultConstExprOp(op);
+      return true;
     }
-
-    return {};
+    return false;
   }
 
   // Target-dependent ops are not const-expr.
   // TODO(#14887): Use trait/interface instead.
   if (isa<IREE::LinalgExt::UpperBoundTileSizeOp,
           IREE::LinalgExt::SetEncodingOp>(op)) {
-    return {};
+    return false;
   }
 
   // By default, ops without results are not const-expr.
   if (op->getNumResults() == 0) {
-    return {};
+    return false;
   }
 
   // Forbid if illegal result types. It is sufficient to verify result
   // types since all constexpr values must come from a result somewhere
   // in the analyzed tree.
   if (!llvm::all_of(op->getResultTypes(), isLegalConstExprType)) {
-    return {};
+    return false;
   }
 
   // Forbid if part of a parent that should be treated atomically.
   if (op->getParentOfType<linalg::LinalgOp>()) {
-    return {};
+    return false;
   }
 
   // Optimization barriers cannot be folded.
   if (isa<IREE::Util::OptimizationBarrierOp>(op)) {
-    return {};
+    return false;
   }
 
   // Special carve-out for unregistered testing ops.
@@ -140,22 +124,40 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   if (!op->isRegistered()) {
     // Reject.
     if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
-      return {};
+      return false;
     }
     // Accept.
     if (op->getName().getStringRef() ==
             "iree_unregistered.non_leaf_const_expr" ||
         op->getName().getStringRef() == "iree_unregistered.const_expr") {
-      return getInfoForDefaultConstExprOp(op);
+      return true;
     }
   }
 
   // By default any effects make it non const-expr.
   if (!isMemoryEffectFree(op)) {
-    return {};
+    return false;
   }
 
-  return getInfoForDefaultConstExprOp(op);
+  return true;
+}
+
+} // namespace
+
+void registerConstExprDependentDialects(DialectRegistry &registry) {
+  registry.insert<IREE::Util::UtilDialect>();
+  registry.insert<linalg::LinalgDialect>();
+}
+
+bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
+
+ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
+  ConstExprOpInfo info;
+  info.isEligible = isEligibleConstExpr(op);
+  // Populate the producers for both eligible and ineligible cases, as we need
+  // the producers of ineligible op to identify hoistable constant producers.
+  populateEscapingProducers(op, info);
+  return info;
 }
 
 bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {

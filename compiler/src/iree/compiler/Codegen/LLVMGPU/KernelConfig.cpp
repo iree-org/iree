@@ -11,7 +11,7 @@
 #include <optional>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -22,7 +22,9 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
@@ -283,18 +285,21 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.
-  int nonUnitParallelDimCount = 0;
+  // Currently dynamic dimensions are tiled with size=1 in codegen.
+  int staticNonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
   for (auto mDim : contractionDims->m) {
-    nonUnitParallelDimCount += bounds[mDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[mDim] != 1 && !ShapedType::isDynamic(bounds[mDim]);
   }
   for (auto nDim : contractionDims->n) {
-    nonUnitParallelDimCount += bounds[nDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
   }
-  if (nonUnitParallelDimCount <= 1)
+  if (staticNonUnitParallelDimCount <= 1)
     return failure();
 
   // Don't consider operations that don't have a broadcast, those should go
@@ -381,9 +386,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamic &&
-                      sizeN != ShapedType::kDynamic &&
-                      sizeK != ShapedType::kDynamic;
+  bool isStaticSize = !ShapedType::isDynamic(sizeM) &&
+                      !ShapedType::isDynamic(sizeN) &&
+                      !ShapedType::isDynamic(sizeK);
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
@@ -758,6 +763,37 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumParallelLoops() != 2)
+    return false;
+
+  if (linalgOp.getNumReductionLoops() != 1)
+    return false;
+
+  // TODO: Allow for matvec with fused dequantization.
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // TODO: Support batch matvec.
+  if (!dims->batch.empty())
+    return false;
+
+  for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
+    if (!llvm::hasSingleElement(indices))
+      return false;
+  }
+
+  // Check if the first parallel dimension has bound 1, indicating we found a
+  // vector shape.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  if (bounds[dims->m.front()] != 1)
+    return false;
+
+  return true;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op,
@@ -902,7 +938,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   // Total parallel size that can fill the GPU with enough workgorups.
   // TODO: query from the target device; roughly 2x hardware compute unit.
-  int parallelThreshold = 256;
+  const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
@@ -921,6 +957,26 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 
+  // With just one subgroup per workgroup, make each subgroup do more work and
+  // process a few reductions (rows) along the last parallel dimension.
+  //
+  // TODO: This is enabled for matvec on ROCm for now. We should
+  // validate this strategy and extend to more linalg generics and to CUDA.
+  if (isRocmTarget(entryPoint) &&
+      llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
+    int64_t lastParallelBound = bounds[parallelDims.back()];
+    int64_t numParallelReductions = 1;
+    const int64_t maxParallelFactor = groupSize / 4;
+    for (int64_t parallelFactor = 2;
+         (parallelFactor < maxParallelFactor) &&
+         (lastParallelBound % parallelFactor == 0) &&
+         (lastParallelBound > parallelFactor);
+         parallelFactor *= 2) {
+      numParallelReductions = parallelFactor;
+    }
+    workgroupTileSizes.back() = numParallelReductions;
+  }
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t remainingGroupSize = groupSize;
@@ -938,7 +994,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,

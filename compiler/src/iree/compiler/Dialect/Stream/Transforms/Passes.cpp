@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -47,7 +46,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-tensor-transformation-pipeline
+// --iree-stream-tensor-transformation-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamTensorPassPipeline(OpPassManager &passManager,
@@ -106,7 +105,7 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-async-transformation-pipeline
+// --iree-stream-async-transformation-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamAsyncPassPipeline(OpPassManager &passManager,
@@ -181,7 +180,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-cmd-transformation-pipeline
+// --iree-stream-cmd-transformation-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamCmdPassPipeline(OpPassManager &passManager,
@@ -220,7 +219,7 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-optimization-pipeline
+// --iree-stream-optimization-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamOptimizationPassPipeline(
@@ -304,7 +303,7 @@ void buildStreamOptimizationPassPipeline(
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-transformation-pipeline
+// --iree-stream-transformation-pipeline
 //===----------------------------------------------------------------------===//
 
 void buildStreamTransformPassPipeline(
@@ -321,9 +320,11 @@ void buildStreamTransformPassPipeline(
   // Optimizations such as dispatch operand fusion remove information we can use
   // to determine memory usage by dispatches.
   if (transformOptions.dumpStatisticsFormat != DumpOutputFormat::None) {
-    passManager.addPass(IREE::Stream::createDumpStatisticsPass(
-        transformOptions.dumpStatisticsFormat,
-        transformOptions.dumpStatisticsFile));
+    DumpStatisticsPassOptions dumpStatisticsOptions;
+    dumpStatisticsOptions.outputFormat = transformOptions.dumpStatisticsFormat;
+    dumpStatisticsOptions.outputFile = transformOptions.dumpStatisticsFile;
+    passManager.addPass(
+        IREE::Stream::createDumpStatisticsPass(dumpStatisticsOptions));
   }
 
   //----------------------------------------------------------------------------
@@ -348,7 +349,16 @@ void buildStreamTransformPassPipeline(
 // Registration
 //===----------------------------------------------------------------------===//
 
-void registerStreamTransformPassPipelines() {
+namespace {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc" // IWYU pragma: export
+} // namespace
+
+void registerStreamPasses() {
+  // Generated.
+  registerPasses();
+
+  // Pipelines.
   PassPipelineRegistration<TransformOptions> tensorPassPipeline(
       "iree-stream-tensor-transformation-pipeline",
       "Lowers source dialects into stream.tensor.* IR.",
@@ -380,19 +390,6 @@ void registerStreamTransformPassPipelines() {
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
         buildStreamTransformPassPipeline(passManager, transformOptions);
       });
-}
-
-namespace {
-#define GEN_PASS_REGISTRATION
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc" // IWYU pragma: export
-} // namespace
-
-void registerStreamPasses() {
-  // Generated.
-  registerPasses();
-
-  // Pipelines.
-  registerStreamTransformPassPipelines();
 }
 
 } // namespace mlir::iree_compiler::IREE::Stream

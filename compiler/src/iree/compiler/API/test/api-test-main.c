@@ -15,8 +15,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/compiler/API/MLIRInterop.h"
 #include "iree/compiler/embedding_api.h"
+#include "iree/compiler/mlir_interop.h"
 
 struct compiler_state_t {
   iree_compiler_session_t *session;

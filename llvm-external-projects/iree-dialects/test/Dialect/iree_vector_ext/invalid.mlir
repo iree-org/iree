@@ -29,3 +29,17 @@ func.func @invalid_source_layout(%lhs: memref<32x32xf16>, %rhs: memref<32x32xf16
 }
 
 // -----
+
+func.func @invalid_to_simd_vector_element_type(%simd : vector<2x2xf16>) -> vector<64xf32> {
+  // expected-error @+1 {{requires the same element type for all operands and results}}
+  %simt = iree_vector_ext.to_simd %simd : vector<2x2xf16> -> vector<64xf32>
+  func.return %simt : vector<64xf32>
+}
+
+// -----
+
+func.func @invalid_to_simt_vector_element_type(%simt : vector<64xf32>) -> vector<2x2xf16> {
+  // expected-error @+1 {{requires the same element type for all operands and results}}
+  %simd = iree_vector_ext.to_simt %simt : vector<64xf32> -> vector<2x2xf16>
+  func.return %simd : vector<2x2xf16>
+}

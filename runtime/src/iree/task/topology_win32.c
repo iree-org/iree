@@ -4,9 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <stdio.h>
-
-#include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/task/topology.h"
 
@@ -201,6 +198,15 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
 iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     iree_host_size_t cpu_count, const uint32_t* cpu_ids,
     iree_task_topology_t* out_topology) {
+  // Today we have a fixed limit on the number of groups within a particular
+  // topology.
+  if (cpu_count >= IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT) {
+    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                            "too many CPUs specified (%" PRIhsz
+                            " provided for a max capacity of %zu)",
+                            cpu_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
+  }
+
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)cpu_count);
 
@@ -316,9 +322,30 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
   return iree_ok_status();
 }
 
+static bool iree_task_topology_core_is_selected(
+    bool has_heterogeneous_cores,
+    iree_task_topology_performance_level_t performance_level,
+    const PROCESSOR_RELATIONSHIP* core) {
+  if (!has_heterogeneous_cores) return true;
+  switch (performance_level) {
+    default:
+    case IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY:
+      // Not filtering on efficiency class.
+      return true;
+    case IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_LOW:
+      // Lowest efficiency only today - we could make the enum 0-N but all
+      // current processors just have low/high (aka little/big aka
+      // efficiency/performance).
+      return core->EfficiencyClass == 0;
+    case IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_HIGH:
+      return core->EfficiencyClass != 0;
+  }
+}
+
 iree_status_t iree_task_topology_initialize_from_physical_cores(
-    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
-    iree_task_topology_t* out_topology) {
+    iree_task_topology_node_id_t node_id,
+    iree_task_topology_performance_level_t performance_level,
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)node_id);
 
@@ -374,8 +401,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     // 1 if the group is included in the current filter.
     // If 0 then all processors in the group are to be ignored.
     uint32_t selected : 1;
-    // Total number of available cores in the group.
-    uint32_t core_count : 8;
+    // Bitmask indicating which cores in the group are selected for use.
+    KAFFINITY affinity_mask;
   } group_info_t;
   group_info_t* group_table =
       iree_alloca(sizeof(group_info_t) * max_group_count);
@@ -402,18 +429,38 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
       }
     }
   }
+
+  // Calculate the total number of cores and whether they are homogenous.
   iree_host_size_t total_core_count = 0;
+  bool has_heterogeneous_cores = false;
+  for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
+       p < all_relationships_end;
+       p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
+    if (p->Relationship == RelationProcessorCore) {
+      assert(p->Processor.GroupCount == 1);
+      ++total_core_count;
+      if (p->Processor.EfficiencyClass > 0) has_heterogeneous_cores = true;
+    }
+  }
+
   iree_host_size_t selected_core_count = 0;
   for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
        p < all_relationships_end;
        p = (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)p + p->Size)) {
     if (p->Relationship == RelationProcessorCore) {
       assert(p->Processor.GroupCount == 1);
-      if (group_table[p->Processor.GroupMask[0].Group].selected) {
-        ++group_table[p->Processor.GroupMask[0].Group].core_count;
-        ++selected_core_count;
+      if (!group_table[p->Processor.GroupMask[0].Group].selected) {
+        // NUMA group was not selected for inclusion.
+        continue;
+      } else if (!iree_task_topology_core_is_selected(has_heterogeneous_cores,
+                                                      performance_level,
+                                                      &p->Processor)) {
+        // Core filtered based on performance level setting.
+        continue;
       }
-      ++total_core_count;
+      group_info_t* group_info = &group_table[p->Processor.GroupMask[0].Group];
+      group_info->affinity_mask |= p->Processor.GroupMask[0].Mask;
+      ++selected_core_count;
     }
   }
   if (!selected_core_count) {
@@ -448,13 +495,16 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   PROCESSOR_NUMBER base_processor_number;
   GetCurrentProcessorNumberEx(&base_processor_number);
   group_info_t* base_group = &group_table[base_processor_number.Group];
-  iree_host_size_t base_core_index = 0;
-  for (iree_host_size_t core_index = 0; core_index < total_core_count;
-       ++core_index) {
-    if (all_cores[core_index]->GroupMask[0].Mask &
-        (1ull << base_processor_number.Number)) {
-      base_core_index = core_index;
-      break;
+  iree_host_size_t base_core_index = -1;
+  if (base_group->selected &&
+      base_group->affinity_mask & (1ull << base_processor_number.Number)) {
+    for (iree_host_size_t core_index = 0; core_index < total_core_count;
+         ++core_index) {
+      if (all_cores[core_index]->GroupMask[0].Mask &
+          (1ull << base_processor_number.Number)) {
+        base_core_index = core_index;
+        break;
+      }
     }
   }
 
@@ -466,23 +516,34 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
   // sense vs being random as it is now.
 
   // Initialize all topology groups from the selected cores.
-  for (iree_host_size_t used_core_index = 0; used_core_index < used_core_count;
-       ++used_core_index) {
+  for (iree_host_size_t used_core_index = 0;
+       used_core_index < used_core_count;) {
     iree_host_size_t adjusted_core_index = used_core_index;
-    if (base_group->selected) {
+    if (base_core_index != -1) {
       // Rotate the starting core index by the base core such that we only use
       // the base core if all other available cores are utilized.
       adjusted_core_index =
           (((base_core_index + 1) % total_core_count) + used_core_index) %
           total_core_count;
     }
+
+    PROCESSOR_RELATIONSHIP* core = all_cores[adjusted_core_index];
+    if (!iree_task_topology_core_is_selected(has_heterogeneous_cores,
+                                             performance_level, core)) {
+      // Core filtered out by performance level; skip and try to find another
+      // usable one. Note that cores with different performance levels may be
+      // arbitrarily distributed across the logical core domain.
+      continue;
+    }
+    ++used_core_index;
+
     uint8_t group_index = (uint8_t)out_topology->group_count++;
     iree_task_topology_group_t* group = &out_topology->groups[group_index];
     iree_task_topology_group_initialize(group_index, group);
     group->processor_index = (uint32_t)adjusted_core_index;
     group->constructive_sharing_mask = 0;  // set below
     iree_task_topology_set_affinity_from_processor(
-        all_cores[adjusted_core_index], &group->ideal_thread_affinity);
+        core, &group->ideal_thread_affinity);
   }
 
   // Assign constructive sharing masks to each topology group.

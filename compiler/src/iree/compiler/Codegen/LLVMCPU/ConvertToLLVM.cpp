@@ -21,6 +21,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ArmNeon2dToIntr/ArmNeon2dToIntr.h"
+#include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
@@ -1032,6 +1033,14 @@ void ConvertToLLVMPass::runOnOperation() {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
   }
 
+  LLVMConversionTarget target(getContext());
+  bool hasAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
+  if (hasAArch64SME) {
+    // Enable ArmSME to LLVM lowerings.
+    configureArmSMEToLLVMConversionLegality(target);
+    populateArmSMEToLLVMConversionPatterns(typeConverter, patterns);
+  }
+
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
@@ -1043,7 +1052,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
-  arith::populateExpandBFloat16Patterns(patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
@@ -1067,7 +1075,6 @@ void ConvertToLLVMPass::runOnOperation() {
   >(abi, typeConverter);
   // clang-format on
 
-  LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp>();
   target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -1095,10 +1102,9 @@ void ConvertToLLVMPass::runOnOperation() {
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
-      if (failed(
-              applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
-        return signalPassFailure();
-      }
+    }
+    if (failed(applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
+      return signalPassFailure();
     }
   }
 }

@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTraits.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -26,6 +25,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_DUMPSTATISTICSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -560,7 +562,7 @@ static void dumpJSONStructures(const UsageInfo &usageInfo,
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-dump-statistics
+// --iree-stream-dump-statistics
 //===----------------------------------------------------------------------===//
 
 // Opens a canonical |filePath| for text output.
@@ -584,19 +586,10 @@ openOutputFile(StringRef filePath) {
   }
 }
 
-class DumpStatisticsPass : public DumpStatisticsBase<DumpStatisticsPass> {
-public:
-  DumpStatisticsPass() = default;
-  DumpStatisticsPass(DumpOutputFormat outputFormat, std::string outputFile) {
-    this->outputFormat = outputFormat;
-    this->outputFile = outputFile;
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Stream::StreamDialect>();
-    registry.insert<IREE::Util::UtilDialect>();
-  }
-
+struct DumpStatisticsPass
+    : public IREE::Stream::impl::DumpStatisticsPassBase<DumpStatisticsPass> {
+  using IREE::Stream::impl::DumpStatisticsPassBase<
+      DumpStatisticsPass>::DumpStatisticsPassBase;
   void runOnOperation() override {
     if (outputFormat == DumpOutputFormat::None)
       return;
@@ -631,11 +624,5 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createDumpStatisticsPass(DumpOutputFormat outputFormat,
-                         std::string outputFile) {
-  return std::make_unique<DumpStatisticsPass>(outputFormat, outputFile);
-}
 
 } // namespace mlir::iree_compiler::IREE::Stream

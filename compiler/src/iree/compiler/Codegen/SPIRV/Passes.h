@@ -12,10 +12,14 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+//===---------------------------------------------------------------------===//
+// SPIR-V pass pipelines
+//===---------------------------------------------------------------------===//
 
 /// Pass pipeline to lower IREE HAL executables without any tiling and
 /// distribution.
@@ -57,6 +61,13 @@ void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm);
 /// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
+
+/// Populates passes needed to link HAL executables across SPIRV targets.
+void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
+
+//===---------------------------------------------------------------------===//
+// SPIR-V passes
+//===---------------------------------------------------------------------===//
 
 /// Pass to perform the final conversion to SPIR-V dialect.
 ///
@@ -123,6 +134,11 @@ createSPIRVLowerExecutableTargetPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVMapMemRefStorageClassPass();
 
+/// Pass to materialize SPIR-V target requirements of hal.exectuable.variant ops
+/// into hal.executable.condition regions.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVMaterializeExecutableConditionsPass();
+
 /// Pass to tile and distribute Linalg ops with buffer semantics to
 /// invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
@@ -140,6 +156,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
 /// SPIR-V cooperative ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileToCooperativeOpsPass();
+
+// Trims the SPIR-V target environment of a HAL executable variant to the
+// minimal requirement per the compiled spirv.module op needs.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVTrimExecutableTargetEnvPass();
 
 /// Converts vector ops to gpu subgroup MMA ops.
 std::unique_ptr<OperationPass<func::FuncOp>>
@@ -180,7 +201,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     ArrayRef<int64_t> workgroupSize);
 
 //----------------------------------------------------------------------------//
-// Register SPIRV Passes
+// Registration
 //----------------------------------------------------------------------------//
 
 void registerCodegenSPIRVPasses();

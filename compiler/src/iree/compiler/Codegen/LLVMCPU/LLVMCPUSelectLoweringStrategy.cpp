@@ -6,8 +6,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -100,7 +100,6 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   LogicalResult verificationStatus = success();
   switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert:
     verificationStatus =
         verifyLoweringConfiguration(moduleOp, translationInfo.value(),
                                     verifyDoubleTilingExpertPassPipelineConfig);

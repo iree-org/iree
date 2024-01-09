@@ -56,7 +56,7 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
   strides.back() = 1;
   for (int i = strides.size() - 1; i > 0; --i) {
-    if (shape[i] == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(shape[i])) {
       break;
     }
     strides[i - 1] = strides[i] * shape[i];

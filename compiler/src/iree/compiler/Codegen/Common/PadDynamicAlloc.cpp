@@ -42,7 +42,7 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
   SmallVector<OpFoldResult> sizes;
   size_t dynamicDimIdx = 0;
   for (int64_t &dimSize : shape) {
-    if (dimSize != ShapedType::kDynamic) {
+    if (!ShapedType::isDynamic(dimSize)) {
       sizes.push_back(rewriter.getIndexAttr(dimSize));
       continue;
     }

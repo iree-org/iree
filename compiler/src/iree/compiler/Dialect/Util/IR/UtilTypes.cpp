@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
@@ -606,23 +605,20 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
 // IREE::Util::ShapeAware*
 //===----------------------------------------------------------------------===//
 
-std::optional<ValueRange> findDynamicDims(Value shapedValue) {
+std::optional<ValueRange> findDynamicDims(Value workValue) {
+
   // Look up the use-def chain: always safe, as any value we reach dominates
   // {|block|, |insertionPoint|} implicitly.
-  SmallVector<Value> worklist;
-  worklist.push_back(shapedValue);
-  while (!worklist.empty()) {
-    auto workValue = worklist.pop_back_val();
+  while (workValue) {
     auto workOp = workValue.getDefiningOp();
     if (!workOp)
-      continue;
-    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(workOp)) {
+      break;
+    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(workOp))
       return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
-    } else if (auto tiedOp = dyn_cast<TiedOpInterface>(workOp)) {
-      auto tiedValue = tiedOp.getTiedResultOperand(workValue);
-      if (tiedValue)
-        worklist.push_back(tiedValue);
-    }
+    else if (auto tiedOp = dyn_cast<TiedOpInterface>(workOp)) {
+      workValue = tiedOp.getTiedResultOperand(workValue);
+    } else
+      break;
   }
   return std::nullopt;
 }
@@ -741,7 +737,7 @@ static SmallVector<Value> buildShape(Location loc, ShapedType type,
   unsigned dynamicIdx = 0;
   for (unsigned i = 0; i < type.getRank(); ++i) {
     int64_t dim = type.getDimSize(i);
-    if (dim == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(dim)) {
       dims.push_back(dynamicDims[dynamicIdx++]);
     } else {
       dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));

@@ -43,11 +43,11 @@ module @example {
     builtin.module {
       // External function declaration using a user-chosen calling convention.
       func.func private @simple_mul_workgroup(
-            %binding0: memref<f32>, 
+            %binding0: memref<f32>,
             %binding0_offset : index,
             %binding1: memref<f32>,
             %binding1_offset : index,
-            %binding2: memref<f32>, 
+            %binding2: memref<f32>,
             %binding2_offset : index,
             %dim: index, %tid: index) attributes {
         // We can include some additional fields on the parameters struct as
@@ -72,7 +72,7 @@ module @example {
         // particular workgroup is in the grid. In this example we use a
         // workgroup size of 64x1x1 (which is exceedingly small for CPUs but
         // useful for demonstration).
-        %workgroup_id_x = flow.dispatch.workgroup.id[0] : index
+        %workgroup_id_x = stream.dispatch.workgroup.id[0] : index
         %tid = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
 
         // Bindings are accessed by reference.
@@ -89,7 +89,7 @@ module @example {
             : memref<?xf32> -> memref<f32>, index, index, index
         %base2, %offset2, %size2, %stride2 = memref.extract_strided_metadata %memref2
             : memref<?xf32> -> memref<f32>, index, index, index
-        
+
         // Call the externally defined C function with an (almost) plain C
         // calling convention (see above for details about the mess memrefs
         // turn into). This will be fetched at runtime from the plugin binary.

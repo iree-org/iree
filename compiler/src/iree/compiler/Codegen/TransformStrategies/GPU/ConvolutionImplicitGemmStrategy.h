@@ -143,8 +143,8 @@ public:
                        /*vectorSize=*/std::nullopt};
   }
 
-  void print(llvm::raw_ostream &os) const;
-  LLVM_DUMP_METHOD void dump() const;
+  void print(llvm::raw_ostream &os) const override;
+  LLVM_DUMP_METHOD void dump() const override;
 
 private:
   // For NCHW convolutions, the filter will be the LHS of the GEMM.

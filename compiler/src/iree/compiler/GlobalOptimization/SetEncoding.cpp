@@ -12,7 +12,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
@@ -291,9 +291,9 @@ struct setContractionOpEncoding
       return {};
     };
     std::optional<CastOpInterface> maybeLhsCastOp =
-        getDefiningNonI1CastOp(origLhs);
+        getDefiningNonI1ExtendingCastOp(origLhs);
     std::optional<CastOpInterface> maybeRhsCastOp =
-        getDefiningNonI1CastOp(origRhs);
+        getDefiningNonI1ExtendingCastOp(origRhs);
     Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
                                       : getElemType(origLhs);
     Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()

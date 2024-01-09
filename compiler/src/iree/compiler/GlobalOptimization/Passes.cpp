@@ -22,10 +22,22 @@ static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     llvm::cl::desc(
         "Enables reassociation of quantized matmul ops (experimental)."),
     llvm::cl::init(false));
+static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
+    "iree-global-opt-enable-fuse-silu-horizontal-matmul",
+    llvm::cl::desc(
+        "Enables fusing specifically structured matmuls (experimental)."),
+    llvm::cl::init(false));
+// TODO(#15973): Make default to true after fixing the CPU DT regression.
+static llvm::cl::opt<bool> clEnableTransposePropagation(
+    "iree-global-opt-propagate-transposes",
+    llvm::cl::desc(
+        "Enables propagation of transpose ops to improve fusion chances."),
+    llvm::cl::init(false));
 
-static llvm::cl::opt<bool> clEnableExpandVectors(
-    "iree-global-opt-enable-expand-vectors",
-    llvm::cl::desc("Enables vector expansion in vector/matrix operations."),
+static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
+    "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
+    llvm::cl::desc(
+        "Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16."),
     llvm::cl::init(false));
 
 void buildGlobalOptExprHoistingPassPipeline(
@@ -81,33 +93,60 @@ void buildGlobalOptimizationPassPipeline(
       // - Convert all elementwise ops to Linalg
       // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
-      .addPass(createGeneralizeLinalgNamedOpsPass)
       // RaiseSpecialOps, by virtue of implementing various peephole
       // optimizations, is sensitive to surrounding IR structure. Thus we run
       // this pass both before unit dim folding + consteval, as well as after.
-      .addPass(IREE::Flow::createRaiseSpecialOps)
+      .addPass(createRaiseSpecialOps)
+      // We decompose and transpose concatenations immediately before folding
+      // unit extent dims because this allows decoupling unit dims in the
+      // concatenation from the transposes that are introduced.
+      .addPass([&]() {
+        return createDecomposeConcatPass(
+            transformOptions.options.outerDimConcat);
+      })
+      // We generalize certain named ops immediately before folding unit extent
+      // dims as the unit dim folding pass updates indexing maps and is better
+      // at working with generics. By this point we have already done any
+      // specialized raising and the op names are no longer useful.
+      .addPass(createGeneralizeLinalgNamedOpsPass)
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
+      .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
+                         createFuseSiluHorizontalMatmulPass)
+      .addPredicatedPass(clEnableDemoteContractionInputsToBF16,
+                         createDemoteContractionInputsToBF16Pass)
       .addPass([&]() {
         return createFuseDequantizationMatmulPass(
             clEnableQuantizedMatmulReassociation);
       })
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+      // Propagate transposes immediately before set encoding/data tiling
+      // because transpose propagation cannot take an opinion on the preferred
+      // layout of various operations. This simplifies local propagation
+      // decisions as SetEncoding is expected to pick the ideal layout for
+      // that operation anyway, and this way we only need to make such a
+      // decision once.
+      .addPredicatedPass(
+          clEnableTransposePropagation,
+          [&]() {
+            return createPropagateLinalgTransposePass(
+                transformOptions.options.aggressiveTransposePropagation);
+          })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
     mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
-    // Expand all vectors in vecmat/matvec ops into matrices for tiling.
-    if (clEnableExpandVectors) {
-      mainPassManager.addPass(createExpandVectorsPass());
-    }
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
-    FunctionLikeNest(mainPassManager)
-        .addPass(createGeneralizeLinalgNamedOpsPass);
+    mainPassManager.addPass(createSimplifyPackUnpackPass());
   }
+  // Generalize transposes and any other remaining named linalg ops that can now
+  // be represented as generics.
+  FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -145,12 +184,14 @@ void buildGlobalOptimizationPassPipeline(
   mainPassManager.addPass(
       IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
 
-  // Strip std.assert & co after we perform optimizations; prior to this we
-  // may use the assertions to derive information during analysis.
-  if (transformOptions.options.stripAssertions) {
-    FunctionLikeNest(mainPassManager)
-        .addPass(IREE::Util::createStripDebugOpsPass);
-  }
+  FunctionLikeNest(mainPassManager)
+      // After running const-eval to a fixed point and folding unit extent dims,
+      // try any new raising opportunities.
+      .addPass(createRaiseSpecialOps)
+      // Strip std.assert & co after we perform optimizations; prior to this we
+      // may use the assertions to derive information during analysis.
+      .addPredicatedPass(transformOptions.options.stripAssertions,
+                         IREE::Util::createStripDebugOpsPass);
 }
 
 namespace {

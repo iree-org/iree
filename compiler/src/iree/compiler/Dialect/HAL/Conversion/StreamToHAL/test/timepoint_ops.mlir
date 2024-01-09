@@ -45,7 +45,7 @@ func.func @timepointExportFence(%arg0: !stream.timepoint) -> !hal.fence {
 // CHECK-LABEL: @timepointChainExternal
 //  CHECK-SAME: (%[[TIMEPOINT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
 func.func @timepointChainExternal(%timepoint: !stream.timepoint, %signal: !hal.fence) {
-  // CHECK: %[[DEVICE:.+]] = hal.ex.shared_device
+  // CHECK: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
   // CHECK: hal.device.queue.execute<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[TIMEPOINT]]) signal(%[[SIGNAL]])
   stream.timepoint.chain_external %timepoint => (%signal : !hal.fence)
   return

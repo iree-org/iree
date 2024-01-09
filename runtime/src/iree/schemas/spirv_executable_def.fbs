@@ -10,6 +10,11 @@ namespace iree.hal.spirv;
 file_identifier "SPVE";
 file_extension "spve";
 
+table ShaderModuleDef {
+  // SPIR-V code blob.
+  code:[uint32];
+}
+
 // Source code location denoted by a file name and line within that file.
 table FileLineLocDef {
   filename:string;
@@ -23,11 +28,20 @@ table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader module.
   entry_points:[string];
 
-  // Required subgroup size for each entry point. 0 means no requirement.
+  // A list of required subgroup sizes for each entry point. 0 means no
+  // requirement.
+  // This list has the same size as the entry_points list.
   subgroup_sizes:[uint32];
 
-  // SPIR-V code words.
-  code:[uint32];
+  // A map of entry point ordinals to the indices of the containing shader
+  // modules (the following field).
+  // This list has the same size as the entry_points list.
+  shader_module_indices:[uint32];
+
+  // A list of shader modules hosting various entry points. Each shader module
+  // contains at least one entry point.
+  // This list may not have the same size as the entry_points list.
+  shader_modules:[ShaderModuleDef];
 
   // A map of entry point ordinals to source locations.
   // This information is optional and may be used by debuggers and profilers to

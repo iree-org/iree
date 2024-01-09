@@ -14,15 +14,15 @@
 #include "iree/base/internal/math.h"
 #include "iree/vm/value.h"
 
-// The kernels below has undefined behavior in cases where the corresponding
+// The kernels below have undefined behavior in cases where the corresponding
 // higher-level ops that map to them have undefined/implementation defined
 // behavior and no additional checking was inserted as part of lowering.
 // Avoiding UB is expected to happen above this level.
 // Note: Setting this variable merely doesn't disable UBSAN.
-#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
+#if defined(IREE_COMPILER_CLANG) && !IREE_VM_UBSAN_CHECKABLE_ENABLE
 #pragma clang attribute push(__attribute__((no_sanitize("undefined"))), \
                              apply_to = function)
-#endif
+#endif  // IREE_COMPILER_CLANG && !IREE_VM_UBSAN_CHECKABLE_ENABLE
 
 static inline int32_t vm_ext_i8i32u(int32_t);
 static inline int32_t vm_ext_i8i32s(int32_t);
@@ -393,7 +393,7 @@ static inline int64_t vm_rem_i64u(int64_t lhs, int64_t rhs) {
 static inline int64_t vm_fma_i64(int64_t a, int64_t b, int64_t c) {
   return a * b + c;
 }
-static inline int64_t vm_abs_i64(int64_t operand) { return labs(operand); }
+static inline int64_t vm_abs_i64(int64_t operand) { return llabs(operand); }
 static inline int64_t vm_min_i64s(int64_t lhs, int64_t rhs) {
   return rhs < lhs ? rhs : lhs;
 }
@@ -651,8 +651,8 @@ static inline int32_t vm_cmp_nan_f32(float operand) {
   return isnan(operand) ? 1 : 0;
 }
 
-#if !IREE_VM_UBSAN_CHECKABLE_ENABLE
+#if defined(IREE_COMPILER_CLANG) && !IREE_VM_UBSAN_CHECKABLE_ENABLE
 #pragma clang attribute pop
-#endif
+#endif  // IREE_COMPILER_CLANG && !IREE_VM_UBSAN_CHECKABLE_ENABLE
 
 #endif  // IREE_VM_OPS_H_

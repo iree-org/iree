@@ -41,7 +41,6 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::drivers::metal::builtin
-    iree::hal::utils::buffer_transfer
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set

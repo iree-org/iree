@@ -39,6 +39,8 @@ iree_cc_library(
     LLVMSupport
     LLVMTargetParser
     MLIRArmNeonDialect
+    MLIRArmSMEDialect
+    MLIRArmSMEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
@@ -48,7 +50,7 @@ iree_cc_library(
     MLIRTargetLLVMIRExport
     MLIRTransformDialect
     iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target

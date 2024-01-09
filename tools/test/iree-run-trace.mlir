@@ -10,7 +10,7 @@
 // RUN:                 --input=4xf32=4,4,4,4 \
 // RUN:                 --output=@%t \
 // RUN:                 --output=+%t) && \
-// RUN:  %PYTHON %S/echo_npy.py %t | \
+// RUN:  "%PYTHON" %S/echo_npy.py %t | \
 // RUN: FileCheck %s --check-prefix=RUN-TRACE
 //      RUN-TRACE{LITERAL}: [ 0. 4. 8. 12.]
 // RUN-TRACE-NEXT{LITERAL}: [ 0. 12. 24. 36.]

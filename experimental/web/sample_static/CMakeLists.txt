@@ -45,6 +45,7 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
   iree_runtime_runtime
+  iree_hal_hal
   iree_hal_local_loaders_static_library_loader
   iree_hal_drivers_local_sync_sync_driver
 )
@@ -89,6 +90,7 @@ target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 target_link_libraries(${_NAME}
   ${_MNIST_OBJECT_NAME}
   iree_runtime_runtime
+  iree_hal_hal
   iree_hal_local_loaders_static_library_loader
   iree_hal_drivers_local_task_task_driver
   iree_task_api

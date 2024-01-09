@@ -20,13 +20,12 @@ iree_compiler_register_plugin(
 iree_compiler_cc_library(
     name = "MetalSPIRV",
     srcs = ["MetalSPIRVTarget.cpp"],
-    hdrs = ["MetalSPIRVTarget.h"],
     deps = [
         ":MSLToMetalLib",
         ":MetalTargetPlatform",
         ":SPIRVToMSL",
         "//compiler/src/iree/compiler/Codegen/Common",
-        "//compiler/src/iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/SPIRV",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/Target",

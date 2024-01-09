@@ -96,8 +96,15 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
-/// Returns true if the operation is an generic op that represents dequant.
-bool isGroupedDequantizationOp(Operation *op);
+/// Returns true if the operation has dequantization-like properties.
+/// This function checks that the genericOp:
+///     1. Has only one output, and the output has an identity indexing map
+///     2. Has all parallel loops.
+///     3. Has exactly one input with an identity indexing map.
+///     4. All other inputs are projected permutations and not permutations.
+///     5. The input with an identity indexing map has a smaller element
+///        bitwidth than the output
+bool isDequantizationLikeOp(Operation *op);
 
 /// Collect all ops that should be cloned into the given dispatch region op.
 SmallVector<Operation *> getCloneableOps(Flow::DispatchRegionOp regionOp);

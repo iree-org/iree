@@ -9,7 +9,8 @@
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
@@ -292,11 +293,11 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   // how to incorporate the handling of kDynamic in the cost-model evaluation
   // below to decide when to prefer a dynamic vs a static tile shape.
   for (auto tile : enumeratedTiles) {
-    if (tile.M == ShapedType::kDynamic || tile.N == ShapedType::kDynamic ||
-        tile.K == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(tile.M) || ShapedType::isDynamic(tile.N) ||
+        ShapedType::isDynamic(tile.K)) {
       assert(enumeratedTiles.size() == 1);
-      assert(tile.M == ShapedType::kDynamic && tile.N == ShapedType::kDynamic &&
-             tile.K == ShapedType::kDynamic);
+      assert(ShapedType::isDynamic(tile.M) && ShapedType::isDynamic(tile.N) &&
+             ShapedType::isDynamic(tile.K));
       return tile;
     }
   }
@@ -493,7 +494,7 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
             return failure();
           }
           for (unsigned i = 0; i < info->innerTileSizes.size(); ++i) {
-            if (info->innerTileSizes[i] == ShapedType::kDynamic) {
+            if (ShapedType::isDynamic(info->innerTileSizes[i])) {
               result->innerTileSizes[i] = ShapedType::kDynamic;
             } else {
               result->innerTileSizes[i] =
@@ -503,6 +504,25 @@ getUpperBoundMaterializeEncodingFn(ArrayRef<ExecutableTargetAttr> targetAttrs) {
         }
         return result;
       };
+}
+
+static FailureOr<MaterializeEncodingValueInfo>
+chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
+                                          OpBuilder &builder, Location loc) {
+  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
+  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
+      loc, resultTypes, TypeAttr::get(tensorType));
+  MaterializeEncodingValueInfo result;
+  result.innerTileSizes = op.getResults();
+  return result;
+}
+
+static MaterializeEncodingValueFn
+getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
+    return chooseDynamicEncodingInfoVMVXMicrokernels;
+  }
+  return {};
 }
 
 void CPUMaterializeEncodingPass::runOnOperation() {

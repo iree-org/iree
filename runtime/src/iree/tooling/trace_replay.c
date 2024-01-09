@@ -176,8 +176,8 @@ static iree_status_t iree_trace_replay_load_builtin_module(
     IREE_RETURN_IF_ERROR(iree_trace_replay_create_device(
         replay, device_node, replay->host_allocator, &replay->device));
     IREE_RETURN_IF_ERROR(iree_hal_module_create(
-        replay->instance, replay->device, IREE_HAL_MODULE_FLAG_NONE,
-        replay->host_allocator, &module));
+        replay->instance, /*device_count=*/1, &replay->device,
+        IREE_HAL_MODULE_FLAG_NONE, replay->host_allocator, &module));
   }
   if (!module) {
     return iree_make_status(
@@ -392,9 +392,12 @@ static void iree_trace_replay_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       *min = -4;
       *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *min = -2;
+      *max = +2;
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       *min = 0;

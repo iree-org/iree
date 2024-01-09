@@ -1,13 +1,11 @@
 add_mlir_library(IREELinalgExtPasses
   ConvertConv2DToWinograd.cpp
   ConvertToLoops.cpp
-  DecomposeSoftmax.cpp
   PadContractionToBlockSize.cpp
   Passes.cpp
   SplitReduction.cpp
   TileAndDecomposeAttention.cpp
   TileAndDecomposeWinogradPass.cpp
-  Tiling.cpp
 
   DEPENDS
   IREELinalgExtPassesIncGen

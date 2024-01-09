@@ -1081,20 +1081,6 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x1280xf32>) -> 
 
 // -----
 
-func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
-  %0 = tensor.empty() : tensor<2x16x32xf32>
-  %1 = linalg.softmax dimension(2) ins(%arg0 : tensor<2x16x32xf32>) outs(%0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32>
-  return %1 : tensor<2x16x32xf32>
-}
-// CHECK:      func.func @softmax(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
-// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<2x16x32xf32>
-// CHECK:        %[[D1:.+]] = linalg.softmax dimension(2) ins(%[[ARG0]] : tensor<2x16x32xf32>) outs(%[[D0]] :
-// CHECK-SAME:     tensor<2x16x32xf32>) -> tensor<2x16x32xf32>
-// CHECK:        return %[[D1]] : tensor<2x16x32xf32>
-// CHECK:      }
-
-// -----
-
 func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32> {
   %0 = tensor.empty() : tensor<192x1024x64xf32>
   %1 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>

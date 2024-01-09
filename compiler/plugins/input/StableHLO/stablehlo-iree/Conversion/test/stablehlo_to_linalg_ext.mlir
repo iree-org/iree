@@ -394,7 +394,7 @@ func.func @scatter_ui32(%arg0: tensor<1xui32>, %arg1: tensor<1x1xi32>, %arg2: te
 // CHECK:      func.func @rfft_1d
 func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   %0 = "stablehlo.fft"(%input) {
-    fft_length = dense<8> : tensor<1xi64>, fft_type = #stablehlo<fft_type RFFT>
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type RFFT>
   } : (tensor<8xf32>) -> tensor<5xcomplex<f32>>
   %1 = "stablehlo.real"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
   %2 = "stablehlo.imag"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
@@ -442,7 +442,7 @@ func.func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 // CHECK:      func.func @rfft_2d
 func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
   %0 = "stablehlo.fft"(%input) {
-    fft_length = dense<8> : tensor<1xi64>, fft_type = #stablehlo<fft_type RFFT>
+    fft_length = array<i64: 8>, fft_type = #stablehlo<fft_type RFFT>
   } : (tensor<4x8xf32>) -> tensor<4x5xcomplex<f32>>
   %1 = "stablehlo.real"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
   %2 = "stablehlo.imag"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
@@ -490,7 +490,7 @@ func.func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
 func.func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %0 = "stablehlo.reverse"(%arg0) {
-    dimensions = dense<1> : tensor<1xi64>
+    dimensions = array<i64: 1>
   } : (tensor<3x5xi32>) -> tensor<3x5xi32>
   return %0 : tensor<3x5xi32>
 }
@@ -505,7 +505,7 @@ func.func @reverse_dim1(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
 
 func.func @reverse_unsigned(%arg0: tensor<3x5xui32>) -> tensor<3x5xui32> {
   %0 = "stablehlo.reverse"(%arg0) {
-    dimensions = dense<1> : tensor<1xi64>
+    dimensions = array<i64: 1>
   } : (tensor<3x5xui32>) -> tensor<3x5xui32>
   return %0 : tensor<3x5xui32>
 }
@@ -526,7 +526,7 @@ func.func @reverse_unsigned(%arg0: tensor<3x5xui32>) -> tensor<3x5xui32> {
 // CHECK-SAME:   %[[IN:[a-zA-Z0-9]+]]
 func.func @reverse_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %0 = "stablehlo.reverse"(%arg0) {
-    dimensions = dense<[0, 1]> : tensor<2xi64>
+    dimensions = array<i64: 0, 1>
   } : (tensor<?x?xi32>) -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }

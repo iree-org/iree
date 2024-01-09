@@ -33,6 +33,9 @@ NOTEBOOKS_EXPECTED_TO_FAIL = [
     # ```
     # convert_saved_model_v1 may be broken, but convert_saved_model works?
     "tensorflow_hub_import.ipynb",
+    # error: 'stablehlo.pad' op attribute 'edge_padding_low' failed to satisfy
+    # constraint: 64-bit signless integer elements attribute
+    "tensorflow_resnet.ipynb",
 ]
 
 

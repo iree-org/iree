@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExprVisitor.h"
@@ -144,7 +145,7 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple) {
 }
 
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return targetAttr && targetAttr.getBackend().getValue().startswith("vmvx");
+  return targetAttr && targetAttr.getBackend().getValue().starts_with("vmvx");
 }
 
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
@@ -566,9 +567,9 @@ static std::optional<unsigned> getInterfaceWorkgroupOpDim(Value value) {
 /// form
 /// ```
 ///   %dim = arith.constant ... : index
-///   %id = flow.dispatch.workgroup.id[%dim]
-///   %count = flow.dispatch.workgroup.count[%dim]
-///   %size = flow.dispatch.workgroup.size[%dim]
+///   %id = stream.dispatch.workgroup.id[%dim]
+///   %count = stream.dispatch.workgroup.count[%dim]
+///   %size = stream.dispatch.workgroup.size[%dim]
 ///   %offset = affine.apply
 ///     affine_map<(d0)[s0, s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
 ///   %new_step = affine.apply
@@ -645,6 +646,39 @@ getTiledAndDistributedLoopInfo(func::FuncOp funcOp) {
     }
   });
   return info;
+}
+
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
+                     ArrayRef<int64_t> tileSizes,
+                     ArrayRef<bool> tileScalableFlags) {
+  // scf::tileUsingSCFForOp expects the num of tile sizes = num of loops.
+  int numLoops = op.getLoopIteratorTypes().size();
+  SmallVector<int64_t> fixedTileSizes(tileSizes);
+  fixedTileSizes.resize(numLoops, /*default=*/0);
+  SmallVector<bool> fixedTileScalableFlags(tileScalableFlags);
+  fixedTileScalableFlags.resize(numLoops, /*default=*/false);
+  if (!llvm::is_contained(fixedTileScalableFlags, true)) {
+    // Non-scalable case: All constant tile sizes.
+    options.setTileSizes(
+        getAsIndexOpFoldResult(op.getContext(), fixedTileSizes));
+  } else {
+    // Scalable case: Multiply scalable tile sizes by a vector.vscale op.
+    options.setTileSizeComputationFunction(
+        [=](OpBuilder &b, Operation *op) -> SmallVector<OpFoldResult> {
+          auto loc = op->getLoc();
+          return llvm::map_to_vector(
+              llvm::zip(fixedTileSizes, fixedTileScalableFlags),
+              [&](auto pair) -> OpFoldResult {
+                auto [t, isScalable] = pair;
+                Value size = b.create<arith::ConstantIndexOp>(loc, t);
+                if (isScalable) {
+                  Value vscale = b.create<vector::VectorScaleOp>(loc);
+                  size = b.create<arith::MulIOp>(loc, size, vscale);
+                }
+                return size;
+              });
+        });
+  }
 }
 
 /// Create a linalg::GenericOp version of an n-D copy that can further tile,

@@ -67,6 +67,13 @@ struct GlobalOptimizationOptions {
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
 
+  // Enables aggressive propagation of transposes to the inputs of named ops,
+  // rewriting named ops as fused generics.
+  bool aggressiveTransposePropagation = false;
+
+  // Enables transposing all concatenations to the outer most dimension.
+  bool outerDimConcat = false;
+
   // Enables data tiling.
   bool dataTiling = true;
 
@@ -116,7 +123,7 @@ struct SchedulingOptions {
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;
 
   // TODO(benvanik): find a way to share this with
-  // Stream/Transforms/PassDetail.h w/o circular deps.
+  // Stream/Transforms/Passes.h w/o circular deps.
   // Defines the output format of a dump pass.
   enum class DumpOutputFormat {
     // Dumping disabled.

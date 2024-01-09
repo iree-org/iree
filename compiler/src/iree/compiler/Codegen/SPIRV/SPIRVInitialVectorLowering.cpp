@@ -449,6 +449,7 @@ public:
           vector::VectorTransformsOptions().setVectorTransposeLowering(
               vector::VectorTransposeLowering::EltWise);
       vector::populateVectorTransposeLoweringPatterns(patterns, options);
+      vector::populateVectorShapeCastLoweringPatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

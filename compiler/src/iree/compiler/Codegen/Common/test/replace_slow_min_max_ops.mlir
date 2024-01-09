@@ -26,7 +26,7 @@ func.func @reduction_min(%arg0: vector<4xf32>) -> f32 {
   return %reduction_min : f32
 }
 
-// CHECK: vector.reduction <minf>
+// CHECK: vector.reduction <minnumf>
 
 // -----
 
@@ -36,7 +36,7 @@ func.func @reduction_max(%arg0: vector<4xf32>) -> f32 {
   return %reduction_max : f32
 }
 
-// CHECK: vector.reduction <maxf>
+// CHECK: vector.reduction <maxnumf>
 
 // -----
 
@@ -46,7 +46,7 @@ func.func @multi_reduction_min(%arg0: vector<4xf32>, %arg1: f32) -> f32 {
   return %multi_reduction_min : f32
 }
 
-// CHECK: vector.multi_reduction <minf>
+// CHECK: vector.multi_reduction <minnumf>
 
 // -----
 
@@ -56,4 +56,4 @@ func.func @multi_reduction_max(%arg0: vector<4xf32>, %arg1: f32) -> f32 {
   return %multi_reduction_max : f32
 }
 
-// CHECK: vector.multi_reduction <maxf>
+// CHECK: vector.multi_reduction <maxnumf>

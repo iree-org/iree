@@ -122,6 +122,9 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
         continue;
       bool allConstants = true;
       for (ConstValueInfo *producerInfo : info->producers) {
+        assert(producerInfo->state != ConstValueInfo::UNANALYZED &&
+               "Producers of unknown value must be all analyzed.");
+
         if (producerInfo->state == ConstValueInfo::UNKNOWN) {
           // Producers unknown. No further progress until next iteration.
           worklist.push_back(info);
@@ -187,12 +190,25 @@ ConstExprAnalysis::addInfo(Value constValue) {
 void ConstExprAnalysis::expandToOp(Operation *op) {
   ConstExprOpInfo opInfo = ConstExprOpInfo::getForOp(op);
   for (auto result : op->getResults()) {
-    auto foundIt = constInfoMap.find(result);
-    if (foundIt != constInfoMap.end())
+    auto *valueInfo = constInfoMap.lookup(result);
+    if (valueInfo && valueInfo->state != ConstValueInfo::UNANALYZED)
       continue;
 
     // Generate new info record.
-    auto *valueInfo = addInfo(result);
+    if (!valueInfo)
+      valueInfo = addInfo(result);
+
+    // Update the producers first as we might early-return below.
+    for (auto producer : opInfo.producers) {
+      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
+      if (!producerInfo) {
+        // Create an unanalyzed value info as a placeholder. The info might be
+        // analyzed later if we are interested in it.
+        producerInfo = addInfo(producer);
+      }
+      valueInfo->producers.insert(producerInfo);
+    }
+
     if (!opInfo.isEligible) {
       // Put it in a NON_CONSTANT state and bail. This is terminal.
       valueInfo->state = ConstValueInfo::NON_CONSTANT;
@@ -201,6 +217,7 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
     }
 
     // If here, then an unknown state.
+    valueInfo->state = ConstValueInfo::UNKNOWN;
     LLVM_DEBUG(dbgs() << "  EXPAND TO UNKNOWN: " << result << "\n");
     worklist.push_back(valueInfo);
 
@@ -213,10 +230,6 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
         break;
       }
       expandToOp(definingOp);
-
-      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
-      assert(producerInfo && "should have producer info in map");
-      valueInfo->producers.insert(producerInfo);
     }
   }
 }
@@ -262,7 +275,11 @@ void ConstExprHoistingPolicy::initialize() {
   Worklist worklist;
   worklist.reserve(analysis.allocedConstInfos.size());
   for (auto &it : analysis.allocedConstInfos) {
-    worklist.push_back(it.get());
+    auto *info = it.get();
+    // Skip unanalyzed values.
+    if (info->state == ConstExprAnalysis::ConstValueInfo::UNANALYZED)
+      continue;
+    worklist.push_back(info);
   }
 
   // Since just initializing invariants, which are local, iteration order
@@ -330,7 +347,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
       for (int64_t dim : type.getShape()) {
         // Conservatively treat dynamic values as 1, to find a lower bound on
         // input size.
-        if (dim != ShapedType::kDynamic) {
+        if (!ShapedType::isDynamic(dim)) {
           elementCount *= dim;
         }
       }
@@ -343,7 +360,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
   if (auto type = dyn_cast<ShapedType>(info->constValue.getType())) {
     int64_t elementCount = 1;
     for (int64_t dim : type.getShape()) {
-      if (dim == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(dim)) {
         // Dynamic values can lead to an unbounded increase in size, treat this
         // as a significant increase.
         return true;

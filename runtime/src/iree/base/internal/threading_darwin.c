@@ -36,8 +36,23 @@ struct iree_thread_t {
   iree_atomic_int32_t is_suspended;
 };
 
+// Maps an IREE iree_thread_priority_class_t value to a QoS type.
+// https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/PrioritizeWorkWithQoS.html
 static qos_class_t iree_thread_qos_class_for_priority_class(
-    iree_thread_priority_class_t priority_class);
+    iree_thread_priority_class_t priority_class) {
+  switch (priority_class) {
+    case IREE_THREAD_PRIORITY_CLASS_LOWEST:
+      return QOS_CLASS_BACKGROUND;
+    case IREE_THREAD_PRIORITY_CLASS_LOW:
+      return QOS_CLASS_UTILITY;
+    default:
+    case IREE_THREAD_PRIORITY_CLASS_NORMAL:
+    case IREE_THREAD_PRIORITY_CLASS_HIGH:
+      return QOS_CLASS_USER_INITIATED;
+    case IREE_THREAD_PRIORITY_CLASS_HIGHEST:
+      return QOS_CLASS_USER_INTERACTIVE;
+  }
+}
 
 static void iree_thread_set_name(const char* name) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -105,8 +120,12 @@ iree_status_t iree_thread_create(iree_thread_entry_t entry, void* entry_arg,
   }
 
   // Ensure we start with the right QoS class.
-  qos_class_t qos_class =
-      iree_thread_qos_class_for_priority_class(params.priority_class);
+  qos_class_t qos_class;
+  if (params.initial_affinity.specified && params.initial_affinity.smt) {
+    qos_class = QOS_CLASS_BACKGROUND;
+  } else {
+    qos_class = iree_thread_qos_class_for_priority_class(params.priority_class);
+  }
   pthread_attr_set_qos_class_np(&thread_attr, qos_class, 0);
 
   // Retain the thread for the thread itself; this way if the caller immediately
@@ -171,25 +190,6 @@ void iree_thread_release(iree_thread_t* thread) {
 
 uintptr_t iree_thread_id(iree_thread_t* thread) {
   return (uintptr_t)thread->handle;
-}
-
-// Maps an IREE iree_thread_priority_class_t value to a QoS type.
-// https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/PrioritizeWorkWithQoS.html
-static qos_class_t iree_thread_qos_class_for_priority_class(
-    iree_thread_priority_class_t priority_class) {
-  switch (priority_class) {
-    case IREE_THREAD_PRIORITY_CLASS_LOWEST:
-      return QOS_CLASS_BACKGROUND;
-    case IREE_THREAD_PRIORITY_CLASS_LOW:
-      return QOS_CLASS_UTILITY;
-    default:
-    case IREE_THREAD_PRIORITY_CLASS_NORMAL:
-      return QOS_CLASS_DEFAULT;
-    case IREE_THREAD_PRIORITY_CLASS_HIGH:
-      return QOS_CLASS_USER_INITIATED;
-    case IREE_THREAD_PRIORITY_CLASS_HIGHEST:
-      return QOS_CLASS_USER_INTERACTIVE;
-  }
 }
 
 iree_thread_override_t* iree_thread_priority_class_override_begin(

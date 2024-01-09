@@ -2144,14 +2144,14 @@ struct ConvertTopKOp final : OpConversionPattern<mlir::chlo::TopKOp> {
     } else {
       values = rewriter.create<mlir::stablehlo::SliceOp>(
           op.getLoc(), tupleFirstElement,
-          DenseIntElementsAttr::get(indicesTy, beginIndices),
-          DenseIntElementsAttr::get(indicesTy, endIndices),
-          DenseIntElementsAttr::get(indicesTy, strides));
+          rewriter.getDenseI64ArrayAttr(beginIndices),
+          rewriter.getDenseI64ArrayAttr(endIndices),
+          rewriter.getDenseI64ArrayAttr(strides));
       indices = rewriter.create<mlir::stablehlo::SliceOp>(
           op.getLoc(), tupleSecondElement,
-          DenseIntElementsAttr::get(indicesTy, beginIndices),
-          DenseIntElementsAttr::get(indicesTy, endIndices),
-          DenseIntElementsAttr::get(indicesTy, strides));
+          rewriter.getDenseI64ArrayAttr(beginIndices),
+          rewriter.getDenseI64ArrayAttr(endIndices),
+          rewriter.getDenseI64ArrayAttr(strides));
     }
 
     rewriter.replaceOp(op, {values, indices});

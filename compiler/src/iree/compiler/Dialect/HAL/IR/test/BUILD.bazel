@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "descriptor_set_ops.mlir",
             "device_folding.mlir",
             "device_ops.mlir",
+            "devices_ops.mlir",
             "executable_folding.mlir",
             "executable_ops.mlir",
             "executable_targets.mlir",

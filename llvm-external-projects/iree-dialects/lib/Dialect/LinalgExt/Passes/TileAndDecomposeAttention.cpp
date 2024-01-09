@@ -192,30 +192,24 @@ static Value computeQKTranspose(Value query, Value key, Value output,
   return matmulOp.getResult(0);
 }
 
-static std::tuple<Value, Value, Value>
-extractSlices(Value key, Value value, Value query, ArrayRef<int64_t> queryShape,
-              ArrayRef<Value> ivs, OpFoldResult sequenceTileLength,
-              OpFoldResult headDimension, Type elementType, Location loc,
-              OpBuilder &builder) {
+static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
+                          ArrayRef<Value> ivs, OpFoldResult keyValueTileLength,
+                          OpFoldResult headDimension, Type elementType,
+                          Location loc, OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
-  SmallVector<OpFoldResult> strides(queryShape.size(), one);
-  SmallVector<OpFoldResult> sizes(queryShape.size(), one);
-  SmallVector<OpFoldResult> offsets(queryShape.size(), zero);
-  sizes[1] = sequenceTileLength;
+  SmallVector<OpFoldResult> strides(keyShape.size(), one);
+  SmallVector<OpFoldResult> sizes(keyShape.size(), one);
+  SmallVector<OpFoldResult> offsets(keyShape.size(), zero);
+  sizes[1] = keyValueTileLength;
   sizes[2] = headDimension;
-  offsets[1] = ivs[0];
-  SmallVector<int64_t> tensorShape{queryShape[1], queryShape[2]};
+  if (!ivs.empty())
+    offsets[1] = ivs[0];
+  SmallVector<int64_t> tensorShape{keyShape[1], keyShape[2]};
   auto tensorType = RankedTensorType::get(tensorShape, elementType);
   Value keySlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, key, offsets, sizes, strides);
-  Value valueSlice = builder.create<tensor::ExtractSliceOp>(
-      loc, tensorType, value, offsets, sizes, strides);
-
-  offsets = SmallVector<OpFoldResult>(queryShape.size(), zero);
-  Value querySlice = builder.create<tensor::ExtractSliceOp>(
-      loc, tensorType, query, offsets, sizes, strides);
-  return std::make_tuple(keySlice, valueSlice, querySlice);
+  return keySlice;
 }
 
 static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
@@ -254,7 +248,8 @@ static Value truncateToF16(Value input, Value output,
 static std::tuple<Value, Value, Value>
 createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
                     Value outputSlice, Value maxSlice, Value sumSlice,
-                    OpFoldResult sequenceTileLength, OpFoldResult headDimension,
+                    OpFoldResult sequenceTileLength,
+                    OpFoldResult keyValueTileLength, OpFoldResult headDimension,
                     Type elementType, SmallVectorImpl<Operation *> &ops,
                     Location loc, OpBuilder &builder) {
 
@@ -262,7 +257,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
   // Compute matmul(q, transpose(k))
   Value zero =
       builder.create<arith::ConstantOp>(loc, builder.getZeroAttr(f32Type));
-  SmallVector<OpFoldResult> resultShape{sequenceTileLength, sequenceTileLength};
+  SmallVector<OpFoldResult> resultShape{sequenceTileLength, keyValueTileLength};
   Value emptySquare =
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
@@ -342,7 +337,8 @@ static Value insertOutputSlice(Value src, Value dst,
 /// TODO: Adopt getTiledImplementation with this.
 IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
                                            SmallVectorImpl<Operation *> &ops,
-                                           RewriterBase &rewriter) {
+                                           RewriterBase &rewriter,
+                                           std::optional<uint64_t> tileSize) {
   Location loc = attnOp.getLoc();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(attnOp);
@@ -355,6 +351,14 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
       tensor::getMixedSizes(rewriter, loc, query);
   OpFoldResult headDimension = queryDimValues[2];
   OpFoldResult sequenceTileLength = queryDimValues[1];
+  OpFoldResult keyValueTileLength = sequenceTileLength;
+  SmallVector<int64_t> keyShape{queryShape};
+  if (tileSize) {
+    keyValueTileLength = rewriter.getIndexAttr(tileSize.value());
+    for (auto it : llvm::enumerate(attnOp.getKeyType().getShape())) {
+      keyShape[it.index()] = it.index() == 1 ? tileSize.value() : it.value();
+    }
+  }
 
   Value key = attnOp.getKey();
   Value value = attnOp.getValue();
@@ -397,7 +401,7 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value zeroValue = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   scf::LoopNest loopNest = createLoopNest(
       ivs, zeroValue,
-      getValueOrCreateConstantIndexOp(rewriter, loc, sequenceTileLength),
+      getValueOrCreateConstantIndexOp(rewriter, loc, keyValueTileLength),
       getValueOrCreateConstantIndexOp(rewriter, loc, sequenceLength),
       ValueRange({accumulatorF32, negativeMax, zeroSum}), loc, rewriter);
   ops.push_back(loopNest.loops.back());
@@ -410,9 +414,12 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
 
   // Extract slices
-  auto [keySlice, valueSlice, querySlice] =
-      extractSlices(key, value, query, queryShape, ivs, sequenceTileLength,
-                    headDimension, elementType, loc, rewriter);
+  Value keySlice = extractSlice(key, keyShape, ivs, keyValueTileLength,
+                                headDimension, elementType, loc, rewriter);
+  Value valueSlice = extractSlice(value, keyShape, ivs, keyValueTileLength,
+                                  headDimension, elementType, loc, rewriter);
+  Value querySlice = extractSlice(query, queryShape, {}, sequenceTileLength,
+                                  headDimension, elementType, loc, rewriter);
 
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
@@ -456,7 +463,8 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 /// TODO: Adopt decomposeOperation with this.
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
-                             RewriterBase &rewriter) {
+                             RewriterBase &rewriter,
+                             std::optional<uint64_t> tileSize) {
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();
@@ -474,11 +482,14 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       tensor::getMixedSizes(rewriter, loc, querySlice);
   OpFoldResult headDimension = queryDimValues[1];
   OpFoldResult sequenceTileLength = queryDimValues[0];
+  OpFoldResult keyValueTileLength =
+      tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
-  auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, tiledResult, max, sum,
-      sequenceTileLength, headDimension, elementType, ops, loc, rewriter);
+  auto [result, newMax, newSum] =
+      createAttentionBody(keySlice, valueSlice, querySlice, tiledResult, max,
+                          sum, sequenceTileLength, keyValueTileLength,
+                          headDimension, elementType, ops, loc, rewriter);
 
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
@@ -487,12 +498,13 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 /// FlashAttention algorithm.
 void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                SmallVectorImpl<Operation *> &ops,
-                               RewriterBase &rewriter, bool onlyTile) {
+                               RewriterBase &rewriter, bool onlyTile,
+                               std::optional<uint64_t> tileSize) {
   IREE::LinalgExt::AttentionOp tiledAttentionOp =
-      tileAttention(attnOp, ops, rewriter);
+      tileAttention(attnOp, ops, rewriter, tileSize);
   if (onlyTile)
     return;
-  decomposeTiledAttention(tiledAttentionOp, ops, rewriter);
+  decomposeTiledAttention(tiledAttentionOp, ops, rewriter, tileSize);
 }
 
 namespace {
@@ -524,11 +536,12 @@ namespace {
 ///    j. Compute matmul(s, v) and add new_accumulator
 ///
 ///
-LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile) {
+LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile,
+                                      std::optional<uint64_t> tileSize) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
     SmallVector<Operation *> ops;
-    tileAndDecomposeAttention(attnOp, ops, rewriter, onlyTile);
+    tileAndDecomposeAttention(attnOp, ops, rewriter, onlyTile, tileSize);
     return WalkResult::advance();
   });
   return success();
@@ -545,9 +558,13 @@ struct TileAndDecomposeAttentionPass
         linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
   }
   TileAndDecomposeAttentionPass() = default;
-  TileAndDecomposeAttentionPass(bool onlyTile) { this->onlyTile = onlyTile; }
+  TileAndDecomposeAttentionPass(bool onlyTile, uint64_t tileSize) {
+    this->onlyTile = onlyTile;
+    this->tileSize = tileSize;
+  }
   TileAndDecomposeAttentionPass(const TileAndDecomposeAttentionPass &pass) {
     onlyTile = pass.onlyTile;
+    tileSize = pass.tileSize;
   }
   void runOnOperation() override;
 };
@@ -556,7 +573,11 @@ struct TileAndDecomposeAttentionPass
 void TileAndDecomposeAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
-  if (failed(reifyAttentionTransform(getOperation(), onlyTile)))
+  std::optional<uint64_t> optionalTileSize{std::nullopt};
+  if (tileSize.hasValue())
+    optionalTileSize = tileSize.getValue();
+  if (failed(
+          reifyAttentionTransform(getOperation(), onlyTile, optionalTileSize)))
     return signalPassFailure();
 }
 

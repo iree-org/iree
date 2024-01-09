@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/NVGPU/Utils/MMAUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -24,26 +25,27 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensorcore-vectorization"
 
-using mlir::iree_compiler::IREE::LinalgExt::LinalgVectorizationPattern;
-using mlir::iree_compiler::IREE::LinalgExt::VectorizationPatterns;
-
 namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
 
-static void populateVectorizationPatterns(RewritePatternSet &patterns) {
+static void vectorizeLinalgOps(func::FuncOp funcOp) {
+  MLIRContext *context = funcOp.getContext();
+  IRRewriter rewriter(context);
   IREE::LinalgExt::LinalgTransformationFilter f(
-      StringAttr::get(patterns.getContext(), getVectorizeMarker()));
-  IREE::LinalgExt::LinalgVectorizationOptions vectorizationOptions;
-  VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
-      patterns, vectorizationOptions, f);
-  patterns.add<LinalgVectorizationPattern>(
-      patterns.getContext(), vectorizationOptions,
-      f.addOpFilter<linalg::ContractionOpInterface>());
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorReductionToContractPatterns(patterns);
+      StringAttr::get(context, getVectorizeMarker()));
+
+  funcOp.walk([&](Operation *op) {
+    if (failed(f.checkAndNotify(rewriter, op)) ||
+        !isa<linalg::FillOp, linalg::GenericOp, linalg::ContractionOpInterface>(
+            op)) {
+      return WalkResult::advance();
+    }
+    (void)linalg::vectorize(rewriter, op);
+    return WalkResult::advance();
+  });
 }
 
 static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
@@ -84,10 +86,13 @@ struct LLVMGPUTensorCoreVectorizationPass
     MLIRContext *context = &getContext();
     {
       // Step 1(a). Vectorize (linalg to vector).
-      RewritePatternSet vectorizationPatterns(context);
-      populateVectorizationPatterns(vectorizationPatterns);
+      vectorizeLinalgOps(funcOp);
+      RewritePatternSet contractionPatterns(context);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(
+          contractionPatterns);
+      vector::populateVectorReductionToContractPatterns(contractionPatterns);
       if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
+              funcOp, std::move(contractionPatterns)))) {
         return signalPassFailure();
       }
       LLVM_DEBUG({

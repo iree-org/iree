@@ -49,74 +49,7 @@ stat /some/path/foo.rdc
 There are multiple GPU vendors for the Android platforms, each offering their
 own tools. [Android GPU Inspector](https://gpuinspector.dev/)
 (AGI) provides a cross-vendor solution. See the
-[documentation](https://gpuinspector.dev/docs/) for more details.
-
-### Build Android app to run IREE
-
-In order to perform capture and analysis with AGI, you will need a full Android
-app. In IREE we have a simple Android native app wrapper to help package
-IREE core libraries together with a specific VM bytecode invocation into an
-Android app. The wrapper and its documentation are placed at
-[`tools/android/run_module_app/`](https://github.com/openxla/iree/tree/main/tools/android/run_module_app).
-
-For example, to package a module compiled from the following
-`stablehlo-dot.mlir` as an Android app:
-
-```mlir
-func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
-  %0 = "stablehlo.dot"(%lhs, %rhs) : (tensor<2x4xf32>, tensor<4x2xf32>) -> tensor<2x2xf32>
-  return %0 : tensor<2x2xf32>
-}
-```
-
-```shell
-# First compile into a VM bytecode module
-$ /path/to/iree/build/tools/iree-compile -- \
-  --iree-input-type=stablehlo \
-  --iree-hal-target-backends=vulkan-spirv \
-  /path/to/stablehlo-dot.mlir \
-  -o /tmp/stablehlo-dot.vmfb
-
-# Then package the Android app
-$ /path/to/iree/source/tools/android/run_module_app/build_apk.sh \
-  ./build-apk \
-  --device vulkan \
-  --module /tmp/stablehlo-dot.vmfb \
-  --function dot \
-  --input=...
-```
-
-Where `/path/to/input/file` is a file containing inputs to `dot`, for example:
-
-``` text
-2x4xf32=[[1.0 2.0 3.0 4.0][5.0 6.0 7.0 8.0]]
-4x2xf32=[[9.0 10.0][11.0 12.0][13.0 14.0][15.0 16.0]]
-```
-
-The above will build an `iree-run-module.apk` under the `./build-apk/`
-directory, which you can then install via `adb install`.
-
-`build_apk.sh` needs the Android SDK and NDK internally, an easy way to manage
-them is by installing [Android Studio](https://developer.android.com/studio).
-After installation, you will need to set up a few environment variables, which
-are printed at the beginning of `build_apk.sh` invocation.
-
-### Capture and analyze with AGI
-
-You can follow AGI's
-[Getting Started](https://gpuinspector.dev/docs/getting-started) page to learn
-how to use it. In general the steps are:
-
-* Install the latest AGI from <https://github.com/google/agi/releases> and launch.
-* Fill in the "Application" field by searching the app. The line should read
-  like `android.intent.action.MAIN:dev.iree.run_module/android.app.NativeActivity`.
-* Select start at beginning and choose a proper duration.
-* Configure system profile to include all GPU counters.
-* Start capture.
-
-Generated traces are in the [perfetto](https://perfetto.dev/) format. They can
-be viewed directly within AGI and also online in a browser at
-<https://ui.perfetto.dev/>, without needing an Android device.
+[documentation](https://developer.android.com/agi) for more details.
 
 ## Desktop GPUs
 

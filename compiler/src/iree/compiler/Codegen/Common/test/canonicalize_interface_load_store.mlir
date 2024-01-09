@@ -15,7 +15,7 @@ func.func @fold_reshape_load() {
   //  CHECK: %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[LOAD]] : tensor<3x3x96xf32>)
   %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<3x3x96xf32>) -> tensor<3x3x96xf32>
   //  CHECK: flow.dispatch.tensor.store %[[FILL]], {{.*}}
-  flow.dispatch.tensor.store %6, %2, offsets = [%c0, %c0, %c0], sizes = [%c1, %c1, %c1], strides = [%c1, %c1, %c1] : tensor<3x3x96xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x3x96xf32>>
+  flow.dispatch.tensor.store %6, %2, offsets = [%c0, %c0, %c0], sizes = [3, 3, 96], strides = [%c1, %c1, %c1] : tensor<3x3x96xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x3x96xf32>>
   return
 }
 
@@ -55,7 +55,7 @@ func.func @dont_fold_reshape_with_not_full_load() {
   // CHECK: tensor.expand_shape
   %4 = tensor.collapse_shape %3 [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %5 = tensor.expand_shape %4 [[0, 1, 2]] : tensor<864xf32> into tensor<3x3x96xf32>
-  flow.dispatch.tensor.store %5, %2, offsets = [%c0, %c0, %c0], sizes = [%c1, %c1, %c1], strides = [%c1, %c1, %c1] : tensor<3x3x96xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x3x96xf32>>
+  flow.dispatch.tensor.store %5, %2, offsets = [%c0, %c0, %c0], sizes = [3, 3, 96], strides = [%c1, %c1, %c1] : tensor<3x3x96xf32> -> !flow.dispatch.tensor<writeonly:tensor<3x3x96xf32>>
   return
 }
 
@@ -75,6 +75,6 @@ func.func @dont_fold_dynamic_reshape() {
   // CHECK: tensor.expand_shape
   %4 = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<?x?x96xf32> into tensor<?x96xf32>
   %5 = tensor.expand_shape %4 [[0], [1, 2]] : tensor<?x96xf32> into tensor<?x12x8xf32>
-  flow.dispatch.tensor.store %5, %2, offsets = [%c0, %c0, %c0], sizes = [%c1, %c1, %c1], strides = [%c1, %c1, %c1] : tensor<?x12x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
+  flow.dispatch.tensor.store %5, %2, offsets = [%c0, %c0, %c0], sizes = [%c1, 12, 8], strides = [%c1, %c1, %c1] : tensor<?x12x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x12x8xf32>>{%dim2}
   return
 }
