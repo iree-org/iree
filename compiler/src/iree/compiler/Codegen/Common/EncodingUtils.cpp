@@ -13,7 +13,6 @@ namespace mlir::iree_compiler {
 
 using IREE::LinalgExt::EncodingAttr;
 using IREE::LinalgExt::EncodingRole;
-using IREE::LinalgExt::EncodingUser;
 
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type
@@ -85,7 +84,7 @@ static AffineMap getMapForRole(EncodingAttr encoding) {
         .getAffineMap();
 }
 
-static FailureOr<linalg::ContractionDimensions>
+FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding) {
   auto indexingMapsAttr = encoding.getUserIndexingMaps();
   SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
@@ -118,9 +117,8 @@ getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
   }
   SmallVector<int64_t> perm;
   EncodingRole role = encoding.getRole().getValue();
-  EncodingUser user = encoding.getUser().getValue();
   // Add batch dim
-  if (user == EncodingUser::BATCH_MATMUL) {
+  if (!cDims->batch.empty()) {
     perm.push_back(mapDimToRoleIndex(cDims->batch[0], encoding));
   }
   // Add M dim
@@ -168,14 +166,6 @@ RankedTensorType dropEncoding(RankedTensorType type) {
   return RankedTensorType::get(type.getShape(), type.getElementType());
 }
 
-bool isMatmulEncodingUser(EncodingUser user) {
-  return user == EncodingUser::MATMUL;
-}
-
-bool isBatchMatmulEncodingUser(EncodingUser user) {
-  return user == EncodingUser::BATCH_MATMUL;
-}
-
 int64_t getIntOrZero(IntegerAttr a) {
   return a == IntegerAttr() ? 0 : a.getInt();
 }
@@ -202,10 +192,6 @@ bool isBatchMatvecEncoding(EncodingAttr encoding) {
   auto cDims = getEncodingContractionDims(encoding);
   return !failed(cDims) && cDims->batch.size() == 1 && cDims->m.size() == 1 &&
          cDims->k.size() == 1 && cDims->n.size() == 0;
-}
-
-bool isVectorEncoding(int64_t rank, EncodingUser user) {
-  return rank == 1 || (isBatchMatmulEncodingUser(user) && rank == 2);
 }
 
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
