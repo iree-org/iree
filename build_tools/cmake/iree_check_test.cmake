@@ -62,11 +62,11 @@ function(iree_check_test)
   #   1. the compiler, either in the same build or provided in IREE_HOST_BIN_DIR
   #   2. compiler support for _RULE_INPUT_TYPE
   #   3. compiler support for _RULE_TARGET_BACKEND
-  set(_IS_BYTECODE_MODULE_BUILD_ENABLED TRUE)
+  set(_BYTECODE_MODULE_BUILD_ENABLED TRUE)
 
   # 1. Check for the compiler.
   if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
-    set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
 
   # 2. Check input type availability.
@@ -76,13 +76,13 @@ function(iree_check_test)
   # support dynamically if optionality would be useful.
   if(DEFINED _RULE_INPUT_TYPE AND NOT IREE_HOST_BIN_DIR)
     if("${_RULE_INPUT_TYPE}" STREQUAL "stablehlo" AND NOT IREE_INPUT_STABLEHLO)
-      set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
     if("${_RULE_INPUT_TYPE}" STREQUAL "tosa" AND NOT IREE_INPUT_TOSA)
-      set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
     if("${_RULE_INPUT_TYPE}" STREQUAL "torch" AND NOT IREE_INPUT_TORCH)
-      set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
 
@@ -99,27 +99,31 @@ function(iree_check_test)
       message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
     endif()
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
-      set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
   # ---------------------------------------------------------------------------
 
   # ---------------------------------------------------------------------------
+  # Tests are defined if _RULE_DRIVER is defined.
+  set(_TEST_DEFINED TRUE)
+  if(NOT DEFINED _RULE_DRIVER)
+    set(_TEST_DEFINED FALSE)
+  endif()
+
   # Test execution requires
   #   1. the bytecode module build to be enabled
   #   2. _RULE_DRIVER is defined and runtime support is enabled
   #   3. no other label exclusions (e.g. 'optonly' test with 'debug' config)
-  set(_IS_TEST_DISABLED FALSE)
+  set(_TEST_DISABLED FALSE)
 
   # 1. Check bytecode module build.
-  if(NOT _IS_BYTECODE_MODULE_BUILD_ENABLED)
-    set(_IS_TEST_DISABLED TRUE)
+  if(NOT _BYTECODE_MODULE_BUILD_ENABLED)
+    set(_TEST_DISABLED TRUE)
   endif()
 
   # 2. Check driver availability.
-  if(NOT DEFINED _RULE_DRIVER)
-    set(_IS_TEST_DISABLED TRUE)
-  else()
+  if(DEFINED _RULE_DRIVER)
     string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
     string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
     string(TOUPPER "${IREE_EXTERNAL_HAL_DRIVERS}" _UPPERCASE_EXTERNAL_DRIVERS)
@@ -130,16 +134,16 @@ function(iree_check_test)
     endif()
     if((NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND
        (NOT IREE_EXTERNAL_${_NORMALIZED_DRIVER}_HAL_DRIVER_FOUND))
-      set(_IS_TEST_DISABLED TRUE)
+      set(_TEST_DISABLED TRUE)
       # We could also disable the bytecode module build here if we wanted to.
-      # set(_IS_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      # set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
 
   # 3. Check label exclusions.
   iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
   if(_EXCLUDED_BY_LABELS)
-    set(_IS_TEST_DISABLED TRUE)
+    set(_TEST_DISABLED TRUE)
   endif()
   # ---------------------------------------------------------------------------
 
@@ -160,7 +164,7 @@ function(iree_check_test)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
-  if(_IS_BYTECODE_MODULE_BUILD_ENABLED)
+  if(_BYTECODE_MODULE_BUILD_ENABLED)
     iree_bytecode_module(
       NAME
         "${_MODULE_NAME}"
@@ -181,7 +185,7 @@ function(iree_check_test)
   # Add a custom build target specifically for the test and its deps.
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
   add_custom_target("${_NAME}" ALL)
-  if(_IS_BYTECODE_MODULE_BUILD_ENABLED)
+  if(_BYTECODE_MODULE_BUILD_ENABLED)
     add_dependencies(
       "${_NAME}"
       "${_NAME}_module"
@@ -190,23 +194,25 @@ function(iree_check_test)
   endif()
   add_dependencies(iree-test-deps "${_NAME}")
 
-  iree_native_test(
-    NAME
-      "${_RULE_NAME}"
-    DRIVER
-      "${_RULE_DRIVER}"
-    SRC
-      "${_RUNNER_TARGET}"
-    ARGS
-      "--module={{${_MODULE_FILE_NAME}}}"
-      ${_RULE_RUNNER_ARGS}
-    LABELS
-      ${_RULE_LABELS}
-    TIMEOUT
-      ${_RULE_TIMEOUT}
-    DISABLED
-      ${_IS_TEST_DISABLED}
-  )
+  if(_TEST_DEFINED)
+    iree_native_test(
+      NAME
+        "${_RULE_NAME}"
+      DRIVER
+        "${_RULE_DRIVER}"
+      SRC
+        "${_RUNNER_TARGET}"
+      ARGS
+        "--module={{${_MODULE_FILE_NAME}}}"
+        ${_RULE_RUNNER_ARGS}
+      LABELS
+        ${_RULE_LABELS}
+      TIMEOUT
+        ${_RULE_TIMEOUT}
+      DISABLED
+        ${_TEST_DISABLED}
+    )
+  endif()
 endfunction()
 
 # iree_check_single_backend_test_suite()
