@@ -105,6 +105,8 @@ jobs:
           echo "target-build-dir-gcs-artifact=${TARGET_BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
 
   test:
+    # These physical devices are not scalable. Only run on postsubmit for now.
+    if: (! inputs.is-pr)
     needs: cross_compile
     strategy:
       matrix:
