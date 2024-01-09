@@ -13,7 +13,6 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_UTILS_H_
 
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -21,9 +20,6 @@
 #include "mlir/IR/Builders.h"
 
 namespace mlir::iree_compiler {
-
-// Returns true if the given variant op uses SPIR-V CodeGen.
-bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();

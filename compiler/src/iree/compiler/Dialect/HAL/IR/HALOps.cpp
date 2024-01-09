@@ -1220,18 +1220,6 @@ DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
   return map;
 }
 
-Value ExecutableVariantOp::createConditionOp(OpBuilder &builder) {
-  assert(!getConditionOp() && "condition op already exists");
-
-  builder.setInsertionPointToStart(&getRegion().front());
-  auto conditionOp = builder.create<IREE::HAL::ExecutableConditionOp>(getLoc());
-  Block *entryPoint = conditionOp.addEntryBlock();
-  Value device = entryPoint->getArgument(0);
-
-  builder.setInsertionPointToStart(entryPoint);
-  return device;
-}
-
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
   // TODO(multi-device): condition on device target ID and other queries that
