@@ -7,8 +7,6 @@
 #include "iree/compiler/Codegen/Utils/LinkingUtils.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/EquivalenceUtils.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -236,29 +234,6 @@ LogicalResult linkExecutablesInto(
           SymbolRefAttr::get(context, linkedExecutableOp.getName(),
                              {SymbolRefAttr::get(linkedTargetOp)});
       symbolReplacements.variantRefs[oldVariantRefAttr] = newVariantRefAttr;
-
-      // Move the condition op too. We need to make sure all variant's condition
-      // op has the same content.
-      auto targetConditionOps =
-          linkedTargetOp.getOps<IREE::HAL::ExecutableConditionOp>();
-      if (auto sourceCoditionOp = variantOp.getConditionOp()) {
-        if (targetConditionOps.empty()) {
-          sourceCoditionOp->moveBefore(
-              &*linkedTargetBuilder.getInsertionPoint());
-        } else {
-          assert(llvm::hasSingleElement(targetConditionOps));
-          IREE::HAL::ExecutableConditionOp referenceOp =
-              *targetConditionOps.begin();
-          if (!isStructurallyEquivalentTo(*sourceCoditionOp.getOperation(),
-                                          *referenceOp.getOperation())) {
-            return variantOp.emitError("contains incompatible condition op");
-          }
-        }
-      } else {
-        if (!targetConditionOps.empty()) {
-          return variantOp.emitError("should contain a condition op");
-        }
-      }
 
       // Move any constant blocks that need to be preserved for future host
       // translation. There may be duplicates provided but they'll be cleaned

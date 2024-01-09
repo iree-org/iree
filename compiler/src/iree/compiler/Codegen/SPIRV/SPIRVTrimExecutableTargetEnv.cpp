@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -17,15 +16,23 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+bool IsSPIRVBasedBackend(StringRef backend) {
+  return backend.starts_with("vulkan") || backend.starts_with("metal") ||
+         backend.starts_with("webgpu");
+}
+
 struct SPIRVTrimExecutableTargetEnvPass final
     : SPIRVTrimExecutableTargetEnvBase<SPIRVTrimExecutableTargetEnvPass> {
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variant = getOperation();
-    if (!usesSPIRVCodeGen(variant)) {
-      // Ignore variants not targeting SPIR-V or external executable variants.
-      // We need to read spirv.module ops to get the deduced minimal list of
-      // required capability and extension. External source executables won't
-      // have any spirv.module ops inside.
+    if (!IsSPIRVBasedBackend(variant.getTarget().getBackend())) {
+      return;
+    }
+    if (variant.getObjects().has_value()) {
+      // Ignore external executable variants. We need to read spirv.module
+      // ops to get the deduced minimal list of required capability and
+      // extension. External source executables won't have any spirv.module
+      // ops inside.
       return;
     }
 

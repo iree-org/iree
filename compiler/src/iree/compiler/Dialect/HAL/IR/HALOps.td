@@ -2162,11 +2162,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
 
-    // Creates the new `hal.executable.condition` op in this variant op and sets
-    // the insertion point of the provided builder to the beginning of the new
-    // region.
-    Value createConditionOp(OpBuilder &builder);
-
     // Returns an i1 indicating whether this variant should be selected.
     Value buildCondition(Value device, OpBuilder &builder);
   }];
