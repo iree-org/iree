@@ -1679,6 +1679,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilbufferhash-utilbufferhashop" class="md-nav__link">
+    util.buffer.hash (Util::BufferHashOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utilbufferload-utilbufferloadop" class="md-nav__link">
     util.buffer.load (Util::BufferLoadOp)
   </a>
@@ -3818,6 +3825,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#utilbufferhash-utilbufferhashop" class="md-nav__link">
+    util.buffer.hash (Util::BufferHashOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#utilbufferload-utilbufferloadop" class="md-nav__link">
     util.buffer.load (Util::BufferLoadOp)
   </a>
@@ -4251,6 +4265,7 @@
 <li><a href="#utilbuffercopy-utilbuffercopyop">util.buffer.copy (Util::BufferCopyOp)</a></li>
 <li><a href="#utilbufferdealloc-utilbufferdeallocop">util.buffer.dealloc (Util::BufferDeallocOp)</a></li>
 <li><a href="#utilbufferfill-utilbufferfillop">util.buffer.fill (Util::BufferFillOp)</a></li>
+<li><a href="#utilbufferhash-utilbufferhashop">util.buffer.hash (Util::BufferHashOp)</a></li>
 <li><a href="#utilbufferload-utilbufferloadop">util.buffer.load (Util::BufferLoadOp)</a></li>
 <li><a href="#utilbuffersize-utilbuffersizeop">util.buffer.size (Util::BufferSizeOp)</a></li>
 <li><a href="#utilbufferslice-utilbuffersliceop">util.buffer.slice (Util::BufferSliceOp)</a></li>
@@ -4685,16 +4700,17 @@ The offset and length must match the natural alignment of the pattern type.</p>
 </tr>
 </tbody>
 </table>
-<h4 id="utilbufferload-utilbufferloadop"><code>util.buffer.load</code> (Util::BufferLoadOp)<a class="headerlink" href="#utilbufferload-utilbufferloadop" title="Permanent link">link</a></h4>
-<p><em>Loads a value from a buffer</em></p>
+<h4 id="utilbufferhash-utilbufferhashop"><code>util.buffer.hash</code> (Util::BufferHashOp)<a class="headerlink" href="#utilbufferhash-utilbufferhashop" title="Permanent link">link</a></h4>
+<p><em>Computes the hash of a byte range of a buffer</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.load` $source `[` $source_offset `for` $length `]`
+<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.hash` $source `[` $source_offset `for` $length `]`
               `:` type($source) `` `{` $source_size `}` `-&gt;` type($result)
               attr-dict-with-keyword
 </code></pre></div>
-<p>Loads a value at a byte offset. Must be aligned to the natural size of the
-result type.</p>
-<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Computes the SipHash-2-4 of a value at a byte offset with the given length.
+This always uses a seed of <code>0x0001020304...0e0f</code> and produces a single 64
+bit value.</p>
+<p>Interfaces: <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
 <h5 id="operands_6">Operands:<a class="headerlink" href="#operands_6" title="Permanent link">link</a></h5>
 <table>
@@ -4734,6 +4750,59 @@ result type.</p>
 <tbody>
 <tr>
 <td style="text-align: center;"><code>result</code></td>
+<td>64-bit signless integer</td>
+</tr>
+</tbody>
+</table>
+<h4 id="utilbufferload-utilbufferloadop"><code>util.buffer.load</code> (Util::BufferLoadOp)<a class="headerlink" href="#utilbufferload-utilbufferloadop" title="Permanent link">link</a></h4>
+<p><em>Loads a value from a buffer</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.buffer.load` $source `[` $source_offset `for` $length `]`
+              `:` type($source) `` `{` $source_size `}` `-&gt;` type($result)
+              attr-dict-with-keyword
+</code></pre></div>
+<p>Loads a value at a byte offset. Must be aligned to the natural size of the
+result type.</p>
+<p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
+<p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
+<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>source</code></td>
+<td>a reference counted byte buffer</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_size</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>source_offset</code></td>
+<td>index</td>
+</tr>
+<tr>
+<td style="text-align: center;"><code>length</code></td>
+<td>index</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
 <td>index or integer or floating-point</td>
 </tr>
 </tbody>
@@ -4749,7 +4818,7 @@ result type.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_7">Operands:<a class="headerlink" href="#operands_7" title="Permanent link">link</a></h5>
+<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4764,7 +4833,7 @@ result type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_6">Results:<a class="headerlink" href="#results_6" title="Permanent link">link</a></h5>
+<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4796,7 +4865,7 @@ result type.</p>
 <tr><td><code>alignment</code></td><td>::mlir::IntegerAttr</td><td>index attribute</td></tr>
 </table>
 
-<h5 id="operands_8">Operands:<a class="headerlink" href="#operands_8" title="Permanent link">link</a></h5>
+<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4823,7 +4892,7 @@ result type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_7">Results:<a class="headerlink" href="#results_7" title="Permanent link">link</a></h5>
+<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4852,7 +4921,7 @@ for the data they are accessing.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_9">Operands:<a class="headerlink" href="#operands_9" title="Permanent link">link</a></h5>
+<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4871,7 +4940,7 @@ for the data they are accessing.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_8">Results:<a class="headerlink" href="#results_8" title="Permanent link">link</a></h5>
+<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4902,7 +4971,7 @@ for the data they are accessing.</p>
 source type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>SubrangeOperandOpInterface</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_10">Operands:<a class="headerlink" href="#operands_10" title="Permanent link">link</a></h5>
+<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4950,7 +5019,7 @@ been used.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>OpAsmOpInterface</code>, <code>SubrangeOperandOpInterface</code>, <code>TiedOpInterface</code>, <code>Util_SizeAwareOp</code>, <code>Util_SubrangeOp</code>, <code>ViewLikeOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_11">Operands:<a class="headerlink" href="#operands_11" title="Permanent link">link</a></h5>
+<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -4977,7 +5046,7 @@ been used.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_9">Results:<a class="headerlink" href="#results_9" title="Permanent link">link</a></h5>
+<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5003,7 +5072,7 @@ been used.</p>
 being folded. It will be dropped during the final step in compilation and
 has no effect at runtime.</p>
 <p>Traits: <code>SameOperandsAndResultType</code></p>
-<h5 id="operands_12">Operands:<a class="headerlink" href="#operands_12" title="Permanent link">link</a></h5>
+<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5018,7 +5087,7 @@ has no effect at runtime.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_10">Results:<a class="headerlink" href="#results_10" title="Permanent link">link</a></h5>
+<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5044,7 +5113,7 @@ std.constant wrapped in an util.optimization_barrier.</p>
 <tr><td><code>value</code></td><td>::mlir::Attribute</td><td>any attribute</td></tr>
 </table>
 
-<h5 id="results_11">Results:<a class="headerlink" href="#results_11" title="Permanent link">link</a></h5>
+<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5118,7 +5187,7 @@ types) are tracked if known.</p>
 <tr><td><code>max_value</code></td><td>::mlir::IntegerAttr</td><td>arbitrary integer attribute</td></tr>
 </table>
 
-<h5 id="operands_13">Operands:<a class="headerlink" href="#operands_13" title="Permanent link">link</a></h5>
+<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5133,7 +5202,7 @@ types) are tracked if known.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_12">Results:<a class="headerlink" href="#results_12" title="Permanent link">link</a></h5>
+<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5165,7 +5234,7 @@ global load and store indirect ops.</p>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
-<h5 id="results_13">Results:<a class="headerlink" href="#results_13" title="Permanent link">link</a></h5>
+<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5187,7 +5256,7 @@ global load and store indirect ops.</p>
 </code></pre></div>
 <p>Returns a copy of the global variable value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code></p>
-<h5 id="operands_14">Operands:<a class="headerlink" href="#operands_14" title="Permanent link">link</a></h5>
+<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5202,7 +5271,7 @@ global load and store indirect ops.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
+<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5230,7 +5299,7 @@ global load and store indirect ops.</p>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
-<h5 id="results_15">Results:<a class="headerlink" href="#results_15" title="Permanent link">link</a></h5>
+<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5275,7 +5344,7 @@ contexts will have different variable storage.</p>
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
 <p>Interfaces: <code>Util_GlobalStoreIndirectOpInterface</code></p>
-<h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
+<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5307,7 +5376,7 @@ contexts will have different variable storage.</p>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
 </table>
 
-<h5 id="operands_16">Operands:<a class="headerlink" href="#operands_16" title="Permanent link">link</a></h5>
+<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5333,7 +5402,7 @@ contexts will have different variable storage.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Allocate on ::mlir::SideEffects::DefaultResource}</code>, <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_17">Operands:<a class="headerlink" href="#operands_17" title="Permanent link">link</a></h5>
+<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5348,7 +5417,7 @@ contexts will have different variable storage.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
+<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5372,7 +5441,7 @@ contexts will have different variable storage.</p>
 may be null if the element is null or the type does not match.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_18">Operands:<a class="headerlink" href="#operands_18" title="Permanent link">link</a></h5>
+<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5391,7 +5460,7 @@ may be null if the element is null or the type does not match.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_17">Results:<a class="headerlink" href="#results_17" title="Permanent link">link</a></h5>
+<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5416,7 +5485,7 @@ the list if the existing size is greater than <code>new_size</code> or extend th
 with the default list value of the element type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_19">Operands:<a class="headerlink" href="#operands_19" title="Permanent link">link</a></h5>
+<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5443,7 +5512,7 @@ with the default list value of the element type.</p>
 <p>Sets the element at the given index to the new value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Write on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_20">Operands:<a class="headerlink" href="#operands_20" title="Permanent link">link</a></h5>
+<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5474,7 +5543,7 @@ with the default list value of the element type.</p>
 <p>Returns the current size of the list in elements.</p>
 <p>Interfaces: <code>InferTypeOpInterface</code>, <code>MemoryEffectOpInterface (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{MemoryEffects::Read on ::mlir::SideEffects::DefaultResource}</code></p>
-<h5 id="operands_21">Operands:<a class="headerlink" href="#operands_21" title="Permanent link">link</a></h5>
+<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5489,7 +5558,7 @@ with the default list value of the element type.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_18">Results:<a class="headerlink" href="#results_18" title="Permanent link">link</a></h5>
+<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5516,7 +5585,7 @@ meaningful folding/optimizations.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_22">Operands:<a class="headerlink" href="#operands_22" title="Permanent link">link</a></h5>
+<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5535,7 +5604,7 @@ meaningful folding/optimizations.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_19">Results:<a class="headerlink" href="#results_19" title="Permanent link">link</a></h5>
+<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5560,47 +5629,6 @@ meaningful folding/optimizations.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `util.range.max` $operands attr-dict `:` type($result)
 </code></pre></div>
 <p>Computes the max of a variadic list of operands. Though it's possible to
-express this with standard arithmetic this op enables more semantically
-meaningful folding/optimizations.</p>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
-<p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_23">Operands:<a class="headerlink" href="#operands_23" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Operand</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>operands</code></td>
-<td>variadic of index or integer</td>
-</tr>
-</tbody>
-</table>
-<h5 id="results_20">Results:<a class="headerlink" href="#results_20" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Result</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;"><code>result</code></td>
-<td>index or integer</td>
-</tr>
-</tbody>
-</table>
-<h4 id="utilrangemin-utilrangeminop"><code>util.range.min</code> (Util::RangeMinOp)<a class="headerlink" href="#utilrangemin-utilrangeminop" title="Permanent link">link</a></h4>
-<p><em>Returns the min of all values</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.range.min` $operands attr-dict `:` type($result)
-</code></pre></div>
-<p>Computes the min of a variadic list of operands. Though it's possible to
 express this with standard arithmetic this op enables more semantically
 meaningful folding/optimizations.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
@@ -5636,6 +5664,47 @@ meaningful folding/optimizations.</p>
 </tr>
 </tbody>
 </table>
+<h4 id="utilrangemin-utilrangeminop"><code>util.range.min</code> (Util::RangeMinOp)<a class="headerlink" href="#utilrangemin-utilrangeminop" title="Permanent link">link</a></h4>
+<p><em>Returns the min of all values</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `util.range.min` $operands attr-dict `:` type($result)
+</code></pre></div>
+<p>Computes the min of a variadic list of operands. Though it's possible to
+express this with standard arithmetic this op enables more semantically
+meaningful folding/optimizations.</p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>SameOperandsAndResultType</code>, <code>SameVariadicOperandSize</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
+<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Operand</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>operands</code></td>
+<td>variadic of index or integer</td>
+</tr>
+</tbody>
+</table>
+<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>index or integer</td>
+</tr>
+</tbody>
+</table>
 <h3 id="status-ops">Status ops<a class="headerlink" href="#status-ops" title="Permanent link">link</a></h3>
 <h4 id="utilstatuscheck_ok-utilstatuscheckokop"><code>util.status.check_ok</code> (Util::StatusCheckOkOp)<a class="headerlink" href="#utilstatuscheck_ok-utilstatuscheckokop" title="Permanent link">link</a></h4>
 <p><em>Raises a global failure if a status is not 'ok'</em></p>
@@ -5657,7 +5726,7 @@ or pending when the failure occurs will complete.</p>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 </table>
 
-<h5 id="operands_25">Operands:<a class="headerlink" href="#operands_25" title="Permanent link">link</a></h5>
+<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5707,7 +5776,7 @@ module.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>CastOpInterface</code>, <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>TiedOpInterface</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_26">Operands:<a class="headerlink" href="#operands_26" title="Permanent link">link</a></h5>
+<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5722,7 +5791,7 @@ module.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_22">Results:<a class="headerlink" href="#results_22" title="Permanent link">link</a></h5>
+<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5747,7 +5816,7 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>Commutative</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_27">Operands:<a class="headerlink" href="#operands_27" title="Permanent link">link</a></h5>
+<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5766,7 +5835,7 @@ reference types (like !util.buffer) that cannot be used with std.cmpi.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_23">Results:<a class="headerlink" href="#results_23" title="Permanent link">link</a></h5>
+<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5791,7 +5860,7 @@ null/undefined/optional/etc values.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5826,7 +5895,7 @@ the index is out of bounds.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
 <p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
-<h5 id="operands_28">Operands:<a class="headerlink" href="#operands_28" title="Permanent link">link</a></h5>
+<h5 id="operands_29">Operands:<a class="headerlink" href="#operands_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5849,7 +5918,7 @@ the index is out of bounds.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
