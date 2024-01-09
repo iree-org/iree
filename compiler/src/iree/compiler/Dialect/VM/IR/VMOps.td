@@ -1598,6 +1598,38 @@ def VM_BufferStoreF64Op :
   let summary = [{64-bit floating-point store}];
 }
 
+def VM_BufferHashOp : VM_Op<"buffer.hash", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
+    ]> {
+  let description = [{
+    Computes the SipHash-2-4 of the source buffer at the given offset for
+    |length| bytes using seed `0x0001020304...0e0f`.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$source_buffer,
+    VM_BufferIndex:$source_offset,
+    VM_BufferIndex:$length
+  );
+  let results = (outs
+    I64:$result
+  );
+
+  let assemblyFormat = [{
+    $source_buffer `,` $source_offset `,` $length
+    attr-dict `:` type($source_buffer) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferHash>,
+    VM_EncOperand<"source_buffer", 0>,
+    VM_EncOperand<"source_offset", 1>,
+    VM_EncOperand<"length", 2>,
+    VM_EncResult<"result">,
+  ];
+}
+
 } // OpGroupBufferOps
 
 //===----------------------------------------------------------------------===//

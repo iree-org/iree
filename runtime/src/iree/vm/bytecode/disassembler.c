@@ -1024,6 +1024,27 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       break;
     }
 
+    DISASM_OP(CORE, BufferHash) {
+      bool buffer_is_move;
+      uint16_t buffer_reg =
+          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.buffer.hash "));
+      EMIT_REF_REG_NAME(buffer_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      break;
+    }
+
     //===------------------------------------------------------------------===//
     // Lists
     //===------------------------------------------------------------------===//

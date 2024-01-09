@@ -47,7 +47,7 @@ class VM_OPC_EnumAttr<string name, string enumName, string enumTag,
   string opcodeEnumTag = enumTag;
 }
 
-// Next available opcode: 0x84
+// Next available opcode: 0x85
 
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
@@ -222,6 +222,7 @@ def VM_OPC_BufferFillI8          : VM_OPC<0x71, "BufferFillI8">;
 def VM_OPC_BufferFillI16         : VM_OPC<0x72, "BufferFillI16">;
 def VM_OPC_BufferFillI32         : VM_OPC<0x73, "BufferFillI32">;
 def VM_OPC_BufferFillI64         : VM_OPC<0x74, "BufferFillI64">;
+def VM_OPC_BufferHash            : VM_OPC<0x84, "BufferHash">;
 
 // Extension prefixes:
 def VM_OPC_PrefixExtF32          : VM_OPC<0xE0, "PrefixExtF32">;
@@ -380,6 +381,7 @@ def VM_CoreOpcodeAttr :
     VM_OPC_BufferFillI64,
     VM_OPC_BufferCopy,
     VM_OPC_BufferCompare,
+    VM_OPC_BufferHash,
 
     VM_OPC_Block,
 
