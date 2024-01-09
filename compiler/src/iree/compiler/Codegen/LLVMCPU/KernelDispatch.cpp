@@ -76,10 +76,12 @@ static llvm::cl::opt<int> clGeneralMatmulTileBytes(
                    "in data-tiled matmuls (mmt4d)."),
     llvm::cl::init(64 * 1024));
 
-static llvm::cl::opt<bool>
-    clEnableVectorPeeling("iree-llvmcpu-enable-vector-peeling",
-                          llvm::cl::desc("Enable peeling for vectorization"),
-                          llvm::cl::init(true));
+static llvm::cl::opt<bool> clDisableVectorPeeling(
+    "iree-codegen-disable-vector-peeling",
+    llvm::cl::desc("Disable peeling as a pre-processing step for "
+                   "vectorization (only relevant when using compiler "
+                   "heuristics to select the strategy)."),
+    llvm::cl::init(false));
 
 // Non-static options are used in other places.
 llvm::cl::opt<bool> clEnableTransformDialectJit(
@@ -100,8 +102,31 @@ enum class VectorPreProcStrategy {
   // be masked-out.
   Masking,
   // Do not apply any vectorization pre-processing transformation.
-  None
+  None,
+  // A hint for the compiler to use its heuristics to determine an
+  // actual pre-processing strategy.
+  Heuristics
 };
+
+llvm::cl::opt<VectorPreProcStrategy> preprocessStrategyFromCL(
+    "iree-codegen-llvmcpu-vector-pproc-strategy",
+    llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
+                   "before vectorization:"),
+    llvm::cl::values(
+        clEnumValN(VectorPreProcStrategy::Peeling, "peel",
+                   "Peel iterations from the vector dimensions so that they "
+                   "become multiple of the vector length"),
+        clEnumValN(
+            VectorPreProcStrategy::Masking, "mask",
+            " Compute vector dimensions assuming vector masking support. "
+            "Vector sizes may be rounded up to the nearest power of two "
+            "and out-of-bounds elements would be masked-out."),
+        clEnumValN(
+            VectorPreProcStrategy::None, "none",
+            "Do not apply any vectorization pre-processing transformation."),
+        clEnumValN(VectorPreProcStrategy::Heuristics, "heurystics",
+                   "To be determined by IREE's heurystics (default).")),
+    llvm::cl::init(VectorPreProcStrategy::Heuristics));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -115,6 +140,9 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     break;
   case VectorPreProcStrategy::None:
     os << "None";
+    break;
+  case VectorPreProcStrategy::Heuristics:
+    os << "Heuristics";
     break;
   }
   return os;
@@ -173,8 +201,11 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 /// given LinalgOp, depending on the op traits and the target architecture.
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
-  // Generic strategies.
+  // 1. Select a strategy based on the input from a user.
+  if (preprocessStrategyFromCL != VectorPreProcStrategy::Heuristics)
+    return preprocessStrategyFromCL;
 
+  // 2. Select a strategy based on heuristics.
   if (linalgOp.hasBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
@@ -188,7 +219,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (clEnableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -199,7 +230,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (clEnableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -210,7 +241,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (clEnableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
