@@ -30,6 +30,7 @@ class TargetABI(Enum):
     VMVX = "vmvx"
     LINUX_GNU = "linux-gnu"
     LINUX_ANDROID29 = "linux-android29"
+    LINUX_ANDROID34 = "linux-android34"
     # IREE defined OS name for vulkan target. See:
     # compiler/src/iree/compiler/Dialect/Vulkan/IR/VulkanBase.td
     VULKAN_ANDROID30 = "android30"
@@ -498,7 +499,7 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
             "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f",
             "--riscv-v-fixed-length-vector-lmul-max=8",
         ]
-    elif arch_info.architecture == "armv8.2-a":
+    elif arch_info.architecture in ["armv8.2-a", "armv9-a"]:
         flags = [
             f"--iree-llvmcpu-target-triple=aarch64-none-{target.target_abi.value}",
         ]

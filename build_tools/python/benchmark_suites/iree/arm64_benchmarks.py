@@ -10,11 +10,11 @@ from typing import List, Sequence
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.device_specs import device_collections
+from e2e_test_framework.device_specs import pixel_8_pro_specs
 from e2e_test_framework.models import tflite_models, tf_models
 
 
-class Android_ARMv8_A_Benchmarks(object):
+class Android_ARM64_Benchmarks(object):
     """Benchmarks on ARMv8-A Android devices."""
 
     MODELS = [
@@ -26,39 +26,78 @@ class Android_ARMv8_A_Benchmarks(object):
         tflite_models.VIT_INT8_TFL,
     ]
 
-    ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
-        target_architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
+    ARMV9_A_CPU_TARGET = iree_definitions.CompileTarget(
+        target_architecture=common_definitions.DeviceArchitecture.ARMV9_A_GENERIC,
         target_backend=iree_definitions.TargetBackend.LLVM_CPU,
-        target_abi=iree_definitions.TargetABI.LINUX_ANDROID29,
+        target_abi=iree_definitions.TargetABI.LINUX_ANDROID34,
+    )
+
+    PIXEL_8_CPU_FLAGS = "--iree-llvmcpu-target-cpu-features=" + ",".join(
+        [
+            "+v9a",
+            "+fullfp16",
+            "+fp-armv8",
+            "+neon",
+            "+aes",
+            "+sha2",
+            "+crc",
+            "+lse",
+            "+rdm",
+            "+complxnum",
+            "+rcpc",
+            "+sha3",
+            "+sm4",
+            "+dotprod",
+            "+fp16fml",
+            "+dit",
+            "+flagm",
+            "+ssbs",
+            "+sb",
+            "+sve2-aes",
+            "+sve2-bitperm",
+            "+sve2-sha3",
+            "+sve2-sm4",
+            "+altnzcv",
+            "+fptoint",
+            "+bf16",
+            "+i8mm",
+            "+bti",
+            "+mte",
+            "+pauth",
+            "+perfmon",
+            "+predres",
+            "+spe",
+            "+ras",
+        ]
     )
 
     NO_DT_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_NO_DT,
         tags=["experimental-flags", "no-dt"],
-        compile_targets=[ARMV8_A_CPU_TARGET],
+        compile_targets=[ARMV9_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=false",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
     DT_ONLY_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DT_ONLY,
         tags=["experimental-flags", "dt-only"],
-        compile_targets=[ARMV8_A_CPU_TARGET],
+        compile_targets=[ARMV9_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=none",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
     DT_UK_COMPILE_CONFIG = iree_definitions.CompileConfig.build(
         id=unique_ids.IREE_COMPILE_CONFIG_ANDROID_ARMV8_2_A_GENERIC_DT_UK,
         tags=["default-flags", "dt-uk"],
-        compile_targets=[ARMV8_A_CPU_TARGET],
+        compile_targets=[ARMV9_A_CPU_TARGET],
         extra_flags=[
             "--iree-opt-data-tiling=true",
             "--iree-llvmcpu-enable-ukernels=all",
-            "--iree-llvmcpu-target-cpu-features=+dotprod",
+            PIXEL_8_CPU_FLAGS,
         ],
     )
 
@@ -86,7 +125,7 @@ class Android_ARMv8_A_Benchmarks(object):
             module_execution_configs.get_elf_system_scheduling_local_task_config(
                 thread_num
             )
-            for thread_num in [1, 2]
+            for thread_num in [1, 5]
         ]
 
         no_dt_gen_confings = [
@@ -111,13 +150,7 @@ class Android_ARMv8_A_Benchmarks(object):
             for model in self.MODELS
         ]
 
-        big_cores_devices = (
-            device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-                architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
-                host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-                tags=["big-cores"],
-            )
-        )
+        big_cores_devices = [pixel_8_pro_specs.BIG_CORES]
         run_configs = self._build_run_configs(
             no_dt_gen_confings + dt_uk_gen_confings,
             local_sync_execution_configs + local_task_execution_configs,

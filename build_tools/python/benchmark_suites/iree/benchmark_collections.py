@@ -12,11 +12,11 @@ from typing import List, Tuple, Sequence
 from e2e_test_artifacts import iree_artifacts
 from e2e_test_framework.definitions import iree_definitions
 from benchmark_suites.iree import (
+    arm64_benchmarks,
     benchmark_presets,
     riscv_benchmarks,
     x86_64_benchmarks,
     adreno_benchmarks,
-    armv8_a_benchmarks,
     cuda_benchmarks,
     mali_benchmarks,
     vulkan_nvidia_benchmarks,
@@ -102,7 +102,7 @@ def generate_benchmarks() -> (
         cuda_benchmarks.Linux_CUDA_Benchmarks(),
         riscv_benchmarks.Linux_RV64_Benchmarks(),
         riscv_benchmarks.Linux_RV32_Benchmarks(),
-        armv8_a_benchmarks.Android_ARMv8_A_Benchmarks(),
+        arm64_benchmarks.Android_ARM64_Benchmarks(),
         adreno_benchmarks.Android_Adreno_Benchmarks(),
         mali_benchmarks.Android_Mali_Benchmarks(),
         vulkan_nvidia_benchmarks.Linux_Vulkan_NVIDIA_Benchmarks(),
