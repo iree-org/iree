@@ -10,8 +10,8 @@ from typing import List, Sequence
 from benchmark_suites.iree import benchmark_presets, module_execution_configs, utils
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
-from e2e_test_framework.models import tflite_models, tf_models
-from e2e_test_framework.device_specs import device_collections
+from e2e_test_framework.models import tflite_models
+from e2e_test_framework.device_specs import pixel_8_pro_specs
 
 
 class Android_Mali_Benchmarks(object):
@@ -88,10 +88,7 @@ class Android_Mali_Benchmarks(object):
             quant_models=self.QUANT_MODELS,
         )
 
-        mali_devices = device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
-            architecture=common_definitions.DeviceArchitecture.ARM_VALHALL,
-            host_environment=common_definitions.HostEnvironment.ANDROID_ARMV8_2_A,
-        )
+        mali_devices = [pixel_8_pro_specs.GPU]
         run_configs = utils.generate_e2e_model_run_configs(
             module_generation_configs=default_gen_configs + experimental_gen_configs,
             module_execution_configs=[module_execution_configs.VULKAN_CONFIG],
