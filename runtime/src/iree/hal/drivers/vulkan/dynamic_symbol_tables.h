@@ -319,7 +319,7 @@ namespace vulkan {
   INS_PFN(EXCLUDED, vkGetDisplayPlaneCapabilitiesKHR)                   \
   INS_PFN(EXCLUDED, vkGetDisplayPlaneSupportedDisplaysKHR)              \
   INS_PFN(OPTIONAL, vkGetPhysicalDeviceCalibrateableTimeDomainsEXT)     \
-  INS_PFN(EXCLUDED, vkGetPhysicalDeviceCooperativeMatrixPropertiesNV)   \
+  INS_PFN(OPTIONAL, vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR)  \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayPlaneProperties2KHR)      \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayPlanePropertiesKHR)       \
   INS_PFN(EXCLUDED, vkGetPhysicalDeviceDisplayProperties2KHR)           \

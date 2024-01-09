@@ -91,6 +91,15 @@ def SPIRVMapMemRefStorageClass :
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
 
+def SPIRVMaterializeExecutableConditions :
+    Pass<"iree-spirv-materialize-executable-conditions",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary = "Materialize SPIR-V target requirements of hal.exectuable.variant "
+                "ops into hal.executable.condition regions";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVMaterializeExecutableConditionsPass()";
+}
+
 def SPIRVSelectLoweringStrategy :
     Pass<"iree-spirv-select-lowering-strategy-pass",
          "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
