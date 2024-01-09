@@ -683,15 +683,17 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
 // ops.
 void buildSPIRVLinkingPassPipeline(OpPassManager &passManager) {
   auto &nestedExecutablePM = passManager.nest<IREE::HAL::ExecutableOp>();
+  // TODO(antiagainst): Re-enable below passes after fixing MobileBertSquad_int8
+  // issues on Pixel 6.
   // Trim the allowed target environment (version/capability/extension/etc.) to
   // the minimal requirement needed by compiled spirv.module ops. This helps to
   // increase the chance of linking different variant ops together.
-  nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
-      createSPIRVTrimExecutableTargetEnvPass());
+  // nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
+  // createSPIRVTrimExecutableTargetEnvPass());
   // Materialize the minimal required target environment into proper device
   // queries to execute in the runtime.
-  nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
-      createSPIRVMaterializeExecutableConditionsPass());
+  // nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
+  // createSPIRVMaterializeExecutableConditionsPass());
   // Link together executables. This may produce some IR duplication.
   passManager.addPass(createSPIRVLinkExecutablesPass());
 
