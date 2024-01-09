@@ -53,7 +53,7 @@ typedef struct iree_hal_cuda2_queue_action_t {
   union {
     struct {
       iree_host_size_t count;
-      iree_hal_command_buffer_t* const* ptr;
+      iree_hal_command_buffer_t** ptr;
     } command_buffers;
   } payload;
 
@@ -308,7 +308,7 @@ void iree_hal_cuda2_pending_queue_actions_destroy(
 
   IREE_ASSERT(iree_hal_cuda2_queue_action_list_is_empty(&actions->action_list));
 
-  // Request the worker to exist.
+  // Request the worker to exit.
   iree_hal_cuda2_worker_state_t prev_state =
       (iree_hal_cuda2_worker_state_t)iree_atomic_exchange_int32(
           &working_area->worker_state,
@@ -343,15 +343,14 @@ static const iree_hal_resource_vtable_t
 static iree_status_t iree_hal_cuda2_copy_command_buffer_list(
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* in_list, iree_allocator_t host_allocator,
-    iree_hal_command_buffer_t* const** out_list) {
-  if (command_buffer_count == 0) {
-    *out_list = NULL;
-  } else {
-    iree_host_size_t total_size = command_buffer_count * sizeof(*in_list);
-    IREE_RETURN_IF_ERROR(
-        iree_allocator_malloc(host_allocator, total_size, (void**)out_list));
-    memcpy((void*)*out_list, in_list, total_size);
-  }
+    iree_hal_command_buffer_t*** out_list) {
+  *out_list = NULL;
+  if (!command_buffer_count) return iree_ok_status();
+
+  iree_host_size_t total_size = command_buffer_count * sizeof(*in_list);
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, total_size, (void**)out_list));
+  memcpy((void*)*out_list, in_list, total_size);
   return iree_ok_status();
 }
 
@@ -367,23 +366,19 @@ static void iree_hal_cuda2_free_command_buffer_list(
 static iree_status_t iree_hal_cuda2_copy_semaphore_list(
     iree_hal_semaphore_list_t in_list, iree_allocator_t host_allocator,
     iree_hal_semaphore_list_t* out_list) {
-  if (in_list.count == 0) {
-    memset(out_list, 0, sizeof(*out_list));
-  } else {
-    out_list->count = in_list.count;
+  memset(out_list, 0, sizeof(*out_list));
+  if (!in_list.count) return iree_ok_status();
 
-    iree_host_size_t semaphore_size =
-        in_list.count * sizeof(*in_list.semaphores);
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, semaphore_size,
-                                               (void**)&out_list->semaphores));
-    memcpy(out_list->semaphores, in_list.semaphores, semaphore_size);
+  out_list->count = in_list.count;
+  iree_host_size_t semaphore_size = in_list.count * sizeof(*in_list.semaphores);
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(host_allocator, semaphore_size,
+                                             (void**)&out_list->semaphores));
+  memcpy(out_list->semaphores, in_list.semaphores, semaphore_size);
 
-    iree_host_size_t value_size =
-        in_list.count * sizeof(*in_list.payload_values);
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-        host_allocator, value_size, (void**)&out_list->payload_values));
-    memcpy(out_list->payload_values, in_list.payload_values, value_size);
-  }
+  iree_host_size_t value_size = in_list.count * sizeof(*in_list.payload_values);
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
+      host_allocator, value_size, (void**)&out_list->payload_values));
+  memcpy(out_list->payload_values, in_list.payload_values, value_size);
   return iree_ok_status();
 }
 
@@ -672,7 +667,7 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
       if (action->event_count >= IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT) {
         iree_slim_mutex_unlock(&actions->action_mutex);
         IREE_TRACE_ZONE_END(z0);
-        return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                                 "exceeded max wait CUevent limit");
       }
       action->events[action->event_count++] = event;
@@ -773,7 +768,6 @@ static iree_status_t iree_hal_cuda2_worker_process_ready_list(
 static int iree_hal_cuda2_worker_execute(
     iree_hal_cuda2_working_area_t* working_area) {
   iree_hal_cuda2_ready_action_slist_t* worklist = &working_area->ready_worklist;
-  iree_atomic_int32_t* state = &working_area->worker_state;
 
   while (true) {
     // Block waiting for incoming requests.
@@ -783,9 +777,9 @@ static int iree_hal_cuda2_worker_execute(
         working_area, iree_infinite_timeout());
 
     // Check if we received request to stop processing and exit this thread.
-    bool should_exit =
-        iree_atomic_load_int32(state, iree_memory_order_acquire) ==
-        IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
+    bool should_exit = iree_atomic_load_int32(&working_area->worker_state,
+                                              iree_memory_order_acquire) ==
+                       IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
 
     iree_status_t status = iree_hal_cuda2_worker_process_ready_list(
         working_area->host_allocator, worklist);
@@ -794,7 +788,8 @@ static int iree_hal_cuda2_worker_execute(
       iree_atomic_store_int32(&working_area->error_code,
                               iree_status_code(status),
                               iree_memory_order_release);
-      iree_atomic_store_int32(state, IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR,
+      iree_atomic_store_int32(&working_area->worker_state,
+                              IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR,
                               iree_memory_order_release);
       iree_notification_post(&working_area->exit_notification,
                              IREE_ALL_WAITERS);
@@ -803,7 +798,8 @@ static int iree_hal_cuda2_worker_execute(
 
     if (should_exit) {
       // Signal that this thread is committed to exit.
-      iree_atomic_store_int32(state, IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED,
+      iree_atomic_store_int32(&working_area->worker_state,
+                              IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED,
                               iree_memory_order_release);
       iree_notification_post(&working_area->exit_notification,
                              IREE_ALL_WAITERS);
