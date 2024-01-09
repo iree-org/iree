@@ -742,6 +742,8 @@ static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
     ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+  // The tiling for parallel dims and reduction dims should be separated, so we
+  // move K dim from parallel tile sizes to reduction tile sizes.
   int64_t numTilingDims = vecTileSizes.size();
   SmallVector<int64_t> cacheParallelTileSizes(cacheTileSizes.begin(),
                                               cacheTileSizes.end());
