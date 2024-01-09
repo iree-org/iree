@@ -153,8 +153,7 @@ void GenericVectorizationPass::runOnOperation() {
   funcOp.walk([&](Operation *op) {
     if (isa<linalg::LinalgOp>(op))
       candidates.push_back(op);
-    if (vectorizePadding && enableVectorMasking &&
-        (isa<tensor::PadOp>(op) || isa<tensor::UnPackOp>(op)))
+    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
   for (Operation *op : candidates) {
