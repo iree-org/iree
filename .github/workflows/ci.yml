@@ -87,16 +87,21 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353" \
-            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b" \
+            gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
+      - name: "Testing IREE with ArmSME"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
+            ./build_tools/cmake/run_arm_sme_tests.py
 
   build_test_all_windows:
     needs: setup
@@ -435,13 +440,13 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
+            gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
