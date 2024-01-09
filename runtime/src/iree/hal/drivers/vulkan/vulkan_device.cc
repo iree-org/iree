@@ -963,16 +963,7 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
     device_properties->subgroup |= 0x2u;
   }
 
-  if (dot_product_features.shaderIntegerDotProduct &&
-      dot_product_properties.integerDotProduct8BitUnsignedAccelerated &&
-      dot_product_properties.integerDotProduct8BitSignedAccelerated &&
-      dot_product_properties.integerDotProduct8BitMixedSignednessAccelerated &&
-      dot_product_properties
-          .integerDotProductAccumulatingSaturating8BitUnsignedAccelerated &&
-      dot_product_properties
-          .integerDotProductAccumulatingSaturating8BitSignedAccelerated &&
-      dot_product_properties
-          .integerDotProductAccumulatingSaturating8BitMixedSignednessAccelerated) {
+  if (dot_product_features.shaderIntegerDotProduct) {
     device_properties->dot_product |= 0x1u;
   }
 
