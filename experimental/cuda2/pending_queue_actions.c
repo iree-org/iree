@@ -140,6 +140,16 @@ static void iree_hal_cuda2_queue_action_list_take_all(
   available_list->tail = NULL;
 }
 
+// Frees all actions in the given |list|.
+static void iree_hal_cuda2_queue_action_list_free_actions(
+    iree_allocator_t host_allocator, iree_hal_cuda2_queue_action_list_t* list) {
+  for (iree_hal_cuda2_queue_action_t* action = list->head; action != NULL;) {
+    iree_hal_cuda2_queue_action_t* next_action = action->next;
+    iree_allocator_free(host_allocator, action);
+    action = next_action;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Ready-list processing
 //===----------------------------------------------------------------------===//
@@ -306,8 +316,6 @@ void iree_hal_cuda2_pending_queue_actions_destroy(
   iree_hal_cuda2_working_area_t* working_area = &actions->working_area;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_ASSERT(iree_hal_cuda2_queue_action_list_is_empty(&actions->action_list));
-
   // Request the worker to exit.
   iree_hal_cuda2_worker_state_t prev_state =
       (iree_hal_cuda2_worker_state_t)iree_atomic_exchange_int32(
@@ -328,6 +336,8 @@ void iree_hal_cuda2_pending_queue_actions_destroy(
   iree_hal_cuda2_working_area_deinitialize(working_area);
 
   iree_slim_mutex_deinitialize(&actions->action_mutex);
+  iree_hal_cuda2_queue_action_list_free_actions(host_allocator,
+                                                &actions->action_list);
   iree_allocator_free(host_allocator, actions);
 
   IREE_TRACE_ZONE_END(z0);
@@ -622,8 +632,9 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
   }
 
   // Scan through the list and categorize actions into pending and ready lists.
-  for (iree_hal_cuda2_queue_action_t* action = actions->action_list.head;
-       action != NULL;) {
+  iree_status_t status = iree_ok_status();
+  iree_hal_cuda2_queue_action_t* action = actions->action_list.head;
+  while (action) {
     iree_hal_cuda2_queue_action_t* next_action = action->next;
     action->next = NULL;
 
@@ -639,12 +650,8 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
       // If this semaphore has already signaled past the desired value, we can
       // just ignore it.
       uint64_t value = 0;
-      iree_status_t status = iree_hal_semaphore_query(semaphores[i], &value);
-      if (!iree_status_is_ok(status)) {
-        iree_slim_mutex_unlock(&actions->action_mutex);
-        IREE_TRACE_ZONE_END(z0);
-        return status;
-      }
+      status = iree_hal_semaphore_query(semaphores[i], &value);
+      if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
       if (value >= values[i]) continue;
 
       // Try to acquire a CUevent from a device wait timepoint. If so, we can
@@ -653,25 +660,23 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
       CUevent event = NULL;
       status = iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
           semaphores[i], values[i], &event);
-      if (!iree_status_is_ok(status)) {
-        iree_slim_mutex_unlock(&actions->action_mutex);
-        IREE_TRACE_ZONE_END(z0);
-        return status;
-      }
+      if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
       if (!event) {
         // Clear the scratch fields.
         action->event_count = 0;
         action->is_pending = true;
         break;
       }
-      if (action->event_count >= IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT) {
-        iree_slim_mutex_unlock(&actions->action_mutex);
-        IREE_TRACE_ZONE_END(z0);
-        return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                "exceeded max wait CUevent limit");
+      if (IREE_UNLIKELY(action->event_count >=
+                        IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT)) {
+        status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                                  "exceeded max wait CUevent limit");
+        break;
       }
       action->events[action->event_count++] = event;
     }
+
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
 
     if (action->is_pending) {
       iree_hal_cuda2_queue_action_list_push_back(&pending_list, action);
@@ -682,6 +687,14 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
     action = next_action;
   }
 
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Some error happened during processing the current action. Clear the
+    // scratch fields and put it back to the pending list so we don't leak.
+    action->event_count = 0;
+    action->is_pending = true;
+    iree_hal_cuda2_queue_action_list_push_back(&pending_list, action);
+  }
+
   // Preserve pending timepoints.
   actions->action_list = pending_list;
 
@@ -689,27 +702,36 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
 
   iree_hal_cuda2_atomic_slist_entry_t* entry = NULL;
   // TODO: avoid host allocator malloc; use some pool for the allocation.
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(actions->host_allocator, sizeof(*entry),
-                                (void**)&entry));
-  entry->ready_list_head = ready_list.head;
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(actions->host_allocator, sizeof(*entry),
+                                   (void**)&entry);
+  }
+
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    // Release all actions in the ready list to avoid leaking.
+    iree_hal_cuda2_queue_action_list_free_actions(actions->host_allocator,
+                                                  &ready_list);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
+  }
 
   // Now push the ready list to the worker and have it to issue the actions to
   // the GPU.
-  iree_hal_cuda2_working_area_t* working_area = &actions->working_area;
-  iree_hal_cuda2_ready_action_slist_push(&working_area->ready_worklist, entry);
+  entry->ready_list_head = ready_list.head;
+  iree_hal_cuda2_ready_action_slist_push(&actions->working_area.ready_worklist,
+                                         entry);
   iree_hal_cuda2_worker_state_t prev_state =
       (iree_hal_cuda2_worker_state_t)iree_atomic_exchange_int32(
-          &working_area->worker_state,
+          &actions->working_area.worker_state,
           IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING,
           iree_memory_order_acq_rel);
-  iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
+  iree_notification_post(&actions->working_area.state_notification,
+                         IREE_ALL_WAITERS);
 
   // Handle potential error cases from the worker thread.
-  iree_status_t status = iree_ok_status();
   if (prev_state == IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR) {
-    iree_status_code_t code = iree_atomic_load_int32(&working_area->error_code,
-                                                     iree_memory_order_acquire);
+    iree_status_code_t code = iree_atomic_load_int32(
+        &actions->working_area.error_code, iree_memory_order_acquire);
     status = iree_status_from_code(code);
   }
 
