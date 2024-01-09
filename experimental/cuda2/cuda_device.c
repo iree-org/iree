@@ -258,7 +258,7 @@ iree_status_t iree_hal_cuda2_device_create(
   iree_hal_cuda2_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_event_pool_allocate(
-        *out_device, cuda_symbols, params->event_pool_capacity, host_allocator,
+        cuda_symbols, params->event_pool_capacity, host_allocator,
         &device_event_pool);
   }
 

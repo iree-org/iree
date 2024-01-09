@@ -121,10 +121,6 @@ struct iree_hal_cuda2_event_pool_t {
   // The symbols used to create and destroy CUevent objects.
   const iree_hal_cuda2_dynamic_symbols_t* symbols;
 
-  // The HAL device that owns this pool. This cannot be NULL. We retain it to
-  // make sure the pool outlive the device.
-  iree_hal_device_t* owning_device;
-
   // Guards event related fields in the pool. We don't expect a performant
   // program to frequently allocate events for synchronization purposes; the
   // traffic to this pool should be low. So it should be fine to use mutex to
@@ -146,7 +142,6 @@ static void iree_hal_cuda2_event_pool_free(
     iree_hal_cuda2_event_pool_t* event_pool);
 
 iree_status_t iree_hal_cuda2_event_pool_allocate(
-    iree_hal_device_t* owning_device,
     const iree_hal_cuda2_dynamic_symbols_t* symbols,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda2_event_pool_t** out_event_pool) {
@@ -179,7 +174,6 @@ iree_status_t iree_hal_cuda2_event_pool_allocate(
 
   if (iree_status_is_ok(status)) {
     *out_event_pool = event_pool;
-    iree_hal_device_retain(owning_device);  // +1
   } else {
     iree_hal_cuda2_event_pool_free(event_pool);
   }
@@ -190,7 +184,6 @@ iree_status_t iree_hal_cuda2_event_pool_allocate(
 static void iree_hal_cuda2_event_pool_free(
     iree_hal_cuda2_event_pool_t* event_pool) {
   iree_allocator_t host_allocator = event_pool->host_allocator;
-  iree_hal_device_t* device = event_pool->owning_device;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < event_pool->available_count; ++i) {
@@ -202,9 +195,6 @@ static void iree_hal_cuda2_event_pool_free(
 
   iree_slim_mutex_deinitialize(&event_pool->event_mutex);
   iree_allocator_free(host_allocator, event_pool);
-
-  // Now release the owning device.
-  iree_hal_device_release(device);  // -1
 
   IREE_TRACE_ZONE_END(z0);
 }
