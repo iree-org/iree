@@ -111,6 +111,11 @@ getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
   if (failed(cDims)) {
     return std::nullopt;
   }
+  // Only support at most 1 Batch, M, N, K dimensions for now
+  if (cDims->m.size() > 1 || cDims->n.size() > 1 || cDims->k.size() > 1 ||
+      cDims->batch.size() > 1) {
+    return std::nullopt;
+  }
   SmallVector<int64_t> perm;
   EncodingRole role = encoding.getRole().getValue();
   EncodingUser user = encoding.getUser().getValue();
