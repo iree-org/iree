@@ -140,8 +140,11 @@ iree_vm_dynamic_module_resolve_source_location(
     void* self, iree_vm_function_t function, iree_vm_source_offset_t pc,
     iree_vm_source_location_t* out_source_location) {
   iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
-  return module->user_module->resolve_source_location(
-      module->user_module->self, function, pc, out_source_location);
+  if (module->user_module->resolve_source_location) {
+    return module->user_module->resolve_source_location(
+        module->user_module->self, function, pc, out_source_location);
+  }
+  return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
 }
 
 static iree_status_t IREE_API_PTR

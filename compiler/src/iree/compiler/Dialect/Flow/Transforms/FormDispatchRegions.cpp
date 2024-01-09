@@ -575,6 +575,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // TODO(#16025): Enable mmt4d fusion. It is disabled because the backends
+  // can not set multi lowering_config properly. See the issue for more details.
+  if (isa<linalg::Mmt4DOp>(producer)) {
+    return false;
+  }
+
   auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
   auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp)

@@ -115,6 +115,13 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/c-runtime-library/secure-template-overloads
     "/D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES"
 
+    # MLIR defines std::complex<APFloat>, which is invalid per the C++ spec
+    # stating that std::complex must only be used with builtin compiler types.
+    # Until MLIR cleans this up we silence it so that we don't end up with
+    # a warning per file that includes mlir/IR/BuiltinAttributes.h.
+    # Tracking issue: https://github.com/llvm/llvm-project/issues/65255
+    "/D_SILENCE_NONFLOATING_COMPLEX_DEPRECATION_WARNING"
+
     # Configure RTTI generation.
     # - /GR - Enable generation of RTTI (default)
     # - /GR- - Disables generation of RTTI
@@ -285,7 +292,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # TODO(benvanik): confirm these are all still required and document:
     "/wd4146"  # operator applied to unsigned type, result still unsigned
     "/wd4244"  # possible loss of data
-    "/wd4267"  # initializing: possible loss of data    
+    "/wd4267"  # initializing: possible loss of data
     "/wd5105"  # allow: macro expansion producing 'defined' has undefined behavior
 )
 

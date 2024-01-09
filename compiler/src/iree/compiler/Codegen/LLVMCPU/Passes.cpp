@@ -31,10 +31,10 @@ namespace mlir::iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
-static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
-    "iree-codegen-check-ir-before-llvm-conversion",
-    llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU "
-                   "before conversion to LLVM IR"),
+static llvm::cl::opt<bool> clFailOnOutOfBoundsStackAllocation(
+    "iree-llvmcpu-fail-on-out-of-bounds-stack-allocation",
+    llvm::cl::desc("fail if the upper bound of dynamic stack allocation cannot "
+                   "be solved"),
     llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clCheckLinalgVectorization(
@@ -636,9 +636,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 
   // Checking stack allocation before converting to CF dialect is easier.
-  if (clCheckIRBeforeLLVMConversion) {
-    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
-  }
+  passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass(
+      clFailOnOutOfBoundsStackAllocation));
 
   // SCF -> CF
   passManager.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
