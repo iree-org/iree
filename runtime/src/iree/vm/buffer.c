@@ -343,7 +343,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
 
 IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
     const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,
-    iree_host_size_t length, int64_t* result) {
+    iree_host_size_t length, int64_t* out_result) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(source_buffer);
 
@@ -394,7 +394,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
   }
 
   hash = v0 ^ v1 ^ v2 ^ v3;
-  *result = hash;
+  *out_result = hash;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
