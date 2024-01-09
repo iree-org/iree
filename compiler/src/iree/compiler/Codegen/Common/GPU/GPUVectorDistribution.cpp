@@ -26,14 +26,85 @@ namespace mlir::iree_compiler {
 
 using VectorValue = TypedValue<VectorType>;
 
+struct DistributionSignature {
+  SmallVector<VectorLayoutInterface> operands;
+  SmallVector<VectorLayoutInterface> results;
+};
+
+static const char *kVectorLayoutFetcherStorageAttrName =
+    "__vector_layout_fetcher_storage";
+
+static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
+  SmallVector<Attribute> operands;
+  SmallVector<Attribute> results;
+
+  for (Value operand : op->getOperands()) {
+    if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
+      operands.push_back(
+          analysis.getLayout<VectorLayoutInterface>(vectorOperand));
+      continue;
+    }
+    operands.push_back(VectorLayoutInterface());
+  }
+
+  for (Value result : op->getResults()) {
+    if (auto vectorResult = dyn_cast<VectorValue>(result)) {
+      results.push_back(
+          analysis.getLayout<VectorLayoutInterface>(vectorResult));
+      continue;
+    }
+    results.push_back(VectorLayoutInterface());
+  }
+
+  ArrayAttr operandsAttr = ArrayAttr::get(op->getContext(), operands);
+  ArrayAttr resultsAttr = ArrayAttr::get(op->getContext(), results);
+  SmallVector<Attribute> signature = {operandsAttr, resultsAttr};
+  op->setAttr(kVectorLayoutFetcherStorageAttrName,
+              ArrayAttr::get(op->getContext(), signature));
+}
+
+static bool hasOpSignature(Operation *op) {
+  return op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName);
+}
+
+static DistributionSignature getOpSignature(Operation *op) {
+  ArrayAttr signatureAttr =
+      op->getAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName);
+  assert(signatureAttr && "Op should have a signature attribute.");
+  assert(signatureAttr.size() == 2 && "Malformed signature attribute.");
+
+  ArrayAttr operandsAttr = dyn_cast<ArrayAttr>(signatureAttr[0]);
+  ArrayAttr resultsAttr = dyn_cast<ArrayAttr>(signatureAttr[1]);
+  assert(operandsAttr && resultsAttr && "Malformed signature attribute.");
+
+  DistributionSignature signature;
+  for (Attribute operandAttr : operandsAttr) {
+    VectorLayoutInterface operandLayout =
+        cast<VectorLayoutInterface>(operandAttr);
+    assert(operandLayout && "Malformed signature attribute.");
+    signature.operands.push_back(operandLayout);
+  }
+
+  for (Attribute resultAttr : resultsAttr) {
+    VectorLayoutInterface resultLayout =
+        cast<VectorLayoutInterface>(resultAttr);
+    assert(resultLayout && "Malformed signature attribute.");
+    signature.results.push_back(resultLayout);
+  }
+
+  return signature;
+}
+
 VectorValue getDistributed(RewriterBase &rewriter, VectorValue value,
+                           VectorLayoutInterface layout,
                            VectorLayoutOptions &options) {
   // If this is a result of a "to_simd" op, use the source value of it.
   if (auto toSIMD = value.getDefiningOp<IREE::VectorExt::ToSIMDOp>()) {
     return cast<VectorValue>(toSIMD.getInput());
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
-  SmallVector<int64_t> distributedShape = options.getDistributedShape(value);
+  SmallVector<int64_t> distributedShape =
+      options.getDistributedShape(value, layout);
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(
@@ -55,8 +126,6 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
       rewriter.setInsertionPointAfterValue(oldResult);
       Value toSIMD = rewriter.create<IREE::VectorExt::ToSIMDOp>(
           oldResult.getLoc(), oldResult.getType(), replacement);
-      // Clone the layout to the new value.
-      options.getAnalysis().cloneLayoutInformationToNewValue(oldResult, toSIMD);
       // Add to replacements.
       replacement = toSIMD;
     }
@@ -68,10 +137,10 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
 
 class DistributeConstants : public OpRewritePattern<arith::ConstantOp> {
 public:
-  DistributeConstants(MLIRContext *context, VectorLayoutAnalysis &analysis,
-                      VectorLayoutOptions &options, PatternBenefit benefit = 1)
+  DistributeConstants(MLIRContext *context, VectorLayoutOptions &options,
+                      PatternBenefit benefit = 1)
       : OpRewritePattern<arith::ConstantOp>(context, benefit),
-        analysis(analysis), options(options) {}
+        options(options) {}
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 PatternRewriter &rewriter) const override {
@@ -87,10 +156,13 @@ public:
     if (!attr.isSplat())
       return failure();
 
+    DistributionSignature signature = getOpSignature(constantOp);
+    VectorLayoutInterface layout = signature.results[0];
+
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
-    auto vectorType =
-        VectorType::get(options.getDistributedShape(constant), elementType);
+    auto vectorType = VectorType::get(
+        options.getDistributedShape(constant, layout), elementType);
     replaceOpWithNewDistributedOp<arith::ConstantOp>(
         options, rewriter, constantOp, vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
@@ -98,67 +170,118 @@ public:
   }
 
 private:
-  VectorLayoutAnalysis &analysis;
   VectorLayoutOptions &options;
 };
 
 class DistributeElementwise
     : public OpTraitRewritePattern<OpTrait::Elementwise> {
 public:
-  DistributeElementwise(MLIRContext *context, VectorLayoutAnalysis &analysis,
-                        VectorLayoutOptions &options,
+  DistributeElementwise(MLIRContext *context, VectorLayoutOptions &options,
                         PatternBenefit benefit = 1)
       : OpTraitRewritePattern<OpTrait::Elementwise>(context, benefit),
-        analysis(analysis), options(options) {}
+        options(options) {}
 
   LogicalResult matchAndRewrite(Operation *op,
                                 PatternRewriter &rewriter) const override {
     if (!OpTrait::hasElementwiseMappableTraits(op))
       return failure();
 
+    DistributionSignature signature = getOpSignature(op);
+
     // Get the distributed operands.
     SmallVector<Value> operands;
-    for (Value operand : op->getOperands()) {
+    for (auto [operand, opLayout] :
+         llvm::zip(op->getOperands(), signature.operands)) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        operand = getDistributed(rewriter, vectorOperand, options);
+        operand = getDistributed(rewriter, vectorOperand, opLayout, options);
       }
       operands.push_back(operand);
     }
 
     // Get the new distributed vector types for the operation.
     SmallVector<Type> resultTypes;
-    for (Value result : op->getResults()) {
+    for (auto [result, resLayout] :
+         llvm::zip(op->getResults(), signature.results)) {
       Type resultType = result.getType();
 
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-        resultType = VectorType::get(options.getDistributedShape(vectorResult),
-                                     vectorResult.getType().getElementType());
+        resultType = VectorType::get(
+            options.getDistributedShape(vectorResult, resLayout),
+            vectorResult.getType().getElementType());
       }
       resultTypes.push_back(resultType);
     }
 
     // Replace the original op with the distributed op.
-    Operation *distributedOp =
-        rewriter.create(op->getLoc(), op->getName().getIdentifier(), operands,
-                        resultTypes, op->getAttrs());
+    Operation *distributedOp = rewriter.create(
+        op->getLoc(), op->getName().getIdentifier(), operands, resultTypes);
     replaceOpWithDistributedValues(rewriter, op, options,
                                    distributedOp->getResults());
     return success();
   }
 
 private:
-  VectorLayoutAnalysis &analysis;
   VectorLayoutOptions &options;
 };
 
+static void
+debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
+  DenseSet<StringRef> uniqueNames;
+  for (Operation *op : worklist) {
+    uniqueNames.insert(op->getName().getStringRef());
+  }
+
+  for (StringRef name : uniqueNames) {
+    llvm::dbgs().indent(2) << "* " << name << "\n";
+  }
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+}
+
 /// A rewriter for the pattern rewriting driver.
-class VectorDistributionRewriter : public PatternRewriter,
-                                   RewriterBase::Listener {
+class VectorDistributionRewriter : public PatternRewriter {
 public:
-  VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &erasedOps)
-      : PatternRewriter(context, this) {}
+  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(context) {}
 };
+
+static void applyVectorDistribution(Operation *root,
+                                    const FrozenRewritePatternSet &patterns,
+                                    VectorLayoutOptions &options) {
+
+  SmallVector<Operation *> worklist;
+
+  VectorDistributionRewriter rewriter(root->getContext());
+  PatternApplicator applicator(patterns);
+  applicator.applyDefaultCostModel();
+
+  // Collect all the operations to be distributed.
+  LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
+  root->walk([&](Operation *op) {
+    if (hasOpSignature(op)) {
+      worklist.push_back(op);
+    }
+  });
+  LLVM_DEBUG(llvm::dbgs() << "Operations to be distributed:\n");
+  LLVM_DEBUG(debugPrintUniqueOperationNames(worklist));
+
+  // Note that the pattern application here never runs on a newly created
+  // operation. It always runs on an existing operation. This ensures that no
+  // invalidated state of the analysis is ever used.
+  for (Operation *op : worklist) {
+
+    LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
+    LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
+    LLVM_DEBUG(llvm::dbgs() << "\n");
+    if (failed(applicator.matchAndRewrite(op, rewriter))) {
+      LLVM_DEBUG(llvm::dbgs().indent(2)
+                 << ": Failed to distribute operation:\n");
+      continue;
+    }
+
+    LLVM_DEBUG(llvm::dbgs().indent(2)
+               << ": Successfully distributed operation:\n");
+  }
+}
 
 static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   auto values = llvm::to_vector_of<Value>(op->getOperands());
@@ -173,84 +296,34 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
-static void
-debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist,
-                               DenseSet<Operation *> &exclude) {
-  DenseSet<StringRef> uniqueNames;
-  for (Operation *op : worklist) {
-    if (exclude.contains(op))
-      continue;
-    uniqueNames.insert(op->getName().getStringRef());
-  }
-
-  for (StringRef name : uniqueNames) {
-    llvm::dbgs().indent(2) << "* " << name << "\n";
-  }
-  LLVM_DEBUG(llvm::dbgs() << "\n");
-}
-
-static void applyVectorDistribution(Operation *root,
-                                    const FrozenRewritePatternSet &patterns,
-                                    VectorLayoutAnalysis &analysis,
-                                    VectorLayoutOptions &options) {
-
-  DenseSet<Operation *> erasedOps;
-  SmallVector<Operation *> worklist;
-
-  VectorDistributionRewriter rewriter(root->getContext(), erasedOps);
-  PatternApplicator applicator(patterns);
-  applicator.applyDefaultCostModel();
-
-  // Collect all the operations to be distributed.
-  LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
-  root->walk([&](Operation *op) {
-    if (canDistribute(op, analysis)) {
-      worklist.push_back(op);
-    }
-  });
-  LLVM_DEBUG(debugPrintUniqueOperationNames(worklist, erasedOps));
-
-  // Note that the pattern application here never runs on a newly created
-  // operation. It always runs on an existing operation. This ensures that no
-  // invalidated state of the analysis is ever used.
-  for (Operation *op : worklist) {
-    if (erasedOps.contains(op))
-      continue;
-
-    LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
-    LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
-    LLVM_DEBUG(llvm::dbgs() << "\n");
-    if (failed(applicator.matchAndRewrite(op, rewriter))) {
-      LLVM_DEBUG(llvm::dbgs().indent(2)
-                 << ": Failed to distribute operation:\n");
-      continue;
-    }
-
-    LLVM_DEBUG(llvm::dbgs().indent(2)
-               << ": Successfully distributed operation:\n");
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "\nDistribution complete:\n\n");
-  LLVM_DEBUG(llvm::dbgs() << "Operation names of ops not distributed:\n");
-  LLVM_DEBUG(debugPrintUniqueOperationNames(worklist, erasedOps));
-}
-
 void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
   // Run the analysis and determine the layouts.
+  LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
-  options.setAnchorOps();
+  options.setAnchorOps(analysis);
   if (failed(analysis.run()))
     return;
-  LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Completed Successfully :\n");
-  LLVM_DEBUG(analysis.print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n\n");
+
+  // Go to each operation, and set it's distribution signature.
+  LLVM_DEBUG(
+      llvm::dbgs() << "Setting distribution signatures for operations\n");
+  root->walk([&](Operation *op) {
+    if (canDistribute(op, analysis)) {
+      setOpSignature(op, analysis);
+    }
+  });
+  LLVM_DEBUG(llvm::dbgs() << "Distribution signatures set\n");
+  LLVM_DEBUG(root->print(llvm::dbgs()));
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
   // Run the distribution patterns.
   RewritePatternSet patterns(root->getContext());
   patterns.add<DistributeConstants, DistributeElementwise>(root->getContext(),
-                                                           analysis, options);
+                                                           options);
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  return applyVectorDistributionDriver(root, frozenPatterns, analysis, options);
+  return applyVectorDistribution(root, frozenPatterns, options);
 }
 
 } // namespace mlir::iree_compiler

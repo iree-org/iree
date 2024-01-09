@@ -1004,21 +1004,23 @@ void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
 
 class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestVectorLayoutOptions(VectorLayoutAnalysis &analysis, Operation *root)
-      : VectorLayoutOptions(analysis, root) {}
+  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
 
   SmallVector<int64_t>
-  getDistributedShape(TypedValue<VectorType> val) override {
+  getDistributedShape(TypedValue<VectorType> val,
+                      VectorLayoutInterface layout) override {
     constexpr VectorExt::LayoutDimension simtLabels[] = {
         VectorExt::LayoutDimension::BATCHY,
         VectorExt::LayoutDimension::BATCHX,
         VectorExt::LayoutDimension::VECTORX,
     };
-    return analysis.getLayout<VectorExt::LayoutAttr>(val).getSIMTVectorShape(
+    return cast<IREE::VectorExt::LayoutAttr>(layout).getSIMTVectorShape(
         simtLabels);
   }
 
-  void setAnchorOps() override { setAnchorOpsFromAttributes(analysis, root); }
+  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+    setAnchorOpsFromAttributes(analysis, root);
+  }
 };
 
 DiagnosedSilenceableFailure
@@ -1026,8 +1028,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::TransformRewriter &rewriter, func::FuncOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  VectorLayoutAnalysis analysis(target);
-  TestVectorLayoutOptions options(analysis, target);
+  TestVectorLayoutOptions options(target);
   distributeVectorOps(target, options);
   return DiagnosedSilenceableFailure::success();
 }

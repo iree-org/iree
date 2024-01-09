@@ -23,6 +23,7 @@ class VectorLayoutOptions;
 /// distributed yet, wrap it in a ToSIMTOp.
 TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
                                       TypedValue<VectorType> value,
+                                      VectorLayoutInterface layout,
                                       VectorLayoutOptions &options);
 
 /// Replace an op with its distributed replacement values.
@@ -49,25 +50,22 @@ OpTy replaceOpWithNewDistributedOp(VectorLayoutOptions &options,
 /// value.
 class VectorLayoutOptions {
 public:
-  VectorLayoutOptions(VectorLayoutAnalysis &analysis, Operation *root)
-      : analysis(analysis), root(root) {
+  VectorLayoutOptions(Operation *root) : root(root) {
     assert(root && "root operation must be non-null");
   }
 
   virtual ~VectorLayoutOptions() = default;
 
-  VectorLayoutAnalysis &getAnalysis() { return analysis; }
-
   /// Set the anchor ops in the analysis rooted on the root operation.
-  virtual void setAnchorOps() = 0;
+  virtual void setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
 
   /// Given a Value of type VectorType, return the distributed shape of the
   /// value, based on its layout in the analysis.
   virtual SmallVector<int64_t>
-  getDistributedShape(TypedValue<VectorType> val) = 0;
+  getDistributedShape(TypedValue<VectorType> val,
+                      VectorLayoutInterface layout) = 0;
 
 protected:
-  VectorLayoutAnalysis &analysis;
   Operation *root;
 }; // namespace iree_compiler
 
