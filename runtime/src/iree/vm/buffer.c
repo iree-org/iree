@@ -9,7 +9,6 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "iree/base/alignment.h"
 #include "iree/vm/instance.h"
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_buffer, iree_vm_buffer_t);
@@ -316,7 +315,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
 }
 
 // Based on reference implementation from https://github.com/veorq/SipHash
-// By Jean-Philippe Aumasson and Daniel J. Bernstein.
+// By Jean-Philippe Aumasson and Daniel J. Bernstein. (CC0 Licensed)
 #define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
 #define SIPROUND(v0, v1, v2, v3) \
   v0 += v1;                      \
@@ -347,6 +346,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
     iree_host_size_t length, int64_t* result) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_ASSERT_ARGUMENT(source_buffer);
+
   // Get the byte span for the source data.
   iree_const_byte_span_t source_span = iree_const_byte_span_empty();
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -394,7 +394,7 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
   }
 
   hash = v0 ^ v1 ^ v2 ^ v3;
-  iree_unaligned_store_le_u64(result, hash);
+  *result = hash;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
