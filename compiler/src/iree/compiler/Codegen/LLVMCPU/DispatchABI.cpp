@@ -499,9 +499,9 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
       LLVM::DIFileAttr::get(context, llvm::sys::path::filename(inputFilePath),
                             llvm::sys::path::parent_path(inputFilePath));
   auto compileUnitAttr = LLVM::DICompileUnitAttr::get(
-      context, llvm::dwarf::DW_LANG_C17, fileAttr,
-      builder.getStringAttr("IREE"), /*isOptimized=*/true,
-      LLVM::DIEmissionKind::Full);
+      context, DistinctAttr::create(UnitAttr::get(context)),
+      llvm::dwarf::DW_LANG_C17, fileAttr, builder.getStringAttr("IREE"),
+      /*isOptimized=*/true, LLVM::DIEmissionKind::Full);
 
   auto int32TypeAttr =
       LLVM::DIBasicTypeAttr::get(context, llvm::dwarf::DW_TAG_base_type, "int",
