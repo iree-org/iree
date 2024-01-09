@@ -195,9 +195,11 @@ static void iree_hal_cuda2_semaphore_fail(iree_hal_semaphore_t* base_semaphore,
 static iree_status_t iree_hal_cuda2_semaphore_timepoint_host_wait_callback(
     void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
     iree_status_code_t status_code) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_cuda2_timepoint_t* timepoint =
       (iree_hal_cuda2_timepoint_t*)user_data;
   iree_event_set(&timepoint->timepoint.host_wait);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -332,11 +334,13 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
 static iree_status_t iree_hal_cuda2_semaphore_timepoint_device_signal_callback(
     void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
     iree_status_code_t status_code) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_cuda2_timepoint_t* timepoint =
       (iree_hal_cuda2_timepoint_t*)user_data;
   // Just release the timepoint back to the pool. This will decrease the
   // reference count of the underlying CUDA event internally.
   iree_hal_cuda2_timepoint_pool_release(timepoint->pool, 1, &timepoint);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
@@ -394,11 +398,13 @@ iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
 static iree_status_t iree_hal_cuda2_semaphore_timepoint_device_wait_callback(
     void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
     iree_status_code_t status_code) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_cuda2_timepoint_t* timepoint =
       (iree_hal_cuda2_timepoint_t*)user_data;
   // Just release the timepoint back to the pool. This will decrease the
   // reference count of the underlying CUDA event internally.
   iree_hal_cuda2_timepoint_pool_release(timepoint->pool, 1, &timepoint);
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 

@@ -97,8 +97,17 @@ need to implement a deferred/pending actions queue.
 
 GPU signals can only be through a `CUevent` object, which has a binary state.
 We need to advance the timeline too. One way is to use `cuLaunchHostFunc()`
-to perform the advance from the CPU side. This additionally would mean we can
-reuse the logic form CPU signaling to unblock CPU waits.
+to advance from the CPU side with `iree_hal_semaphore_list_signal()`.
+This additionally would mean we can reuse the logic form CPU signaling to
+unblock CPU waits.
+
+After advancing the timeline from the CPU side with `cuLaunchHostFunc()`,
+we can release more workload from the deferred/pending actions queue to the GPU.
+Though, per the [documentation][cu-launch-host-func] of `cuLaunchHostFunc()`,
+"the host function must not make any CUDA API calls." So we cannot do that
+directly inside `cuLaunchHostFunc()`; we need to notify another separate
+thread to call CUDA APIs to push more work to the GPU. So the deferred/pending
+action queue should have an associcated thread.
 
 For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that
@@ -164,3 +173,4 @@ To summarize, we need the following data structures to implement HAL semaphore:
 [cu-mem-ops]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEMOP.html
 [cu-external-resource]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html
 [cu-event]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EVENT.html
+[cu-launch-host-func]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXEC.html#group__CUDA__EXEC_1gab95a78143bae7f21eebb978f91e7f3f
