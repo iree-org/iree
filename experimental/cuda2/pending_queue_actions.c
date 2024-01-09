@@ -740,28 +740,32 @@ static bool iree_hal_cuda2_worker_committed_exiting(
 static iree_status_t iree_hal_cuda2_worker_process_ready_list(
     iree_allocator_t host_allocator,
     iree_hal_cuda2_ready_action_slist_t* worklist) {
-  iree_hal_cuda2_atomic_slist_entry_t* entry =
-      iree_hal_cuda2_ready_action_slist_pop(worklist);
-  while (entry) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_ok_status();
+  do {
+    iree_hal_cuda2_atomic_slist_entry_t* entry =
+        iree_hal_cuda2_ready_action_slist_pop(worklist);
+    if (!entry) break;
+
     // Process the current batch of ready actions.
-    for (iree_hal_cuda2_queue_action_t* action = entry->ready_list_head;
-         action != NULL;) {
+    iree_hal_cuda2_queue_action_t* action = entry->ready_list_head;
+    while (action) {
       iree_hal_cuda2_queue_action_t* next_action = action->next;
       action->next = NULL;
 
-      iree_status_t status =
-          iree_hal_cuda2_pending_queue_actions_issue_execution(action);
-      if (!iree_status_is_ok(status)) return status;
+      status = iree_hal_cuda2_pending_queue_actions_issue_execution(action);
+      if (!iree_status_is_ok(status)) break;
       action->event_count = 0;
 
       action = next_action;
     }
 
     iree_allocator_free(host_allocator, entry);
-    // Try to see if we have the next batch.
-    entry = iree_hal_cuda2_ready_action_slist_pop(worklist);
-  }
-  return iree_ok_status();
+  } while (iree_status_is_ok(status));
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 // The main function for the ready-list processing worker thread.
