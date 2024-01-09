@@ -485,7 +485,8 @@ HALDispatchABI::getInputTypes(MLIRContext *context,
 
 // static
 LLVM::DISubprogramAttr
-HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
+HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
+                               LLVM::LLVMFuncOp llvmFuncOp,
                                const LLVMTypeConverter *typeConverter) {
   auto *context = &typeConverter->getContext();
   Builder builder(context);
@@ -516,13 +517,18 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
           di.getPtrOf(di.getConstOf(di.getWorkgroupStateV0T())),
       });
 
-  auto funcNameAttr = builder.getStringAttr(funcName);
-  return LLVM::DISubprogramAttr::get(
-      context, compileUnitAttr, fileAttr, funcNameAttr, funcNameAttr, fileAttr,
-      /*line=*/1,
-      /*scopeline=*/1,
-      LLVM::DISubprogramFlags::Definition | LLVM::DISubprogramFlags::Optimized,
-      subroutineTypeAttr);
+  auto funcNameAttr = builder.getStringAttr(llvmFuncOp.getName());
+  DistinctAttr id;
+  if (!llvmFuncOp.isExternal()) {
+    id = DistinctAttr::create(UnitAttr::get(context));
+  }
+  return LLVM::DISubprogramAttr::get(context, id, compileUnitAttr, fileAttr,
+                                     funcNameAttr, funcNameAttr, fileAttr,
+                                     /*line=*/1,
+                                     /*scopeline=*/1,
+                                     LLVM::DISubprogramFlags::Definition |
+                                         LLVM::DISubprogramFlags::Optimized,
+                                     subroutineTypeAttr);
 }
 
 // Returns the most local DISubprogramAttr starting from |forOp|.

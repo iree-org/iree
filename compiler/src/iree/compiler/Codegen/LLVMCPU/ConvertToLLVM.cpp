@@ -174,7 +174,7 @@ struct ConvertHALEntryPointFuncOp
     // order to get any debug information (including just line tables) from MLIR
     // into LLVM IR.
     auto scopeAttr = HALDispatchABI::buildScopeAttr(
-        llvmFuncOp->getParentOfType<mlir::ModuleOp>(), llvmFuncOp.getName(),
+        llvmFuncOp->getParentOfType<mlir::ModuleOp>(), llvmFuncOp,
         getTypeConverter());
     llvmFuncOp->setLoc(FusedLoc::get(llvmFuncOp.getContext(),
                                      {llvmFuncOp->getLoc()}, scopeAttr));
