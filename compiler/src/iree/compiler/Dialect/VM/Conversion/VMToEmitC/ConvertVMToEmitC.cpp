@@ -2022,7 +2022,7 @@ private:
 
     // iree_vm_function_call_t call;
     auto call = builder
-                    .create<emitc::ConstantOp>(
+                    .create<emitc::VariableOp>(
                         /*location=*/loc,
                         /*resultType=*/
                         emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"),

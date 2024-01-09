@@ -12,7 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 #define IREE_COMPILER_CODEGEN_SPIRV_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -133,6 +133,11 @@ createSPIRVLowerExecutableTargetPass();
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVMapMemRefStorageClassPass();
+
+/// Pass to materialize SPIR-V target requirements of hal.exectuable.variant ops
+/// into hal.executable.condition regions.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVMaterializeExecutableConditionsPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to
 /// invocations.

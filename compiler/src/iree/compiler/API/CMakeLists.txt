@@ -12,17 +12,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    MLIRInteropHeaders
-  HDRS
-    "MLIRInterop.h"
-  DEPS
-    IREELLVMIncludeSetup
-    iree::compiler::bindings::c::headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     StaticImpl
   DEPS
     IREEDialectsCAPI
@@ -159,6 +148,8 @@ iree_cc_library(
   LINKOPTS
     # Linux uses a linker script to version symbols.
     $<$<PLATFORM_ID:Linux>:-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/api_version.ld>
+  DEPS
+    iree::compiler::bindings::c::headers
 )
 
 # Make sure that re-link if extra linker inputs change.
@@ -199,6 +190,18 @@ set_target_properties(
     OUTPUT_NAME "IREECompiler"
     VERSION "0"
     SOVERSION "0"
+)
+
+# We can install shared libraries and export them without exporting their
+# deps. This wouldn't work if this were a static library as we'd need to
+# untangle the exporting of all of LLVM.
+iree_install_targets(
+  TARGETS
+    iree_compiler_API_SharedImpl
+  COMPONENT
+    IREERuntimeLibraries-Compiler
+  EXPORT_SET
+    Compiler
 )
 
 # Signal the main shared library/dll as part of the bundle of files that

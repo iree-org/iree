@@ -15,12 +15,6 @@ def LinalgExtToLoops :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
 
-def TilingInterfaceTiling :
-    Pass<"iree-linalg-ext-tile", "func::FuncOp"> {
-  let summary = "Test pass for tiling using TiledOpInterface";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTilingInterfaceTilingPass()";
-}
-
 def PadContractionToBlockSize :
     Pass<"iree-linalg-pad-contraction-to-block-size", ""> {
   let summary = "Pads contraction (matmul) ops to next multiple of block size";
@@ -86,6 +80,8 @@ def TileAndDecomposeAttention :
   let options = [
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
+    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
+           "Tile size for sequential for loop in attention">,
   ];
 }
 

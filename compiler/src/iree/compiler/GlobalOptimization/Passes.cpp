@@ -142,6 +142,7 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
+    mainPassManager.addPass(createSimplifyPackUnpackPass());
   }
   // Generalize transposes and any other remaining named linalg ops that can now
   // be represented as generics.

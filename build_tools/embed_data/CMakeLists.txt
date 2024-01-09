@@ -19,7 +19,7 @@ target_sources(generate_embed_data PRIVATE generate_embed_data_main.cc)
 set_target_properties(generate_embed_data PROPERTIES OUTPUT_NAME generate_embed_data)
 
 install(TARGETS generate_embed_data
-        COMPONENT generate_embed_data
+        COMPONENT IREETools-CompilerExtra
         RUNTIME DESTINATION bin
         BUNDLE DESTINATION bin)
 

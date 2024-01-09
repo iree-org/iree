@@ -41,7 +41,6 @@
 #include <limits>
 
 #include "iree/compiler/API/Internal/Diagnostics.h"
-#include "iree/compiler/API/MLIRInterop.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -53,6 +52,7 @@
 #include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
+#include "iree/compiler/mlir_interop.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -1325,7 +1325,7 @@ void ireeCompilerInvocationSetCrashHandler(
     iree_compiler_error_t *(*onCrashCallback)(
         iree_compiler_output_t **outOutput, void *userData),
     void *userData) {
-  struct StreamImpl : public mlir::PassManager::ReproducerStream {
+  struct StreamImpl : public mlir::ReproducerStream {
     StreamImpl(iree_compiler_output_t *output) : output(output) {
       unwrap(output)->keep();
     }
@@ -1344,7 +1344,7 @@ void ireeCompilerInvocationSetCrashHandler(
       [=](mlir::PassManager &passManager) {
         passManager.enableCrashReproducerGeneration(
             [=](std::string &errorMessage)
-                -> std::unique_ptr<mlir::PassManager::ReproducerStream> {
+                -> std::unique_ptr<mlir::ReproducerStream> {
               iree_compiler_output_t *output = nullptr;
               auto error = onCrashCallback(&output, userData);
               if (error) {
@@ -1502,7 +1502,7 @@ ireeCompilerInvocationOutputHALExecutable(iree_compiler_invocation_t *inv,
 }
 
 //===----------------------------------------------------------------------===//
-// Unstable MLIRInterop.h helpers
+// Unstable mlir_interop.h helpers
 //===----------------------------------------------------------------------===//
 
 void ireeCompilerRegisterDialects(MlirDialectRegistry registry) {

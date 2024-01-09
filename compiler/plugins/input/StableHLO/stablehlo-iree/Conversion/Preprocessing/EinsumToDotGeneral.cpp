@@ -149,7 +149,7 @@ struct EinsumToDotGeneralPattern final
     } else {
       // Generate a transpose.
       rewriter.replaceOpWithNewOp<mlir::stablehlo::TransposeOp>(
-          einsum, dotGeneralOp, rewriter.getI64TensorAttr(resultPerms));
+          einsum, dotGeneralOp, rewriter.getDenseI64ArrayAttr(resultPerms));
     }
     return success();
   }

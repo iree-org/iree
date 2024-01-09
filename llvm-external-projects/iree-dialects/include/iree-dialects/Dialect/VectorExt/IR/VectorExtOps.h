@@ -29,4 +29,70 @@
 
 // clang-format on
 
+namespace mlir::iree_compiler::IREE::VectorExt {
+
+/// Dimensional Strided Iterator class used to represent
+/// an iterator through a single dimension of the layout.
+class DimensionalIterator {
+public:
+  DimensionalIterator(int64_t position = 0, int64_t stride = 1)
+      : position(position), stride(stride) {}
+  int64_t operator*() const { return position; }
+  DimensionalIterator &operator++() {
+    position += stride;
+    return *this;
+  }
+  bool operator!=(const DimensionalIterator &other) const {
+    return position != other.position;
+  }
+
+private:
+  int64_t position, stride;
+};
+
+/// Dimensional Range class used to represent the range of
+/// a particular dimension of the layout. Can be iterated on
+/// using a DimensionalIterator.
+class DimensionalRange {
+public:
+  DimensionalRange() {}
+  DimensionalRange(int64_t start, int64_t stop, int64_t step = 1)
+      : start(start), stop(stop), step(step) {}
+  DimensionalIterator begin() const { return DimensionalIterator(start, step); }
+  DimensionalIterator end() const { return DimensionalIterator(stop, step); }
+
+private:
+  int64_t start, stop, step;
+};
+
+// Iterator class for LayoutAttrs and PerDimLayoutAttrs.
+// Provides O(1) access to state for any given dimension.
+// Also preserves insertion order.
+// Layout iterators skip lane dimensions as these are not
+// required during distribution.
+class LayoutIterator {
+public:
+  using State = llvm::MapVector<LayoutDimension, DimensionalIterator>;
+  using DimensionMapping =
+      llvm::DenseMap<int64_t, SmallVector<LayoutDimension>>;
+  void maybeFreezeAndConcatenate(const LayoutIterator &frozenIterator);
+  LayoutIterator(LayoutAttr &attr, DenseMap<LayoutDimension, int64_t> strides);
+  LayoutIterator(PerDimLayoutAttr &attr,
+                 DenseMap<LayoutDimension, int64_t> strides);
+  void apply(std::function<void(const LayoutIterator::State &)>);
+  LayoutIterator &operator++();
+  State getState() const { return state; }
+
+private:
+  void initialize(PerDimLayoutAttr &attr,
+                  DenseMap<LayoutDimension, int64_t> strides);
+  bool iterationComplete();
+  State state;
+  llvm::MapVector<LayoutDimension, DimensionalRange> ranges;
+  DimensionMapping simdDimensionToLayoutDimension;
+  DenseSet<LayoutDimension> frozenDimensions;
+};
+
+} // namespace mlir::iree_compiler::IREE::VectorExt
+
 #endif // IREE_DIALECTS_DIALECT_VECTOREXT_IR_VECTOREXTOPS_H_

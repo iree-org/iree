@@ -16,81 +16,6 @@
 namespace mlir::iree_compiler {
 
 namespace {
-
-static std::tuple<SmallVector<utils::IteratorType>, SmallVector<AffineMap>>
-computeIteratorTypesAndIndexingMaps(int64_t inputRank, int64_t dim,
-                                    OpBuilder &builder,
-                                    bool allParallel = false) {
-  SmallVector<utils::IteratorType> iteratorTypes(inputRank,
-                                                 utils::IteratorType::parallel);
-  if (!allParallel)
-    iteratorTypes[dim] = utils::IteratorType::reduction;
-  auto identityMap =
-      AffineMap::getMultiDimIdentityMap(inputRank, builder.getContext());
-  SmallVector<AffineExpr, 2> affineExprs;
-  for (int i = 0; i < inputRank; i++) {
-    if (i != dim)
-      affineExprs.push_back(mlir::getAffineDimExpr(i, builder.getContext()));
-  }
-  auto reductionMap =
-      AffineMap::get(inputRank, 0, affineExprs, builder.getContext());
-  SmallVector<AffineMap> indexingMaps{identityMap, reductionMap};
-  return std::make_tuple(iteratorTypes, indexingMaps);
-}
-
-template <typename T>
-static Value reduce(Value input, Value output, int64_t dim, Location loc,
-                    OpBuilder &builder) {
-  auto inputType = input.getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  int64_t inputRank = inputShape.size();
-  auto [iteratorTypes, indexingMaps] =
-      computeIteratorTypesAndIndexingMaps(inputRank, dim, builder);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, output.getType(), input, output, indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<T>(loc, args[0], args[1]);
-        b.create<linalg::YieldOp>(loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
-static linalg::GenericOp subtractAndExp(Value input, Value max, Value output,
-                                        int64_t dim, Location loc,
-                                        OpBuilder &builder) {
-  auto inputType = input.getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  int64_t inputRank = inputShape.size();
-  auto [iteratorTypes, indexingMaps] =
-      computeIteratorTypesAndIndexingMaps(inputRank, dim, builder, true);
-  indexingMaps.push_back(indexingMaps[0]);
-  return builder.create<linalg::GenericOp>(
-      loc, input.getType(), ValueRange{input, max}, output, indexingMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value diff = b.create<arith::SubFOp>(loc, args[0], args[1]);
-        Value result = b.create<math::ExpOp>(loc, diff);
-        b.create<linalg::YieldOp>(loc, result);
-      });
-}
-
-static Value computeSoftmax(Value numerator, Value denominator, Value output,
-                            int64_t dim, Location loc, OpBuilder &builder) {
-  auto inputType = numerator.getType().cast<ShapedType>();
-  ArrayRef<int64_t> inputShape = inputType.getShape();
-  int64_t inputRank = inputShape.size();
-  auto [iteratorTypes, indexingMaps] =
-      computeIteratorTypesAndIndexingMaps(inputRank, dim, builder, true);
-  indexingMaps.push_back(indexingMaps[0]);
-  auto genericOp = builder.create<linalg::GenericOp>(
-      loc, numerator.getType(), ValueRange{numerator, denominator}, output,
-      indexingMaps, iteratorTypes,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<arith::DivFOp>(loc, args[0], args[1]);
-        b.create<linalg::YieldOp>(loc, result);
-      });
-  return genericOp.getResult(0);
-}
-
 /// Given an N-dimensional tensor x, this op converts
 /// softmax(x) to the following sequence of operations:
 ///
@@ -109,7 +34,8 @@ static Value computeSoftmax(Value numerator, Value denominator, Value output,
 /// 4. Divide z and l. This gives the N-dimensional softmax.
 ///    softmax = z / l
 ///
-static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
+static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp,
+                                              bool useFusion) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;
   SmallVector<Operation *> softmaxOpsToDecompose;
@@ -136,30 +62,32 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
     // the decomposition above.
     rewriter.replaceOp(decomposableSoftmaxOp, *result);
 
-    // Fusion later depends on couple of Ops/Values - we try to obtain the same
-    // by backtracking through the generated value's def-chain.
-    Operation *resultOp = (*result)[0].getDefiningOp();
-    Value numerator = resultOp->getOperand(0);
-    Operation *numeratorOp = numerator.getDefiningOp();
+    if (useFusion) {
+      // Fusion later depends on couple of Ops/Values - we try to obtain the
+      // same by backtracking through the generated value's def-chain.
+      Operation *resultOp = (*result)[0].getDefiningOp();
+      Value numerator = resultOp->getOperand(0);
+      Operation *numeratorOp = numerator.getDefiningOp();
 
-    // Rematerialize operands that are marked for this.
-    SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
-        numerator.getUses(), [](OpOperand &use) { return &use; }));
-    for (OpOperand *use : uses) {
-      Operation *consumer = use->getOwner();
-      OpBuilder::InsertionGuard g(rewriter);
-      rewriter.setInsertionPoint(consumer);
-      FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
-          linalg::fuseElementwiseOps(rewriter, use);
-      if (succeeded(fusionResult)) {
-        SmallVector<Value> replacements = llvm::to_vector(
-            llvm::map_range(consumer->getResults(), [&](Value oldValue) {
-              return fusionResult->replacements.lookup(oldValue);
-            }));
-        rewriter.replaceOp(consumer, replacements);
+      // Rematerialize operands that are marked for this.
+      SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
+          numerator.getUses(), [](OpOperand &use) { return &use; }));
+      for (OpOperand *use : uses) {
+        Operation *consumer = use->getOwner();
+        OpBuilder::InsertionGuard g(rewriter);
+        rewriter.setInsertionPoint(consumer);
+        FailureOr<linalg::ElementwiseOpFusionResult> fusionResult =
+            linalg::fuseElementwiseOps(rewriter, use);
+        if (succeeded(fusionResult)) {
+          SmallVector<Value> replacements = llvm::to_vector(
+              llvm::map_range(consumer->getResults(), [&](Value oldValue) {
+                return fusionResult->replacements.lookup(oldValue);
+              }));
+          rewriter.replaceOp(consumer, replacements);
+        }
       }
+      toDelete.push_back(numeratorOp);
     }
-    toDelete.push_back(numeratorOp);
   }
   for (Operation *op : toDelete) {
     rewriter.eraseOp(op);
@@ -169,21 +97,24 @@ static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp) {
 }
 
 struct DecomposeSoftmaxPass : DecomposeSoftmaxBase<DecomposeSoftmaxPass> {
+  DecomposeSoftmaxPass() = default;
+  DecomposeSoftmaxPass(bool useFusion) { this->useFusion = useFusion; }
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     IRRewriter rewriter(context);
-    if (failed(convertSoftmaxToGenerics(getOperation())))
+    if (failed(convertSoftmaxToGenerics(getOperation(), useFusion)))
       return signalPassFailure();
   }
 };
 
 } // namespace
 
-std::unique_ptr<Pass> createDecomposeSoftmaxPass() {
-  return std::make_unique<DecomposeSoftmaxPass>();
+std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion) {
+  return std::make_unique<DecomposeSoftmaxPass>(useFusion);
 }
 
 } // namespace mlir::iree_compiler

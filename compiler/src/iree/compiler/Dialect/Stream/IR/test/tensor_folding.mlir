@@ -24,6 +24,18 @@ func.func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buf
   return %1 : !hal.buffer_view
 }
 
+// -----
+
+// CHECK-LABEL: @NofoldTensorExportOpBufferToView
+func.func @NofoldTensorExportOpBufferToView(%arg0: !hal.buffer, %arg1: index) -> !hal.buffer_view {
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import
+  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]]
+  // CHECK: return %[[EXPORT]] : !hal.buffer_view
+  %c20 = arith.constant 20 : index
+  %0 = stream.tensor.import %arg0 : !hal.buffer -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  %1 = stream.tensor.export %0 : tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  return %1 : !hal.buffer_view
+}
 
 // -----
 
@@ -167,6 +179,16 @@ func.func @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !strea
   // CHECK-NOT: stream.tensor.clone
   %0 = stream.tensor.clone %arg0 : tensor<2x2xf32> in !stream.resource<*>{%arg1} -> tensor<2x2xf32> in !stream.resource<*>{%arg1}
   // CHECK: return %arg0
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NofoldTensorCloneOp
+func.func @NofoldTensorCloneOp(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<*> {
+  // CHECK: %[[CLONE:.+]] = stream.tensor.clone
+  %0 = stream.tensor.clone %arg0 : tensor<2x2xf32> in !stream.resource<external>{%arg1} -> tensor<2x2xf32> in !stream.resource<*>{%arg1}
+  // CHECK: return %[[CLONE]] : !stream.resource<*>
   return %0 : !stream.resource<*>
 }
 

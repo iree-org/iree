@@ -49,6 +49,11 @@ def LLVMCPUCheckIRBeforeLLVMConversion :
     Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
   let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
+  let options = [
+    Option<"failOnOutOfBounds", "fail-on-out-of-bounds", "bool", "true",
+           "Fails if the upper bound of dynamic stack allocation cannot be"
+           "resolved or is more than the limit.">
+  ];
 }
 
 def LLVMCPUEmitVectorizationRemarks :
@@ -110,13 +115,6 @@ def LLVMCPUSynchronizeSymbolVisibility :
     Pass<"iree-llvmcpu-synchronize-symbol-visibility", "ModuleOp"> {
   let summary = "Synchronizes LLVM linkage with MLIR symbol visibility";
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
-}
-
-def LLVMCPUTensorPad :
-    Pass<"iree-llvmcpu-tensor-pad", "func::FuncOp"> {
-  let summary = "Pass to pad operations on tensors in top-down order.";
-  let constructor =
-      "mlir::iree_compiler::createLLVMCPUTensorPadPass()";
 }
 
 def LLVMCPUTile :

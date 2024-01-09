@@ -40,45 +40,6 @@ struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
   }
 };
 
-/// Pattern to rewrite a ForallOp to an scf::ForOp.
-struct ForallOpToScfForRewriter : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<scf::ForOp>
-  returningMatchAndRewrite(scf::ForallOp forallOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(forallOp, rewriter);
-  }
-};
-
-struct FusionResult {
-  TilingInterface consumerOp;
-  SmallVector<TilingInterface> fusedOps;
-};
-
-/// Pattern to fuse the producers of a tileable op.
-struct LinalgExtFusionPattern
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  LinalgExtFusionPattern(MLIRContext *context, ArrayRef<int64_t> operandsToFuse)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        operandsToFuse(operandsToFuse.begin(), operandsToFuse.end()) {}
-
-  FailureOr<FusionResult>
-  returningMatchAndRewrite(TilingInterface consumerOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(TilingInterface consumerOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(consumerOp, rewriter);
-  }
-
-private:
-  SmallVector<int64_t> operandsToFuse;
-};
-
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.
