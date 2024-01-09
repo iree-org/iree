@@ -136,10 +136,15 @@ LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
       return;
     }
     for (auto &func : module.getFunctionList()) {
-      // Some ROCM/HIP builtin functions have noninline for default.
-      if (targetMachine.getTargetTriple().isAMDGCN() &&
-          func.hasFnAttribute(llvm::Attribute::NoInline)) {
-        func.removeFnAttr(llvm::Attribute::NoInline);
+      // Some ROCM/HIP builtin functions have Optnone and NoInline for default.
+      if (targetMachine.getTargetTriple().isAMDGCN()) {
+        if (func.hasFnAttribute(llvm::Attribute::OptimizeNone)) {
+          func.removeFnAttr(llvm::Attribute::OptimizeNone);
+        }
+        if (targetMachine.getTargetTriple().isAMDGCN() &&
+            func.hasFnAttribute(llvm::Attribute::NoInline)) {
+          func.removeFnAttr(llvm::Attribute::NoInline);
+        }
       }
       func.addFnAttr(llvm::Attribute::AlwaysInline);
     }

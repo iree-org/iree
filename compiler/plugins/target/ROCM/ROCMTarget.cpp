@@ -18,6 +18,7 @@
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -74,6 +75,16 @@ struct ROCMOptions {
   }
 };
 } // namespace
+
+static void dumpModuleToPath(StringRef path, StringRef baseName,
+                             StringRef suffix, StringRef extension,
+                             llvm::Module &module) {
+  llvm::SmallVector<char, 0> data;
+  llvm::raw_svector_ostream ostream(data);
+  module.print(ostream, nullptr);
+  dumpDataToPath(path, baseName, suffix, extension,
+                 StringRef(data.data(), data.size()));
+}
 
 static std::string translateModuleToObj(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
@@ -347,9 +358,19 @@ public:
       linkROCDLIfNecessary(llvmModule.get(), options.targetChip,
                            options.bitcodeDirectory);
     }
+    if (!serOptions.dumpIntermediatesPath.empty()) {
+      dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                       serOptions.dumpBaseName, variantOp.getName(),
+                       ".linked.ll", *llvmModule);
+    }
     // Add Optimize module
     optimizeModule(*llvmModule, *targetMachine);
-
+    // Store optimized ll.
+    if (!serOptions.dumpIntermediatesPath.empty()) {
+      dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                       serOptions.dumpBaseName, variantOp.getName(),
+                       ".optimized.ll", *llvmModule);
+    }
     // Serialize hsaco kernel into the binary that we will embed in the
     // final FlatBuffer.
     std::unique_ptr<llvm::Module> moduleCopy;
