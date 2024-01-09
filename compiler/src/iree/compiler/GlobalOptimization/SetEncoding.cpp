@@ -87,37 +87,6 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
                                                         source);
 };
 
-enum class ContractionOpType {
-  kInvalid,
-  kMatmul,
-  kBatchMatmul,
-  kVecmat,
-  kBatchVecmat,
-  kMatvec,
-  kBatchMatvec,
-};
-
-static ContractionOpType
-getContractionOpType(linalg::ContractionOpInterface op) {
-  FailureOr<linalg::ContractionDimensions> cDims =
-      linalg::inferContractionDims(cast<linalg::LinalgOp>(op.getOperation()));
-  if (failed(cDims))
-    return ContractionOpType::kInvalid;
-  if (cDims->batch.size() == 0 && cDims->m.size() == 1 && cDims->n.size() == 1)
-    return ContractionOpType::kMatmul;
-  if (cDims->batch.size() == 0 && cDims->m.size() == 0 && cDims->n.size() == 1)
-    return ContractionOpType::kVecmat;
-  if (cDims->batch.size() == 0 && cDims->m.size() == 1 && cDims->n.size() == 0)
-    return ContractionOpType::kMatvec;
-  if (cDims->batch.size() == 1 && cDims->m.size() == 1 && cDims->n.size() == 1)
-    return ContractionOpType::kBatchMatmul;
-  if (cDims->batch.size() == 1 && cDims->m.size() == 0 && cDims->n.size() == 1)
-    return ContractionOpType::kBatchVecmat;
-  if (cDims->batch.size() == 1 && cDims->m.size() == 1 && cDims->n.size() == 0)
-    return ContractionOpType::kBatchMatvec;
-  return ContractionOpType::kInvalid;
-}
-
 struct MatmulNarrowSizes {
   std::optional<int64_t> M, N;
 };
@@ -125,7 +94,6 @@ struct MatmulNarrowSizes {
 // Returns the minimum of static sizes of the M/N-dimensions in the types of the
 // Ouput.
 static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
-                                              ContractionOpType opType,
                                               linalg::LinalgOp linalgOp) {
   linalg::ContractionDimensions cDims =
       linalg::inferContractionDims(linalgOp).value();
@@ -135,29 +103,8 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
         map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
             .value());
   };
-  int64_t M, N;
-  switch (opType) {
-  case ContractionOpType::kMatmul:
-  case ContractionOpType::kBatchMatmul: {
-    M = getOutputSizeAtDimPos(cDims.m[0]);
-    N = getOutputSizeAtDimPos(cDims.n[0]);
-    break;
-  }
-  case ContractionOpType::kVecmat:
-  case ContractionOpType::kBatchVecmat: {
-    M = 1;
-    N = getOutputSizeAtDimPos(cDims.n[0]);
-    break;
-  }
-  case ContractionOpType::kMatvec:
-  case ContractionOpType::kBatchMatvec: {
-    M = getOutputSizeAtDimPos(cDims.m[0]);
-    N = 1;
-    break;
-  }
-  case ContractionOpType::kInvalid:
-    return MatmulNarrowSizes();
-  }
+  int64_t M = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
+  int64_t N = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
 
   MatmulNarrowSizes narrow;
   // Threshold below which a M/N size is considered "narrow", making it
@@ -178,12 +125,10 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
 }
 
 static IREE::LinalgExt::EncodingAttr
-makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
-             IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
-             Type originalType, MatmulNarrowSizes narrow,
-             ArrayAttr indexingMaps) {
+makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingRole role,
+             TypeRange operandTypes, Type originalType,
+             MatmulNarrowSizes narrow, ArrayAttr indexingMaps) {
   auto *context = builder.getContext();
-  auto userAttr = IREE::LinalgExt::EncodingUserAttr::get(context, user);
   auto roleAttr = IREE::LinalgExt::EncodingRoleAttr::get(context, role);
   SmallVector<Attribute> elemTypeAttrs =
       llvm::map_to_vector(operandTypes, [](auto t) {
@@ -197,7 +142,7 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingUser user,
     return x ? builder.getIndexAttr(*x) : IntegerAttr();
   };
   return IREE::LinalgExt::EncodingAttr::get(
-      context, userAttr, roleAttr, operandElemTypesAttr, originalTypeAttr,
+      context, roleAttr, operandElemTypesAttr, originalTypeAttr,
       getAttr(narrow.M), getAttr(narrow.N), indexingMaps);
 }
 
@@ -219,7 +164,6 @@ static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
 
 static Value
 padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                  IREE::LinalgExt::EncodingUser user,
                   IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
                   MatmulNarrowSizes narrow, ArrayAttr indexingMaps,
                   std::optional<CastOpInterface> castOp = std::nullopt) {
@@ -228,7 +172,7 @@ padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
   auto encodingForPad =
-      makeEncoding(builder, user, role, operandTypes,
+      makeEncoding(builder, role, operandTypes,
                    /*originalType=*/Type{}, narrow, indexingMaps);
   Value padded = pad(builder, loc, padSource, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
@@ -239,9 +183,8 @@ padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != padSource.getType()) {
-    encodingForSetEncoding =
-        makeEncoding(builder, user, role, operandTypes, padSource.getType(),
-                     narrow, indexingMaps);
+    encodingForSetEncoding = makeEncoding(
+        builder, role, operandTypes, padSource.getType(), narrow, indexingMaps);
   }
   Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
   if (castOp) {
@@ -284,6 +227,16 @@ struct setContractionOpEncoding
       return rewriter.notifyMatchFailure(
           linalgOp, "the op has preset compilation strategy, skip SetEncoding");
     }
+    if (!linalg::isaContractionOpInterface(linalgOp)) {
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "the op is not a contraction op");
+    }
+    auto maps = linalgOp.getIndexingMaps();
+    auto cDims = linalg::inferContractionDims(linalgOp);
+    if (failed(cDims)) {
+      return rewriter.notifyMatchFailure(
+          op, "Failed to infer contraction dimensions");
+    }
 
     auto inputs = linalgOp.getDpsInputs();
     auto outputs = linalgOp.getDpsInits();
@@ -320,27 +273,9 @@ struct setContractionOpEncoding
       return failure();
     }
 
-    ContractionOpType opType = getContractionOpType(op);
-    IREE::LinalgExt::EncodingUser user;
-    switch (opType) {
-    case ContractionOpType::kMatmul:
-    case ContractionOpType::kVecmat:
-    case ContractionOpType::kMatvec:
-      user = IREE::LinalgExt::EncodingUser::MATMUL;
-      break;
-    case ContractionOpType::kBatchMatmul:
-    case ContractionOpType::kBatchVecmat:
-    case ContractionOpType::kBatchMatvec:
-      user = IREE::LinalgExt::EncodingUser::BATCH_MATMUL;
-      break;
-    case ContractionOpType::kInvalid:
-      return rewriter.notifyMatchFailure(op, "unsupported contraction op");
-    }
+    MatmulNarrowSizes narrowSizes =
+        getMatmulNarrowSizes(origOut.getType().cast<ShapedType>(), linalgOp);
 
-    MatmulNarrowSizes narrowSizes = getMatmulNarrowSizes(
-        origOut.getType().cast<ShapedType>(), opType, linalgOp);
-
-    auto maps = linalgOp.getIndexingMaps();
     Location loc = linalgOp.getLoc();
     SmallVector<Type> operandTypes(linalgOp->getOperandTypes());
     operandTypes[0] =
@@ -348,12 +283,12 @@ struct setContractionOpEncoding
     operandTypes[1] =
         cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
     Value encodedLhs = padAndSetEncoding(
-        rewriter, loc, origLhs, user, IREE::LinalgExt::EncodingRole::LHS,
+        rewriter, loc, origLhs, IREE::LinalgExt::EncodingRole::LHS,
         operandTypes, narrowSizes, maps, maybeLhsCastOp);
     Value encodedRhs = padAndSetEncoding(
-        rewriter, loc, origRhs, user, IREE::LinalgExt::EncodingRole::RHS,
+        rewriter, loc, origRhs, IREE::LinalgExt::EncodingRole::RHS,
         operandTypes, narrowSizes, maps, maybeRhsCastOp);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut, user,
+    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut,
                                          IREE::LinalgExt::EncodingRole::RESULT,
                                          operandTypes, narrowSizes, maps);
     Value opTiled;

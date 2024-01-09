@@ -8,6 +8,7 @@
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
@@ -461,10 +462,10 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
 }
 
 static uint32_t
-getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingUser user,
+getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
-  if (user != IREE::LinalgExt::EncodingUser::MATMUL ||
-      operandTypes.size() != 3) {
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
@@ -531,7 +532,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     inputValues.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
   }
   uint32_t flagForUserAndOperandTypes = getFlagForUserAndOperandTypes(
-      encoding.getUser().getValue(), encoding.getElementTypes().getValue());
+      encoding, encoding.getElementTypes().getValue());
   uint32_t flagForRole = getFlagForRole(encoding.getRole().getValue());
   if (!flagForUserAndOperandTypes || !flagForRole) {
     return rewriter.notifyMatchFailure(op, "unhandled encoding");
