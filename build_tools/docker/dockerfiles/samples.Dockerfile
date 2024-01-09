@@ -6,7 +6,6 @@
 
 # An image for running IREE's samples. Includes support for:
 #   * CMake
-#   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
 FROM gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75

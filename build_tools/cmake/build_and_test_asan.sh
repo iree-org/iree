@@ -85,7 +85,6 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
   # Respect the user setting, but default to turning off CUDA.
   export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
   # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
-  # We test on SwiftShader as a baseline, which does not support this extension.
   export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
   # Respect the user setting, but default to skipping tests that require Nvidia GPU.
   export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
