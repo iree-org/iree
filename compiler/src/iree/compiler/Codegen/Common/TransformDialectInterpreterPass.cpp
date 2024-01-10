@@ -77,10 +77,18 @@ extern llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName;
 
 /// Create a Transform dialect interpreter pass.
 std::unique_ptr<Pass>
-createTransformDialectInterpreterPass(StringRef entryPoint) {
-  StringRef strategyName =
-      entryPoint.empty() ? clCodegenTransformDialectStrategyName : entryPoint;
-  return std::make_unique<TransformDialectInterpreterPass>(
-      clCodegenTransformDialectLibraryFileName, strategyName);
+createTransformDialectInterpreterPass(StringRef transformSequenceName) {
+  StringRef strategyName = transformSequenceName.empty()
+                               ? clCodegenTransformDialectStrategyName
+                               : transformSequenceName;
+  StringRef libraryPath = "";
+  SmallVector<StringRef, 2> parts;
+  llvm::SplitString(llvm::StringRef(clCodegenTransformDialectLibraryFileName),
+                    parts, "::");
+  if (!parts.empty()) {
+    libraryPath = parts[0];
+  }
+  return std::make_unique<TransformDialectInterpreterPass>(libraryPath,
+                                                           strategyName);
 }
 } // namespace mlir::iree_compiler

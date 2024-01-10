@@ -105,7 +105,31 @@ module attributes { transform.with_named_sequence } {
     transform.yield %matched : !transform.any_op
   }
 
-  transform.named_sequence @transform_main(%variant_op: !transform.any_op {transform.consumed}) {
+  // An example of a custom transform dialect based kernel config. Note that
+  // because of the way `transform.foreach_match` works, the callback cannot
+  // manipulate IR beyond the op *given* to the matcher, as foreach_match will
+  // attempt to keep walking the IR even after a successful match. The expected
+  // flow for a strategy like this is as follows:
+  //
+  // Author an entry point like this (@kernel_config) that walks the IR and
+  // attempts to annotate the dispatch with the codegen strategy to use, i.e.
+  //   transform.foreach_match in %variant_op
+  //       @matcher_0 -> @annotator_0,
+  //       @matcher_1 -> @annotator_1,
+  //       ...
+  //
+  // the annotators should attach an #iree_codegen.translation_info attribute
+  // to the `hal.executable.export` ops within the variant as well as any
+  // relevant op specific tile sizes (and other important attributes like
+  // workgroup_size and subgroup_size, if relevant). This will then get handed
+  // off to backend specific kernel config, which will let these user configs
+  // pass through unperturbed.
+  //
+  // To couple this with a transform dialect based codegen strategy, the target
+  // codegen strategy can be included inline with this library and relevant ops
+  // can be annotated with `TransformDialectCodegen` as the lowering pipeline,
+  // with a reference to the strategy to use (see an example above).
+  transform.named_sequence @kernel_config(%variant_op: !transform.any_op {transform.consumed}) {
     transform.foreach_match in %variant_op
         @match_matmul -> @custom_matmul,
         @match_reduce -> @use_base_vectorize

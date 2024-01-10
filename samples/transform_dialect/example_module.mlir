@@ -108,8 +108,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executabl
 
 /// We test first with threading off so that the printers are legible.
 // RUN: iree-compile %s --iree-hal-target-backends=vulkan \
-// RUN:   --iree-codegen-use-transform-dialect-configuration=transform_main \
-// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
+// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir::kernel_config \
 // RUN:   --compile-from=executable-sources \
 // RUN:   --compile-to=executable-targets \
 // RUN:   --mlir-disable-threading | \
@@ -122,8 +121,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executabl
 
 /// Then test with threading to make sure it runs
 // RUN: iree-compile %s --iree-hal-target-backends=vulkan \
-// RUN:   --iree-codegen-use-transform-dialect-configuration=transform_main \
-// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
+// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir::kernel_config \
 // RUN:   --compile-from=executable-sources \
 // RUN:   --compile-to=executable-targets \
 // RUN:   --mlir-disable-threading | \
