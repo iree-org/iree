@@ -246,9 +246,102 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+CUDA_SRCS = enforce_glob(
+    [
+        "abs.mlir",
+        "add.mlir",
+        "arithmetic_right_shift.mlir",
+        "bitwise_and.mlir",
+        "bitwise_or.mlir",
+        "bitwise_xor.mlir",
+        "ceil.mlir",
+        "clamp.mlir",
+        "clz.mlir",
+        "const.mlir",
+        "equal.mlir",
+        "exp.mlir",
+        "floor.mlir",
+        "fully_connected.mlir",
+        "gather.mlir",
+        "greater.mlir",
+        "greater_equal.mlir",
+        "if.mlir",
+        "log.mlir",
+        "logical_left_shift.mlir",
+        "logical_right_shift.mlir",
+        "logical_right_shift_16.mlir",
+        "matmul.mlir",
+        "max_pool.mlir",
+        "maximum.mlir",
+        "minimum.mlir",
+        "mul.mlir",
+        "negate.mlir",
+        "pad.mlir",
+        "reciprocal.mlir",
+        "reduce.mlir",
+        "reshape.mlir",
+        "rsqrt.mlir",
+        "select.mlir",
+        "sigmoid.mlir",
+        "sub.mlir",
+        "table.mlir",
+        "tanh.mlir",
+        "transpose.mlir",
+        "while.mlir",
+    ],
+    include = ["*.mlir"],
+    exclude = [
+        "mul_shift.mlir",
+    ],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_cuda2_graph",
+    srcs = CUDA_SRCS,
+    compiler_flags = [
+        # TODO(#13984): memset emulation required for graphs.
+        "--iree-stream-emulate-memset",
+        "--iree-hal-cuda-enable-legacy-sync=false",
+    ],
+    driver = "cuda2",
+    input_type = "tosa",
+    runner_args = ["--cuda2_use_streams=false"],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_cuda2_stream",
+    srcs = CUDA_SRCS,
+    compiler_flags = [
+        "--iree-hal-cuda-enable-legacy-sync=false",
+    ],
+    driver = "cuda2",
+    input_type = "tosa",
+    runner_args = ["--cuda2_use_streams=true"],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
+
 test_suite(
     name = "check",
     tests = [
+        ":check_cuda2_graph",
+        ":check_cuda2_stream",
         ":check_llvm-cpu_local-task",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
