@@ -560,11 +560,10 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addCPUBufferizePasses(nestedModulePM);
 }
 
-void addTransformDialectPasses(OpPassManager &passManager,
-                               StringRef entryPoint) {
+void addTransformDialectPasses(OpPassManager &passManager) {
   // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.

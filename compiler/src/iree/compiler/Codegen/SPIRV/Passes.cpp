@@ -263,10 +263,9 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
 }
 
-void addSPIRVTransformDialectPasses(OpPassManager &passManager,
-                                    StringRef entryPoint) {
+void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -646,9 +645,8 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
-void addSPIRVTransformDialectPassPipeline(OpPassManager &pm,
-                                          StringRef entryPoint) {
-  addSPIRVTransformDialectPasses(pm, entryPoint);
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
+  addSPIRVTransformDialectPasses(pm);
 
   // Run GenericVectorization pass additionally to convert vectors into forms
   // needed for SPIR-V.

@@ -95,12 +95,9 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   case CodeGenPipeline::SPIRVWinogradVectorize:
     addSPIRVWinogradVectorizePassPipeline(pipeline);
     break;
-  case CodeGenPipeline::TransformDialectCodegen: {
-    SymbolRefAttr codegenSpec = translationInfo.value().getCodegenSpec();
-    addSPIRVTransformDialectPassPipeline(
-        pipeline, codegenSpec ? codegenSpec.getLeafReference() : StringRef(""));
+  case CodeGenPipeline::TransformDialectCodegen:
+    addSPIRVTransformDialectPassPipeline(pipeline);
     break;
-  }
   // No pipeline specified, nothing to do.
   case CodeGenPipeline::None:
     return;

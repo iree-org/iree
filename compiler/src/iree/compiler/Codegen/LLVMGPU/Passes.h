@@ -40,7 +40,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm);
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
 /// Transform dialect-based path.
-void addGPUTransformDialectPasses(OpPassManager &pm, StringRef entryPoint);
+void addGPUTransformDialectPasses(OpPassManager &pm);
 
 /// Lowering transpose using shared memory.
 void addGPUTransposePassPipeline(OpPassManager &pm);

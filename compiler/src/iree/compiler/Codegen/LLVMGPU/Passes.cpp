@@ -597,10 +597,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
-void addGPUTransformDialectPasses(OpPassManager &passManager,
-                                  StringRef entryPoint) {
+void addGPUTransformDialectPasses(OpPassManager &passManager) {
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
+      mlir::iree_compiler::createTransformDialectInterpreterPass());
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
