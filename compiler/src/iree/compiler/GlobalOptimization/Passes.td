@@ -83,12 +83,6 @@ def InferNumericNarrowing :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createInferNumericNarrowingPass()";
 }
 
-def LiftGenericToTransposeBatchMatmul:
-    Pass<"iree-global-opt-lift-generic-to-tranpose-batch-matmul", ""> {
-  let summary = "Converts linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createLiftGenericToTransposeBatchMatmulPass()";
-}
-
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
