@@ -29,6 +29,8 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
 
 void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
 
+void populateGPUDistributionPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_
