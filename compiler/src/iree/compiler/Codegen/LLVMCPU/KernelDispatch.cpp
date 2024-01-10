@@ -43,23 +43,23 @@ namespace mlir::iree_compiler {
 /// TODO: Find a way to plumb this through to not rely on these flags.
 
 static llvm::cl::opt<int> clNumberOfRuntimeThreads(
-    "iree-codegen-llvm-number-of-threads",
+    "iree-llvmcpu-number-of-threads",
     llvm::cl::desc("number of threads that are used at runtime if codegen "
                    "thread distribution is enabled"),
     llvm::cl::init(8));
 
 static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-codegen-llvm-disable-distribution",
+    "iree-llvmcpu-disable-distribution",
     llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int>
-    defaultDistTileSize("iree-codegen-llvm-distribution-size",
-                        llvm::cl::desc("default distribution tile size"),
-                        llvm::cl::init(64));
+    clDefaultDistTileSize("iree-llvmcpu-distribution-size",
+                          llvm::cl::desc("default distribution tile size"),
+                          llvm::cl::init(64));
 
 static llvm::cl::opt<int> clNarrowMatmulTileBytes(
-    "iree-codegen-llvm-narrow-matmul-tile-bytes",
+    "iree-llvmcpu-narrow-matmul-tile-bytes",
     llvm::cl::desc(
         "target distribution tile size for wide matrix operand of narrow "
         "matmuls, expressed in bytes. Currently only used in data-tiled "
@@ -70,20 +70,20 @@ static llvm::cl::opt<int> clNarrowMatmulTileBytes(
     llvm::cl::init(64 * 1024));
 
 static llvm::cl::opt<int> clGeneralMatmulTileBytes(
-    "iree-codegen-llvm-general-matmul-tile-bytes",
+    "iree-llvmcpu-general-matmul-tile-bytes",
     llvm::cl::desc("target distribution tile size for matrix operands of "
                    "general matmuls, expressed in bytes. Currently only used "
                    "in data-tiled matmuls (mmt4d)."),
     llvm::cl::init(64 * 1024));
 
 static llvm::cl::opt<bool>
-    enableVectorPeeling("iree-codegen-enable-vector-peeling",
-                        llvm::cl::desc("Enable peeling for vectorization"),
-                        llvm::cl::init(true));
+    clEnableVectorPeeling("iree-llvmcpu-enable-vector-peeling",
+                          llvm::cl::desc("Enable peeling for vectorization"),
+                          llvm::cl::init(true));
 
 // Non-static options are used in other places.
-llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
-    "iree-codegen-llvmcpu-enable-transform-dialect-jit",
+llvm::cl::opt<bool> clEnableTransformDialectJit(
+    "iree-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
@@ -188,7 +188,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (clEnableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -199,7 +199,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (clEnableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -210,7 +210,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (clEnableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -585,7 +585,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
     adjustedMinTileSizes[i] =
         config.minTileSizes.empty() ? 1 : config.minTileSizes[i];
     adjustedMaxTileSizes[i] = config.maxTileSizes.empty()
-                                  ? defaultDistTileSize
+                                  ? clDefaultDistTileSize
                                   : config.maxTileSizes[i];
     adjustedVectorSizeHints[i] =
         config.vectorSizeHints.empty() ? 1 : config.vectorSizeHints[i];
@@ -1080,7 +1080,7 @@ setRootConfig(func::FuncOp entryPointFn,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // Use the default distribution for the matmul loops.
-  int64_t defaultMaxSize = defaultDistTileSize;
+  int64_t defaultMaxSize = clDefaultDistTileSize;
   if (isX86(targetAttr) || isRISCV(targetAttr) ||
       (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr))) {
     defaultMaxSize = 128;
@@ -1346,7 +1346,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
       distTileSizes[rank - 1] = 1ll << value.getSExtValue();
       distTileSizes[rank - 1] = std::max(
-          distTileSizes[rank - 1], static_cast<int64_t>(defaultDistTileSize));
+          distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
     } else {
       return fftOp.emitOpError("non-constant stage might not work for fft op");
     }
@@ -1432,7 +1432,7 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
-  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize / 2);
+  distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize / 2);
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
@@ -1488,7 +1488,7 @@ setTransformStrategyRootConfig(func::FuncOp entryPointFn,
                                const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
-  if (!clCPUEnableTransformDialectJit)
+  if (!clEnableTransformDialectJit)
     return failure();
   cpu::CPUModel cpuModel;
   if (failed(
@@ -1594,7 +1594,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   distConfig.allowIncompleteTile = true;
   distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize);
+  distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
 
