@@ -166,11 +166,18 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.constExprHoisting) {
     buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
   }
-
-  if (!transformOptions.options.parameterArchivePath.empty()) {
-    pipeline.addPass(IREE::IO::Parameters::createParameterizeGlobalsPass(
-        transformOptions.options.parameterArchivePath,
-        transformOptions.options.parameterNamespace));
+  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::ExportParameterizableGlobalsPassOptions
+        parameterizeGlobalsOptions;
+    parameterizeGlobalsOptions.archivePath =
+        transformOptions.options.parameterArchiveExportPath;
+    parameterizeGlobalsOptions.parameterScope =
+        transformOptions.options.parameterExportScope;
+    parameterizeGlobalsOptions.minimumSize =
+        transformOptions.options.minimumParameterExportSize;
+    pipeline.addPass(
+        IREE::IO::Parameters::createExportParameterizableGlobalsPass(
+            parameterizeGlobalsOptions));
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {

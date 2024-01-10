@@ -20,13 +20,9 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    cfg = "//tests:lit.cfg.py",
-    tags = [
-        "driver=local-task",
-    ],
+    cfg = "//compiler:lit.cfg.py",
     tools = [
-        "//tools:iree-compile",
-        "//tools:iree-run-module",
+        "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )

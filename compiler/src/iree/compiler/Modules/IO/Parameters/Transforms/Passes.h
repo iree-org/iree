@@ -13,14 +13,17 @@
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
-// Moves all global initial values to a parameter archive.
-std::unique_ptr<Pass>
-createParameterizeGlobalsPass(std::string archivePath = "",
-                              std::string parameterNamespace = "");
+//// Moves all global initial values to a parameter archive.
+// std::unique_ptr<Pass>
+// createParameterizeGlobalsPass(std::string archivePath = "",
+//                               std::string parameterNamespace = "");
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h.inc" // IWYU pragma: keep
 
 void registerParametersPasses();
 

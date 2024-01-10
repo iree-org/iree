@@ -95,10 +95,13 @@ struct GlobalOptimizationOptions {
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
   // File path to create a parameter archive out of global initial values.
-  std::string parameterArchivePath = "";
+  std::string parameterArchiveExportPath = "";
 
-  // Optional namespace to use for the created parameter archive.
-  std::string parameterNamespace = "";
+  // Optional scope to use for the created parameter archive.
+  std::string parameterExportScope = "";
+
+  // Minimum size of constants to export as parameters.
+  int64_t minimumParameterExportSize = 256;
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;

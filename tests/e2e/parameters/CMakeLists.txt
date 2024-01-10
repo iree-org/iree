@@ -15,12 +15,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "parameterize_globals.mlir"
+    "export_parameterizable_globals.mlir"
   TOOLS
-    ${IREE_LLD_TARGET}
     FileCheck
     iree-compile
-    iree-opt
     iree-run-module
   LABELS
     "driver=local-task"

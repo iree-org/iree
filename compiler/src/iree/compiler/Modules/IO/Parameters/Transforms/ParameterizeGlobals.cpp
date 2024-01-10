@@ -6,6 +6,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/file_io.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/hal/api.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/tooling/parameter_util.h"
@@ -14,14 +15,69 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Modules/IO/Parameters/Transforms/PassDetail.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
+#define GEN_PASS_DEF_EXPORTPARAMETERIZABLEGLOBALSPASS
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h.inc"
+
 namespace {
 
+// Hoists all serializable constants with storage size at least |minimumSize|
+// into their own globals with initial value equal to the constant value.
+static void hoistConstantsIntoGlobals(mlir::ModuleOp moduleOp,
+                                      int64_t minimumSize) {
+  SymbolTable moduleSymbols(moduleOp);
+  IRRewriter rewriter(OpBuilder::atBlockBegin(moduleOp.getBody()));
+  llvm::DenseMap<arith::ConstantOp, Util::GlobalOp> hoistedMap;
+  moduleOp.walk([&](arith::ConstantOp constant) {
+    // Constants part of a different logical program should not be hoisted.
+    if (SymbolTable::getNearestSymbolTable(constant) != moduleOp) {
+      return;
+    }
+    TypedAttr initialValueAttr = constant.getValue();
+    auto serializableAttr =
+        dyn_cast<IREE::Util::SerializableAttrInterface>(initialValueAttr);
+    if (!serializableAttr) {
+      return;
+    }
+
+    // Check that the serialized size of the attribute is at least as big as
+    // the pass configured minimum storage size.
+    iree_io_physical_size_t storageSize = serializableAttr.getStorageSize();
+    if (storageSize < minimumSize) {
+      return;
+    }
+
+    // Create a new global with initial value equal to the constant.
+    Location loc = constant.getLoc();
+    Util::GlobalOp globalOp = rewriter.create<Util::GlobalOp>(
+        loc, "constant_hoisted", false, constant.getType());
+    moduleSymbols.insert(globalOp);
+    // Attributes are stored uniqued by their contents so this is not a copy.
+    globalOp.setInitialValueAttr(initialValueAttr);
+    SymbolTable::setSymbolVisibility(globalOp,
+                                     SymbolTable::Visibility::Private);
+    hoistedMap[constant] = globalOp;
+  });
+
+  // Replace all constants with their associated hoisted globals.
+  for (auto it : hoistedMap) {
+    arith::ConstantOp originalConstant = it.first;
+    Util::GlobalOp globalOp = it.second;
+    rewriter.setInsertionPointAfterValue(originalConstant);
+    Value load =
+        rewriter.create<Util::GlobalLoadOp>(globalOp->getLoc(), globalOp);
+    rewriter.replaceOp(originalConstant, load);
+  }
+}
+
+extern "C" {
 static void iree_io_file_handle_release_mapping(
     void *user_data, iree_io_file_handle_primitive_t handle_primitive) {
   iree_file_contents_free((iree_file_contents_t *)user_data);
@@ -45,16 +101,30 @@ static iree_status_t iree_tooling_open_output_parameter_file(
   }
   return status;
 }
+}
 
-struct ParameterizeGlobalsPass
-    : public ParameterizeGlobalsBase<ParameterizeGlobalsPass> {
-  ParameterizeGlobalsPass(std::string archivePathStr,
-                          std::string parameterNamespaceStr) {
-    this->archivePath = archivePathStr;
-    this->parameterNamespace = parameterNamespaceStr;
-  };
-  ParameterizeGlobalsPass(const ParameterizeGlobalsPass &pass)
-      : ParameterizeGlobalsPass(pass.archivePath, pass.parameterNamespace) {}
+static LogicalResult handleRuntimeError(ModuleOp moduleOp, iree_status_t status,
+                                        StringRef failureMessage) {
+  if (iree_status_is_ok(status))
+    return success();
+  std::string message;
+  message.resize(512);
+  iree_host_size_t buffer_length;
+  if (!iree_status_format(status, message.size(), &message[0],
+                          &buffer_length)) {
+    message.resize(buffer_length + 1);
+    iree_status_format(status, message.size(), &message[0], &buffer_length);
+  }
+  message.resize(buffer_length);
+  iree_status_ignore(status);
+  return moduleOp.emitError() << failureMessage << message;
+}
+
+struct ExportParameterizableGlobalsPass
+    : public IREE::IO::Parameters::impl::ExportParameterizableGlobalsPassBase<
+          ExportParameterizableGlobalsPass> {
+  using IREE::IO::Parameters::impl::ExportParameterizableGlobalsPassBase<
+      ExportParameterizableGlobalsPass>::ExportParameterizableGlobalsPassBase;
 
   void runOnOperation() override {
     // Nothing to do if no path specified.
@@ -64,6 +134,9 @@ struct ParameterizeGlobalsPass
 
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getOperation();
+
+    // First hoist all inline constants into their own globals.
+    hoistConstantsIntoGlobals(moduleOp, minimumSize);
 
     iree_allocator_t host_allocator = iree_allocator_system();
 
@@ -78,15 +151,13 @@ struct ParameterizeGlobalsPass
     SmallVector<IREE::Util::GlobalOp> constantGlobals;
     // Walk the globals in the module.
     for (auto global : moduleOp.getOps<IREE::Util::GlobalOp>()) {
-      // Mutable globals cannot become parameters.
+      // TODO: Support exporting mutable globals.
       if (global.getIsMutable()) {
         continue;
       }
-      // Only initialized globals can be parameterized, and we restrict to
-      // tensors.
+      // Only globals initialized with initial values can be parameterized.
       auto initialValueAttr = global.getInitialValueAttr();
-      if (!initialValueAttr ||
-          !llvm::isa<RankedTensorType>(initialValueAttr.getType())) {
+      if (!initialValueAttr) {
         continue;
       }
 
@@ -97,7 +168,12 @@ struct ParameterizeGlobalsPass
         continue;
       }
 
+      // Check that the serialized size of the attribute is at least as big as
+      // the pass configured minimum storage size.
       iree_io_physical_size_t storageSize = serializableAttr.getStorageSize();
+      if (storageSize < minimumSize) {
+        continue;
+      }
       StringRef name = global.getSymName();
 
       // Add a data entry to the builder for this global.
@@ -108,9 +184,8 @@ struct ParameterizeGlobalsPass
           /*metadata=*/iree_const_byte_span_empty(),
           /*alignment=*/IREE_IO_PARAMETER_ARCHIVE_DEFAULT_DATA_ALIGNMENT,
           storageSize);
-      if (!iree_status_is_ok(status)) {
-        moduleOp.emitError()
-            << "Failed to add data entry for global " << global;
+      if (failed(handleRuntimeError(moduleOp, status,
+                                    "Failed to add data entry for global"))) {
         return signalPassFailure();
       }
 
@@ -135,9 +210,8 @@ struct ParameterizeGlobalsPass
         archivePath.c_str());
     auto releaseFileExit = llvm::make_scope_exit(
         [&]() { return iree_io_file_handle_release(target_file_handle); });
-    if (!iree_status_is_ok(status)) {
-      moduleOp.emitError() << "Failed to open output parameter archive at "
-                           << archivePath;
+    if (failed(handleRuntimeError(moduleOp, status,
+                                  "Failed to open output parameter archive"))) {
       return signalPassFailure();
     }
 
@@ -148,9 +222,8 @@ struct ParameterizeGlobalsPass
                             target_file_offset, host_allocator, &target_stream);
     auto releaseStreamExit = llvm::make_scope_exit(
         [&]() { return iree_io_stream_release(target_stream); });
-    if (!iree_status_is_ok(status)) {
-      moduleOp.emitError() << "Failed to create I/O stream to output file "
-                           << archivePath;
+    if (failed(handleRuntimeError(
+            moduleOp, status, "Failed to create I/O stream to output file"))) {
       return signalPassFailure();
     }
 
@@ -160,8 +233,8 @@ struct ParameterizeGlobalsPass
     status = iree_io_parameter_index_create(host_allocator, &built_index);
     auto releaseIndexExit = llvm::make_scope_exit(
         [&]() { return iree_io_parameter_index_release(built_index); });
-    if (!iree_status_is_ok(status)) {
-      moduleOp.emitError() << "Failed to allocate parameter index";
+    if (failed(handleRuntimeError(moduleOp, status,
+                                  "Failed to allocate parameter index"))) {
       return signalPassFailure();
     }
 
@@ -170,16 +243,15 @@ struct ParameterizeGlobalsPass
     status = iree_io_parameter_archive_builder_write(
         &builder, target_file_handle, target_file_offset, target_stream,
         built_index);
-    if (!iree_status_is_ok(status)) {
-      moduleOp.emitError() << "Failed to write parameter index header to "
-                           << "output file " << archivePath;
+    if (failed(handleRuntimeError(
+            moduleOp, status,
+            "Failed to write parameter index header to output file"))) {
       return signalPassFailure();
     }
 
-    StringAttr namespaceAttr =
-        parameterNamespace.empty()
-            ? StringAttr()
-            : StringAttr::get(context, parameterNamespace);
+    StringAttr scopeAttr = parameterScope.empty()
+                               ? StringAttr()
+                               : StringAttr::get(context, parameterScope);
 
     // Write all of the global contents to the appropriate data storage
     // segments.
@@ -192,17 +264,17 @@ struct ParameterizeGlobalsPass
           iree_string_view_t{name.data(),
                              static_cast<iree_host_size_t>(name.size())},
           &target_entry);
-      if (!iree_status_is_ok(status)) {
-        moduleOp.emitError() << "Failed to write parameter index header to "
-                             << "output file " << archivePath;
+      if (failed(handleRuntimeError(
+              moduleOp, status,
+              "Failed to write parameter index header to output file"))) {
         return signalPassFailure();
       }
       status = iree_io_stream_seek(target_stream, IREE_IO_STREAM_SEEK_SET,
                                    target_file_offset +
                                        target_entry->storage.file.offset);
-      if (!iree_status_is_ok(status)) {
-        moduleOp.emitError() << "Failed to seek to location of global in index "
-                             << constantGlobal;
+      if (failed(handleRuntimeError(
+              moduleOp, status,
+              "Failed to seek to location of global in index"))) {
         return signalPassFailure();
       }
 
@@ -220,16 +292,15 @@ struct ParameterizeGlobalsPass
       status =
           iree_io_stream_write(target_stream, buffer.size(),
                                reinterpret_cast<const char *>(buffer.data()));
-      if (!iree_status_is_ok(status)) {
-        moduleOp.emitError()
-            << "Failed to write global to index " << constantGlobal;
+      if (failed(handleRuntimeError(moduleOp, status,
+                                    "Failed to write global to index"))) {
         return signalPassFailure();
       }
 
       // Now we can just replace the existing initial value with a reference to
       // the parameter.
       auto param = IREE::Stream::NamedParameterAttr::get(
-          context, constantGlobal.getType(), namespaceAttr,
+          context, constantGlobal.getType(), scopeAttr,
           StringAttr::get(context, name), DictionaryAttr());
       constantGlobal.setInitialValueAttr(param);
     }
@@ -237,12 +308,4 @@ struct ParameterizeGlobalsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass>
-createParameterizeGlobalsPass(std::string archivePath,
-                              std::string parameterNamespace) {
-  return std::make_unique<ParameterizeGlobalsPass>(archivePath,
-                                                   parameterNamespace);
-}
-
 } // namespace mlir::iree_compiler::IREE::IO::Parameters
