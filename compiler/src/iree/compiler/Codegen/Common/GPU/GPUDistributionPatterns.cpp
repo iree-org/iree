@@ -14,17 +14,15 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE::VectorExt;
+namespace mlir::iree_compiler {
 
+using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
 namespace {
 
-class DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
-public:
-  using OpDistributionPattern<arith::ConstantOp>::OpDistributionPattern;
+struct DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
+  using OpDistributionPattern::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 DistributionSignature &signature,
@@ -55,8 +53,7 @@ public:
 };
 
 template <typename OpTy>
-class DistributeElementwise : public OpDistributionPattern<OpTy> {
-public:
+struct DistributeElementwise : public OpDistributionPattern<OpTy> {
   using OpDistributionPattern<OpTy>::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(OpTy op, DistributionSignature &signature,
@@ -98,10 +95,11 @@ public:
 
 }; // namespace
 
-void mlir::iree_compiler::populateGPUDistributionPatterns(
-    RewritePatternSet &patterns) {
+void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeElementwise<arith::MulIOp>,
                DistributeElementwise<arith::MulFOp>,
                DistributeElementwise<arith::AddIOp>,
                DistributeElementwise<arith::AddFOp>>(patterns.getContext());
 }
+
+}; // namespace mlir::iree_compiler

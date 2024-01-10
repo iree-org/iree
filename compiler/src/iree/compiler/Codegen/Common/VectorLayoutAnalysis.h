@@ -129,13 +129,6 @@ public:
   /// Return the operation this on which this analysis was rooted on.
   Operation *getRootOperation() const;
 
-  /// Duplicate layout information from the old value to the new value. This
-  /// is only expected to be used when cloning values. It is the job of the user
-  /// to ensure that there are no conflicts when cloning.
-  /// TODO: We should not rely on the user for this. The analysis should be
-  /// able to update itself and insert conflicts if needed.
-  void cloneLayoutInformationToNewValue(Value oldValue, Value newValue);
-
   /// Annotate each operation with "vector_result_x" attributes that specify
   /// the layout of each result of the operation. 'x' here is the x^th result.
   /// This is only for debugging purposes, to understand the result of the

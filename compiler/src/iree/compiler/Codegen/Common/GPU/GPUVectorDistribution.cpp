@@ -131,13 +131,6 @@ DistributionPattern::getOpSignature(Operation *op) const {
   return ::mlir::iree_compiler::getOpSignature(op);
 }
 
-LogicalResult DistributionPattern::match(Operation *op) const {
-  if (!hasOpSignature(op)) {
-    return failure();
-  }
-  return match(op);
-}
-
 static void
 debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
   DenseSet<StringRef> uniqueNames;
@@ -200,10 +193,8 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
 
   // Check if all operands and results of this operation have a layout.
   return llvm::all_of(values, [&](Value value) -> bool {
-    if (auto vectorValue = dyn_cast<VectorValue>(value)) {
-      return (bool)analysis.getLayout<Attribute>(vectorValue);
-    }
-    return false;
+    auto vectorValue = dyn_cast<VectorValue>(value);
+    return vectorValue && analysis.getLayout<Attribute>(vectorValue);
   });
 }
 

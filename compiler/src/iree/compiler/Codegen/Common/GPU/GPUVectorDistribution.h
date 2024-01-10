@@ -38,8 +38,6 @@ struct DistributionPattern : public RewritePattern {
 
   /// Get the signature for the given operation.
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
-
-  virtual LogicalResult match(Operation *op) const override;
 };
 
 template <typename SourceOp>
