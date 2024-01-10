@@ -93,7 +93,7 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
   SmallVector<int64_t> distributedShape =
-      options.getDistributedShape(value, layout);
+      layout.getDistributedShape(value.getType());
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(
@@ -160,7 +160,7 @@ public:
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
     auto vectorType = VectorType::get(
-        options.getDistributedShape(constant, layout), elementType);
+        layout.getDistributedShape(constant.getType()), elementType);
     Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), vectorType, attr.getSplatValue<Attribute>());
     replaceOpWithDistributedValues(rewriter, constantOp,
@@ -196,7 +196,7 @@ public:
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
         resultType = VectorType::get(
-            options.getDistributedShape(vectorResult, resLayout),
+            resLayout.getDistributedShape(vectorResult.getType()),
             vectorResult.getType().getElementType());
       }
       resultTypes.push_back(resultType);

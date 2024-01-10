@@ -1006,18 +1006,6 @@ class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
 
-  SmallVector<int64_t>
-  getDistributedShape(TypedValue<VectorType> val,
-                      VectorLayoutInterface layout) override {
-    constexpr VectorExt::LayoutDimension simtLabels[] = {
-        VectorExt::LayoutDimension::BATCHY,
-        VectorExt::LayoutDimension::BATCHX,
-        VectorExt::LayoutDimension::VECTORX,
-    };
-    return cast<IREE::VectorExt::LayoutAttr>(layout).getSIMTVectorShape(
-        simtLabels);
-  }
-
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
   }

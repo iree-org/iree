@@ -26,9 +26,7 @@ struct DistributionSignature {
 
 class DistributionPattern : public RewritePattern {
 public:
-  DistributionPattern(StringRef rootName, VectorLayoutOptions &options,
-                      PatternBenefit benefit, MLIRContext *context)
-      : RewritePattern(rootName, benefit, context), options(options) {}
+  using RewritePattern::RewritePattern;
 
   /// Lookup the distributed value for the given SIMD value. If the value
   /// was not distributed yet, wrap it in a ToSIMTOp.
@@ -43,18 +41,12 @@ public:
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
 
   virtual LogicalResult match(Operation *op) const override;
-
-protected:
-  VectorLayoutOptions &options;
 };
 
 template <typename SourceOp>
 class OpDistributionPattern : public DistributionPattern {
 public:
-  OpDistributionPattern(VectorLayoutOptions &options, PatternBenefit benefit,
-                        MLIRContext *context)
-      : DistributionPattern(SourceOp::getOperationName(), options, benefit,
-                            context) {}
+  using DistributionPattern::DistributionPattern;
 
   virtual LogicalResult matchAndRewrite(SourceOp op,
                                         DistributionSignature &opSignature,
@@ -86,12 +78,6 @@ public:
 
   /// Set the anchor ops in the analysis rooted on the root operation.
   virtual void setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
-
-  /// Given a Value of type VectorType, return the distributed shape of the
-  /// value, based on its layout in the analysis.
-  virtual SmallVector<int64_t>
-  getDistributedShape(TypedValue<VectorType> val,
-                      VectorLayoutInterface layout) = 0;
 
 protected:
   Operation *root;
