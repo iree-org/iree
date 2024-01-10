@@ -90,6 +90,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRNVGPUDialect
     MLIRPass
+    MLIRRewrite
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSCFUtils
