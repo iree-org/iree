@@ -16,11 +16,15 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
 
@@ -107,66 +111,63 @@ RankedTensorType getExpandedType(RankedTensorType type, bool isBatched,
       type.getElementType());
 }
 
-Value getMmt4dLhs(Value value, linalg::ContractionOpInterface op,
-                  RewriterBase &rewriter,
-                  SmallVectorImpl<ReassociationIndices> &ri) {
-  RankedTensorType type = value.getType().cast<RankedTensorType>();
-  RankedTensorType newType;
-  if (op.isVecmat()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/false, ri);
-  } else if (op.isBatchVecmat()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/false, ri);
-  } else {
-    return value;
-  }
+/// Given an input Value and a desired output element type, create and return
+/// an element-wise linalg::GenericOp that extends the input Value to the
+/// output element type.
+static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
+                                      Location loc, Type outElemType) {
+  auto inputType = cast<RankedTensorType>(input.getType());
+  SmallVector<AffineMap> maps(
+      2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
+  SmallVector<utils::IteratorType> iteratorTypes(inputType.getRank(),
+                                                 utils::IteratorType::parallel);
+  auto castedType = inputType.clone(outElemType);
+  SmallVector<OpFoldResult> inputMixedSizes =
+      tensor::getMixedSizes(rewriter, loc, input);
+  Value init =
+      rewriter.create<tensor::EmptyOp>(loc, inputMixedSizes, outElemType);
   return rewriter
-      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
-      .getResult();
+      .create<linalg::GenericOp>(
+          loc, castedType, input, init, maps, iteratorTypes,
+          [&](OpBuilder &b, Location nestedLoc, ValueRange args) {
+            Value castRes =
+                b.create<arith::ExtUIOp>(nestedLoc, outElemType, args[0])
+                    ->getResult(0);
+            b.create<linalg::YieldOp>(nestedLoc, castRes);
+          })
+      .getResult(0);
 }
 
-Value getMmt4dRhs(Value value, linalg::ContractionOpInterface op,
-                  RewriterBase &rewriter,
-                  SmallVectorImpl<ReassociationIndices> &ri) {
-  RankedTensorType type = value.getType().cast<RankedTensorType>();
-  RankedTensorType newType;
-  if (op.isMatvec()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/false, ri);
-  } else if (op.isBatchMatvec()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/false, ri);
-  } else {
-    return value;
+/// If needed, expand and the input Value, and return the resulting input with
+/// the canonical mmt4d input shape. If the input element type is unsigned,
+/// create a producer Linalg::GenericOp on the input that unsigned extends the
+/// input to the output element type. This extension is required to keep the
+/// unsignedness information on the input for ukernels.
+Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
+                      RewriterBase &rewriter,
+                      SmallVectorImpl<ReassociationIndices> &ri,
+                      ArrayRef<Type> elemTypes, int operandIdx) {
+  assert(linalgOp.getNumDpsInputs() == 2);
+  assert(linalgOp.getNumDpsInits() == 1);
+  auto cDims = linalg::inferContractionDims(linalgOp);
+  Location loc = linalgOp->getLoc();
+  Value expandedValue = value;
+  // If vecmat with non-rhs operandIdx or matvec with non-lhs operandIdx, the
+  // operand is a vector and must be extended
+  if ((cDims->m.empty() && operandIdx != 1) ||
+      (cDims->n.empty() && operandIdx != 0)) {
+    auto type = value.getType().cast<RankedTensorType>();
+    RankedTensorType newType = getExpandedType(
+        type, /*isBatched=*/!cDims->batch.empty(),
+        /*isTransposed=*/operandIdx == 2 && cDims->n.empty(), ri);
+    expandedValue =
+        rewriter.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
   }
-  return rewriter
-      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
-      .getResult();
-}
-
-Value getMmt4dResult(Value value, linalg::ContractionOpInterface op,
-                     RewriterBase &rewriter,
-                     SmallVectorImpl<ReassociationIndices> &ri) {
-  // For vecmat/batch_vecmat we can rely on the same functionality as LHS.
-  if (op.isVecmat() || op.isBatchVecmat()) {
-    return getMmt4dLhs(value, op, rewriter, ri);
+  if (elemTypes[operandIdx].isUnsignedInteger()) {
+    return createElementWiseExtUIOp(rewriter, expandedValue, loc,
+                                    elemTypes.back());
   }
-
-  auto type = value.getType().cast<RankedTensorType>();
-  RankedTensorType newType;
-  if (op.isMatvec()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/false, /*isTransposed=*/true, ri);
-  } else if (op.isBatchMatvec()) {
-    newType =
-        getExpandedType(type, /*isBatched=*/true, /*isTransposed=*/true, ri);
-  } else {
-    return value;
-  }
-  return rewriter
-      .create<tensor::ExpandShapeOp>(op->getLoc(), newType, value, ri)
-      .getResult();
+  return expandedValue;
 }
 
 //===---------------------------------------------------------------------===//
@@ -294,16 +295,10 @@ static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
   return results;
 }
 
-/// Utility method to convert from linalg contraction ops with
-/// - lhs encoding with role=LHS
-/// - rhs encoding with role=RHS
-/// - result encoding with role=RESULT
-/// to linalg.mmt4d or linalg.batch_mmt4d ops.
-static FailureOr<Operation *> lowerOpWithEncoding(
-    RewriterBase &rewriter, mlir::linalg::ContractionOpInterface op,
-    ArrayRef<Value> operands, MaterializeEncodingFn materializeEncodingFn,
-    MaterializeEncodingValueFn) {
-  auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+static FailureOr<Operation *>
+lowerContractionOpWithEncoding(RewriterBase &rewriter,
+                               linalg::LinalgOp linalgOp, ValueRange operands,
+                               MaterializeEncodingFn materializeEncodingFn) {
   if (!linalgOp.hasPureTensorSemantics())
     return failure();
 
@@ -339,10 +334,19 @@ static FailureOr<Operation *> lowerOpWithEncoding(
                                     operands.take_front(inputs.size()),
                                     operands.drop_front(inputs.size()));
   } else {
+    auto elemTypes = llvm::map_to_vector(
+        lhsEncoding.getElementTypes().getValue(),
+        [](Attribute a) { return a.cast<TypeAttr>().getValue(); });
     SmallVector<ReassociationIndices> ri;
-    Value newLhs = getMmt4dLhs(operands[0], op, rewriter, ri);
-    Value newRhs = getMmt4dRhs(operands[1], op, rewriter, ri);
-    Value newResult = getMmt4dResult(operands[2], op, rewriter, ri);
+    Value newLhs =
+        getMmt4dOperand(operands[0], linalgOp, rewriter, ri, elemTypes,
+                        /*operandIdx=*/0);
+    Value newRhs =
+        getMmt4dOperand(operands[1], linalgOp, rewriter, ri, elemTypes,
+                        /*operandIdx=*/1);
+    Value newResult =
+        getMmt4dOperand(operands[2], linalgOp, rewriter, ri, elemTypes,
+                        /*operandIdx=*/2);
 
     Type newResultType = newResult.getType();
 
@@ -362,21 +366,6 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     }
   }
   return result;
-}
-
-/// Utility method to convert from `linalg.fill` on `tensor` type with
-/// encoding to fill of the materialized type
-static FailureOr<Operation *>
-lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
-                    ValueRange convertedInputOperands,
-                    ValueRange convertedOutputOperands, MaterializeEncodingFn,
-                    MaterializeEncodingValueFn) {
-  if (!fillOp.hasPureTensorSemantics())
-    return failure();
-  Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
-      fillOp.getLoc(), convertedOutputOperands[0].getType(),
-      convertedInputOperands, convertedOutputOperands);
-  return materializedFillOp;
 }
 
 /// Utility method to convert `tensor.empty` with encoding to a `tensor.empty`
@@ -417,39 +406,67 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   return newEmptyOp;
 }
 
-/// Utility method to convert from `linalg.generic` on `tensor` type with
-/// encoding to `linalg.generic` on the materialized type
-static FailureOr<Operation *>
-lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
-                    ValueRange convertedInputOperands,
-                    ValueRange convertedOutputOperands, MaterializeEncodingFn,
-                    MaterializeEncodingValueFn) {
-  if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
-      genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
-    return rewriter.notifyMatchFailure(genericOp,
-                                       "linalg.generic op is not elementwise "
-                                       "with single input and single output");
+/// Utility method to convert from a linalg::LinalgOp on `tensor` types with
+/// encodings to a linalg::LinalgOp on the materialized type. The current
+/// supported op types are:
+///  - linalg::LinalgOp that `isaContractionOpInterface`
+///  - linalg::FillOp
+///  - element-wise linalg::GenericOp with single input and output
+static FailureOr<Operation *> lowerOpWithEncoding(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
+    MaterializeEncodingFn materializeEncodingFn, MaterializeEncodingValueFn) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
+    SmallVector<Value> operands;
+    operands.append(convertedInputOperands.begin(),
+                    convertedInputOperands.end());
+    operands.append(convertedOutputOperands.begin(),
+                    convertedOutputOperands.end());
+    return lowerContractionOpWithEncoding(rewriter, linalgOp, operands,
+                                          materializeEncodingFn);
   }
-  if (!llvm::all_of(genericOp.getIndexingMapsArray(),
-                    [](AffineMap m) { return m.isIdentity(); })) {
-    return rewriter.notifyMatchFailure(
-        genericOp, "indexing maps are not all identity maps");
-  }
-  auto convertedResultType =
-      convertedOutputOperands[0].getType().cast<RankedTensorType>();
-  SmallVector<AffineMap> maps(
-      2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
-                                           rewriter.getContext()));
-  SmallVector<utils::IteratorType> iteratorTypes(convertedResultType.getRank(),
-                                                 utils::IteratorType::parallel);
-  auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-      genericOp.getLoc(), convertedResultType, convertedInputOperands,
-      convertedOutputOperands, maps, iteratorTypes,
-      /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-  rewriter.inlineRegionBefore(genericOp.getRegion(),
-                              materializedGenericOp.getRegion(),
-                              materializedGenericOp.getRegion().begin());
-  return materializedGenericOp.getOperation();
+
+  return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
+      .Case<linalg::FillOp>(
+          [&](linalg::FillOp fillOp) -> FailureOr<Operation *> {
+            if (!fillOp.hasPureTensorSemantics())
+              return failure();
+            Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
+                fillOp.getLoc(), convertedOutputOperands[0].getType(),
+                convertedInputOperands, convertedOutputOperands);
+            return materializedFillOp;
+          })
+      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp)
+                                   -> FailureOr<Operation *> {
+        if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
+            genericOp.getNumDpsInputs() != 1 ||
+            genericOp.getNumDpsInits() != 1) {
+          return rewriter.notifyMatchFailure(
+              genericOp, "linalg.generic op is not elementwise "
+                         "with single input and single output");
+        }
+        if (!llvm::all_of(genericOp.getIndexingMapsArray(),
+                          [](AffineMap m) { return m.isIdentity(); })) {
+          return rewriter.notifyMatchFailure(
+              genericOp, "indexing maps are not all identity maps");
+        }
+        auto convertedResultType =
+            convertedOutputOperands[0].getType().cast<RankedTensorType>();
+        SmallVector<AffineMap> maps(
+            2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
+                                                 rewriter.getContext()));
+        SmallVector<utils::IteratorType> iteratorTypes(
+            convertedResultType.getRank(), utils::IteratorType::parallel);
+        auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
+            genericOp.getLoc(), convertedResultType, convertedInputOperands,
+            convertedOutputOperands, maps, iteratorTypes,
+            /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+        rewriter.inlineRegionBefore(genericOp.getRegion(),
+                                    materializedGenericOp.getRegion(),
+                                    materializedGenericOp.getRegion().begin());
+        return materializedGenericOp.getOperation();
+      })
+      .Default([](Operation *op) { return failure(); });
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
@@ -849,9 +866,13 @@ public:
         static_cast<const MaterializeEncodingTypeConverter *>(
             this->getTypeConverter())
             ->getMaterializeEncodingFn();
-    FailureOr<Operation *> convertedOp =
-        lowerOpWithEncoding(rewriter, op, operands, materializeEncodingFn,
-                            this->materializeEncodingValueFn);
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+    if (!linalgOp || operands.size() != 3) {
+      return failure();
+    }
+    FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
+        rewriter, linalgOp, operands.take_front(2), operands.take_back(1),
+        materializeEncodingFn, this->materializeEncodingValueFn);
     if (failed(convertedOp)) {
       return failure();
     }
