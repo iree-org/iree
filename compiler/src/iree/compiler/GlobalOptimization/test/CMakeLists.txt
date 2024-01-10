@@ -24,7 +24,6 @@ iree_lit_test_suite(
     "fuse_silu_horizontal_matmul.mlir"
     "generalize_named_ops.mlir"
     "infer_numeric_narrowing.mlir"
-    "lift_generic_to_transpose_batch_matmul.mlir"
     "materialize_homogeneous_encodings.mlir"
     "optimize_numerics.mlir"
     "propagate_linalg_transpose.mlir"
