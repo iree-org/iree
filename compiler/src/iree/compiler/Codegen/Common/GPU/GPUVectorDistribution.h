@@ -17,15 +17,12 @@
 namespace mlir::iree_compiler {
 
 /// Forward declarations.
-class VectorLayoutOptions;
-
 struct DistributionSignature {
   SmallVector<VectorLayoutInterface> operands;
   SmallVector<VectorLayoutInterface> results;
 };
 
-class DistributionPattern : public RewritePattern {
-public:
+struct DistributionPattern : public RewritePattern {
   using RewritePattern::RewritePattern;
 
   /// Lookup the distributed value for the given SIMD value. If the value
@@ -44,9 +41,10 @@ public:
 };
 
 template <typename SourceOp>
-class OpDistributionPattern : public DistributionPattern {
-public:
-  using DistributionPattern::DistributionPattern;
+struct OpDistributionPattern : public DistributionPattern {
+  OpDistributionPattern<SourceOp>(MLIRContext *context,
+                                  PatternBenefit benefit = 1)
+      : DistributionPattern(SourceOp::getOperationName(), benefit, context) {}
 
   virtual LogicalResult matchAndRewrite(SourceOp op,
                                         DistributionSignature &opSignature,
@@ -63,11 +61,6 @@ public:
 };
 
 /// Options that control how vector values are distributed.
-///
-/// The way to use these options is to derive from this class and implement
-/// methods to control how VectorLayoutAnalysis is initialized by passing it
-/// initial anchors and how to get the distributed shape of a given vector
-/// value.
 class VectorLayoutOptions {
 public:
   VectorLayoutOptions(Operation *root) : root(root) {
@@ -95,7 +88,9 @@ protected:
 ///   - Run a global analysis to determine how to distribute rest of the vector
 ///     values keeping the initial anchors in mind.
 ///   - Use the analysis information to distribute each operation.
-void distributeVectorOps(Operation *root, VectorLayoutOptions &options);
+void distributeVectorOps(Operation *root,
+                         RewritePatternSet &distributionPatterns,
+                         VectorLayoutOptions &options);
 
 } // namespace mlir::iree_compiler
 

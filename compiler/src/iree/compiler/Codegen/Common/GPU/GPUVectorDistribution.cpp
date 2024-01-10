@@ -138,79 +138,6 @@ LogicalResult DistributionPattern::match(Operation *op) const {
   return match(op);
 }
 
-class DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
-public:
-  using OpDistributionPattern<arith::ConstantOp>::OpDistributionPattern;
-
-  LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    Value constantResult = constantOp.getResult();
-    if (!isa<VectorType>(constantResult.getType()))
-      return failure();
-    auto constant = cast<VectorValue>(constantResult);
-
-    // Only handle splat values for now.
-    auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
-    if (!attr)
-      return failure();
-
-    VectorLayoutInterface layout = signature.results[0];
-
-    // Replace the original op with the distributed op.
-    Type elementType = constant.getType().getElementType();
-    auto vectorType = VectorType::get(
-        layout.getDistributedShape(constant.getType()), elementType);
-    Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
-        constantOp.getLoc(), vectorType, attr.getSplatValue<Attribute>());
-    replaceOpWithDistributedValues(rewriter, constantOp,
-                                   distirbutedOp->getResult(0));
-    return success();
-  }
-};
-
-template <typename OpTy>
-class DistributeElementwise : public OpDistributionPattern<OpTy> {
-public:
-  using OpDistributionPattern<OpTy>::OpDistributionPattern;
-
-  LogicalResult matchAndRewrite(OpTy op, DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    // Get the distributed operands.
-    SmallVector<Value> operands;
-    for (auto [operand, opLayout] :
-         llvm::zip(op->getOperands(), signature.operands)) {
-      if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      opLayout);
-      }
-      operands.push_back(operand);
-    }
-
-    // Get the new distributed vector types for the operation.
-    SmallVector<Type> resultTypes;
-    for (auto [result, resLayout] :
-         llvm::zip(op->getResults(), signature.results)) {
-      Type resultType = result.getType();
-
-      // Distribute vector result types.
-      if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-        resultType = VectorType::get(
-            resLayout.getDistributedShape(vectorResult.getType()),
-            vectorResult.getType().getElementType());
-      }
-      resultTypes.push_back(resultType);
-    }
-
-    // Replace the original op with the distributed op.
-    Operation *distributedOp = rewriter.create(
-        op->getLoc(), op->getName().getIdentifier(), operands, resultTypes);
-    DistributionPattern::replaceOpWithDistributedValues(
-        rewriter, op, distributedOp->getResults());
-    return success();
-  }
-};
-
 static void
 debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
   DenseSet<StringRef> uniqueNames;
@@ -231,8 +158,7 @@ public:
 };
 
 static void applyVectorDistribution(Operation *root,
-                                    const FrozenRewritePatternSet &patterns,
-                                    VectorLayoutOptions &options) {
+                                    const FrozenRewritePatternSet &patterns) {
 
   SmallVector<Operation *> worklist;
 
@@ -281,7 +207,9 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
-void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
+void distributeVectorOps(Operation *root,
+                         RewritePatternSet &distributionPatterns,
+                         VectorLayoutOptions &options) {
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
@@ -303,18 +231,8 @@ void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
   LLVM_DEBUG(root->print(llvm::dbgs()));
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
-  // Run the distribution patterns.
-  RewritePatternSet patterns(root->getContext());
-  patterns.add<DistributeConstants>(root->getContext(), options);
-
-  patterns.add<DistributeElementwise<arith::AddFOp>,
-               DistributeElementwise<arith::AddIOp>,
-               DistributeElementwise<arith::MulFOp>,
-               DistributeElementwise<arith::MulIOp>>(root->getContext(),
-                                                     options);
-
-  FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  return applyVectorDistribution(root, frozenPatterns, options);
+  FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
+  return applyVectorDistribution(root, frozenPatterns);
 }
 
 } // namespace mlir::iree_compiler

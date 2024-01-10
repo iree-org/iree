@@ -11,6 +11,7 @@
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
@@ -1017,7 +1018,9 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
-  distributeVectorOps(target, options);
+  RewritePatternSet patterns(target.getContext());
+  populateGPUDistributionPatterns(patterns);
+  distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }
 
