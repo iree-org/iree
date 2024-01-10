@@ -1,4 +1,4 @@
-// Copyright 2023 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,16 +7,11 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-vector-distribution"
 
@@ -79,8 +74,7 @@ static DistributionSignature getOpSignature(Operation *op) {
 
   DistributionSignature signature;
   for (Attribute operandAttr : operandsAttr) {
-    VectorLayoutInterface operandLayout =
-        cast<VectorLayoutInterface>(operandAttr);
+    auto operandLayout = cast<VectorLayoutInterface>(operandAttr);
     assert(operandLayout && "Malformed signature attribute.");
     signature.operands.push_back(operandLayout);
   }
@@ -150,10 +144,8 @@ public:
     auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
-    auto attr = dyn_cast<DenseElementsAttr>(constantOp.getValue());
+    auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!attr)
-      return failure();
-    if (!attr.isSplat())
       return failure();
 
     DistributionSignature signature = getOpSignature(constantOp);
@@ -268,7 +260,6 @@ static void applyVectorDistribution(Operation *root,
   // operation. It always runs on an existing operation. This ensures that no
   // invalidated state of the analysis is ever used.
   for (Operation *op : worklist) {
-
     LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
     LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
     LLVM_DEBUG(llvm::dbgs() << "\n");
@@ -290,7 +281,7 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   // Check if all operands and results of this operation have a layout.
   return llvm::all_of(values, [&](Value value) -> bool {
     if (auto vectorValue = dyn_cast<VectorValue>(value)) {
-      return analysis.getLayout<Attribute>(vectorValue) != nullptr;
+      return (bool)analysis.getLayout<Attribute>(vectorValue);
     }
     return false;
   });
@@ -306,7 +297,7 @@ void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
-  // Go to each operation, and set it's distribution signature.
+  // Go to each operation, and set its distribution signature.
   LLVM_DEBUG(
       llvm::dbgs() << "Setting distribution signatures for operations\n");
   root->walk([&](Operation *op) {
