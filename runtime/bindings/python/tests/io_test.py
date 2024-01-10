@@ -56,6 +56,7 @@ def compile_mm_test():
         MM_TEST_COMPILED = iree.compiler.compile_str(
             MM_TEST_ASM,
             target_backends=iree.compiler.core.DEFAULT_TESTING_BACKENDS,
+            # TODO(#16098): re-enable const eval once parameters are supported.
             extra_args=["--iree-opt-const-eval=false"],
         )
     return MM_TEST_COMPILED
