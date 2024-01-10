@@ -7,7 +7,7 @@
 // masked vectorisation. However, note that all tile sizes in the main loop
 // after peeling are guaranteed to match the tile sizes, i.e. for the example
 // below the following always holds:
-//    * ? = vscale * 16
+//    * ? = (vscale * 16)
 // Hence, masking is not really needed. Vector mask canonicalisations are
 // capable of recognising that and remove the masks inserted by the Linalg
 // vectoriser.

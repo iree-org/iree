@@ -53,7 +53,7 @@ iree_lit_test_suite(
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
     "vector_lowering.mlir"
-    "vectorize_and_hoist.mlir"
+    "vectorize_with_masking_and_hoist.mlir"
     "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck
