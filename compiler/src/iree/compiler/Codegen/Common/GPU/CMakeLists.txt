@@ -100,6 +100,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    iree::compiler::Codegen::Common::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
