@@ -124,7 +124,7 @@ static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
         clEnumValN(
             VectorPreProcStrategy::None, "none",
             "Do not apply any vectorization pre-processing transformation."),
-        clEnumValN(VectorPreProcStrategy::Heuristics, "heurystics",
+        clEnumValN(VectorPreProcStrategy::Heuristics, "heuristics",
                    "To be determined by IREE's heuristics (default).")),
     llvm::cl::init(VectorPreProcStrategy::Heuristics));
 
