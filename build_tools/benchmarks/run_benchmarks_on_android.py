@@ -512,8 +512,8 @@ def set_gpu_frequency_scaling_policy(policy: str):
     device_model = get_android_device_model()
     gpu_name = get_android_gpu_name()
     benchmarks_tool_dir = pathlib.Path(git_root) / "build_tools" / "benchmarks"
-    if device_model.startswith("Pixel"):
-        gpu_script = benchmarks_tool_dir / "set_pixel_gpu_scaling_policy.sh"
+    if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
+        gpu_script = benchmarks_tool_dir / "set_pixel6_gpu_scaling_policy.sh"
     elif gpu_name.lower().startswith("adreno"):
         gpu_script = benchmarks_tool_dir / "set_adreno_gpu_scaling_policy.sh"
     else:

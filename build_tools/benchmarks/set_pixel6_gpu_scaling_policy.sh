@@ -6,7 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Runs on a Pixel device itself to set the GPU frequency scaling policy.
+# Runs on a Pixel 6 device itself to set the GPU frequency scaling policy.
 
 ################################### WARNING ####################################
 # This will overheat the phone if it's not on a cooling plate, resulting in    #
@@ -18,14 +18,7 @@ set -euo pipefail
 
 POLICY="${1:-performance}"
 
-MALI_GPU_PATTERN="/sys/devices/platform/*.mali"
-MALI_GPU_PATHS=($MALI_GPU_PATTERN)
-# Assume there is only 1 GPU.
-if (( "${#MALI_GPU_PATHS[@]}" != 1 )); then
-  echo "Too many GPUs: ${MALI_GPU_PATHS[@]}"
-  exit 1
-fi
-MALI_GPU_PATH="${MALI_GPU_PATHS[0]}"
+readonly MALI_GPU_PATH="/sys/devices/platform/1c500000.mali"
 
 echo "GPU info (before changing frequency scaling policy):"
 echo 'policy\t\t\t\t\tcur\tmin\tmax'
