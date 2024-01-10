@@ -21,11 +21,6 @@ namespace mlir::iree_compiler {
 
 using VectorValue = TypedValue<VectorType>;
 
-struct DistributionSignature {
-  SmallVector<VectorLayoutInterface> operands;
-  SmallVector<VectorLayoutInterface> results;
-};
-
 static const char *kVectorLayoutFetcherStorageAttrName =
     "__vector_layout_fetcher_storage";
 
@@ -89,9 +84,9 @@ static DistributionSignature getOpSignature(Operation *op) {
   return signature;
 }
 
-VectorValue getDistributed(RewriterBase &rewriter, VectorValue value,
-                           VectorLayoutInterface layout,
-                           VectorLayoutOptions &options) {
+VectorValue
+DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
+                                    VectorLayoutInterface layout) const {
   // If this is a result of a "to_simd" op, use the source value of it.
   if (auto toSIMD = value.getDefiningOp<IREE::VectorExt::ToSIMDOp>()) {
     return cast<VectorValue>(toSIMD.getInput());
@@ -106,9 +101,8 @@ VectorValue getDistributed(RewriterBase &rewriter, VectorValue value,
   return toSIMT.getResult();
 }
 
-void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
-                                    VectorLayoutOptions &options,
-                                    ValueRange values) {
+void DistributionPattern::replaceOpWithDistributedValues(
+    RewriterBase &rewriter, Operation *op, ValueRange values) const {
   // Replace all OpResults with the given values.
   SmallVector<Value> replacements;
   for (auto [opResult, replacement] :
@@ -129,14 +123,27 @@ void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
   rewriter.replaceOp(op, replacements);
 }
 
-class DistributeConstants : public OpRewritePattern<arith::ConstantOp> {
+std::optional<DistributionSignature>
+DistributionPattern::getOpSignature(Operation *op) const {
+  if (!hasOpSignature(op)) {
+    return std::nullopt;
+  }
+  return ::mlir::iree_compiler::getOpSignature(op);
+}
+
+LogicalResult DistributionPattern::match(Operation *op) const {
+  if (!hasOpSignature(op)) {
+    return failure();
+  }
+  return match(op);
+}
+
+class DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
 public:
-  DistributeConstants(MLIRContext *context, VectorLayoutOptions &options,
-                      PatternBenefit benefit = 1)
-      : OpRewritePattern<arith::ConstantOp>(context, benefit),
-        options(options) {}
+  using OpDistributionPattern<arith::ConstantOp>::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
+                                DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     Value constantResult = constantOp.getResult();
     if (!isa<VectorType>(constantResult.getType()))
@@ -148,44 +155,34 @@ public:
     if (!attr)
       return failure();
 
-    DistributionSignature signature = getOpSignature(constantOp);
     VectorLayoutInterface layout = signature.results[0];
 
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
     auto vectorType = VectorType::get(
         options.getDistributedShape(constant, layout), elementType);
-    replaceOpWithNewDistributedOp<arith::ConstantOp>(
-        rewriter, options, constantOp, vectorType,
-        SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
+    Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
+        constantOp.getLoc(), vectorType, attr.getSplatValue<Attribute>());
+    replaceOpWithDistributedValues(rewriter, constantOp,
+                                   distirbutedOp->getResult(0));
     return success();
   }
-
-private:
-  VectorLayoutOptions &options;
 };
 
-class DistributeElementwise
-    : public OpTraitRewritePattern<OpTrait::Elementwise> {
+template <typename OpTy>
+class DistributeElementwise : public OpDistributionPattern<OpTy> {
 public:
-  DistributeElementwise(MLIRContext *context, VectorLayoutOptions &options,
-                        PatternBenefit benefit = 1)
-      : OpTraitRewritePattern<OpTrait::Elementwise>(context, benefit),
-        options(options) {}
+  using OpDistributionPattern<OpTy>::OpDistributionPattern;
 
-  LogicalResult matchAndRewrite(Operation *op,
+  LogicalResult matchAndRewrite(OpTy op, DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    if (!OpTrait::hasElementwiseMappableTraits(op))
-      return failure();
-
-    DistributionSignature signature = getOpSignature(op);
-
     // Get the distributed operands.
     SmallVector<Value> operands;
     for (auto [operand, opLayout] :
          llvm::zip(op->getOperands(), signature.operands)) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        operand = getDistributed(rewriter, vectorOperand, opLayout, options);
+        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
+                                                      opLayout);
       }
       operands.push_back(operand);
     }
@@ -208,13 +205,10 @@ public:
     // Replace the original op with the distributed op.
     Operation *distributedOp = rewriter.create(
         op->getLoc(), op->getName().getIdentifier(), operands, resultTypes);
-    replaceOpWithDistributedValues(rewriter, options, op,
-                                   distributedOp->getResults());
+    DistributionPattern::replaceOpWithDistributedValues(
+        rewriter, op, distributedOp->getResults());
     return success();
   }
-
-private:
-  VectorLayoutOptions &options;
 };
 
 static void
@@ -311,8 +305,14 @@ void distributeVectorOps(Operation *root, VectorLayoutOptions &options) {
 
   // Run the distribution patterns.
   RewritePatternSet patterns(root->getContext());
-  patterns.add<DistributeConstants, DistributeElementwise>(root->getContext(),
-                                                           options);
+  patterns.add<DistributeConstants>(root->getContext(), options);
+
+  patterns.add<DistributeElementwise<arith::AddFOp>,
+               DistributeElementwise<arith::AddIOp>,
+               DistributeElementwise<arith::MulFOp>,
+               DistributeElementwise<arith::MulIOp>>(root->getContext(),
+                                                     options);
+
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
   return applyVectorDistribution(root, frozenPatterns, options);
 }

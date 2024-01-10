@@ -19,28 +19,56 @@ namespace mlir::iree_compiler {
 /// Forward declarations.
 class VectorLayoutOptions;
 
-/// Lookup the distributed value for the given SIMD value. If the value was not
-/// distributed yet, wrap it in a ToSIMTOp.
-TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
-                                      VectorLayoutOptions &options,
-                                      TypedValue<VectorType> value,
-                                      VectorLayoutInterface layout);
+struct DistributionSignature {
+  SmallVector<VectorLayoutInterface> operands;
+  SmallVector<VectorLayoutInterface> results;
+};
 
-/// Replace an op with its distributed replacement values.
-void replaceOpWithDistributedValues(RewriterBase &rewriter,
-                                    VectorLayoutOptions &options, Operation *op,
-                                    ValueRange values);
+class DistributionPattern : public RewritePattern {
+public:
+  DistributionPattern(StringRef rootName, VectorLayoutOptions &options,
+                      PatternBenefit benefit, MLIRContext *context)
+      : RewritePattern(rootName, benefit, context), options(options) {}
 
-/// Replace an op with a new distributed op. The results of the distributed op
-/// must be distributed vector values.
-template <typename OpTy, typename... Args>
-OpTy replaceOpWithNewDistributedOp(RewriterBase &rewriter,
-                                   VectorLayoutOptions &options, Operation *op,
-                                   Args &&...args) {
-  auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
-  replaceOpWithDistributedValues(rewriter, options, op, newOp->getResults());
-  return newOp;
-}
+  /// Lookup the distributed value for the given SIMD value. If the value
+  /// was not distributed yet, wrap it in a ToSIMTOp.
+  TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
+                                        TypedValue<VectorType> value,
+                                        VectorLayoutInterface layout) const;
+
+  /// Replace an op with its distributed replacement values.
+  void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
+                                      ValueRange values) const;
+
+  std::optional<DistributionSignature> getOpSignature(Operation *op) const;
+
+  virtual LogicalResult match(Operation *op) const override;
+
+protected:
+  VectorLayoutOptions &options;
+};
+
+template <typename SourceOp>
+class OpDistributionPattern : public DistributionPattern {
+public:
+  OpDistributionPattern(VectorLayoutOptions &options, PatternBenefit benefit,
+                        MLIRContext *context)
+      : DistributionPattern(SourceOp::getOperationName(), options, benefit,
+                            context) {}
+
+  virtual LogicalResult matchAndRewrite(SourceOp op,
+                                        DistributionSignature &opSignature,
+                                        PatternRewriter &rewriter) const = 0;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const final {
+    std::optional<DistributionSignature> opSignature = getOpSignature(op);
+    if (!opSignature) {
+      return failure();
+    }
+    return matchAndRewrite(cast<SourceOp>(op), *opSignature, rewriter);
+  }
+};
 
 /// Options that control how vector values are distributed.
 ///
