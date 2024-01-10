@@ -159,8 +159,18 @@ std::optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
                                           Block::iterator insertionPoint);
 
 // Returns the dynamic dimensions for the value at |idx|.
-ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
-                                   ValueRange dynamicDims);
+// |dynamicDims| is zero or more dynamic dimensions corresponding to the
+// |values| list of arbitrary types.
+// Shaped types will return zero or more dynamic dimension values.
+// Sized types will return exactly one value.
+ValueRange findDynamicDimsInList(unsigned idx, ValueRange values,
+                                 ValueRange dynamicDims);
+
+// Returns the size of the size-aware typed value at |idx| in |values|.
+// |dynamicDims| is zero or more dynamic dimensions corresponding to the
+// |values| list of arbitrary types.
+Value findValueSizeInList(unsigned idx, ValueRange values,
+                          ValueRange dynamicDims);
 
 // Returns dimension values for each dynamic dimension of the given |value|.
 // |value| must be a ShapedType. The returned value range will be empty if the
