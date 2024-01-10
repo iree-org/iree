@@ -35,7 +35,7 @@ struct LLVMTarget {
   static constexpr bool DEFAULT_LINK_STATIC = false;
   static constexpr bool DEFAULT_LOOP_INTERLEAVING = false;
   static constexpr bool DEFAULT_LOOP_VECTORIZATION = false;
-  static constexpr bool DEFAULT_LOOP_UNROLLING = true;
+  static constexpr bool DEFAULT_LOOP_UNROLLING = false;
   static constexpr bool DEFAULT_SLP_VECTORIZATION = false;
   static constexpr llvm::FloatABI::ABIType DEFAULT_FLOAT_ABI =
       llvm::FloatABI::ABIType::Hard;
