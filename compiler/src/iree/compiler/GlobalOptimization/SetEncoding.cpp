@@ -9,6 +9,8 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
+#include <cassert>
+#include <optional>
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
@@ -33,7 +35,11 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Interfaces/CastInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "llvm/Support/Debug.h"
@@ -146,35 +152,17 @@ makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingRole role,
       getAttr(narrow.M), getAttr(narrow.N), indexingMaps);
 }
 
-// Creates a linalg::GenericOp that performs an element-wise cast of the same
-// type as performed in `castOp`, and returns the result enceoded with
-// `encodingAttr`. The element type of `encoded` is expected to be the same as
-// the element type of the input to `castOp`, which can be a CastOpInterface op
-// on a tensor or single element.
-static Value castEncodedResult(OpBuilder &builder, Location loc, Value encoded,
-                               CastOpInterface castOp,
-                               IREE::LinalgExt::EncodingAttr encodingAttr) {
-  auto genericOp = castOp->getParentOfType<linalg::GenericOp>();
-  NamedAttrList castAttrs = genericOp
-                                ? linalg::getPrunedAttributeList(genericOp)
-                                : castOp->getAttrs();
-  return createGenericElementwiseCastOp(builder, loc, encoded, castOp,
-                                        castAttrs, encodingAttr);
-}
-
-static Value
-padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                  IREE::LinalgExt::EncodingRole role, TypeRange operandTypes,
-                  MatmulNarrowSizes narrow, ArrayAttr indexingMaps,
-                  std::optional<CastOpInterface> castOp = std::nullopt) {
-  Value padSource = castOp ? source.getDefiningOp()->getOperand(0) : source;
+static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
+                               IREE::LinalgExt::EncodingRole role,
+                               TypeRange operandTypes, MatmulNarrowSizes narrow,
+                               ArrayAttr indexingMaps) {
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
   auto encodingForPad =
       makeEncoding(builder, role, operandTypes,
                    /*originalType=*/Type{}, narrow, indexingMaps);
-  Value padded = pad(builder, loc, padSource, encodingForPad);
+  Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
   // returned by pad() above, but we want setEncoding to be aware of the
@@ -182,16 +170,11 @@ padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // verbosity, we only specify the original original_type when it differs from
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
-  if (padded.getType() != padSource.getType()) {
+  if (padded.getType() != source.getType()) {
     encodingForSetEncoding = makeEncoding(
-        builder, role, operandTypes, padSource.getType(), narrow, indexingMaps);
+        builder, role, operandTypes, source.getType(), narrow, indexingMaps);
   }
-  Value encoded = setEncoding(builder, loc, padded, encodingForSetEncoding);
-  if (castOp) {
-    encoded = castEncodedResult(builder, loc, encoded, castOp.value(),
-                                encodingForSetEncoding);
-  }
-  return encoded;
+  return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
 
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
@@ -211,13 +194,30 @@ static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                                 sizes, strides);
 }
 
+/// Given a LinalgOp and one of its OpOperands, return the element type,
+/// inferring unsignedness from the body of the LinalgOp
+static Type getContractionInputTypeWithSignedness(OpBuilder &builder,
+                                                  linalg::LinalgOp linalgOp,
+                                                  OpOperand *operand) {
+  assert(linalg::isaContractionOpInterface(linalgOp));
+  assert(operand->getOwner() == linalgOp.getOperation());
+  auto elemType = getElementTypeOrSelf(operand->get().getType());
+  // Infer if unsigned from body ops
+  Value blockArg = linalgOp.getMatchingBlockArgument(operand);
+  for (auto bodyCastOp : blockArg.getParentBlock()->getOps<arith::ExtUIOp>()) {
+    if (bodyCastOp->getOperand(0) == blockArg) {
+      return builder.getIntegerType(elemType.getIntOrFloatBitWidth(), false);
+    }
+  }
+  return elemType;
+}
+
 namespace {
 
 struct setContractionOpEncoding
-    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
-  using OpInterfaceRewritePattern<
-      linalg::ContractionOpInterface>::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
     if (!linalgOp.hasTensorSemantics()) {
@@ -233,9 +233,10 @@ struct setContractionOpEncoding
     }
     auto maps = linalgOp.getIndexingMaps();
     auto cDims = linalg::inferContractionDims(linalgOp);
-    if (failed(cDims)) {
+    if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+        cDims->n.size() > 1 || cDims->k.size() > 1) {
       return rewriter.notifyMatchFailure(
-          op, "Failed to infer contraction dimensions");
+          op, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
     }
 
     auto inputs = linalgOp.getDpsInputs();
@@ -249,32 +250,23 @@ struct setContractionOpEncoding
         llvm::any_of(outputs, hasEncoding)) {
       return failure();
     }
-    Value origLhs = inputs[0];
-    Value origRhs = inputs[1];
-    Value origOut = outputs[0];
+    Value lhs = inputs[0];
+    Value rhs = inputs[1];
+    Value out = outputs[0];
 
-    auto getElemType = [](Value v) -> Type {
-      if (auto tensorType = llvm::dyn_cast<RankedTensorType>(v.getType())) {
-        return tensorType.getElementType();
-      }
-      return {};
-    };
-    std::optional<CastOpInterface> maybeLhsCastOp =
-        getDefiningNonI1ExtendingCastOp(origLhs);
-    std::optional<CastOpInterface> maybeRhsCastOp =
-        getDefiningNonI1ExtendingCastOp(origRhs);
-    Type lhsElemType = maybeLhsCastOp ? getCastElemType(origLhs).value()
-                                      : getElemType(origLhs);
-    Type rhsElemType = maybeRhsCastOp ? getCastElemType(origRhs).value()
-                                      : getElemType(origRhs);
-    Type outElemType = getElemType(origOut);
+    Type lhsElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInputOperand(0));
+    Type rhsElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInputOperand(1));
+    Type outElemType = getContractionInputTypeWithSignedness(
+        rewriter, linalgOp, linalgOp.getDpsInitOperand(0));
 
     if (!lhsElemType || !rhsElemType || !outElemType) {
       return failure();
     }
 
     MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(origOut.getType().cast<ShapedType>(), linalgOp);
+        getMatmulNarrowSizes(out.getType().cast<ShapedType>(), linalgOp);
 
     Location loc = linalgOp.getLoc();
     SmallVector<Type> operandTypes(linalgOp->getOperandTypes());
@@ -282,13 +274,13 @@ struct setContractionOpEncoding
         cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
     operandTypes[1] =
         cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
-    Value encodedLhs = padAndSetEncoding(
-        rewriter, loc, origLhs, IREE::LinalgExt::EncodingRole::LHS,
-        operandTypes, narrowSizes, maps, maybeLhsCastOp);
-    Value encodedRhs = padAndSetEncoding(
-        rewriter, loc, origRhs, IREE::LinalgExt::EncodingRole::RHS,
-        operandTypes, narrowSizes, maps, maybeRhsCastOp);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, origOut,
+    Value encodedLhs = padAndSetEncoding(rewriter, loc, lhs,
+                                         IREE::LinalgExt::EncodingRole::LHS,
+                                         operandTypes, narrowSizes, maps);
+    Value encodedRhs = padAndSetEncoding(rewriter, loc, rhs,
+                                         IREE::LinalgExt::EncodingRole::RHS,
+                                         operandTypes, narrowSizes, maps);
+    Value encodedOut = padAndSetEncoding(rewriter, loc, out,
                                          IREE::LinalgExt::EncodingRole::RESULT,
                                          operandTypes, narrowSizes, maps);
     Value opTiled;
@@ -297,15 +289,15 @@ struct setContractionOpEncoding
                   ->getResult(0);
 
     // Sizes are computed by original output size.
-    FailureOr<SmallVector<OpFoldResult>> origOutSizes =
-        IREE::LinalgExt::getDims(rewriter, loc, origOut);
-    if (failed(origOutSizes)) {
+    FailureOr<SmallVector<OpFoldResult>> outSizes =
+        IREE::LinalgExt::getDims(rewriter, loc, out);
+    if (failed(outSizes)) {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to get shape of result");
     }
 
-    Value result = unsetEncodingAndExtractSlice(rewriter, loc, opTiled,
-                                                origOutSizes.value());
+    Value result =
+        unsetEncodingAndExtractSlice(rewriter, loc, opTiled, outSizes.value());
 
     rewriter.replaceOp(linalgOp, result);
     return success();
