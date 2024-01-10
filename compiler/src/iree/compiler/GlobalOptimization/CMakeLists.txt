@@ -51,7 +51,6 @@ iree_cc_library(
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "InferNumericNarrowing.cpp"
-    "LiftGenericToTransposeBatchMatmul.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
     "Passes.cpp"
