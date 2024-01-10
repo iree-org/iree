@@ -21,7 +21,7 @@ using VectorValue = TypedValue<VectorType>;
 
 namespace {
 
-struct DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
+struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
@@ -53,7 +53,7 @@ struct DistributeConstants : public OpDistributionPattern<arith::ConstantOp> {
 };
 
 template <typename OpTy>
-struct DistributeElementwise : public OpDistributionPattern<OpTy> {
+struct DistributeElementwise final : OpDistributionPattern<OpTy> {
   using OpDistributionPattern<OpTy>::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(OpTy op, DistributionSignature &signature,

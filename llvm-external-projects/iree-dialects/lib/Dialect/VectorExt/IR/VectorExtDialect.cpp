@@ -110,9 +110,8 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
 }
 
 SmallVector<int64_t> LayoutAttr::getDistributedShape(VectorType) const {
-  SmallVector<LayoutDimension> labels = {LayoutDimension::BATCHX,
-                                         LayoutDimension::BATCHY,
-                                         LayoutDimension::VECTORX};
+  LayoutDimension labels[] = {LayoutDimension::BATCHX, LayoutDimension::BATCHY,
+                              LayoutDimension::VECTORX};
   SmallVector<int64_t> simtVectorShape;
   for (LayoutDimension dim : labels) {
     ArrayRef<PerDimLayoutAttr> layouts = getLayouts();

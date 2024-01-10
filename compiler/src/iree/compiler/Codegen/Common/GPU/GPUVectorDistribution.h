@@ -23,7 +23,7 @@ struct DistributionSignature {
   SmallVector<VectorLayoutInterface> results;
 };
 
-struct DistributionPattern : public RewritePattern {
+struct DistributionPattern : RewritePattern {
   using RewritePattern::RewritePattern;
 
   /// Lookup the distributed value for the given SIMD value. If the value
@@ -41,7 +41,7 @@ struct DistributionPattern : public RewritePattern {
 };
 
 template <typename SourceOp>
-struct OpDistributionPattern : public DistributionPattern {
+struct OpDistributionPattern : DistributionPattern {
   OpDistributionPattern<SourceOp>(MLIRContext *context,
                                   PatternBenefit benefit = 1)
       : DistributionPattern(SourceOp::getOperationName(), benefit, context) {}

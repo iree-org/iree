@@ -145,8 +145,7 @@ debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
 }
 
 /// A rewriter for the pattern rewriting driver.
-class VectorDistributionRewriter : public PatternRewriter {
-public:
+struct VectorDistributionRewriter : PatternRewriter {
   VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(context) {}
 };
 
