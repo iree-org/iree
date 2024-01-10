@@ -26,14 +26,13 @@ get_default_parallel_level() {
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL="${CTEST_PARALLEL_LEVEL:-$(get_default_parallel_level)}"
 
-# Respect the user setting, but default to turning on Vulkan.
-export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
+# Respect the user setting, but default to turning off Vulkan.
+export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 # Respect the user setting, but default to turning off Metal.
 export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 # Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE="${IREE_CUDA_DISABLE:-1}"
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
-# We test on SwiftShader as a baseline, which does not support this extension.
 export IREE_VULKAN_F16_DISABLE="${IREE_VULKAN_F16_DISABLE:-1}"
 # Respect the user setting, but default to skipping tests that require Nvidia GPU.
 export IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}"
@@ -74,6 +73,9 @@ declare -a label_exclude_args=(
 
 if (( IREE_VULKAN_DISABLE == 1 )); then
   label_exclude_args+=("^driver=vulkan$")
+fi
+if (( IREE_METAL_DISABLE == 1 )); then
+  label_exclude_args+=("^driver=metal$")
 fi
 if (( IREE_CUDA_DISABLE == 1 )); then
   label_exclude_args+=("^driver=cuda$")

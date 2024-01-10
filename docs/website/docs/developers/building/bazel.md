@@ -167,7 +167,7 @@ bazel test -k //... \
 !!! tip
 
     See the
-    [`build_tools/bazel/build_core.sh`](https://github.com/openxla/iree/blob/main/build_tools/bazel/build_core.sh)
+    [`build_tools/bazel/build_test_all.sh`](https://github.com/openxla/iree/blob/main/build_tools/bazel/build_test_all.sh)
     script for examples of other flags and environment variables that can be
     used to configure what Bazel runs.
 
