@@ -8,7 +8,9 @@
 
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -226,6 +228,10 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
   patterns
       .insert<GlobalOpExpansion, GlobalLoadOpExpansion, GlobalStoreOpExpansion>(
           expansionState, typeConverter, context);
+  patterns.add<GenericConvertTypesPattern<IREE::Util::GlobalOp>,
+               GenericConvertTypesPattern<IREE::Util::GlobalLoadOp>,
+               GenericConvertTypesPattern<IREE::Util::GlobalStoreOp>>(
+      typeConverter, context);
 }
 
 void populateUtilToStreamConversionPatterns(MLIRContext *context,

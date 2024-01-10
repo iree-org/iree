@@ -16,6 +16,7 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -405,6 +406,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   FunctionLikeNest(passManager)
       .addPass(IREE::HAL::createElideRedundantCommandsPass);
 
+  // TODO: Maybe this should be a part of Affine lowering pass.
+  // Remove if it is added there.
+  // https://github.com/llvm/llvm-project/issues/78458
+  passManager.addPass(affine::createAffineExpandIndexOpsPass());
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.
   passManager.addPass(mlir::createLowerAffinePass());

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
+#include "iree/compiler/Dialect/Flow/Conversion/MeshToFlow/MeshToFlow.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -22,6 +23,7 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createIREEImportPublicPass());
   passManager.addPass(createImportMLProgramPass());
   passManager.addPass(createSanitizeModuleNamesPass());
+  passManager.addPass(IREE::Flow::createConvertMeshToFlowPass());
 }
 
 void registerCommonInputConversionPasses() {

@@ -171,4 +171,18 @@ struct DispatchTensorTypeStorage : public TypeStorage {
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h.inc" // IWYU pragma: keep
 // clang-format on
 
+namespace mlir::iree_compiler::IREE::Flow {
+
+// Create an attribute corresponding to the underlying numeric element type.
+// If there no such correspondence a null attribute is returned.
+IREE::Flow::CollectiveElementTypeAttr
+getCollectiveElementTypeAttr(RankedTensorType type);
+
+// Convert the numeric type `type` to the corresponding enum value.
+// If there is not correspondence nullopt is returned.
+std::optional<IREE::Flow::CollectiveElementType>
+convertToFlowCollectiveElementType(Type type);
+
+} // namespace mlir::iree_compiler::IREE::Flow
+
 #endif // IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
