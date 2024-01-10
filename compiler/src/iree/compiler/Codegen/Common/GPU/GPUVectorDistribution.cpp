@@ -156,7 +156,7 @@ public:
     auto vectorType = VectorType::get(
         options.getDistributedShape(constant, layout), elementType);
     replaceOpWithNewDistributedOp<arith::ConstantOp>(
-        options, rewriter, constantOp, vectorType,
+        rewriter, options, constantOp, vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
     return success();
   }
@@ -208,7 +208,7 @@ public:
     // Replace the original op with the distributed op.
     Operation *distributedOp = rewriter.create(
         op->getLoc(), op->getName().getIdentifier(), operands, resultTypes);
-    replaceOpWithDistributedValues(rewriter, op, options,
+    replaceOpWithDistributedValues(rewriter, options, op,
                                    distributedOp->getResults());
     return success();
   }

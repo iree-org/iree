@@ -22,23 +22,23 @@ class VectorLayoutOptions;
 /// Lookup the distributed value for the given SIMD value. If the value was not
 /// distributed yet, wrap it in a ToSIMTOp.
 TypedValue<VectorType> getDistributed(RewriterBase &rewriter,
+                                      VectorLayoutOptions &options,
                                       TypedValue<VectorType> value,
-                                      VectorLayoutInterface layout,
-                                      VectorLayoutOptions &options);
+                                      VectorLayoutInterface layout);
 
 /// Replace an op with its distributed replacement values.
-void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
-                                    VectorLayoutOptions &options,
+void replaceOpWithDistributedValues(RewriterBase &rewriter,
+                                    VectorLayoutOptions &options, Operation *op,
                                     ValueRange values);
 
 /// Replace an op with a new distributed op. The results of the distributed op
 /// must be distributed vector values.
 template <typename OpTy, typename... Args>
-OpTy replaceOpWithNewDistributedOp(VectorLayoutOptions &options,
-                                   RewriterBase &rewriter, Operation *op,
+OpTy replaceOpWithNewDistributedOp(RewriterBase &rewriter,
+                                   VectorLayoutOptions &options, Operation *op,
                                    Args &&...args) {
   auto newOp = rewriter.create<OpTy>(op->getLoc(), std::forward<Args>(args)...);
-  replaceOpWithDistributedValues(rewriter, op, options, newOp->getResults());
+  replaceOpWithDistributedValues(rewriter, options, op, newOp->getResults());
   return newOp;
 }
 
@@ -75,7 +75,7 @@ protected:
 ///   - Make `options` set some initial information about how to distribute
 ///     some vector values. This is usually done on operations like
 ///     vector.contract, vector.transfer_read/vector.transfer_write,
-///     vector.multi_reduction, where we are trying to target a specific
+///     vector.multi_reduction, where we are trying to target specific
 ///     hardware instructions. This information is provided in the form of a
 ///     layout for the value.
 ///   - Run a global analysis to determine how to distribute rest of the vector
