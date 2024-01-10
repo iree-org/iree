@@ -120,7 +120,7 @@ struct MaterializeUserConfigsPass
     bool hasTransformStrategy = !clCodegenTransformDialectStrategyName.empty();
 
     std::string libraryFileName;
-    if (hasTransformConfig) {
+    if (hasTransformLibrary) {
       if (parts[0].empty()) {
         variantOp.emitError() << "Cannot specify an empty library path";
         return signalPassFailure();
