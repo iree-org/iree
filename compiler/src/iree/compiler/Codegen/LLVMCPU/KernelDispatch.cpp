@@ -77,7 +77,7 @@ static llvm::cl::opt<int> clGeneralMatmulTileBytes(
     llvm::cl::init(64 * 1024));
 
 static llvm::cl::opt<bool> clDisableVectorPeeling(
-    "iree-codegen-disable-vector-peeling",
+    "iree-llvmcpu-disable-vector-peeling",
     llvm::cl::desc("Disable peeling as a pre-processing step for "
                    "vectorization (only relevant when using compiler "
                    "heuristics to select the strategy)."),
@@ -108,7 +108,7 @@ enum class VectorPreProcStrategy {
   Heuristics
 };
 
-llvm::cl::opt<VectorPreProcStrategy> preprocessStrategyFromCL(
+static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
     "iree-codegen-llvmcpu-vector-pproc-strategy",
     llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
                    "before vectorization:"),
@@ -125,7 +125,7 @@ llvm::cl::opt<VectorPreProcStrategy> preprocessStrategyFromCL(
             VectorPreProcStrategy::None, "none",
             "Do not apply any vectorization pre-processing transformation."),
         clEnumValN(VectorPreProcStrategy::Heuristics, "heurystics",
-                   "To be determined by IREE's heurystics (default).")),
+                   "To be determined by IREE's heuristics (default).")),
     llvm::cl::init(VectorPreProcStrategy::Heuristics));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
@@ -198,14 +198,17 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 }
 
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
-/// given LinalgOp, depending on the op traits and the target architecture.
+/// given LinalgOp. It is based on either:
+///   * user-specified value, or
+///   * heuristics (e.g. the op traits and the target architecture).
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
-  // 1. Select a strategy based on the input from a user.
-  if (preprocessStrategyFromCL != VectorPreProcStrategy::Heuristics)
-    return preprocessStrategyFromCL;
+  // If set, use the strategy selected by a user.
+  if (clPProcStrategy != VectorPreProcStrategy::Heuristics) {
+    return clPProcStrategy;
+  }
 
-  // 2. Select a strategy based on heuristics.
+  // Select a strategy based on heuristics.
   if (linalgOp.hasBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
