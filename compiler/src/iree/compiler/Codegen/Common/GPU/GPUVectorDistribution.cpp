@@ -21,7 +21,7 @@ namespace mlir::iree_compiler {
 
 using VectorValue = TypedValue<VectorType>;
 
-static const char *kVectorLayoutFetcherStorageAttrName =
+constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
     "__vector_layout_fetcher_storage";
 
 static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
@@ -48,7 +48,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
 
   ArrayAttr operandsAttr = ArrayAttr::get(op->getContext(), operands);
   ArrayAttr resultsAttr = ArrayAttr::get(op->getContext(), results);
-  SmallVector<Attribute> signature = {operandsAttr, resultsAttr};
+  Attribute signature[] = {operandsAttr, resultsAttr};
   op->setAttr(kVectorLayoutFetcherStorageAttrName,
               ArrayAttr::get(op->getContext(), signature));
 }
