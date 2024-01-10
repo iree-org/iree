@@ -16,7 +16,8 @@
 
 namespace mlir::iree_compiler {
 
-/// Forward declarations.
+/// A signature describing the layout for each operand of vector type for
+/// an operation.
 struct DistributionSignature {
   SmallVector<VectorLayoutInterface> operands;
   SmallVector<VectorLayoutInterface> results;
@@ -35,6 +36,7 @@ struct DistributionPattern : public RewritePattern {
   void replaceOpWithDistributedValues(RewriterBase &rewriter, Operation *op,
                                       ValueRange values) const;
 
+  /// Get the signature for the given operation.
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
 
   virtual LogicalResult match(Operation *op) const override;
@@ -60,7 +62,8 @@ struct OpDistributionPattern : public DistributionPattern {
   }
 };
 
-/// Options that control how vector values are distributed.
+/// Options to control how the layout analysis is initialised for vector
+/// distribution.
 class VectorLayoutOptions {
 public:
   VectorLayoutOptions(Operation *root) : root(root) {
