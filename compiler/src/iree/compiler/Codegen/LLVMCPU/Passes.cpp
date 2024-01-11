@@ -286,7 +286,6 @@ void buildLLVMCPUVectorLoweringPipeline(
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
 
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVectorTransferLoweringPass());
