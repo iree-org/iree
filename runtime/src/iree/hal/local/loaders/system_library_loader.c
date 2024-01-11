@@ -83,6 +83,11 @@ typedef struct iree_hal_system_executable_t {
   // Name used for the file field in tracy and debuggers.
   iree_string_view_t identifier;
 
+#if (IREE_TRACING_FEATURES)
+  // Optional mapping of filenames to custom contents.
+  tracy_file_mapping* file_mapping;
+#endif
+
   // Queried metadata from the library.
   union {
     const iree_hal_executable_library_header_t** header;
@@ -214,6 +219,7 @@ static iree_status_t iree_hal_system_executable_create(
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
+  printf("iree_hal_system_executable_create()\n");
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(executable_params->executable_data.data &&
                        executable_params->executable_data.data_length);
@@ -271,6 +277,11 @@ static iree_status_t iree_hal_system_executable_create(
         iree_hal_system_executable_import_thunk_v0, host_allocator);
   }
 
+  if (iree_status_is_ok(status)) {
+    status = IREE_HAL_EXECUTABLE_LIBRARY_SETUP_TRACING(
+        executable->library.v0, host_allocator, &executable->file_mapping);
+  }
+
   // Verify that the library matches the executable params.
   if (iree_status_is_ok(status)) {
     status = iree_hal_executable_library_verify(executable_params,
@@ -313,11 +324,13 @@ static iree_status_t iree_hal_system_executable_issue_call(
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   const iree_hal_executable_library_v0_t* library = executable->library.v0;
-
   if (IREE_UNLIKELY(ordinal >= library->exports.count)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
   }
+  // printf("iree_hal_system_executable_issue_call(): ordinal %zu\n", ordinal);
+  // printf("iree_hal_system_executable_issue_call(): identifier %s\n",
+  // executable->identifier.data);
 
   IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN(z0, executable->identifier,
                                                     library, ordinal);

@@ -153,6 +153,27 @@ static llvm::StructType *makeSrcLocType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct.iree_hal_executable_src_file_v0_t = type {
+//   i32,
+//   i8*
+// }
+static llvm::StructType *makeSrcFileType(llvm::LLVMContext &context) {
+  if (auto *existingType = llvm::StructType::getTypeByName(
+          context, "iree_hal_executable_src_file_v0_t")) {
+    return existingType;
+  }
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *i8PtrType = llvm::PointerType::getUnqual(context);
+  auto *type = llvm::StructType::create(context,
+                                        {
+                                            i32Type,
+                                            i8PtrType,
+                                        },
+                                        "iree_hal_executable_src_loc_v0_t",
+                                        /*isPacked=*/false);
+  return type;
+}
+
 // %struct.iree_hal_executable_export_table_v0_t = type {
 //   i32,
 //   i32*,
@@ -160,6 +181,7 @@ static llvm::StructType *makeSrcLocType(llvm::LLVMContext &context) {
 //   i8**,
 //   i8**,
 //   %struct.iree_hal_executable_src_loc_v0_t*,
+//   %struct.iree_hal_executable_src_file_v0_t*,
 // }
 static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   if (auto *existingType = llvm::StructType::getTypeByName(
@@ -171,6 +193,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
   auto *i8PtrType = llvm::PointerType::getUnqual(context);
   auto *srcLocType = makeSrcLocType(context);
+  auto *srcFileType = makeSrcFileType(context);
   auto *type = llvm::StructType::create(
       context,
       {
@@ -180,6 +203,7 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
           i8PtrType->getPointerTo(),
           i8PtrType->getPointerTo(),
           srcLocType->getPointerTo(),
+          srcFileType->getPointerTo(),
       },
       "iree_hal_executable_export_table_v0_t",
       /*isPacked=*/false);
@@ -367,6 +391,7 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
   auto *dispatchFunctionType = makeDispatchFunctionType(context);
   auto *dispatchAttrsType = makeDispatchAttrsType(context);
   auto *srcLocType = makeSrcLocType(context);
+  auto *srcFileType = makeSrcFileType(context);
   auto *i8Type = llvm::IntegerType::getInt8Ty(context);
   auto *i16Type = llvm::IntegerType::getInt16Ty(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
@@ -491,6 +516,33 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
         exportSrcLocsType, global, ArrayRef<llvm::Constant *>{zero, zero});
   }
 
+  // iree_hal_executable_src_file_v0_t::src_files;
+  llvm::Constant *exportSrcFiles =
+      llvm::Constant::getNullValue(srcLocType->getPointerTo());
+  if (mode == Mode::INCLUDE_REFLECTION_ATTRS) {
+    SmallVector<llvm::Constant *> exportSrcFileValues;
+    for (auto dispatch : exports) {
+      exportSrcFileValues.push_back(llvm::ConstantStruct::get(
+          srcFileType,
+          {
+              // file_contents_length=
+              llvm::ConstantInt::get(i32Type, dispatch.sourceContents.length()),
+              // file_contents=
+              getStringConstant(dispatch.sourceContents, module),
+          }));
+    }
+    auto *exportSrcFilesType =
+        llvm::ArrayType::get(srcLocType, exportSrcFileValues.size());
+    auto *global = new llvm::GlobalVariable(
+        *module, exportSrcFilesType, /*isConstant=*/true,
+        llvm::GlobalVariable::PrivateLinkage,
+        llvm::ConstantArray::get(exportSrcFilesType, exportSrcFileValues),
+        /*Name=*/libraryName + "_src_files");
+    // TODO(benvanik): force alignment (16? natural pointer width?)
+    exportSrcFiles = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        exportSrcFilesType, global, ArrayRef<llvm::Constant *>{zero, zero});
+  }
+
   return llvm::ConstantStruct::get(
       exportTableType, {
                            // count=
@@ -505,6 +557,8 @@ LibraryBuilder::buildLibraryV0ExportTable(std::string libraryName) {
                            exportTags,
                            // src_locs=
                            exportSrcLocs,
+                           // src_files=
+                           exportSrcFiles,
                        });
 }
 

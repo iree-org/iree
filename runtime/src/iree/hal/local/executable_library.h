@@ -401,6 +401,18 @@ typedef struct iree_hal_executable_src_loc_v0_t {
   const char* path;
 } iree_hal_executable_src_loc_v0_t;
 
+// Source file contents for a dispatch function indicating what was used to
+// generate it. This only represents a single source snapshot, of which there
+// may be multiple valid possibilities (source program in Python, imported high
+// level framework .mlir, LLVM bitcode, etc.).
+typedef struct iree_hal_executable_src_file_v0_t {
+  // The line within the file that best represents an entry point.
+  // The length of |file_contents|.
+  uint32_t file_contents_length;
+  // The file's contents, including newline characters.
+  const char* file_contents;
+} iree_hal_executable_src_file_v0_t;
+
 // A table of exported functions arranged as a struct-of-arrays for more
 // efficient packing and faster lookup. Each subarray - when not omitted and
 // NULL - is indexed by export ordinal and has up to |count| entries.
@@ -429,6 +441,10 @@ typedef struct iree_hal_executable_export_table_v0_t {
 
   // Optional table of source locations 1:1 with ptrs.
   const iree_hal_executable_src_loc_v0_t* src_locs;
+
+  // Optional table of source files 1:1 with ptrs.
+  const iree_hal_executable_src_file_v0_t* src_files;
+
 } iree_hal_executable_export_table_v0_t;
 
 // A table declaring the executable-level constants that can be used to

@@ -48,4 +48,18 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
   (void)zone_id;
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+iree_status_t iree_hal_executable_library_setup_tracing(
+    const iree_hal_executable_library_v0_t* library,
+    iree_allocator_t host_allocator, tracy_file_mapping** out_file_mapping);
+#define IREE_HAL_EXECUTABLE_LIBRARY_SETUP_TRACING(library, host_allocator, \
+                                                  out_file_mapping)        \
+  iree_hal_executable_library_setup_tracing(library, host_allocator,       \
+                                            out_file_mapping)
+#else
+#define IREE_HAL_EXECUTABLE_LIBRARY_SETUP_TRACING(library, host_allocator, \
+                                                  out_file_mapping)        \
+  iree_ok_status()
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_UTIL_H_

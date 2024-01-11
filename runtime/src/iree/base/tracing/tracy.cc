@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <string.h>
+
 #include "iree/base/tracing.h"
 
 // Textually include the Tracy implementation.
@@ -214,6 +216,46 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
   tracy::MemWrite(&item->lockRelease.id, lock_id);
   tracy::MemWrite(&item->lockRelease.time, tracy::Profiler::GetTime());
   tracy::Profiler::QueueSerialFinish();
+}
+
+void iree_tracing_register_custom_file_contents(
+    tracy_file_mapping const* file_mapping) {
+  tracy::Profiler::SourceCallbackRegister(
+      [](void* data, const char* filename, size_t& size) -> char* {
+        tracy_file_mapping const* file_mapping =
+            (tracy_file_mapping const*)data;
+        fprintf(stdout, "Tracy source callback queried file: '%s'\n", filename);
+
+        tracy_file_contents* found_file_contents =
+            (tracy_file_contents*)bsearch(filename, file_mapping->file_contents,
+                                          file_mapping->file_mapping_length,
+                                          sizeof(*file_mapping->file_contents),
+                                          tracy_file_contents_search_cmp);
+
+        if (!found_file_contents) {
+          return nullptr;
+        }
+
+        fprintf(stdout, "...Found match: %s\n", found_file_contents->file_name);
+        auto buf = (char*)tracy::tracy_malloc_fast(
+            found_file_contents->file_contents_length);
+        strcpy(buf, found_file_contents->file_contents);
+        size = found_file_contents->file_contents_length;
+        return buf;
+      },
+      /*data=*/(void*)file_mapping);
+}
+
+int tracy_file_contents_sort_cmp(const void* a, const void* b) {
+  tracy_file_contents* file_contents_a = (tracy_file_contents*)a;
+  tracy_file_contents* file_contents_b = (tracy_file_contents*)b;
+  return strcmp(file_contents_a->file_name, file_contents_b->file_name);
+}
+
+int tracy_file_contents_search_cmp(const void* key, const void* val) {
+  const char* filename_key = (const char*)key;
+  tracy_file_contents* file_contents = (tracy_file_contents*)val;
+  return strcmp(filename_key, file_contents->file_name);
 }
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE

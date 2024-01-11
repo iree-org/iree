@@ -131,6 +131,35 @@ void iree_tracing_mutex_after_lock(uint32_t lock_id);
 void iree_tracing_mutex_after_try_lock(uint32_t lock_id, bool was_acquired);
 void iree_tracing_mutex_after_unlock(uint32_t lock_id);
 
+// Entry in the Tracy file map.
+typedef struct tracy_file_contents {
+  const char* file_name;
+  uint32_t file_name_length;
+  const char* file_contents;
+  uint32_t file_contents_length;
+} tracy_file_contents;
+
+// Mapping of file name to source contents to embed in a program for Tracy.
+// The mapping must live for the lifetime of the executable being traced.
+// file_contents list must be sorted; see tracy_file_contents_sort_cmp()
+typedef struct tracy_file_mapping {
+  tracy_file_contents* file_contents;
+  uint32_t file_mapping_length;
+} tracy_file_mapping;
+
+// Registers custom file contents to provide for Tracy. The provided file
+// mapping from filename to source is queried by Tracy during trace capture.
+// file_contents list must be sorted; see tracy_file_contents_sort_cmp()
+void iree_tracing_register_custom_file_contents(
+    tracy_file_mapping const* file_mapping);
+
+// Comparator for sorting tracy_file_contents list. Use with qsort()
+int tracy_file_contents_sort_cmp(const void* a, const void* b);
+
+// Comparator for searching a sorted tracy_file_contents list. Use with
+// bsearch()
+int tracy_file_contents_search_cmp(const void* key, const void* val);
+
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 int64_t iree_tracing_time(void);

@@ -38,6 +38,7 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Target/LLVMIR/Dialect/ArmSME/ArmSMEToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -370,15 +371,34 @@ public:
 
       std::string sourceFile = "";
       int sourceLine = 0;
+      std::string sourceContents = "";
       if (options.debugLevel >= 1) {
         if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+          llvm::dbgs() << "The first loc for target: " << loc << "\n";
+          // exportOp.dump();
+          // llvm::dbgs() << "---------------------- " << loc << "\n";
+
           sourceFile = loc->getFilename().str();
           sourceLine = loc->getLine();
+
+          if (options.debugLevel >= 3) {
+            std::string error;
+            auto file = mlir::openInputFile(loc->getFilename(), &error);
+            if (file) {
+              // TODO(KoolJBlack): Exclude src contents above a certain size?
+              sourceContents = std::string(file->getBuffer().begin(),
+                                           file->getBuffer().end());
+            } else {
+              return mlir::emitError(loc.value())
+                     << "Unable to extract src contents:" << error;
+            }
+          }
         }
       }
+
       libraryBuilder.addExport(
-          exportOp.getName(), sourceFile, sourceLine, /*tag=*/"",
-          LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
+          exportOp.getName(), sourceFile, sourceLine, sourceContents,
+          /*tag=*/"", LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);

@@ -112,9 +112,10 @@ public:
   // |sourceFile| and |sourceLoc| are optional source information
   // |tag| is an optional attachment
   void addExport(StringRef name, StringRef sourceFile, uint32_t sourceLoc,
-                 StringRef tag, DispatchAttrs attrs, llvm::Function *func) {
-    exports.push_back(
-        {name.str(), sourceFile.str(), sourceLoc, tag.str(), attrs, func});
+                 StringRef sourceContents, StringRef tag, DispatchAttrs attrs,
+                 llvm::Function *func) {
+    exports.push_back({name.str(), sourceFile.str(), sourceLoc,
+                       sourceContents.str(), tag.str(), attrs, func});
   }
 
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
@@ -150,6 +151,7 @@ private:
     std::string name;
     std::string sourceFile;
     uint32_t sourceLoc;
+    std::string sourceContents;
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;

@@ -119,6 +119,8 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
     source_file = library->exports.src_locs[ordinal].path;
     source_file_length = library->exports.src_locs[ordinal].path_length;
     source_line = library->exports.src_locs[ordinal].line;
+    // printf("iree_hal_executable_library_call_zone_begin(): source file(%d):
+    // %s\n", source_line, source_file);
   } else {
     // No source location data, so make do with what we have.
     source_file = executable_identifier.data;
@@ -138,6 +140,88 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
   }
 
   return z0;
+}
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+iree_status_t iree_hal_executable_library_setup_tracing(
+    const iree_hal_executable_library_v0_t* library,
+    iree_allocator_t host_allocator, tracy_file_mapping** out_file_mapping) {
+  iree_status_t status = iree_ok_status();
+#if (IREE_TRACING_FEATURES)
+  // Do we have src files?
+  bool contains_srs = false;
+  for (uint32_t i = 0; i < library->exports.count; ++i) {
+    if (library->exports.src_files[i].file_contents_length > 0) {
+      contains_srs = true;
+      break;
+    }
+  }
+  if (!contains_srs) {
+    fprintf(
+        stdout,
+        "iree_hal_executable_library_setup_tracing(): found no sources. not "
+        "registering\n");
+    return iree_ok_status();
+  }
+
+  // Alloc tracy file mapping
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(host_allocator, sizeof(**out_file_mapping),
+                                   (void**)out_file_mapping);
+  }
+
+  tracy_file_mapping* file_mapping = *out_file_mapping;
+
+  if (iree_status_is_ok(status)) {
+    status = iree_allocator_malloc(
+        host_allocator,
+        library->exports.count * sizeof(*file_mapping->file_contents),
+        (void**)&file_mapping->file_contents);
+  }
+
+  // Fill tracy mapping
+  if (iree_status_is_ok(status)) {
+    for (uint32_t i = 0; i < library->exports.count; ++i) {
+      // TODO(kooljblack): use custom names for custom file contents
+      const char* name = library->exports.names[i];
+      const char* file_name = library->exports.src_locs[i].path;
+      uint32_t file_name_length = library->exports.src_locs[i].path_length;
+      const char* file_contents = library->exports.src_files[i].file_contents;
+      uint32_t file_contents_length =
+          library->exports.src_files[i].file_contents_length;
+      fprintf(stdout,
+              "iree_hal_executable_library_setup_tracing(): adding src for "
+              "entry point: '%s'\n",
+              name);
+      fprintf(stdout,
+              "iree_hal_executable_library_setup_tracing(): ...with file name: "
+              "'%s'\n",
+              file_name);
+      fprintf(stdout,
+              "iree_hal_executable_library_setup_tracing(): ...with contents: "
+              "'%s'\n",
+              file_contents);
+      file_mapping->file_contents[i].file_name = file_name;
+      file_mapping->file_contents[i].file_name_length = file_name_length;
+      file_mapping->file_contents[i].file_contents = file_contents;
+      file_mapping->file_contents[i].file_contents_length =
+          file_contents_length;
+    }
+    file_mapping->file_mapping_length = library->exports.count;
+  }
+
+  // Sort file mappings
+  qsort(file_mapping->file_contents, file_mapping->file_mapping_length,
+        sizeof(*file_mapping->file_contents), tracy_file_contents_sort_cmp);
+
+  // Register the mapping
+  if (iree_status_is_ok(status)) {
+    iree_tracing_register_custom_file_contents(file_mapping);
+  }
+#endif
+  return status;
 }
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
