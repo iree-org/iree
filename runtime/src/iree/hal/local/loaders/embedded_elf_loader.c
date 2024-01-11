@@ -30,11 +30,6 @@ typedef struct iree_hal_elf_executable_t {
   // Name used for the file field in tracy and debuggers.
   iree_string_view_t identifier;
 
-#if (IREE_TRACING_FEATURES)
-  // Optional mapping of filenames to custom contents.
-  tracy_file_mapping* file_mapping;
-#endif
-
   // Queried metadata from the library.
   union {
     const iree_hal_executable_library_header_t** header;
@@ -153,11 +148,6 @@ static iree_status_t iree_hal_elf_executable_create(
         &executable->library.v0->imports,
         (iree_hal_executable_import_thunk_v0_t)iree_elf_thunk_i_ppp,
         host_allocator);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = IREE_HAL_EXECUTABLE_LIBRARY_SETUP_TRACING(
-        executable->library.v0, host_allocator, &executable->file_mapping);
   }
 
   // Verify that the library matches the executable params.
