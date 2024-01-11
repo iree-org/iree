@@ -450,7 +450,18 @@ void CollapseDimensionsPass::runOnOperation() {
   // Move all the `tensor.collapse_shape` leafs  and `tensor.expand_shape` roots
   // of the modified dispatches out of the dispatch.
   for (auto dispatchOp : modifiedDispatchOps) {
-    Region &body = dispatchOp.getBody();
+    // Hoist tensor reshape ops out of dispatch region first. Otherwise, the
+    // reshape(cst) will be folded into a constant living in the dispatch. It
+    // could introduce big constants inlined in the dispatch.
+    FailureOr<DispatchRegionOp> newDispatchOp =
+        hoistTensorReshapesOutOfDispatchRegion(
+            rewriter, cast<DispatchRegionOp>(dispatchOp));
+    if (failed(newDispatchOp)) {
+      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
+      return signalPassFailure();
+    }
+
+    Region &body = newDispatchOp.value().getBody();
     assert(llvm::hasSingleElement(body) && "expected op with a single body");
     Block &block = body.front();
     RewritePatternSet moveReshapeOps(&getContext());
@@ -467,12 +478,6 @@ void CollapseDimensionsPass::runOnOperation() {
             applyOpPatternsAndFold(candidateOps, std::move(moveReshapeOps)))) {
       funcOp.emitOpError(
           "failed to propagate reshape ops introduced during collapse");
-      return signalPassFailure();
-    }
-
-    if (failed(hoistTensorReshapesOutOfDispatchRegion(
-            rewriter, cast<DispatchRegionOp>(dispatchOp)))) {
-      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
       return signalPassFailure();
     }
   }
