@@ -775,8 +775,8 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
 static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
-    SmallVector<bool> &inputVecScalableTileFlags,
-    ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+    ArrayRef<bool> inputVecScalableTileFlags, ArrayRef<int64_t> vecTileSizes,
+    int vectorSize) {
 
   // Clamp vector tile sizes to have better hint about peeling + masking. This
   // is critical for scalable vectorization, so it can resolve correct scalable
