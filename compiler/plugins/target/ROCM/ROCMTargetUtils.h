@@ -20,7 +20,7 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // Links optimized Ukernel module.
 void linkUkernelBCIfNecessary(llvm::Module *module, Location loc,
                               StringRef enabledUkernelsStr,
-                              std::string targetChip, std::string bitCodeDir,
+                              StringRef targetChip, StringRef bitCodeDir,
                               unsigned linkerFlags,
                               llvm::TargetMachine &targetMachine);
 // Compiles ISAToHsaco Code

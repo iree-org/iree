@@ -338,14 +338,13 @@ public:
       return failure();
     }
 
-    if (!options.enableROCMUkernels.empty()) {
-      if (options.enableROCMUkernels != "none") {
-        auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-        linkUkernelBCIfNecessary(llvmModule.get(), variantOp.getLoc(),
-                                 enabledUkernelsStr, options.targetChip,
-                                 options.bitcodeDirectory,
-                                 llvm::Linker::OverrideFromSrc, *targetMachine);
-      }
+    if (!options.enableROCMUkernels.empty() ||
+        options.enableROCMUkernels != "none") {
+      auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
+      linkUkernelBCIfNecessary(llvmModule.get(), variantOp.getLoc(),
+                               enabledUkernelsStr, options.targetChip,
+                               options.bitcodeDirectory,
+                               llvm::Linker::OverrideFromSrc, *targetMachine);
     }
     // Link module to Device Library
     if (options.linkBitcode) {

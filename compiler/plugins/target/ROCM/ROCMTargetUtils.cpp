@@ -121,8 +121,8 @@ static std::vector<std::string> getROCDLPaths(std::string targetChip,
 }
 
 static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
-                                                std::string targetChip,
-                                                std::string bitCodeDir) {
+                                                StringRef targetChip,
+                                                StringRef bitCodeDir) {
   // AMD bitcodes.
   static const std::vector<std::string> allUkernelNames({"argmax"});
   std::vector<std::string> selectedUkernelNames;
@@ -141,8 +141,9 @@ static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
   std::string app = "/";
   std::string bc_ext = ".bc";
   for (auto &kernelName : selectedUkernelNames) {
-    std::string filename = "rocm_" + kernelName + "_ukernel_" + targetChip;
-    result.push_back(bitCodeDir + app + filename + bc_ext);
+    std::string filename =
+        "rocm_" + kernelName + "_ukernel_" + targetChip.str();
+    result.push_back(bitCodeDir.str() + app + filename + bc_ext);
   }
   return result;
 }
@@ -224,7 +225,7 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 // it.
 void linkUkernelBCIfNecessary(llvm::Module *module, Location loc,
                               StringRef enabledUkernelsStr,
-                              std::string targetChip, std::string bitCodeDir,
+                              StringRef targetChip, StringRef bitCodeDir,
                               unsigned linkerFlags,
                               llvm::TargetMachine &targetMachine) {
   if (!couldNeedUkernelBitcode(*module)) {
