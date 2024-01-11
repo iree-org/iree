@@ -41,6 +41,7 @@ iree_lit_test_suite(
     "pipeline_vectorize_nd_extract_tests.mlir"
     "scalable_tile_and_vectorize_matmul.mlir"
     "select_aarch64_lowering_strategy.mlir"
+    "select_aarch64_sve_lowering_strategy_peeling.mlir"
     "select_lowering_strategy_without_distribution.mlir"
     "select_riscv_lowering_strategy.mlir"
     "select_x86_64_lowering_strategy.mlir"
