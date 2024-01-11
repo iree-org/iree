@@ -4653,7 +4653,8 @@ only the non-padded part of the output.</p>
   ArrayAttr,   # element_types
   TypeAttr,   # original_type
   IntegerAttr,   # matmul_narrow_M
-  IntegerAttr   # matmul_narrow_N
+  IntegerAttr,   # matmul_narrow_N
+  ArrayAttr   # user_indexing_maps
 &gt;
 </code></pre></div>
 <p>This attribute describes the change in the layout for
@@ -4703,6 +4704,11 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">matmul_narrow_N</td>
 <td style="text-align: center;"><code>IntegerAttr</code></td>
 <td>optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)</td>
+</tr>
+<tr>
+<td style="text-align: center;">user_indexing_maps</td>
+<td style="text-align: center;"><code>ArrayAttr</code></td>
+<td>Indexing maps of the operation using this tensor</td>
 </tr>
 </tbody>
 </table>
