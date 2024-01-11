@@ -296,7 +296,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -375,7 +375,7 @@ void addMultiTilingExpertPassPipeline(
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -440,7 +440,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -496,7 +496,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
       static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
   nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -536,7 +536,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
