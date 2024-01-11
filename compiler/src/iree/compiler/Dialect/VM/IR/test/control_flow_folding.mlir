@@ -116,10 +116,10 @@ vm.module @check_folds {
 
   // CHECK-LABEL: @check_nearly_eq_f32
   vm.func @check_nearly_eq_f32(%arg0 : f32, %arg1 : f32) {
-    // CHECK-NEXT:   %zero = vm.const.f32.zero
-    // CHECK-NEXT:   %c1 = vm.const.i32 1
-    // CHECK-NEXT:   [[THRESHOLD:%.+]] = vm.const.i32 100
-    // CHECK-NEXT:   %c9 = vm.const.i32 9
+    //  CHECK-DAG:   %zero = vm.const.f32.zero
+    //  CHECK-DAG:   %c1 = vm.const.i32 1
+    //  CHECK-DAG:   [[THRESHOLD:%.+]] = vm.const.i32 100
+    //  CHECK-DAG:   %c9 = vm.const.i32 9
     // CHECK-NEXT:   %0 = vm.cmp.lt.f32.o %arg0, %zero : f32
     // CHECK-NEXT:   %1 = vm.xor.i32 %0, %c1 : i32
     // CHECK-NEXT:   %2 = vm.cmp.lt.f32.o %arg1, %zero : f32
