@@ -17,6 +17,13 @@ int64_t __ockl_wfred_min_i64(int64_t);
 extern "C" __device__ __attribute__((const))
 int32_t __ockl_wfred_min_i32(int32_t);
 
+/*
+Constraint/Tiling note:
+For simplicity, we distribute all parallel dim across different wg, and only use
+single subgroup/warp per workgroup. This constraint is also set during tiling
+phase in KernelConfig.
+*/
+
 extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
                                                         size_t input_offset,
                                                         int32_t *outputBuffer,
@@ -33,10 +40,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
-    float new_in =
+    float newIn =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
-    laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f32(new_in, laneMax);
+    laneResult = newIn > laneMax ? idx : laneResult;
+    laneMax = __ocml_fmax_f32(newIn, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -72,10 +79,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
-    float new_in =
+    float newIn =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
-    laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f32(new_in, laneMax);
+    laneResult = newIn > laneMax ? idx : laneResult;
+    laneMax = __ocml_fmax_f32(newIn, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -110,10 +117,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
-    half new_in =
+    half newIn =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
-    laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f16(new_in, laneMax);
+    laneResult = newIn > laneMax ? idx : laneResult;
+    laneMax = __ocml_fmax_f16(newIn, laneMax);
   }
 
   // Final reduction with one subgroup
@@ -144,11 +151,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
-    half new_in = idx >= reductionSize
-                      ? NEG_F16_MAX
-                      : __half(inputBuffer[input_offset + idx]);
-    laneResult = new_in > laneMax ? idx : laneResult;
-    laneMax = __ocml_fmax_f16(new_in, laneMax);
+    half newIn = idx >= reductionSize ? NEG_F16_MAX
+                                      : __half(inputBuffer[input_offset + idx]);
+    laneResult = newIn > laneMax ? idx : laneResult;
+    laneMax = __ocml_fmax_f16(newIn, laneMax);
   }
 
   // Final reduction with one subgroup

@@ -130,7 +130,8 @@ LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
                                 << "`: " << ec.message();
   }
   auto setAlwaysInline = [&](llvm::Module &module) {
-    if (targetMachine.getTargetCPU().contains("gfx1")) {
+    if (targetMachine.getTargetCPU().contains("gfx10") ||
+        targetMachine.getTargetCPU().contains("gfx11")) {
       // some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
       // inlined.
       return;

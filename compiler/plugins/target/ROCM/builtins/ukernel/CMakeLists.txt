@@ -7,8 +7,8 @@ if (NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
 
-# Check if Hip is installed on system.
-# Hip is required to compile ukernels.
+# Check if HIP is installed on system.
+# HIP is required to compile ukernels.
 if (NOT IREE_ROCM_PATH)
   set(IREE_ROCM_PATH "/opt/rocm")
 endif()
@@ -56,8 +56,10 @@ function(iree_rocm_bitcode_library)
     # Suppress warnings about missing path to rocm lib,
     # and benign warning about ROCM version.
     "-nogpulib"
-    "--offload-device-only"
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    # Avoid error caused by clang bundling.
+    "--offload-device-only"
+    # Only enable necessary optimizations S.T we can use -O3.
     "-Xclang" "-disable-llvm-optzns"
     "${OPT_FLAG}"
 
@@ -91,7 +93,7 @@ function(iree_rocm_bitcode_library)
 
   add_custom_command(
     OUTPUT
-      ${_OUT}
+      "${_OUT}"
     COMMAND
       ${IREE_LLVM_LINK_BINARY}
       ${_BITCODE_FILES}

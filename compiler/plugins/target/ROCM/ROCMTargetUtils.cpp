@@ -124,7 +124,7 @@ static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
                                                 StringRef targetChip,
                                                 StringRef bitCodeDir) {
   // AMD bitcodes.
-  static const std::vector<std::string> allUkernelNames({"argmax"});
+  const std::vector<std::string> allUkernelNames({"argmax"});
   std::vector<std::string> selectedUkernelNames;
   if (enabledUkernelsStr == "all") {
     selectedUkernelNames = allUkernelNames;
@@ -139,11 +139,10 @@ static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
   // Construct full path to ROCDL bitcode libraries.
   std::vector<std::string> result;
   std::string app = "/";
-  std::string bc_ext = ".bc";
   for (auto &kernelName : selectedUkernelNames) {
     std::string filename =
         "rocm_" + kernelName + "_ukernel_" + targetChip.str();
-    result.push_back(bitCodeDir.str() + app + filename + bc_ext);
+    result.push_back(bitCodeDir.str() + app + filename + ".bc");
   }
   return result;
 }
