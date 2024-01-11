@@ -145,9 +145,9 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUVectorLowering :
-    Pass<"iree-llvmcpu-vector-lowering", "func::FuncOp"> {
-  let summary = "Pass to lower Vector ops before conversion to LLVM.";
+def LLVMCPUVirtualVectorLowering :
+    Pass<"iree-llvmcpu-virtual-vector-lowering", "func::FuncOp"> {
+  let summary = "Pass to lower high level vector operations like contract or multidim reduce ops to lower level vector ops.";
   let options = [
     Option<"splitVectorTransfersTo", "split-transfers", "std::string",
       /*default=*/"",
@@ -157,12 +157,35 @@ def LLVMCPUVectorLowering :
           "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
+  ];
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVirtualVectorLoweringPass()";
+}
+
+def LLVMCPUVectorTransferLowering :
+    Pass<"iree-llvmcpu-vector-transfer-lowering", "func::FuncOp"> {
+  let summary = "Pass to lower transfer ops to simpler ops like `vector.load`, `vector.store`, `vector.broadcast`, and a set of scf ops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorTransferLoweringPass()";
+}
+
+def LLVMCPUVectorTransposeLowering :
+    Pass<"iree-llvmcpu-vector-transpose-lowering", "func::FuncOp"> {
+  let summary = "Pass to lower vector.transpose ops.";
+  let options = [
     Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
   ];
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUVectorLoweringPass()";
+      "mlir::iree_compiler::createLLVMCPUVectorTransposeLoweringPass()";
+}
+
+def LLVMCPUVectorShapeCastLowering :
+    Pass<"iree-llvmcpu-vector-shape-cast-lowering", "func::FuncOp"> {
+  let summary = "Pass to lower vector.shape_cast ops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPUVectorShapeCastLoweringPass()";
 }
 
 def VectorContractCustomKernels :
