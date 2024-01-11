@@ -54,7 +54,9 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
 
-  auto vectorTransformOptions = vector::VectorTransformsOptions();
+  auto vectorTransformOptions =
+      vector::VectorTransformsOptions().setVectorTransposeLowering(
+          vector::VectorTransposeLowering::Shuffle1D);
   if (has16x16Transpose(funcOp)) {
     vectorTransformOptions.setVectorTransposeLowering(
         vector::VectorTransposeLowering::Shuffle16x16);

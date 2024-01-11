@@ -50,7 +50,6 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
       vector::VectorTransformsOptions()
           .setVectorTransformsOptions(vectorContractLowering)
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
-          .setVectorTransferSplit(vector::VectorTransferSplit::LinalgCopy)
           .setVectorTransferSplit(vectorTransferSplit);
 
   RewritePatternSet patterns(ctx);
