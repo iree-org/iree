@@ -775,7 +775,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
 static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
-    const ScalableTileFlagsListTypeRef inputScalableTileFlags,
+    SmallVector<bool> &inputVecScalableTileFlags,
     ArrayRef<int64_t> vecTileSizes, int vectorSize) {
 
   // Clamp vector tile sizes to have better hint about peeling + masking. This
@@ -804,6 +804,16 @@ static LogicalResult setMatmulPeelingRootConfig(
   SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
   std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
 
+  // The backend struggles to legalize non-power-of-two scalable vectors,
+  // hence the extra rounding up.
+  for (const auto &[index, size] : llvm::enumerate(vectorParallelTileSizes)) {
+    if (!size)
+      continue;
+    vectorParallelTileSizes[index] =
+        roundUpToPow2(size,
+                      /*predicate=*/inputVecScalableTileFlags[index]);
+  }
+
   TileSizesListType tileSizes = {
       SmallVector<int64_t>(distTileSizes), cacheParallelTileSizes,
       cacheReductionTileSizes, vectorParallelTileSizes,
@@ -811,29 +821,19 @@ static LogicalResult setMatmulPeelingRootConfig(
   // No need for tiling inner parallel dims.
   tileSizes.emplace_back(numTilingDims, 0);
 
-  // The backend struggles to legalize non-power-of-two scalable vectors,
-  // hence the extra rounding up.
-  const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
-  for (const auto &[index, size] : llvm::enumerate(vectorParallelTileSizes)) {
-    if (!size)
-      continue;
-    vectorParallelTileSizes[index] =
-        roundUpToPow2(size,
-                      /*predicate=*/vecScalableDims[index]);
-  }
-
   // 2. Set scalable flags for all the tiling levels.
-  SmallVector<bool> parallelScalableFlags;
-  for (auto [index, tileSize] : llvm::enumerate(vecTileSizes))
-    parallelScalableFlags.push_back(vecScalableDims[index]);
-  // Ensure there's no zero scalable dims.
+  SmallVector<bool> parallelScalableFlags(inputVecScalableTileFlags.begin(),
+                                          inputVecScalableTileFlags.end());
   SmallVector<bool> reductionScalableFlags(numTilingDims, false);
+
+  // Ensure there's no zero scalable dims.
   for (unsigned i = 0; i < numTilingDims; i++) {
     if (vectorReductionTileSizes[i] == 0)
       reductionScalableFlags[i] = false;
     if (vectorParallelTileSizes[i] == 0)
       parallelScalableFlags[i] = false;
   }
+
   ScalableTileFlagsListType newScalableTileFlags;
   // No scalable:
   // * distribution,
