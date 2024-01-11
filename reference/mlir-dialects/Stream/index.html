@@ -6898,7 +6898,7 @@ through host buffers.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.yield` attr-dict
               ($resource_operands^ `:`
-              custom&lt;SizeAwareTypeList&gt;(type($resource_operands),
+              custom&lt;ShapedTypeList&gt;(type($resource_operands),
               $resource_operand_sizes))?
 </code></pre></div>
 <p>The values returned represent the asynchronous value at the point in time
@@ -8913,7 +8913,7 @@ allocations and avoid copies.</p>
 <div class="highlight"><pre><span></span><code>operation ::= `stream.timepoint.await` (`on` `(` $affinity^ `)`)?
               $await_timepoint `=` `` `&gt;`
               $resource_operands `:`
-              custom&lt;SizeAwareTypeList&gt;(type($resource_operands),
+              custom&lt;ShapedTypeList&gt;(type($resource_operands),
               type($results), $resource_operand_sizes)
               attr-dict-with-keyword
 </code></pre></div>
