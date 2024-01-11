@@ -201,22 +201,23 @@ void buildDeviceQueryRegion(const KernelFeatures &features, Value device,
 
   Value result = builder.create<arith::ConstantIntOp>(loc, true, 1);
   if (features.computeFloat) {
-    result = buildQueryOp("compute.f", features.computeFloat, result);
+    result =
+        buildQueryOp("compute.bitwidths.fp", features.computeFloat, result);
   }
   if (features.computeInt) {
-    result = buildQueryOp("compute.i", features.computeInt, result);
+    result = buildQueryOp("compute.bitwidths.int", features.computeInt, result);
   }
   if (features.storage) {
-    result = buildQueryOp("storage", features.storage, result);
+    result = buildQueryOp("storage.bitwidths", features.storage, result);
   }
   if (features.subgroup) {
-    result = buildQueryOp("subgroup", features.subgroup, result);
+    result = buildQueryOp("subgroup.ops", features.subgroup, result);
   }
   if (features.dotProduct) {
-    result = buildQueryOp("dotprod", features.dotProduct, result);
+    result = buildQueryOp("dotprod.ops", features.dotProduct, result);
   }
   if (features.coopMatrix) {
-    result = buildQueryOp("coopmatrix", features.coopMatrix, result);
+    result = buildQueryOp("coopmatrix.ops", features.coopMatrix, result);
   }
   builder.create<IREE::HAL::ReturnOp>(loc, result);
 }
@@ -225,22 +226,24 @@ void buildDeviceQueryRegion(const KernelFeatures &features, Value device,
 SmallVector<std::string> getDeviceQueries(const KernelFeatures &features) {
   SmallVector<std::string> queries;
   if (features.computeFloat) {
-    queries.push_back("compute.f=" + std::to_string(features.computeFloat));
+    queries.push_back("compute.bitwidths.fp=" +
+                      std::to_string(features.computeFloat));
   }
   if (features.computeInt) {
-    queries.push_back("compute.i=" + std::to_string(features.computeInt));
+    queries.push_back("compute.bitwidths.int=" +
+                      std::to_string(features.computeInt));
   }
   if (features.storage) {
-    queries.push_back("storage=" + std::to_string(features.storage));
+    queries.push_back("storage.bitwidths=" + std::to_string(features.storage));
   }
   if (features.subgroup) {
-    queries.push_back("subgroup=" + std::to_string(features.subgroup));
+    queries.push_back("subgroup.ops=" + std::to_string(features.subgroup));
   }
   if (features.dotProduct) {
-    queries.push_back("dotprod=" + std::to_string(features.dotProduct));
+    queries.push_back("dotprod.ops=" + std::to_string(features.dotProduct));
   }
   if (features.coopMatrix) {
-    queries.push_back("coopmatrix=" + std::to_string(features.coopMatrix));
+    queries.push_back("coopmatrix.ops=" + std::to_string(features.coopMatrix));
   }
   return queries;
 }

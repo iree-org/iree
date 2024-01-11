@@ -32,11 +32,11 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_subgroup_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=3"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup.ops=3"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "subgroup.ops") : i1, i32 = 0 : i32
   //  CHECK-NEXT:   %[[ZERO:.+]] = arith.constant 0 : i32
   //  CHECK-NEXT:   %[[TARGET:.+]] = arith.constant 3 : i32
   //  CHECK-NEXT:   %[[CHECK:.+]] = arith.andi %[[V]], %[[TARGET]] : i32
@@ -65,11 +65,11 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_8bit_storage_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage=1"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage.bitwidths=1"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "storage") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "storage.bitwidths") : i1, i32 = 0 : i32
   //  CHECK-NEXT:   %[[ZERO:.+]] = arith.constant 0 : i32
   //  CHECK-NEXT:   %[[TARGET:.+]] = arith.constant 1 : i32
   //  CHECK-NEXT:   %[[CHECK:.+]] = arith.andi %[[V]], %[[TARGET]] : i32
@@ -99,11 +99,11 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_16bit_storage_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage=2"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage.bitwidths=2"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "storage") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "storage.bitwidths") : i1, i32 = 0 : i32
   //  CHECK-NEXT:   %[[ZERO:.+]] = arith.constant 0 : i32
   //  CHECK-NEXT:   %[[TARGET:.+]] = arith.constant 2 : i32
   //  CHECK-NEXT:   %[[CHECK:.+]] = arith.andi %[[V]], %[[TARGET]] : i32
@@ -133,9 +133,9 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_int_compute_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.i=7"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.bitwidths.int=7"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "compute.i") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.int") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 7 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_int_compute_capabilities target(
@@ -158,9 +158,9 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_float_compute_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.f=3"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.bitwidths.fp=3"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "compute.f") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.fp") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 3 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_float_compute_capabilities target(
@@ -183,9 +183,9 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_dot_product_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "dotprod=1"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "dotprod.ops=1"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "dotprod") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "dotprod.ops") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_dot_product_capabilities target(
@@ -208,9 +208,9 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_cooperative_matrix_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "coopmatrix=1"]}>)
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "coopmatrix.ops=1"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
-  //  CHECK-SAME:     key("hal.dispatch" :: "coopmatrix") : i1, i32 = 0 : i32
+  //  CHECK-SAME:     key("hal.dispatch" :: "coopmatrix.ops") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_cooperative_matrix_capabilities target(

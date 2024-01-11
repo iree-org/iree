@@ -1428,27 +1428,27 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
   // Note that the device queries used here should match the ones used in
   // buildDeviceQueryRegion() on the compiler side.
   if (iree_string_view_equal(category, IREE_SV("hal.dispatch"))) {
-    if (iree_string_view_equal(key, IREE_SV("compute.f"))) {
+    if (iree_string_view_equal(key, IREE_SV("compute.bitwidths.fp"))) {
       *out_value = device->logical_device->supported_properties().compute_float;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("compute.i"))) {
+    if (iree_string_view_equal(key, IREE_SV("compute.bitwidths.int"))) {
       *out_value = device->logical_device->supported_properties().compute_int;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("storage"))) {
+    if (iree_string_view_equal(key, IREE_SV("storage.bitwidths"))) {
       *out_value = device->logical_device->supported_properties().storage;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("subgroup"))) {
+    if (iree_string_view_equal(key, IREE_SV("subgroup.ops"))) {
       *out_value = device->logical_device->supported_properties().subgroup;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("dotprod"))) {
+    if (iree_string_view_equal(key, IREE_SV("dotprod.ops"))) {
       *out_value = device->logical_device->supported_properties().dot_product;
       return iree_ok_status();
     }
-    if (iree_string_view_equal(key, IREE_SV("coopmatrix"))) {
+    if (iree_string_view_equal(key, IREE_SV("coopmatrix.ops"))) {
       *out_value =
           device->logical_device->supported_properties().cooperative_matrix;
       return iree_ok_status();
