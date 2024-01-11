@@ -110,6 +110,13 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// using shared memory when CodeGen towards the GPU.
 bool sharedMemTransposeFilter(AffineMap indexMap);
 
+//===----------------------------------------------------------------------===//
+// GPU UKernel Utils
+//===----------------------------------------------------------------------===//
+
+/// Checks if target GPU has UKernel support.
+bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_

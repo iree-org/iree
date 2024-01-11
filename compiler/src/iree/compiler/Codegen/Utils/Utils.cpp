@@ -187,20 +187,6 @@ bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
   return false;
 }
 
-// TODO: Add more popular kernels into this list and the ukernel cmake.
-//       No real technical reason to only allow these aside from compile
-//       time and diskspace.
-bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
-  if (!targetArch) {
-    return false;
-  }
-  StringRef targetArchStr = targetArch->getValue();
-  const llvm::StringSet<> kSupportedTargetChip{"gfx90a", "gfx940", "gfx1030",
-                                               "gfx1100"};
-  return kSupportedTargetChip.contains(targetArchStr);
-}
-
 std::optional<StringRef>
 getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr) {
   auto cpuFeatures = getConfigStringAttr(targetAttr, "cpu_features");

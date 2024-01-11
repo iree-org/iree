@@ -1063,7 +1063,7 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 }
 
 /// Set the configuration for argmax that can be mapped to argmax uKernel.
-/// Distribute all parallel dim across different wg, and only use single
+/// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
 static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
                                             linalg::GenericOp op,
@@ -1075,7 +1075,7 @@ static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
     auto target = variantOp.getTarget();
     const char ukernelName[] = "argmax";
     if (!hasUkernel(target, ukernelName) ||
-        !hasUkernelSupportedRocmArch(target)) {
+        !hasUkernelSupportedGpuArch(target)) {
       return failure();
     }
   }
@@ -1090,14 +1090,13 @@ static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
-  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
-  int64_t numParallelDims = op.getNumParallelLoops();
-
   // Currently Argmax UKernel only support 1 reduction dim.
   if (reductionDims.size() != 1)
     return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
   int64_t numDynamicReductionDims = 0;
   for (unsigned dim : reductionDims) {
     if (ShapedType::isDynamic(bounds[dim])) {
@@ -1122,8 +1121,8 @@ static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
 
   // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
   // number of elements, and then it does a single step butterfly warp reduce.
-  // Hence it expects wgSize to be workgroupSize, and reductionTileSize to be
-  // size of the reduction dim.
+  // Hence it expects workgroupSize to be warpSize/subgroupSize, and
+  // reductionTileSize to be size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;

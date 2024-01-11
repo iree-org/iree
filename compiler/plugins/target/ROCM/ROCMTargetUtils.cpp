@@ -40,18 +40,6 @@ bool couldNeedDeviceBitcode(const llvm::Module &module) {
   return false;
 }
 
-bool couldNeedUkernelBitcode(const llvm::Module &module) {
-  for (const llvm::Function &function : module.functions()) {
-    // The list of prefixes should be in sync with library functions used in
-    // target_util.cc.
-    if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().starts_with("__iree_uk_rocm_"))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void dieWithSMDiagnosticError(llvm::SMDiagnostic *diagnostic) {
   llvm::WithColor::error(llvm::errs())
       << diagnostic->getFilename().str() << ":" << diagnostic->getLineNo()
@@ -227,9 +215,6 @@ void linkUkernelBCIfNecessary(llvm::Module *module, Location loc,
                               StringRef targetChip, StringRef bitCodeDir,
                               unsigned linkerFlags,
                               llvm::TargetMachine &targetMachine) {
-  if (!couldNeedUkernelBitcode(*module)) {
-    return;
-  }
   std::vector<std::string> ukernelPaths =
       getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
   llvm::Linker linker(*module);

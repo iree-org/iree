@@ -881,4 +881,31 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// GPU UKernel Utils
+//===----------------------------------------------------------------------===//
+
+// TODO: Add more popular kernels into this list and the ukernel cmake.
+//       No real technical reason to only allow these aside from compile
+//       time and diskspace.
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
+  if (!targetArch) {
+    return false;
+  }
+  StringRef targetArchStr = targetArch->getValue();
+  const llvm::StringSet<> kSupportedTargetChip{"gfx90a", "gfx940", "gfx1030",
+                                               "gfx1100"};
+  return kSupportedTargetChip.contains(targetArchStr);
+}
+
+/// Checks if target GPU has UKernel support.
+bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isROCMBackend(targetAttr) && hasUkernelSupportedRocmArch(targetAttr)) {
+    return true;
+  }
+  // TODO: Once plumbed, add a CUDA backend and supported cuda arch check.
+  return false;
+}
+
 } // namespace mlir::iree_compiler

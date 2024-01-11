@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -61,18 +61,16 @@ getFnNameAndDefAttrs(const char *ukernelName, std::string &typeSuffixID,
   return result;
 }
 
-/// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
-/// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
-/// into a call to the microkernel.
+/// Matches generic that represent argmax and check if
+/// we have the ukernel that matches it shape constraint, and types.
+/// If we do, then we convert into iree_codegen.ukernel.argmax operation,
+/// that is later lowered into a call to the microkernel.
 static FailureOr<IREE::Codegen::UKernelOpInterface>
 matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   const char ukernelName[] = "argmax";
-  if (!hasUkernel(targetAttr, ukernelName)) {
-    return failure();
-  }
-
-  if (!hasUkernelSupportedRocmArch(targetAttr)) {
+  if (!hasUkernel(targetAttr, ukernelName) ||
+      !hasUkernelSupportedGpuArch(targetAttr)) {
     return failure();
   }
 

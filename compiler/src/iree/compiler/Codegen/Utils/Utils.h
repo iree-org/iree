@@ -82,9 +82,6 @@ bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasUkernel(IREE::HAL::ExecutableTargetAttr targetAttr,
                 StringRef ukernelName = "");
 
-// Returns true if the rocm archtecture target is supported for ukernels.
-bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 /// Returns the CPU target features associated with the `targetAttr`, if set.
 std::optional<StringRef>
 getCpuFeatures(IREE::HAL::ExecutableTargetAttr targetAttr);

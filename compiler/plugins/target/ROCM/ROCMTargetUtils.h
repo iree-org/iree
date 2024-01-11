@@ -26,6 +26,9 @@ void linkUkernelBCIfNecessary(llvm::Module *module, Location loc,
 // Compiles ISAToHsaco Code
 std::string createHsaco(Location loc, const std::string isa, StringRef name);
 
+// Returns true if the rocm archtecture target is supported for ukernels.
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 } // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_PLUGINS_TARGET_ROCM_ROCMTARGETUTILS_H_
