@@ -25,16 +25,30 @@ argmax_ukernel_source = fetch_source_fixture(
 
 
 @pytest.fixture
-def argmax_ukernel_rdna3_rocm_vmfb(argmax_ukernel_source):
+def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
     return iree_compile(
         argmax_ukernel_source,
-        "rdna3_rocm",
+        "gfx90a_rocm",
         flags=COMMON_FLAGS
         + [
             "--iree-hal-target-backends=rocm",
-            "--iree-rocm-target-chip=gfx1100",
+            "--iree-rocm-target-chip=gfx90a",
             "--iree-rocm-link-bc=true",
-            "--iree-rocm-enable-ukernels=none",
+            "--iree-rocm-enable-ukernels=argmax",
+        ],
+    )
+
+@pytest.fixture
+def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
+    return iree_compile(
+        argmax_ukernel_source,
+        "gfx940_rocm",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=rocm",
+            "--iree-rocm-target-chip=gfx940",
+            "--iree-rocm-link-bc=true",
+            "--iree-rocm-enable-ukernels=argmax",
         ],
     )
 
@@ -74,16 +88,16 @@ argmax_output_f32 = fetch_source_fixture(
 
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
-@pytest.mark.plat_rdna3_rocm
-def test_correctness_rnda3_rocm(
-    argmax_ukernel_rdna3_rocm_vmfb,
+@pytest.mark.plat_gfx90a_rocm
+def test_correctness_gfx90a_rocm(
+    argmax_ukernel_gfx90a_rocm_vmfb,
     argmax_input_f16,
     argmax_output_f16,
     argmax_input_f32,
     argmax_output_f32,
 ):
     iree_run_module(
-        argmax_ukernel_rdna3_rocm_vmfb,
+        argmax_ukernel_gfx90a_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i32",
         args=[
@@ -92,7 +106,7 @@ def test_correctness_rnda3_rocm(
         ],
     )
     iree_run_module(
-        argmax_ukernel_rdna3_rocm_vmfb,
+        argmax_ukernel_gfx90a_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f16i64",
         args=[
@@ -102,7 +116,7 @@ def test_correctness_rnda3_rocm(
     )
 
     iree_run_module(
-        argmax_ukernel_rdna3_rocm_vmfb,
+        argmax_ukernel_gfx90a_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i32",
         args=[
@@ -111,7 +125,55 @@ def test_correctness_rnda3_rocm(
         ],
     )
     iree_run_module(
-        argmax_ukernel_rdna3_rocm_vmfb,
+        argmax_ukernel_gfx90a_rocm_vmfb,
+        device="rocm",
+        function="argmax_3d_dyn_f32i64",
+        args=[
+            f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
+        ],
+    )
+
+@pytest.mark.presubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_gfx940_rocm
+def test_correctness_gfx940_rocm(
+    argmax_ukernel_gfx940_rocm_vmfb,
+    argmax_input_f16,
+    argmax_output_f16,
+    argmax_input_f32,
+    argmax_output_f32,
+):
+    iree_run_module(
+        argmax_ukernel_gfx940_rocm_vmfb,
+        device="rocm",
+        function="argmax_3d_dyn_f16i32",
+        args=[
+            f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
+        ],
+    )
+    iree_run_module(
+        argmax_ukernel_gfx940_rocm_vmfb,
+        device="rocm",
+        function="argmax_3d_dyn_f16i64",
+        args=[
+            f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
+        ],
+    )
+
+    iree_run_module(
+        argmax_ukernel_gfx940_rocm_vmfb,
+        device="rocm",
+        function="argmax_3d_dyn_f32i32",
+        args=[
+            f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
+        ],
+    )
+    iree_run_module(
+        argmax_ukernel_gfx940_rocm_vmfb,
         device="rocm",
         function="argmax_3d_dyn_f32i64",
         args=[

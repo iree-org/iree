@@ -8,6 +8,7 @@
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
 #define GLOBAL_SPACE __attribute__((address_space(1)))
+#define SHARED_SPACE __attribute__((address_space(3)))
 
 extern "C" __device__ __attribute__((const)) half __ockl_wfred_max_f16(half);
 extern "C" __device__ __attribute__((const)) float __ockl_wfred_max_f32(float);
@@ -16,11 +17,11 @@ int64_t __ockl_wfred_min_i64(int64_t);
 extern "C" __device__ __attribute__((const))
 int32_t __ockl_wfred_min_i32(int32_t);
 
-extern "C" __device__ void
-__iree_uk_rocm_argmax_F32I32(GLOBAL_SPACE float *inputBuffer,
-                             size_t input_offset,
-                             GLOBAL_SPACE int32_t *outputBuffer,
-                             size_t output_offset, size_t reductionSize) {
+extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
+                                                        size_t input_offset,
+                                                        int32_t *outputBuffer,
+                                                        size_t output_offset,
+                                                        size_t reductionSize) {
   uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
@@ -55,11 +56,11 @@ __iree_uk_rocm_argmax_F32I32(GLOBAL_SPACE float *inputBuffer,
     outputBuffer[output_offset] = laneResult;
 }
 
-extern "C" __device__ void
-__iree_uk_rocm_argmax_F32I64(GLOBAL_SPACE float *inputBuffer,
-                             size_t input_offset,
-                             GLOBAL_SPACE int64_t *outputBuffer,
-                             size_t output_offset, size_t reductionSize) {
+extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
+                                                        size_t input_offset,
+                                                        int64_t *outputBuffer,
+                                                        size_t output_offset,
+                                                        size_t reductionSize) {
   uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
   float laneMax =
@@ -94,10 +95,11 @@ __iree_uk_rocm_argmax_F32I64(GLOBAL_SPACE float *inputBuffer,
     outputBuffer[output_offset] = laneResult;
 }
 
-extern "C" __device__ void
-__iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
-                             GLOBAL_SPACE int32_t *outputBuffer,
-                             size_t output_offset, size_t reductionSize) {
+extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
+                                                        size_t input_offset,
+                                                        int32_t *outputBuffer,
+                                                        size_t output_offset,
+                                                        size_t reductionSize) {
   half NEG_F16_MAX = __float2half(-65504.0f);
   uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
@@ -127,10 +129,11 @@ __iree_uk_rocm_argmax_F16I32(half *inputBuffer, size_t input_offset,
     outputBuffer[output_offset] = laneResult;
 }
 
-extern "C" __device__ void
-__iree_uk_rocm_argmax_F16I64(half *inputBuffer, size_t input_offset,
-                             GLOBAL_SPACE int64_t *outputBuffer,
-                             size_t output_offset, size_t reductionSize) {
+extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
+                                                        size_t input_offset,
+                                                        int64_t *outputBuffer,
+                                                        size_t output_offset,
+                                                        size_t reductionSize) {
   half NEG_F16_MAX = __float2half(-65504.0f);
   uint laneID = __builtin_amdgcn_workitem_id_x();
   // Set identity value to handle problem non divisible by subgroupSize.
