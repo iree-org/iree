@@ -8,8 +8,8 @@
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
-#include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -18,16 +18,7 @@ namespace mlir::iree_compiler::IREE::VM {
 
 class EmitCTypeConverter : public mlir::TypeConverter {
 public:
-  EmitCTypeConverter();
-  FailureOr<std::reference_wrapper<VMAnalysis>>
-  lookupAnalysis(mlir::func::FuncOp &funcOp) {
-    return lookupAnalysis(funcOp.getOperation());
-  }
-  FailureOr<std::reference_wrapper<VMAnalysis>>
-  lookupAnalysis(IREE::VM::FuncOp &funcOp) {
-    return lookupAnalysis(funcOp.getOperation());
-  }
-  std::optional<Value> materializeRef(Value ref);
+  EmitCTypeConverter(ModuleOp module);
 
   // This is the same as convertType, but returns `iree_vm_ref_t` rather than a
   // pointer to it for `vm.ref` types.
@@ -35,25 +26,8 @@ public:
   Type convertTypeAsPointer(Type type) const;
   emitc::OpaqueType convertTypeAsCType(Type type) const;
 
-  void cacheTypeTable(IREE::VM::ModuleOp module) {
-    typeTable = buildTypeTable(module);
-  }
-  void mapType(Type type, size_t index) { typeOrdinalMap[type] = index; }
-  std::optional<size_t> lookupType(Type type) const {
-    auto ptr = typeOrdinalMap.find(type);
-    if (ptr == typeOrdinalMap.end()) {
-      return std::nullopt;
-    }
-    return ptr->second;
-  }
-
   SetVector<Operation *> sourceMaterializations;
-  VMAnalysisCache analysisCache;
-  std::vector<TypeDef> typeTable;
-
-private:
-  llvm::DenseMap<Type, int> typeOrdinalMap;
-  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(Operation *op);
+  mutable ModuleAnalysis analysis;
 };
 
 } // namespace mlir::iree_compiler::IREE::VM
