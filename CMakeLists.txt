@@ -239,7 +239,7 @@ option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL driv
 # not cross compiling. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-set(IREE_HAL_DRIVER_CUDA2_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+set(IREE_HAL_DRIVER_CUDA2_DEFAULT OFF)
 if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
   set(IREE_HAL_DRIVER_CUDA2_DEFAULT OFF)
