@@ -182,6 +182,29 @@ UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
                                            getStridedOuterDimsAttr());
 }
 
+void UKernelGenericOp::getEffects(
+    SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
+        &effects) {
+  SmallVector<Value> readOnlyOperands = getDpsInputs();
+  readOnlyOperands.append(getOtherOperands().begin(), getOtherOperands().end());
+  for (Value value : readOnlyOperands) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+  for (Value value : getDpsInits()) {
+    if (!llvm::isa<MemRefType>(value.getType())) {
+      continue;
+    }
+    effects.emplace_back(MemoryEffects::Read::get(), value,
+                         SideEffects::DefaultResource::get());
+    effects.emplace_back(MemoryEffects::Write::get(), value,
+                         SideEffects::DefaultResource::get());
+  }
+}
+
 } // namespace mlir::iree_compiler::IREE::Codegen
 
 namespace mlir::iree_compiler {

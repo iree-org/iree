@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmcpu-vector-lowering{split-transfers=linalg-copy}))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmcpu-vector-lowering-pipeline --split-input-file %s | FileCheck %s
 
 func.func @matmul_391x384x384_f32() {
   %cst = arith.constant 0.000000e+00 : f32

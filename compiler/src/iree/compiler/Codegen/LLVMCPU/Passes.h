@@ -25,7 +25,7 @@ createConvertToLLVMPass(bool reassociateFpReordering = false);
 
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUCheckIRBeforeLLVMConversionPass();
+createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds = true);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
@@ -73,11 +73,28 @@ createLLVMCPUTilePass(int64_t tilingLevel = -1);
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 
-// Pass to lower Vector ops before conversion to LLVM.
+//------------------------------------------------------------------------------
+// Passes to lower Vector ops before conversion to LLVM.
+//------------------------------------------------------------------------------
+
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
 };
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "");
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorTransferLoweringPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorTransposeLoweringPass(
+    bool lowerVectorTransposeToAVX2 = false);
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorShapeCastLoweringPass();
+
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options);

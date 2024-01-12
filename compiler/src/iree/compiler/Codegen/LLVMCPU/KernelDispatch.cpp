@@ -43,23 +43,23 @@ namespace mlir::iree_compiler {
 /// TODO: Find a way to plumb this through to not rely on these flags.
 
 static llvm::cl::opt<int> clNumberOfRuntimeThreads(
-    "iree-codegen-llvm-number-of-threads",
+    "iree-llvmcpu-number-of-threads",
     llvm::cl::desc("number of threads that are used at runtime if codegen "
                    "thread distribution is enabled"),
     llvm::cl::init(8));
 
 static llvm::cl::opt<bool> clDisableDistribution(
-    "iree-codegen-llvm-disable-distribution",
+    "iree-llvmcpu-disable-distribution",
     llvm::cl::desc("disable thread distribution in codegen"),
     llvm::cl::init(false));
 
 static llvm::cl::opt<int>
-    defaultDistTileSize("iree-codegen-llvm-distribution-size",
-                        llvm::cl::desc("default distribution tile size"),
-                        llvm::cl::init(64));
+    clDefaultDistTileSize("iree-llvmcpu-distribution-size",
+                          llvm::cl::desc("default distribution tile size"),
+                          llvm::cl::init(64));
 
 static llvm::cl::opt<int> clNarrowMatmulTileBytes(
-    "iree-codegen-llvm-narrow-matmul-tile-bytes",
+    "iree-llvmcpu-narrow-matmul-tile-bytes",
     llvm::cl::desc(
         "target distribution tile size for wide matrix operand of narrow "
         "matmuls, expressed in bytes. Currently only used in data-tiled "
@@ -70,20 +70,22 @@ static llvm::cl::opt<int> clNarrowMatmulTileBytes(
     llvm::cl::init(64 * 1024));
 
 static llvm::cl::opt<int> clGeneralMatmulTileBytes(
-    "iree-codegen-llvm-general-matmul-tile-bytes",
+    "iree-llvmcpu-general-matmul-tile-bytes",
     llvm::cl::desc("target distribution tile size for matrix operands of "
                    "general matmuls, expressed in bytes. Currently only used "
                    "in data-tiled matmuls (mmt4d)."),
     llvm::cl::init(64 * 1024));
 
-static llvm::cl::opt<bool>
-    enableVectorPeeling("iree-codegen-enable-vector-peeling",
-                        llvm::cl::desc("Enable peeling for vectorization"),
-                        llvm::cl::init(true));
+static llvm::cl::opt<bool> clDisableVectorPeeling(
+    "iree-llvmcpu-disable-vector-peeling",
+    llvm::cl::desc("Disable peeling as a pre-processing step for "
+                   "vectorization (only relevant when using compiler "
+                   "heuristics to select the strategy)."),
+    llvm::cl::init(false));
 
 // Non-static options are used in other places.
-llvm::cl::opt<bool> clCPUEnableTransformDialectJit(
-    "iree-codegen-llvmcpu-enable-transform-dialect-jit",
+llvm::cl::opt<bool> clEnableTransformDialectJit(
+    "iree-llvmcpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
@@ -100,8 +102,31 @@ enum class VectorPreProcStrategy {
   // be masked-out.
   Masking,
   // Do not apply any vectorization pre-processing transformation.
-  None
+  None,
+  // A hint for the compiler to use its heuristics to determine an
+  // actual pre-processing strategy.
+  Heuristics
 };
+
+static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
+    "iree-codegen-llvmcpu-vector-pproc-strategy",
+    llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
+                   "before vectorization:"),
+    llvm::cl::values(
+        clEnumValN(VectorPreProcStrategy::Peeling, "peel",
+                   "Peel iterations from the vector dimensions so that they "
+                   "become multiple of the vector length"),
+        clEnumValN(
+            VectorPreProcStrategy::Masking, "mask",
+            " Compute vector dimensions assuming vector masking support. "
+            "Vector sizes may be rounded up to the nearest power of two "
+            "and out-of-bounds elements would be masked-out."),
+        clEnumValN(
+            VectorPreProcStrategy::None, "none",
+            "Do not apply any vectorization pre-processing transformation."),
+        clEnumValN(VectorPreProcStrategy::Heuristics, "heuristics",
+                   "To be determined by IREE's heuristics (default).")),
+    llvm::cl::init(VectorPreProcStrategy::Heuristics));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -115,6 +140,9 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     break;
   case VectorPreProcStrategy::None:
     os << "None";
+    break;
+  case VectorPreProcStrategy::Heuristics:
+    os << "Heuristics";
     break;
   }
   return os;
@@ -170,11 +198,17 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 }
 
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
-/// given LinalgOp, depending on the op traits and the target architecture.
+/// given LinalgOp. It is based on either:
+///   * user-specified value, or
+///   * heuristics (e.g. the op traits and the target architecture).
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
-  // Generic strategies.
+  // If set, use the strategy selected by a user.
+  if (clPProcStrategy != VectorPreProcStrategy::Heuristics) {
+    return clPProcStrategy;
+  }
 
+  // Select a strategy based on heuristics.
   if (linalgOp.hasBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
@@ -188,7 +222,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -199,7 +233,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -210,7 +244,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
       return VectorPreProcStrategy::Masking;
     }
 
-    if (enableVectorPeeling) {
+    if (!clDisableVectorPeeling) {
       return VectorPreProcStrategy::Peeling;
     }
   }
@@ -585,7 +619,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
     adjustedMinTileSizes[i] =
         config.minTileSizes.empty() ? 1 : config.minTileSizes[i];
     adjustedMaxTileSizes[i] = config.maxTileSizes.empty()
-                                  ? defaultDistTileSize
+                                  ? clDefaultDistTileSize
                                   : config.maxTileSizes[i];
     adjustedVectorSizeHints[i] =
         config.vectorSizeHints.empty() ? 1 : config.vectorSizeHints[i];
@@ -1080,7 +1114,7 @@ setRootConfig(func::FuncOp entryPointFn,
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
 
   // Use the default distribution for the matmul loops.
-  int64_t defaultMaxSize = defaultDistTileSize;
+  int64_t defaultMaxSize = clDefaultDistTileSize;
   if (isX86(targetAttr) || isRISCV(targetAttr) ||
       (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr))) {
     defaultMaxSize = 128;
@@ -1346,7 +1380,7 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     if (matchPattern(fftOp.getStage(), m_ConstantInt(&value))) {
       distTileSizes[rank - 1] = 1ll << value.getSExtValue();
       distTileSizes[rank - 1] = std::max(
-          distTileSizes[rank - 1], static_cast<int64_t>(defaultDistTileSize));
+          distTileSizes[rank - 1], static_cast<int64_t>(clDefaultDistTileSize));
     } else {
       return fftOp.emitOpError("non-constant stage might not work for fft op");
     }
@@ -1432,7 +1466,7 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
-  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize / 2);
+  distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize / 2);
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
@@ -1488,7 +1522,7 @@ setTransformStrategyRootConfig(func::FuncOp entryPointFn,
                                const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
-  if (!clCPUEnableTransformDialectJit)
+  if (!clEnableTransformDialectJit)
     return failure();
   cpu::CPUModel cpuModel;
   if (failed(
@@ -1594,7 +1628,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
   distConfig.allowIncompleteTile = true;
   distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  distConfig.maxTileSizes.append(numLoops, defaultDistTileSize);
+  distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
 
@@ -2292,8 +2326,10 @@ setLoweringConfigForComputeOps(func::FuncOp entryPointFn,
                   continue;
                 tileSizes[pos] = tileSizes[pos] / size;
               }
-              if (!outerDimsPerm.empty())
+              if (!outerDimsPerm.empty()) {
+                tileSizes.resize(numLoops, 0);
                 applyPermutationToVector(tileSizes, outerDimsPerm);
+              }
             }
           })
           .Default([&](auto) {

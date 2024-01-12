@@ -293,10 +293,13 @@ def GenericVectorization :
       "mlir::iree_compiler::createGenericVectorizationPass()";
 }
 
-def HoistRedundantVectorTransfers :
-    Pass<"iree-codegen-hoist-redundant-vector-transfers", "func::FuncOp"> {
-  let summary = "Hoist redundant vector transfers";
-  let constructor = "mlir::iree_compiler::createHoistRedundantVectorTransfersPass()";
+def OptimizeTensorInsertExtractSlices
+    : Pass<"iree-codegen-optimize-tensor-insert-extract-slices",
+           "func::FuncOp"> {
+  let summary = "Optimize tensor.insert_slice/tensor.extract_slice operations "
+                "(e.g. hoist and fold)";
+  let constructor =
+      "mlir::iree_compiler::createOptimizeTensorInsertExtractSlicesPass()";
 }
 
 def HoistUnrolledVectorExtractInsertSlice :

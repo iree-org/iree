@@ -420,10 +420,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
+      return IREE::Util::findDynamicDimsInList(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+      return IREE::Util::findDynamicDimsInList(idx, getResults(), getResultDims());
     }
 
     IREE::HAL::ExecutableObjectsAttr getObjectsAttr() {
@@ -2161,6 +2161,11 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     // Returns a map of constant key attributes to ordinals across all constant
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
+
+    // Creates the new `hal.executable.condition` op in this variant op and sets
+    // the insertion point of the provided builder to the beginning of the new
+    // region.
+    Value createConditionOp(OpBuilder &builder);
 
     // Returns an i1 indicating whether this variant should be selected.
     Value buildCondition(Value device, OpBuilder &builder);

@@ -1,5 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=true},cse,canonicalize))" %s | FileCheck %s
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=false},cse,canonicalize))" %s | FileCheck %s --check-prefix=NOSKIPROUND
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=true},cse,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-lower-to-ukernels{skip-intermediate-roundings=false},cse,canonicalize))" %s | FileCheck %s --check-prefix=NOSKIPROUND
 
 func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>,
     %arg2 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> attributes {
@@ -13,11 +13,11 @@ func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1281 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1281 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -130,11 +130,11 @@ func.func @mmt4d_i8i8i32(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?x?xi8>,
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1282 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1282 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -164,11 +164,11 @@ func.func @mmt4d_i16i16i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1287 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1287 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -198,11 +198,11 @@ func.func @mmt4d_i16i8i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi8
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1289 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1289 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -232,11 +232,11 @@ func.func @mmt4d_f16f16f32(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1283 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1283 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -266,11 +266,11 @@ func.func @mmt4d_f16f16f16(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1284 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1284 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -290,11 +290,11 @@ func.func @mmt4d_f16f16f16(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 // NOSKIPROUND-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // NOSKIPROUND-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
 // NOSKIPROUND-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
+//  NOSKIPROUND-DAG:   %[[FLAGS:.+]] = arith.constant 260 : i32
 //  NOSKIPROUND-DAG:   %[[C0:.+]] = arith.constant 0
 //  NOSKIPROUND-DAG:   %[[C1:.+]] = arith.constant 1
 //  NOSKIPROUND-DAG:   %[[C2:.+]] = arith.constant 2
 //  NOSKIPROUND-DAG:   %[[C3:.+]] = arith.constant 3
-//  NOSKIPROUND-DAG:   %[[FLAGS:.+]] = arith.constant 260 : i32
 //  NOSKIPROUND-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  NOSKIPROUND-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  NOSKIPROUND-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -324,11 +324,11 @@ func.func @mmt4d_bf16bf16f32(%arg0 : tensor<?x?x?x?xbf16>, %arg1 : tensor<?x?x?x
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xbf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xbf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1285 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1285 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -358,11 +358,11 @@ func.func @mmt4d_bf16bf16bf16(%arg0 : tensor<?x?x?x?xbf16>, %arg1 : tensor<?x?x?
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xbf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xbf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xbf16>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1286 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1286 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -682,11 +682,11 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi8>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1282 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1282 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]
@@ -702,7 +702,7 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
 //      CHECK:   return %[[MICRO_KERNEL]]
 
-// ----
+// -----
 
 func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: tensor<?x?x?x?xi4>, %arg2: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all"}>
@@ -744,11 +744,11 @@ func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: te
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi4>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xi32>
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1288 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //  CHECK-DAG:   %[[C2:.+]] = arith.constant 2
 //  CHECK-DAG:   %[[C3:.+]] = arith.constant 3
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1288 : i32
 //  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG1]], %[[C1]]

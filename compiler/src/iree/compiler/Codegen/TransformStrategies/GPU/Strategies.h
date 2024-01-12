@@ -18,8 +18,8 @@ class Value;
 namespace mlir::iree_compiler::gpu {
 
 /// Forward declarations of all supported strategies.
-struct BatchMatmulStrategy;
-struct MatmulStrategy;
+class BatchMatmulStrategy;
+class MatmulStrategy;
 class PadStrategy;
 class SmallReductionStrategy;
 class StagedReductionStrategy;

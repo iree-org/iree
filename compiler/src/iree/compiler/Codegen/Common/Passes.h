@@ -176,7 +176,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createHoistRedundantVectorTransfersPass();
+createOptimizeTensorInsertExtractSlicesPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();

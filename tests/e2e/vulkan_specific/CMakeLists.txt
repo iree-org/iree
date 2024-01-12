@@ -26,6 +26,7 @@ iree_check_single_backend_test_suite(
   LABELS
     "manual"
     "notap"
+    "vulkan_uses_vk_khr_16bit_storage"
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 

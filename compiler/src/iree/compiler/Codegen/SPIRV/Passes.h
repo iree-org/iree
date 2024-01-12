@@ -134,6 +134,11 @@ createSPIRVLowerExecutableTargetPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVMapMemRefStorageClassPass();
 
+/// Pass to materialize SPIR-V target requirements of hal.exectuable.variant ops
+/// into hal.executable.condition regions.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSPIRVMaterializeExecutableConditionsPass();
+
 /// Pass to tile and distribute Linalg ops with buffer semantics to
 /// invocations.
 std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();

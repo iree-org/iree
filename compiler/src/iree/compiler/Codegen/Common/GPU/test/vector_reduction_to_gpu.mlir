@@ -130,8 +130,8 @@ hal.executable private @reduce_uniform_buffer_offset  {
 }
 
 //   CHECK-LABEL: func.func @reduce_uniform_buffer_offset()
-//         CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//         CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(uniform_buffer)
 //         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
 //         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>
@@ -199,8 +199,8 @@ hal.executable private @reduce_storage_buffer_offset  {
 }
 
 //   CHECK-LABEL: func.func @reduce_storage_buffer_offset()
-//         CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//         CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //         CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //         CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[C0]]]
 //         CHECK:   %[[EXT0:.+]] = vector.extractelement %[[LOAD]][%[[C0]] : index] : vector<4xi32>

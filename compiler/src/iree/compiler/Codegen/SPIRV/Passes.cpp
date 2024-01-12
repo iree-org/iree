@@ -124,7 +124,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
 static void addSPIRVVectorLoweringPasses(OpPassManager &modulePM) {
   modulePM.addNestedPass<func::FuncOp>(createSPIRVInitialVectorLoweringPass());
   modulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
   modulePM.addNestedPass<func::FuncOp>(createSPIRVFinalVectorLoweringPass());
 }
 
@@ -458,7 +458,7 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(OpPassManager &pm,
       createSPIRVVectorizeToCooperativeOpsPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 
@@ -518,7 +518,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
     nestedPM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedPM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedPM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedPM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -549,7 +549,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
   nestedPM.addNestedPass<func::FuncOp>(createSPIRVInitialVectorLoweringPass());
   nestedPM.addPass(createCSEPass());
   nestedPM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
   nestedPM.addNestedPass<func::FuncOp>(createSPIRVFinalVectorLoweringPass());
 
   nestedPM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
@@ -598,7 +598,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -682,6 +682,16 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath) {
 // NOTE: this runs on the top-level program module containing all hal.executable
 // ops.
 void buildSPIRVLinkingPassPipeline(OpPassManager &passManager) {
+  auto &nestedExecutablePM = passManager.nest<IREE::HAL::ExecutableOp>();
+  // Trim the allowed target environment (version/capability/extension/etc.) to
+  // the minimal requirement needed by compiled spirv.module ops. This helps to
+  // increase the chance of linking different variant ops together.
+  nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
+      createSPIRVTrimExecutableTargetEnvPass());
+  // Materialize the minimal required target environment into proper device
+  // queries to execute in the runtime.
+  nestedExecutablePM.addNestedPass<IREE::HAL::ExecutableVariantOp>(
+      createSPIRVMaterializeExecutableConditionsPass());
   // Link together executables. This may produce some IR duplication.
   passManager.addPass(createSPIRVLinkExecutablesPass());
 

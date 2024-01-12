@@ -8,20 +8,8 @@
 #define IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-
-namespace mlir {
-class Location;
-class LogicalResult;
-class OpBuilder;
-class OpFoldResult;
-class RewriterBase;
-class Value;
-namespace tensor {
-class ExtractSliceOp;
-class InsertSliceOp;
-} // namespace tensor
-} // namespace mlir
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 

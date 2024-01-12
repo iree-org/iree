@@ -52,14 +52,11 @@ IMAGES_TO_DEPENDENCIES = {
     "riscv-toolchain-builder": [],
     "frontends": ["android"],
     "shark": [],
-    "swiftshader": ["base"],
-    "samples": ["swiftshader"],
-    "frontends-swiftshader": ["frontends", "swiftshader"],
+    "samples": ["base"],
     "frontends-nvidia": ["frontends"],
     # Containers with all the newest versions of dependencies that we support
     # instead of the oldest.
     "base-bleeding-edge": [],
-    "swiftshader-bleeding-edge": ["base-bleeding-edge"],
     "nvidia-bleeding-edge": ["base-bleeding-edge"],
 }
 

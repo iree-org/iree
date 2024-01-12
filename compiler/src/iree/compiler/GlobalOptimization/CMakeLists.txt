@@ -59,6 +59,7 @@ iree_cc_library(
     "RaiseSpecialOps.cpp"
     "RemoveZeroExtentTensors.cpp"
     "SetEncoding.cpp"
+    "SimplifyPackUnpack.cpp"
     "Utils.cpp"
   DEPS
     ::PassHeaders

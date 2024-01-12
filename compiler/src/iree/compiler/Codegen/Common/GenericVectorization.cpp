@@ -230,7 +230,6 @@ void GenericVectorizationPass::runOnOperation() {
                                                         funcOp.getContext());
     vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                          funcOp.getContext());
-    populateVectorTransferTensorSliceTransforms(vectorizationPatterns);
   }
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 

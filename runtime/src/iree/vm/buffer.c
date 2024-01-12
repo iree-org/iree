@@ -314,6 +314,91 @@ IREE_API_EXPORT iree_status_t iree_vm_buffer_write_elements(
   return iree_ok_status();
 }
 
+// Based on reference implementation from https://github.com/veorq/SipHash
+// By Jean-Philippe Aumasson and Daniel J. Bernstein. (CC0 Licensed)
+#define ROTL(x, b) (uint64_t)(((x) << (b)) | ((x) >> (64 - (b))))
+#define SIPROUND(v0, v1, v2, v3) \
+  v0 += v1;                      \
+  v1 = ROTL(v1, 13);             \
+  v1 ^= v0;                      \
+  v0 = ROTL(v0, 32);             \
+  v2 += v3;                      \
+  v3 = ROTL(v3, 16);             \
+  v3 ^= v2;                      \
+  v0 += v3;                      \
+  v3 = ROTL(v3, 21);             \
+  v3 ^= v0;                      \
+  v2 += v1;                      \
+  v1 = ROTL(v1, 17);             \
+  v1 ^= v2;                      \
+  v2 = ROTL(v2, 32)
+
+// Using SipHash-2-4.
+#ifndef cROUNDS
+#define cROUNDS 2
+#endif
+#ifndef dROUNDS
+#define dROUNDS 4
+#endif
+
+IREE_API_EXPORT iree_status_t iree_vm_buffer_hash(
+    const iree_vm_buffer_t* source_buffer, iree_host_size_t source_offset,
+    iree_host_size_t length, int64_t* out_result) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_ASSERT_ARGUMENT(source_buffer);
+
+  // Get the byte span for the source data.
+  iree_const_byte_span_t source_span = iree_const_byte_span_empty();
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_buffer_map_ro(source_buffer, source_offset, length, 1,
+                                &source_span));
+  const uint8_t* source = source_span.data;
+  const uint8_t* end = source + source_span.data_length -
+                       (source_span.data_length % sizeof(uint64_t));
+  const int left = source_span.data_length & 7;
+  uint64_t hash = ((uint64_t)source_span.data_length) << 56;
+
+  // Using key = 0x000102030405060708090a0b0c0d0e0f
+  uint64_t v0 = UINT64_C(0x736f6d6570736575 ^ 0x0706050403020100);
+  uint64_t v1 = UINT64_C(0x646f72616e646f6d ^ 0x0f0e0d0c0b0a0908);
+  uint64_t v2 = UINT64_C(0x6c7967656e657261 ^ 0x0706050403020100);
+  uint64_t v3 = UINT64_C(0x7465646279746573 ^ 0x0f0e0d0c0b0a0908);
+  uint64_t m;
+
+  for (; source != end; source += 8) {
+    m = iree_unaligned_load_le_u64((const uint64_t*)source);
+    v3 ^= m;
+    for (int i = 0; i < cROUNDS; ++i) {
+      SIPROUND(v0, v1, v2, v3);
+    }
+    v0 ^= m;
+  }
+
+  uint64_t tmp = 0;
+  for (int l = left; l > 0; --l) {
+    tmp = tmp << 8;
+    tmp |= (uint64_t)source[l - 1];
+  }
+  hash |= tmp;
+  v3 ^= hash;
+
+  for (int i = 0; i < cROUNDS; ++i) {
+    SIPROUND(v0, v1, v2, v3);
+  }
+
+  v0 ^= hash;
+  v2 ^= 0xff;
+
+  for (int i = 0; i < dROUNDS; ++i) {
+    SIPROUND(v0, v1, v2, v3);
+  }
+
+  hash = v0 ^ v1 ^ v2 ^ v3;
+  *out_result = hash;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
 iree_status_t iree_vm_buffer_register_types(iree_vm_instance_t* instance) {
   static const iree_vm_ref_type_descriptor_t descriptor = {
       .destroy = iree_vm_buffer_destroy,

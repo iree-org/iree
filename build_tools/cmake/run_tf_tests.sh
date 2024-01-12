@@ -12,7 +12,7 @@ ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
 BUILD_DIR="$1"
-IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-0}"
+IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
 # VMVX codegen is for reference and less optimized than other target backends.
@@ -39,7 +39,6 @@ declare -a TARGET_BACKENDS=()
 if (( ${IREE_VULKAN_DISABLE} != 1 )); then
   TARGET_BACKENDS+=(vulkan)
 fi
-
 if (( ${IREE_VMVX_DISABLE} != 1 )); then
   TARGET_BACKENDS+=(vmvx)
 fi

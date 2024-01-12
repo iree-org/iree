@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -99,7 +100,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
   llvm::SmallDenseSet<Operation *> origTiledAndFusedOps;
   collectTiledAndFusedOps(rootOp, origTiledAndFusedOps);
   auto isIgnoredUser = [&](Operation *user, scf::ForOp outerMostTiledLoop) {
-    return origTiledAndFusedOps.count(user) || isa<tensor::DimOp>(user);
+    return origTiledAndFusedOps.count(user) ||
+           isa<tensor::DimOp, IREE::Codegen::UKernelGenericOp>(user);
   };
 
   // The rest of this method is similar to

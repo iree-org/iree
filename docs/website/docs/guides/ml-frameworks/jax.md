@@ -10,7 +10,7 @@ icon: simple/python
 # JAX integration
 
 !!! note
-    IREE's JAX support is under active development. This page is still under
+    IREE's JAX support is under development. This page is still under
     construction.
 
 ## :octicons-book-16: Overview
@@ -23,7 +23,7 @@ programs:
   [iree-org/iree-jax repository](https://github.com/iree-org/iree-jax).
 * A PJRT plugin that adapts IREE as a native JAX backend for online / just in
   time (JIT) use. This plugin is being developed in the
-  [openxla/openxla-pjrt-plugin repository](https://github.com/openxla/openxla-pjrt-plugin).
+  [`integrations/pjrt` directory](https://github.com/openxla/iree/tree/main/integrations/pjrt).
 
 <!-- TODO: Expand on interface differences -->
 <!-- TODO: Add quickstart instructions -->
