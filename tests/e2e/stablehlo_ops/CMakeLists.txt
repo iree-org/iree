@@ -370,7 +370,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda"
+    "cuda1"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
   INPUT_TYPE
@@ -453,7 +453,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda"
+    "cuda1"
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS
@@ -534,7 +534,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda2"
+    "cuda"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
     "--iree-hal-cuda-enable-legacy-sync=false"
@@ -618,7 +618,7 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda2"
+    "cuda"
   COMPILER_FLAGS
     "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE

@@ -6,7 +6,7 @@
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
-    cuda2
+    cuda
   VARIANT_SUFFIX
     graph
   DRIVER_REGISTRATION_HDR
@@ -31,7 +31,7 @@ iree_hal_cts_test_suite(
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
-    cuda2
+    cuda
   VARIANT_SUFFIX
     stream
   DRIVER_REGISTRATION_HDR

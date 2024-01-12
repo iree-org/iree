@@ -303,7 +303,7 @@ iree_check_single_backend_test_suite(
         "--iree-stream-emulate-memset",
         "--iree-hal-cuda-enable-legacy-sync=false",
     ],
-    driver = "cuda2",
+    driver = "cuda",
     input_type = "tosa",
     runner_args = ["--cuda2_use_streams=false"],
     tags = [
@@ -323,7 +323,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-hal-cuda-enable-legacy-sync=false",
     ],
-    driver = "cuda2",
+    driver = "cuda",
     input_type = "tosa",
     runner_args = ["--cuda2_use_streams=true"],
     tags = [

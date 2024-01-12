@@ -66,8 +66,8 @@ static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     const iree_hal_driver_info_t** out_driver_infos) {
   // NOTE: we could query supported cuda versions or featuresets here.
   static const iree_hal_driver_info_t driver_infos[1] = {{
-      .driver_name = iree_string_view_literal("cuda"),
-      .full_name = iree_string_view_literal("CUDA (dynamic)"),
+      .driver_name = iree_string_view_literal("cuda1"),
+      .full_name = iree_string_view_literal("deprecated CUDA (dynamic)"),
   }};
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
   *out_driver_infos = driver_infos;
@@ -79,7 +79,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
     iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
   *out_driver = NULL;
-  if (!iree_string_view_equal(driver_name, IREE_SV("cuda"))) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("cuda1"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "no driver '%.*s' is provided by this factory",
                             (int)driver_name.size, driver_name.data);
