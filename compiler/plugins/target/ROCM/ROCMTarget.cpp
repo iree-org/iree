@@ -341,10 +341,10 @@ public:
     if (!options.enableROCMUkernels.empty() ||
         options.enableROCMUkernels != "none") {
       auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-      linkUkernelBCIfNecessary(llvmModule.get(), variantOp.getLoc(),
-                               enabledUkernelsStr, options.targetChip,
-                               options.bitcodeDirectory,
-                               llvm::Linker::OverrideFromSrc, *targetMachine);
+      linkUkernelBCFiles(llvmModule.get(), variantOp.getLoc(),
+                         enabledUkernelsStr, options.targetChip,
+                         options.bitcodeDirectory,
+                         llvm::Linker::OverrideFromSrc, *targetMachine);
     }
     // Link module to Device Library
     if (options.linkBitcode) {

@@ -28,6 +28,7 @@ iree_cc_library(
   DEPS
     LLVMAMDGPUCodeGen
     LLVMAnalysis
+    LLVMBitWriter
     LLVMCore
     LLVMIRReader
     LLVMLinker

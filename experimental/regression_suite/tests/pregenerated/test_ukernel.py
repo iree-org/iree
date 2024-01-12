@@ -38,6 +38,7 @@ def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
         ],
     )
 
+
 @pytest.fixture
 def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
     return iree_compile(
@@ -133,6 +134,7 @@ def test_correctness_gfx90a_rocm(
             f"--expected_output=@{argmax_output_f32.path}",
         ],
     )
+
 
 @pytest.mark.presubmit
 @pytest.mark.unstable_linalg
