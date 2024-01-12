@@ -55,7 +55,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
     laneResult = __ockl_wfred_min_i32(indexVal);
-    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    if (laneID == 0)
+      outputBuffer[output_offset] = laneResult;
     return;
   }
   if (wgMax == laneMax)
@@ -96,7 +97,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
     laneResult = __ockl_wfred_min_i64(indexVal);
-    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    if (laneID == 0)
+      outputBuffer[output_offset] = laneResult;
     return;
   }
   if (wgMax == laneMax)
@@ -132,7 +134,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
     laneResult = __ockl_wfred_min_i32(indexVal);
-    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    if (laneID == 0)
+      outputBuffer[output_offset] = laneResult;
     return;
   }
   if (wgMax == laneMax)
@@ -168,7 +171,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
     laneResult = __ockl_wfred_min_i64(indexVal);
-    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    if (laneID == 0)
+      outputBuffer[output_offset] = laneResult;
     return;
   }
   if (wgMax == laneMax)
