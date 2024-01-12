@@ -573,8 +573,7 @@ Value mlir::iree_compiler::gpu::buildConvertToTensorCoreOp(
   b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
     b.create<transform::ApplyFoldMemrefAliasOpsPatternsOp>(loc);
   });
-  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      funcH);
+  b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
   // TODO: not a functional style transform and avoid returning funcH.
   funcH = b.create<transform::HoistRedundantVectorTransfersOp>(
       transform::AnyOpType::get(b.getContext()), funcH);
@@ -685,8 +684,7 @@ Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
     b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
   });
   b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
-  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      funcH);
+  b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
   b.create<IREEEliminateEmptyTensorsOp>(variantH);
   auto bufferizeOp = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
   bufferizeOp.setTargetGpu(true);

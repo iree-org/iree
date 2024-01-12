@@ -152,8 +152,7 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
       populatePatternsFn(b, loc);
   });
   b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
-  b.create<IREE::transform_dialect::ApplyCommonSubexpressionEliminationOp>(
-      funcH);
+  b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
 }
 
 /// Dynamically selects the first non-empty handle; i.e. if (h1, h2) is:
