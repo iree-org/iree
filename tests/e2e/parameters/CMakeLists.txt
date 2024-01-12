@@ -15,7 +15,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "export_parameterizable_globals.mlir"
+    "export_parameters.mlir"
   TOOLS
     FileCheck
     iree-compile

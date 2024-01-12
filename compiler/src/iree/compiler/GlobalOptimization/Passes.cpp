@@ -166,22 +166,28 @@ void buildGlobalOptimizationPassPipeline(
   if (transformOptions.options.constExprHoisting) {
     buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
   }
-  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
-    IREE::IO::Parameters::ExportParameterizableGlobalsPassOptions
-        parameterizeGlobalsOptions;
-    parameterizeGlobalsOptions.archivePath =
-        transformOptions.options.parameterArchiveExportPath;
-    parameterizeGlobalsOptions.parameterScope =
-        transformOptions.options.parameterExportScope;
-    parameterizeGlobalsOptions.minimumSize =
-        transformOptions.options.minimumParameterExportSize;
-    pipeline.addPass(
-        IREE::IO::Parameters::createExportParameterizableGlobalsPass(
-            parameterizeGlobalsOptions));
-  }
 
   if (transformOptions.buildConstEvalPassPipeline) {
     transformOptions.buildConstEvalPassPipeline(pipeline);
+  }
+
+  // Export after const-eval. If the user wants to keep the input constants
+  // as is in the final parameter archive, they will probably want to disable
+  // const-eval, or could run this pass as preprocessing. There might be a
+  // configuration in the future where users want to limit const-eval to smaller
+  // constants that aren't exported and skip it for larger parameters, but this
+  // is the best place for the common case of wanting const-eval in the final
+  // artifact + archive.
+  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
+    exportParametersOptions.archivePath =
+        transformOptions.options.parameterArchiveExportPath;
+    exportParametersOptions.parameterScope =
+        transformOptions.options.parameterExportScope;
+    exportParametersOptions.minimumSize =
+        transformOptions.options.minimumParameterExportSize;
+    pipeline.addPass(IREE::IO::Parameters::createExportParametersPass(
+        exportParametersOptions));
   }
 
   if (transformOptions.options.numericPrecisionReduction) {

@@ -17,11 +17,12 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
-    "ParameterizeGlobals.cpp"
+    "ExportParameters.cpp"
     "Passes.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
     MLIRPass
     MLIRSupport

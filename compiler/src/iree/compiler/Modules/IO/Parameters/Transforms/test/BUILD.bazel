@@ -16,7 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "export_parameterizable_globals.mlir",
+            "export_parameters.mlir",
         ],
         include = ["*.mlir"],
     ),

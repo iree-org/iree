@@ -9,9 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ExportParameterizableGlobalsPass :
-    Pass<"iree-io-export-parameterizable-globals", "mlir::ModuleOp"> {
-  let summary = "Moves all global initial values to a parameter archive";
+def ExportParametersPass :
+    Pass<"iree-io-export-parameters", "mlir::ModuleOp"> {
+  let summary = "Moves all inline constants of a minimum size and constant "
+                "initialized globals values to a parameter archive";
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",

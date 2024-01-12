@@ -15,7 +15,7 @@ package(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "ParameterizeGlobals.cpp",
+        "ExportParameters.cpp",
         "Passes.cpp",
     ],
     hdrs = [
@@ -34,6 +34,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/io/formats/irpa",
         "//runtime/src/iree/tooling:parameter_util",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

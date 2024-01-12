@@ -23,7 +23,7 @@
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
-#define GEN_PASS_DEF_EXPORTPARAMETERIZABLEGLOBALSPASS
+#define GEN_PASS_DEF_EXPORTPARAMETERSPASS
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h.inc"
 
 namespace {
@@ -120,11 +120,11 @@ static LogicalResult handleRuntimeError(ModuleOp moduleOp, iree_status_t status,
   return moduleOp.emitError() << failureMessage << message;
 }
 
-struct ExportParameterizableGlobalsPass
-    : public IREE::IO::Parameters::impl::ExportParameterizableGlobalsPassBase<
-          ExportParameterizableGlobalsPass> {
-  using IREE::IO::Parameters::impl::ExportParameterizableGlobalsPassBase<
-      ExportParameterizableGlobalsPass>::ExportParameterizableGlobalsPassBase;
+struct ExportParametersPass
+    : public IREE::IO::Parameters::impl::ExportParametersPassBase<
+          ExportParametersPass> {
+  using IREE::IO::Parameters::impl::ExportParametersPassBase<
+      ExportParametersPass>::ExportParametersPassBase;
 
   void runOnOperation() override {
     // Nothing to do if no path specified.
