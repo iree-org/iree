@@ -7,11 +7,8 @@
 #include <float.h>
 #include <hip/hip_fp16.h>
 #include <hip/hip_runtime.h>
-#define GLOBAL_SPACE __attribute__((address_space(1)))
-#define SHARED_SPACE __attribute__((address_space(3)))
 
 extern "C" __device__ __attribute__((const)) half __ockl_wfred_max_f16(half);
-extern "C" __device__ __attribute__((const)) float __ockl_wfred_max_f32(float);
 extern "C" __device__ __attribute__((const))
 int64_t __ockl_wfred_min_i64(int64_t);
 extern "C" __device__ __attribute__((const))
@@ -57,7 +54,9 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
   // if there are, find smallest index (argmax semantics).
   if (__popcll(laneHasMaxValmask) > 1) {
     int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
-    laneResult = __ockl_wfred_min_i64(indexVal);
+    laneResult = __ockl_wfred_min_i32(indexVal);
+    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    return;
   }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
@@ -97,6 +96,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
     laneResult = __ockl_wfred_min_i64(indexVal);
+    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    return;
   }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
@@ -130,7 +131,9 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
   // if there are, find smallest index (argmax semantics).
   if (__popcll(laneHasMaxValmask) > 1) {
     int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
-    laneResult = __ockl_wfred_min_i64(indexVal);
+    laneResult = __ockl_wfred_min_i32(indexVal);
+    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    return;
   }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
@@ -165,6 +168,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   if (__popcll(laneHasMaxValmask) > 1) {
     int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
     laneResult = __ockl_wfred_min_i64(indexVal);
+    if (laneID == 0) outputBuffer[output_offset] = laneResult;
+    return;
   }
   if (wgMax == laneMax)
     outputBuffer[output_offset] = laneResult;
