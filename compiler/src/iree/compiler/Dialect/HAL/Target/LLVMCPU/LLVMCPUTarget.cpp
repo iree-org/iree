@@ -523,51 +523,12 @@ public:
                  << llvm::toString(archBitcode.takeError());
         }
 
-        llvm::Expected<std::unique_ptr<llvm::Module>> archEntryPointsBitcode =
-            loadUKernelArchEntryPointsBitcode(targetMachine.get(), context);
-        if (!archEntryPointsBitcode) {
-          return mlir::emitError(variantOp.getLoc())
-                 << "failed to load architecture-specific ukernel entry points "
-                    "bitcode: "
-                 << llvm::toString(archEntryPointsBitcode.takeError());
-        }
-
-        // archBitcode and archEntryPointsBitcode are optional, may be null if
-        // there is none for the target architecture. However, they should
-        // simultaneously be null or non-null.
-        if ((archBitcode.get() == nullptr) !=
-            (archEntryPointsBitcode.get() == nullptr)) {
-          return mlir::emitError(variantOp.getLoc())
-                 << "there should be architecture-specific ukernel bit code "
-                    "if, "
-                    "and only if there is architecture-specific ukernels entry "
-                    "points bitcode.";
-        }
-
         if (archBitcode.get()) {
           addUkernelFunctions(*archBitcode.get());
-          addUkernelFunctions(*archEntryPointsBitcode.get());
 
-          // archEntryPointsBitcode contains overrides for weak symbols that
+          // archBitcode contains overrides for weak symbols that
           // will come in the baseBitcode below. So we link it before
           // baseBitcode, with OverrideFromSrc.
-          StringRef archEntryPointsBitcodeName =
-              archEntryPointsBitcode.get()->getName();
-          if (failed(linkBitcodeModule(
-                  variantOp.getLoc(), moduleLinker, 0, *targetMachine,
-                  archEntryPointsBitcodeName, std::move(archEntryPointsBitcode),
-                  setAlwaysInline))) {
-            return mlir::emitError(variantOp.getLoc())
-                   << "failed linking in architecture-specific ukernel entry "
-                      "points bitcode "
-                      "for target triple '"
-                   << targetTriple.str() << "'";
-          }
-
-          // archEntryPointsBitcode references symbols defined in archBitcode,
-          // so we link that now. We can apply LinkOnlyNeeded, since the only
-          // purpose of archBitcode is to satisfy references made in
-          // archEntryPointsBitcode.
           StringRef archBitcodeName = archBitcode.get()->getName();
           if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
                                        llvm::Linker::LinkOnlyNeeded,

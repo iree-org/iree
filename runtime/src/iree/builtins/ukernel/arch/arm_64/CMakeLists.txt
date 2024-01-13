@@ -17,7 +17,7 @@ iree_bitcode_library(
   NAME
     ukernel_bitcode_arm_64_entry_points
   ARCH
-    wasm_64
+    arm_64
   INTERNAL_HDRS
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
@@ -154,6 +154,7 @@ iree_link_bitcode(
     "ukernel_bitcode_arm_64_base.bc"
     "ukernel_bitcode_arm_64_bf16.bc"
     "ukernel_bitcode_arm_64_dotprod.bc"
+    "ukernel_bitcode_arm_64_entry_points.bc"
     "ukernel_bitcode_arm_64_fp16fml.bc"
     "ukernel_bitcode_arm_64_fullfp16.bc"
     "ukernel_bitcode_arm_64_i8mm.bc"
@@ -162,7 +163,6 @@ iree_link_bitcode(
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64.bc")
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64_entry_points.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

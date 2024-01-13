@@ -78,38 +78,6 @@ loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
 }
 
 llvm::Expected<std::unique_ptr<llvm::Module>>
-loadUKernelArchEntryPointsBitcode(llvm::TargetMachine *targetMachine,
-                                  llvm::LLVMContext &context) {
-  const char *archName =
-      getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
-  char filename[64];
-  snprintf(filename, sizeof filename, "ukernel_bitcode_%s_entry_points.bc",
-           archName);
-  llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
-      loadUKernelBitcodeFile(filename, context);
-  if (!bitcode) {
-    // Propagate the error to the caller.
-    return bitcode;
-  }
-
-  if (!bitcode.get()) {
-    // File not found. This is normal: arch-specific bitcode is optional.
-    return bitcode;
-  }
-
-  // Architecture entry-point functions should be inlinable into base (non-arch)
-  // functions, so that their logic selecting specific "tile functions" can
-  // evaluate at compile time based on constant argument values in the caller,
-  // so that unused tile functions (e.g. for other data types, other CPU feature
-  // variants, etc) get DCE'd. In order for these entry points to be inlinable,
-  // they must have matching target attributes, so, just like we call
-  // removeTargetAttributes in loadUKernelBaseBitcode, we need to do that also
-  // here.
-  removeTargetAttributes(*bitcode.get());
-  return bitcode;
-}
-
-llvm::Expected<std::unique_ptr<llvm::Module>>
 loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
                        llvm::LLVMContext &context) {
   const char *archName =

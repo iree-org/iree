@@ -44,14 +44,7 @@ iree_bitcode_library(
         "query_tile_sizes_arm_64_entry_point.c",
         "unpack_arm_64_entry_point.c",
     ],
-    # wasm_64 here is a proxy for "some reasonable 64-bit architecture". This
-    # should match the `ukernel_bitcode_64bit_base` bitcode library, because we
-    # want this code inlined into the ukernel entry points so that code path
-    # selection logic can evaluate at compile time and unused code paths can be
-    # DCE'd. The entry points don't need to be architecture-specialized, all
-    # they do is return function pointers to the actual architecture-specialized
-    # symbols defined in the other iree_bitcode_library's below.
-    arch = "wasm_64",
+    arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
 )
 
@@ -109,6 +102,7 @@ iree_bitcode_library(
 iree_link_bitcode(
     name = "ukernel_bitcode_arm_64",
     bitcode_files = [
+        "ukernel_bitcode_arm_64_entry_points.bc",
         "ukernel_bitcode_arm_64_base.bc",
         "ukernel_bitcode_arm_64_fullfp16.bc",
         "ukernel_bitcode_arm_64_fp16fml.bc",
@@ -122,7 +116,6 @@ iree_cmake_extra_content(
     content = """
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
 iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64.bc")
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64_entry_points.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 """,
     inline = True,
