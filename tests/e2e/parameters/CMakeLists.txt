@@ -19,6 +19,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-compile
+    iree-dump-parameters
     iree-run-module
   LABELS
     "driver=local-task"

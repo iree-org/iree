@@ -26,6 +26,7 @@ iree_lit_test_suite(
     ],
     tools = [
         "//tools:iree-compile",
+        "//tools:iree-dump-parameters",
         "//tools:iree-run-module",
         "@llvm-project//llvm:FileCheck",
     ],
