@@ -89,7 +89,6 @@ cc_binary_benchmark(
         "//runtime/src/iree/base",
         "//runtime/src/iree/testing:benchmark_main",
         "//runtime/src/iree/vm",
-        "@com_google_benchmark//:benchmark",
     ],
 )
 

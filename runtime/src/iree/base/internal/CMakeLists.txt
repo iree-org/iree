@@ -206,7 +206,6 @@ iree_cc_binary_benchmark(
     "fpu_state_benchmark.cc"
   DEPS
     ::fpu_state
-    benchmark
     iree::base
     iree::testing::benchmark_main
   TESTONLY
@@ -317,7 +316,6 @@ iree_cc_binary_benchmark(
     "synchronization_benchmark.cc"
   DEPS
     ::synchronization
-    benchmark
     iree::testing::benchmark_main
   TESTONLY
 )

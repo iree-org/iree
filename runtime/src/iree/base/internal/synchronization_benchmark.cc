@@ -4,11 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#if !IREE_HAS_NOP_BENCHMARK_LIB
+
 #include <cstddef>
 #include <mutex>
 
-#include "benchmark/benchmark.h"
 #include "iree/base/internal/synchronization.h"
+#include "iree/testing/benchmark_lib.h"
 
 namespace {
 
@@ -254,3 +256,5 @@ BENCHMARK_TEMPLATE(BM_Contended, std::mutex)
 // care beyond that.
 
 }  // namespace
+
+#endif  // !IREE_HAS_NOP_BENCHMARK_LIB

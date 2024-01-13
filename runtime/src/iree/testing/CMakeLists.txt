@@ -14,6 +14,7 @@ if(IREE_ENABLE_THREADING)
       benchmark
     HDRS
       "benchmark.h"
+      "benchmark_lib.h"
     SRCS
       "benchmark_full.cc"
     DEPS
@@ -27,8 +28,11 @@ else()
       benchmark
     HDRS
       "benchmark.h"
+      "benchmark_lib.h"
     SRCS
       "benchmark_nop.c"
+    DEFINES
+      IREE_HAS_NOP_BENCHMARK_LIB=1
     DEPS
       iree::base
     PUBLIC

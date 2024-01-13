@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "benchmark/benchmark.h"
+#if !IREE_HAS_NOP_BENCHMARK_LIB
+
 #include "iree/base/api.h"
+#include "iree/testing/benchmark_lib.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module.h"
 #include "iree/vm/native_module_test.h"
@@ -16,3 +18,5 @@ namespace {
 // TODO(benvanik): native module benchmarks.
 
 }  // namespace
+
+#endif  // !IREE_HAS_NOP_BENCHMARK_LIB

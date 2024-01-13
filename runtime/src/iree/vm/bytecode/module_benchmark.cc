@@ -4,11 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#if !IREE_HAS_NOP_BENCHMARK_LIB
+
 #include <array>
 #include <vector>
 
-#include "benchmark/benchmark.h"
 #include "iree/base/api.h"
+#include "iree/testing/benchmark_lib.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
 #include "iree/vm/bytecode/module_benchmark_module_c.h"
@@ -371,3 +373,5 @@ static void BM_BufferReduceBytecodeUnrolled(benchmark::State& state) {
 BENCHMARK(BM_BufferReduceBytecodeUnrolled)->Arg(100000);
 
 }  // namespace
+
+#endif  // !IREE_HAS_NOP_BENCHMARK_LIB

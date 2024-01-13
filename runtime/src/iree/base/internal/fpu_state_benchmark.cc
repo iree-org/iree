@@ -4,11 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#if !IREE_HAS_NOP_BENCHMARK_LIB
+
 #include <cstddef>
 
-#include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/fpu_state.h"
+#include "iree/testing/benchmark_lib.h"
 
 namespace {
 
@@ -122,3 +124,5 @@ void BM_VectorizedDenormalsNotFlushedToZero(benchmark::State& state) {
 BENCHMARK(BM_VectorizedDenormalsNotFlushedToZero);
 
 }  // namespace
+
+#endif  // !IREE_HAS_NOP_BENCHMARK_LIB

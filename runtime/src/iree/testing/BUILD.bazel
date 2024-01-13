@@ -21,6 +21,7 @@ iree_runtime_cc_library(
     ],
     hdrs = [
         "benchmark.h",
+        "benchmark_lib.h",
     ],
     deps = [
         "//runtime/src/iree/base",
@@ -32,6 +33,7 @@ iree_runtime_cc_library(
     name = "benchmark_main",
     testonly = True,
     srcs = ["benchmark_main.c"],
+    hdrs = ["benchmark_lib.h"],
     deps = [
         ":benchmark",
         "//runtime/src/iree/base/internal:flags",

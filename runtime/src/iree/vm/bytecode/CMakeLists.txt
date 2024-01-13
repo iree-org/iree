@@ -76,7 +76,6 @@ iree_cc_binary_benchmark(
   DEPS
     ::module
     ::module_benchmark_module_c
-    benchmark
     iree::base
     iree::testing::benchmark_main
     iree::vm

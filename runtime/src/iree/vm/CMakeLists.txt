@@ -129,7 +129,6 @@ iree_cc_binary_benchmark(
   DEPS
     ::impl
     ::native_module_test_hdrs
-    benchmark
     iree::base
     iree::testing::benchmark_main
   TESTONLY
