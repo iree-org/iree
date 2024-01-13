@@ -894,9 +894,16 @@ bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
     return false;
   }
   StringRef targetArchStr = targetArch->getValue();
-  const llvm::StringSet<> kSupportedTargetChip{"gfx90a", "gfx940", "gfx1030",
-                                               "gfx1100"};
-  return kSupportedTargetChip.contains(targetArchStr);
+  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
+                                        "gfx1100"};
+  size_t arraySize =
+      sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
+  for (int i = 0; i < arraySize; i++) {
+    // return true if targetChip is found inside kSupportedTargetChip.
+    if (targetArchStr.compare(kSupportedTargetChip[i]) == 0)
+      return true;
+  }
+  return false;
 }
 
 /// Checks if target GPU has UKernel support.

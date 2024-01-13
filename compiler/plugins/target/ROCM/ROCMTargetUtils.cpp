@@ -154,10 +154,13 @@ static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
                                                 StringRef targetChip,
                                                 StringRef bitCodeDir) {
   // AMD bitcodes.
-  const std::vector<std::string> allUkernelNames({"argmax"});
   std::vector<std::string> selectedUkernelNames;
   if (enabledUkernelsStr == "all") {
-    selectedUkernelNames = allUkernelNames;
+    const char *allUkernelNames[] = {"argmax"};
+    size_t numUkernels = sizeof(allUkernelNames) / sizeof(allUkernelNames[0]);
+    for (int i = 0; i < numUkernels; i++) {
+      selectedUkernelNames.push_back(allUkernelNames[i]);
+    }
   } else {
     while (!enabledUkernelsStr.empty()) {
       auto split = enabledUkernelsStr.split(',');
@@ -251,9 +254,16 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
 }
 
 bool hasUkernelSupportedRocmArch(StringRef targetChip) {
-  const llvm::StringSet<> kSupportedTargetChip{"gfx90a", "gfx940", "gfx1030",
-                                               "gfx1100"};
-  return kSupportedTargetChip.contains(targetChip);
+  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
+                                        "gfx1100"};
+  size_t arraySize =
+      sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
+  for (int i = 0; i < arraySize; i++) {
+    // return true if targetChip is found inside kSupportedTargetChip.
+    if (targetChip.compare(kSupportedTargetChip[i]) == 0)
+      return true;
+  }
+  return false;
 }
 
 // Links optimized Ukernel bitcodes into the given module if the module needs
