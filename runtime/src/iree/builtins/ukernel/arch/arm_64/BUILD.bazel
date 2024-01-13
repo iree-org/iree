@@ -30,37 +30,30 @@ UKERNEL_ARM_64_INTERNAL_HEADERS = [
     "common_arm_64.h",
     "common_arm_64_entry_point.h",
     "mmt4d_arm_64_internal.h",
-    "pack_arm_64_internal.h",
-    "unpack_arm_64_internal.h",
     "//runtime/src/iree/builtins/ukernel:internal_headers_filegroup",
     "//runtime/src/iree/schemas:cpu_data_headers_filegroup",
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_entry_points",
+    name = "ukernel_bitcode_arch_arm_64_entry_points",
     srcs = [
         "mmt4d_arm_64_entry_point.c",
-        "pack_arm_64_entry_point.c",
-        "query_tile_sizes_arm_64_entry_point.c",
-        "unpack_arm_64_entry_point.c",
     ],
     arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_base",
+    name = "ukernel_bitcode_arch_arm_64_base",
     srcs = [
         "mmt4d_arm_64_base.c",
-        "pack_arm_64_base.c",
-        "unpack_arm_64_base.c",
     ],
     arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_fullfp16",
+    name = "ukernel_bitcode_arch_arm_64_fullfp16",
     srcs = ["mmt4d_arm_64_fullfp16.c"],
     arch = "arm_64",
     copts = ["-march=armv8.2-a+fp16"],
@@ -68,7 +61,7 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_fp16fml",
+    name = "ukernel_bitcode_arch_arm_64_fp16fml",
     srcs = ["mmt4d_arm_64_fp16fml.c"],
     arch = "arm_64",
     copts = ["-march=armv8.2-a+fp16fml"],
@@ -76,7 +69,7 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_bf16",
+    name = "ukernel_bitcode_arch_arm_64_bf16",
     srcs = ["mmt4d_arm_64_bf16.c"],
     arch = "arm_64",
     copts = ["-march=armv8.2-a+bf16"],
@@ -84,7 +77,7 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_dotprod",
+    name = "ukernel_bitcode_arch_arm_64_dotprod",
     srcs = ["mmt4d_arm_64_dotprod.c"],
     arch = "arm_64",
     copts = ["-march=armv8.2-a+dotprod"],
@@ -92,7 +85,7 @@ iree_bitcode_library(
 )
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_arm_64_i8mm",
+    name = "ukernel_bitcode_arch_arm_64_i8mm",
     srcs = ["mmt4d_arm_64_i8mm.c"],
     arch = "arm_64",
     copts = ["-march=armv8.2-a+i8mm"],
@@ -100,22 +93,22 @@ iree_bitcode_library(
 )
 
 iree_link_bitcode(
-    name = "ukernel_bitcode_arm_64",
+    name = "ukernel_bitcode_arch_arm_64",
     bitcode_files = [
-        "ukernel_bitcode_arm_64_entry_points.bc",
-        "ukernel_bitcode_arm_64_base.bc",
-        "ukernel_bitcode_arm_64_fullfp16.bc",
-        "ukernel_bitcode_arm_64_fp16fml.bc",
-        "ukernel_bitcode_arm_64_bf16.bc",
-        "ukernel_bitcode_arm_64_dotprod.bc",
-        "ukernel_bitcode_arm_64_i8mm.bc",
+        "ukernel_bitcode_arch_arm_64_entry_points.bc",
+        "ukernel_bitcode_arch_arm_64_base.bc",
+        "ukernel_bitcode_arch_arm_64_fullfp16.bc",
+        "ukernel_bitcode_arch_arm_64_fp16fml.bc",
+        "ukernel_bitcode_arch_arm_64_bf16.bc",
+        "ukernel_bitcode_arch_arm_64_dotprod.bc",
+        "ukernel_bitcode_arch_arm_64_i8mm.bc",
     ],
 )
 
 iree_cmake_extra_content(
     content = """
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_arm_64.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 """,
     inline = True,

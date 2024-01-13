@@ -175,14 +175,6 @@
 #define IREE_UK_ATTRIBUTE_ALIGNED(N)
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
-#if IREE_UK_HAVE_ATTRIBUTE(weak) || defined(IREE_UK_COMPILER_GCC)
-#define IREE_UK_WEAK __attribute__((weak))
-#define IREE_UK_HAVE_WEAK 1
-#else
-#define IREE_UK_WEAK
-#define IREE_UK_HAVE_WEAK 0
-#endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
-
 #if IREE_UK_HAVE_ATTRIBUTE(maybe_unused) && defined(IREE_UK_COMPILER_CLANG)
 #define IREE_UK_ATTRIBUTE_UNUSED __attribute__((maybe_unused))
 #elif IREE_UK_HAVE_ATTRIBUTE(unused) || defined(IREE_UK_COMPILER_CLANG_OR_GCC)

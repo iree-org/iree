@@ -15,7 +15,7 @@ if(_IREE_UKERNEL_BITCODE_BUILD_ARM_64)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_entry_points
+    ukernel_bitcode_arch_arm_64_entry_points
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -24,18 +24,13 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_entry_point.c"
-    "pack_arm_64_entry_point.c"
-    "query_tile_sizes_arm_64_entry_point.c"
-    "unpack_arm_64_entry_point.c"
 )
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_base
+    ukernel_bitcode_arch_arm_64_base
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -44,17 +39,13 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_base.c"
-    "pack_arm_64_base.c"
-    "unpack_arm_64_base.c"
 )
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_fullfp16
+    ukernel_bitcode_arch_arm_64_fullfp16
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -63,8 +54,6 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_fullfp16.c"
   COPTS
@@ -73,7 +62,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_fp16fml
+    ukernel_bitcode_arch_arm_64_fp16fml
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -82,8 +71,6 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_fp16fml.c"
   COPTS
@@ -92,7 +79,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_bf16
+    ukernel_bitcode_arch_arm_64_bf16
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -101,8 +88,6 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_bf16.c"
   COPTS
@@ -111,7 +96,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_dotprod
+    ukernel_bitcode_arch_arm_64_dotprod
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -120,8 +105,6 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_dotprod.c"
   COPTS
@@ -130,7 +113,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_arm_64_i8mm
+    ukernel_bitcode_arch_arm_64_i8mm
   ARCH
     arm_64
   INTERNAL_HDRS
@@ -139,8 +122,6 @@ iree_bitcode_library(
     "common_arm_64.h"
     "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
-    "pack_arm_64_internal.h"
-    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_i8mm.c"
   COPTS
@@ -149,20 +130,20 @@ iree_bitcode_library(
 
 iree_link_bitcode(
   NAME
-    ukernel_bitcode_arm_64
+    ukernel_bitcode_arch_arm_64
   SRCS
-    "ukernel_bitcode_arm_64_base.bc"
-    "ukernel_bitcode_arm_64_bf16.bc"
-    "ukernel_bitcode_arm_64_dotprod.bc"
-    "ukernel_bitcode_arm_64_entry_points.bc"
-    "ukernel_bitcode_arm_64_fp16fml.bc"
-    "ukernel_bitcode_arm_64_fullfp16.bc"
-    "ukernel_bitcode_arm_64_i8mm.bc"
+    "ukernel_bitcode_arch_arm_64_base.bc"
+    "ukernel_bitcode_arch_arm_64_bf16.bc"
+    "ukernel_bitcode_arch_arm_64_dotprod.bc"
+    "ukernel_bitcode_arch_arm_64_entry_points.bc"
+    "ukernel_bitcode_arch_arm_64_fp16fml.bc"
+    "ukernel_bitcode_arch_arm_64_fullfp16.bc"
+    "ukernel_bitcode_arch_arm_64_i8mm.bc"
 
 )
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arm_64.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_arm_64.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
