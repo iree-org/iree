@@ -176,7 +176,7 @@ void buildGlobalOptimizationPassPipeline(
   // const-eval, or could run this pass as preprocessing. There might be a
   // configuration in the future where users want to limit const-eval to smaller
   // constants that aren't exported and skip it for larger parameters, but this
-  // is the best place for the common case of wanting const-eval in the final
+  // is a sensible place for the common case of wanting const-eval in the final
   // artifact + archive.
   if (!transformOptions.options.parameterArchiveExportPath.empty()) {
     IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;

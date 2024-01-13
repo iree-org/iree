@@ -5,21 +5,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/api.h"
-#include "iree/base/internal/file_io.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/hal/api.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/tooling/parameter_util.h"
 
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Support/FileOutputBuffer.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/FileUtilities.h"
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
@@ -77,31 +78,23 @@ static void hoistConstantsIntoGlobals(mlir::ModuleOp moduleOp,
   }
 }
 
-extern "C" {
-static void iree_io_file_handle_release_mapping(
-    void *user_data, iree_io_file_handle_primitive_t handle_primitive) {
-  iree_file_contents_free((iree_file_contents_t *)user_data);
-}
-
-static iree_status_t iree_tooling_open_output_parameter_file(
-    iree_io_physical_offset_t archive_offset,
-    iree_io_physical_size_t archive_length, iree_allocator_t host_allocator,
-    iree_io_file_handle_t **out_file_handle, const char *path) {
-  iree_file_contents_t *file_contents = NULL;
-  IREE_RETURN_IF_ERROR(iree_file_create_mapped(
-      path, archive_offset + archive_length, archive_offset,
-      (iree_host_size_t)archive_length, host_allocator, &file_contents));
-  iree_io_file_handle_release_callback_t release_callback = {
-      iree_io_file_handle_release_mapping, file_contents};
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_WRITE, file_contents->buffer, release_callback,
-      host_allocator, out_file_handle);
-  if (!iree_status_is_ok(status)) {
-    iree_file_contents_free(file_contents);
+// Wrapper around iree_io_stream for use when serializing constants.
+class iree_io_stream_ostream : public llvm::raw_ostream {
+public:
+  explicit iree_io_stream_ostream(iree_io_stream_t *stream) : stream(stream) {
+    iree_io_stream_retain(stream);
   }
-  return status;
-}
-}
+  ~iree_io_stream_ostream() override { iree_io_stream_release(stream); }
+
+private:
+  uint64_t current_pos() const override {
+    return iree_io_stream_offset(stream);
+  }
+  void write_impl(const char *ptr, size_t size) override {
+    IREE_CHECK_OK(iree_io_stream_write(stream, size, ptr));
+  }
+  iree_io_stream_t *stream = NULL;
+};
 
 static LogicalResult handleRuntimeError(ModuleOp moduleOp, iree_status_t status,
                                         StringRef failureMessage) {
@@ -198,16 +191,29 @@ struct ExportParametersPass
     }
 
     // Open a file of sufficient size (now that we know it) for writing.
-    iree_io_physical_offset_t target_file_offset = 0;
-    iree_io_physical_offset_t archive_offset = iree_align_uint64(
-        target_file_offset, IREE_IO_PARAMETER_ARCHIVE_HEADER_ALIGNMENT);
     iree_io_physical_size_t archive_length =
         iree_io_parameter_archive_builder_total_size(&builder);
 
+    auto FileOrErr =
+        llvm::FileOutputBuffer::create(archivePath, archive_length);
+    if (!FileOrErr) {
+      moduleOp.emitError()
+          << "Failed to create file output buffer at " << archivePath
+          << " with error: "
+          << llvm::errorToErrorCode(FileOrErr.takeError()).message();
+      return signalPassFailure();
+    }
+    std::unique_ptr<llvm::FileOutputBuffer> FileBuffer = std::move(*FileOrErr);
+
+    // Wrap the output file for use with the parameter archive builder.
     iree_io_file_handle_t *target_file_handle = NULL;
-    iree_status_t status = iree_tooling_open_output_parameter_file(
-        archive_offset, archive_length, host_allocator, &target_file_handle,
-        archivePath.c_str());
+    iree_byte_span_t file_contents = iree_make_byte_span(
+        FileBuffer->getBufferStart(), FileBuffer->getBufferSize());
+    // Release callback is a no-op, the mapping is managed by the unique_ptr.
+    iree_status_t status = iree_io_file_handle_wrap_host_allocation(
+        IREE_IO_FILE_ACCESS_WRITE, file_contents,
+        iree_io_file_handle_release_callback_null(), host_allocator,
+        &target_file_handle);
     auto releaseFileExit = llvm::make_scope_exit(
         [&]() { return iree_io_file_handle_release(target_file_handle); });
     if (failed(handleRuntimeError(moduleOp, status,
@@ -219,7 +225,7 @@ struct ExportParametersPass
     iree_io_stream_t *target_stream = NULL;
     status =
         iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, target_file_handle,
-                            target_file_offset, host_allocator, &target_stream);
+                            /*file_offset=*/0, host_allocator, &target_stream);
     auto releaseStreamExit = llvm::make_scope_exit(
         [&]() { return iree_io_stream_release(target_stream); });
     if (failed(handleRuntimeError(
@@ -241,7 +247,7 @@ struct ExportParametersPass
     // Commit the archive header to the file and produce an index referencing
     // it. This will allow us to know where to copy file contents.
     status = iree_io_parameter_archive_builder_write(
-        &builder, target_file_handle, target_file_offset, target_stream,
+        &builder, target_file_handle, /*file_offset=*/0, target_stream,
         built_index);
     if (failed(handleRuntimeError(
             moduleOp, status,
@@ -252,6 +258,7 @@ struct ExportParametersPass
     StringAttr scopeAttr = parameterScope.empty()
                                ? StringAttr()
                                : StringAttr::get(context, parameterScope);
+    iree_io_stream_ostream llvm_stream(target_stream);
 
     // Write all of the global contents to the appropriate data storage
     // segments.
@@ -270,8 +277,7 @@ struct ExportParametersPass
         return signalPassFailure();
       }
       status = iree_io_stream_seek(target_stream, IREE_IO_STREAM_SEEK_SET,
-                                   target_file_offset +
-                                       target_entry->storage.file.offset);
+                                   target_entry->storage.file.offset);
       if (failed(handleRuntimeError(
               moduleOp, status,
               "Failed to seek to location of global in index"))) {
@@ -282,20 +288,13 @@ struct ExportParametersPass
       auto serializableAttr =
           dyn_cast<IREE::Util::SerializableAttrInterface>(initialValueAttr);
 
-      SmallVector<char> buffer;
-      if (failed(serializableAttr.serializeToVector(
-              constantGlobal.getLoc(), llvm::endianness::native, buffer))) {
+      if (failed(serializableAttr.serializeToStream(constantGlobal.getLoc(),
+                                                    llvm::endianness::native,
+                                                    llvm_stream))) {
         moduleOp.emitError() << "Failed to serialize global " << constantGlobal;
         return signalPassFailure();
       }
-
-      status =
-          iree_io_stream_write(target_stream, buffer.size(),
-                               reinterpret_cast<const char *>(buffer.data()));
-      if (failed(handleRuntimeError(moduleOp, status,
-                                    "Failed to write global to index"))) {
-        return signalPassFailure();
-      }
+      llvm_stream.flush();
 
       // Now we can just replace the existing initial value with a reference to
       // the parameter.
@@ -303,6 +302,17 @@ struct ExportParametersPass
           context, constantGlobal.getType(), scopeAttr,
           StringAttr::get(context, name), DictionaryAttr());
       constantGlobal.setInitialValueAttr(param);
+    }
+    // Commit the written file.
+    llvm::Error maybeCommit = FileBuffer->commit();
+    if (maybeCommit) {
+      InFlightDiagnostic errorStream =
+          moduleOp.emitError() << "Failed to commit archive with error: ";
+      llvm::handleAllErrors(std::move(maybeCommit),
+                            [&](const llvm::ErrorInfoBase &PE) {
+                              errorStream << PE.message() << "\n";
+                            });
+      return signalPassFailure();
     }
   }
 };

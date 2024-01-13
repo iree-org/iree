@@ -29,7 +29,6 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base
-    iree::base::internal::file_io
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
     iree::hal

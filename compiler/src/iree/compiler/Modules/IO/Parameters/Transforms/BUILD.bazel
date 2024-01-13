@@ -27,7 +27,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
