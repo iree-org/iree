@@ -47,9 +47,9 @@ iree_bitcode_library(
     "pack_arm_64_internal.h"
     "unpack_arm_64_internal.h"
   SRCS
-    "mmt4d_arm_64.c"
-    "pack_arm_64.c"
-    "unpack_arm_64.c"
+    "mmt4d_arm_64_base.c"
+    "pack_arm_64_base.c"
+    "unpack_arm_64_base.c"
 )
 
 iree_bitcode_library(
@@ -290,12 +290,12 @@ iree_cc_library(
     arm_64
   SRCS
     "mmt4d_arm_64_entry_point.c"
-    "mmt4d_arm_64.c"
+    "mmt4d_arm_64_base.c"
     "pack_arm_64_entry_point.c"
-    "pack_arm_64.c"
+    "pack_arm_64_base.c"
     "query_tile_sizes_arm_64_entry_point.c"
     "unpack_arm_64_entry_point.c"
-    "unpack_arm_64.c"
+    "unpack_arm_64_base.c"
   DEPS
     ::common_arm_64
     iree::base::core_headers

@@ -51,9 +51,9 @@ iree_bitcode_library(
 iree_bitcode_library(
     name = "ukernel_bitcode_arm_64_base",
     srcs = [
-        "mmt4d_arm_64.c",
-        "pack_arm_64.c",
-        "unpack_arm_64.c",
+        "mmt4d_arm_64_base.c",
+        "pack_arm_64_base.c",
+        "unpack_arm_64_base.c",
     ],
     arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
