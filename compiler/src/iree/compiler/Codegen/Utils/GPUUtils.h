@@ -114,7 +114,10 @@ bool sharedMemTransposeFilter(AffineMap indexMap);
 // GPU UKernel Utils
 //===----------------------------------------------------------------------===//
 
-/// Checks if target GPU has UKernel support.
+/// Checks if target Chip(StringRef) has UKernel support.
+bool hasUkernelSupportedRocmArch(StringRef targetChip);
+
+/// Checks if targetAttr's GPU target has UKernel support.
 bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 } // namespace mlir::iree_compiler

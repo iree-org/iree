@@ -6,6 +6,7 @@
 
 #include "./ROCMTargetUtils.h"
 
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
@@ -253,19 +254,6 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
   };
 }
 
-bool hasUkernelSupportedRocmArch(StringRef targetChip) {
-  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
-                                        "gfx1100"};
-  size_t arraySize =
-      sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
-  for (int i = 0; i < arraySize; i++) {
-    // return true if targetChip is found inside kSupportedTargetChip.
-    if (targetChip.compare(kSupportedTargetChip[i]) == 0)
-      return true;
-  }
-  return false;
-}
-
 // Links optimized Ukernel bitcodes into the given module if the module needs
 // it.
 void linkUkernelBCFiles(llvm::Module *module, Location loc,
@@ -273,7 +261,7 @@ void linkUkernelBCFiles(llvm::Module *module, Location loc,
                         StringRef bitCodeDir, unsigned linkerFlags,
                         llvm::TargetMachine &targetMachine) {
   // Early exit if Ukernel not supported on target chip.
-  if (!hasUkernelSupportedRocmArch(targetChip))
+  if (!iree_compiler::hasUkernelSupportedRocmArch(targetChip))
     return;
   std::vector<std::string> ukernelPaths =
       getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);

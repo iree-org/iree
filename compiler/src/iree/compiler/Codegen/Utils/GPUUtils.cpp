@@ -888,22 +888,26 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
 // TODO: Add more popular kernels into this list and the ukernel cmake.
 //       No real technical reason to only allow these aside from compile
 //       time and diskspace.
-bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
-  if (!targetArch) {
-    return false;
-  }
-  StringRef targetArchStr = targetArch->getValue();
+bool hasUkernelSupportedRocmArch(StringRef targetChip) {
   const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
                                         "gfx1100"};
   size_t arraySize =
       sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
   for (int i = 0; i < arraySize; i++) {
     // return true if targetChip is found inside kSupportedTargetChip.
-    if (targetArchStr.compare(kSupportedTargetChip[i]) == 0)
+    if (targetChip.compare(kSupportedTargetChip[i]) == 0)
       return true;
   }
   return false;
+}
+
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
+  if (!targetArch) {
+    return false;
+  }
+  StringRef targetArchStr = targetArch->getValue();
+  return hasUkernelSupportedRocmArch(targetArchStr);
 }
 
 /// Checks if target GPU has UKernel support.
