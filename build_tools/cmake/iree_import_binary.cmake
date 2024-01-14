@@ -14,6 +14,7 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target/binary (see Usage below)
+# OPTIONAL: Don't fail if not found (but will issue a warning)
 #
 # Usage:
 #   if(BUILD_AWESOME_TOOL)
