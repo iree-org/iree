@@ -44,7 +44,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
   }
 
   // Final reduction with one subgroup
-  // NOTE: __ockl_wfred_max_f32 has correctness issue on clang.
+  // NOTE: __ockl_wfred_max_f32 has correctness issue on gfx1100 documented on
+  // https://github.com/openxla/iree/issues/16112.
   float wgMax = laneMax;
   for (int i = 1; i < warpSize; i *= 2) {
     wgMax = __ocml_fmax_f32(__shfl_xor(wgMax, i), wgMax);
@@ -86,7 +87,8 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   }
 
   // Final reduction with one subgroup
-  // NOTE: __ockl_wfred_max_f32 has correctness issue on clang.
+  // NOTE: __ockl_wfred_max_f32 has correctness issue on gfx1100 documented on
+  // https://github.com/openxla/iree/issues/16112.
   float wgMax = laneMax;
   for (int i = 1; i < warpSize; i *= 2) {
     wgMax = __ocml_fmax_f32(__shfl_xor(wgMax, i), wgMax);
