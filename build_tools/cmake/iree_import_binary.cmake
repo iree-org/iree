@@ -31,7 +31,7 @@ include(CMakeParseArguments)
 function(iree_import_binary)
   cmake_parse_arguments(
     _RULE
-    ""
+    "OPTIONAL"
     "NAME"
     ""
     ${ARGN}
@@ -58,9 +58,15 @@ function(iree_import_binary)
        BASE_DIRECTORY ${IREE_ROOT_DIR} EXPAND_TILDE)
 
   if(NOT EXISTS ${_BINARY_PATH})
-    message(FATAL_ERROR "Could not find '${_FULL_BINARY_NAME}' under "
-            "'${IREE_HOST_BIN_DIR}'\n(Expanded to '${_BINARY_PATH}').\n"
-            "Ensure that IREE_HOST_BIN_DIR points to a complete binary directory.")
+    if(_RULE_OPTIONAL)
+      message(WARNING "Could not find optional '${_FULL_BINARY_NAME}' under "
+              "'${IREE_HOST_BIN_DIR}'. Features that depend on it may fail to "
+              "build.")
+    else()
+      message(FATAL_ERROR "Could not find '${_FULL_BINARY_NAME}' under "
+              "'${IREE_HOST_BIN_DIR}'\n(Expanded to '${_BINARY_PATH}').\n"
+              "Ensure that IREE_HOST_BIN_DIR points to a complete binary directory.")
+    endif()
   endif()
 
   add_executable(${_RULE_NAME} IMPORTED GLOBAL)
