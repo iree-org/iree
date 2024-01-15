@@ -209,7 +209,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   }
 
   // Select a strategy based on heuristics.
-  if (linalgOp.hasBufferSemantics()) {
+  if (linalgOp.hasPureBufferSemantics()) {
     return VectorPreProcStrategy::None;
   }
 
@@ -1497,7 +1497,7 @@ setDefaultGenericOpRootConfig(func::FuncOp entryPointFn,
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
-  if (genericOp.hasTensorSemantics()) {
+  if (genericOp.hasPureTensorSemantics()) {
     passPipeline =
         vecPreProcStrategy == VectorPreProcStrategy::Peeling
             ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
@@ -1598,7 +1598,7 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
 
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
-      genericOp.hasTensorSemantics()
+      genericOp.hasPureTensorSemantics()
           ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
           : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
@@ -1681,7 +1681,7 @@ static LogicalResult setElementwiseGenericOpRootConfig(
                        << "\n");
 
   DispatchLoweringPassPipeline passPipeline;
-  if (genericOp.hasBufferSemantics()) {
+  if (genericOp.hasPureBufferSemantics()) {
     passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
   } else if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
     passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;

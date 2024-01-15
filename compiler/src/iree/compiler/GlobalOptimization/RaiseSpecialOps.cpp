@@ -135,7 +135,7 @@ std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
 /// operation.
 static FailureOr<linalg::GenericOp>
 raiseTensorExtractToInput(linalg::GenericOp linalgOp, RewriterBase &rewriter) {
-  if (!linalgOp.hasTensorSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
   if (!isElementwise(linalgOp)) {
@@ -317,7 +317,7 @@ tryRaiseToExtractSlice(AffineMap inputIndexingMap, AffineMap outputIndexingMap,
 /// tensor, and tries to raise it to a view-like operation on the input tensor.
 static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
                                              RewriterBase &rewriter) {
-  if (!linalgOp.hasTensorSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics()) {
     return failure();
   }
 

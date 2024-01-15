@@ -846,7 +846,7 @@ bool isCooperativeMatrixFusable(linalg::GenericOp genericOp) {
 }
 
 bool needToPrmoteCForCooperativeMatrix(linalg::LinalgOp matmulOp) {
-  assert(matmulOp.hasTensorSemantics());
+  assert(matmulOp.hasPureTensorSemantics());
   Value result = matmulOp.getOperation()->getResult(0);
   if (!result.hasOneUse())
     return true; // Be conservative.
@@ -1485,7 +1485,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   bool vectorizable =
       allowVectorization &&
       // The vectorization pipeline assumes tensor semantics for tiling.
-      linalgOp.hasTensorSemantics() && !linalgOp.hasIndexSemantics() &&
+      linalgOp.hasPureTensorSemantics() && !linalgOp.hasIndexSemantics() &&
       // Require all affine maps to be projected permutation so that we can
       // generate vector transfer ops.
       llvm::all_of(

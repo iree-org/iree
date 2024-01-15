@@ -25,7 +25,7 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
                                 PatternRewriter &rewriter) const override {
-    if (!genericOp.hasTensorSemantics()) {
+    if (!genericOp.hasPureTensorSemantics()) {
       return rewriter.notifyMatchFailure(genericOp, "no tensor semantics");
     }
 

@@ -42,7 +42,7 @@ LogicalResult splitReductionPrecondition(Operation *op,
                                          bool fpReductionReordering) {
   linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op);
 
-  if (!linalgOp.hasTensorSemantics()) {
+  if (!linalgOp.hasPureTensorSemantics()) {
     LLVM_DEBUG(llvm::dbgs() << "doesn't have tensor semantics\n");
     return failure();
   }

@@ -304,7 +304,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     ArrayRef<Value> operands, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-  if (!linalgOp.hasTensorSemantics())
+  if (!linalgOp.hasPureTensorSemantics())
     return failure();
 
   auto inputs = linalgOp.getDpsInputOperands();
@@ -376,7 +376,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
                     ValueRange convertedInputOperands,
                     ValueRange convertedOutputOperands, MaterializeEncodingFn,
                     MaterializeEncodingValueFn) {
-  if (!fillOp.hasTensorSemantics())
+  if (!fillOp.hasPureTensorSemantics())
     return failure();
   Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
       fillOp.getLoc(), convertedOutputOperands[0].getType(),
@@ -429,7 +429,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
                     ValueRange convertedInputOperands,
                     ValueRange convertedOutputOperands, MaterializeEncodingFn,
                     MaterializeEncodingValueFn) {
-  if (!genericOp.hasTensorSemantics() || !isElementwise(genericOp) ||
+  if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
       genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
     return rewriter.notifyMatchFailure(genericOp,
                                        "linalg.generic op is not elementwise "
