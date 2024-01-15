@@ -778,6 +778,7 @@ static LogicalResult setMatmulPeelingRootConfig(
     ArrayRef<bool> inputVecScalableTileFlags, ArrayRef<int64_t> vecTileSizes,
     int vectorSize) {
 
+  // 0. Preprocess for scalable vectors
   // Clamp vector tile sizes to have better hint about peeling + masking. This
   // is critical for scalable vectorization, so it can resolve correct scalable
   // vector sizes.
@@ -787,6 +788,16 @@ static LogicalResult setMatmulPeelingRootConfig(
       continue;
     }
     clampedVecTileSizes[index] = std::min(clampedVecTileSizes[index], size);
+  }
+
+  // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
+  // hence the extra rounding up.
+  for (const auto &[index, size] : llvm::enumerate(clampedVecTileSizes)) {
+    if (!size)
+      continue;
+    clampedVecTileSizes[index] =
+        roundUpToPow2(size,
+                      /*predicate=*/inputVecScalableTileFlags[index]);
   }
 
   // 1. Compute tile sizes for all tiling levels.
@@ -804,16 +815,6 @@ static LogicalResult setMatmulPeelingRootConfig(
   SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
   std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
 
-  // The backend struggles to legalize non-power-of-two scalable vectors,
-  // hence the extra rounding up.
-  for (const auto &[index, size] : llvm::enumerate(vectorParallelTileSizes)) {
-    if (!size)
-      continue;
-    vectorParallelTileSizes[index] =
-        roundUpToPow2(size,
-                      /*predicate=*/inputVecScalableTileFlags[index]);
-  }
-
   TileSizesListType tileSizes = {
       SmallVector<int64_t>(distTileSizes), cacheParallelTileSizes,
       cacheReductionTileSizes, vectorParallelTileSizes,
@@ -825,14 +826,7 @@ static LogicalResult setMatmulPeelingRootConfig(
   SmallVector<bool> parallelScalableFlags(inputVecScalableTileFlags.begin(),
                                           inputVecScalableTileFlags.end());
   SmallVector<bool> reductionScalableFlags(numTilingDims, false);
-
-  // Ensure there's no zero scalable dims.
-  for (unsigned i = 0; i < numTilingDims; i++) {
-    if (vectorReductionTileSizes[i] == 0)
-      reductionScalableFlags[i] = false;
-    if (vectorParallelTileSizes[i] == 0)
-      parallelScalableFlags[i] = false;
-  }
+  std::swap(parallelScalableFlags.back(), reductionScalableFlags.back());
 
   ScalableTileFlagsListType newScalableTileFlags;
   // No scalable:
@@ -1222,8 +1216,6 @@ setRootConfig(func::FuncOp entryPointFn,
                        << distScalableTileFlags << "\n");
   LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
-  LLVM_DEBUG(KD_DBGS() << "Vector scalable tile sizes: " << vecTileSizes
-                       << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector scalable tile flags: " << vecScalableFlags
                        << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
