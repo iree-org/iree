@@ -82,7 +82,7 @@ static DistributionSignature getOpSignature(Operation *op) {
   for (Attribute resultAttr : resultsAttr) {
     // Ignore null attributes.
     if (!resultAttr) {
-      signature.operands.push_back(VectorLayoutInterface());
+      signature.results.push_back(VectorLayoutInterface());
       continue;
     }
 
