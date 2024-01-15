@@ -1019,6 +1019,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
 
+  rewriter.setInsertionPointToStart(&target.getBody().front());
   SmallVector<Value> threadGrid = {
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),

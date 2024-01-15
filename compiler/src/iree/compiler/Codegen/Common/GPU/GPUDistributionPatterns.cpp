@@ -67,11 +67,9 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
     }
 
     // Compute the index for the dim.
-    offset.dump();
-    stride.dump();
-    rewriter.getUnknownLoc().dump();
+    AffineMap indexMap = AffineMap::get(0, 3, offset);
     Value index = rewriter.create<affine::AffineApplyOp>(
-        rewriter.getUnknownLoc(), offset, threadGrid);
+        rewriter.getUnknownLoc(), indexMap, threadGrid);
     simdIndex.push_back(index);
   }
 
@@ -219,8 +217,9 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                            PatternBenefit benefit = 1)
       : OpDistributionPattern<OpTy>(context, benefit), threadGrid(threadGrid) {}
 
-  void accessMemory(OpTy xferOp, VectorValue accumulator,
-                    LayoutAttr vectorLayout, PatternRewriter &rewriter) const {
+  VectorValue accessMemory(OpTy xferOp, VectorValue accumulator,
+                           LayoutAttr vectorLayout,
+                           PatternRewriter &rewriter) const {
     // We need to take special consideration of the permutation map when
     // lowering. When accessing memory, we use the memoryLayout, because that
     // is how the data is accessed in memory. The data is stored in the vector
@@ -238,11 +237,12 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     iterator.apply([&](const LayoutIterator::State &state) {
       SmallVector<Value> memoryIndices =
           getMemoryIndices(state, memoryLayout, xferOp.getIndices(), rewriter);
-      SmallVector<Value> accIndices =
-          getAccumulatorIndices(state, vectorLayout, rewriter);
+      SmallVector<int64_t> accIndices = computeSIMTIndex(state, vectorLayout);
       accumulator = accessUnit(xferOp, memoryIndices, accIndices, accumulator,
                                vectorLayout, rewriter);
     });
+
+    return accumulator;
   }
 
   SmallVector<Value> getMemoryIndices(const LayoutIterator::State &state,
@@ -264,29 +264,19 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     return memoryIndices;
   }
 
-  SmallVector<Value> getAccumulatorIndices(const LayoutIterator::State &state,
-                                           LayoutAttr vectorLayout,
-                                           RewriterBase &rewriter) const {
-    SmallVector<int64_t> simtIndices = computeSIMTIndex(state, vectorLayout);
-    SmallVector<Value> simt(simtIndices.size());
-
-    for (int i = 0, e = simtIndices.size(); i < e; ++i) {
-      simt[i] = rewriter.create<arith::ConstantIndexOp>(
-          rewriter.getUnknownLoc(), simtIndices[i]);
-    }
-
-    return simt;
-  }
-
   virtual VectorValue accessUnit(OpTy xferOp, SmallVector<Value> &memoryIndices,
-                                 SmallVector<Value> &accIndices,
+                                 SmallVector<int64_t> &accIndices,
                                  VectorValue accumulator,
                                  LayoutAttr vectorLayout,
                                  PatternRewriter &rewriter) const = 0;
 
   int getLoadStoreWidth(LayoutAttr layout) const {
-    int width = 1;
-    return width;
+    PerDimLayoutAttr fastestChanging = layout.getLayouts().back();
+    if (std::optional<int64_t> width =
+            fastestChanging.getShape(LayoutDimension::VECTORX)) {
+      return *width;
+    }
+    return 1;
   }
 
   SmallVector<Value> threadGrid;
@@ -313,21 +303,24 @@ struct DistributeTransferReadLayoutAttr
         readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
 
-    accessMemory(readOp, acc, vectorLayout, rewriter);
+    VectorValue readVec = accessMemory(readOp, acc, vectorLayout, rewriter);
 
-    replaceOpWithDistributedValues(rewriter, readOp, result);
+    replaceOpWithDistributedValues(rewriter, readOp, readVec);
     return success();
   }
 
   VectorValue accessUnit(vector::TransferReadOp readOp,
                          SmallVector<Value> &memoryIndices,
-                         SmallVector<Value> &accIndices,
+                         SmallVector<int64_t> &accIndices,
                          VectorValue accumulator, LayoutAttr vectorLayout,
                          PatternRewriter &rewriter) const override {
     auto unitType = VectorType::get({getLoadStoreWidth(vectorLayout)},
                                     accumulator.getType().getElementType());
-    return rewriter.create<vector::LoadOp>(readOp.getLoc(), unitType,
-                                           readOp.getSource(), memoryIndices);
+    VectorValue load = rewriter.create<vector::LoadOp>(
+        readOp.getLoc(), unitType, readOp.getSource(), memoryIndices);
+    return rewriter.create<vector::InsertStridedSliceOp>(
+        readOp.getLoc(), load, accumulator, accIndices,
+        SmallVector<int64_t>{1});
   }
 };
 
