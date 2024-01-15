@@ -8,8 +8,11 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+
+#include <cassert>
 
 namespace mlir::iree_compiler {
 
@@ -90,10 +93,33 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
   }
 };
 
-}; // namespace
+struct DistributeReduction final : OpDistributionPattern<vector::ReductionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::ReductionOp op,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    llvm::errs() << "JAKUB: Distribute reduction: " << op << "\n";
+    assert(!signature.operands.empty());
+    assert(signature.operands.front() &&
+           "Expected layout attr for the vector operand");
+    Value newOperand = DistributionPattern::getDistributed(
+        rewriter, op.getVector(), signature.operands.front());
+
+    // Replace the original op with the distributed op.
+    auto distributedOp = rewriter.create<vector::ReductionOp>(
+        op.getLoc(), op.getKind(), newOperand, op.getAcc(), op.getFastmath());
+    DistributionPattern::replaceOpWithDistributedValues(
+        rewriter, op, distributedOp->getResults());
+    return success();
+  }
+};
+
+} // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeElementwise<arith::MulIOp>,
+  patterns.add<DistributeConstants, DistributeReduction,
+               DistributeElementwise<arith::MulIOp>,
                DistributeElementwise<arith::MulFOp>,
                DistributeElementwise<arith::AddIOp>,
                DistributeElementwise<arith::AddFOp>>(patterns.getContext());
