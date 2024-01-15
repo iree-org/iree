@@ -99,7 +99,6 @@ struct DistributeReduction final : OpDistributionPattern<vector::ReductionOp> {
   LogicalResult matchAndRewrite(vector::ReductionOp op,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    llvm::errs() << "JAKUB: Distribute reduction: " << op << "\n";
     assert(!signature.operands.empty());
     assert(signature.operands.front() &&
            "Expected layout attr for the vector operand");
