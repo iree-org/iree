@@ -776,6 +776,17 @@ static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
     ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+  // Clamp vector tile sizes to have better hint about peeling + masking. This
+  // is critical for scalable vectorization, so it can resolve correct scalable
+  // vector sizes.
+  SmallVector<int64_t> clampedVecTileSizes(vecTileSizes);
+  for (const auto &[index, size] : llvm::enumerate(cacheTileSizes)) {
+    if (!size) {
+      continue;
+    }
+    clampedVecTileSizes[index] = std::min(clampedVecTileSizes[index], size);
+  }
+
   // The tiling for parallel dims (M and N) and reduction dim (K) should be
   // separated, so we move K dim from parallel tile sizes to reduction tile
   // sizes.
@@ -785,8 +796,8 @@ static LogicalResult setMatmulPeelingRootConfig(
   SmallVector<int64_t> cacheReductionTileSizes(numTilingDims, 0);
   std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
 
-  SmallVector<int64_t> vectorParallelTileSizes(vecTileSizes.begin(),
-                                               vecTileSizes.end());
+  SmallVector<int64_t> vectorParallelTileSizes(clampedVecTileSizes.begin(),
+                                               clampedVecTileSizes.end());
   SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
   std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
 
