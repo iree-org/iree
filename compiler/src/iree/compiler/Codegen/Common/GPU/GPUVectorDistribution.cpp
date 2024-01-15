@@ -166,6 +166,7 @@ static void applyVectorDistribution(Operation *root,
   SmallVector<Operation *> worklist;
 
   VectorDistributionRewriter rewriter(root->getContext());
+  rewriter.getUnknownLoc().dump();
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 

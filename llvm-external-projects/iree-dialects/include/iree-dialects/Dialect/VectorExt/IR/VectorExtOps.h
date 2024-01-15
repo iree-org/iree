@@ -42,6 +42,8 @@ public:
     return position < other.position;
   }
 
+  int64_t getPosition() const { return position; }
+
 private:
   int64_t position, stride;
 };
