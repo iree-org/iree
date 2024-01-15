@@ -41,3 +41,23 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#layout = #iree_vector_ext.layout<<[BATCHX, LANEY], [2, 8]>, <[BATCHY, LANEX, VECTORX], [2, 2, 4]>>
+
+builtin.module attributes { transform.with_named_sequence } {
+  // CHECK-LABEL: @distribute_transfer_read
+  func.func @distribute_transfer_read(%alloc: memref<32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout} : memref<32x32xf16>, vector<16x16xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
