@@ -7,11 +7,42 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCBuilders.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "mlir/Dialect/EmitC/IR/EmitC.h"
 
 namespace mlir::iree_compiler::emitc_builders {
 
 namespace {
+std::string mapPreprocessorDirective(PreprocessorDirective directive) {
+  switch (directive) {
+  case PreprocessorDirective::DEFINE:
+    return "#define";
+  case PreprocessorDirective::UNDEF:
+    return "#undef";
+  case PreprocessorDirective::IFDEF:
+    return "#ifdef";
+  case PreprocessorDirective::IFNDEF:
+    return "#ifndef";
+  case PreprocessorDirective::IF:
+    return "#if";
+  case PreprocessorDirective::ENDIF:
+    return "#endif";
+  case PreprocessorDirective::ELSE:
+    return "#else";
+  case PreprocessorDirective::ELIF:
+    return "#elif";
+  case PreprocessorDirective::LINE:
+    return "#line";
+  case PreprocessorDirective::ERROR:
+    return "#error";
+  case PreprocessorDirective::INCLUDE:
+    return "#include";
+  case PreprocessorDirective::PRAGMA:
+    return "#pragma";
+  default:
+    llvm_unreachable("unsupported unary operator");
+    return "XXX";
+  }
+}
+
 std::string mapUnaryOperator(UnaryOperator op) {
   switch (op) {
   case UnaryOperator::PLUS:
@@ -417,6 +448,79 @@ void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
       /*args=*/ArrayAttr{},
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{operand});
+}
+
+emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
+                                        PreprocessorDirective directive,
+                                        StringRef value) {
+
+  auto t = mapPreprocessorDirective(directive);
+  if (!value.empty()) {
+    t += " ";
+    t += value;
+  }
+
+  return builder.create<emitc::VerbatimOp>(location, t);
+}
+
+FailureOr<emitc::VerbatimOp>
+func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
+          bool as_static, IREE::VM::EmitCTypeConverter &typeConverter) {
+  std::string decl;
+  if (as_static)
+    decl += "static ";
+  if (func.getNumResults() == 0) {
+    decl += "void";
+  } else if (func.getNumResults() == 1) {
+    auto cType = typeConverter.convertTypeToStringLiteral(
+        func.getFunctionType().getResult(0));
+    decl += cType.value();
+  } else {
+    return failure();
+  }
+  decl += " ";
+  decl += func.getSymName();
+  decl += "(";
+  size_t argIndex = 0;
+  for (Type type : func.getFunctionType().getInputs()) {
+    if (argIndex++ > 0) {
+      decl += ", ";
+    }
+    auto cType = typeConverter.convertTypeToStringLiteral(type);
+    if (!cType.has_value()) {
+      return func.emitError() << "failed to convert type " << type;
+    }
+    decl += cType.value();
+  }
+  decl += ");";
+
+  return {builder.create<emitc::VerbatimOp>(location, decl)};
+}
+
+FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
+                                        StringRef name,
+                                        ArrayRef<StructField> fields) {
+  auto ctx = builder.getContext();
+  std::string decl = std::string("struct ") + name.str() + " {";
+  for (auto &field : fields) {
+    decl += field.type + " " + field.name;
+    if (field.isArray())
+      decl += "[" + std::to_string(field.arraySize.value()) + "]";
+    decl += ";";
+  }
+  decl += "};";
+
+  return {
+      builder.create<emitc::VerbatimOp>(location, StringAttr::get(ctx, decl))};
+}
+
+void makeFuncStatic(OpBuilder builder, Location location,
+                    mlir::func::FuncOp func) {
+  if (!func->hasAttr("emitc.static"))
+    return;
+  func->removeAttr("emitc.static");
+  builder.setInsertionPoint(func);
+  builder.create<emitc::VerbatimOp>(location, "static ");
 }
 
 } // namespace mlir::iree_compiler::emitc_builders

@@ -2,7 +2,7 @@
 
 // CHECK: #include "iree/vm/ops.h"
 vm.module @calling_convention_test {
-  // CHECK: static iree_status_t calling_convention_test_no_in_no_return(iree_vm_stack_t* v1, calling_convention_test_t* v2, calling_convention_test_state_t* v3) {
+  // CHECK: iree_status_t calling_convention_test_no_in_no_return(iree_vm_stack_t* v1, struct calling_convention_test_t* v2, struct calling_convention_test_state_t* v3) {
   vm.func @no_in_no_return() -> () {
     // CHECK-NEXT: iree_status_t v4;
     // CHECK-NEXT: v4 = iree_ok_status();
@@ -10,7 +10,7 @@ vm.module @calling_convention_test {
     vm.return
   }
 
-  // CHECK: static iree_status_t calling_convention_test_i32_in_no_return(iree_vm_stack_t* v1, calling_convention_test_t* v2, calling_convention_test_state_t* v3, int32_t v4) {
+  // CHECK: iree_status_t calling_convention_test_i32_in_no_return(iree_vm_stack_t* v1, struct calling_convention_test_t* v2, struct calling_convention_test_state_t* v3, int32_t v4) {
   vm.func @i32_in_no_return(%arg0 : i32) -> () {
     // CHECK-NEXT: iree_status_t v5;
     // CHECK-NEXT: v5 = iree_ok_status();
@@ -18,7 +18,7 @@ vm.module @calling_convention_test {
     vm.return
   }
 
-  // CHECK: static iree_status_t calling_convention_test_no_in_i32_return(iree_vm_stack_t* v1, calling_convention_test_t* v2, calling_convention_test_state_t* v3, int32_t* v4) {
+  // CHECK: iree_status_t calling_convention_test_no_in_i32_return(iree_vm_stack_t* v1, struct calling_convention_test_t* v2, struct calling_convention_test_state_t* v3, int32_t* v4) {
   vm.func @no_in_i32_return() -> (i32) {
     // CHECK-NEXT: int32_t v5;
     // CHECK-NEXT: iree_status_t v6;
@@ -30,7 +30,7 @@ vm.module @calling_convention_test {
     vm.return %0 : i32
   }
 
-  // CHECK: static iree_status_t calling_convention_test_i32_in_i32_return(iree_vm_stack_t* v1, calling_convention_test_t* v2, calling_convention_test_state_t* v3, int32_t v4, int32_t* v5) {
+  // CHECK: iree_status_t calling_convention_test_i32_in_i32_return(iree_vm_stack_t* v1, struct calling_convention_test_t* v2, struct calling_convention_test_state_t* v3, int32_t v4, int32_t* v5) {
   vm.func @i32_in_i32_return(%arg0 : i32) -> (i32) {
     // CHECK-NEXT: int32_t v6;
     // CHECK-NEXT: iree_status_t v7;

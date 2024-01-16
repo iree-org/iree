@@ -11,17 +11,39 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCTypeConverter.h"
+
 namespace mlir::iree_compiler::emitc_builders {
 
 struct StructField {
   std::string type;
   std::string name;
+  std::optional<size_t> arraySize = std::nullopt;
+
+  bool isArray() const { return arraySize.has_value(); }
+};
+
+enum PreprocessorDirective {
+  DEFINE = 0,
+  UNDEF,
+  IFDEF,
+  IFNDEF,
+  IF,
+  ENDIF,
+  ELSE,
+  ELIF,
+  LINE,
+  ERROR,
+  INCLUDE,
+  PRAGMA
 };
 
 enum UnaryOperator {
@@ -122,6 +144,21 @@ Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
                                Value instance, Value stringView);
 
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand);
+
+emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
+                                        PreprocessorDirective directive,
+                                        StringRef value);
+
+FailureOr<emitc::VerbatimOp>
+func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
+          bool as_static, IREE::VM::EmitCTypeConverter &typeConverter);
+
+FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
+                                        StringRef name,
+                                        ArrayRef<StructField> fields);
+
+void makeFuncStatic(OpBuilder builder, Location location,
+                    mlir::func::FuncOp func);
 
 } // namespace mlir::iree_compiler::emitc_builders
 

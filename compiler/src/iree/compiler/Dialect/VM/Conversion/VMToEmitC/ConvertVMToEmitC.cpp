@@ -82,10 +82,11 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   auto moduleOp = funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
 
   FunctionType funcType = funcOp.getFunctionType();
-  std::string name =
-      std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
-  std::string moduleTypeName = (moduleOp.getName() + "_t").str();
-  std::string moduleStateTypeName = (moduleOp.getName() + "_state_t").str();
+  std::string name = moduleOp.getName().str() + "_" + funcOp.getName().str();
+  std::string moduleTypeName =
+      std::string("struct ") + moduleOp.getName().str() + "_t";
+  std::string moduleStateTypeName =
+      std::string("struct ") + moduleOp.getName().str() + "_state_t";
 
   Type stackType =
       emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
@@ -602,7 +603,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     builder.setInsertionPointToStart(entryBlock);
 
-    std::string moduleTypeName = moduleName + "_t";
+    std::string moduleTypeName = std::string("struct ") + moduleName + "_t";
 
     auto castedModuleOp = builder.create<emitc::CastOp>(
         /*location=*/loc,
@@ -658,7 +659,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     builder.setInsertionPointToStart(entryBlock);
 
-    std::string moduleStateTypeName = moduleName + "_state_t";
+    std::string moduleStateTypeName =
+        std::string("struct ") + moduleName + "_state_t";
 
     Value state = emitc_builders::allocateVariable(
         builder, loc,
@@ -837,7 +839,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     builder.setInsertionPointToStart(entryBlock);
 
-    std::string moduleStateTypeName = moduleName + "_state_t";
+    std::string moduleStateTypeName =
+        std::string("struct ") + moduleName + "_state_t";
 
     auto stateOp = builder.create<emitc::CastOp>(
         /*location=*/loc,
@@ -938,7 +941,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     builder.setInsertionPointToStart(entryBlock);
 
-    std::string moduleStateTypeName = moduleName + "_state_t";
+    std::string moduleStateTypeName =
+        std::string("struct ") + moduleName + "_state_t";
 
     auto stateOp = builder.create<emitc::CastOp>(
         /*location=*/loc,
@@ -1022,7 +1026,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     builder.setInsertionPointToStart(entryBlock);
 
-    std::string moduleTypeName = moduleName + "_t";
+    std::string moduleTypeName = std::string("struct ") + moduleName + "_t";
 
     Value module = emitc_builders::allocateVariable(
         builder, loc,
@@ -1167,6 +1171,362 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         ArrayRef<Value>{vmModulePtr, instanceArg, allocatorArg, moduleArg});
 
     builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+  }
+
+  return success();
+}
+
+// TODO: Replace string concatenation with Twine concatenation
+LogicalResult
+createModuleStructure(IREE::VM::ModuleOp moduleOp,
+                      IREE::VM::EmitCTypeConverter &typeConverter) {
+  auto ctx = moduleOp.getContext();
+  auto loc = moduleOp.getLoc();
+
+  auto mark = [ctx](Operation *op) {
+    attachAttribute(op, "vm.verbatim.emit_at_start", UnitAttr::get(ctx));
+  };
+
+  OpBuilder builder(moduleOp);
+
+  SmallVector<Operation *> opsToRemove;
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&moduleOp.getBlock());
+
+    std::string includeGuard = moduleOp.getName().upper() + "_H_";
+
+    auto op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::IFNDEF, includeGuard);
+    mark(op);
+
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::DEFINE, includeGuard);
+    mark(op);
+
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/api.h\"");
+    mark(op);
+
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::IFDEF, "__cplusplus");
+    mark(op);
+    op = builder.create<emitc::VerbatimOp>(loc, "extern \"C\" {");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::ENDIF, "//  __cplusplus");
+    mark(op);
+
+    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+      if (!funcOp->hasAttr("vm.module.constructor"))
+        continue;
+      auto declOp = emitc_builders::func_decl(
+          builder, loc, funcOp, funcOp->hasAttr("emitc.static"), typeConverter);
+      if (failed(declOp))
+        return failure();
+      mark(declOp.value());
+    }
+
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::IFDEF, "__cplusplus");
+    mark(op);
+    op = builder.create<emitc::VerbatimOp>(loc, "}  // extern \"C\" {");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::ENDIF, "//  __cplusplus");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::ENDIF,
+        std::string("//  ") + includeGuard);
+    mark(op);
+    op = emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IF,
+                                               "defined(EMITC_IMPLEMENTATION)");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/ops.h\"");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/ops_emitc.h\"");
+    mark(op);
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/shims_emitc.h\"");
+    mark(op);
+
+    // rodata ops
+    // TODO: Make this a conversion
+    for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+      auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
+          rodataOp.getValue());
+      assert(value && "expected a serializable rodata value");
+      SmallVector<char> byteBuffer;
+      if (failed(value.serializeToVector(
+              rodataOp.getLoc(), llvm::endianness::little, byteBuffer))) {
+        return rodataOp.emitError() << "error during serialization";
+      }
+
+      constexpr size_t kDefaultRodataAlignment = 16;
+      size_t alignment =
+          rodataOp.getAlignment()
+              ? static_cast<size_t>(rodataOp.getAlignment().value())
+              : 0;
+      if (alignment == 0)
+        alignment = kDefaultRodataAlignment;
+
+      std::string bufferName =
+          moduleOp.getName().str() + "_" + rodataOp.getName().str();
+
+      std::string stmt = "iree_alignas(" + std::to_string(alignment) +
+                         ") static const uint8_t " + bufferName + "[] = {";
+      size_t index = 0;
+      for (char value : byteBuffer) {
+        if (index++ > 0)
+          stmt += ", ";
+        stmt += std::to_string(
+            static_cast<unsigned int>(static_cast<unsigned char>(value)));
+      }
+      stmt += "};";
+      auto op = builder.create<emitc::VerbatimOp>(loc, stmt);
+      mark(op);
+      opsToRemove.push_back(rodataOp.getOperation());
+    }
+
+    // structs
+    // Returns |count| or 1 if |count| == 0.
+    // Some compilers (MSVC) don't support zero-length struct fields on the
+    // interior of structs (just VLA at the tail).
+    auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
+
+    const int64_t numTypes =
+        llvm::cast<IntegerAttr>(
+            moduleOp.getOperation()->getAttr("vm.num_types"))
+            .getInt();
+
+    std::string moduleStructName = moduleOp.getName().str() + "_t";
+    SmallVector<emitc_builders::StructField> moduleStructFields{
+        {"iree_allocator_t", "allocator"},
+        {"iree_vm_ref_type_t", "types", countOrEmpty(numTypes)}};
+
+    auto structOp = emitc_builders::struct_def(builder, loc, moduleStructName,
+                                               moduleStructFields);
+    if (failed(structOp))
+      return failure();
+    mark(structOp.value());
+
+    auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
+
+    std::string moduleStructStateName = moduleOp.getName().str() + "_state_t";
+    SmallVector<emitc_builders::StructField> moduleStructStateFields{
+        {"iree_allocator_t", "allocator"},
+        {"uint8_t", "rwdata", countOrEmpty(ordinalCounts.getGlobalBytes())},
+        {"iree_vm_ref_t", "refs", countOrEmpty(ordinalCounts.getGlobalRefs())},
+        {"iree_vm_buffer_t", "rodata_buffers",
+         countOrEmpty(ordinalCounts.getRodatas())},
+        {"iree_vm_function_t", "imports",
+         countOrEmpty(ordinalCounts.getImportFuncs())},
+    };
+
+    auto structStateOp = emitc_builders::struct_def(
+        builder, loc, moduleStructStateName, moduleStructStateFields);
+    if (failed(structStateOp))
+      return failure();
+    mark(structStateOp.value());
+
+    // function declarations
+    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+      Operation *op = funcOp.getOperation();
+      if (op->hasAttr("vm.module.constructor"))
+        continue;
+      auto declOp = emitc_builders::func_decl(
+          builder, loc, funcOp, funcOp->hasAttr("emitc.static"), typeConverter);
+      if (failed(declOp))
+        return failure();
+      mark(declOp.value());
+    }
+
+    // global descriptors
+    // TODO: Move this to a structured helper
+    //   - define structs for each entity etc.
+    auto printStringView = [](StringRef s) -> std::string {
+      // We can't use iree_make_string_view because function calls are not
+      // allowed for constant expressions in C.
+      // TODO(#7605): Switch to IREE_SVL. We can't use IREE_SVL today because it
+      // uses designated initializers, which cause issues when compiled as C++.
+      return ("{\"" + s + "\", " + std::to_string(s.size()) + "}").str();
+    };
+
+    // dependencies
+    std::string dependenciesName = moduleOp.getName().str() + "_dependencies_";
+    std::string deps;
+    deps += "static const iree_vm_module_dependency_t " + dependenciesName +
+            "[] = {";
+    auto dependencies = moduleOp.getDependencies();
+    if (dependencies.empty()) {
+      // Empty list placeholder.
+      deps += "{{0}},";
+    } else {
+      for (auto &dependency : dependencies) {
+        deps += "{" + printStringView(dependency.name) + ", " +
+                std::to_string(dependency.minimumVersion) + ", " +
+                (dependency.isOptional
+                     ? "IREE_VM_MODULE_DEPENDENCY_FLAG_OPTIONAL"
+                     : "IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED") +
+                "},";
+      }
+    }
+    deps += "};";
+    op = builder.create<emitc::VerbatimOp>(loc, deps);
+    mark(op);
+
+    // imports
+    SmallVector<IREE::VM::ImportOp> importOps(
+        moduleOp.getOps<IREE::VM::ImportOp>());
+    std::string importName = moduleOp.getName().str() + "_imports_";
+    std::string imports;
+    imports += "static const iree_vm_native_import_descriptor_t " + importName +
+               "[] = {";
+    if (importOps.empty()) {
+      // Empty list placeholder.
+      imports += "{0},";
+    } else {
+      // sort import ops by ordinal
+      llvm::sort(importOps, [](auto &lhs, auto &rhs) {
+        return lhs.getOrdinal()->getZExtValue() <
+               rhs.getOrdinal()->getZExtValue();
+      });
+      for (auto importOp : importOps) {
+        imports +=
+            std::string("{") +
+            (importOp.getIsOptional() ? "IREE_VM_NATIVE_IMPORT_OPTIONAL"
+                                      : "IREE_VM_NATIVE_IMPORT_REQUIRED") +
+            ", " + printStringView(importOp.getName()) + "},";
+      }
+    }
+    imports += "};";
+    op = builder.create<emitc::VerbatimOp>(loc, imports);
+    mark(op);
+
+    for (auto op : moduleOp.getOps<IREE::VM::ImportOp>()) {
+      opsToRemove.push_back(op);
+    }
+
+    // exports
+    SmallVector<func::FuncOp> exportedFunctions;
+    for (auto func : moduleOp.getOps<func::FuncOp>()) {
+      if (func.getOperation()->hasAttr("vm.export_name")) {
+        exportedFunctions.push_back(func);
+      }
+    }
+    auto extractExportName = [](func::FuncOp funcOp) {
+      return llvm::cast<StringAttr>(
+          funcOp.getOperation()->getAttr("vm.export_name"));
+    };
+    std::string exportName = moduleOp.getName().str() + "_exports_";
+    std::string exports;
+    exports += "static const iree_vm_native_export_descriptor_t " + exportName +
+               "[] = {";
+    if (exportedFunctions.empty()) {
+      // Empty list placeholder.
+      exports += "{{0}},";
+    } else {
+      // sort export ops
+      llvm::sort(exportedFunctions, [&extractExportName](auto &lhs, auto &rhs) {
+        return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
+      });
+      for (auto funcOp : exportedFunctions) {
+        StringAttr exportName = extractExportName(funcOp);
+        StringAttr callingConvention = llvm::cast<StringAttr>(
+            funcOp.getOperation()->getAttr("vm.calling_convention"));
+        if (!callingConvention) {
+          return funcOp.emitError("Couldn't find calling convention attribute");
+        }
+
+        // TODO(simon-camp): support function-level reflection attributes
+        exports += "{" + printStringView(exportName) + ", " +
+                   printStringView(callingConvention.getValue()) +
+                   ", 0, NULL},";
+      }
+    }
+    exports += "};";
+    op = builder.create<emitc::VerbatimOp>(loc, exports);
+    mark(op);
+
+    // functions
+    std::string functionName = moduleOp.getName().str() + "_funcs_";
+    std::string functions;
+    functions +=
+        "static const iree_vm_native_function_ptr_t " + functionName + "[] = {";
+    if (exportedFunctions.empty()) {
+      // Empty list placeholder.
+      functions += "{0},";
+    } else {
+      // We only add exported functions to the table, as calls to internal
+      // functions are directly mapped to C function calls of the generated
+      // implementation.
+      for (auto funcOp : exportedFunctions) {
+        auto funcName = funcOp.getName();
+        functions += std::string("{") +
+                     "(iree_vm_native_function_shim_t)iree_emitc_shim, " +
+                     "(iree_vm_native_function_target_t)" + funcName.str() +
+                     "},";
+      }
+    }
+    functions += "};";
+    op = builder.create<emitc::VerbatimOp>(loc, functions);
+    mark(op);
+
+    // module descriptor
+    // TODO(simon-camp): support module-level reflection attributes
+    std::string descriptorName = moduleOp.getName().str() + "_descriptor_";
+    std::string descriptor;
+    descriptor +=
+        "static const iree_vm_native_module_descriptor_t " + descriptorName +
+        " = {"
+        // name:
+        + printStringView(moduleOp.getName()) +
+        ","
+        // version:
+        + std::to_string(moduleOp.getVersion().value_or(0u)) +
+        ","
+        // attrs:
+        + "0," +
+        "NULL,"
+        // dependencies:
+        + std::to_string(dependencies.size()) + "," + dependenciesName +
+        ","
+        // imports:
+        + std::to_string(importOps.size()) + "," + importName +
+        ","
+        // exports:
+        + std::to_string(exportedFunctions.size()) + "," + exportName +
+        ","
+        // functions:
+        + std::to_string(exportedFunctions.size()) + "," + functionName + "," +
+        "};";
+
+    op = builder.create<emitc::VerbatimOp>(loc, descriptor);
+    mark(op);
+
+    // move functions marked with vm.emit_at_end to the end of the module
+    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
+      if (func->hasAttr("vm.emit_at_end")) {
+        func->moveBefore(moduleOp.getBlock().getTerminator());
+        func->removeAttr("vm.emit_at_end");
+      }
+    }
+
+    builder.setInsertionPoint(moduleOp.getBlock().getTerminator());
+    op = emitc_builders::preprocessorDirective(
+        builder, loc, emitc_builders::ENDIF, "  // EMITC_IMPLEMENTATION");
+
+    // remove emitc.static attributes from function by inserting a verbatim op
+    // before the func op
+    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
+      emitc_builders::makeFuncStatic(builder, loc, func);
+    }
+  }
+
+  for (auto op : opsToRemove) {
+    op->erase();
   }
 
   return success();
@@ -1328,7 +1688,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
-    std::string newFuncName = (funcOp.getName() + "_export_shim").str();
+    std::string newFuncName = funcOp.getName().str() + "_export_shim";
 
     Type stackType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
@@ -1459,8 +1819,10 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     auto moduleOp =
         newFuncOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
 
-    std::string moduleTypeName = (moduleOp.getName() + "_t").str();
-    std::string moduleStateTypeName = (moduleOp.getName() + "_state_t").str();
+    std::string moduleTypeName =
+        std::string("struct ") + moduleOp.getName().str() + "_t";
+    std::string moduleStateTypeName =
+        std::string("struct ") + moduleOp.getName().str() + "_state_t";
 
     auto moduleCasted = rewriter.create<emitc::CastOp>(
         /*location=*/loc,
@@ -1540,7 +1902,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
                << "failed to emit C type for struct definition";
       }
 
-      std::string structName = (funcOp.getName() + "_args_t").str();
+      std::string structName = funcOp.getName().str() + "_args_t";
       argumentStruct.name = structName;
       typedefStruct(structName, structBody.value());
     }
@@ -1554,7 +1916,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
         return failure();
       }
 
-      std::string structName = (funcOp.getName() + "_result_t").str();
+      std::string structName = funcOp.getName().str() + "_result_t";
       resultStruct.name = structName;
       typedefStruct(structName, structBody.value());
     }
@@ -4430,6 +4792,7 @@ public:
     target.addLegalOp<IREE::VM::ImportOp>();
 
     // This op is needed in the printer to emit an array holding the data.
+    // TODO: Mark illegal once there is a conversion
     target.addLegalOp<IREE::VM::RodataOp>();
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
@@ -4455,6 +4818,12 @@ public:
         return;
       }
     });
+
+    // Generate boilerplate code like inlcudes for the iree API, include guards,
+    // etc.
+    if (failed(createModuleStructure(module, typeConverter))) {
+      return signalPassFailure();
+    }
   }
 };
 
