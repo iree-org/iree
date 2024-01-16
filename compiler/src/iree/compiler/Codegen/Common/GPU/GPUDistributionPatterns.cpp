@@ -291,7 +291,7 @@ struct DistributeTransferReadLayoutAttr
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue result = readOp.getResult();
+    VectorValue vector = readOp.getVector();
     LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.results[0]);
     if (!vectorLayout) {
       return failure();
@@ -301,7 +301,7 @@ struct DistributeTransferReadLayoutAttr
 
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(
-        vectorLayout.getDistributedShape(result.getType()), elementType);
+        vectorLayout.getDistributedShape(vector.getType()), elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
@@ -328,6 +328,59 @@ struct DistributeTransferReadLayoutAttr
   }
 };
 
+struct DistributeTransferWriteLayoutAttr
+    : DistributeXferLayoutAttr<vector::TransferWriteOp> {
+  using DistributeXferLayoutAttr<
+      vector::TransferWriteOp>::DistributeXferLayoutAttr;
+
+  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue vector = writeOp.getVector();
+    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.operands[0]);
+    if (!vectorLayout) {
+      return failure();
+    }
+
+    // TODO: Return failure if we need masking.
+
+    Type elementType = writeOp.getSource().getType().getElementType();
+    auto vectorType = VectorType::get(
+        vectorLayout.getDistributedShape(vector.getType()), elementType);
+    Value zero = rewriter.create<arith::ConstantOp>(
+        writeOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
+    VectorValue acc = cast<VectorValue>(zero);
+
+    accessMemory(writeOp, acc, vectorLayout, rewriter);
+
+    rewriter.eraseOp(writeOp);
+    return success();
+  }
+
+  VectorValue accessUnit(vector::TransferWriteOp writeOp,
+                         SmallVector<Value> &memoryIndices,
+                         SmallVector<int64_t> &accIndices,
+                         VectorValue accumulator, LayoutAttr vectorLayout,
+                         LayoutAttr memoryLayout,
+                         PatternRewriter &rewriter) const override {
+    int width = getLoadStoreWidth(memoryLayout);
+
+    SmallVector<int64_t> strides(accIndices.size(), 1);
+    SmallVector<int64_t> shapes(accIndices.size(), 1);
+    shapes[shapes.size() - 1] = width;
+    Value result = rewriter.create<vector::ExtractStridedSliceOp>(
+        writeOp.getLoc(), getDistributed(rewriter, accumulator, vectorLayout),
+        accIndices, shapes, strides);
+    result = rewriter.create<vector::ExtractOp>(
+        writeOp.getLoc(), result,
+        SmallVector<int64_t>(accIndices.size() - 1, 0));
+    rewriter.create<vector::StoreOp>(writeOp.getLoc(), result,
+                                     writeOp.getSource(), memoryIndices);
+
+    return accumulator;
+  }
+};
+
 }; // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
@@ -339,8 +392,9 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
 
 void populateGPUDistributionLayoutAttrPatterns(ArrayRef<Value> threadGrid,
                                                RewritePatternSet &patterns) {
-  patterns.add<DistributeTransferReadLayoutAttr>(patterns.getContext(),
-                                                 threadGrid);
+  patterns
+      .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
+          patterns.getContext(), threadGrid);
 }
 
 }; // namespace mlir::iree_compiler
