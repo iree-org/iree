@@ -39,8 +39,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
     uint idx = warpSize * i + laneID;
     float newIn =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
-    laneResult = newIn > laneMax ? idx : laneResult;
+    if (newIn == laneMax)
+      continue;
     laneMax = __ocml_fmax_f32(newIn, laneMax);
+    laneResult = newIn == laneMax ? idx : laneResult;
   }
 
   // Final reduction with one subgroup
@@ -82,8 +84,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
     uint idx = warpSize * i + laneID;
     float newIn =
         idx >= reductionSize ? -FLT_MAX : inputBuffer[input_offset + idx];
-    laneResult = newIn > laneMax ? idx : laneResult;
+    if (newIn == laneMax)
+      continue;
     laneMax = __ocml_fmax_f32(newIn, laneMax);
+    laneResult = newIn == laneMax ? idx : laneResult;
   }
 
   // Final reduction with one subgroup
@@ -124,8 +128,10 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
     uint idx = warpSize * i + laneID;
     half newIn =
         idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
-    laneResult = newIn > laneMax ? idx : laneResult;
+    if (newIn == laneMax)
+      continue;
     laneMax = __ocml_fmax_f16(newIn, laneMax);
+    laneResult = newIn == laneMax ? idx : laneResult;
   }
 
   // Final reduction with one subgroup
@@ -159,10 +165,12 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   uint numBatches = reductionSize / warpSize + 1;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
-    half newIn = idx >= reductionSize ? NEG_F16_MAX
-                                      : __half(inputBuffer[input_offset + idx]);
-    laneResult = newIn > laneMax ? idx : laneResult;
+    half newIn =
+        idx >= reductionSize ? NEG_F16_MAX : inputBuffer[input_offset + idx];
+    if (newIn == laneMax)
+      continue;
     laneMax = __ocml_fmax_f16(newIn, laneMax);
+    laneResult = newIn == laneMax ? idx : laneResult;
   }
 
   // Final reduction with one subgroup
