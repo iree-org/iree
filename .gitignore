@@ -90,5 +90,3 @@ llvm-external-projects/iree-dialects/.cache
 
 # pkgci artifacts
 artifacts/
-
-iree_venv

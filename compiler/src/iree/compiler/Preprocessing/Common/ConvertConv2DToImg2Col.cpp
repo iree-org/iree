@@ -46,7 +46,7 @@ namespace {
 // and linalg.matmul.
 //
 // A convolution operaton can be written as a matrix-matrix multiplication by
-// unfolding the cross corrolation between input and filter and explicitly copy
+// unfolding the cross correlation between input and filter and explicitly copy
 // overlapped sliding window inputs.
 //
 // Consider 2D input X with single channel input and output and 2x2 filter W:
@@ -93,8 +93,11 @@ public:
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+    if (!hasAllOneValues(convOp.getDilations())) {
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "expected no dilations (expected dilations to all be one).";
+      });
+    }
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -247,12 +250,13 @@ public:
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
         diag << "expected 'filterType' and 'inputType' to have static shapes.";
       });
-      return failure();
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "expected no dilations (expected dilations to all be one).";
+      });
 
     auto loc = convOp.getLoc();
 
@@ -408,7 +412,9 @@ public:
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "expected no dilations (expected dilations to all be one).";
+      });
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
