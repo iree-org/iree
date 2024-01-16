@@ -52,6 +52,18 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
 
+  {
+    RewritePatternSet patterns(ctx);
+    // Disable it because it crashes in matmul
+    // vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+    vector::ExtractOp::getCanonicalizationPatterns(patterns, &getContext());
+    vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
+        patterns);
+    vector::populateBubbleVectorBitCastOpPatterns(patterns);
+    vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
+
   RewritePatternSet patterns(ctx);
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
   // TODO(hanchung): Maybe we should move drop unit dims patterns to a separate
