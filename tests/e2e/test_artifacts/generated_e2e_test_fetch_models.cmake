@@ -270,10 +270,3 @@ iree_fetch_artifact(
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
   UNPACK
 )
-
-iree_fetch_artifact(
-  NAME "model-Vit_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tflite/tflite_models_1698315913/VIT_CLASSIFICATION_INT8_TFLITE_3X224X224XINT8/model_int8.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
-  UNPACK
-)

@@ -24,7 +24,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tf_models.GPT2_117M_1x1_FP32_TF,
         # TODO(#16124): Renable the model.
         # tflite_models.MOBILEBERT_INT8,
-        tflite_models.VIT_INT8_TFL,
+        # tflite_models.VIT_INT8_TFL,
     ]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
