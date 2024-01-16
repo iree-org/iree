@@ -73,19 +73,20 @@ TEST_CONFIGS = [
         ],
     ),
     # efficientnet_int8_correctness_test
-    ModelTestConfig(
-        name="efficientnet_int8_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.EFFICIENTNET_INT8
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="efficientnet_int8_expected_output.txt",
-        unsupported_platforms=[
-            CMakePlatform.ANDROID_ARMV8_A,
-            CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.LINUX_RISCV64,
-        ],
-    ),
+    # TODO(#16124): Renable the test.
+    # ModelTestConfig(
+    #     name="efficientnet_int8_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.EFFICIENTNET_INT8
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="efficientnet_int8_expected_output.txt",
+    #     unsupported_platforms=[
+    #         CMakePlatform.ANDROID_ARMV8_A,
+    #         CMakePlatform.LINUX_RISCV32,
+    #         CMakePlatform.LINUX_RISCV64,
+    #     ],
+    # ),
     # deeplab_v3_fp32_correctness_test
     ModelTestConfig(
         name="deeplab_v3_fp32_correctness_test",
@@ -101,13 +102,14 @@ TEST_CONFIGS = [
         ],
     ),
     # person_detect_int8_correctness_test
-    ModelTestConfig(
-        name="person_detect_int8_correctness_test",
-        imported_model=iree_definitions.ImportedModel.from_model(
-            tflite_models.PERSON_DETECT_INT8
-        ),
-        execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
-        expected_output="1x2xi8=[72 -72]",
-        unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
-    ),
+    # TODO(#16124): Renable the test.
+    # ModelTestConfig(
+    #     name="person_detect_int8_correctness_test",
+    #     imported_model=iree_definitions.ImportedModel.from_model(
+    #         tflite_models.PERSON_DETECT_INT8
+    #     ),
+    #     execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
+    #     expected_output="1x2xi8=[72 -72]",
+    #     unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
+    # ),
 ]

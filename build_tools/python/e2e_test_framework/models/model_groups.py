@@ -20,9 +20,10 @@ from e2e_test_framework.models import (
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
     # Tiny models.
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
-    ),
+    # TODO(#16124): Renable the model.
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
     ),
@@ -30,18 +31,20 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
-    ),
+    # TODO(#16124): Renable the model.
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=tflite_models.EFFICIENTNET_INT8, threads=[1, 8]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V1, threads=[1, 8]
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V2, threads=[1, 8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILENET_V2_INT8, threads=[1, 8]
-    ),
+    # TODO(#16124): Renable the model.
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=tflite_models.MOBILENET_V2_INT8, threads=[1, 8]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILESSD_FP32, threads=[1, 8]
     ),

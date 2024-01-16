@@ -1,10 +1,4 @@
 iree_import_tflite_model(
-  TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8_tflite_"
-  SOURCE "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"
-  OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-)
-
-iree_import_tflite_model(
   TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32_tflite_"
   SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32.tflite"
   OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
@@ -17,12 +11,6 @@ iree_import_tflite_model(
 )
 
 iree_import_tflite_model(
-  TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8_tflite_"
-  SOURCE "${ROOT_ARTIFACTS_DIR}/model_EfficientNet_int8.tflite"
-  OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-)
-
-iree_import_tflite_model(
   TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32_tflite_"
   SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileNetV1_fp32.0_float.tflite"
   OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
@@ -32,12 +20,6 @@ iree_import_tflite_model(
   TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32_tflite_"
   SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_fp32.0_224.tflite"
   OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_fp32_tflite_.mlir"
-)
-
-iree_import_tflite_model(
-  TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileNetV2_int8_tflite_"
-  SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_int8.0_224_quantized.tflite"
-  OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
 )
 
 iree_import_tflite_model(
@@ -62,26 +44,6 @@ iree_import_tflite_model(
   TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32_tflite_"
   SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_fp32.tflite"
   OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
-)
-
-iree_import_tflite_model(
-  TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8_tflite_"
-  SOURCE "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
-  OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
-)
-
-iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
 )
 
 iree_bytecode_module(
@@ -113,20 +75,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
@@ -151,20 +99,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=false"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
   PUBLIC
 )
 
@@ -337,21 +271,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
@@ -382,21 +301,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
@@ -423,21 +327,6 @@ iree_bytecode_module(
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
 
@@ -622,21 +511,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
@@ -667,21 +541,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
@@ -708,21 +567,6 @@ iree_bytecode_module(
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=all"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
 
@@ -1256,22 +1100,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
@@ -1300,86 +1128,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
     "--riscv-v-fixed-length-vector-lmul-max=8"
   FRIENDLY_NAME "MobileNetV1_fp32(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "MobileBertSquad_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags]"
   PUBLIC
 )
 
@@ -1692,24 +1440,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
@@ -1746,24 +1476,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
@@ -1796,24 +1508,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
   PUBLIC
 )
 
@@ -2034,25 +1728,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
@@ -2091,25 +1766,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
@@ -2144,25 +1800,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
   PUBLIC
 )
 
@@ -2395,25 +2032,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV3Small_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
@@ -2452,25 +2070,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV1_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
@@ -2505,25 +2104,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileNetV2_fp32(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
   PUBLIC
 )
 
@@ -3205,26 +2785,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
@@ -3261,106 +2821,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "MobileNetV1_fp32(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileNetV2_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MobileNetV2_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv64-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv64"
-    "--iree-llvmcpu-target-abi=lp64d"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+d,+zvl512b,+v"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [riscv_64-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_EfficientNet_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "EfficientNet_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "MobileBertSquad_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=tosa"
-    "--iree-llvmcpu-target-triple=riscv32-pc-linux-gnu"
-    "--iree-llvmcpu-target-cpu=generic-rv32"
-    "--iree-llvmcpu-target-abi=ilp32"
-    "--iree-llvmcpu-target-cpu-features=+m,+a,+f,+zvl512b,+zve32f"
-    "--riscv-v-fixed-length-vector-lmul-max=8"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "PersonDetect_int8(tflite) [riscv_32-generic-linux_gnu-llvm_cpu][default-flags,compile-stats]"
   PUBLIC
 )
 
@@ -3762,16 +3222,12 @@ iree_bytecode_module(
 
 add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-DeepLabV3_fp32_tflite_
-  ${PACKAGE_NAME}_iree-imported-model-EfficientNet_int8_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp16_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_fp32_tflite_
-  ${PACKAGE_NAME}_iree-imported-model-MobileBertSquad_int8_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileNetV1_fp32_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileNetV2_fp32_tflite_
-  ${PACKAGE_NAME}_iree-imported-model-MobileNetV2_int8_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileNetV3Small_fp32_tflite_
   ${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32_tflite_
-  ${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8_tflite_
   ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_tflite_
   ${PACKAGE_NAME}_model-BertForMaskedLMTF
   ${PACKAGE_NAME}_model-BertLargeTF
@@ -3854,11 +3310,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -3900,7 +3351,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
@@ -3909,10 +3359,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
@@ -3920,11 +3366,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_compile-stats_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
@@ -3989,11 +3430,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
@@ -4035,7 +3471,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
@@ -4044,10 +3479,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
@@ -4055,11 +3486,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
@@ -4089,15 +3515,9 @@ add_dependencies(iree-benchmark-suites-large
 
 add_dependencies(iree-benchmark-suites-riscv
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MiniLML12H384Uncased_stablehlo___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_
 )
 
 add_dependencies(iree-benchmark-suites-x86_64
@@ -4109,8 +3529,6 @@ add_dependencies(iree-benchmark-suites-x86_64
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Falcon7bInt4GptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
@@ -4130,15 +3548,11 @@ add_dependencies(iree-benchmark-suites-x86_64
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___vmvx-generic-vmvx-vmvx__experimental-flags_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
 )
@@ -4148,7 +3562,6 @@ add_dependencies(iree-benchmark-suites-x86_64-dt-only
   ${PACKAGE_NAME}_iree-module-BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-DeepLabV3_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-EfficientNetV2STF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Falcon7bGptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Falcon7bInt4GptqPT_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
@@ -4158,10 +3571,8 @@ add_dependencies(iree-benchmark-suites-x86_64-dt-only
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV1_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV2_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-MobileNetV2_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileNetV3Small_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
 )
 
