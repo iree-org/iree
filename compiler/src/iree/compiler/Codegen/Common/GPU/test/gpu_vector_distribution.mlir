@@ -44,14 +44,83 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
-#layout = #iree_vector_ext.layout<<[BATCHX, LANEY], [2, 8]>, <[BATCHY, LANEX, VECTORX], [2, 2, 4]>>
+#layout_row_major = #iree_vector_ext.layout<<[BATCHX, LANEY], [2, 8]>, <[BATCHY, LANEX, VECTORX], [2, 1, 8]>>
+#layout_col_major = #iree_vector_ext.layout<<[BATCHX, LANEY, VECTORX], [1, 4, 4]>, <[BATCHY, LANEX], [2, 8]>>
 
 builtin.module attributes { transform.with_named_sequence } {
-  // CHECK-LABEL: @distribute_transfer_read
-  func.func @distribute_transfer_read(%alloc: memref<32x32xf16>) -> vector<16x16xf16> {
+  // CHECK-LABEL: @distribute_transfer_read_row_major
+  func.func @distribute_transfer_read_row_major(%alloc: memref<4x4xf16>) -> vector<16x16xf16> {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.0 : f16
-    %root = vector.transfer_read %alloc[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout} : memref<32x32xf16>, vector<16x16xf16>
+    %root = vector.transfer_read %alloc[%c0, %c0], %cst
+            {in_bounds = [false, false],
+             "__vector_layout_test_anchor_result_0" = #layout_row_major}
+                    : memref<4x4xf16>, vector<16x16xf16>
+    // CHECK-COUNT-4: vector.load {{.*}}, vector<8xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  // CHECK-LABEL: @distribute_transfer_read_col_major
+  func.func @distribute_transfer_read_col_major(%alloc: memref<32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0], %cst
+            {in_bounds = [true, true],
+             "__vector_layout_test_anchor_result_0" = #layout_col_major}
+                    : memref<32x32xf16>, vector<16x16xf16>
+    // CHECK-COUNT-8: vector.load {{.*}}, vector<1xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  // CHECK-LABEL: @distribute_transfer_read_row_major_with_broadcast
+  func.func @distribute_transfer_read_row_major_with_broadcast(%a: index, %b: index, %alloc: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
+            {in_bounds = [true, true],
+             permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+             "__vector_layout_test_anchor_result_0" = #layout_row_major}
+                    : memref<32x32x32x32xf16>, vector<16x16xf16>
+    // CHECK-COUNT-4: vector.load {{.*}}, vector<8xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  // CHECK-LABEL: @distribute_transfer_read_col_major_with_broadcast
+  func.func @distribute_transfer_read_col_major_with_broadcast(%a: index, %b: index, %alloc: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
+            {in_bounds = [true, true],
+             permutation_map = affine_map<(d0, d1, d2, d3) -> (d2, d3)>,
+             "__vector_layout_test_anchor_result_0" = #layout_col_major}
+                    : memref<32x32x32x32xf16>, vector<16x16xf16>
+    // CHECK-COUNT-8: vector.load {{.*}}, vector<1xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  // CHECK-LABEL: @distribute_transfer_read_row_major_transpose
+  func.func @distribute_transfer_read_row_major_transpose(%a: index, %b: index, %alloc: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
+            {in_bounds = [true, true],
+             permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
+             "__vector_layout_test_anchor_result_0" = #layout_row_major}
+                    : memref<32x32x32x32xf16>, vector<16x16xf16>
+    // CHECK-COUNT-32: vector.load {{.*}}, vector<1xf16>
+    func.return %root : vector<16x16xf16>
+  }
+
+  // CHECK-LABEL: @distribute_transfer_read_col_major_transpose
+  func.func @distribute_transfer_read_col_major_transpose(%a: index, %b: index, %alloc: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.0 : f16
+    %root = vector.transfer_read %alloc[%c0, %c0, %a, %b], %cst
+            {in_bounds = [true, true],
+             permutation_map = affine_map<(d0, d1, d2, d3) -> (d3, d2)>,
+             "__vector_layout_test_anchor_result_0" = #layout_col_major}
+                    : memref<32x32x32x32xf16>, vector<16x16xf16>
+    // CHECK-COUNT-2: vector.load {{.*}}, vector<4xf16>
     func.return %root : vector<16x16xf16>
   }
 

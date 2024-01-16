@@ -239,7 +239,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
           getMemoryIndices(state, memoryLayout, xferOp.getIndices(), rewriter);
       SmallVector<int64_t> accIndices = computeSIMTIndex(state, vectorLayout);
       accumulator = accessUnit(xferOp, memoryIndices, accIndices, accumulator,
-                               vectorLayout, rewriter);
+                               vectorLayout, memoryLayout, rewriter);
     });
 
     return accumulator;
@@ -268,6 +268,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                                  SmallVector<int64_t> &accIndices,
                                  VectorValue accumulator,
                                  LayoutAttr vectorLayout,
+                                 LayoutAttr memoryLayout,
                                  PatternRewriter &rewriter) const = 0;
 
   int getLoadStoreWidth(LayoutAttr layout) const {
@@ -296,6 +297,8 @@ struct DistributeTransferReadLayoutAttr
       return failure();
     }
 
+    // TODO: Return failure if we need masking.
+
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(
         vectorLayout.getDistributedShape(result.getType()), elementType);
@@ -313,8 +316,9 @@ struct DistributeTransferReadLayoutAttr
                          SmallVector<Value> &memoryIndices,
                          SmallVector<int64_t> &accIndices,
                          VectorValue accumulator, LayoutAttr vectorLayout,
+                         LayoutAttr memoryLayout,
                          PatternRewriter &rewriter) const override {
-    auto unitType = VectorType::get({getLoadStoreWidth(vectorLayout)},
+    auto unitType = VectorType::get({getLoadStoreWidth(memoryLayout)},
                                     accumulator.getType().getElementType());
     VectorValue load = rewriter.create<vector::LoadOp>(
         readOp.getLoc(), unitType, readOp.getSource(), memoryIndices);
