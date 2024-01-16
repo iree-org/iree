@@ -32,7 +32,8 @@ class Linux_RV64_Benchmarks(object):
         tflite_models.DEEPLABV3_FP32,
         tflite_models.EFFICIENTNET_INT8,
         tflite_models.MOBILEBERT_FP32,
-        tflite_models.MOBILEBERT_INT8,
+        # TODO(#16124): Renable the model.
+        # tflite_models.MOBILEBERT_INT8,
         tflite_models.MOBILENET_V1,
         tflite_models.MOBILENET_V2_INT8,
         tflite_models.PERSON_DETECT_INT8,

@@ -63,7 +63,8 @@ class Android_Mali_Benchmarks(object):
     ]
     FP16_MODELS = [tflite_models.MOBILEBERT_FP16]
     QUANT_MODELS = [
-        tflite_models.MOBILEBERT_INT8,
+        # TODO(#16124): Renable the model.
+        # tflite_models.MOBILEBERT_INT8,
     ]
 
     def generate(

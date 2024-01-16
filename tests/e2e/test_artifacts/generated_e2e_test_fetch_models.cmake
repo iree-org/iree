@@ -76,13 +76,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-MobileBertSquad_int8"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-EfficientNetV2STF"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734j.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.timestamp_1683504734j.mlirbc"
@@ -268,6 +261,13 @@ iree_fetch_artifact(
   NAME "model-matmul_128x256x8192_f32t_tile_config_default"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileBertSquad_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
   UNPACK
 )
 

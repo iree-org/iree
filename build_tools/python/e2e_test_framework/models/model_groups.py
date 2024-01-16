@@ -56,9 +56,10 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILEBERT_FP32, threads=[1, 8]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
-    ),
+    # TODO(#16124): Renable the model.
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=tflite_models.MOBILEBERT_INT8, threads=[1, 8]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.EFFICIENTNET_V2_S_FP32, threads=[1, 8]
     ),
