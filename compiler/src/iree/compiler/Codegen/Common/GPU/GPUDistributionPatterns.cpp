@@ -22,8 +22,14 @@ using VectorValue = TypedValue<VectorType>;
 
 namespace {
 
-static std::optional<int64_t> findDimInLayout(LayoutAttr layout,
-                                              LayoutDimension dim) {
+/// Given a LayoutAttr, find the shape of the given layout dimension. It is
+/// expected that the layout has at most one instance of the requested
+/// dimension. Example:
+///   LayoutAttr: <<BATCHX: 4>, <BATCHY: 4, LANEX: 4>>
+///   dim: BATCHX
+///   output: 4
+static std::optional<int64_t> findDimShape(LayoutAttr layout,
+                                           LayoutDimension dim) {
   for (PerDimLayoutAttr dimLayout : layout.getLayouts()) {
     if (std::optional<int64_t> shape = dimLayout.getShape(dim)) {
       return shape;
@@ -32,6 +38,9 @@ static std::optional<int64_t> findDimInLayout(LayoutAttr layout,
   return std::nullopt;
 }
 
+/// Given the state of the iterator, compute the indices of the original vector
+/// that the current iterator state is iterating over. These indices are
+/// parameterized by the thread grid.
 static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
                                            LayoutAttr layout,
                                            ArrayRef<Value> threadGrid,
@@ -45,7 +54,7 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
   for (PerDimLayoutAttr dimLayout : layout.getLayouts()) {
     AffineExpr offset = getAffineConstantExpr(0, ctx);
     AffineExpr stride = getAffineConstantExpr(1, ctx);
-    for (const auto &[label, shape] : llvm::reverse(
+    for (auto [label, shape] : llvm::reverse(
              llvm::zip(dimLayout.getLabels(), dimLayout.getShapes()))) {
       int64_t position = state.lookup(label.getValue()).getPosition();
 
@@ -76,8 +85,10 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
   return simdIndex;
 }
 
-// Get the offset into the SIMT vector corresponding to the iterator on the
-// layout.
+/// Given the state of the iterator, compute the indices of the distributed
+/// vector that the current iterator state is iterating over. The indices
+/// are not parameterized by thread, and it is expected that the indices for
+/// all threads are same.
 static SmallVector<int64_t> computeSIMTIndex(const LayoutIterator::State &state,
                                              LayoutAttr layout) {
   constexpr LayoutDimension labels[] = {
@@ -86,8 +97,8 @@ static SmallVector<int64_t> computeSIMTIndex(const LayoutIterator::State &state,
       LayoutDimension::VECTORX};
 
   SmallVector<int64_t> offset;
-  for (auto label : labels) {
-    std::optional shape = findDimInLayout(layout, label);
+  for (LayoutDimension label : labels) {
+    std::optional shape = findDimShape(layout, label);
     if (!shape) {
       continue;
     }
@@ -283,10 +294,9 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
   SmallVector<Value> threadGrid;
 };
 
-struct DistributeTransferReadLayoutAttr
+struct DistributeTransferReadLayoutAttr final
     : DistributeXferLayoutAttr<vector::TransferReadOp> {
-  using DistributeXferLayoutAttr<
-      vector::TransferReadOp>::DistributeXferLayoutAttr;
+  using DistributeXferLayoutAttr::DistributeXferLayoutAttr;
 
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
@@ -328,10 +338,9 @@ struct DistributeTransferReadLayoutAttr
   }
 };
 
-struct DistributeTransferWriteLayoutAttr
+struct DistributeTransferWriteLayoutAttr final
     : DistributeXferLayoutAttr<vector::TransferWriteOp> {
-  using DistributeXferLayoutAttr<
-      vector::TransferWriteOp>::DistributeXferLayoutAttr;
+  using DistributeXferLayoutAttr::DistributeXferLayoutAttr;
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
