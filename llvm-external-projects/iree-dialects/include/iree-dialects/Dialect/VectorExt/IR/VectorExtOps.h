@@ -33,7 +33,7 @@ public:
   }
 
   bool operator==(const DimensionalIterator &other) const {
-    return position != other.position;
+    return position == other.position;
   }
   bool operator!=(const DimensionalIterator &other) const {
     return !(*this == other);
