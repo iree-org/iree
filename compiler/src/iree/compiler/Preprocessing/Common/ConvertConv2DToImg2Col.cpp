@@ -88,14 +88,16 @@ public:
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected 'filterType' and 'inputType' to have static shapes.";
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
       });
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations())) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected no dilations (expected dilations to all be one).";
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
       });
     }
 
@@ -248,14 +250,16 @@ public:
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected 'filterType' and 'inputType' to have static shapes.";
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
       });
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected no dilations (expected dilations to all be one).";
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
       });
 
     auto loc = convOp.getLoc();
@@ -406,14 +410,16 @@ public:
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected 'filterType' and 'inputType' to have static shapes.";
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
       });
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
       return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
-        diag << "expected no dilations (expected dilations to all be one).";
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
       });
 
     Value input = convOp.getInputs()[0];
