@@ -56,8 +56,8 @@ LayoutIterator &LayoutIterator::operator++() {
   for (auto &[dim, it] : state) {
     if (frozenDimensions.contains(dim))
       continue;
-    if (it != ranges[dim].end()) {
-      ++it;
+    ++it;
+    if (it < ranges[dim].end()) {
       break;
     }
     it = ranges[dim].begin();
@@ -89,7 +89,7 @@ void LayoutIterator::initialize(PerDimLayoutAttr &attr,
     if (isLaneDimension(dim))
       continue;
     int64_t stride = strides.contains(dim) ? strides[dim] : 1;
-    ranges[dim] = DimensionalRange(0, shape - 1, stride);
+    ranges[dim] = DimensionalRange(0, shape, stride);
     state[dim] = ranges[dim].begin();
   }
 }
