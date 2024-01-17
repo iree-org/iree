@@ -49,7 +49,7 @@ static Value computeHouseholder(Value v, Value tau, Value k,
   auto outMap = b.getMultiDimIdentityMap(hShape.size());
 
   SmallVector<AffineExpr> exprs;
-  for (int i = 0; i < vTy.getRank(); ++i) {
+  for (int i = 0, s = vTy.getRank(); i < s; ++i) {
     exprs.push_back(b.getAffineDimExpr(i));
   }
 
