@@ -73,6 +73,9 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 /// Methods to get target information.
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Methods to get target information.
+bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
 // is enabled at all.
@@ -203,6 +206,9 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               Location loc,
                                               OpFoldResult byteOffset,
                                               Type elementType);
+
+/// Check if a linalg.generic is representing an argmax operation.
+LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
 
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to

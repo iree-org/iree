@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "gpu_distribute.mlir"
     "gpu_distribute_shared_memory.mlir"
     "gpu_generalize_named_ops.mlir"
+    "gpu_lower_to_ukernels.mlir"
     "gpu_pipeline.mlir"
     "gpu_tensor_alloc.mlir"
     "gpu_tensor_tile.mlir"

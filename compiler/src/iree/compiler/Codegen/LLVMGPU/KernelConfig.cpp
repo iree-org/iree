@@ -1062,6 +1062,83 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
+/// Set the configuration for argmax that can be mapped to argmax uKernel.
+/// Distribute all parallel dim across different workgroups, and only use single
+/// subgroup per workgroup.
+static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
+                                            linalg::GenericOp op,
+                                            const TargetInfo &targetInfo) {
+
+  // Checks if UKernels are enabled.
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    auto target = variantOp.getTarget();
+    const char ukernelName[] = "argmax";
+    if (!hasUkernel(target, ukernelName) ||
+        !hasUkernelSupportedGpuArch(target)) {
+      return failure();
+    }
+  }
+
+  if (!targetInfo.hasWarpShuffle)
+    return failure();
+
+  if (failed(isArgmaxOp(op)))
+    return failure();
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+
+  // Currently Argmax UKernel only support 1 reduction dim.
+  if (reductionDims.size() != 1)
+    return failure();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+  int64_t numDynamicReductionDims = 0;
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      numDynamicReductionDims++;
+    }
+    if (dim < numParallelDims) {
+      return failure();
+    }
+  }
+
+  // Distribution of multi-dim masked writes currently aren't fully supported.
+  if (numDynamicReductionDims > 1) {
+    return failure();
+  }
+
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+
+  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // number of elements, and then it does a single step butterfly warp reduce.
+  // Hence it expects workgroupSize to be warpSize(subgroupSize), and
+  // reductionTileSize to be size of the reduction dim.
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+  reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+  std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          entryPoint, op, tileSizes,
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault,
+          workgroupSize))) {
+    return failure();
+  }
+  return success();
+}
+
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
 static LogicalResult
 setUKernelConfig(func::FuncOp entryPoint,
@@ -1255,6 +1332,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      return success();
+    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
+                                entryPointFn, genericOp, targetInfo))) {
       return success();
     }
   }
