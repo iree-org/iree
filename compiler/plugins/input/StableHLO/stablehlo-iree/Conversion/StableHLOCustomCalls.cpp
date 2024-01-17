@@ -73,7 +73,7 @@ static Value computeHouseholder(Value v, Value tau, Value k,
           [&](OpBuilder &bb, Location loc, ValueRange args) {
             ImplicitLocOpBuilder b(loc, bb);
             SmallVector<Value> indices;
-            for (int i = 0; i < hTy.getRank(); ++i) {
+            for (int i = 0, s = hTy.getRank(); i < s; ++i) {
               indices.push_back(b.create<linalg::IndexOp>(loc, i));
             }
 
