@@ -162,12 +162,6 @@ iree_symlink_tool(
 
 iree_symlink_tool(
   TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-trace
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-trace
-)
-
-iree_symlink_tool(
-  TARGET runtime
   FROM_TOOL_TARGET iree-convert-parameters
   TO_EXE_NAME iree/_runtime_libs/iree-convert-parameters
 )
@@ -194,12 +188,6 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-dump-parameters
   TO_EXE_NAME iree/_runtime_libs/iree-dump-parameters
-)
-
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-run-trace
-  TO_EXE_NAME iree/_runtime_libs/iree-run-trace
 )
 
 iree_symlink_tool(
@@ -331,13 +319,11 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   TARGETS
     iree-cpuinfo
     iree-benchmark-module
-    iree-benchmark-trace
     iree-convert-parameters
     iree-create-parameters
     iree-dump-module
     iree-dump-parameters
     iree-run-module
-    iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
   COMPONENT \"${_INSTALL_COMPONENT}\"

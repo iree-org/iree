@@ -76,30 +76,7 @@ iree_cc_binary(
     iree::tooling::device_util
     iree::tooling::vm_util
     iree::vm
-  INSTALL_COMPONENT IREETools-Runtime    
-)
-
-iree_cc_binary(
-  NAME
-    iree-benchmark-trace
-  SRCS
-    "iree-benchmark-trace-main.c"
-  DEPS
-    iree::base
-    iree::base::internal::atomic_slist
-    iree::base::internal::file_io
-    iree::base::internal::flags
-    iree::base::internal::path
-    iree::hal
-    iree::modules::hal
-    iree::testing::benchmark
-    iree::tooling::device_util
-    iree::tooling::trace_replay
-    iree::tooling::vm_util
-    iree::tooling::yaml_util
-    iree::vm
-    yaml
-  INSTALL_COMPONENT IREETools-Runtime  
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -136,7 +113,7 @@ iree_cc_binary(
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -148,7 +125,7 @@ iree_cc_binary(
     iree::base
     iree::base::internal::cpu
     iree::schemas::cpu_data
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -165,7 +142,7 @@ iree_cc_binary(
     iree::io::parameter_index
     iree::io::scope_map
     iree::io::stream
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -180,7 +157,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::schemas::instruments
     iree::schemas::instruments::dispatch_def_c_fbs
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -197,7 +174,7 @@ iree_cc_binary(
     iree::base::internal::flatcc::parsing
     iree::schemas::bytecode_module_def_c_fbs
     iree::vm::bytecode::module
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 iree_cc_binary(
@@ -212,7 +189,7 @@ iree_cc_binary(
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 
 # Only enable fatelf tool when we're compiling it in.
@@ -230,7 +207,7 @@ iree_cc_binary(
     iree::base::internal::file_io
     iree::base::internal::path
     iree::hal::local::elf::elf_module
-  INSTALL_COMPONENT IREETools-Runtime    
+  INSTALL_COMPONENT IREETools-Runtime
 )
 endif()  # IREE_HAL_EXECUTABLE_*_EMBEDDED_ELF
 
@@ -247,26 +224,6 @@ iree_cc_binary(
     iree::tooling::run_module
     iree::vm
   INSTALL_COMPONENT IREETools-Runtime
-)
-
-iree_cc_binary(
-  NAME
-    iree-run-trace
-  SRCS
-    "iree-run-trace-main.c"
-  DEPS
-    iree::base
-    iree::base::internal::flags
-    iree::base::internal::path
-    iree::hal
-    iree::modules::hal
-    iree::tooling::device_util
-    iree::tooling::trace_replay
-    iree::tooling::vm_util
-    iree::tooling::yaml_util
-    iree::vm
-    yaml
-  INSTALL_COMPONENT IREETools-Runtime    
 )
 
 iree_cc_binary(
