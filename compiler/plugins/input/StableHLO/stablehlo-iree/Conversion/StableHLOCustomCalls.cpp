@@ -538,8 +538,7 @@ struct CholeskyRewriter final : OpRewritePattern<mlir::stablehlo::CholeskyOp> {
       std::swap(shape[shape.size() - 2], shape[shape.size() - 1]);
       std::swap(perms[perms.size() - 2], perms[perms.size() - 1]);
       scf = b.create<mlir::stablehlo::TransposeOp>(
-          RankedTensorType::get(shape, operandTy.getElementType()), scf,
-          b.getI64TensorAttr(perms));
+          RankedTensorType::get(shape, operandTy.getElementType()), scf, perms);
     }
 
     rewriter.replaceOp(op, scf);
