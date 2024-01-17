@@ -8,6 +8,8 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
@@ -84,6 +86,13 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
     // Replace the original op with the distributed op.
     Operation *distributedOp = rewriter.create(
         op->getLoc(), op->getName().getIdentifier(), operands, resultTypes);
+
+    // Propagate known attributes.
+    StringRef fastmathAttrName = arith::FastMathFlagsAttr::getMnemonic();
+    if (Attribute attr = op->getAttr(fastmathAttrName)) {
+      distributedOp->setAttr(fastmathAttrName, attr);
+    }
+
     DistributionPattern::replaceOpWithDistributedValues(
         rewriter, op, distributedOp->getResults());
     return success();

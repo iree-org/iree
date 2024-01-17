@@ -109,7 +109,7 @@ enum class VectorPreProcStrategy {
 };
 
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
-    "iree-codegen-llvmcpu-vector-pproc-strategy",
+    "iree-llvmcpu-vector-pproc-strategy",
     llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
                    "before vectorization:"),
     llvm::cl::values(
@@ -775,7 +775,10 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
 static LogicalResult setMatmulPeelingRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
-    ArrayRef<int64_t> vecTileSizes, int vectorSize) {
+    ArrayRef<bool> inputVecScalableTileFlags, ArrayRef<int64_t> vecTileSizes,
+    int vectorSize) {
+
+  // 0. Preprocess for scalable vectors
   // Clamp vector tile sizes to have better hint about peeling + masking. This
   // is critical for scalable vectorization, so it can resolve correct scalable
   // vector sizes.
@@ -787,6 +790,17 @@ static LogicalResult setMatmulPeelingRootConfig(
     clampedVecTileSizes[index] = std::min(clampedVecTileSizes[index], size);
   }
 
+  // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
+  // hence the extra rounding up.
+  for (const auto &[index, size] : llvm::enumerate(clampedVecTileSizes)) {
+    if (!size)
+      continue;
+    clampedVecTileSizes[index] =
+        roundUpToPow2(size,
+                      /*predicate=*/inputVecScalableTileFlags[index]);
+  }
+
+  // 1. Compute tile sizes for all tiling levels.
   // The tiling for parallel dims (M and N) and reduction dim (K) should be
   // separated, so we move K dim from parallel tile sizes to reduction tile
   // sizes.
@@ -808,8 +822,35 @@ static LogicalResult setMatmulPeelingRootConfig(
   // No need for tiling inner parallel dims.
   tileSizes.emplace_back(numTilingDims, 0);
 
+  // 2. Set scalable flags for all the tiling levels.
+  SmallVector<bool> parallelScalableFlags(inputVecScalableTileFlags.begin(),
+                                          inputVecScalableTileFlags.end());
+  SmallVector<bool> reductionScalableFlags(numTilingDims, false);
+  std::swap(parallelScalableFlags.back(), reductionScalableFlags.back());
+
+  ScalableTileFlagsListType newScalableTileFlags;
+  // No scalable:
+  // * distribution,
+  // * cache parallel, and
+  // * cache reduction
+  // tile sizes.
+  newScalableTileFlags.emplace_back(numTilingDims, false);
+  newScalableTileFlags.emplace_back(numTilingDims, false);
+  newScalableTileFlags.emplace_back(numTilingDims, false);
+
+  newScalableTileFlags.push_back(parallelScalableFlags);
+  newScalableTileFlags.push_back(reductionScalableFlags);
+
+  // No scalable inner parallel dims.
+  newScalableTileFlags.emplace_back(numTilingDims, false);
+
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for contraction: " << tileSizes
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Final tile scalable flags for contraction: "
+                       << newScalableTileFlags << "\n");
+
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes,
+      entryPointFn, op, tileSizes, newScalableTileFlags,
       DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
 }
 
@@ -870,7 +911,7 @@ setMatmulRootConfig(func::FuncOp entryPointFn,
   }
 
   TileSizesListType newTileSizes;
-  // Copy all the tile size levels except the distribution which will be split
+  // Copy all the tile size levels except the vector tile sizes which are split
   // into parallel and reduction.
   std::copy(inputTileSizes.begin(), inputTileSizes.end() - 1,
             std::back_inserter(newTileSizes));
@@ -889,8 +930,8 @@ setMatmulRootConfig(func::FuncOp entryPointFn,
   newScalableTileFlags.emplace_back(numTilingDims, false);
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for contraction: " << newTileSizes
-                       << "\n"
-                       << "Final tile scalable flags for contraction: "
+                       << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Final tile scalable flags for contraction: "
                        << newScalableTileFlags << "\n");
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
@@ -1150,7 +1191,13 @@ setRootConfig(func::FuncOp entryPointFn,
   // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
 
+  SmallVector<bool> distScalableTileFlags(distTileSizes.size(), false);
+  ScalableTileFlagsListType scalableTileFlags = {distScalableTileFlags,
+                                                 vecScalableFlags};
+
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Distribution scalable tile sizes: "
+                       << distScalableTileFlags << "\n");
   LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector scalable tile flags: " << vecScalableFlags
@@ -1158,16 +1205,12 @@ setRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vector size: " << vectorSize << "\n");
 
   if (usePeelingPipeline) {
-    // TODO: Use scalable vector sizes.
-    return setMatmulPeelingRootConfig(entryPointFn, contractionOp,
-                                      distTileSizes, cacheTileSizes,
-                                      vecTileSizes, vectorSize);
+    return setMatmulPeelingRootConfig(
+        entryPointFn, contractionOp, distTileSizes, cacheTileSizes,
+        vecScalableFlags, vecTileSizes, vectorSize);
   }
 
-  SmallVector<bool> distScalableTileFlags(distTileSizes.size(), false);
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
-  ScalableTileFlagsListType scalableTileFlags = {distScalableTileFlags,
-                                                 vecScalableFlags};
   return setMatmulRootConfig(entryPointFn, contractionOp, tileSizes,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
