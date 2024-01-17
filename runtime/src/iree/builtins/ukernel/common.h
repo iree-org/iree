@@ -155,13 +155,6 @@
 #define IREE_UK_ASSUME_UNREACHABLE
 #endif  // IREE_UK_HAVE_BUILTIN(__builtin_unreachable)
 
-#define IREE_UK_ASSUME(condition) \
-  do {                            \
-    if (!(condition)) {           \
-      IREE_UK_ASSUME_UNREACHABLE; \
-    }                             \
-  } while (false)
-
 #if IREE_UK_HAVE_ATTRIBUTE(noinline) || defined(IREE_UK_COMPILER_GCC)
 #define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
 #else

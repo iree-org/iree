@@ -58,8 +58,6 @@ void iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
       }
     }
   }
-
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     int8x16_t rhs[4];
     for (int i = 0; i < 4; ++i) {
