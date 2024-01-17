@@ -31,8 +31,15 @@ public:
     position += stride;
     return *this;
   }
-  bool operator!=(const DimensionalIterator &other) const {
+
+  bool operator==(const DimensionalIterator &other) const {
     return position != other.position;
+  }
+  bool operator!=(const DimensionalIterator &other) const {
+    return !(*this == other);
+  }
+  bool operator<(const DimensionalIterator &other) const {
+    return position < other.position;
   }
 
 private:
