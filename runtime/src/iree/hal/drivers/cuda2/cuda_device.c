@@ -16,21 +16,21 @@
 #include "iree/hal/drivers/cuda2/cuda_allocator.h"
 #include "iree/hal/drivers/cuda2/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda2/cuda_status_util.h"
-#include "iree/hal/drivers/cuda2/event_pool.h"
-#include "iree/hal/drivers/cuda2/event_semaphore.h"
 #include "iree/hal/drivers/cuda2/graph_command_buffer.h"
 #include "iree/hal/drivers/cuda2/memory_pools.h"
 #include "iree/hal/drivers/cuda2/nccl_channel.h"
 #include "iree/hal/drivers/cuda2/nccl_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda2/nop_executable_cache.h"
-#include "iree/hal/drivers/cuda2/pending_queue_actions.h"
 #include "iree/hal/drivers/cuda2/pipeline_layout.h"
 #include "iree/hal/drivers/cuda2/stream_command_buffer.h"
-#include "iree/hal/drivers/cuda2/timepoint_pool.h"
 #include "iree/hal/drivers/cuda2/tracing.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/event_pool.h"
+#include "iree/hal/utils/event_semaphore.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
+#include "iree/hal/utils/pending_queue_actions.h"
+#include "iree/hal/utils/timepoint_pool.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_device_t
@@ -67,6 +67,11 @@ typedef struct iree_hal_cuda2_device_t {
   iree_hal_cuda2_tracing_context_t* tracing_context;
 
   iree_allocator_t host_allocator;
+
+  // Symbol tables for CUevent-implemented semaphore and pending action queue.
+  iree_hal_event_impl_symtable_t event_impl_symtable;
+  iree_hal_stream_impl_symtable_t stream_impl_symtable;
+  iree_hal_command_buffer_impl_symtable_t command_buffer_impl_symtable;
 
   // Host/device event pools, used for backing semaphore timepoints.
   iree_event_pool_t* host_event_pool;
@@ -126,13 +131,86 @@ static iree_status_t iree_hal_cuda2_device_check_params(
   return iree_ok_status();
 }
 
+static iree_status_t iree_hal_cuda2_event_impl_create(
+    void* user_data, iree_hal_event_impl_t* out_event) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(
+      symbols, cuEventCreate((CUevent*)out_event, CU_EVENT_DISABLE_TIMING),
+      "cuEventCreate");
+}
+
+static void iree_hal_cuda2_event_impl_destroy(void* user_data,
+                                              iree_hal_event_impl_t event) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  IREE_CUDA_IGNORE_ERROR(symbols, cuEventDestroy((CUevent)event));
+}
+
+static iree_status_t iree_hal_cuda2_event_impl_synchronize(
+    void* user_data, iree_hal_event_impl_t event) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(symbols, cuEventSynchronize((CUevent)event),
+                                 "cuEventSynchronize");
+}
+
+static iree_status_t iree_hal_cuda2_stream_impl_record_event(
+    void* user_data, iree_hal_stream_impl_t stream,
+    iree_hal_event_impl_t event) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(
+      symbols, cuEventRecord((CUevent)event, (CUstream)stream),
+      "cuEventRecord");
+}
+
+static iree_status_t iree_hal_cuda2_stream_impl_wait_event(
+    void* user_data, iree_hal_stream_impl_t stream,
+    iree_hal_event_impl_t event) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(
+      symbols,
+      cuStreamWaitEvent((CUstream)stream, (CUevent)event,
+                        CU_EVENT_WAIT_DEFAULT),
+      "cuStreamWaitEvent");
+}
+
+static iree_status_t iree_hal_cuda2_stream_impl_launch_graph(
+    void* user_data, iree_hal_stream_impl_t stream,
+    iree_hal_graph_executable_impl_t graph) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(
+      symbols, cuGraphLaunch((CUgraphExec)graph, (CUstream)stream),
+      "cuGraphLaunch");
+}
+
+static iree_status_t iree_hal_cuda2_stream_impl_launch_host_fn(
+    void* user_data, iree_hal_stream_impl_t stream,
+    iree_hal_host_fn_impl_t host_fn, void* host_fn_user_data) {
+  const iree_hal_cuda2_dynamic_symbols_t* symbols =
+      (const iree_hal_cuda2_dynamic_symbols_t*)user_data;
+  return IREE_CURESULT_TO_STATUS(
+      symbols, cuLaunchHostFunc((CUstream)stream, host_fn, host_fn_user_data),
+      "cuLaunchHostFunc");
+}
+
+static iree_hal_graph_executable_impl_t
+iree_hal_cuda2_command_buffer_impl_graph_command_buffer_handle(
+    iree_hal_command_buffer_t* command_buffer) {
+  return (iree_hal_graph_executable_impl_t)
+      iree_hal_cuda2_graph_command_buffer_handle(command_buffer);
+}
+
 static iree_status_t iree_hal_cuda2_device_create_internal(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda2_device_params_t* params, CUdevice cu_device,
     CUstream dispatch_stream, CUstream callback_stream, CUcontext context,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    iree_allocator_t host_allocator, iree_hal_cuda2_device_t** out_device) {
   iree_hal_cuda2_device_t* device = NULL;
   iree_host_size_t total_size = iree_sizeof_struct(*device) + identifier.size;
   IREE_RETURN_IF_ERROR(
@@ -157,7 +235,8 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   device->host_allocator = host_allocator;
 
   iree_status_t status = iree_hal_cuda2_pending_queue_actions_create(
-      cuda_symbols, &device->block_pool, host_allocator,
+      &device->stream_impl_symtable, &device->command_buffer_impl_symtable,
+      (void*)cuda_symbols, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
 
   // Enable tracing for the (currently only) stream - no-op if disabled.
@@ -194,7 +273,7 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   }
 
   if (iree_status_is_ok(status)) {
-    *out_device = (iree_hal_device_t*)device;
+    *out_device = device;
   } else {
     iree_hal_device_release((iree_hal_device_t*)device);
   }
@@ -205,8 +284,9 @@ iree_status_t iree_hal_cuda2_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda2_device_params_t* params,
     const iree_hal_cuda2_dynamic_symbols_t* cuda_symbols,
-    const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    const iree_hal_cuda2_nccl_dynamic_symbols_t* nccl_symbols,
+    CUdevice cuda_device, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(driver);
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
@@ -219,7 +299,7 @@ iree_status_t iree_hal_cuda2_device_create(
   CUcontext context = NULL;
   if (iree_status_is_ok(status)) {
     status = IREE_CURESULT_TO_STATUS(
-        cuda_symbols, cuDevicePrimaryCtxRetain(&context, device));
+        cuda_symbols, cuDevicePrimaryCtxRetain(&context, cuda_device));
   }
   if (iree_status_is_ok(status)) {
     status = IREE_CURESULT_TO_STATUS(cuda_symbols, cuCtxSetCurrent(context));
@@ -238,15 +318,17 @@ iree_status_t iree_hal_cuda2_device_create(
         cuda_symbols, cuStreamCreate(&callback_stream, CU_STREAM_NON_BLOCKING));
   }
 
+  iree_hal_cuda2_device_t* device = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda2_device_create_internal(
-        driver, identifier, params, device, dispatch_stream, callback_stream,
-        context, cuda_symbols, nccl_symbols, host_allocator, out_device);
+        driver, identifier, params, cuda_device, dispatch_stream,
+        callback_stream, context, cuda_symbols, nccl_symbols, host_allocator,
+        &device);
   } else {
     // Release resources we have accquired thus far.
     if (callback_stream) cuda_symbols->cuStreamDestroy(callback_stream);
     if (dispatch_stream) cuda_symbols->cuStreamDestroy(dispatch_stream);
-    if (context) cuda_symbols->cuDevicePrimaryCtxRelease(device);
+    if (context) cuda_symbols->cuDevicePrimaryCtxRelease(cuda_device);
   }
 
   iree_event_pool_t* host_event_pool = NULL;
@@ -257,9 +339,30 @@ iree_status_t iree_hal_cuda2_device_create(
 
   iree_hal_cuda2_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
+    device->event_impl_symtable.create = iree_hal_cuda2_event_impl_create;
+    device->event_impl_symtable.destroy = iree_hal_cuda2_event_impl_destroy;
+    device->event_impl_symtable.synchronize =
+        iree_hal_cuda2_event_impl_synchronize;
+
+    device->stream_impl_symtable.record_event =
+        iree_hal_cuda2_stream_impl_record_event;
+    device->stream_impl_symtable.wait_event =
+        iree_hal_cuda2_stream_impl_wait_event;
+    device->stream_impl_symtable.launch_graph =
+        iree_hal_cuda2_stream_impl_launch_graph;
+    device->stream_impl_symtable.launch_host_fn =
+        iree_hal_cuda2_stream_impl_launch_host_fn;
+
+    device->command_buffer_impl_symtable.is_graph_command_buffer =
+        iree_hal_cuda2_graph_command_buffer_isa;
+    device->command_buffer_impl_symtable.graph_command_buffer_handle =
+        iree_hal_cuda2_command_buffer_impl_graph_command_buffer_handle;
+    device->command_buffer_impl_symtable.create_stream_command_buffer =
+        iree_hal_cuda2_device_create_stream_command_buffer;
+
     status = iree_hal_cuda2_event_pool_allocate(
-        cuda_symbols, params->event_pool_capacity, host_allocator,
-        &device_event_pool);
+        &device->event_impl_symtable, (void*)cuda_symbols,
+        params->event_pool_capacity, host_allocator, &device_event_pool);
   }
 
   iree_hal_cuda2_timepoint_pool_t* timepoint_pool = NULL;
@@ -270,18 +373,19 @@ iree_status_t iree_hal_cuda2_device_create(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_cuda2_device_t* cuda_device =
-        iree_hal_cuda2_device_cast(*out_device);
-    cuda_device->host_event_pool = host_event_pool;
-    cuda_device->device_event_pool = device_event_pool;
-    cuda_device->timepoint_pool = timepoint_pool;
+    device->host_event_pool = host_event_pool;
+    device->device_event_pool = device_event_pool;
+    device->timepoint_pool = timepoint_pool;
+
+    *out_device = (iree_hal_device_t*)device;
   } else {
     // Release resources we have accquired after HAL device creation.
     if (timepoint_pool) iree_hal_cuda2_timepoint_pool_free(timepoint_pool);
     if (device_event_pool) iree_hal_cuda2_event_pool_release(device_event_pool);
     if (host_event_pool) iree_event_pool_free(host_event_pool);
+
     // Release other resources via the HAL device.
-    iree_hal_device_release(*out_device);
+    iree_hal_device_release((iree_hal_device_t*)device);
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -611,8 +715,9 @@ static iree_status_t iree_hal_cuda2_device_create_semaphore(
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
   return iree_hal_cuda2_event_semaphore_create(
-      initial_value, device->cuda_symbols, device->timepoint_pool,
-      device->pending_queue_actions, device->host_allocator, out_semaphore);
+      &device->event_impl_symtable, (void*)device->cuda_symbols, initial_value,
+      device->timepoint_pool, device->pending_queue_actions,
+      device->host_allocator, out_semaphore);
 }
 
 static iree_hal_semaphore_compatibility_t
@@ -752,7 +857,8 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_hal_cuda2_pending_queue_actions_enqueue_execution(
-      base_device, device->dispatch_cu_stream, device->callback_cu_stream,
+      base_device, (iree_hal_stream_impl_t)device->dispatch_cu_stream,
+      (iree_hal_stream_impl_t)device->callback_cu_stream,
       device->pending_queue_actions, wait_semaphore_list, signal_semaphore_list,
       command_buffer_count, command_buffers);
   if (iree_status_is_ok(status)) {

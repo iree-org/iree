@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda2/event_semaphore.h"
+#include "iree/hal/utils/event_semaphore.h"
 
 #include "iree/base/internal/synchronization.h"
-#include "iree/hal/drivers/cuda2/cuda_dynamic_symbols.h"
-#include "iree/hal/drivers/cuda2/cuda_status_util.h"
-#include "iree/hal/drivers/cuda2/timepoint_pool.h"
-#include "iree/hal/utils/semaphore_base.h"
+#include "iree/hal/api.h"
+#include "iree/hal/utils/event_pool.h"
+#include "iree/hal/utils/timepoint_pool.h"
 
 typedef struct iree_hal_cuda2_semaphore_t {
   // Abstract resource used for injecting reference counting and vtable;
@@ -20,7 +19,9 @@ typedef struct iree_hal_cuda2_semaphore_t {
   // The allocator used to create this semaphore.
   iree_allocator_t host_allocator;
   // The symbols used to issue CUDA API calls.
-  const iree_hal_cuda2_dynamic_symbols_t* symbols;
+  const iree_hal_event_impl_symtable_t* symbols;
+  // User data to the symbol table functions.
+  void* symbol_user_data;
 
   // The timepoint pool to acquire timepoint objects.
   iree_hal_cuda2_timepoint_pool_t* timepoint_pool;
@@ -52,11 +53,12 @@ static iree_hal_cuda2_semaphore_t* iree_hal_cuda2_semaphore_cast(
 }
 
 iree_status_t iree_hal_cuda2_event_semaphore_create(
-    uint64_t initial_value, const iree_hal_cuda2_dynamic_symbols_t* symbols,
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
+    const iree_hal_event_impl_symtable_t* symbols, void* symbol_user_data,
+    uint64_t initial_value, iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
     iree_hal_cuda2_pending_queue_actions_t* pending_queue_actions,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(symbols);
+  IREE_ASSERT_ARGUMENT(symbol_user_data);
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   IREE_ASSERT_ARGUMENT(pending_queue_actions);
   IREE_ASSERT_ARGUMENT(out_semaphore);
@@ -71,6 +73,7 @@ iree_status_t iree_hal_cuda2_event_semaphore_create(
                                 &semaphore->base);
   semaphore->host_allocator = host_allocator;
   semaphore->symbols = symbols;
+  semaphore->symbol_user_data = symbol_user_data;
   semaphore->timepoint_pool = timepoint_pool;
   semaphore->pending_queue_actions = pending_queue_actions;
   iree_slim_mutex_initialize(&semaphore->mutex);
@@ -293,10 +296,11 @@ static iree_status_t iree_hal_cuda2_semaphore_wait(
   iree_hal_cuda2_event_t* wait_event = NULL;
   if (iree_hal_cuda2_semaphore_acquire_event_host_wait(semaphore, value,
                                                        &wait_event)) {
-    IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, semaphore->symbols,
-        cuEventSynchronize(iree_hal_cuda2_event_handle(wait_event)),
-        "cuEventSynchronize");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, semaphore->symbols->synchronize(
+                semaphore->symbol_user_data,
+                iree_hal_cuda2_event_handle(wait_event)));
+
     iree_hal_cuda2_event_release(wait_event);
     IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
@@ -347,7 +351,7 @@ static iree_status_t iree_hal_cuda2_semaphore_timepoint_device_signal_callback(
 // device.
 iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
-    CUevent* out_event) {
+    iree_hal_event_impl_t* out_event) {
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
   iree_hal_cuda2_timepoint_t* signal_timepoint = NULL;
@@ -411,7 +415,7 @@ static iree_status_t iree_hal_cuda2_semaphore_timepoint_device_wait_callback(
 // |min_value| on the device.
 iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
-    CUevent* out_event) {
+    iree_hal_event_impl_t* out_event) {
   iree_hal_cuda2_semaphore_t* semaphore =
       iree_hal_cuda2_semaphore_cast(base_semaphore);
   iree_hal_cuda2_timepoint_t* wait_timepoint = NULL;

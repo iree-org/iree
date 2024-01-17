@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
 load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
@@ -199,5 +199,65 @@ iree_runtime_cc_test(
         "//runtime/src/iree/hal",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
+    ],
+)
+
+#===------------------------------------------------------------------------===#
+# Utilities with thread dependencies
+#===------------------------------------------------------------------------===#
+
+iree_cmake_extra_content(
+    content = """
+if(NOT IREE_ENABLE_THREADING)
+  return()
+endif()
+""",
+    inline = True,
+)
+
+iree_runtime_cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:synchronization",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "timepoint_pool",
+    srcs = ["timepoint_pool.c"],
+    hdrs = ["timepoint_pool.h"],
+    deps = [
+        ":event_pool",
+        ":semaphore_base",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:event_pool",
+        "//runtime/src/iree/base/internal:synchronization",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "event_semaphore_and_pending_queue",
+    srcs = [
+        "event_semaphore.c",
+        "pending_queue_actions.c",
+    ],
+    hdrs = [
+        "event_semaphore.h",
+        "pending_queue_actions.h",
+    ],
+    deps = [
+        ":deferred_command_buffer",
+        ":event_pool",
+        ":resource_set",
+        ":timepoint_pool",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/internal:threading",
+        "//runtime/src/iree/hal",
     ],
 )

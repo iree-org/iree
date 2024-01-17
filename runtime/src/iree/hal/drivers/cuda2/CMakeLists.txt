@@ -24,10 +24,6 @@ iree_cc_library(
     "cuda_device.c"
     "cuda_device.h"
     "cuda_driver.c"
-    "event_pool.c"
-    "event_pool.h"
-    "event_semaphore.c"
-    "event_semaphore.h"
     "graph_command_buffer.c"
     "graph_command_buffer.h"
     "memory_pools.c"
@@ -38,14 +34,10 @@ iree_cc_library(
     "nccl_channel.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
-    "pending_queue_actions.c"
-    "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
-    "timepoint_pool.c"
-    "timepoint_pool.h"
     "tracing.c"
     "tracing.h"
   DEPS
@@ -54,18 +46,17 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
-    iree::base::internal::atomic_slist
     iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
-    iree::base::internal::synchronization
-    iree::base::internal::threading
     iree::hal
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
+    iree::hal::utils::event_pool
+    iree::hal::utils::event_semaphore_and_pending_queue
     iree::hal::utils::file_transfer
     iree::hal::utils::memory_file
     iree::hal::utils::resource_set
-    iree::hal::utils::semaphore_base
+    iree::hal::utils::timepoint_pool
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )

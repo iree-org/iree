@@ -4,11 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_CUDA2_EVENT_POOL_H_
-#define IREE_HAL_DRIVERS_CUDA2_EVENT_POOL_H_
+#ifndef IREE_HAL_UTILS_EVENT_POOL_H_
+#define IREE_HAL_UTILS_EVENT_POOL_H_
 
 #include "iree/base/api.h"
-#include "iree/hal/drivers/cuda2/cuda_dynamic_symbols.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +16,19 @@ extern "C" {
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_event_t
 //===----------------------------------------------------------------------===//
+
+// Implementation type for iree_hal_event_t.
+// It maps to CUevent for CUDA and hipEvent_t for HIP.
+typedef struct iree_hal_event_impl_t* iree_hal_event_impl_t;
+
+// Symbol table for event related implementation APIs.
+typedef struct iree_hal_event_impl_symtable_t {
+  iree_status_t(IREE_API_PTR* create)(void* user_data,
+                                      iree_hal_event_impl_t* out_event);
+  void(IREE_API_PTR* destroy)(void* user_data, iree_hal_event_impl_t event);
+  iree_status_t(IREE_API_PTR* synchronize)(void* user_data,
+                                           iree_hal_event_impl_t event);
+} iree_hal_event_impl_symtable_t;
 
 // An struct that wraps a CUevent object with a reference count for lifetime
 // management.
@@ -28,7 +40,8 @@ extern "C" {
 typedef struct iree_hal_cuda2_event_t iree_hal_cuda2_event_t;
 
 // Returns the underlying CUevent handle behind |event|.
-CUevent iree_hal_cuda2_event_handle(const iree_hal_cuda2_event_t* event);
+iree_hal_event_impl_t iree_hal_cuda2_event_handle(
+    const iree_hal_cuda2_event_t* event);
 
 // Retains the given |event| by increasing its reference count.
 void iree_hal_cuda2_event_retain(iree_hal_cuda2_event_t* event);
@@ -49,10 +62,12 @@ typedef struct iree_hal_cuda2_event_pool_t iree_hal_cuda2_event_pool_t;
 
 // Allocates a new event pool with up to |available_capacity| events.
 //
+// |symbols| and |symbol_user_data| must outlive the created event pool.
+//
 // Extra events requested beyond the capability are directly created and
 // destroyed without pooling.
 iree_status_t iree_hal_cuda2_event_pool_allocate(
-    const iree_hal_cuda2_dynamic_symbols_t* symbols,
+    const iree_hal_event_impl_symtable_t* symbols, void* symbol_user_data,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda2_event_pool_t** out_event_pool);
 
@@ -77,4 +92,4 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_CUDA2_EVENT_POOL_H_
+#endif  // IREE_HAL_UTILS_EVENT_POOL_H_

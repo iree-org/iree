@@ -238,4 +238,60 @@ iree_cc_test(
     iree::testing::gtest_main
 )
 
+if(NOT IREE_ENABLE_THREADING)
+  return()
+endif()
+
+iree_cc_library(
+  NAME
+    event_pool
+  HDRS
+    "event_pool.h"
+  SRCS
+    "event_pool.c"
+  DEPS
+    iree::base
+    iree::base::internal::synchronization
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    timepoint_pool
+  HDRS
+    "timepoint_pool.h"
+  SRCS
+    "timepoint_pool.c"
+  DEPS
+    ::event_pool
+    ::semaphore_base
+    iree::base
+    iree::base::internal::event_pool
+    iree::base::internal::synchronization
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    event_semaphore_and_pending_queue
+  HDRS
+    "event_semaphore.h"
+    "pending_queue_actions.h"
+  SRCS
+    "event_semaphore.c"
+    "pending_queue_actions.c"
+  DEPS
+    ::deferred_command_buffer
+    ::event_pool
+    ::resource_set
+    ::timepoint_pool
+    iree::base
+    iree::base::internal::arena
+    iree::base::internal::atomic_slist
+    iree::base::internal::synchronization
+    iree::base::internal::threading
+    iree::hal
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

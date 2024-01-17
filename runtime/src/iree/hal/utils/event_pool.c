@@ -4,18 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda2/event_pool.h"
+#include "iree/hal/utils/event_pool.h"
 
-#include <stdbool.h>
 #include <stddef.h>
-#include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda2/cuda_dynamic_symbols.h"
-#include "iree/hal/drivers/cuda2/cuda_status_util.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_cuda2_event_t
@@ -30,37 +24,41 @@ struct iree_hal_cuda2_event_t {
 
   // The allocator used to create the event.
   iree_allocator_t host_allocator;
+
   // The symbols used to create and destroy CUevent objects.
-  const iree_hal_cuda2_dynamic_symbols_t* symbols;
+  const iree_hal_event_impl_symtable_t* symbols;
+  // User data to the symbol table functions.
+  void* symbol_user_data;
 
   // The event pool that owns this event. This cannot be NULL. We retain it to
   // make sure the event outlive the pool.
   iree_hal_cuda2_event_pool_t* pool;
   // The underlying CUevent object.
-  CUevent cu_event;
+  iree_hal_event_impl_t event_impl;
 };
 
-CUevent iree_hal_cuda2_event_handle(const iree_hal_cuda2_event_t* event) {
-  return event->cu_event;
+iree_hal_event_impl_t iree_hal_cuda2_event_handle(
+    const iree_hal_cuda2_event_t* event) {
+  return event->event_impl;
 }
 
 static inline void iree_hal_cuda2_event_destroy(iree_hal_cuda2_event_t* event) {
   iree_allocator_t host_allocator = event->host_allocator;
-  const iree_hal_cuda2_dynamic_symbols_t* symbols = event->symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_ASSERT_REF_COUNT_ZERO(&event->ref_count);
-  IREE_CUDA_IGNORE_ERROR(symbols, cuEventDestroy(event->cu_event));
+  event->symbols->destroy(event->symbol_user_data, event->event_impl);
   iree_allocator_free(host_allocator, event);
 
   IREE_TRACE_ZONE_END(z0);
 }
 
 static inline iree_status_t iree_hal_cuda2_event_create(
-    const iree_hal_cuda2_dynamic_symbols_t* symbols,
+    const iree_hal_event_impl_symtable_t* symbols, void* symbol_user_data,
     iree_hal_cuda2_event_pool_t* pool, iree_allocator_t host_allocator,
     iree_hal_cuda2_event_t** out_event) {
   IREE_ASSERT_ARGUMENT(symbols);
+  IREE_ASSERT_ARGUMENT(symbol_user_data);
   IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_event);
   *out_event = NULL;
@@ -73,12 +71,12 @@ static inline iree_status_t iree_hal_cuda2_event_create(
   iree_atomic_ref_count_init(&event->ref_count);  // -> 1
   event->host_allocator = host_allocator;
   event->symbols = symbols;
+  event->symbol_user_data = symbol_user_data;
   event->pool = pool;
-  event->cu_event = NULL;
+  event->event_impl = NULL;
 
-  iree_status_t status = IREE_CURESULT_TO_STATUS(
-      symbols, cuEventCreate(&event->cu_event, CU_EVENT_DISABLE_TIMING),
-      "cuEventCreate");
+  iree_status_t status =
+      event->symbols->create(event->symbol_user_data, &event->event_impl);
   if (iree_status_is_ok(status)) {
     *out_event = event;
   } else {
@@ -118,8 +116,11 @@ struct iree_hal_cuda2_event_pool_t {
 
   // The allocator used to create the event pool.
   iree_allocator_t host_allocator;
+
   // The symbols used to create and destroy CUevent objects.
-  const iree_hal_cuda2_dynamic_symbols_t* symbols;
+  const iree_hal_event_impl_symtable_t* symbols;
+  // User data to the symbol table functions.
+  void* symbol_user_data;
 
   // Guards event related fields in the pool. We don't expect a performant
   // program to frequently allocate events for synchronization purposes; the
@@ -142,10 +143,11 @@ static void iree_hal_cuda2_event_pool_free(
     iree_hal_cuda2_event_pool_t* event_pool);
 
 iree_status_t iree_hal_cuda2_event_pool_allocate(
-    const iree_hal_cuda2_dynamic_symbols_t* symbols,
+    const iree_hal_event_impl_symtable_t* symbols, void* symbol_user_data,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
     iree_hal_cuda2_event_pool_t** out_event_pool) {
   IREE_ASSERT_ARGUMENT(symbols);
+  IREE_ASSERT_ARGUMENT(symbol_user_data);
   IREE_ASSERT_ARGUMENT(out_event_pool);
   *out_event_pool = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -160,6 +162,7 @@ iree_status_t iree_hal_cuda2_event_pool_allocate(
   iree_atomic_ref_count_init(&event_pool->ref_count);  // -> 1
   event_pool->host_allocator = host_allocator;
   event_pool->symbols = symbols;
+  event_pool->symbol_user_data = symbol_user_data;
   iree_slim_mutex_initialize(&event_pool->event_mutex);
   event_pool->available_capacity = available_capacity;
   event_pool->available_count = 0;
@@ -167,7 +170,7 @@ iree_status_t iree_hal_cuda2_event_pool_allocate(
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < available_capacity; ++i) {
     status = iree_hal_cuda2_event_create(
-        symbols, event_pool, host_allocator,
+        event_pool->symbols, symbol_user_data, event_pool, host_allocator,
         &event_pool->available_list[event_pool->available_count++]);
     if (!iree_status_is_ok(status)) break;
   }
@@ -241,9 +244,9 @@ iree_status_t iree_hal_cuda2_event_pool_acquire(
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "event-pool-unpooled-acquire");
     iree_status_t status = iree_ok_status();
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      status = iree_hal_cuda2_event_create(event_pool->symbols, event_pool,
-                                           event_pool->host_allocator,
-                                           &out_events[from_pool_count + i]);
+      status = iree_hal_cuda2_event_create(
+          event_pool->symbols, event_pool->symbol_user_data, event_pool,
+          event_pool->host_allocator, &out_events[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
         // Must release all events we've acquired so far.
         iree_hal_cuda2_event_pool_release_event(event_pool, from_pool_count + i,

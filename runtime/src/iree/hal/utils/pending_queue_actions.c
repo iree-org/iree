@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/drivers/cuda2/pending_queue_actions.h"
+#include "iree/hal/utils/pending_queue_actions.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,12 +15,9 @@
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda2/cuda_device.h"
-#include "iree/hal/drivers/cuda2/cuda_dynamic_symbols.h"
-#include "iree/hal/drivers/cuda2/cuda_status_util.h"
-#include "iree/hal/drivers/cuda2/event_semaphore.h"
-#include "iree/hal/drivers/cuda2/graph_command_buffer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
+#include "iree/hal/utils/event_pool.h"
+#include "iree/hal/utils/event_semaphore.h"
 #include "iree/hal/utils/resource_set.h"
 
 // The maximal number of CUevent objects a command buffer can wait.
@@ -62,9 +59,9 @@ typedef struct iree_hal_cuda2_queue_action_t {
   iree_hal_device_t* device;
 
   // The stream to launch main GPU workload.
-  CUstream dispatch_cu_stream;
+  iree_hal_stream_impl_t dispatch_cu_stream;
   // The stream to launch CUDA host function callbacks.
-  CUstream callback_cu_stream;
+  iree_hal_stream_impl_t callback_cu_stream;
 
   // Resource set to retain all associated resources by the payload.
   iree_hal_resource_set_t* resource_set;
@@ -75,7 +72,7 @@ typedef struct iree_hal_cuda2_queue_action_t {
   iree_hal_semaphore_list_t signal_semaphore_list;
 
   // Scratch fields for analyzing whether actions are ready to issue.
-  CUevent events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
+  iree_hal_event_impl_t events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
   iree_host_size_t event_count;
   bool is_pending;
 } iree_hal_cuda2_queue_action_t;
@@ -238,7 +235,9 @@ struct iree_hal_cuda2_pending_queue_actions_t {
   iree_arena_block_pool_t* block_pool;
 
   // The symbols used to create and destroy CUevent objects.
-  const iree_hal_cuda2_dynamic_symbols_t* symbols;
+  const iree_hal_stream_impl_symtable_t* stream_symbols;
+  const iree_hal_command_buffer_impl_symtable_t* command_buffer_symbols;
+  void* stream_symbol_user_data;
 
   // Non-recursive mutex guarding access to the action list.
   iree_slim_mutex_t action_mutex;
@@ -257,10 +256,14 @@ static const iree_hal_resource_vtable_t
     iree_hal_cuda2_pending_queue_actions_vtable;
 
 iree_status_t iree_hal_cuda2_pending_queue_actions_create(
-    const iree_hal_cuda2_dynamic_symbols_t* symbols,
-    iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
+    const iree_hal_stream_impl_symtable_t* stream_symbols,
+    const iree_hal_command_buffer_impl_symtable_t* command_buffer_symbols,
+    void* stream_symbol_user_data, iree_arena_block_pool_t* block_pool,
+    iree_allocator_t host_allocator,
     iree_hal_cuda2_pending_queue_actions_t** out_actions) {
-  IREE_ASSERT_ARGUMENT(symbols);
+  IREE_ASSERT_ARGUMENT(stream_symbols);
+  IREE_ASSERT_ARGUMENT(command_buffer_symbols);
+  IREE_ASSERT_ARGUMENT(stream_symbol_user_data);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_actions);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -273,7 +276,9 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_create(
                                &actions->resource);
   actions->host_allocator = host_allocator;
   actions->block_pool = block_pool;
-  actions->symbols = symbols;
+  actions->stream_symbols = stream_symbols;
+  actions->command_buffer_symbols = command_buffer_symbols;
+  actions->stream_symbol_user_data = stream_symbol_user_data;
   iree_slim_mutex_initialize(&actions->action_mutex);
   memset(&actions->action_list, 0, sizeof(actions->action_list));
 
@@ -401,8 +406,9 @@ static void iree_hal_cuda2_free_semaphore_list(
 }
 
 iree_status_t iree_hal_cuda2_pending_queue_actions_enqueue_execution(
-    iree_hal_device_t* device, CUstream dispatch_stream,
-    CUstream callback_stream, iree_hal_cuda2_pending_queue_actions_t* actions,
+    iree_hal_device_t* device, iree_hal_stream_impl_t dispatch_stream,
+    iree_hal_stream_impl_t callback_stream,
+    iree_hal_cuda2_pending_queue_actions_t* actions,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
@@ -517,8 +523,11 @@ static void iree_hal_cuda2_execution_device_signal_host_callback(
 static iree_status_t iree_hal_cuda2_pending_queue_actions_issue_execution(
     iree_hal_cuda2_queue_action_t* action) {
   IREE_ASSERT(action->is_pending == false);
-  const iree_hal_cuda2_dynamic_symbols_t* symbols =
-      action->owning_actions->symbols;
+  const iree_hal_stream_impl_symtable_t* stream_symbols =
+      action->owning_actions->stream_symbols;
+  const iree_hal_command_buffer_impl_symtable_t* command_buffer_symbols =
+      action->owning_actions->command_buffer_symbols;
+  void* symbol_user_data = action->owning_actions->stream_symbol_user_data;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // No need to lock given that this action is already detched from the pending
@@ -526,23 +535,23 @@ static iree_status_t iree_hal_cuda2_pending_queue_actions_issue_execution(
 
   // First wait all the device CUevent in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->event_count; ++i) {
-    IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, symbols,
-        cuStreamWaitEvent(action->dispatch_cu_stream, action->events[i],
-                          CU_EVENT_WAIT_DEFAULT),
-        "cuStreamWaitEvent");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        stream_symbols->wait_event(symbol_user_data, action->dispatch_cu_stream,
+                                   action->events[i]));
   }
 
   // Then launch all command buffers to the dispatch stream.
   for (iree_host_size_t i = 0; i < action->payload.command_buffers.count; ++i) {
     iree_hal_command_buffer_t* command_buffer =
         action->payload.command_buffers.ptr[i];
-    if (iree_hal_cuda2_graph_command_buffer_isa(command_buffer)) {
-      CUgraphExec exec = iree_hal_cuda2_graph_command_buffer_handle(
-          action->payload.command_buffers.ptr[i]);
-      IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, symbols, cuGraphLaunch(exec, action->dispatch_cu_stream),
-          "cuGraphLaunch");
+    if (command_buffer_symbols->is_graph_command_buffer(command_buffer)) {
+      iree_hal_graph_executable_impl_t exec =
+          command_buffer_symbols->graph_command_buffer_handle(
+              action->payload.command_buffers.ptr[i]);
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, stream_symbols->launch_graph(symbol_user_data,
+                                           action->dispatch_cu_stream, exec));
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
@@ -550,7 +559,7 @@ static iree_status_t iree_hal_cuda2_pending_queue_actions_issue_execution(
           IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
           IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED;
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, iree_hal_cuda2_device_create_stream_command_buffer(
+          z0, command_buffer_symbols->create_stream_command_buffer(
                   action->device, mode, IREE_HAL_COMMAND_CATEGORY_ANY,
                   /*binding_capacity=*/0, &stream_command_buffer));
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
@@ -566,32 +575,28 @@ static iree_status_t iree_hal_cuda2_pending_queue_actions_issue_execution(
   // Last record CUevent signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
     // Grab a CUevent for this semaphore value signaling.
-    CUevent event = NULL;
+    iree_hal_event_impl_t event = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
                 action->signal_semaphore_list.semaphores[i],
                 action->signal_semaphore_list.payload_values[i], &event));
 
     // Record the event signaling in the dispatch stream.
-    IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, symbols, cuEventRecord(event, action->dispatch_cu_stream),
-        "cuEventRecord");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, stream_symbols->record_event(symbol_user_data,
+                                         action->dispatch_cu_stream, event));
     // Let the callback stream to wait on the CUevent.
-    IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, symbols,
-        cuStreamWaitEvent(action->callback_cu_stream, event,
-                          CU_EVENT_WAIT_DEFAULT),
-        "cuStreamWaitEvent");
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, stream_symbols->wait_event(symbol_user_data,
+                                       action->callback_cu_stream, event));
   }
 
   // Now launch a host function on the callback stream to advance the semaphore
   // timeline.
-  IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, symbols,
-      cuLaunchHostFunc(action->callback_cu_stream,
-                       iree_hal_cuda2_execution_device_signal_host_callback,
-                       action),
-      "cuLaunchHostFunc");
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, stream_symbols->launch_host_fn(
+              symbol_user_data, action->callback_cu_stream,
+              iree_hal_cuda2_execution_device_signal_host_callback, action));
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -657,7 +662,7 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
       // Try to acquire a CUevent from a device wait timepoint. If so, we can
       // use that CUevent to wait on the device. Otherwise, this action is still
       // not ready.
-      CUevent event = NULL;
+      iree_hal_event_impl_t event = NULL;
       status = iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
           semaphores[i], values[i], &event);
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;

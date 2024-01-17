@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_CUDA2_TIMEPOINT_POOL_H_
-#define IREE_HAL_DRIVERS_CUDA2_TIMEPOINT_POOL_H_
+#ifndef IREE_HAL_UTILS_TIMEPOINT_POOL_H_
+#define IREE_HAL_UTILS_TIMEPOINT_POOL_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/event_pool.h"
-#include "iree/hal/drivers/cuda2/event_pool.h"
+#include "iree/hal/utils/event_pool.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 #ifdef __cplusplus
@@ -116,4 +116,4 @@ void iree_hal_cuda2_timepoint_pool_release(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_CUDA2_TIMEPOINT_POOL_H_
+#endif  // IREE_HAL_UTILS_TIMEPOINT_POOL_H_
