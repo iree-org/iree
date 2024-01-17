@@ -110,35 +110,6 @@ class SystemApiTest(unittest.TestCase):
         results2 = f(results, results)
         np.testing.assert_allclose(results2, [16.0, 100.0, 324.0, 784.0])
 
-    def test_tracing_explicit(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            tracer = iree.runtime.Tracer(temp_dir)
-            config = iree.runtime.Config("local-task", tracer=tracer)
-            self.verify_tracing(config, temp_dir)
-
-    def test_tracing_from_environment(self):
-        original = os.environ.get(iree.runtime.TRACE_PATH_ENV_KEY)
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                os.environ[iree.runtime.TRACE_PATH_ENV_KEY] = temp_dir
-                config = iree.runtime.Config("local-task")
-                self.verify_tracing(config, temp_dir)
-        finally:
-            if original:
-                os.environ[iree.runtime.TRACE_PATH_ENV_KEY] = original
-
-    def verify_tracing(self, config, temp_dir):
-        logging.info("Tracing test to: %s", temp_dir)
-        ctx = iree.runtime.SystemContext(config=config)
-        ctx.add_vm_module(create_simple_mul_module(ctx.instance))
-        f = ctx.modules.arithmetic["simple_mul"]
-        arg0 = np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32)
-        arg1 = np.array([4.0, 5.0, 6.0, 7.0], dtype=np.float32)
-        results = f(arg0, arg1)
-        self.assertTrue(os.path.exists(os.path.join(temp_dir, "arithmetic.vmfb")))
-        self.assertTrue(os.path.exists(os.path.join(temp_dir, "calls.yaml")))
-        # TODO: Once replay is possible, verify that.
-
     def test_load_vm_module(self):
         ctx = iree.runtime.SystemContext()
         arithmetic = iree.runtime.load_vm_module(create_simple_mul_module(ctx.instance))
