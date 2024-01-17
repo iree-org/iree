@@ -1176,7 +1176,23 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-// TODO: Replace string concatenation with Twine concatenation
+/// TODO:
+///   - replace string concatenation with Twines
+///   - be more thoughtful of the location to use
+///   - move things to conversion patterns if possible
+///   - create helper functions in emitc_builders.escape_hatch
+///     - function declaration
+///     - global
+///     - structured preprocessor directive
+///     - struct definition
+///     - remove all uses of `attachAttribute`
+///       - emitc.static
+///       - vm.calling_convention
+///       - vm.emit_at_end
+///       - vm.export_name
+///       - vm.module.constructor
+///       - vm.num_types
+///       - vm.verbatim.emit_at_start
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
