@@ -76,22 +76,25 @@ class Linux_CUDA_Benchmarks(object):
     ) -> List[iree_definitions.E2EModelRunConfig]:
         """Generates IREE compile and run configs."""
         # The CUDA tag is required to put them into the CUDA benchmark preset.
-        run_configs = self._generate_configs(
-            model_groups.CUDA_MODELS,
-            self.SM_80_COMPILE_CONFIG,
-            execution_config=module_execution_configs.CUDA_CONFIG,
-            presets=[benchmark_presets.CUDA],
-        )
-        ubench_run_configs = self._generate_configs(
-            model_groups.MICRO_MATMUL,
-            self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
-            execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-            presets=[benchmark_presets.CUDA],
-        )
-        ubench_splitk_run_configs = self._generate_configs(
-            model_groups.MICRO_MATMUL_SPLITK,
-            self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
-            execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
-            presets=[benchmark_presets.CUDA],
-        )
-        return run_configs + ubench_run_configs + ubench_splitk_run_configs
+        # TODO(#16124): They are disabled because we can not finish them in
+        # even in hours.
+        # run_configs = self._generate_configs(
+        #     model_groups.CUDA_MODELS,
+        #     self.SM_80_COMPILE_CONFIG,
+        #     execution_config=module_execution_configs.CUDA_CONFIG,
+        #     presets=[benchmark_presets.CUDA],
+        # )
+        # ubench_run_configs = self._generate_configs(
+        #     model_groups.MICRO_MATMUL,
+        #     self.SM_80_UBENCH_MATMUL_COMPILE_CONFIG,
+        #     execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
+        #     presets=[benchmark_presets.CUDA],
+        # )
+        # ubench_splitk_run_configs = self._generate_configs(
+        #     model_groups.MICRO_MATMUL_SPLITK,
+        #     self.SM_80_UBENCH_MATMUL_SPLITK_COMPILE_CONFIG,
+        #     execution_config=module_execution_configs.CUDA_BATCH_SIZE_100_CONFIG,
+        #     presets=[benchmark_presets.CUDA],
+        # )
+        # return run_configs + ubench_run_configs + ubench_splitk_run_configs
+        return []
