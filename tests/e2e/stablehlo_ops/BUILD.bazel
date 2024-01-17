@@ -528,6 +528,7 @@ CUDA_SRCS = enforce_glob(
         "broadcast.mlir",
         "broadcast_add.mlir",
         "broadcast_in_dim.mlir",
+        "cholesky.mlir",
         "clamp.mlir",
         "compare.mlir",
         "complex.mlir",
