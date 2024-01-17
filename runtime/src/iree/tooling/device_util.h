@@ -22,9 +22,9 @@ iree_hal_driver_registry_t* iree_hal_available_driver_registry(void);
 // flags and tools should encourage that.
 iree_string_view_t iree_hal_default_device_uri(void);
 
-// TODO(#5724): remove this and replace with an iree_hal_device_set_t.
-void iree_hal_get_devices_flag_list(iree_host_size_t* out_count,
-                                    const iree_string_view_t** out_list);
+// Returns a reference to the storage of the --device= flag.
+// Changes to flags invalidate the storage.
+iree_string_view_list_t iree_hal_device_flag_list(void);
 
 // Creates a single device from the --device= flag.
 // Uses the |default_device| if no flags were specified.
@@ -33,6 +33,13 @@ iree_status_t iree_hal_create_device_from_flags(
     iree_hal_driver_registry_t* driver_registry,
     iree_string_view_t default_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device);
+
+// Creates one or more devices from the repeatable --device= flag.
+// Uses the |default_device| if no flags were specified.
+iree_status_t iree_hal_create_devices_from_flags(
+    iree_hal_driver_registry_t* driver_registry,
+    iree_string_view_t default_device, iree_allocator_t host_allocator,
+    iree_hal_device_list_t** out_device_list);
 
 // Configures the |device| channel provider based on the current environment.
 // Today this simply checks to see if the process is running under MPI and

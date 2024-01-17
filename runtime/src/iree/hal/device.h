@@ -480,6 +480,36 @@ IREE_API_EXPORT iree_status_t
 iree_hal_device_profiling_end(iree_hal_device_t* device);
 
 //===----------------------------------------------------------------------===//
+// iree_hal_device_list_t
+//===----------------------------------------------------------------------===//
+
+// A fixed-size list of retained devices.
+typedef struct iree_hal_device_list_t {
+  iree_allocator_t host_allocator;
+  iree_host_size_t capacity;
+  iree_host_size_t count;
+  iree_hal_device_t* devices[];
+} iree_hal_device_list_t;
+
+// Allocates an empty device list with the given capacity.
+IREE_API_EXPORT iree_status_t iree_hal_device_list_allocate(
+    iree_host_size_t capacity, iree_allocator_t host_allocator,
+    iree_hal_device_list_t** out_list);
+
+// Frees a device |list|.
+IREE_API_EXPORT void iree_hal_device_list_free(iree_hal_device_list_t* list);
+
+// Pushes a |device| onto the |list| and retains it.
+IREE_API_EXPORT iree_status_t iree_hal_device_list_push_back(
+    iree_hal_device_list_t* list, iree_hal_device_t* device);
+
+// Returns the device at index |i| in the |list| or NULL if out of range.
+// Callers must retain the device if it's possible for the returned pointer to
+// live beyond the list.
+IREE_API_EXPORT iree_hal_device_t* iree_hal_device_list_at(
+    const iree_hal_device_list_t* list, iree_host_size_t i);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_device_t implementation details
 //===----------------------------------------------------------------------===//
 
