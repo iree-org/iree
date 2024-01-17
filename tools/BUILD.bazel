@@ -205,7 +205,7 @@ iree_runtime_cc_binary(
 
 iree_runtime_cc_binary(
     name = "iree-e2e-matmul-test",
-    srcs = ["iree-e2e-matmul-test.c"],
+    srcs = ["iree-e2e-matmul-test.cc"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal",
@@ -214,12 +214,11 @@ iree_runtime_cc_binary(
         "//runtime/src/iree/base/internal:path",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/tooling:context_util",
         "//runtime/src/iree/tooling:device_util",
-        "//runtime/src/iree/tooling:trace_replay",
         "//runtime/src/iree/tooling:vm_util",
-        "//runtime/src/iree/tooling:yaml_util",
         "//runtime/src/iree/vm",
-        "@com_github_yaml_libyaml//:yaml",
+        "//runtime/src/iree/vm:cc",
     ],
 )
 

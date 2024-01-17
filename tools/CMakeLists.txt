@@ -230,7 +230,7 @@ iree_cc_binary(
   NAME
     iree-e2e-matmul-test
   SRCS
-    "iree-e2e-matmul-test.c"
+    "iree-e2e-matmul-test.cc"
   DEPS
     iree::base
     iree::base::internal::cpu
@@ -238,12 +238,11 @@ iree_cc_binary(
     iree::base::internal::path
     iree::hal
     iree::modules::hal
+    iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::trace_replay
     iree::tooling::vm_util
-    iree::tooling::yaml_util
     iree::vm
-    yaml
+    iree::vm::cc
 )
 
 if(IREE_BUILD_COMPILER)
