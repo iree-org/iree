@@ -1121,7 +1121,7 @@ static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
 
   // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
   // number of elements, and then it does a single step butterfly warp reduce.
-  // Hence it expects workgroupSize to be warpSize/subgroupSize, and
+  // Hence it expects workgroupSize to be warpSize(subgroupSize), and
   // reductionTileSize to be size of the reduction dim.
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();

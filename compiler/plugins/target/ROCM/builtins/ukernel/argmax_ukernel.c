@@ -16,9 +16,9 @@ int32_t __ockl_wfred_min_i32(int32_t);
 
 /*
 Constraint/Tiling note:
-For simplicity, we distribute all parallel dim across different wg, and only use
-single subgroup/warp per workgroup. This constraint is also set during tiling
-phase in KernelConfig.
+For simplicity, we distribute all parallel dim across different workgroup, and
+only use single subgroup/warp per workgroup. This constraint is also set during
+tiling phase in KernelConfig.
 */
 
 extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
@@ -34,7 +34,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
 
   // NOTE: On F32 kernels with clang, reductionSize/blockDim.x has numerical
   // inaccuracy.
-  uint numBatches = reductionSize / warpSize + 1;
+  uint numBatches = (reductionSize + warpSize - 1) / warpSize;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
     float newIn =
@@ -54,15 +54,17 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I32(float *inputBuffer,
   }
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
-  // if there are, find smallest index (argmax semantics).
-  if (__popcll(laneHasMaxValmask) > 1) {
-    int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
-    laneResult = __ockl_wfred_min_i32(indexVal);
-    if (laneID == 0)
+  // if there is only one max value holder, write and exit.
+  if (__popcll(laneHasMaxValmask) == 1) {
+    if (wgMax == laneMax)
       outputBuffer[output_offset] = laneResult;
     return;
   }
-  if (wgMax == laneMax)
+  // if there are multiple max value holder, find smallest index (argmax
+  // semantics).
+  int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
+  laneResult = __ockl_wfred_min_i32(indexVal);
+  if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
 }
 
@@ -79,7 +81,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
 
   // NOTE: On F32 kernels with clang, reductionSize/blockDim.x has numerical
   // inaccuracy.
-  uint numBatches = reductionSize / warpSize + 1;
+  uint numBatches = (reductionSize + warpSize - 1) / warpSize;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
     float newIn =
@@ -99,15 +101,17 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   }
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
-  // if there are, find smallest index (argmax semantics).
-  if (__popcll(laneHasMaxValmask) > 1) {
-    int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
-    laneResult = __ockl_wfred_min_i64(indexVal);
-    if (laneID == 0)
+  // if there is only one max value holder, write and exit.
+  if (__popcll(laneHasMaxValmask) == 1) {
+    if (wgMax == laneMax)
       outputBuffer[output_offset] = laneResult;
     return;
   }
-  if (wgMax == laneMax)
+  // if there are multiple max value holder, find smallest index (argmax
+  // semantics).
+  int32_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+  laneResult = __ockl_wfred_min_i64(indexVal);
+  if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
 }
 
@@ -123,7 +127,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
                                          : inputBuffer[input_offset + laneID];
   int32_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize + 1;
+  uint numBatches = (reductionSize + warpSize - 1) / warpSize;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
     half newIn =
@@ -138,15 +142,17 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I32(half *inputBuffer,
   half wgMax = __ockl_wfred_max_f16(laneMax);
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
-  // if there are, find smallest index (argmax semantics).
-  if (__popcll(laneHasMaxValmask) > 1) {
-    int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
-    laneResult = __ockl_wfred_min_i32(indexVal);
-    if (laneID == 0)
+  // if there is only one max value holder, write and exit.
+  if (__popcll(laneHasMaxValmask) == 1) {
+    if (wgMax == laneMax)
       outputBuffer[output_offset] = laneResult;
     return;
   }
-  if (wgMax == laneMax)
+  // if there are multiple max value holder, find smallest index (argmax
+  // semantics).
+  int32_t indexVal = wgMax == laneMax ? laneResult : __INT32_MAX__;
+  laneResult = __ockl_wfred_min_i32(indexVal);
+  if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
 }
 
@@ -162,7 +168,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
                                          : inputBuffer[input_offset + laneID];
   int64_t laneResult = laneID;
 
-  uint numBatches = reductionSize / warpSize + 1;
+  uint numBatches = (reductionSize + warpSize - 1) / warpSize;
   for (int i = 1; i < numBatches; ++i) {
     uint idx = warpSize * i + laneID;
     half newIn =
@@ -177,14 +183,16 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   half wgMax = __ockl_wfred_max_f16(laneMax);
   // Check if there are multiple max value holders.
   uint64_t laneHasMaxValmask = __ballot(wgMax == laneMax);
-  // if there are, find smallest index (argmax semantics).
-  if (__popcll(laneHasMaxValmask) > 1) {
-    int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
-    laneResult = __ockl_wfred_min_i64(indexVal);
-    if (laneID == 0)
+  // if there is only one max value holder, write and exit.
+  if (__popcll(laneHasMaxValmask) == 1) {
+    if (wgMax == laneMax)
       outputBuffer[output_offset] = laneResult;
     return;
   }
-  if (wgMax == laneMax)
+  // if there are multiple max value holder, find smallest index (argmax
+  // semantics).
+  int32_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+  laneResult = __ockl_wfred_min_i64(indexVal);
+  if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
 }
