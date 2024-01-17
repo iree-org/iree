@@ -543,6 +543,7 @@ CUDA_SRCS = enforce_glob(
         "finite.mlir",
         "floor.mlir",
         "gather.mlir",
+        "householder.mlir",
         "iota.mlir",
         "log.mlir",
         "log_plus_one.mlir",
