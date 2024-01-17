@@ -51,7 +51,6 @@ void iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
       acc[i] = vdupq_n_f32(0);
     }
   }
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     float16x8_t rhs = vld1q_f16(rhs_ptr);
     rhs_ptr += 8;

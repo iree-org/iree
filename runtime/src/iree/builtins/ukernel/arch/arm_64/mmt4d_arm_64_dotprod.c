@@ -25,7 +25,6 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod(
       acc[i] = vdupq_n_s32(0);
     }
   }
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     int8x16_t rhs[2];
     for (int i = 0; i < 2; ++i) {
