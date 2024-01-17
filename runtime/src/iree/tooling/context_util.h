@@ -51,9 +51,12 @@ iree_vm_module_t* iree_tooling_module_list_back(
 //
 // |default_device_uri| can be specified to provide a default if a device flag
 // is not provided by the user.
-// |out_device| will contain the created device if using the full HAL.
+// |out_device| will contain the first created device if using the full HAL.
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
+//
+// If multiple devices are created the one returned (and it's corresponding
+// allocator) are considered the 'lead' device for bookkeeping purposes.
 iree_status_t iree_tooling_resolve_modules(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,
@@ -86,9 +89,12 @@ iree_status_t iree_tooling_create_instance(iree_allocator_t host_allocator,
 //
 // |default_device_uri| can be specified to provide a default if a device flag
 // is not provided by the user.
-// |out_device| will contain the created device if using the full HAL.
+// |out_device| will contain the first created device if using the full HAL.
 // |out_device_allocator| can be used to allocate buffers for use with the
 // context and is available in all execution models.
+//
+// If multiple devices are created the one returned (and it's corresponding
+// allocator) are considered the 'lead' device for bookkeeping purposes.
 iree_status_t iree_tooling_create_context_from_flags(
     iree_vm_instance_t* instance, iree_host_size_t user_module_count,
     iree_vm_module_t** user_modules, iree_string_view_t default_device_uri,

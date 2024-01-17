@@ -1173,12 +1173,8 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   // Query device overrides, if any. When omitted the devices from the trace
   // file will be used.
-  // TODO(#5724): remove this and instead provide a device set on initialize.
-  iree_host_size_t device_uri_count = 0;
-  const iree_string_view_t* device_uris = NULL;
-  iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
-  iree_trace_replay_set_hal_devices_override(&replay, device_uri_count,
-                                             device_uris);
+  iree_trace_replay_set_hal_devices_override(&replay,
+                                             iree_hal_device_flag_list());
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
