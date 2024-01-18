@@ -552,9 +552,6 @@ public:
 
 struct ConvertConv2DToImg2ColPass
     : ConvertConv2DToImg2ColBase<ConvertConv2DToImg2ColPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());

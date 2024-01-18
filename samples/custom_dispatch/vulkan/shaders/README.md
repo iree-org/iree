@@ -145,3 +145,20 @@ for instructions for CMake setup and building from source.
         --input=8xf32=4 \
         /tmp/example.vmfb
     ```
+
+## Udon Kernel Instructions
+
+(Pronounced U-DO-U, the second `u` is upside-down). This is a flow for authoring
+custom dispatches externally alongside match and replace logic that can be fed
+directly into a pre-built `iree-compile`.
+
+In addition to the above steps, when compiling the module, pass in both the
+target module and the transform library implementing the matcher + kernel.  
+
+    ```
+    iree-compile \
+        --iree-hal-executable-object-search-path=../iree-build/ \
+        samples/custom_dispatch/vulkan/shaders/example_udon.mlir \
+        --iree-preprocessing-transform-library=samples/custom_dispatch/vulkan/shaders/udon_spec.mlir \
+        -o=/tmp/example.vmfb
+    ```

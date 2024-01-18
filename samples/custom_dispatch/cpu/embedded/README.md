@@ -148,3 +148,30 @@ for instructions for CMake setup and building from source.
         --input=8xf32=4 \
         --module=/tmp/example.vmfb
     ```
+
+## Udon Kernel Instructions
+
+(Pronounced U-DO-U, the second `u` is upside-down) Follow the first two steps
+above to build the samples, and then compile with one additional flag to
+include the path to the kernel matcher and replacer.
+
+    ```
+    iree-compile \
+        --iree-hal-executable-object-search-path=../iree-build/ \
+        --iree-preprocessing-transform-spec-filename=samples/custom_dispatch/cpu/embedded/udon_spec.mlir \
+        samples/custom_dispatch/cpu/embedded/example_udon.mlir \
+        -o=/tmp/example.vmfb
+    ```
+
+And then run the example the same way.
+
+    ```
+    iree-run-module \
+        --device=local-sync \
+        --function=mixed_invocation \
+        --input=5xf32=7 \
+        --input=5xf32=4 \
+        --input=10xf32=-4 \
+        --input=10xf32=3 \
+        --module=/tmp/example.vmfb
+    ```

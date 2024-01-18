@@ -30,6 +30,9 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
+#define GEN_PASS_DECL
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: keep
+
 void registerCommonPreprocessingPasses();
 
 } // namespace mlir::iree_compiler::Preprocessing

@@ -1,0 +1,67 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "PreprocessingExtensionsOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "PreprocessingExtensionsOpGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "PreprocessingExtensionsOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "PreprocessingExtensionsOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "PreprocessingExtensionsOps.td",
+    deps = [":td_files"],
+)
+
+iree_compiler_cc_library(
+    name = "PreprocessingExtensions",
+    srcs = [
+        "PreprocessingExtensions.cpp",
+        "PreprocessingExtensionsOps.cpp.inc",
+    ],
+    hdrs = [
+        "PreprocessingExtensions.h",
+        "PreprocessingExtensionsOps.h.inc",
+    ],
+    deps = [
+        ":PreprocessingExtensionsOpGen",
+        "//compiler/src/iree/compiler/Utils",
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)

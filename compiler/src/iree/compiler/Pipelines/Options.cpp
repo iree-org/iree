@@ -213,6 +213,12 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Textual description of the pass pipeline to run before "
                      "running normal IREE compilation pipelines"),
       llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-preprocessing-transform-spec-filename",
+      preprocessingTransformSpecFilename,
+      llvm::cl::desc(
+          "File name of a transform dialect spec to use for preprocessing"),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
