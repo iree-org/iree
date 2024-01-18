@@ -49,6 +49,12 @@ typedef struct iree_hal_cuda2_queue_action_t {
   // Retained to make sure it outlives the current action.
   iree_hal_cuda2_pending_queue_actions_t* owning_actions;
 
+  // The callback to run after completing this action and before freeing
+  // all resources.
+  iree_hal_cuda2_pending_action_cleanup_callback_t cleanup_callback;
+  // User data to pass into the callback.
+  void* callback_user_data;
+
   iree_hal_cuda2_queue_action_kind_t kind;
   union {
     struct {
@@ -403,6 +409,8 @@ static void iree_hal_cuda2_free_semaphore_list(
 iree_status_t iree_hal_cuda2_pending_queue_actions_enqueue_execution(
     iree_hal_device_t* device, CUstream dispatch_stream,
     CUstream callback_stream, iree_hal_cuda2_pending_queue_actions_t* actions,
+    iree_hal_cuda2_pending_action_cleanup_callback_t cleanup_callback,
+    void* callback_user_data,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
@@ -417,6 +425,8 @@ iree_status_t iree_hal_cuda2_pending_queue_actions_enqueue_execution(
                                 (void**)&action));
 
   action->kind = IREE_HAL_CUDA2_QUEUE_ACTION_TYPE_EXECUTION;
+  action->cleanup_callback = cleanup_callback;
+  action->callback_user_data = callback_user_data;
   action->device = device;
   action->dispatch_cu_stream = dispatch_stream;
   action->callback_cu_stream = callback_stream;
@@ -603,6 +613,8 @@ static void iree_hal_cuda2_pending_queue_actions_cleanup_execution(
   iree_hal_cuda2_pending_queue_actions_t* actions = action->owning_actions;
   iree_allocator_t host_allocator = actions->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  action->cleanup_callback(action->callback_user_data);
 
   iree_hal_resource_set_free(action->resource_set);
   iree_hal_cuda2_free_semaphore_list(host_allocator,
