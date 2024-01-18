@@ -13,8 +13,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 #include "iree/compiler/Codegen/Common/FoldTensorExtractOp.cpp.inc"
@@ -66,5 +65,4 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass() {
   return std::make_unique<FoldTensorExtractOpPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

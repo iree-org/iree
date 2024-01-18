@@ -20,8 +20,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // NOTE: HALDispatchABI and the associated conversion patterns should live under
 // iree/compiler/Dialect/HAL/Target/LLVMCPU/ instead of here as they have
@@ -201,13 +200,13 @@ public:
   static SmallVector<Type, 5>
   getInputTypes(MLIRContext *context, const LLVMTypeConverter *typeConverter);
 
-  // Builds a DISubprogram for a function in |moduleOp| named |funcName|.
+  // Builds a DISubprogram for |llvmFuncOp| function in |moduleOp|.
   // This is required in order to get any debug information (including line
   // tables) from MLIR into LLVM IR. It does not need to match the exact
   // definition but the closer we can make it to the real thing the more useful
   // downstream tools will be.
   static LLVM::DISubprogramAttr
-  buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
+  buildScopeAttr(mlir::ModuleOp moduleOp, LLVM::LLVMFuncOp llvmFuncOp,
                  const LLVMTypeConverter *typeConverter);
 
   explicit HALDispatchABI(LLVMTypeConverter *typeConverter)
@@ -419,7 +418,6 @@ private:
   static llvm::sys::Mutex sMutex;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_DISPATCHABI_H_

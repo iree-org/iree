@@ -10,8 +10,9 @@
 #include <unordered_set>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Device.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/Musl.h"
@@ -32,10 +33,12 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmSME/IR/ArmSME.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Target/LLVMIR/Dialect/ArmSME/ArmSMEToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -65,10 +68,7 @@ static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
 // not provided.
 constexpr unsigned defaultNativeVectorWidth = 16;
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
@@ -160,6 +160,7 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
+    mlir::registerArmSMEDialectTranslation(registry);
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
@@ -167,7 +168,8 @@ public:
                     mlir::transform::TransformDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
-                    arm_neon::ArmNeonDialect>();
+                    arm_neon::ArmNeonDialect,
+                    arm_sme::ArmSMEDialect>();
     // clang-format on
   }
 
@@ -207,7 +209,9 @@ public:
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                     OpPassManager &passManager) override {
-    buildLLVMCPUCodegenPassPipeline(passManager);
+    auto target = variantOp.getTarget();
+    bool enableAArch64SME = isAArch64(target) && hasSMEFeature(target);
+    buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {
@@ -480,132 +484,27 @@ public:
     }
 
     if (clLinkCPUUKernelBitcode) {
-      // Tracks ukernel functions, in order to set their linkage to internal
-      // after ukernel bitcode modules are linked but before runLLVMIRPasses, so
-      // that unused ukernel code paths get DCE'd. Notes:
-      // 1. We can't rely on fixupVisibility to do this, because fixupVisibility
-      //    is called after runLLVMIRPasses, which is what performs DCE. The
-      //    reason why fixupVisibility can't be moved before runLLVMIRPasses is
-      //    that causes all math functions to be DCE'd, as references to them
-      //    get introduced only later down. The basic difference here between
-      //    ukernel functions and math functions is that any references to
-      //    ukernel functions already exist at this point.
-      // 2. We can't just set internal linkage right away upon loading ukernel
-      //    bitcode modules, because some ukernel symbols have to override weak
-      //    symbols, and that's disabled when linkage is set to internal.
-      std::unordered_set<std::string> ukernelFunctions;
-
       // Link in ukernel bitcode.
       if (hasUkernel(variantOp.getTarget())) {
-        auto setAlwaysInline = [&](llvm::Module &module) {
-          for (auto &func : module.getFunctionList()) {
-            func.addFnAttr(llvm::Attribute::AlwaysInline);
-          }
-        };
-        auto addUkernelFunctions = [&](const llvm::Module &module) {
-          for (auto &func : module.getFunctionList()) {
-            if (func.isDeclaration()) {
-              continue;
-            }
-            ukernelFunctions.insert(func.getName().str());
-          }
-        };
-
-        llvm::Expected<std::unique_ptr<llvm::Module>> archBitcode =
-            loadUKernelArchBitcode(targetMachine.get(), context);
-        if (!archBitcode) {
+        llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
+            loadUKernelBitcode(targetMachine.get(), context);
+        if (!bitcode) {
           return mlir::emitError(variantOp.getLoc())
-                 << "failed to load architecture-specific ukernel bitcode: "
-                 << llvm::toString(archBitcode.takeError());
+                 << "failed to load ukernel bitcode: "
+                 << llvm::toString(bitcode.takeError());
         }
 
-        llvm::Expected<std::unique_ptr<llvm::Module>> archEntryPointsBitcode =
-            loadUKernelArchEntryPointsBitcode(targetMachine.get(), context);
-        if (!archEntryPointsBitcode) {
-          return mlir::emitError(variantOp.getLoc())
-                 << "failed to load architecture-specific ukernel entry points "
-                    "bitcode: "
-                 << llvm::toString(archEntryPointsBitcode.takeError());
-        }
-
-        // archBitcode and archEntryPointsBitcode are optional, may be null if
-        // there is none for the target architecture. However, they should
-        // simultaneously be null or non-null.
-        if ((archBitcode.get() == nullptr) !=
-            (archEntryPointsBitcode.get() == nullptr)) {
-          return mlir::emitError(variantOp.getLoc())
-                 << "there should be architecture-specific ukernel bit code "
-                    "if, "
-                    "and only if there is architecture-specific ukernels entry "
-                    "points bitcode.";
-        }
-
-        if (archBitcode.get()) {
-          addUkernelFunctions(*archBitcode.get());
-          addUkernelFunctions(*archEntryPointsBitcode.get());
-
-          // archEntryPointsBitcode contains overrides for weak symbols that
-          // will come in the baseBitcode below. So we link it before
-          // baseBitcode, with OverrideFromSrc.
-          StringRef archEntryPointsBitcodeName =
-              archEntryPointsBitcode.get()->getName();
-          if (failed(linkBitcodeModule(
-                  variantOp.getLoc(), moduleLinker, 0, *targetMachine,
-                  archEntryPointsBitcodeName, std::move(archEntryPointsBitcode),
-                  setAlwaysInline))) {
-            return mlir::emitError(variantOp.getLoc())
-                   << "failed linking in architecture-specific ukernel entry "
-                      "points bitcode "
-                      "for target triple '"
-                   << targetTriple.str() << "'";
-          }
-
-          // archEntryPointsBitcode references symbols defined in archBitcode,
-          // so we link that now. We can apply LinkOnlyNeeded, since the only
-          // purpose of archBitcode is to satisfy references made in
-          // archEntryPointsBitcode.
-          StringRef archBitcodeName = archBitcode.get()->getName();
+        if (bitcode.get()) {
+          StringRef bitcodeName = bitcode.get()->getName();
           if (failed(linkBitcodeModule(variantOp.getLoc(), moduleLinker,
                                        llvm::Linker::LinkOnlyNeeded,
-                                       *targetMachine, archBitcodeName,
-                                       std::move(archBitcode), {}))) {
+                                       *targetMachine, bitcodeName,
+                                       std::move(bitcode), {}))) {
             return mlir::emitError(variantOp.getLoc())
                    << "failed linking in architecture-specific ukernel bitcode "
                       "for target triple '"
                    << targetTriple.str() << "'";
           }
-        }
-
-        // The baseBitcode module contains weak symbols for fallbacks,
-        // potentially overridden by symbols defined in archEntryPointsBitcode
-        // above. So this must be linked after archEntryPointsBitcode. The
-        // baseBitcode module contains the actual ukernel entry points as seen
-        // from the MLIR module, and its purpose is to satisfy these references,
-        // so we can apply LinkOnlyNeeded here.
-        llvm::Expected<std::unique_ptr<llvm::Module>> baseBitcode =
-            loadUKernelBaseBitcode(targetMachine.get(), context);
-        if (baseBitcode) {
-          addUkernelFunctions(*baseBitcode.get());
-        }
-        // Sequence that access before we std::move(baseBitcode)!
-        StringRef baseBitcodeName =
-            baseBitcode ? baseBitcode.get()->getName() : "";
-        if (failed(linkBitcodeModule(
-                variantOp.getLoc(), moduleLinker, llvm::Linker::LinkOnlyNeeded,
-                *targetMachine, baseBitcodeName, std::move(baseBitcode),
-                setAlwaysInline))) {
-          return mlir::emitError(variantOp.getLoc())
-                 << "failed linking in base ukernel bitcode";
-        }
-      }
-
-      // Set internal linkage on all ukernel functions. No new references to
-      // ukernels will be created past this point, so any unreferenced ukernel
-      // symbol is safe to DCE, which will happen below in runLLVMIRPasses, so
-      // we need to set internal linkage before that.
-      for (auto &func : llvmModule->getFunctionList()) {
-        if (ukernelFunctions.count(func.getName().str())) {
-          func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
         }
       }
     }
@@ -1066,7 +965,4 @@ void registerLLVMCPUTargetBackends(
   static TargetBackendRegistration registration("llvm-cpu", backendFactory);
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

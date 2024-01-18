@@ -64,20 +64,6 @@ std::optional<int64_t> PerDimLayoutAttr::getShape(const LayoutDimension &dim) {
 
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
-SmallVector<int64_t>
-LayoutAttr::getSIMTVectorShape(ArrayRef<LayoutDimension> dims) {
-  SmallVector<int64_t> simtVectorShape;
-  for (LayoutDimension dim : dims) {
-    ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-    for (PerDimLayoutAttr layout : layouts) {
-      if (!layout.contains(dim))
-        continue;
-      simtVectorShape.push_back(layout.getShape(dim).value());
-    }
-  }
-  return simtVectorShape;
-}
-
 bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
   for (auto perDimLayout : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = perDimLayout.value().getShapes();
@@ -121,4 +107,19 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
     newLayouts.push_back(layouts[index]);
   }
   return LayoutAttr::get(getContext(), newLayouts);
+}
+
+SmallVector<int64_t> LayoutAttr::getDistributedShape(VectorType) const {
+  LayoutDimension labels[] = {LayoutDimension::BATCHX, LayoutDimension::BATCHY,
+                              LayoutDimension::VECTORX};
+  SmallVector<int64_t> simtVectorShape;
+  for (LayoutDimension dim : labels) {
+    ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
+    for (PerDimLayoutAttr layout : layouts) {
+      if (!layout.contains(dim))
+        continue;
+      simtVectorShape.push_back(layout.getShape(dim).value());
+    }
+  }
+  return simtVectorShape;
 }

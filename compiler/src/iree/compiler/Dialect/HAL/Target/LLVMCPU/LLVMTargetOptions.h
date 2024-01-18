@@ -15,10 +15,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/Location.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Defines kinds of Sanitizer
 // The order in enum class should be same as one in flat buffer schema
@@ -38,7 +35,7 @@ struct LLVMTarget {
   static constexpr bool DEFAULT_LINK_STATIC = false;
   static constexpr bool DEFAULT_LOOP_INTERLEAVING = false;
   static constexpr bool DEFAULT_LOOP_VECTORIZATION = false;
-  static constexpr bool DEFAULT_LOOP_UNROLLING = true;
+  static constexpr bool DEFAULT_LOOP_UNROLLING = false;
   static constexpr bool DEFAULT_SLP_VECTORIZATION = false;
   static constexpr llvm::FloatABI::ABIType DEFAULT_FLOAT_ABI =
       llvm::FloatABI::ABIType::Hard;
@@ -148,9 +145,6 @@ private:
   void initializeTargetInvariantFlags();
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LLVMTARGETOPTIONS_H_

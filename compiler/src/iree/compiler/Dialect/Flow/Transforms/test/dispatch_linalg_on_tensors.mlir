@@ -790,7 +790,7 @@ func.func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tens
 
 // -----
 
-func.func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
+func.func @dynamic_dot() -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -801,10 +801,7 @@ func.func @dynamic_dot() -> !hal.buffer_view attributes {iree.abi.stub} {
   %4 = tensor.empty(%2, %3) : tensor<?x?xf32>
   %5 = linalg.fill ins(%cst : f32) outs(%4 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %6 = linalg.matmul ins(%0, %1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %7 = tensor.dim %6, %c0 : tensor<?x?xf32>
-  %8 = tensor.dim %6, %c1 : tensor<?x?xf32>
-  %9 = hal.tensor.export %6 : tensor<?x?xf32>{%7, %8} -> !hal.buffer_view
-  return %9 : !hal.buffer_view
+  return %6 : tensor<?x?xf32>
 }
 // CHECK-LABEL: func.func @dynamic_dot()
 //   CHECK-NOT:    linalg.fill
@@ -1021,13 +1018,10 @@ func.func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG2]], %[[C0]]
+//       CHECK:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[ARG2]] : tensor<?xi32>{%[[D0]]} -> tensor<1x?xi32>{%[[D0]]}
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG3]], %[[C0]]
 //   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG3]], %[[C1]]
-//       CHECK:   flow.dispatch.workgroups[%[[D0]], %[[D1]], %[[D2]]]
-//  CHECK-SAME:       tensor<?xi32>{%[[D0]]}
-//  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}
-//  CHECK-NEXT:     !flow.dispatch.tensor<readonly:tensor<?xi32>>
-//  CHECK-SAME:     !flow.dispatch.tensor<readwrite:tensor<?x?xi32>>
+//       CHECK:   flow.tensor.update %[[RESHAPE]], %[[ARG3]]{{.*}} : tensor<1x?xi32>{%[[D0]]} -> %[[ARG3]] as tensor<?x?xi32>{%[[D1]], %[[D2]]}
 
 // -----
 

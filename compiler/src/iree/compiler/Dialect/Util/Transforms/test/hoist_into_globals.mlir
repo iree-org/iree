@@ -143,6 +143,31 @@ module @hoist_tree_const_expr {
 }
 
 // -----
+// Tests a const-expr with disabled-hoist consumers due to ineligible.
+// CHECK-LABEL: @hoist_const_expr_with_ineligible_consumer
+module @hoist_const_expr_with_ineligible_consumer {
+  // CHECK: util.global private @[[HOISTED_0:.*]] : i32
+  // CHECK: func.func @main
+  func.func @main() -> i32 {
+    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
+    // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_0]])
+    // CHECK: return %[[RESULT]]
+    %0 = arith.constant 0 : i32
+    %1 = arith.constant 1 : i32
+    %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
+    %3 = "iree_unregistered.var_expr"(%2) : (i32) -> i32
+    return %3 : i32
+  }
+  // CHECK: util.initializer attributes {iree.compiler.consteval} {
+  // CHECK:   %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
+  // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
+  // CHECK:   util.global.store %[[CE0]], @[[HOISTED_0]] : i32
+  // CHECK:   util.initializer.return
+  // CHECK: }
+}
+
+// -----
 // Ensures that non-leaf const-exprs (i.e. think broadcasts and other ops
 // that should be considered const-expr but that you never want to hoist as
 // a leaf) are hoisted internal to a const-expr but are left as-is at the leaf.

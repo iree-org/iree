@@ -10,8 +10,8 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-namespace mlir {
-namespace iree_compiler {
+
+namespace mlir::iree_compiler {
 
 static constexpr int32_t kNumGPUDims = 3;
 static constexpr int32_t kWarpSize = 32;
@@ -110,7 +110,16 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
 /// using shared memory when CodeGen towards the GPU.
 bool sharedMemTransposeFilter(AffineMap indexMap);
 
-} // namespace iree_compiler
-} // namespace mlir
+//===----------------------------------------------------------------------===//
+// GPU UKernel Utils
+//===----------------------------------------------------------------------===//
+
+/// Checks if target Chip(StringRef) has UKernel support.
+bool hasUkernelSupportedRocmArch(StringRef targetChip);
+
+/// Checks if targetAttr's GPU target has UKernel support.
+bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_

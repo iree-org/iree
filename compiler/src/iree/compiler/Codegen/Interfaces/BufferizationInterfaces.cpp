@@ -42,8 +42,7 @@ using mlir::bufferization::OneShotBufferizationOptions;
 using mlir::bufferization::replaceOpWithBufferizedValues;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Utility functions.
@@ -57,7 +56,7 @@ static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
   SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
   strides.back() = 1;
   for (int i = strides.size() - 1; i > 0; --i) {
-    if (shape[i] == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(shape[i])) {
       break;
     }
     strides[i - 1] = strides[i] * shape[i];
@@ -654,5 +653,4 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

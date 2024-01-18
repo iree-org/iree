@@ -15,14 +15,14 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 static constexpr unsigned kNumMaxParallelDims = 3;
 
@@ -72,6 +72,9 @@ const char *getIreeArchNameForTargetTriple(llvm::Triple triple);
 
 /// Methods to get target information.
 bool isVMVXBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Methods to get target information.
+bool isROCMBackend(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 // Returns true if the ukernel with given `ukernelName` is enabled.
 // If `ukernelName` is empty (the default), returns true if any ukernel
@@ -176,6 +179,13 @@ isTiledAndDistributedLoop(scf::ForOp forOp);
 SmallVector<LoopTilingAndDistributionInfo>
 getTiledAndDistributedLoopInfo(func::FuncOp funcOp);
 
+/// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
+/// provided the corresponding tile size will be multiplied by a vector.vscale
+/// op.
+void setSCFTileSizes(scf::SCFTilingOptions &options, TilingInterface op,
+                     ArrayRef<int64_t> tileSizes,
+                     ArrayRef<bool> tileScalableFlags);
+
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
 
@@ -197,6 +207,9 @@ OpFoldResult convertByteOffsetToElementOffset(RewriterBase &rewriter,
                                               OpFoldResult byteOffset,
                                               Type elementType);
 
+/// Check if a linalg.generic is representing an argmax operation.
+LogicalResult isArgmaxOp(linalg::GenericOp genericOp);
+
 /// Replace the uses of memref value `origValue` with the given
 /// `replacementValue`. Some uses of the memref value might require changes to
 /// the operation itself. Create new operations which can carry the change, and
@@ -212,7 +225,6 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

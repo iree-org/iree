@@ -23,8 +23,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -46,6 +45,10 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     assert(!newModuleOp.getBodyRegion().empty());
     if (auto version = srcOp->getAttrOfType<IntegerAttr>("vm.version")) {
       newModuleOp.setVersionAttr(version);
+    }
+    if (auto reflectionAttr =
+            srcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+      newModuleOp->setAttr("iree.reflection", reflectionAttr);
     }
     Block *firstCreatedBlock = &newModuleOp.getBodyRegion().front();
     rewriter.inlineRegionBefore(srcOp.getBodyRegion(), firstCreatedBlock);
@@ -1259,5 +1262,4 @@ void populateStandardToVMPatterns(MLIRContext *context,
                                                                 context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

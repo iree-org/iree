@@ -35,6 +35,7 @@ hal.executable @_attention_dispatch_0 {
 // CHECK-DAG:  #[[MAP4:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
 // CHECK-DAG:  #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG:  #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// CHECK-DAG:  #[[MAP7:.+]] = affine_map<(d0, d1) -> (d1, d0)>
 // CHECK:      func.func @_attention_dispatch_0() {
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<32x64xf32>
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<-1.000000e+30> : vector<32xf32>
@@ -143,13 +144,12 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:          %[[D31:.+]] = vector.broadcast %[[D22]] : vector<32xf32> to vector<64x32xf32>
 // CHECK:          %[[D33:.+]] = vector.transpose %[[D31]], [1, 0] : vector<64x32xf32> to vector<32x64xf32>
 // CHECK:          %[[D34:.+]] = arith.mulf %[[D33]], %[[ARG3]] : vector<32x64xf32>
-// CHECK:          %[[D35:.+]] = vector.transfer_read %[[ALLOC_11]][%[[C0]], %[[C0]]], %[[CST_4]] {in_bounds = [true,
-// CHECK-SAME:       true]} : memref<128x64xf16, #[[GPU]].address_space<workgroup>>, vector<128x64xf16>
 // CHECK:          %[[D36:.+]] = arith.extf %[[D29]] : vector<32x128xf16> to vector<32x128xf32>
-// CHECK:          %[[D37:.+]] = arith.extf %[[D35]] : vector<128x64xf16> to vector<128x64xf32>
-// CHECK:          %[[D38:.+]] = vector.transpose %[[D37]], [1, 0] : vector<128x64xf32> to vector<64x128xf32>
+// CHECK:          %[[D35:.+]] = vector.transfer_read %[[ALLOC_11]][%[[C0]], %[[C0]]], %[[CST_4]]
+// CHECK-SAME:       {in_bounds = [true, true], permutation_map = #[[MAP7]]} : memref<128x64xf16, #[[GPU]].address_space<workgroup>>, vector<64x128xf16>
+// CHECK:          %[[D37:.+]] = arith.extf %[[D35]] : vector<64x128xf16> to vector<64x128xf32>
 // CHECK:          %[[D39:.+]] = vector.contract {indexing_maps = [#[[MAP4]], #[[MAP5]], #[[MAP6]]], iterator_types =
-// CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D36]], %[[D38]], %[[D34]] :
+// CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D36]], %[[D37]], %[[D34]] :
 // CHECK-SAME:       vector<32x128xf32>, vector<64x128xf32> into vector<32x64xf32>
 // CHECK:          gpu.barrier
 // CHECK:          scf.yield %[[D16]], %[[D24]], %[[D39]] : vector<32xf32>, vector<32xf32>, vector<32x64xf32>

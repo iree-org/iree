@@ -23,13 +23,13 @@ class ModuleOp;
 class OpPassManager;
 } // namespace mlir
 
-namespace mlir::iree_compiler {
-
-namespace IREE::HAL {
 // Forward declared only from Dialect/HAL/Target/TargetRegistry.h so as to avoid
 // bringing full dependencies into the plugin API.
+namespace mlir::iree_compiler::IREE::HAL {
 class TargetBackendList;
-} // namespace IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL
+
+namespace mlir::iree_compiler {
 
 class AbstractPluginSession;
 class PluginRegistrar;

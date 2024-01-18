@@ -21,7 +21,7 @@ MINILM_L12_H384_UNCASED_INT32_SEQLEN128 = common_definitions.Model(
     tags=["int32", "seqlen128"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://huggingface.co/microsoft/MiniLM-L12-H384-uncased/commit/44acabbec0ef496f6dbc93adadea57f376b7c0ec
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734j.mlirbc",
     entry_function="predict",
     input_types=["1x128xi32", "1x128xi32", "1x128xi32"],
 )
@@ -32,7 +32,7 @@ BERT_FOR_MASKED_LM_FP32_SEQLEN512 = common_definitions.Model(
     tags=["fp32", "seqlen512", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://huggingface.co/transformers/v3.0.2/model_doc/bert.html#tfbertformaskedlm
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertForMaskedLMTF_2023-05-07.timestamp_1683504734.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertForMaskedLMTF_2023-05-07.timestamp_1683504734j.mlirbc",
     entry_function="forward",
     input_types=["1x512xi32", "1x512xi32"],
 )
@@ -43,7 +43,7 @@ EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
     tags=["fp32", "cnn", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_2023-05-07.timestamp_1683504734.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_2023-05-07.timestamp_1683504734j.mlirbc",
     entry_function="forward",
     input_types=["1x384x384x3xf32"],
 )
@@ -56,7 +56,7 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Derived from https://github.com/mlcommons/inference/tree/master/language/bert
     # Instructions on how to regenerate the model: https://gist.github.com/mariecwhite/e61ccebd979d98d097946ac7725bcc29
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertLargeTF_2023-05-07.timestamp_1683504734.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertLargeTF_2023-05-07.timestamp_1683504734j.mlirbc",
     entry_function="serving_default",
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"],
 )
@@ -81,7 +81,7 @@ GPT2_117M_1x1_FP32_TF = common_definitions.Model(
     input_types=["1x1xi32", "12x2x1x12x4x64xf32"],
 )
 
-TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975"
+TF_MODELS_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/tensorflow/tf_models_2.15.0.dev20230817_1692333975j"
 
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")

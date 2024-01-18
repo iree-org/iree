@@ -37,24 +37,6 @@ def OpGroupExperimentalOps : OpDocGroup {
 
 let opDocGroup = OpGroupExperimentalOps in {
 
-def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let results = (outs
-    HAL_Device:$result
-  );
-
-  let assemblyFormat = "attr-dict `:` type($result)";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins),
-    [{
-      $_state.addTypes({DeviceType::get($_builder.getContext())});
-    }]>,
-  ];
-}
-
 def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -438,10 +420,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
+      return IREE::Util::findDynamicDimsInList(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+      return IREE::Util::findDynamicDimsInList(idx, getResults(), getResultDims());
     }
 
     IREE::HAL::ExecutableObjectsAttr getObjectsAttr() {
@@ -1577,7 +1559,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
 }
 
 def HAL_DeviceQueryOp :
-    HAL_PureOp<"device.query", [HAL_DeviceQuery]> {
+    HAL_PureOp<"device.query", []> {
   let summary = [{returns a runtime configuration parameter from the device}];
   let description = [{
     Queries a device configuration parameter with the given key.
@@ -1587,11 +1569,7 @@ def HAL_DeviceQueryOp :
 
     This is roughly equivalent to the `sysconf` linux syscall
     (https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
-    set of keys available and their interpretation is target-dependent. If there
-    is a HAL match attribute (`#hal.device.match.*`) or op
-    (`hal.device.match.*`) prefer to use that in order to get compile-time
-    propagation when the target is specified and elide the runtime query and
-    get compile-time verification when a runtime query is required.
+    set of keys available and their interpretation is target-dependent.
 
     Users of the op must check the `ok` result before using the value as what
     set of keys is available may change over time. If in doubt: don't use this.
@@ -1864,6 +1842,57 @@ def HAL_DeviceQueueFlushOp : HAL_Op<"device.queue.flush"> {
 } // OpGroupDeviceOps
 
 //===----------------------------------------------------------------------===//
+// !hal.device management
+//===----------------------------------------------------------------------===//
+
+def OpGroupDeviceManagementOps : OpDocGroup {
+  let summary = "Device management ops";
+  let description = "Device availability and selection support.";
+}
+
+let opDocGroup = OpGroupDeviceManagementOps in {
+
+def HAL_DevicesCountOp : HAL_PureOp<"devices.count", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the number of available devices}];
+  let description = [{
+    Returns the total number of available devices registered at runtime.
+  }];
+
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    attr-dict `:` type($result)
+  }];
+}
+
+def HAL_DevicesGetOp : HAL_PureOp<"devices.get", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{returns the device with the given index}];
+  let description = [{
+    Returns the device with the given index in the [0, hal.devices.count) range.
+    Devices may be lazily initialized upon first use.
+  }];
+
+  let arguments = (ins
+    Index:$index
+  );
+  let results = (outs
+    HAL_Device:$result
+  );
+
+  let assemblyFormat = [{
+    $index attr-dict `:` type($result)
+  }];
+}
+
+}  // OpGroupDeviceManagementOps
+
+//===----------------------------------------------------------------------===//
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
@@ -2132,6 +2161,11 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     // Returns a map of constant key attributes to ordinals across all constant
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
+
+    // Creates the new `hal.executable.condition` op in this variant op and sets
+    // the insertion point of the provided builder to the beginning of the new
+    // region.
+    Value createConditionOp(OpBuilder &builder);
 
     // Returns an i1 indicating whether this variant should be selected.
     Value buildCondition(Value device, OpBuilder &builder);

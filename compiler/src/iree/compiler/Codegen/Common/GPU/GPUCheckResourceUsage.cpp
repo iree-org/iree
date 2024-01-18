@@ -12,8 +12,7 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 class GPUCheckResourceUsagePass final
@@ -59,7 +58,7 @@ shapedTypeStaticSize(memref::AllocOp allocOp, ShapedType shapedType,
              "getIndexBitwidth should have been set earlier");
       allocSize *= getIndexBitwidth(func);
     } else
-      allocSize *= shapedType.getElementType().getIntOrFloatBitWidth();
+      allocSize *= IREE::Util::getTypeBitWidth(shapedType.getElementType());
   }
   return allocSize;
 }
@@ -126,5 +125,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
                                                      getIndexBitwidth);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

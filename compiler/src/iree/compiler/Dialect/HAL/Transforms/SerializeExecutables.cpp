@@ -11,6 +11,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Utils/TracingUtils.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/FileSystem.h"
 #include "mlir/IR/Attributes.h"
@@ -19,41 +21,27 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
-class SerializeTargetExecutablesPass
-    : public PassWrapper<SerializeTargetExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableOp>> {
-public:
-  SerializeTargetExecutablesPass()
-      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
-  SerializeTargetExecutablesPass(const SerializeTargetExecutablesPass &pass)
-      : targetRegistry(pass.targetRegistry) {}
-  SerializeTargetExecutablesPass(const TargetBackendRegistry &targetRegistry,
-                                 StringRef target, int debugLevel,
-                                 std::string dumpIntermediatesPath,
-                                 std::string dumpBinariesPath)
-      : targetRegistry(targetRegistry) {
-    this->target = target.str();
-    this->debugLevel = debugLevel;
-    this->dumpIntermediatesPath = dumpIntermediatesPath;
-    this->dumpBinariesPath = dumpBinariesPath;
-  }
+#define GEN_PASS_DEF_SERIALIZEEXECUTABLESPASS
+#define GEN_PASS_DEF_SERIALIZETARGETEXECUTABLESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
 
-  StringRef getArgument() const override {
-    return "iree-hal-serialize-target-executables";
-  }
+namespace {
 
-  StringRef getDescription() const override {
-    return "Serializes hal.executable.variant ops to hal.executable.binary ops";
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-serialize-target-executables
+//===----------------------------------------------------------------------===//
+
+struct SerializeTargetExecutablesPass
+    : public IREE::HAL::impl::SerializeTargetExecutablesPassBase<
+          SerializeTargetExecutablesPass> {
+  using IREE::HAL::impl::SerializeTargetExecutablesPassBase<
+      SerializeTargetExecutablesPass>::SerializeTargetExecutablesPassBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::HAL::HALDialect>();
-    auto targetBackend = targetRegistry.getTargetBackend(target);
+    auto targetBackend = targetRegistry->getTargetBackend(target);
     if (targetBackend) {
       targetBackend->getDependentDialects(registry);
     }
@@ -63,7 +51,7 @@ public:
     auto executableOp = getOperation();
     auto moduleOp = executableOp->getParentOfType<mlir::ModuleOp>();
 
-    auto targetBackend = targetRegistry.getTargetBackend(target);
+    auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
       executableOp.emitError()
           << "unregistered target backend '" << target << "'";
@@ -105,99 +93,35 @@ public:
       variantOp.erase();
     }
   }
-
-private:
-  Option<std::string> target{
-      *this, "target",
-      llvm::cl::desc(
-          "Target backend name whose executables will be serialized by "
-          "this pass.")};
-
-  Option<int> debugLevel{*this, "debug-level",
-                         llvm::cl::desc("Debug level for serialization (0-3)"),
-                         llvm::cl::init(2)};
-  Option<std::string> dumpIntermediatesPath{
-      *this, "dump-intermediates-path",
-      llvm::cl::desc("Path to write translated executable intermediates (.bc, "
-                     ".o, etc) into for debugging.")};
-  Option<std::string> dumpBinariesPath{
-      *this, "dump-binaries-path",
-      llvm::cl::desc("Path to write translated and serialized executable "
-                     "binaries into for debugging.")};
-
-  const TargetBackendRegistry &targetRegistry;
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeTargetExecutablesPass(
-    const TargetBackendRegistry &targetRegistry, StringRef target,
-    int debugLevel, std::string dumpIntermediatesPath,
-    std::string dumpBinariesPath) {
-  return std::make_unique<SerializeTargetExecutablesPass>(
-      targetRegistry, target, debugLevel, dumpIntermediatesPath,
-      dumpBinariesPath);
-}
+//===----------------------------------------------------------------------===//
+// --iree-hal-serialize-executables
+//===----------------------------------------------------------------------===//
 
-static PassRegistration<SerializeTargetExecutablesPass> linkTargetPass([] {
-  return std::make_unique<SerializeTargetExecutablesPass>();
-});
-
-class SerializeExecutablesPass
-    : public PassWrapper<SerializeExecutablesPass,
-                         OperationPass<IREE::HAL::ExecutableOp>> {
-public:
-  SerializeExecutablesPass()
-      : targetRegistry(TargetBackendRegistry::getGlobal()) {}
-  SerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
-                           int debugLevel, std::string dumpIntermediatesPath,
-                           std::string dumpBinariesPath)
-      : targetRegistry(targetRegistry), debugLevel(debugLevel),
-        dumpIntermediatesPath(dumpIntermediatesPath),
-        dumpBinariesPath(dumpBinariesPath) {}
-
-  StringRef getArgument() const override {
-    return "iree-hal-serialize-executables";
-  }
-
-  StringRef getDescription() const override {
-    return "Serializes hal.executable.variant ops to hal.executable.binary ops";
-  }
-
+struct SerializeExecutablesPass
+    : public IREE::HAL::impl::SerializeExecutablesPassBase<
+          SerializeExecutablesPass> {
+  using IREE::HAL::impl::SerializeExecutablesPassBase<
+      SerializeExecutablesPass>::SerializeExecutablesPassBase;
   void runOnOperation() override {
     auto executableOp = getOperation();
     OpPassManager passManager(executableOp.getOperationName());
     for (const auto &targetName : gatherExecutableTargetNames(executableOp)) {
-      passManager.addPass(createSerializeTargetExecutablesPass(
-          targetRegistry, targetName, debugLevel, dumpIntermediatesPath,
-          dumpBinariesPath));
+      passManager.addPass(IREE::HAL::createSerializeTargetExecutablesPass(
+          {targetRegistry, targetName, debugLevel, dumpIntermediatesPath,
+           dumpBinariesPath}));
     }
+
+    IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());
+
     if (failed(runPipeline(passManager, executableOp))) {
       executableOp.emitError() << "failed to serialize executables";
       return signalPassFailure();
     }
   }
-
-private:
-  const TargetBackendRegistry &targetRegistry;
-  int debugLevel;
-  std::string dumpIntermediatesPath;
-  std::string dumpBinariesPath;
 };
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createSerializeExecutablesPass(const TargetBackendRegistry &targetRegistry,
-                               int debugLevel,
-                               std::string dumpIntermediatesPath,
-                               std::string dumpBinariesPath) {
-  return std::make_unique<SerializeExecutablesPass>(
-      targetRegistry, debugLevel, dumpIntermediatesPath, dumpBinariesPath);
-}
+} // namespace
 
-static PassRegistration<SerializeExecutablesPass> linkPass([] {
-  return std::make_unique<SerializeExecutablesPass>();
-});
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

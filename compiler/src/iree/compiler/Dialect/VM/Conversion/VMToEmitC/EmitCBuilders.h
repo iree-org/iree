@@ -17,9 +17,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace emitc_builders {
+namespace mlir::iree_compiler::emitc_builders {
 
 struct StructField {
   std::string type;
@@ -125,8 +123,6 @@ Value ireeVmInstanceLookupType(OpBuilder builder, Location location,
 
 void ireeVmRefRelease(OpBuilder builder, Location location, Value operand);
 
-} // namespace emitc_builders
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::emitc_builders
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_

@@ -16,8 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //------------------------------------------------------------------------------
 // VMVX passes
@@ -66,7 +65,6 @@ void buildVMVXLinkingPassPipeline(OpPassManager &passManager);
 
 void registerCodegenVMVXPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_VMVX_PASSES_H_

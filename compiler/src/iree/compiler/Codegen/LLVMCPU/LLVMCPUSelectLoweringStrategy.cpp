@@ -6,8 +6,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -27,8 +27,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Selects the lowering strategy for a hal.executable.variant operation.
@@ -101,7 +100,6 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   LogicalResult verificationStatus = success();
   switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert:
     verificationStatus =
         verifyLoweringConfiguration(moduleOp, translationInfo.value(),
                                     verifyDoubleTilingExpertPassPipelineConfig);
@@ -125,5 +123,4 @@ createLLVMCPUSelectLoweringStrategyPass() {
   return std::make_unique<LLVMCPUSelectLoweringStrategyPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

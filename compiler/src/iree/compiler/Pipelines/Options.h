@@ -9,8 +9,7 @@
 
 #include "iree/compiler/Utils/OptionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 struct BindingOptions {
   // Whether to include runtime support functions for the IREE native ABI.
@@ -68,6 +67,13 @@ struct GlobalOptimizationOptions {
   bool promoteBF16ToF32 = false;
   bool demoteI64ToI32 = false;
 
+  // Enables aggressive propagation of transposes to the inputs of named ops,
+  // rewriting named ops as fused generics.
+  bool aggressiveTransposePropagation = false;
+
+  // Enables transposing all concatenations to the outer most dimension.
+  bool outerDimConcat = false;
+
   // Enables data tiling.
   bool dataTiling = true;
 
@@ -117,7 +123,7 @@ struct SchedulingOptions {
   ExecutionModel executionModel = ExecutionModel::AsyncInternal;
 
   // TODO(benvanik): find a way to share this with
-  // Stream/Transforms/PassDetail.h w/o circular deps.
+  // Stream/Transforms/Passes.h w/o circular deps.
   // Defines the output format of a dump pass.
   enum class DumpOutputFormat {
     // Dumping disabled.
@@ -153,7 +159,6 @@ struct PreprocessingOptions {
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_PIPELINES_OPTIONS_H_

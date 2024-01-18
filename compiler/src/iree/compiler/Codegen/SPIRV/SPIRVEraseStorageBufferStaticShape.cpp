@@ -20,8 +20,7 @@
 
 #define DEBUG_TYPE "iree-spirv-erase-storage-buffer-static-shape"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -134,5 +133,4 @@ createSPIRVEraseStorageBufferStaticShapePass() {
   return std::make_unique<EraseStorageBufferStaticShapePass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

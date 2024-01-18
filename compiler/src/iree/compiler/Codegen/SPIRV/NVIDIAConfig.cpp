@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -28,9 +29,7 @@ constexpr unsigned NVIDIANumSubgroupsPerWorkgroup = 4;
 // The number of tiles along M and N dimensions per workgroup.
 constexpr unsigned NVIDIANumMNTilesPerSubgroup = 4;
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
                                            const spirv::TargetEnv &targetEnv) {
@@ -46,7 +45,7 @@ static LogicalResult setNVIDIAMatmulConfig(linalg::LinalgOp op,
   std::array<int64_t, 3> threadMNK;
   auto inputType =
       llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
-  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+  if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {8, 8, 32};
   } else {
     threadMNK = {4, 4, 32};
@@ -95,6 +94,4 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

@@ -178,8 +178,7 @@ struct FftOpConversion final : OpConversionPattern<mlir::stablehlo::FftOp> {
 
     int64_t rank = inputType.getRank();
     int64_t n = inputType.getDimSize(rank - 1);
-    int64_t fftLength =
-        op.getFftLength().getSplatValue<IntegerAttr>().getInt() / 2 + 1;
+    int64_t fftLength = op.getFftLength().front() / 2 + 1;
 
     Location loc = op.getLoc();
     auto matrixType =

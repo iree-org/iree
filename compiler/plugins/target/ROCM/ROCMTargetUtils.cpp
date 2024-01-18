@@ -6,6 +6,8 @@
 
 #include "./ROCMTargetUtils.h"
 
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -20,10 +22,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===========Link LLVM Module to ROCDL Start===================/
 // Inspiration of code from this section comes from XLA Kernel Gen Project
@@ -34,8 +33,8 @@ bool couldNeedDeviceBitcode(const llvm::Module &module) {
     // The list of prefixes should be in sync with library functions used in
     // target_util.cc.
     if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().startswith("__ocml_") ||
-         function.getName().startswith("__ockl_"))) {
+        (function.getName().starts_with("__ocml_") ||
+         function.getName().starts_with("__ockl_"))) {
       return true;
     }
   }
@@ -95,6 +94,48 @@ linkWithBitcodeVector(llvm::Module *module,
   return success();
 }
 
+LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
+                                   unsigned linkerFlags, StringRef path,
+                                   llvm::TargetMachine &targetMachine,
+                                   llvm::LLVMContext &context) {
+  auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(path);
+  if (auto ec = bitcodeBufferRef.getError()) {
+    return mlir::emitError(loc) << "failed reading user bitcode file `" << path
+                                << "`: " << ec.message();
+  }
+  auto setAlwaysInline = [&](llvm::Module &module) {
+    if (targetMachine.getTargetCPU().contains("gfx10") ||
+        targetMachine.getTargetCPU().contains("gfx11")) {
+      // some ROCM/HIP functions for gfx10 or gfx11 has accuracy issue if
+      // inlined.
+      return;
+    }
+    for (auto &func : module.getFunctionList()) {
+      // Some ROCM/HIP builtin functions have Optnone and NoInline for default.
+      if (targetMachine.getTargetTriple().isAMDGCN()) {
+        if (func.hasFnAttribute(llvm::Attribute::OptimizeNone)) {
+          func.removeFnAttr(llvm::Attribute::OptimizeNone);
+        }
+        if (targetMachine.getTargetTriple().isAMDGCN() &&
+            func.hasFnAttribute(llvm::Attribute::NoInline)) {
+          func.removeFnAttr(llvm::Attribute::NoInline);
+        }
+      }
+      func.addFnAttr(llvm::Attribute::AlwaysInline);
+    }
+  };
+  if (failed(linkBitcodeModule(
+          loc, linker, linkerFlags, targetMachine, path,
+          llvm::parseBitcodeFile(*bitcodeBufferRef->get(), context),
+          setAlwaysInline))) {
+    return mlir::emitError(loc) << "failed linking in user bitcode file `"
+                                << path << "` for target triple '"
+                                << targetMachine.getTargetTriple().str() << "'";
+  }
+
+  return success();
+}
+
 static std::vector<std::string> getROCDLPaths(std::string targetChip,
                                               std::string bitCodeDir) {
   // AMDGPU bitcodes.
@@ -106,6 +147,36 @@ static std::vector<std::string> getROCDLPaths(std::string targetChip,
   std::string app = "/";
   for (auto &filename : rocdlFilenames) {
     result.push_back(bitCodeDir + app + filename);
+  }
+  return result;
+}
+
+static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
+                                                StringRef targetChip,
+                                                StringRef bitCodeDir) {
+  // AMD bitcodes.
+  std::vector<std::string> selectedUkernelNames;
+  if (enabledUkernelsStr == "all") {
+    const char *allUkernelNames[] = {"argmax"};
+    size_t numUkernels = sizeof(allUkernelNames) / sizeof(allUkernelNames[0]);
+    for (int i = 0; i < numUkernels; i++) {
+      selectedUkernelNames.push_back(allUkernelNames[i]);
+    }
+  } else {
+    while (!enabledUkernelsStr.empty()) {
+      auto split = enabledUkernelsStr.split(',');
+      selectedUkernelNames.push_back(split.first.str());
+      enabledUkernelsStr = split.second;
+    }
+  }
+
+  // Construct full path to ROCDL bitcode libraries.
+  std::vector<std::string> result;
+  std::string app = "/";
+  for (auto &kernelName : selectedUkernelNames) {
+    std::string filename =
+        "rocm_" + kernelName + "_ukernel_" + targetChip.str();
+    result.push_back(bitCodeDir.str() + app + filename + ".bc");
   }
   return result;
 }
@@ -183,6 +254,26 @@ void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
   };
 }
 
+// Links optimized Ukernel bitcodes into the given module if the module needs
+// it.
+void linkUkernelBCFiles(llvm::Module *module, Location loc,
+                        StringRef enabledUkernelsStr, StringRef targetChip,
+                        StringRef bitCodeDir, unsigned linkerFlags,
+                        llvm::TargetMachine &targetMachine) {
+  // Early exit if Ukernel not supported on target chip.
+  if (!iree_compiler::hasUkernelSupportedRocmArch(targetChip))
+    return;
+  std::vector<std::string> ukernelPaths =
+      getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
+  llvm::Linker linker(*module);
+  for (auto &path : ukernelPaths) {
+    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, StringRef(path),
+                                    targetMachine, module->getContext()))) {
+      llvm::WithColor::error(llvm::errs()) << "Fail to Link Ukernel.\n";
+    }
+  }
+}
+
 //===========Link LLVM Module to ROCDL End===================/
 
 //=====================Create HSACO Begin=============//
@@ -258,7 +349,4 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
 }
 //==============Create HSACO End=============//
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

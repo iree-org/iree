@@ -20,8 +20,7 @@
 #include "iree/compiler/Preprocessing/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void buildIREEPrecompileTransformPassPipeline(
     const IREE::HAL::TargetBackendRegistry &targetRegistry,
@@ -38,7 +37,7 @@ void buildIREEPrecompileTransformPassPipeline(
   // specifying targets.
   if (!executableOptions.targets.empty()) {
     passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        targetRegistry, executableOptions.targets));
+        {&targetRegistry, executableOptions.targets}));
   }
 
   // Input pipelines can result in changes to the exported functions and types
@@ -131,8 +130,8 @@ void buildIREEPrecompileTransformPassPipeline(
   default:
     if (compileFrom < IREEVMPipelinePhase::Preprocessing) { // late-entry.
       // Not a large enough phase for IREE_TRACE_ADD_[BEGIN,END]_FRAME_PASS.
-      IREE::buildPreprocessingPassPipeline(passManager, preprocessingOptions,
-                                           hooks.pipelineExtensions);
+      Preprocessing::buildPreprocessingPassPipeline(
+          passManager, preprocessingOptions, hooks.pipelineExtensions);
     }
     if (compileTo == IREEVMPipelinePhase::Preprocessing)
       return; // early-exit
@@ -321,5 +320,4 @@ void registerIREEVMTransformPassPipeline() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

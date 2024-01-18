@@ -13,13 +13,12 @@
 #include <array>
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
                                          spirv::ResourceLimitsAttr limits) {
@@ -28,7 +27,7 @@ static LogicalResult setMaliMatmulConfig(linalg::LinalgOp op,
   std::array<int64_t, 3> threadMNK;
   Type inputType = op.getDpsInputOperand(0)->get().getType();
   Type elementType = llvm::cast<ShapedType>(inputType).getElementType();
-  if (elementType.getIntOrFloatBitWidth() == 16) {
+  if (IREE::Util::getTypeBitWidth(elementType) == 16) {
     threadMNK = {2, 8, 8};
   } else if (elementType.isInteger(8)) {
     threadMNK = {4, 4, 16};
@@ -68,6 +67,4 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

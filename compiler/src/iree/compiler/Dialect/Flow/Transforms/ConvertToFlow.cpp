@@ -14,13 +14,12 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE;
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
+
 // Pass to test conversion to flow patterns.
-struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
+struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
                     linalg::LinalgDialect, scf::SCFDialect,
@@ -30,8 +29,8 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet convertToFlowPatterns(context);
-    Flow::populateTensorToFlowConversionPatterns(context,
-                                                 convertToFlowPatterns);
+    IREE::Flow::populateTensorToFlowConversionPatterns(context,
+                                                       convertToFlowPatterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -40,8 +39,11 @@ struct ConvertToFlowPass : public Flow::ConvertToFlowBase<ConvertToFlowPass> {
     }
   }
 };
+
 } // namespace
 
-std::unique_ptr<Pass> Flow::createConvertToFlowPass() {
+std::unique_ptr<Pass> createConvertToFlowPass() {
   return std::make_unique<ConvertToFlowPass>();
 }
+
+} // namespace mlir::iree_compiler::IREE::Flow

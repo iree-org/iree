@@ -21,6 +21,7 @@
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ArmNeon2dToIntr/ArmNeon2dToIntr.h"
+#include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/FuncToLLVM/ConvertFuncToLLVM.h"
@@ -58,8 +59,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -174,7 +174,7 @@ struct ConvertHALEntryPointFuncOp
     // order to get any debug information (including just line tables) from MLIR
     // into LLVM IR.
     auto scopeAttr = HALDispatchABI::buildScopeAttr(
-        llvmFuncOp->getParentOfType<mlir::ModuleOp>(), llvmFuncOp.getName(),
+        llvmFuncOp->getParentOfType<mlir::ModuleOp>(), llvmFuncOp,
         getTypeConverter());
     llvmFuncOp->setLoc(FusedLoc::get(llvmFuncOp.getContext(),
                                      {llvmFuncOp->getLoc()}, scopeAttr));
@@ -1033,6 +1033,14 @@ void ConvertToLLVMPass::runOnOperation() {
     patterns.add<ExpandMulSIExtended>(patterns.getContext(), /*benefit=*/1024);
   }
 
+  LLVMConversionTarget target(getContext());
+  bool hasAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
+  if (hasAArch64SME) {
+    // Enable ArmSME to LLVM lowerings.
+    configureArmSMEToLLVMConversionLegality(target);
+    populateArmSMEToLLVMConversionPatterns(typeConverter, patterns);
+  }
+
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
@@ -1044,7 +1052,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
-  arith::populateExpandBFloat16Patterns(patterns);
   populateVectorToSCFConversionPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
@@ -1068,7 +1075,6 @@ void ConvertToLLVMPass::runOnOperation() {
   >(abi, typeConverter);
   // clang-format on
 
-  LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp>();
   target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
@@ -1096,10 +1102,9 @@ void ConvertToLLVMPass::runOnOperation() {
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {
       populateUnfusedFMAOpsPassPatterns(&getContext(), postPatterns);
-      if (failed(
-              applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
-        return signalPassFailure();
-      }
+    }
+    if (failed(applyPatternsAndFoldGreedily(module, std::move(postPatterns)))) {
+      return signalPassFailure();
     }
   }
 }
@@ -1109,5 +1114,4 @@ createConvertToLLVMPass(bool reassociateFpReductions) {
   return std::make_unique<ConvertToLLVMPass>(reassociateFpReductions);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

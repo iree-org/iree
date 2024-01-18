@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
@@ -26,10 +27,12 @@
 
 #define DEBUG_TYPE "iree-dump-executable-benchmarks"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_DUMPEXECUTABLEBENCHMARKSPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
 
 // We could use the resource constraints in the module when we have them.
 static const int64_t kBufferAlignment = 256;
@@ -176,8 +179,8 @@ appendGlobalBuffer(Location loc, StringRef baseName,
   auto initBuilder = OpBuilder::atBlockBegin(initOp.addEntryBlock());
   IndexSet indexSet(loc, initBuilder);
 
-  // TODO(benvanik): real device lookup.
-  auto device = initBuilder.create<IREE::HAL::ExSharedDeviceOp>(loc);
+  // TODO(multi-device): support multiple devices in benchmark generation.
+  Value device = IREE::HAL::DeviceType::resolveAny(loc, initBuilder);
   auto allocator =
       initBuilder.create<IREE::HAL::DeviceAllocatorOp>(loc, device).getResult();
 
@@ -245,8 +248,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   auto batchSizeArg = funcBuilder.create<arith::IndexCastOp>(
       loc, funcBuilder.getIndexType(), entryBlock->getArgument(0));
 
-  // TODO(benvanik): real device lookup.
-  auto device = funcBuilder.create<IREE::HAL::ExSharedDeviceOp>(loc);
+  // TODO(multi-device): support multiple devices in benchmark generation.
+  Value device = IREE::HAL::DeviceType::resolveAny(loc, funcBuilder);
 
   // Create and begin command buffer.
   // TODO(benvanik): reuse the command buffer (initialize once and store).
@@ -449,28 +452,15 @@ static void dumpModuleToStream(mlir::ModuleOp moduleOp, StringRef fileName,
   os << "\n"; // newline at end of file
 }
 
-class DumpExecutableBenchmarksPass
-    : public PassWrapper<DumpExecutableBenchmarksPass,
-                         OperationPass<ModuleOp>> {
-public:
-  DumpExecutableBenchmarksPass() = default;
-  DumpExecutableBenchmarksPass(const DumpExecutableBenchmarksPass &pass) {}
-  DumpExecutableBenchmarksPass(StringRef path) { this->path = path.str(); }
+//===----------------------------------------------------------------------===//
+// --iree-hal-dump-executable-benchmarks
+//===----------------------------------------------------------------------===//
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-    registry.insert<arith::ArithDialect>();
-    registry.insert<scf::SCFDialect>();
-  }
-
-  StringRef getArgument() const override {
-    return "iree-hal-dump-executable-benchmarks";
-  }
-
-  StringRef getDescription() const override {
-    return "Dumps standalone hal.executable benchmarks to a path.";
-  }
-
+struct DumpExecutableBenchmarksPass
+    : public IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
+          DumpExecutableBenchmarksPass> {
+  using IREE::HAL::impl::DumpExecutableBenchmarksPassBase<
+      DumpExecutableBenchmarksPass>::DumpExecutableBenchmarksPassBase;
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
@@ -522,23 +512,8 @@ public:
       }
     }
   }
-
-private:
-  Option<std::string> path{
-      *this, "path",
-      llvm::cl::desc("Path to write hal.executable benchmarks into.")};
 };
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createDumpExecutableBenchmarksPass(StringRef path) {
-  return std::make_unique<DumpExecutableBenchmarksPass>(path);
-}
+} // namespace
 
-static PassRegistration<DumpExecutableBenchmarksPass> pass([] {
-  return std::make_unique<DumpExecutableBenchmarksPass>();
-});
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

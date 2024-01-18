@@ -1341,6 +1341,40 @@ def Util_BufferStoreOp : Util_Op<"buffer.store", [
   }];
 }
 
+def Util_BufferHashOp : Util_Op<"buffer.hash", [
+  MemoryEffects<[MemRead]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_SubrangeOperandOpInterface>,
+]> {
+  let summary = [{computes the hash of a byte range of a buffer}];
+  let description = [{
+    Computes the SipHash-2-4 of a value at a byte offset with the given length.
+    This always uses a seed of `0x0001020304...0e0f` and produces a single 64
+    bit value.
+  }];
+
+  let arguments = (ins
+    Util_BufferType:$source,
+    Util_Size:$source_size,
+    Util_Offset:$source_offset,
+    Util_Size:$length
+  );
+  let results = (outs
+    I64:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `for` $length `]`
+    `:` type($source) `` `{` $source_size `}` `->` type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return getSourceSize(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+}
+
 } // OpGroupBufferOps
 
 //===----------------------------------------------------------------------===//

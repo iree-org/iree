@@ -18,10 +18,11 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_ELIDEREDUNDANTCOMMANDSPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
 namespace {
 
 struct DescriptorState {
@@ -84,8 +85,6 @@ struct CommandBufferState {
 };
 
 using CommandBufferStateMap = DenseMap<Value, CommandBufferState>;
-
-} // namespace
 
 static void processOp(IREE::HAL::CommandBufferExecutionBarrierOp op,
                       CommandBufferState &state) {
@@ -204,21 +203,13 @@ static LogicalResult processOp(IREE::HAL::CommandBufferPushDescriptorSetOp op,
   return success();
 }
 
-class ElideRedundantCommandsPass
-    : public PassWrapper<ElideRedundantCommandsPass, OperationPass<void>> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-  }
+//===----------------------------------------------------------------------===//
+// --iree-hal-elide-redundant-commands
+//===----------------------------------------------------------------------===//
 
-  StringRef getArgument() const override {
-    return "iree-hal-elide-redundant-commands";
-  }
-
-  StringRef getDescription() const override {
-    return "Elides stateful command buffer ops that set redundant state.";
-  }
-
+struct ElideRedundantCommandsPass
+    : public IREE::HAL::impl::ElideRedundantCommandsPassBase<
+          ElideRedundantCommandsPass> {
   void runOnOperation() override {
     auto parentOp = getOperation();
 
@@ -290,13 +281,6 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass() {
-  return std::make_unique<ElideRedundantCommandsPass>();
-}
+} // namespace
 
-static PassRegistration<ElideRedundantCommandsPass> pass;
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

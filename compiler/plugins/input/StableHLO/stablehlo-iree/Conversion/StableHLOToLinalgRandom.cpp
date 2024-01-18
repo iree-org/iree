@@ -426,9 +426,9 @@ LogicalResult generateLinalgThreeFry32(OpBuilder &builder, Location loc,
   llvm::SmallVector<int64_t> offset(resultTy.getRank(), 0);
   llvm::SmallVector<int64_t> stride(resultTy.getRank(), 1);
   Value slice = builder.create<mlir::stablehlo::SliceOp>(
-      loc, resultTy, reshape, builder.getI64TensorAttr(offset),
-      builder.getI64TensorAttr(resultTy.getShape()),
-      builder.getI64TensorAttr(stride));
+      loc, resultTy, reshape, builder.getDenseI64ArrayAttr(offset),
+      builder.getDenseI64ArrayAttr(resultTy.getShape()),
+      builder.getDenseI64ArrayAttr(stride));
 
   // Set the new tensor values.
   store = setState64(builder, loc, store, newState);
@@ -636,12 +636,14 @@ LogicalResult generateLinalgPhilox32(OpBuilder &builder, Location loc,
   // Slice to only the required results.
   collapseShape[0] = resultTy.getNumElements();
 
-  llvm::SmallVector<int64_t> offset(resultTy.getRank(), 0);
-  llvm::SmallVector<int64_t> stride(resultTy.getRank(), 1);
+  auto sliceResultTy = intermediateType.clone(collapseShape);
+  llvm::SmallVector<int64_t> offset(sliceResultTy.getRank(), 0);
+  llvm::SmallVector<int64_t> stride(sliceResultTy.getRank(), 1);
   Value slice = builder.create<mlir::stablehlo::SliceOp>(
-      loc, intermediateType.clone(collapseShape), reshapeIntermediate,
-      builder.getI64TensorAttr(offset), builder.getI64TensorAttr(collapseShape),
-      builder.getI64TensorAttr(stride));
+      loc, sliceResultTy, reshapeIntermediate,
+      builder.getDenseI64ArrayAttr(offset),
+      builder.getDenseI64ArrayAttr(collapseShape),
+      builder.getDenseI64ArrayAttr(stride));
   Value reshapeResult =
       builder.create<mlir::stablehlo::ReshapeOp>(loc, resultTy, slice);
 
@@ -727,12 +729,14 @@ LogicalResult generateLinalgPhilox64(OpBuilder &builder, Location loc,
   // Slice to only the required results.
   collapseShape[0] = resultTy.getNumElements();
 
-  llvm::SmallVector<int64_t> offset(resultTy.getRank(), 0);
-  llvm::SmallVector<int64_t> stride(resultTy.getRank(), 1);
+  auto sliceResultTy = intermediateType.clone(collapseShape);
+  llvm::SmallVector<int64_t> offset(sliceResultTy.getRank(), 0);
+  llvm::SmallVector<int64_t> stride(sliceResultTy.getRank(), 1);
   Value slice = builder.create<mlir::stablehlo::SliceOp>(
-      loc, intermediateType.clone(collapseShape), reshapeIntermediate,
-      builder.getI64TensorAttr(offset), builder.getI64TensorAttr(collapseShape),
-      builder.getI64TensorAttr(stride));
+      loc, sliceResultTy, reshapeIntermediate,
+      builder.getDenseI64ArrayAttr(offset),
+      builder.getDenseI64ArrayAttr(collapseShape),
+      builder.getDenseI64ArrayAttr(stride));
   Value reshapeResult =
       builder.create<mlir::stablehlo::ReshapeOp>(loc, resultTy, slice);
 

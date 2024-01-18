@@ -62,7 +62,7 @@ set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature
 
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT ON)
-if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
   set(IREE_ENABLE_CPUINFO_DEFAULT OFF)
 endif()
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
@@ -239,8 +239,10 @@ option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL driv
 # not cross compiling. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+set(IREE_HAL_DRIVER_CUDA2_DEFAULT OFF)
 if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
+  set(IREE_HAL_DRIVER_CUDA2_DEFAULT OFF)
 endif()
 
 # Vulkan support is enabled by default if the platform might support Vulkan.
@@ -258,6 +260,7 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_CUDA2 "Enables the 'cuda2' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA2_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
@@ -312,6 +315,9 @@ endif()
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_CUDA2)
+  message(STATUS "  - cuda2")
 endif()
 if(IREE_HAL_DRIVER_LOCAL_SYNC)
   message(STATUS "  - local-sync")
@@ -433,6 +439,7 @@ option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
+option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
@@ -544,6 +551,7 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_import_binary)
+include(iree_install_support)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -575,22 +583,6 @@ set(IREE_PACKAGE_ROOT_PREFIX "iree")
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
-# Experimental next-generation CUDA HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=cuda2
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    cuda2
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/cuda2"
-  DRIVER_TARGET
-    iree::experimental::cuda2::registration
-  REGISTER_FN
-    iree_hal_cuda2_driver_module_register
-)
-
-#-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
 # Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
 #-------------------------------------------------------------------------------
@@ -614,7 +606,7 @@ iree_register_external_hal_driver(
 iree_register_external_hal_driver(
   NAME
     hip
-  SOURCE_DIR 
+  SOURCE_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
   DRIVER_TARGET
     iree::experimental::hip::registration
@@ -854,10 +846,16 @@ else()
   # Also add a library that can be depended on to get LLVM includes setup
   # properly. bazel_to_cmake targets this for some header only pseudo deps.
   add_library(IREELLVMIncludeSetup INTERFACE)
-  target_include_directories(IREELLVMIncludeSetup INTERFACE
-    ${LLVM_INCLUDE_DIRS}
-    ${MLIR_INCLUDE_DIRS}
-    ${LLD_INCLUDE_DIRS}
+  foreach(_d ${LLVM_INCLUDE_DIRS} ${MLIR_INCLUDE_DIRS} ${LLD_INCLUDE_DIRS})
+    # BUILD_INTERFACE only works one at a time.
+    target_include_directories(IREELLVMIncludeSetup INTERFACE
+      $<BUILD_INTERFACE:${_d}>
+    )
+  endforeach()
+  iree_install_targets(
+    TARGETS IREELLVMIncludeSetup
+    COMPONENT IREEPublicLibraries-Compiler
+    EXPORT_SET Compiler
   )
 
   # Splice the includes setup into base LLVM libraries so that using them
@@ -895,12 +893,25 @@ endif()
 
 #-------------------------------------------------------------------------------
 # Other dependencies
+# By default we bundle a number of dependencies needed to build the project.
+# When bundled like this, they are installed into the IREEBundledLibraries
+# component and exported to their subsystem which requires them (if a static
+# dep from the public API): "Runtime" or "Compiler".
+#
+# Some deps have a usable CMake build, and we add_subdirectory these, manually
+# using iree_install_targets to include them in our installation. Others require
+# custom CMake and these are in the build_tools/third_party directory.
+#
+# TODO: We should have a mode that purely uses find_package for OS friendly
+# packaging/externalizing deps.
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+# libyaml
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
+
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
 
@@ -908,11 +919,23 @@ iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
 if(IREE_ENABLE_THREADING)
+  # Benchmark.
   iree_set_benchmark_cmake_options()
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS benchmark
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
+
   if(IREE_ENABLE_CPUINFO)
     iree_set_cpuinfo_cmake_options()
     add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
+    iree_install_targets(
+      TARGETS cpuinfo
+      COMPONENT IREEBundledLibraries
+      EXPORT_SET Runtime
+    )
   endif()
 endif()
 
@@ -925,6 +948,11 @@ endif()
 
 if(IREE_HAL_DRIVER_VULKAN)
   add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+  iree_install_targets(
+    TARGETS Vulkan-Headers
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
@@ -1056,3 +1084,92 @@ endif()
 if(IREE_BUILD_TESTS)
   iree_create_ctest_customization()
 endif()
+
+#-------------------------------------------------------------------------------
+# Install/exports
+# Note that with no further options, install convenience targets install to
+# CMAKE_INSTALL_PREFIX. Per usual, this can be further prefixed with an
+# environment variable "DESTDIST" on a per invocation basis (i.e. to place under
+# a versioned path, etc).
+#
+# The `iree-install-dist` target includes everthing that is typically included in
+# a distribution tarball.
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/cmake ${IREE_BINARY_DIR}/lib/cmake/IREE)
+
+# Convenience installation targets.
+iree_add_install_target(NAME iree-install-dist)
+iree_add_install_target(
+  NAME iree-install-dev-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-runtime-libraries
+  ADD_TO iree-install-dist
+)
+iree_add_install_target(
+  NAME iree-install-tools
+  ADD_TO iree-install-dist
+)
+
+iree_add_install_target(
+  NAME iree-install-cmake-exports
+  COMPONENT IREECMakeExports
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-dev-libraries-runtime
+  COMPONENT IREEDevLibraries-Runtime
+  ADD_TO iree-install-dev-libraries
+)
+
+iree_add_install_target(
+  NAME iree-install-bundled-libraries
+  COMPONENT IREEBundledLibraries
+  ADD_TO iree-install-dev-libraries-runtime
+)
+
+if(IREE_BUILD_COMPILER)
+  iree_add_install_target(
+    NAME iree-install-dev-libraries-compiler
+    COMPONENT IREEDevLibraries-Compiler
+    ADD_TO iree-install-dev-libraries
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler
+    COMPONENT IREETools-Compiler
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler-dev
+    COMPONENT IREETools-CompilerDev
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-tools-compiler-extra
+    COMPONENT IREETools-CompilerExtra
+    # TODO: Remove the ADD_TO here and include the component in the iree-dist
+    # tarball build stage.
+    ADD_TO iree-install-tools
+  )
+
+  iree_add_install_target(
+    NAME iree-install-runtime-libraries-compiler
+    COMPONENT IREERuntimeLibraries-Compiler
+    ADD_TO
+      iree-install-runtime-libraries
+      iree-install-tools-compiler
+      iree-install-dev-libraries-compiler
+  )
+endif()
+
+iree_add_install_target(
+  NAME iree-install-tools-runtime
+  COMPONENT IREETools-Runtime
+  ADD_TO iree-install-tools
+)

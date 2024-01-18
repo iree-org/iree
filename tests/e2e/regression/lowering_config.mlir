@@ -1,12 +1,12 @@
 #compilation0 = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[32, 32], [8, 8, 0], [0, 0, 8], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingPadExpert>>
+    translation_info = <CPUDoubleTilingExpert>>
 #compilation1 = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [[64, 64], [4, 4, 0], [0, 0, 4], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingPadExpert>>
+    translation_info = <CPUDoubleTilingExpert>>
 #compilation2 = #iree_codegen.compilation_info<
     lowering_config = <tile_sizes = [{sizes=[32, 64], interchange=[1,0]}, [8, 32, 0], [0, 0, 8], [0, 0, 0]]>,
-    translation_info = <CPUDoubleTilingPadExpert>>
+    translation_info = <CPUDoubleTilingExpert>>
 
 func.func @lowering_config_test() {
   %a = util.unfoldable_constant dense<1.0> : tensor<128x256xf32>

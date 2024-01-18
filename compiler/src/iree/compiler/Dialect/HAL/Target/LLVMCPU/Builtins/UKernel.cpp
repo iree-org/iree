@@ -12,10 +12,7 @@
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Note: even if the llvm::Expected status is successful, the enclosed pointer
 // may still be null, indicating that the file was not found.
@@ -30,99 +27,38 @@ loadUKernelBitcodeFile(StringRef filename, llvm::LLVMContext &context) {
       return llvm::parseBitcodeFile(bitcodeBufferRef, context);
     }
   }
+
   // Some bitcode files are optional: we don't have arch-specific ukernel code
   // for all architectures. So it's normal to be returning nullptr here.
   return nullptr;
 }
 
-static void removeTargetAttributes(llvm::Module &module) {
-  // Copied from Device.cpp - TODO: move this to a shared utility.
-  // Clang adds its own per-function attributes that we need to strip so that
-  // our current executable variant target is used instead.
-  for (auto &func : module.functions()) {
-    func.removeFnAttr("target-cpu");
-    func.removeFnAttr("tune-cpu");
-    func.removeFnAttr("target-features");
-  }
-}
-
 llvm::Expected<std::unique_ptr<llvm::Module>>
-loadUKernelBaseBitcode(llvm::TargetMachine *targetMachine,
-                       llvm::LLVMContext &context) {
-  llvm::Triple triple = targetMachine->getTargetTriple();
-  StringRef filename;
-  if (triple.isArch64Bit()) {
-    filename = "ukernel_bitcode_64bit_base.bc";
-  } else if (triple.isArch32Bit()) {
-    filename = "ukernel_bitcode_32bit_base.bc";
-  } else {
-    return llvm::createStringError(
-        llvm::inconvertibleErrorCode(),
-        "Don't know what ukernel bitcode file to load.");
-  }
-  llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
-      loadUKernelBitcodeFile(filename, context);
-  if (!bitcode) {
-    // Propagate the error to the caller.
-    return bitcode;
-  }
-
-  if (!bitcode.get()) {
-    // File not found. For base bitcode, this shouldn't happen.
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "Base ukernel bitcode file not found: %s",
-                                   filename.str().c_str());
-  }
-
-  // Base bitcode is compiled for any reasonable architecture of the right
-  // bitness, as we don't care about anything else than bitness here.
-  removeTargetAttributes(*bitcode.get());
-  return bitcode;
-}
-
-llvm::Expected<std::unique_ptr<llvm::Module>>
-loadUKernelArchEntryPointsBitcode(llvm::TargetMachine *targetMachine,
-                                  llvm::LLVMContext &context) {
+loadUKernelBitcode(llvm::TargetMachine *targetMachine,
+                   llvm::LLVMContext &context) {
   const char *archName =
       getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
-  char filename[64];
-  snprintf(filename, sizeof filename, "ukernel_bitcode_%s_entry_points.bc",
-           archName);
-  llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
+  std::string filename = std::string("ukernel_bitcode_") + archName + ".bc";
+  llvm::Expected<std::unique_ptr<llvm::Module>> module =
       loadUKernelBitcodeFile(filename, context);
-  if (!bitcode) {
-    // Propagate the error to the caller.
-    return bitcode;
+  if (!module) {
+    // Error. Propagate to the caller.
+    return module;
   }
-
-  if (!bitcode.get()) {
-    // File not found. This is normal: arch-specific bitcode is optional.
-    return bitcode;
+  if (!module.get()) {
+    // File not found. Just means that we don't have bitcode for that
+    // architecture. Return the null module as a success case.
+    return module;
   }
-
-  // Architecture entry-point functions should be inlinable into base (non-arch)
-  // functions, so that their logic selecting specific "tile functions" can
-  // evaluate at compile time based on constant argument values in the caller,
-  // so that unused tile functions (e.g. for other data types, other CPU feature
-  // variants, etc) get DCE'd. In order for these entry points to be inlinable,
-  // they must have matching target attributes, so, just like we call
-  // removeTargetAttributes in loadUKernelBaseBitcode, we need to do that also
-  // here.
-  removeTargetAttributes(*bitcode.get());
-  return bitcode;
+  // Ukernels rely fundamentally on always getting inlined, for their logic
+  // to specialize at compile time, including specialization for a specific
+  // combination of data types, a specific SIMD ISA variant, etc. Then all the
+  // unused code paths can get DCE'd. That's why failure to inline a ukernel
+  // can result in a large penalty in both performance and code size.
+  for (auto &func : module.get()->functions()) {
+    func.addFnAttr(llvm::Attribute::AlwaysInline);
+  }
+  return module;
 }
 
-llvm::Expected<std::unique_ptr<llvm::Module>>
-loadUKernelArchBitcode(llvm::TargetMachine *targetMachine,
-                       llvm::LLVMContext &context) {
-  const char *archName =
-      getIreeArchNameForTargetTriple(targetMachine->getTargetTriple());
-  char filename[64];
-  snprintf(filename, sizeof filename, "ukernel_bitcode_%s.bc", archName);
-  return loadUKernelBitcodeFile(filename, context);
-}
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

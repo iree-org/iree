@@ -19,10 +19,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace ABI {
+namespace mlir::iree_compiler::IREE::ABI {
 
 // Returns the invocation model specified on |op| or the |defaultModel|.
 static IREE::ABI::InvocationModel
@@ -133,8 +130,12 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     // HACK: this is relying on the fact that there's only one HAL device.
     // We should instead have a way of creating fences on the device that
     // is used to produce the tensors we're wrapping.
-    auto device =
-        entryBuilder.create<IREE::HAL::ExSharedDeviceOp>(importOp.getLoc());
+    //
+    // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
+    // could always say device 0 for now but could instead look for an
+    // iree.abi.affinity/iree.abi.device/etc.
+    Value device =
+        IREE::HAL::DeviceType::resolveAny(importOp.getLoc(), entryBuilder);
 
     // When exporting a fence we need to put a barrier between the rest of the
     // program and the tensors consumed by the import.
@@ -399,6 +400,12 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
   auto *context = exportOp.getContext();
   SmallVector<NamedAttribute> attrs;
 
+  if (auto reflectionAttr =
+          exportOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+    attrs.append(reflectionAttr.getValue().begin(),
+                 reflectionAttr.getValue().end());
+  }
+
   if (auto abiAttr = exportOp->getAttr("iree.abi")) {
     attrs.emplace_back(StringAttr::get(context, "iree.abi"), abiAttr);
   }
@@ -486,6 +493,7 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
 
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
+  exportOp->removeAttr("iree.reflection");
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
@@ -722,7 +730,4 @@ createWrapEntryPointsPass(IREE::ABI::InvocationModel invocationModel) {
 
 static PassRegistration<WrapEntryPointsPass> pass;
 
-} // namespace ABI
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::ABI

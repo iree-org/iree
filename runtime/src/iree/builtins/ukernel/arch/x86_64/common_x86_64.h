@@ -50,7 +50,7 @@ static inline __m256i iree_uk_avx2_load_8x4xi8_strided(
     const iree_uk_int8_t* src, iree_uk_index_t stride) {
   __m256i indices = _mm256_mullo_epi32(
       _mm256_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7), _mm256_set1_epi32(stride));
-  return _mm256_i32gather_epi32(src, indices, 1);
+  return _mm256_i32gather_epi32((const int*)src, indices, 1);
 }
 
 static inline __m128i iree_uk_avx2_load_8x2xi8_strided(
@@ -264,9 +264,8 @@ static inline __m512i iree_uk_avx512_loadu_4x128_from_16x16xi32(
 static inline void iree_uk_avx512_storeu_4x128_to_16x16xi32(
     iree_uk_int32_t* dst, int i0, int j0, int i1, int j1, int i2, int j2,
     int i3, int j3, __m512i vec512) {
-  return iree_uk_avx512_storeu_4x128(dst + i0 * 16 + j0, dst + i1 * 16 + j1,
-                                     dst + i2 * 16 + j2, dst + i3 * 16 + j3,
-                                     vec512);
+  iree_uk_avx512_storeu_4x128(dst + i0 * 16 + j0, dst + i1 * 16 + j1,
+                              dst + i2 * 16 + j2, dst + i3 * 16 + j3, vec512);
 }
 
 static inline __m512i iree_uk_avx512_load_16x4xi8_strided(

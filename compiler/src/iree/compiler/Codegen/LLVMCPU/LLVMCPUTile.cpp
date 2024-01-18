@@ -23,8 +23,7 @@
 
 #define DEBUG_TYPE "iree-llvmcpu-tile"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -61,8 +60,8 @@ void LLVMCPUTilePass::runOnOperation() {
   }
 
   for (auto computeOp : computeOps) {
-    auto op = cast<TilingInterface>(computeOp);
-    if (op.getLoopIteratorTypes().empty())
+    auto op = dyn_cast<TilingInterface>(computeOp);
+    if (!op || op.getLoopIteratorTypes().empty())
       continue;
 
     // For now do not tile `tensor.pad` operations. The `tensor.pad`
@@ -119,5 +118,4 @@ createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

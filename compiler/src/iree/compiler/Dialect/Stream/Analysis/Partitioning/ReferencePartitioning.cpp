@@ -15,10 +15,7 @@
 
 #define DEBUG_TYPE "iree-stream-partitioning"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 // Returns an AsmState at the ancestor to |block| that is isolated from above.
 // Returns nullptr if debug dumps of partitioning is disabled.
@@ -503,7 +500,4 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
   return waveSet;
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

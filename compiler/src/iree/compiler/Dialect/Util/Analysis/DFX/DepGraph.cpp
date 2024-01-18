@@ -31,9 +31,7 @@ struct DOTGraphTraits<DFXDepGraph *> : public DefaultDOTGraphTraits {
 
 } // end namespace llvm
 
-namespace mlir {
-namespace iree_compiler {
-namespace DFX {
+namespace mlir::iree_compiler::DFX {
 
 void DepGraph::print(llvm::raw_ostream &os) {
   for (auto &depElement : syntheticRoot.deps) {
@@ -57,6 +55,4 @@ void DepGraph::dumpGraph() {
   callTimes++;
 }
 
-} // namespace DFX
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::DFX

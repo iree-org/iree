@@ -4,9 +4,9 @@ func.func @slice_whole_buffer() {
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
   %result = "stablehlo.slice"(%input) {
-    start_indices = dense<[0, 0]> : tensor<2xi64>,
-    limit_indices = dense<[3, 4]> : tensor<2xi64>,
-    strides = dense<1> : tensor<2xi64>
+    start_indices = array<i64: 0, 0>,
+    limit_indices = array<i64: 3, 4>,
+    strides = array<i64: 1, 1>
   } : (tensor<3x4xi32>) -> tensor<3x4xi32>
   check.expect_eq_const(%result, dense<[
       [1, 2, 3, 4],
@@ -21,9 +21,9 @@ func.func @slice_whole_stride() {
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
   %result = "stablehlo.slice"(%input) {
-    start_indices = dense<[1, 0]> : tensor<2xi64>,
-    limit_indices = dense<[2, 4]> : tensor<2xi64>,
-    strides = dense<1> : tensor<2xi64>
+    start_indices = array<i64: 1, 0>,
+    limit_indices = array<i64: 2, 4>,
+    strides = array<i64: 1, 1>
   } : (tensor<3x4xi32>) -> tensor<1x4xi32>
   check.expect_eq_const(%result, dense<[[5, 6, 7, 8]]> : tensor<1x4xi32>) : tensor<1x4xi32>
   return
@@ -35,9 +35,9 @@ func.func @slice_stride_part() {
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
   %result = "stablehlo.slice"(%input) {
-    start_indices = dense<[1, 1]> : tensor<2xi64>,
-    limit_indices = dense<[2, 3]> : tensor<2xi64>,
-    strides = dense<1> : tensor<2xi64>
+    start_indices = array<i64: 1, 1>,
+    limit_indices = array<i64: 2, 3>,
+    strides = array<i64: 1, 1>
   } : (tensor<3x4xi32>) -> tensor<1x2xi32>
   check.expect_eq_const(%result, dense<[[6, 7]]> : tensor<1x2xi32>) : tensor<1x2xi32>
   return
@@ -49,9 +49,9 @@ func.func @slice_multi_stride() {
     [05, 06, 07, 08],
     [09, 10, 11, 12]]> : tensor<3x4xi32>
   %result = "stablehlo.slice"(%input) {
-    start_indices = dense<[1, 0]> : tensor<2xi64>,
-    limit_indices = dense<[3, 4]> : tensor<2xi64>,
-    strides = dense<1> : tensor<2xi64>
+    start_indices = array<i64: 1, 0>,
+    limit_indices = array<i64: 3, 4>,
+    strides = array<i64: 1, 1>
   } : (tensor<3x4xi32>) -> tensor<2x4xi32>
   check.expect_eq_const(%result, dense<[
       [5, 6, 7, 8],

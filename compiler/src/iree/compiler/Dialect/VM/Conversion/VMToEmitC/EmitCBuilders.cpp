@@ -9,9 +9,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace emitc_builders {
+namespace mlir::iree_compiler::emitc_builders {
 
 namespace {
 std::string mapUnaryOperator(UnaryOperator op) {
@@ -421,6 +419,4 @@ void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
       /*operands=*/ArrayRef<Value>{operand});
 }
 
-} // namespace emitc_builders
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::emitc_builders

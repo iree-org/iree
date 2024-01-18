@@ -171,8 +171,8 @@ func.func @conv2d_dyn(%arg0: tensor<?x?x?x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %
 
 // CHECK-LABEL: @conv2d_dyn_filter_zp
 func.func @conv2d_dyn_filter_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x1024xi8>, %arg2: tensor<1x?x?x1024xi32>) -> tensor<1x?x?x1024xi32> {
-  // CHECK: %[[C1:.+]] = arith.constant 1 : index
-  // CHECK: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
 
   %iZp = arith.constant 42 : i32
   %fZp = arith.constant 0 : i32
@@ -200,11 +200,11 @@ func.func @conv2d_dyn_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<?x?x5x
   %fZp = arith.constant 42 : i32
   %iZp = arith.constant 0 : i32
 
-  // CHECK: %[[C0:.+]] = arith.constant 0 : i32
-  // CHECK: %[[I1:.+]] = arith.constant 1 : index
-  // CHECK: %[[I2:.+]] = arith.constant 2 : index
-  // CHECK: %[[I0:.+]] = arith.constant 0 : index
-  // CHECK: %[[C42:.+]] = arith.constant 42 : i32
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i32
+  // CHECK-DAG: %[[I1:.+]] = arith.constant 1 : index
+  // CHECK-DAG: %[[I2:.+]] = arith.constant 2 : index
+  // CHECK-DAG: %[[I0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C42:.+]] = arith.constant 42 : i32
   // CHECK: %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
 
   // CHECK: %[[INIT:.+]] = tensor.empty() : tensor<1x14x16xi32>

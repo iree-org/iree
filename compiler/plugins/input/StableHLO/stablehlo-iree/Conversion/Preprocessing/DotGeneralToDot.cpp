@@ -47,13 +47,8 @@ Value transposeReshape(Value arg, Location loc,
   auto transposePermutation =
       llvm::to_vector<5>(llvm::concat<const int64_t>(leftDims, rightDims));
 
-  TensorType transposePermutationType =
-      RankedTensorType::get({static_cast<int64_t>(transposePermutation.size())},
-                            rewriter.getIntegerType(64));
-
   auto transposePermutationAttr =
-      llvm::cast<DenseIntElementsAttr>(DenseIntElementsAttr::get(
-          transposePermutationType, llvm::ArrayRef(transposePermutation)));
+      rewriter.getDenseI64ArrayAttr(transposePermutation);
 
   // Compute the resulting shape.
   llvm::SmallVector<int64_t, 5> transposedShape;

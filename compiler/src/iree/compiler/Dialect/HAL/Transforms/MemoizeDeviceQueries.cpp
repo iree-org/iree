@@ -6,35 +6,32 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "llvm/ADT/StringSet.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
+
+#define GEN_PASS_DEF_MEMOIZEDEVICEQUERIESPASS
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h.inc"
+
+namespace {
+
+//===----------------------------------------------------------------------===//
+// --iree-hal-memoize-device-queries
+//===----------------------------------------------------------------------===//
 
 // NOTE: this implementation is just for a single active device. As we start to
 // support multiple devices we'll need to change this to be per-device.
-class MemoizeDeviceQueriesPass
-    : public PassWrapper<MemoizeDeviceQueriesPass, OperationPass<ModuleOp>> {
-public:
-  StringRef getArgument() const override {
-    return "iree-hal-memoize-device-queries";
-  }
-
-  StringRef getDescription() const override {
-    return "Caches hal.device.query results for use across the entire module";
-  }
-
+struct MemoizeDeviceQueriesPass
+    : public IREE::HAL::impl::MemoizeDeviceQueriesPassBase<
+          MemoizeDeviceQueriesPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -47,6 +44,7 @@ public:
         auto fullKey = ArrayAttr::get(
             moduleOp.getContext(),
             {
+                // TODO(multi-device): add attr key on device resolve source.
                 StringAttr::get(moduleOp.getContext(),
                                 queryOp.getCategory() + queryOp.getKey()),
                 queryOp.getDefaultValue().has_value()
@@ -93,8 +91,8 @@ public:
       auto initializerOp =
           moduleBuilder.create<IREE::Util::InitializerOp>(fusedLoc);
       auto funcBuilder = OpBuilder::atBlockBegin(initializerOp.addEntryBlock());
-      auto device =
-          funcBuilder.createOrFold<IREE::HAL::ExSharedDeviceOp>(fusedLoc);
+      // TODO(multi-device): pass in resolve info to the call and reuse.
+      Value device = IREE::HAL::DeviceType::resolveAny(fusedLoc, funcBuilder);
       auto queryOp = funcBuilder.create<IREE::HAL::DeviceQueryOp>(
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.getCategoryAttr(), anyQueryOp.getKeyAttr(),
@@ -121,13 +119,6 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass() {
-  return std::make_unique<MemoizeDeviceQueriesPass>();
-}
+} // namespace
 
-static PassRegistration<MemoizeDeviceQueriesPass> pass;
-
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

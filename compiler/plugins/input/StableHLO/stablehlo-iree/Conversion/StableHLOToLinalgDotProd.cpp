@@ -32,7 +32,7 @@ DotOperationType getDotOperationType(mlir::stablehlo::DotOp dotOp) {
   ArrayRef<int64_t> rhsShape =
       cast<ShapedType>(dotOp.getRhs().getType()).getShape();
   auto shapeMatches = [](int64_t a, int64_t b) {
-    return a == ShapedType::kDynamic || b == ShapedType::kDynamic || a == b;
+    return ShapedType::isDynamic(a) || ShapedType::isDynamic(b) || a == b;
   };
   if (lhsShape.size() == 1 && rhsShape.size() == 1 &&
       shapeMatches(lhsShape[0], rhsShape[0])) {

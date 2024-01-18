@@ -18,10 +18,7 @@
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 struct Artifact {
   // Wraps an existing file on the file system.
@@ -118,9 +115,6 @@ protected:
   LLVMTargetOptions targetOptions;
 };
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_LINKERTOOL_H_

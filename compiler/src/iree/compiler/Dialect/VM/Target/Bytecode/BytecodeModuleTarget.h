@@ -14,10 +14,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 // Defines the output format of the bytecode module.
 enum class BytecodeOutputFormat {
@@ -73,9 +70,6 @@ LogicalResult translateModuleToBytecode(
     mlir::ModuleOp outerModuleOp, IREE::VM::TargetOptions vmOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEMODULETARGET_H_

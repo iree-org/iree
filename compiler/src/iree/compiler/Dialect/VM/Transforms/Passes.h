@@ -15,10 +15,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -50,6 +47,10 @@ createConversionPass(TargetOptions targetOptions);
 //===----------------------------------------------------------------------===//
 // Module layout
 //===----------------------------------------------------------------------===//
+
+// Reifies and pads vm.rodata.table.inline ops as two vm.rodata.inline ops.
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createReifyRodataTablesPass();
 
 // Hoists inline vm.rodata.inline values to module-level constant storage.
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
@@ -118,9 +119,6 @@ inline void registerVMTestPasses() {
   createConvertStandardToVMTestPass();
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_

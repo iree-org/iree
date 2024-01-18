@@ -45,6 +45,7 @@ stream.executable private @convert_multi_i1 {
   builtin.module {
     func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
+      %c4 = arith.constant 4 : index
       // CHECK-DAG: %[[BINDING0:.+]] = stream.binding.subspan %arg0{{.+}} -> !flow.dispatch.tensor<readonly:tensor<4xi8>>
       %binding0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi1>>
       // CHECK-DAG: %[[BINDING1:.+]] = stream.binding.subspan %arg1{{.+}} -> !flow.dispatch.tensor<readwrite:tensor<4xi8>>
@@ -59,7 +60,7 @@ stream.executable private @convert_multi_i1 {
       %result = arith.ori %tile0, %tile1 : tensor<?xi1>
       // CHECK: %[[RESULT_I8:.+]] = arith.extui %[[RESULT_I1]] : tensor<?xi1> to tensor<?xi8>
       // CHECK-NEXT: flow.dispatch.tensor.store %[[RESULT_I8]], %[[BINDING1]], {{.+}} : tensor<?xi8> -> !flow.dispatch.tensor<readwrite:tensor<4xi8>>
-      flow.dispatch.tensor.store %result, %binding1, offsets = [0], sizes = [4], strides = [1] : tensor<?xi1> -> !flow.dispatch.tensor<readwrite:tensor<4xi1>>
+      flow.dispatch.tensor.store %result, %binding1, offsets = [0], sizes = [%c4], strides = [1] : tensor<?xi1> -> !flow.dispatch.tensor<readwrite:tensor<4xi1>>
       return
     }
   }

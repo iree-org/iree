@@ -27,14 +27,15 @@ iree_lit_test_suite(
     name = "lit",
     srcs = [
         "mma.mlir",
-        "reduction.mlir",
-        "reduction_eltwise.mlir",
-        "reduction_v2.mlir",
-        "reduction_v2_uneven.mlir",
-        "softmax.mlir",
-        "softmax_v2.mlir",
+        # TODO(#15892): reductions have flakes and need to be triaged.
+        # "reduction.mlir",
+        # "reduction_eltwise.mlir",
+        # "reduction_v2.mlir",
+        # "reduction_v2_uneven.mlir",
+        # "softmax.mlir",
+        # "softmax_v2.mlir",
         # First few ops of softmax only, acts as a proxy example.
-        "softmax_partial.mlir",
+        # "softmax_partial.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,

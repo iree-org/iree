@@ -26,16 +26,6 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
-    name = "buffer_transfer",
-    srcs = ["buffer_transfer.c"],
-    hdrs = ["buffer_transfer.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/hal",
-    ],
-)
-
-iree_runtime_cc_library(
     name = "debug_allocator",
     srcs = ["debug_allocator.c"],
     hdrs = ["debug_allocator.h"],

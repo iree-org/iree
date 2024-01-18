@@ -22,8 +22,7 @@ static llvm::cl::opt<bool> clVerboseDebugInfo(
     llvm::cl::desc("Emit verbose debug information in LLVM IR."),
     llvm::cl::init(false));
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI
@@ -486,7 +485,8 @@ HALDispatchABI::getInputTypes(MLIRContext *context,
 
 // static
 LLVM::DISubprogramAttr
-HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
+HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
+                               LLVM::LLVMFuncOp llvmFuncOp,
                                const LLVMTypeConverter *typeConverter) {
   auto *context = &typeConverter->getContext();
   Builder builder(context);
@@ -500,9 +500,9 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
       LLVM::DIFileAttr::get(context, llvm::sys::path::filename(inputFilePath),
                             llvm::sys::path::parent_path(inputFilePath));
   auto compileUnitAttr = LLVM::DICompileUnitAttr::get(
-      context, llvm::dwarf::DW_LANG_C17, fileAttr,
-      builder.getStringAttr("IREE"), /*isOptimized=*/true,
-      LLVM::DIEmissionKind::Full);
+      context, DistinctAttr::create(UnitAttr::get(context)),
+      llvm::dwarf::DW_LANG_C17, fileAttr, builder.getStringAttr("IREE"),
+      /*isOptimized=*/true, LLVM::DIEmissionKind::Full);
 
   auto int32TypeAttr =
       LLVM::DIBasicTypeAttr::get(context, llvm::dwarf::DW_TAG_base_type, "int",
@@ -517,13 +517,18 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp, StringRef funcName,
           di.getPtrOf(di.getConstOf(di.getWorkgroupStateV0T())),
       });
 
-  auto funcNameAttr = builder.getStringAttr(funcName);
-  return LLVM::DISubprogramAttr::get(
-      context, compileUnitAttr, fileAttr, funcNameAttr, funcNameAttr, fileAttr,
-      /*line=*/1,
-      /*scopeline=*/1,
-      LLVM::DISubprogramFlags::Definition | LLVM::DISubprogramFlags::Optimized,
-      subroutineTypeAttr);
+  auto funcNameAttr = builder.getStringAttr(llvmFuncOp.getName());
+  DistinctAttr id;
+  if (!llvmFuncOp.isExternal()) {
+    id = DistinctAttr::create(UnitAttr::get(context));
+  }
+  return LLVM::DISubprogramAttr::get(context, id, compileUnitAttr, fileAttr,
+                                     funcNameAttr, funcNameAttr, fileAttr,
+                                     /*line=*/1,
+                                     /*scopeline=*/1,
+                                     LLVM::DISubprogramFlags::Definition |
+                                         LLVM::DISubprogramFlags::Optimized,
+                                     subroutineTypeAttr);
 }
 
 // Returns the most local DISubprogramAttr starting from |forOp|.
@@ -816,7 +821,7 @@ MemRefDescriptor HALDispatchABI::loadBinding(Operation *forOp, int64_t ordinal,
       desc.setConstantStride(builder, loc, rank - 1, 1);
       OpFoldResult currentStride = builder.getIndexAttr(1);
       for (int i = rank - 1; i > 0; --i) {
-        if (strides[i - 1] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(strides[i - 1])) {
           auto dim = desc.size(builder, loc, i);
           Value currentStrideVal;
           if (std::optional<int64_t> currentStrideInt =
@@ -1443,5 +1448,4 @@ Value HALDispatchABI::getExtraField(Operation *forOp, StringRef extraField,
   }
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

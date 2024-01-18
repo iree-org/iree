@@ -7,6 +7,7 @@
 #include "iree/vm/shims.h"
 
 IREE_VM_ABI_DEFINE_SHIM(irIi, v);
+IREE_VM_ABI_DEFINE_SHIM(i, r);
 IREE_VM_ABI_DEFINE_SHIM(r, i);
 IREE_VM_ABI_DEFINE_SHIM(r, I);
 IREE_VM_ABI_DEFINE_SHIM(r, ii);

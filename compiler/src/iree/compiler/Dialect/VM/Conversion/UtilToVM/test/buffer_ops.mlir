@@ -295,3 +295,20 @@ func.func @buffer_store_index(%arg0: !util.buffer, %arg1: index, %arg2: index) {
   util.buffer.store %arg2, %arg0[%byte_offset for %element_size] : index -> !util.buffer{%arg1}
   return
 }
+
+// -----
+
+// CHECK-LABEL: @buffer_hash
+func.func @buffer_hash(%arg0: !util.buffer, %arg1: index) -> i64 {
+  %byte_offset = arith.constant 128 : index
+  %length = arith.constant 17 : index
+  // CHECK-32-DAG: %[[BYTE_OFFSET:.+]] = vm.const.i64 128
+  // CHECK-32-DAG: %[[LENGTH:.+]] = vm.const.i64 17
+  // CHECK-32: %[[VALUE:.+]] = vm.buffer.hash %arg0, %[[BYTE_OFFSET]], %[[LENGTH]] : !vm.buffer -> i64
+  // CHECK-64-DAG: %[[BYTE_OFFSET:.+]] = vm.const.i64 128
+  // CHECK-64-DAG: %[[LENGTH:.+]] = vm.const.i64 17
+  // CHECK-64: %[[VALUE:.+]] = vm.buffer.hash %arg0, %[[BYTE_OFFSET]], %[[LENGTH]] : !vm.buffer -> i64
+  %0 = util.buffer.hash %arg0[%byte_offset for %length] : !util.buffer{%arg1} -> i64
+  // CHECK: return %[[VALUE]]
+  return %0 : i64
+}

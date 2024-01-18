@@ -19,10 +19,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/Types.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 #include "iree/compiler/Dialect/VM/IR/VMOpInterfaces.h.inc" // IWYU pragma: export
 
@@ -61,9 +58,6 @@ private:
   VMOpAsmInterface *fallbackOpAsmInterface;
 };
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM
 
 #endif // IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_

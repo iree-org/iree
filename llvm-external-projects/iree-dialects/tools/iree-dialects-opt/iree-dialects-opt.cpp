@@ -46,7 +46,7 @@ namespace IREE = mlir::iree_compiler::IREE;
 namespace mlir {
 namespace test_ext {
 /// Test passes, do not deserve an include.
-void registerTestListenerPasses();
+void registerVectorExtTestPasses();
 } // namespace test_ext
 } // namespace mlir
 
@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
   mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
-  mlir::test_ext::registerTestListenerPasses();
+  mlir::test_ext::registerVectorExtTestPasses();
 
   // External models.
   mlir::func::registerInlinerExtension(registry);

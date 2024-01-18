@@ -828,12 +828,8 @@ static iree_status_t check_matmul_failure(
   int m_end = iree_min(m_size, row + context);
   int n_start = iree_max(0, (int)col - (int)context);
   int n_end = iree_min(n_size, col + context);
-  // We have a lot more freedom to pick k_start, k_end, since these parameters
-  // only affect which regions of the input lhs and rhs matrices are printed.
-  // If we were only testing random lhs and rhs, we would just pick
-  // k_start = 0 and any reasonable k_end value.
-  int k_start = iree_max(0, iree_min(m_start, n_start));
-  int k_end = iree_min(k_size, iree_max(m_end, n_end));
+  int k_start = 0;
+  int k_end = iree_min(k_size, 2 * context);
   // [k_start, k_end) could be arbitrarily long at this point. Constrain it a
   // bit to avoid huge output.
   k_end = iree_min(k_end, k_start + 4 * context);
@@ -1177,12 +1173,8 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   // Query device overrides, if any. When omitted the devices from the trace
   // file will be used.
-  // TODO(#5724): remove this and instead provide a device set on initialize.
-  iree_host_size_t device_uri_count = 0;
-  const iree_string_view_t* device_uris = NULL;
-  iree_hal_get_devices_flag_list(&device_uri_count, &device_uris);
-  iree_trace_replay_set_hal_devices_override(&replay, device_uri_count,
-                                             device_uris);
+  iree_trace_replay_set_hal_devices_override(&replay,
+                                             iree_hal_device_flag_list());
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {

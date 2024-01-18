@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -23,10 +22,11 @@
 
 #define DEBUG_TYPE "iree-stream-pack-dispatch-operands"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
+
+#define GEN_PASS_DEF_PACKDISPATCHOPERANDSPASS
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -297,18 +297,12 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-hal-pack-dispatch-operands
+// --iree-hal-pack-dispatch-operands
 //===----------------------------------------------------------------------===//
 
-class PackDispatchOperandsPass
-    : public PackDispatchOperandsBase<PackDispatchOperandsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::complex::ComplexDialect>();
-    registry.insert<IREE::Stream::StreamDialect>();
-  }
-
+struct PackDispatchOperandsPass
+    : public IREE::Stream::impl::PackDispatchOperandsPassBase<
+          PackDispatchOperandsPass> {
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
 
@@ -343,11 +337,4 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createPackDispatchOperandsPass() {
-  return std::make_unique<PackDispatchOperandsPass>();
-}
-
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

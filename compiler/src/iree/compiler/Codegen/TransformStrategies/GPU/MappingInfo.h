@@ -10,9 +10,7 @@
 
 #include "mlir/IR/Attributes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 /// Helper struct to hold the mapping information for a given operation.
 struct MappingInfo {
@@ -26,8 +24,6 @@ struct MappingInfo {
   LLVM_DUMP_METHOD void dump() const;
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_MAPPING_INFO_H_

@@ -19,8 +19,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void populateHALInlineToVMPatterns(MLIRContext *context,
                                    ConversionTarget &conversionTarget,
@@ -67,5 +66,4 @@ void populateHALInlineToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal_inline.device.query.i64");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

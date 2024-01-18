@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering --iree-llvmcpu-vector-lowering --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-llvmcpu-mmt4d-vector-lowering -iree-codegen-llvmcpu-vector-lowering-pipeline --split-input-file | FileCheck %s
 
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -45,7 +45,7 @@ module {
           }
           scf.yield %11 : tensor<64x64xf32>
         }
-        flow.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [%c64, %c64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
+        flow.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x128xf32>>
       }
     }
     return
@@ -159,7 +159,7 @@ module {
           }
           scf.yield %19 : tensor<64x64xf32>
         }
-        flow.dispatch.tensor.store %17, %5, offsets = [%arg0, %arg1], sizes = [%c64, %c64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
+        flow.dispatch.tensor.store %17, %5, offsets = [%arg0, %arg1], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<384x512xf32>>
       }
     }
     return

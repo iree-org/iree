@@ -12,8 +12,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Definitions and Utilities
@@ -54,6 +53,11 @@ LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
 
 LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp,
                                       unsigned swizzleLogTile);
+
+// Lowers workgroup memory copies to distributed transfer_read/transfer_write
+// ops. Expects the memory copy to be marked with copy_to_workgroup_memory
+// marker.
+LogicalResult gpuDistributeSharedMemoryCopy(func::FuncOp funcOp);
 
 //===----------------------------------------------------------------------===//
 // Passes
@@ -127,10 +131,13 @@ createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 // This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass();
 
+/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
+/// operation.
+std::unique_ptr<OperationPass<>> createGPULowerToUKernelsPass();
+
 /// Register Common GPU passes.
 void registerCodegenCommonGPUPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_

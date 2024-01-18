@@ -115,6 +115,13 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/c-runtime-library/secure-template-overloads
     "/D_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES"
 
+    # MLIR defines std::complex<APFloat>, which is invalid per the C++ spec
+    # stating that std::complex must only be used with builtin compiler types.
+    # Until MLIR cleans this up we silence it so that we don't end up with
+    # a warning per file that includes mlir/IR/BuiltinAttributes.h.
+    # Tracking issue: https://github.com/llvm/llvm-project/issues/65255
+    "/D_SILENCE_NONFLOATING_COMPLEX_DEPRECATION_WARNING"
+
     # Configure RTTI generation.
     # - /GR - Enable generation of RTTI (default)
     # - /GR- - Disables generation of RTTI
@@ -144,8 +151,10 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   # internally is very useful when importing. If you feel that some of these
   # should be different (especially more strict), please raise an issue!
   CLANG
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wall"
+
+    "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
 
     # Disable warnings we don't care about or that generally have a low
     # signal/noise ratio.
@@ -174,6 +183,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-unused-local-typedef"
     "-Wno-unused-private-field"
     "-Wno-user-defined-warnings"
+    "-Wno-missing-braces"  # Inconsistently triggers between C++/C headers.
 
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
@@ -207,7 +217,10 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
   GCC
     "-Wall"
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
+    "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
+
+    "-Wno-address"  # https://github.com/openxla/iree/issues/16016
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
@@ -219,6 +232,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     $<$<COMPILE_LANGUAGE:C>:-Wno-pointer-sign>
     "-Wno-sign-compare"
     "-Wno-unused-function"
+    "-Wno-unknown-pragmas"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).
@@ -273,6 +287,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4065"  # allow: switch statement contains 'default' but no 'case' labels
     "/wd4141"  # allow: inline used more than once
     "/wd4624"  # allow: destructor was implicitly defined as deleted
+    "/wd4576"  # allow: a parenthesized type followed by an initializer list is a non-standard explicit type conversion syntax
 
     # TODO(benvanik): confirm these are all still required and document:
     "/wd4146"  # operator applied to unsigned type, result still unsigned

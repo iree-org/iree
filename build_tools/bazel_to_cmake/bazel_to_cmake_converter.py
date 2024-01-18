@@ -394,6 +394,7 @@ class BuildFileFunctions(object):
         testonly=None,
         linkopts=None,
         includes=None,
+        system_includes=None,
         **kwargs,
     ):
         if self._should_skip_target(**kwargs):
@@ -412,6 +413,9 @@ class BuildFileFunctions(object):
         deps_block = self._convert_target_list_block("DEPS", deps)
         testonly_block = self._convert_option_block("TESTONLY", testonly)
         includes_block = self._convert_includes_block(includes)
+        system_includes_block = self._convert_string_list_block(
+            "SYSTEM_INCLUDES", system_includes
+        )
 
         self._converter.body += (
             f"iree_cc_library(\n"
@@ -425,6 +429,7 @@ class BuildFileFunctions(object):
             f"{defines_block}"
             f"{testonly_block}"
             f"{includes_block}"
+            f"{system_includes_block}"
             f"  PUBLIC\n)\n\n"
         )
 

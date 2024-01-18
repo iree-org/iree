@@ -13,33 +13,6 @@
 #include <unistd.h>
 
 //==============================================================================
-// Memory subsystem information and control
-//==============================================================================
-
-void iree_memory_query_info(iree_memory_info_t* out_info) {
-  memset(out_info, 0, sizeof(*out_info));
-
-  int page_size = sysconf(_SC_PAGESIZE);
-  out_info->normal_page_size = page_size;
-  out_info->normal_page_granularity = page_size;
-
-  // Large pages arent't currently used so we aren't introducing the build goo
-  // to detect and use them yet.
-  // https://linux.die.net/man/3/gethugepagesizes
-  // http://manpages.ubuntu.com/manpages/bionic/man3/gethugepagesize.3.html
-  // Would be:
-  //   #include <hugetlbfs.h>
-  //   out_info->large_page_granularity = gethugepagesize();
-  out_info->large_page_granularity = page_size;
-
-  out_info->can_allocate_executable_pages = true;
-}
-
-void iree_memory_jit_context_begin(void) {}
-
-void iree_memory_jit_context_end(void) {}
-
-//==============================================================================
 // Virtual address space manipulation
 //==============================================================================
 
@@ -134,29 +107,6 @@ iree_status_t iree_memory_view_protect_ranges(void* base_address,
 
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-// IREE_ELF_CLEAR_CACHE can be defined externally to override this default
-// behavior.
-#if !defined(IREE_ELF_CLEAR_CACHE)
-// __has_builtin was added in GCC 10, so just hard-code the availability
-// for < 10, special cased here so it can be dropped once no longer needed.
-#if defined __GNUC__ && __GNUC__ < 10
-#define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
-#elif defined __has_builtin
-#if __has_builtin(__builtin___clear_cache)
-#define IREE_ELF_CLEAR_CACHE(start, end) __builtin___clear_cache(start, end)
-#endif  // __builtin___clear_cache
-#endif  // __has_builtin
-#endif  // !defined(IREE_ELF_CLEAR_CACHE)
-
-#if !defined(IREE_ELF_CLEAR_CACHE)
-#error "no instruction cache clear implementation"
-#endif  // !defined(IREE_ELF_CLEAR_CACHE)
-
-void iree_memory_view_flush_icache(void* base_address,
-                                   iree_host_size_t length) {
-  IREE_ELF_CLEAR_CACHE(base_address, ((char*)base_address) + length);
 }
 
 #endif  // IREE_PLATFORM_*

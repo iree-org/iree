@@ -7,15 +7,13 @@
 #ifndef IREE_COMPILER_CODEGEN_VMVX_KERNELDISPATCH_H_
 #define IREE_COMPILER_CODEGEN_VMVX_KERNELDISPATCH_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinOps.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 LogicalResult initVMVXLaunchConfig(ModuleOp moduleOp);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_VMVX_KERNELDISPATCH_H_

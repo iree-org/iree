@@ -28,8 +28,7 @@
 
 #define DEBUG_TYPE "tile-dispatch-using-interface"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Method to check if a value is zero
 static bool isZero(Value val) {
@@ -260,22 +259,7 @@ static LogicalResult replaceAllStoresWithTiledVersion(
   return success();
 }
 
-namespace {
-/// Result of the tiled operation.
-struct IREETilingResult {
-  SmallVector<Operation *> tiledOps;
-  SmallVector<Value> tiledValues;
-  SmallVector<scf::ForOp> loops;
-  SmallVector<Value> workgroupCount;
-  // TODO(ravishankarm): Cleanup the following returns. We should not need
-  // these.
-  llvm::SmallBitVector tiledLoops;
-  SmallVector<OpFoldResult> tileOffsets;
-  SmallVector<OpFoldResult> tileSizes;
-};
-} // namespace
-
-static FailureOr<IREETilingResult>
+FailureOr<IREETilingResult>
 tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options) {
   OpBuilder::InsertionGuard guard(rewriter);
@@ -625,5 +609,4 @@ void populateTileAndDistributeToWorkgroupsCleanupPatterns(
                   SwapExtractSliceWithTensorEmpty>(context);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

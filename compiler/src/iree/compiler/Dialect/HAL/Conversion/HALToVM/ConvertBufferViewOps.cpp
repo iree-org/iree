@@ -8,8 +8,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void populateHALBufferViewToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
@@ -33,5 +32,4 @@ void populateHALBufferViewToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.buffer_view.trace");
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

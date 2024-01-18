@@ -16,8 +16,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Convert encoding-specific operations based on target attributes. Examples:
 ///   linalg_ext.set_encoding   -> tensor.pack
@@ -55,7 +54,6 @@ createCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
 
 void registerCodegenCommonCPUPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_CPU_PASSES_H_

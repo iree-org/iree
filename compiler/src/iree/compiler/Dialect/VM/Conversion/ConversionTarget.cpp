@@ -6,8 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // static
 std::pair<mlir::ModuleOp, mlir::ModuleOp>
@@ -20,6 +19,11 @@ VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
   if (!innerModuleOp) {
     innerModuleOp =
         ModuleOp::create(outerModuleOp.getLoc(), outerModuleOp.getName());
+    if (auto reflectionAttr =
+            outerModuleOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+      innerModuleOp->setAttr("iree.reflection", reflectionAttr);
+      outerModuleOp->removeAttr("iree.reflection");
+    }
     innerModuleOp.getBodyRegion().takeBody(outerModuleOp.getBodyRegion());
     outerModuleOp.getBodyRegion().getBlocks().push_back(new Block());
     outerModuleOp.push_back(innerModuleOp);
@@ -45,5 +49,4 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
       +[](mlir::ModuleOp op) { return isTopLevelModule(op); });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

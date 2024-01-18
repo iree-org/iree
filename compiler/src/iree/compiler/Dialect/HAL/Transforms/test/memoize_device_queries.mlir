@@ -3,7 +3,7 @@
 //      CHECK: util.global private @_device_query_0 : i1
 // CHECK-NEXT: util.global private @_device_query_0_ok : i1
 // CHECK-NEXT: util.initializer {
-// CHECK-NEXT:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
+//  CHECK-DAG:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK-NEXT:   %[[OK0:.+]], %[[VALUE0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "id0*") : i1, i1 = false
 // CHECK-NEXT:   util.global.store %[[OK0]], @_device_query_0_ok : i1
 // CHECK-NEXT:   util.global.store %[[VALUE0]], @_device_query_0 : i1
@@ -11,7 +11,7 @@
 //      CHECK: util.global private @_device_query_1 : i1
 // CHECK-NEXT: util.global private @_device_query_1_ok : i1
 // CHECK-NEXT: util.initializer {
-// CHECK-NEXT:   %[[DEVICE:.+]] = hal.ex.shared_device : !hal.device
+//  CHECK-DAG:   %[[DEVICE:.+]] = hal.devices.get %{{.+}}
 // CHECK-NEXT:   %[[OK1:.+]], %[[VALUE1:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "id1") : i1, i1 = false
 // CHECK-NEXT:   util.global.store %[[OK1]], @_device_query_1_ok : i1
 // CHECK-NEXT:   util.global.store %[[VALUE1]], @_device_query_1 : i1

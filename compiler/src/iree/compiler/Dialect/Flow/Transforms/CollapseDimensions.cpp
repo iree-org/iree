@@ -33,10 +33,7 @@
 
 #define DEBUG_TYPE "iree-flow-collapse-dimensions"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 /// Pass declaration.
@@ -328,7 +325,7 @@ hoistTensorReshapesOutOfDispatchRegion(RewriterBase &rewriter,
       int64_t staticCollapsedShape = 1;
       SmallVector<OpFoldResult> dynamicCollapsedDims;
       for (auto collapsedDim : reassociation[index]) {
-        if (expandedShape[collapsedDim] == ShapedType::kDynamic) {
+        if (ShapedType::isDynamic(expandedShape[collapsedDim])) {
           dynamicCollapsedDims.push_back(dynamicDimsList.front());
           dynamicDimsList = dynamicDimsList.drop_front();
         } else {
@@ -453,7 +450,18 @@ void CollapseDimensionsPass::runOnOperation() {
   // Move all the `tensor.collapse_shape` leafs  and `tensor.expand_shape` roots
   // of the modified dispatches out of the dispatch.
   for (auto dispatchOp : modifiedDispatchOps) {
-    Region &body = dispatchOp.getBody();
+    // Hoist tensor reshape ops out of dispatch region first. Otherwise, the
+    // reshape(cst) will be folded into a constant living in the dispatch. It
+    // could introduce big constants inlined in the dispatch.
+    FailureOr<DispatchRegionOp> newDispatchOp =
+        hoistTensorReshapesOutOfDispatchRegion(
+            rewriter, cast<DispatchRegionOp>(dispatchOp));
+    if (failed(newDispatchOp)) {
+      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
+      return signalPassFailure();
+    }
+
+    Region &body = newDispatchOp.value().getBody();
     assert(llvm::hasSingleElement(body) && "expected op with a single body");
     Block &block = body.front();
     RewritePatternSet moveReshapeOps(&getContext());
@@ -472,12 +480,6 @@ void CollapseDimensionsPass::runOnOperation() {
           "failed to propagate reshape ops introduced during collapse");
       return signalPassFailure();
     }
-
-    if (failed(hoistTensorReshapesOutOfDispatchRegion(
-            rewriter, cast<DispatchRegionOp>(dispatchOp)))) {
-      dispatchOp->emitOpError("failed to hoist reshapes out of dispatch");
-      return signalPassFailure();
-    }
   }
 }
 
@@ -486,7 +488,4 @@ createCollapseDimensionsPass() {
   return std::make_unique<CollapseDimensionsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

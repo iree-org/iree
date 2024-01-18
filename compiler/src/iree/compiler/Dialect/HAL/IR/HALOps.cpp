@@ -20,10 +20,7 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionImplementation.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
 // custom<DescriptorType>($descriptor_type)
@@ -334,11 +331,6 @@ static void printWorkgroupCountRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 // hal.ex.*
 //===----------------------------------------------------------------------===//
-
-void ExSharedDeviceOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "device");
-}
 
 void ExFileFromMemoryOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
@@ -927,6 +919,27 @@ LogicalResult DeviceQueueExecuteOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.devices.*
+//===----------------------------------------------------------------------===//
+
+void DevicesCountOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "device_count");
+}
+
+void DevicesGetOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  APInt index;
+  if (matchPattern(getIndex(), m_ConstantInt(&index))) {
+    llvm::SmallString<16> str("device_");
+    index.toStringUnsigned(str);
+    setNameFn(getResult(), str);
+  } else {
+    setNameFn(getResult(), "device_n");
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable.source
 //===----------------------------------------------------------------------===//
 
@@ -1207,11 +1220,31 @@ DenseMap<Attribute, int> ExecutableVariantOp::gatherConstantOrdinals() {
   return map;
 }
 
+Value ExecutableVariantOp::createConditionOp(OpBuilder &builder) {
+  assert(!getConditionOp() && "condition op already exists");
+
+  builder.setInsertionPointToStart(&getRegion().front());
+  auto conditionOp = builder.create<IREE::HAL::ExecutableConditionOp>(getLoc());
+  Block *entryPoint = conditionOp.addEntryBlock();
+  Value device = entryPoint->getArgument(0);
+
+  builder.setInsertionPointToStart(entryPoint);
+  return device;
+}
+
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
-  auto matchAttr =
-      cast<IREE::HAL::MatchAttrInterface>(getTarget().getMatchExpression());
-  auto selected = matchAttr.buildConditionExpression(getLoc(), device, builder);
+  // TODO(multi-device): condition on device target ID and other queries that
+  // may be useful for disambiguating two devices that support the same
+  // executable targets. Today executable targets are unique per device target
+  // but that need not always be the case.
+  auto i1Type = builder.getI1Type();
+  Value selected = builder
+                       .create<IREE::HAL::DeviceQueryOp>(
+                           getLoc(), i1Type, i1Type, device,
+                           builder.getStringAttr("hal.executable.format"),
+                           getTarget().getFormat(), builder.getZeroAttr(i1Type))
+                       .getValue();
 
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();
@@ -1611,10 +1644,7 @@ void FenceAwaitOp::getAsmResultNames(
   setNameFn(getStatus(), "status");
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

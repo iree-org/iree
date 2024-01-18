@@ -11,10 +11,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 // Potential value set of Attribute instances representing constant values.
 // The yielded set of potential values will consist of |mlir::Attribute|
@@ -51,9 +48,6 @@ private:
   ChangeStatus updateValue(Value value, DFX::Solver &solver) override;
 };
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Util
 
 #endif // IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_ATTRIBUTES_POTENTIAL_VALUES_H_

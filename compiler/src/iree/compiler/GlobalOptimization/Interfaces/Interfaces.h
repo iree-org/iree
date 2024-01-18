@@ -9,13 +9,11 @@
 
 #include "mlir/IR/Dialect.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
-/// Register all global optimization related interfaces.
+/// Registers all global optimization related interfaces.
 void registerGlobalOptimizationInterfaces(DialectRegistry &registry);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_INTERFACES_INTERFACES_H_

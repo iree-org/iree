@@ -37,8 +37,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -284,6 +283,7 @@ struct ConvertBf16ArithToF32Pass
     // Some arithmetic operations exist in the vector dialect.
     target.addDynamicallyLegalOp<vector::FMAOp, vector::ReductionOp,
                                  vector::MultiDimReductionOp, vector::MaskOp,
+                                 vector::MatmulOp, vector::OuterProductOp,
                                  vector::YieldOp>(checkOp);
 
     // Some ops are always legal.
@@ -318,5 +318,4 @@ createConvertBf16ArithToF32Pass() {
   return std::make_unique<ConvertBf16ArithToF32Pass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

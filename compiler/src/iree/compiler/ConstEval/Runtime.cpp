@@ -15,9 +15,7 @@
 #define DEBUG_TYPE "iree-const-eval"
 using llvm::dbgs;
 
-namespace mlir {
-namespace iree_compiler {
-namespace ConstEval {
+namespace mlir::iree_compiler::ConstEval {
 
 namespace {
 
@@ -442,9 +440,10 @@ void CompiledBinary::initialize(void *data, size_t length) {
   iree_hal_driver_release(driver);
 
   // Create hal module.
-  IREE_CHECK_OK(iree_hal_module_create(runtime.instance.get(), device.get(),
-                                       IREE_HAL_MODULE_FLAG_NONE,
-                                       iree_allocator_system(), &hal_module));
+  iree_hal_device_t *device_ptr = device.get();
+  IREE_CHECK_OK(iree_hal_module_create(
+      runtime.instance.get(), /*device_count=*/1, &device_ptr,
+      IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
 
   // Bytecode module.
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
@@ -496,6 +495,4 @@ Runtime &Runtime::getInstance() {
   return instance;
 }
 
-} // namespace ConstEval
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::ConstEval

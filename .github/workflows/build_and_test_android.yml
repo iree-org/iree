@@ -81,7 +81,7 @@ jobs:
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
             --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
-            gcr.io/iree-oss/android@sha256:d349a3d137d0ed0f7360af16096db682da0233679cdbb00a326150149e3c4fa4 \
+            gcr.io/iree-oss/android@sha256:66bc80fc16e31de0bf64cfcdc65be37a35b7f6c5cd44e89707e35d34da961bb5 \
             build_tools/cmake/build_android.sh
           echo "target-build-dir=${TARGET_BUILD_DIR}" >> "${GITHUB_OUTPUT}"
       - name: "Creating archive of target build dir"
@@ -118,7 +118,11 @@ jobs:
           - device-name: pixel-6-pro
             label-exclude: "^requires-gpu"
           - device-name: moto-edge-x30
-            label-exclude: "^requires-gpu"
+            # Moto Edge X30 supports VK_KHR_16bit_storage for only storage
+            # buffers, but not uniform buffers, see
+            # https://vulkan.gpuinfo.org/displayreport.php?id=14481#features_extensions
+            # We request both bits. Disable running such tests.
+            label-exclude: "^requires-gpu|vulkan_uses_vk_khr_16bit_storage"
     name: test_on_${{ matrix.target.device-name }}
     runs-on:
       - self-hosted # must come first

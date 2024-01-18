@@ -16,6 +16,7 @@ include "mlir/Interfaces/FunctionInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 // Trial ops do not have any memory effects but may invoke Undefine Behavior on
@@ -1196,6 +1197,48 @@ def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
   ];
 }
 
+def VM_RodataTableInlineOp : VM_PureOp<"rodata.table.inline", [
+    VM_PseudoOp,
+  ]> {
+  let summary = [{inlined constant rodata table}];
+  let description = [{
+    vm.rodata with another associated vm.rodata table specifying byte offsets
+    and sizes as a subview into the flattened data. The table is a flat array
+    of 32 or 64-bit integers storing (offset, size) in element order.
+
+    The optional alignment attribute applies to both the table and data rodata.
+    The data_alignment attribute can be used to specify an alignment for the
+    elements of the table, padding to the data alignment with zeros. The element
+    sizes reflect the unpadded attribute storage sizes.
+
+    See vm.rodata for more information.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$table_name,
+    OptionalAttr<StrAttr>:$data_name,
+    TypeAttrOf<VM_AnyIntegerType>:$table_type,
+    Util_AnySerializableArrayAttr:$data_array,
+    OptionalAttr<I64Attr>:$alignment,
+    OptionalAttr<I64Attr>:$data_alignment,
+    OptionalAttr<StrAttr>:$mime_type
+  );
+
+  let results = (outs
+    VM_RefOf<VM_BufferType>:$table_result,
+    VM_RefOf<VM_BufferType>:$data_result
+  );
+
+  let assemblyFormat = [{
+    $table_type attr-dict `:` type($table_result) `,` type($data_result) `=` $data_array
+  }];
+
+  let builders = [
+    OpBuilder<(ins "IntegerType":$table_type, "ArrayAttr":$value)>,
+    OpBuilder<(ins "StringAttr":$name, "IntegerType":$table_type, "ArrayAttr":$value)>
+  ];
+}
+
 } // OpGroupConstantOps
 
 //===----------------------------------------------------------------------===//
@@ -1553,6 +1596,38 @@ def VM_BufferStoreF64Op :
     VM_BufferStoreOp<F64, "buffer.store.f64", VM_OPC_BufferStoreF64,
                      [VM_ExtF64]> {
   let summary = [{64-bit floating-point store}];
+}
+
+def VM_BufferHashOp : VM_Op<"buffer.hash", [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      MemoryEffects<[MemRead]>,
+    ]> {
+  let description = [{
+    Computes the SipHash-2-4 of the source buffer at the given offset for
+    |length| bytes using seed `0x0001020304...0e0f`.
+  }];
+
+  let arguments = (ins
+    VM_RefOf<VM_BufferType>:$source_buffer,
+    VM_BufferIndex:$source_offset,
+    VM_BufferIndex:$length
+  );
+  let results = (outs
+    I64:$result
+  );
+
+  let assemblyFormat = [{
+    $source_buffer `,` $source_offset `,` $length
+    attr-dict `:` type($source_buffer) `->` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_BufferHash>,
+    VM_EncOperand<"source_buffer", 0>,
+    VM_EncOperand<"source_offset", 1>,
+    VM_EncOperand<"length", 2>,
+    VM_EncResult<"result">,
+  ];
 }
 
 } // OpGroupBufferOps

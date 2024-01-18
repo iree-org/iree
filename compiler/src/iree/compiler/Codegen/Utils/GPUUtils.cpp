@@ -15,9 +15,12 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+#include <cassert>
+#include <cstdint>
 #include <optional>
 
 #define DEBUG_TYPE "iree-codegen-gpu-utils"
@@ -27,8 +30,7 @@
 
 static constexpr unsigned kShuffleBitWidth = 32;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // GPU processor IDs and sizes
@@ -319,7 +321,7 @@ void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
 // Reduction utils
 //===----------------------------------------------------------------------===//
 
-/// Packs scalar element to it's vector equivalent.
+/// Packs scalar element to its vector equivalent.
 /// (i.e f16 -> vector<1xf16> and f32 -> vector<1xf32>)
 static Value promoteElementToVector(Location loc, OpBuilder &builder,
                                     Value input) {
@@ -363,43 +365,63 @@ Value unpackToVector(Location loc, OpBuilder &builder, Value packedInput,
   return unpackedVector;
 }
 
-/// Emit warp reduction code sequence for a given input.
+/// Emit warp reduction code sequence for a given scalar input value.
 static Value warpReduction(Location loc, OpBuilder &builder, Value input,
                            vector::CombiningKind kind, uint32_t warpSize,
                            uint32_t numLaneToReduce) {
-  VectorType unpackedType = llvm::dyn_cast<VectorType>(input.getType());
-  Value laneVal = input;
   assert(llvm::isPowerOf2_32(numLaneToReduce));
+  assert((llvm::isa<IntegerType, FloatType>(input.getType())) &&
+         "Input must be a scalar");
+  IntegerType shuffleIntType = builder.getIntegerType(kShuffleBitWidth);
+  Type origInputType = input.getType();
+  const unsigned origBitWidth = origInputType.getIntOrFloatBitWidth();
+  assert(origBitWidth <= kShuffleBitWidth && "Unsupported input type bitwidth");
+
+  const bool needsPacking = kShuffleBitWidth != origBitWidth;
+  IntegerType equivIntType = builder.getIntegerType(origBitWidth);
+
+  // Always perform the shuffles over the supported scalar type. For inputs of
+  // smaller bitwidth, perform packing and unpacking via the supported integer
+  // type.
+  auto unpack = [loc, &builder, needsPacking, equivIntType,
+                 origInputType](Value packedVal) -> Value {
+    if (!needsPacking)
+      return packedVal;
+    auto asInt = builder.create<arith::TruncIOp>(loc, equivIntType, packedVal);
+    return builder.create<arith::BitcastOp>(loc, origInputType, asInt);
+  };
+
+  auto pack = [loc, &builder, needsPacking, equivIntType,
+               shuffleIntType](Value unpackedVal) -> Value {
+    if (!needsPacking)
+      return unpackedVal;
+    auto asInt =
+        builder.create<arith::BitcastOp>(loc, equivIntType, unpackedVal);
+    return builder.create<arith::ExtUIOp>(loc, shuffleIntType, asInt);
+  };
+
+  // Lane value always stays in the original type. We use it to perform arith
+  // reductions.
+  Value laneVal = input;
   // Parallel reduction using butterfly shuffles.
   for (uint64_t i = 1; i < numLaneToReduce; i <<= 1) {
-    Value shuffleInput = laneVal;
-    if (unpackedType) {
-      shuffleInput = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
     Value shuffled = builder
-                         .create<gpu::ShuffleOp>(loc, shuffleInput, i,
+                         .create<gpu::ShuffleOp>(loc, pack(laneVal), i,
                                                  /*width=*/warpSize,
                                                  /*mode=*/gpu::ShuffleMode::XOR)
                          .getShuffleResult();
-    if (unpackedType) {
-      shuffled = unpackToVector(loc, builder, shuffled, unpackedType);
-    }
-    laneVal = makeArithReduction(builder, loc, kind, laneVal, shuffled);
+    laneVal = makeArithReduction(builder, loc, kind, laneVal, unpack(shuffled));
   }
   // Broadcast the result to all the lanes.
   if (warpSize != numLaneToReduce) {
-    if (unpackedType) {
-      laneVal = packVectorToSupportedWidth(loc, builder, laneVal);
-    }
-    laneVal = builder
-                  .create<gpu::ShuffleOp>(loc, laneVal, 0,
-                                          /*width=*/warpSize,
-                                          /*mode=*/gpu::ShuffleMode::IDX)
-                  .getShuffleResult();
-    if (unpackedType) {
-      laneVal = unpackToVector(loc, builder, laneVal, unpackedType);
-    }
+    Value shuffled = builder
+                         .create<gpu::ShuffleOp>(loc, pack(laneVal), 0,
+                                                 /*width=*/warpSize,
+                                                 /*mode=*/gpu::ShuffleMode::IDX)
+                         .getShuffleResult();
+    laneVal = unpack(shuffled);
   }
+
   return laneVal;
 }
 
@@ -429,72 +451,19 @@ static TypedAttr getCombiningKindIdentity(OpBuilder &builder,
   case vector::CombiningKind::XOR:
     return builder.getZeroAttr(type);
   case vector::CombiningKind::MINIMUMF:
-  case vector::CombiningKind::MINF: {
+  case vector::CombiningKind::MINNUMF: {
     auto posInfApFloat = APFloat::getInf(
         llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/false);
     return builder.getFloatAttr(type, posInfApFloat);
   }
   case vector::CombiningKind::MAXIMUMF:
-  case vector::CombiningKind::MAXF: {
+  case vector::CombiningKind::MAXNUMF: {
     auto negInfApFloat = APFloat::getInf(
         llvm::cast<FloatType>(type).getFloatSemantics(), /*Negative=*/true);
     return builder.getFloatAttr(type, negInfApFloat);
   }
   }
   return TypedAttr();
-}
-
-/// Compute the value on a single thread to get per lane reduction value.
-/// If bit-width is not supported on shuffle operations, and a lower precision,
-/// we represent them as a vector S.T we can pack them into a single 32-bit
-/// width for shuffles.
-static Value reduceToSupportedWidth(Location loc, OpBuilder &builder,
-                                    Value input, vector::CombiningKind kind) {
-  auto vecType = llvm::cast<VectorType>(input.getType());
-  Type elementType = vecType.getElementType();
-  int64_t vecSize = vecType.getDimSize(0);
-  unsigned bitWidth = elementType.getIntOrFloatBitWidth();
-  // Simply reduce if it's already 32 bits.
-  if (bitWidth == kShuffleBitWidth) {
-    return builder.create<vector::ReductionOp>(loc, kind, input);
-  }
-  assert(kShuffleBitWidth % bitWidth == 0 &&
-         "Bitwidth needs to be able to be packed into shuffle-bitwidth.");
-  int64_t unrollCount = kShuffleBitWidth / bitWidth;
-  // Original size needs to be divisble by or less than unroll count to
-  // determine slice size.
-  assert(vecSize % unrollCount == 0 || vecSize < unrollCount);
-  unsigned sliceSize = vecSize / unrollCount;
-  VectorType unrolledLaneValType = VectorType::get({unrollCount}, elementType);
-  Value perLaneReduction = builder.create<arith::ConstantOp>(
-      loc, builder.getZeroAttr(unrolledLaneValType));
-  if (vecSize % unrollCount == 0) {
-    // Unroll reductions s.t we can pack into a supported 32-bitWidth format.
-    for (int64_t i = 0; i < unrollCount; i++) {
-      Value laneValSlice = builder.create<vector::ExtractStridedSliceOp>(
-          loc, input,
-          /*offsets=*/ArrayRef<int64_t>{sliceSize * i},
-          /*sizes=*/ArrayRef<int64_t>{sliceSize},
-          /*strides=*/ArrayRef<int64_t>{1});
-      Value reductionSlice =
-          builder.create<vector::ReductionOp>(loc, kind, laneValSlice);
-      SmallVector<int64_t> perLaneUnrollId = {i};
-      perLaneReduction = builder.create<vector::InsertOp>(
-          loc, reductionSlice, perLaneReduction, perLaneUnrollId);
-    }
-  } else {
-    // In cases where vecSize < unrollCount, we would pad the vector
-    // with identity elements until it's total bit size is 32.
-    TypedAttr identityAttr =
-        getCombiningKindIdentity(builder, kind, elementType);
-    identityAttr = DenseElementsAttr::get(unrolledLaneValType, identityAttr);
-    Value identity = builder.create<arith::ConstantOp>(loc, unrolledLaneValType,
-                                                       identityAttr);
-    perLaneReduction = builder.create<vector::InsertStridedSliceOp>(
-        loc, input, identity, /*offsets=*/ArrayRef<int64_t>{0},
-        /*strides=*/ArrayRef<int64_t>{1});
-  }
-  return perLaneReduction;
 }
 
 /// Emit identity variable.
@@ -562,7 +531,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
   // butterfly shuffle algorithm).
   //
   // First reduce on a single thread to get per lane reduction value.
-  Value laneVal = reduceToSupportedWidth(loc, builder, input, kind);
+  Value laneVal = builder.create<vector::ReductionOp>(loc, kind, input);
   laneVal = warpReduction(loc, builder, laneVal, kind, warpSize, warpSize);
   // if we have more than one warp, reduce across warps.
   if (size > warpSize) {
@@ -609,10 +578,7 @@ Value emitGPUGroupReduction(Location loc, OpBuilder &builder, Value input,
     }
     laneVal = warpReduction(loc, builder, loadVal, kind, warpSize, numWarp);
   }
-  // Handles cases for sub-32bit precision where output is still in vector form.
-  if (llvm::isa<VectorType>(laneVal.getType())) {
-    laneVal = builder.create<vector::ReductionOp>(loc, kind, laneVal);
-  }
+
   return laneVal;
 }
 
@@ -915,5 +881,42 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
   return false;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+//===----------------------------------------------------------------------===//
+// GPU UKernel Utils
+//===----------------------------------------------------------------------===//
+
+// TODO: Add more popular kernels into this list and the ukernel cmake.
+//       No real technical reason to only allow these aside from compile
+//       time and diskspace.
+bool hasUkernelSupportedRocmArch(StringRef targetChip) {
+  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
+                                        "gfx1100"};
+  size_t arraySize =
+      sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
+  for (int i = 0; i < arraySize; i++) {
+    // return true if targetChip is found inside kSupportedTargetChip.
+    if (targetChip.compare(kSupportedTargetChip[i]) == 0)
+      return true;
+  }
+  return false;
+}
+
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
+  if (!targetArch) {
+    return false;
+  }
+  StringRef targetArchStr = targetArch->getValue();
+  return hasUkernelSupportedRocmArch(targetArchStr);
+}
+
+/// Checks if target GPU has UKernel support.
+bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isROCMBackend(targetAttr) && hasUkernelSupportedRocmArch(targetAttr)) {
+    return true;
+  }
+  // TODO: Once plumbed, add a CUDA backend and supported cuda arch check.
+  return false;
+}
+
+} // namespace mlir::iree_compiler

@@ -17,7 +17,6 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AssignTargetDevices.cpp"
-    "BenchmarkBatchDispatches.cpp"
     "ConfigureExecutables.cpp"
     "ConvertToHAL.cpp"
     "DumpExecutableBenchmarks.cpp"
@@ -30,7 +29,9 @@ iree_cc_library(
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
+    "Passes.h.inc"
     "PreprocessExecutables.cpp"
+    "RepeatDispatches.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
     "StripExecutableContents.cpp"
@@ -38,6 +39,7 @@ iree_cc_library(
     "TranslateExecutables.cpp"
     "VerifyTargetEnvironment.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRAffineToStandard
     MLIRArithDialect
@@ -53,7 +55,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTransforms
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Analysis
     iree::compiler::Dialect::HAL::Conversion
@@ -74,6 +76,15 @@ iree_cc_library(
     iree::schemas::instruments
     iree::schemas::instruments::dispatch_def_c_fbs
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

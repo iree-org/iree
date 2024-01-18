@@ -34,8 +34,7 @@
 
 #define DEBUG_TYPE "iree-llvm-gpu-lowering-pass-pipeline"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
@@ -87,7 +86,7 @@ static void
 tileAndDistributeToWorkgroup(OpPassManager &pm,
                              bool useWARForCooperativeMatrixCodegen = false) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass(
-      /*maxWorkgroupParallelDims=*/1,
+      kNumMaxParallelDims,
       linalg::DistributionMethod::CyclicNumProcsEqNumIters));
 
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -116,7 +115,7 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
   options.foldCastIntoContract = true;
   options.maxVectorSize = 4096;
   pm.addNestedPass<func::FuncOp>(createGenericVectorizationPass(options));
-  pm.addNestedPass<func::FuncOp>(createHoistRedundantVectorTransfersPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeTensorInsertExtractSlicesPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 }
@@ -158,7 +157,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
@@ -208,7 +207,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // store to load forwarding. This relies on shacky alias analysis and we need
   // to move this to tensor level once we have better abstractions.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 
   // Hoist loop invariant code to avoid pipelining it.
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -249,7 +248,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -313,7 +312,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 
   // Distribute shared memory copies.
   nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
@@ -363,7 +362,7 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
 
   // tensor to memref
   addBufferizePasses(nestedModulePM);
@@ -407,7 +406,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createHoistRedundantVectorTransfersPass());
+        createOptimizeTensorInsertExtractSlicesPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
   }
@@ -423,7 +422,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeVectorTransferPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createHoistRedundantVectorTransfersPass());
+      createOptimizeTensorInsertExtractSlicesPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLoopInvariantCodeMotionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -485,9 +484,16 @@ void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
       createRemoveSingleIterationLoopPass());
 }
 
-void addGPUDefaultPassPipeline(OpPassManager &pm) {
-  tileAndBufferize(pm);
+void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
+  tileAndDistributeToWorkgroup(pm, /*useWARForCooperativeMatrixCodegen=*/true);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  if (enableMicrokernels) {
+    nestedModulePM.addPass(createGPULowerToUKernelsPass());
+  }
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+
+  addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
 }
@@ -670,5 +676,4 @@ void registerCodegenLLVMGPUPasses() {
       });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

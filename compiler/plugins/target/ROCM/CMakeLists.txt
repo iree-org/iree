@@ -28,6 +28,7 @@ iree_cc_library(
   DEPS
     LLVMAMDGPUCodeGen
     LLVMAnalysis
+    LLVMBitWriter
     LLVMCore
     LLVMIRReader
     LLVMLinker
@@ -50,9 +51,11 @@ iree_cc_library(
     MLIRROCDLToLLVMIRTranslation
     MLIRSupport
     MLIRTargetLLVMIRExport
-    iree::compiler::Codegen::Dialect::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::schemas::rocm_executable_def_c_fbs

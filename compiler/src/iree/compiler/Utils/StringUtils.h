@@ -11,8 +11,7 @@
 
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // Replaces all occurrences of `match` in `str` with `substitute`.
 // Operates in place.
@@ -47,7 +46,6 @@ std::string sanitizeSymbolName(StringRef name);
 //  `a$-æb` -> `a_-_b`
 std::string sanitizeFileName(StringRef name);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_UTILS_STRINGUTILS_H_

@@ -6,6 +6,13 @@
 
 set(FLATCC_ROOT "${IREE_ROOT_DIR}/third_party/flatcc/")
 
+# We don't install any headers because their only use is in built code
+# (not public).
+set(IREE_HDRS_ROOT_PATH OFF)
+# Considered part of the runtime. See runtime/src/CMakeLists.txt.
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT IREEBundledLibraries)
+set(IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_EXPORT_SET Runtime)
+
 external_cc_library(
   PACKAGE
     flatcc
@@ -56,7 +63,7 @@ external_cc_library(
     parsing
   ROOT
     ${FLATCC_ROOT}
-  INCLUDES
+  SYSTEM_INCLUDES
     "${FLATCC_ROOT}/include"
   SRCS
     "config/config.h"
@@ -116,6 +123,10 @@ add_executable(iree-flatcc-cli
   "${FLATCC_ROOT}/src/runtime/emitter.c"
   "${FLATCC_ROOT}/src/runtime/refmap.c"
 )
+set_target_properties(iree-flatcc-cli
+  PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${IREE_BINARY_DIR}/tools"
+)
 target_include_directories(iree-flatcc-cli SYSTEM
   PUBLIC
     "${FLATCC_ROOT}/external"
@@ -124,7 +135,7 @@ target_include_directories(iree-flatcc-cli SYSTEM
 )
 install(
   TARGETS iree-flatcc-cli
-  COMPONENT iree-flatcc-cli
+  COMPONENT IREETools-Runtime
   RUNTIME DESTINATION bin
   BUNDLE DESTINATION bin
 )

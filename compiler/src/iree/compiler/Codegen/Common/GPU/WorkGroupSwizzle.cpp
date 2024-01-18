@@ -9,8 +9,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// This function implements the following swizzling logic
 /// void getTiledId2(unsigned x, unsigned y, unsigned* tiledx,
@@ -123,5 +122,4 @@ createWorkGroupSwizzle(unsigned swizzleLogTile) {
   return std::make_unique<WorkGroupSwizzlePass>(swizzleLogTile);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

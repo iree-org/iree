@@ -10,15 +10,10 @@
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/MappingInfo.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
-namespace llvm {
-class raw_ostream;
-}
-
-namespace mlir {
-namespace iree_compiler {
-namespace gpu {
+namespace mlir::iree_compiler::gpu {
 
 struct AbstractGemmLikeStrategy : GPUStrategy {
   AbstractGemmLikeStrategy(const GPUModel &gpuModel) : GPUStrategy(gpuModel) {}
@@ -181,8 +176,6 @@ struct AbstractGemmLikeStrategy : GPUStrategy {
   constexpr static int64_t kMinMmaSyncMinK = 4;
 };
 
-} // namespace gpu
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::gpu
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_ABSTRACT_GEMM_LIKE_STRATEGY_H_

@@ -19,10 +19,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace VM {
+namespace mlir::iree_compiler::IREE::VM {
 
 //===----------------------------------------------------------------------===//
 // ListType
@@ -171,7 +168,4 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   });
 }
 
-} // namespace VM
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::VM

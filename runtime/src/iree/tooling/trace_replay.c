@@ -88,9 +88,7 @@ void iree_trace_replay_deinitialize(iree_trace_replay_t* replay) {
 }
 
 void iree_trace_replay_set_hal_devices_override(
-    iree_trace_replay_t* replay, iree_host_size_t device_uri_count,
-    const iree_string_view_t* device_uris) {
-  replay->device_uri_count = device_uri_count;
+    iree_trace_replay_t* replay, iree_string_view_list_t device_uris) {
   replay->device_uris = device_uris;
 }
 
@@ -133,7 +131,9 @@ iree_status_t iree_trace_replay_event_context_load(iree_trace_replay_t* replay,
 // type: module_load
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): rework this to allow for multiple devices from a device set.
+// TODO(multi-device): rework this to allow for multiple devices. Today it
+// assumes there's a single device but the |device_node| can specify any
+// arbitrary device we want to create.
 static iree_status_t iree_trace_replay_create_device(
     iree_trace_replay_t* replay, yaml_node_t* device_node,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
@@ -147,15 +147,17 @@ static iree_status_t iree_trace_replay_create_device(
   // Use the provided driver name or override with the --device= flag.
   iree_string_view_t device_uri = iree_yaml_node_as_string(device_node);
   if (iree_string_view_is_empty(device_uri)) {
-    if (replay->device_uri_count != 1) {
+    if (replay->device_uris.count != 1) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "exactly one device must be specified when none "
                               "is present in the trace file");
     }
-    device_uri = replay->device_uris[0];
+    device_uri = replay->device_uris.values[0];
   }
 
   // Try to create the device.
+  // NOTE: this is assuming a single device only - we may retire trace replay
+  // before we ever try to make it work with multiple devices.
   return iree_hal_create_device_from_flags(replay->driver_registry, device_uri,
                                            host_allocator, out_device);
 }
@@ -176,8 +178,8 @@ static iree_status_t iree_trace_replay_load_builtin_module(
     IREE_RETURN_IF_ERROR(iree_trace_replay_create_device(
         replay, device_node, replay->host_allocator, &replay->device));
     IREE_RETURN_IF_ERROR(iree_hal_module_create(
-        replay->instance, replay->device, IREE_HAL_MODULE_FLAG_NONE,
-        replay->host_allocator, &module));
+        replay->instance, /*device_count=*/1, &replay->device,
+        IREE_HAL_MODULE_FLAG_NONE, replay->host_allocator, &module));
   }
   if (!module) {
     return iree_make_status(
@@ -345,7 +347,7 @@ static void iree_trace_replay_write_element(
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_16, uint16_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_32, uint32_t)
     IREE_TRACE_REPLAY_WRITE_ELEMENT_CASE(UINT_64, uint64_t)
-    // clang-format off
+      // clang-format off
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
       break;
@@ -392,9 +394,12 @@ static void iree_trace_replay_get_min_max_for_element_type(
     case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
-    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
       *min = -4;
       *max = +4;
+      break;
+    case IREE_HAL_ELEMENT_TYPE_BFLOAT_16:
+      *min = -2;
+      *max = +2;
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       *min = 0;

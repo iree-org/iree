@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <stdio.h>
-
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/task/topology.h"
 
-#if !defined(IREE_PLATFORM_WINDOWS)
+#if !defined(IREE_PLATFORM_APPLE) && !defined(IREE_PLATFORM_EMSCRIPTEN) && \
+    !defined(IREE_PLATFORM_WINDOWS)
 
 // Initializes |out_topology| with a standardized behavior when cpuinfo is not
 // available (unsupported arch, failed to query, etc).
@@ -87,8 +86,9 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 }
 
 iree_status_t iree_task_topology_initialize_from_physical_cores(
-    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
-    iree_task_topology_t* out_topology) {
+    iree_task_topology_node_id_t node_id,
+    iree_task_topology_performance_level_t performance_level,
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   iree_task_topology_initialize_fallback(max_core_count, out_topology);
   return iree_ok_status();
 }
@@ -113,17 +113,6 @@ iree_host_size_t iree_task_topology_query_node_count(void) {
 // We wrap this here because cpuinfo only returns non-NULL on linux.
 static const struct cpuinfo_core* iree_task_topology_get_current_core() {
   const struct cpuinfo_core* current_core = cpuinfo_get_current_core();
-#if defined(IREE_PLATFORM_WINDOWS)
-  // TODO(benvanik): drop cpuinfo.
-  if (current_core == NULL) {
-    PROCESSOR_NUMBER processor_number;
-    GetCurrentProcessorNumberEx(&processor_number);
-    uint32_t processor_id =
-        cpuinfo_get_package(processor_number.Group)->processor_start +
-        processor_number.Number;
-    current_core = cpuinfo_get_processor(processor_id)->core;
-  }
-#endif  // IREE_PLATFORM_WINDOWS
   return current_core;
 }
 
@@ -176,9 +165,6 @@ static void iree_task_topology_set_affinity_from_processor(
 #elif defined(__linux__)
   out_affinity->group = processor->cluster->cluster_id;
   out_affinity->id = processor->linux_id;
-#elif defined(_WIN32) || defined(__CYGWIN__)
-  out_affinity->group = processor->windows_group_id;
-  out_affinity->id = processor->windows_processor_id;
 #else
   // WASM? Unusued today.
   out_affinity->specified = 0;
@@ -324,34 +310,73 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
         i, processor, &out_topology->groups[i]);
   }
 
-  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
+  iree_status_t status =
+      iree_task_topology_fixup_constructive_sharing_masks(out_topology);
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 // Returns true if the given |core| passes the filter and should be included.
 // |user_data| is the value passed alongside the filter function.
 typedef bool (*iree_task_topology_core_filter_t)(
-    const struct cpuinfo_core* core, uintptr_t user_data);
+    const struct cpuinfo_core* core, void* user_data);
+
+typedef struct iree_task_topology_core_filter_params_t {
+  uint32_t cluster_id;
+  iree_task_topology_performance_level_t performance_level;
+} iree_task_topology_core_filter_params_t;
 
 // Matches all cores that have the provided cluster ID.
 static bool iree_task_topology_core_filter_by_cluster_id(
-    const struct cpuinfo_core* core, uintptr_t user_data) {
-  uint32_t cluster_id = (uint32_t)user_data;
-  if (cluster_id == IREE_TASK_TOPOLOGY_NODE_ID_ANY) return true;
-  return core->cluster->cluster_id == cluster_id;
+    const struct cpuinfo_core* core, void* user_data) {
+  const iree_task_topology_core_filter_params_t* params =
+      (const iree_task_topology_core_filter_params_t*)user_data;
+  if (params->cluster_id != IREE_TASK_TOPOLOGY_NODE_ID_ANY &&
+      core->cluster->cluster_id != params->cluster_id) {
+    return false;
+  }
+  // cpuinfo doesn't expose performance levels and instead we have to switch on
+  // uarch - yuck.
+  iree_task_topology_performance_level_t core_performance_level =
+      IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY;
+  switch (core->uarch) {
+    default:
+      // Unknown or homogeneous.
+      core_performance_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY;
+      break;
+    case cpuinfo_uarch_monsoon:    // Apple A11 big core
+    case cpuinfo_uarch_vortex:     // Apple A12 big core
+    case cpuinfo_uarch_lightning:  // Apple A13 big core
+    case cpuinfo_uarch_firestorm:  // Apple A14 big core
+    case cpuinfo_uarch_avalanche:  // Apple A15 big core
+      core_performance_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_HIGH;
+      break;
+    case cpuinfo_uarch_mistral:   // Apple A11 little core
+    case cpuinfo_uarch_tempest:   // Apple A12 little core
+    case cpuinfo_uarch_thunder:   // Apple A13 little core
+    case cpuinfo_uarch_icestorm:  // Apple A14 little core
+    case cpuinfo_uarch_blizzard:  // Apple A15 little core
+      core_performance_level = IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_LOW;
+      break;
+  }
+  if (core_performance_level == IREE_TASK_TOPOLOGY_PERFORMANCE_LEVEL_ANY) {
+    // Unable to distinguish/homogenous cores, always match.
+    return true;
+  }
+  return core_performance_level == params->performance_level;
 }
 
 // Initializes a topology with one group for each core that matches |filter_fn|.
 //
 // If cpuinfo is not available this falls back to the same behavior as
 // iree_task_topology_initialize_from_physical_cores.
-static void iree_task_topology_initialize_from_physical_cores_with_filter(
-    iree_task_topology_core_filter_t filter_fn, uintptr_t filter_fn_data,
+static iree_status_t
+iree_task_topology_initialize_from_physical_cores_with_filter(
+    iree_task_topology_core_filter_t filter_fn, void* filter_fn_data,
     iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
   if (!iree_task_topology_is_cpuinfo_available()) {
     iree_task_topology_initialize_fallback(max_core_count, out_topology);
-    return;
+    return iree_ok_status();
   }
 
   max_core_count = iree_min(max_core_count, IREE_TASK_TOPOLOGY_GROUP_BIT_COUNT);
@@ -388,19 +413,26 @@ static void iree_task_topology_initialize_from_physical_cores_with_filter(
     }
   }
 
-  iree_task_topology_fixup_constructive_sharing_masks(out_topology);
+  iree_status_t status =
+      iree_task_topology_fixup_constructive_sharing_masks(out_topology);
   IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 iree_status_t iree_task_topology_initialize_from_physical_cores(
-    iree_task_topology_node_id_t node_id, iree_host_size_t max_core_count,
-    iree_task_topology_t* out_topology) {
-  iree_task_topology_initialize_from_physical_cores_with_filter(
-      iree_task_topology_core_filter_by_cluster_id, (uintptr_t)node_id,
-      max_core_count, out_topology);
-  return iree_ok_status();
+    iree_task_topology_node_id_t node_id,
+    iree_task_topology_performance_level_t performance_level,
+    iree_host_size_t max_core_count, iree_task_topology_t* out_topology) {
+  iree_task_topology_core_filter_params_t params = {
+      .cluster_id = node_id,
+      .performance_level = performance_level,
+  };
+  return iree_task_topology_initialize_from_physical_cores_with_filter(
+      iree_task_topology_core_filter_by_cluster_id, &params, max_core_count,
+      out_topology);
 }
 
 #endif  // IREE_TASK_CPUINFO_DISABLED
 
-#endif  // !IREE_PLATFORM_WINDOWS
+#endif  // !IREE_PLATFORM_APPLE && !IREE_PLATFORM_EMSCRIPTEN &&
+        // !IREE_PLATFORM_WINDOWS

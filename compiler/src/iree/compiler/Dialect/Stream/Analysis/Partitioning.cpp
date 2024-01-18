@@ -13,10 +13,7 @@
 
 #define DEBUG_TYPE "iree-stream-partitioning"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 #ifndef NDEBUG
 
@@ -182,7 +179,4 @@ partitionRegionConcurrency(IREE::Stream::PartitioningConfigAttr config,
   return partitionRegionConcurrencyReference(config, block);
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

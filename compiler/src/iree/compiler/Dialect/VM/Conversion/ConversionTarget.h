@@ -12,8 +12,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // A conversion target for the VM dialect that handles some boilerplate for
 // nested module conversion.
@@ -38,7 +37,6 @@ public:
   VMConversionTarget(MLIRContext *context);
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_CONVERSIONTARGET_H_

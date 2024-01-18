@@ -11,7 +11,7 @@
 #include <optional>
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -22,18 +22,14 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-
-constexpr StringLiteral kCudaTarget = "cuda";
-constexpr StringLiteral kRocmTarget = "rocm";
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -52,10 +48,10 @@ llvm::cl::opt<bool>
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
                     llvm::cl::init(false));
 
-} // namespace iree_compiler
-} // namespace mlir
-
 namespace {
+
+constexpr StringLiteral kCudaTarget = "cuda";
+constexpr StringLiteral kRocmTarget = "rocm";
 
 /// Structure to represent target features.
 struct TargetInfo {
@@ -76,6 +72,7 @@ struct TileWorkgroupSizePair {
 
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
+
 } // namespace
 
 /// Return the best combination of tile size and wg size. It will then used to
@@ -288,18 +285,21 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
 
   // Also exclude the case of matvec, which has only one non-unit parallel dim.
   // They should go down different pipelines.
-  int nonUnitParallelDimCount = 0;
+  // Currently dynamic dimensions are tiled with size=1 in codegen.
+  int staticNonUnitParallelDimCount = 0;
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
   for (auto mDim : contractionDims->m) {
-    nonUnitParallelDimCount += bounds[mDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[mDim] != 1 && !ShapedType::isDynamic(bounds[mDim]);
   }
   for (auto nDim : contractionDims->n) {
-    nonUnitParallelDimCount += bounds[nDim] != 1;
+    staticNonUnitParallelDimCount +=
+        bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
   }
-  if (nonUnitParallelDimCount <= 1)
+  if (staticNonUnitParallelDimCount <= 1)
     return failure();
 
   // Don't consider operations that don't have a broadcast, those should go
@@ -386,9 +386,9 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       }
     }
   }
-  bool isStaticSize = sizeM != ShapedType::kDynamic &&
-                      sizeN != ShapedType::kDynamic &&
-                      sizeK != ShapedType::kDynamic;
+  bool isStaticSize = !ShapedType::isDynamic(sizeM) &&
+                      !ShapedType::isDynamic(sizeN) &&
+                      !ShapedType::isDynamic(sizeK);
   if (isStaticSize) {
     /// Try tensorcore config first.
     if (supportsTensorCore(entryPoint, op, targetInfo)) {
@@ -763,6 +763,37 @@ static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
   return setTranslationInfo(entryPoint, translationInfo);
 }
 
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getNumParallelLoops() != 2)
+    return false;
+
+  if (linalgOp.getNumReductionLoops() != 1)
+    return false;
+
+  // TODO: Allow for matvec with fused dequantization.
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // TODO: Support batch matvec.
+  if (!dims->batch.empty())
+    return false;
+
+  for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
+    if (!llvm::hasSingleElement(indices))
+      return false;
+  }
+
+  // Check if the first parallel dimension has bound 1, indicating we found a
+  // vector shape.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  if (bounds[dims->m.front()] != 1)
+    return false;
+
+  return true;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
                                             linalg::LinalgOp op,
@@ -907,7 +938,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   // Total parallel size that can fill the GPU with enough workgorups.
   // TODO: query from the target device; roughly 2x hardware compute unit.
-  int parallelThreshold = 256;
+  const int parallelThreshold = 256;
   // How many 128-bit vectors each thread should at least read.
   const int targetVectorCount = 8;
   while (parallelSize && *parallelSize > parallelThreshold &&
@@ -926,6 +957,26 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   if ((groupSize / subgroupSize) > subgroupSize)
     return failure();
 
+  // With just one subgroup per workgroup, make each subgroup do more work and
+  // process a few reductions (rows) along the last parallel dimension.
+  //
+  // TODO: This is enabled for matvec on ROCm for now. We should
+  // validate this strategy and extend to more linalg generics and to CUDA.
+  if (isRocmTarget(entryPoint) &&
+      llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
+    int64_t lastParallelBound = bounds[parallelDims.back()];
+    int64_t numParallelReductions = 1;
+    const int64_t maxParallelFactor = groupSize / 4;
+    for (int64_t parallelFactor = 2;
+         (parallelFactor < maxParallelFactor) &&
+         (lastParallelBound % parallelFactor == 0) &&
+         (lastParallelBound > parallelFactor);
+         parallelFactor *= 2) {
+      numParallelReductions = parallelFactor;
+    }
+    workgroupTileSizes.back() = numParallelReductions;
+  }
+
   std::array<int64_t, 3> workgroupSize = {groupSize, 1, 1};
   SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
   int64_t remainingGroupSize = groupSize;
@@ -943,7 +994,7 @@ static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
   }
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
@@ -1009,6 +1060,83 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
       entryPoint, linalgOp, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem,
       workgroupSize);
+}
+
+/// Set the configuration for argmax that can be mapped to argmax uKernel.
+/// Distribute all parallel dim across different workgroups, and only use single
+/// subgroup per workgroup.
+static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
+                                            linalg::GenericOp op,
+                                            const TargetInfo &targetInfo) {
+
+  // Checks if UKernels are enabled.
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    auto target = variantOp.getTarget();
+    const char ukernelName[] = "argmax";
+    if (!hasUkernel(target, ukernelName) ||
+        !hasUkernelSupportedGpuArch(target)) {
+      return failure();
+    }
+  }
+
+  if (!targetInfo.hasWarpShuffle)
+    return failure();
+
+  if (failed(isArgmaxOp(op)))
+    return failure();
+  SmallVector<unsigned> parallelDims;
+  SmallVector<unsigned> reductionDims;
+  op.getParallelDims(parallelDims);
+  op.getReductionDims(reductionDims);
+
+  // Currently Argmax UKernel only support 1 reduction dim.
+  if (reductionDims.size() != 1)
+    return failure();
+
+  // Make sure reduction dimensions are static and innermost ones.
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  int64_t numParallelDims = op.getNumParallelLoops();
+  int64_t numDynamicReductionDims = 0;
+  for (unsigned dim : reductionDims) {
+    if (ShapedType::isDynamic(bounds[dim])) {
+      numDynamicReductionDims++;
+    }
+    if (dim < numParallelDims) {
+      return failure();
+    }
+  }
+
+  // Distribution of multi-dim masked writes currently aren't fully supported.
+  if (numDynamicReductionDims > 1) {
+    return failure();
+  }
+
+  // Tile all the parallel dimension to 1.
+  SmallVector<unsigned> partitionedLoops =
+      cast<PartitionableLoopsInterface>(op.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  size_t numLoops = partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1;
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 1);
+
+  // Currently Argmax Ukernel let's every thread reduce reductionDim/WarpSize
+  // number of elements, and then it does a single step butterfly warp reduce.
+  // Hence it expects workgroupSize to be warpSize(subgroupSize), and
+  // reductionTileSize to be size of the reduction dim.
+  SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
+  int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+  reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+  std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
+  if (failed(setOpConfigAndEntryPointFnTranslation(
+          entryPoint, op, tileSizes,
+          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault,
+          workgroupSize))) {
+    return failure();
+  }
+  return success();
 }
 
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
@@ -1205,6 +1333,9 @@ static LogicalResult setRootConfig(func::FuncOp entryPointFn,
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
       return success();
+    } else if (genericOp && succeeded(setArgmaxUkernelConfig(
+                                entryPointFn, genericOp, targetInfo))) {
+      return success();
     }
   }
 
@@ -1241,9 +1372,6 @@ static void propagateLoweringConfig(Operation *rootOperation,
     }
   }
 }
-
-namespace mlir {
-namespace iree_compiler {
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
@@ -1311,5 +1439,4 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   return success();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

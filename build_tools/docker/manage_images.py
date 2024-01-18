@@ -50,16 +50,12 @@ IMAGES_TO_DEPENDENCIES = {
     "nvidia": ["base"],
     "riscv": ["base"],
     "riscv-toolchain-builder": [],
-    "gradle-android": ["base"],
     "frontends": ["android"],
-    "swiftshader": ["base"],
-    "samples": ["swiftshader"],
-    "frontends-swiftshader": ["frontends", "swiftshader"],
+    "samples": ["base"],
     "frontends-nvidia": ["frontends"],
     # Containers with all the newest versions of dependencies that we support
     # instead of the oldest.
     "base-bleeding-edge": [],
-    "swiftshader-bleeding-edge": ["base-bleeding-edge"],
     "nvidia-bleeding-edge": ["base-bleeding-edge"],
 }
 

@@ -20,9 +20,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::GlobalOptimization {
 
 class MaterializeHomogeneousEncodingsPass
     : public MaterializeHomogeneousEncodingsBase<
@@ -46,13 +44,8 @@ public:
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
-    auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
-    if (!targetsAttr || targetsAttr.size() != 1) {
-      return runNopPipeline(moduleOp);
-    }
-    auto deviceTarget = cast<IREE::HAL::DeviceTargetAttr>(targetsAttr[0]);
-    SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
-        deviceTarget.getExecutableTargets();
+    auto executableTargets =
+        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(moduleOp);
     if (executableTargets.size() != 1) {
       return runNopPipeline(moduleOp);
     }
@@ -85,6 +78,4 @@ createMaterializeHomogeneousEncodingsPass() {
   return std::make_unique<MaterializeHomogeneousEncodingsPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::GlobalOptimization

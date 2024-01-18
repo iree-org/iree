@@ -96,17 +96,14 @@ func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f
 
 // -----
 
-#map = affine_map<() -> ()>
-func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view {
+func.func @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> tensor<i32> {
   %c1 = arith.constant 1 : index
   %c2_i32 = arith.constant 2 : i32
   %c0 = arith.constant 0 : index
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<1xi32>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<1xi32>
   %2 = tensor.empty() : tensor<i32>
-  %extracted = tensor.extract %0[%c1] : tensor<1xi32>
+  %extracted = tensor.extract %arg0[%c1] : tensor<1xi32>
   %4 = flow.dispatch.region -> (tensor<i32>) {
-    %6 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%2 : tensor<i32>) {
+    %6 = linalg.generic {indexing_maps = [affine_map<() -> ()>], iterator_types = []} outs(%2 : tensor<i32>) {
     ^bb0(%out: i32):
       %7 = arith.addi %extracted, %c2_i32 : i32
       linalg.yield %7 : i32
@@ -115,8 +112,7 @@ func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   } count() -> (index, index, index) {
     flow.return %c1, %c1, %c1 : index, index, index
   }
-  %5 = hal.tensor.export %4 "output 0" : tensor<i32> -> !hal.buffer_view
-  return %5 : !hal.buffer_view
+  return %4 : tensor<i32>
 }
 
 
@@ -185,4 +181,59 @@ func.func @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1
 //  CHECK-SAME:       ins(%[[ARG1]], %[[GEN0]] :
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   flow.return %[[GEN1]] :
+//       CHECK:   return %[[DISP]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+module {
+  func.func @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
+    %c0_i32 = arith.constant 0 : i32
+    %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
+    %1 = linalg.generic {indexing_maps = [#map, #map],
+                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                         ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
+    ^bb0(%in: i16, %out: i32):
+      %7 = arith.extsi %in : i16 to i32
+      linalg.yield %7 : i32
+    } -> tensor<32x1x16x1x8xi32>
+    %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
+    %3 = linalg.generic {indexing_maps = [#map, #map],
+                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                         ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
+    ^bb0(%in: i4, %out: i32):
+      %7 = arith.extui %in : i4 to i32
+      linalg.yield %7 : i32
+    } -> tensor<32x344x16x32x8xi32>
+    %4 = tensor.empty() : tensor<32x1x344x1x32xi32>
+    %5 = linalg.fill ins(%c0_i32 : i32) outs(%4 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+    %6 = flow.dispatch.region -> (tensor<32x1x344x1x32xi32>) {
+      %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+      flow.return %7 : tensor<32x1x344x1x32xi32>
+    }
+    return %6 : tensor<32x1x344x1x32xi32>
+  }
+}
+//       CHECK: func.func @clone_dequantization
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<32x1x16x1x8xi16>
+//  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<32x344x16x32x8xi4>
+//       CHECK:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<32x1x344x1x32xi32>)
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : i32
+//   CHECK-DAG:   %[[INIT0:.+]] = tensor.empty() : tensor<32x1x16x1x8xi32>
+//   CHECK-DAG:   %[[INIT1:.+]] = tensor.empty() : tensor<32x1x344x1x32xi32>
+//   CHECK-DAG:   %[[INIT2:.+]] = tensor.empty() : tensor<32x344x16x32x8xi32>
+//       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[C0]]
+//  CHECK-SAME:       outs(%[[INIT1]] :
+//       CHECK:   %[[GEN0:.+]] = linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%[[ARG0]] :
+//  CHECK-SAME:       outs(%[[INIT0]] :
+//       CHECK:   %[[GEN1:.+]] = linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
+//  CHECK-SAME:       ins(%[[ARG1]] :
+//  CHECK-SAME:       outs(%[[INIT2]] :
+//       CHECK:   %[[MMT4D:.+]] = linalg.batch_mmt4d
+//  CHECK-SAME:       ins(%[[GEN0]], %[[GEN1]] :
+//  CHECK-SAME:       outs(%[[FILL]] :
+//       CHECK:   flow.return %[[MMT4D]] :
 //       CHECK:   return %[[DISP]]

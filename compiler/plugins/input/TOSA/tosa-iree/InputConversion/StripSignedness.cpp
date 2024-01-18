@@ -10,8 +10,7 @@
 #include "tosa-iree/InputConversion/PassDetail.h"
 #include "tosa-iree/InputConversion/Passes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -131,5 +130,4 @@ createStripSignednessPass() {
   return std::make_unique<StripSignednessPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

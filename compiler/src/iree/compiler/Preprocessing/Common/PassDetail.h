@@ -12,15 +12,11 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
+namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: keep
 
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::Preprocessing
 
 #endif // IREE_COMPILER_PREPROCESSING_COMMON_PASS_DETAIL_H_

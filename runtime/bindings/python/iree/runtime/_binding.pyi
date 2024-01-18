@@ -324,6 +324,12 @@ class ParameterIndex:
         writable: bool = False,
         mmap: bool = True
     ) -> None: ...
+    def create_archive_file(
+        self,
+        file_path: str,
+        file_offset: int = 0,
+        target_index: Optional[ParameterIndex] = None,
+    ) -> ParameterIndex: ...
     def create_provider(
         self, *, scope: str = "", max_concurrent_operations: Optional[int] = None
     ) -> ParameterProvider: ...

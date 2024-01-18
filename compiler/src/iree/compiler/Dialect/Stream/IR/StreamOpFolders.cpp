@@ -5,22 +5,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <algorithm>
-#include <numeric>
 #include <optional>
 
-#include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/StringExtras.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dominance.h"
@@ -28,15 +21,11 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Stream {
+namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
 // Utilities shared across patterns
@@ -1226,7 +1215,8 @@ OpFoldResult TensorExportOp::fold(FoldAdaptor operands) {
   // If operand comes from import with the same properties then fold.
   // These checks are conservative, since encoding changes may be meaningful.
   auto importOp = getSource().getDefiningOp<TensorImportOp>();
-  if (importOp && getSourceEncoding() == importOp.getResultEncoding() &&
+  if (importOp && importOp.getSource().getType() == getType() &&
+      getSourceEncoding() == importOp.getResultEncoding() &&
       getSourceEncodingDims() == importOp.getResultEncodingDims() &&
       getSourceSize() == importOp.getResultSize() &&
       getAffinity() == importOp.getAffinity()) {
@@ -1361,10 +1351,8 @@ void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.tensor.clone
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorCloneOp::fold(FoldAdaptor operands) {
-  auto users = getResult().getUsers();
-  if (!users.empty() && std::next(users.begin()) == users.end()) {
-    // If the second user is the end it means there's one user.
+OpFoldResult TensorCloneOp::fold(FoldAdaptor) {
+  if (getResult().hasOneUse() && getType() == getSource().getType()) {
     return getSource();
   }
   return {};
@@ -1377,7 +1365,8 @@ struct ElideUnneededTensorClones : public OpRewritePattern<TensorCloneOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TensorCloneOp cloneOp,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::Util::TiedOpInterface::hasAnyTiedUses(cloneOp.getResult())) {
+    if (cloneOp.getType() == cloneOp.getSource().getType() &&
+        !IREE::Util::TiedOpInterface::hasAnyTiedUses(cloneOp.getResult())) {
       rewriter.replaceOp(cloneOp, cloneOp.getSource());
       return success();
     }
@@ -1799,7 +1788,8 @@ void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
-  if (getUpdateSize() == getTargetSize()) {
+  if (getUpdateSize() == getTargetSize() &&
+      getUpdate().getType() == getType()) {
     // If updating the entire target then just replace with the update.
     // Note that this breaks copy-on-write semantics but will be fixed up during
     // canonicalization if needed.
@@ -3389,7 +3379,4 @@ OpFoldResult ChannelCountOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-} // namespace Stream
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Stream

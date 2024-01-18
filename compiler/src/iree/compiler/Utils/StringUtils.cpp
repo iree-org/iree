@@ -8,8 +8,7 @@
 
 #include "llvm/ADT/StringRef.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 void replaceAllSubstrsInPlace(std::string &str, const std::string &match,
                               const std::string &substitute) {
@@ -55,5 +54,4 @@ std::string sanitizeFileName(StringRef name) {
   return result;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

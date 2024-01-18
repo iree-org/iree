@@ -11,6 +11,7 @@
 
 #include "iree/hal/allocator.h"         // IWYU pragma: export
 #include "iree/hal/buffer.h"            // IWYU pragma: export
+#include "iree/hal/buffer_transfer.h"   // IWYU pragma: export
 #include "iree/hal/buffer_view.h"       // IWYU pragma: export
 #include "iree/hal/buffer_view_util.h"  // IWYU pragma: export
 #include "iree/hal/channel.h"           // IWYU pragma: export

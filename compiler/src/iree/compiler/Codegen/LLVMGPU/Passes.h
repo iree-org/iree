@@ -12,11 +12,10 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Passes
@@ -54,7 +53,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
 /// Default pass pipeline on GPU, currently used only for the ukernel path.
-void addGPUDefaultPassPipeline(OpPassManager &pm);
+void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels);
 
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm);
@@ -132,7 +131,6 @@ void registerCodegenLLVMGPUPasses();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_

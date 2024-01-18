@@ -23,8 +23,8 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 // Pattern to canonialize tranpose where only one dimension is not unit
@@ -157,5 +157,4 @@ createOptimizeVectorTransferPass(bool flatten, bool dropUnitDims) {
   return std::make_unique<OptimizeVectorTransferPass>(flatten, dropUnitDims);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

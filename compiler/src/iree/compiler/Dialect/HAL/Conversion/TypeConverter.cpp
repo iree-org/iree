@@ -10,8 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 HALTypeConverter::HALTypeConverter(
     ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
@@ -85,5 +84,4 @@ HALTypeConverter::HALTypeConverter(
   });
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

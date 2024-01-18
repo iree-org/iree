@@ -23,10 +23,11 @@ table ExecutableDef {
   entry_points:[string];
 
   // Block sizes for each entry point.
-  //
+  // This list has the same size as the entry_points list.
   block_sizes:[BlockSizeDef];
 
   // Size of dynamic shared memory.
+  // This list has the same size as the entry_points list.
   shared_memory_sizes:[uint32];
 
   // HSACO string of the module.

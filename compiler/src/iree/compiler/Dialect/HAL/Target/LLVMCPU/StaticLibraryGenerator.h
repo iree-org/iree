@@ -10,10 +10,7 @@
 
 #include <string>
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 // Produces a static executable library and generated '.h'.
 // The temporary object file is copied to the library_output_path. The '.h' file
@@ -24,9 +21,6 @@ bool outputStaticLibrary(const std::string &library_name,
                          const std::string &library_output_path,
                          const std::string &temp_object_path);
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL
 
 #endif // IREE_COMPILER_DIALECT_HAL_TARGET_LLVMCPU_STATICLIBRARYGENERATOR_H_

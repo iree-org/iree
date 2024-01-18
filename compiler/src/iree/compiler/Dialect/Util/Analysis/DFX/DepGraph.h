@@ -14,9 +14,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace DFX {
+namespace mlir::iree_compiler::DFX {
 
 class AbstractElement;
 class Solver;
@@ -99,9 +97,7 @@ struct DepGraph {
   AsmState &asmState;
 };
 
-} // namespace DFX
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::DFX
 
 namespace llvm {
 

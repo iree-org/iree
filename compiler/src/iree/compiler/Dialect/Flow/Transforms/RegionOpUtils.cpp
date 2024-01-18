@@ -29,6 +29,8 @@
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
+#define DEBUG_TYPE "iree-flow-region-op-utils"
+
 // NOTE: These flags are added for experimental purposes only
 // for developer control. These should be treated as internal
 // compiler implementation details.
@@ -38,11 +40,7 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
                    "into a dispatch region or 0 to disable inlining."),
     llvm::cl::init(256));
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
-using namespace mlir::iree_compiler::IREE;
-
-#define DEBUG_TYPE "iree-flow-region-op-utils"
+namespace mlir::iree_compiler::IREE::Flow {
 
 //===----------------------------------------------------------------------===//
 // Methods for getting the workload information for dispatch region creation.
@@ -86,8 +84,8 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
-SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
-                                       OpBuilder &builder) {
+SmallVector<Range> getLoopRanges(Operation *op, Location loc,
+                                 OpBuilder &builder) {
   return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
       .Case<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp,
             tensor::InsertSliceOp>([&](auto op) {
@@ -106,19 +104,20 @@ SmallVector<Range> Flow::getLoopRanges(Operation *op, Location loc,
 
 /// Return `true` if an operation is within a `flow.dispatch.region` or
 /// `flow.dispatch.workgroups` op.
-bool Flow::isNonNullAndOutsideDispatch(Operation *op) {
+bool isNonNullAndOutsideDispatch(Operation *op) {
   if (!op)
     return false;
   Operation *parentOp = op->getParentOp();
   while (parentOp) {
-    if (isa<Flow::DispatchRegionOp, Flow::DispatchWorkgroupsOp>(parentOp)) {
+    if (isa<IREE::Flow::DispatchRegionOp, IREE::Flow::DispatchWorkgroupsOp>(
+            parentOp)) {
       return false;
     }
     parentOp = parentOp->getParentOp();
   }
   return true;
 }
-bool Flow::isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations) {
+bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations) {
   return llvm::all_of(operations, [](Operation *op) {
     return isNonNullAndOutsideDispatch(op);
   });
@@ -130,7 +129,8 @@ static SmallVector<Value> getWorkloadForRootOp(OpBuilder &builder,
   // Compute workgroup count to use for the dispatch op. These are the ranges
   // of the outermost parallel loops that can be distributed.
   Location loc = rootOp->getLoc();
-  SmallVector<Range> loopRanges = Flow::getLoopRanges(rootOp, loc, builder);
+  SmallVector<Range> loopRanges =
+      IREE::Flow::getLoopRanges(rootOp, loc, builder);
   AffineExpr s0, s1, s2;
   bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap workload = AffineMap::get(0, 3, (s1 - s0).ceilDiv(s2));
@@ -196,7 +196,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
 /// These is the legacy path for workgroup count calculation that
 /// arent handled by the current default.
 static void createWorkgroupCountFromDagRootRegion(
-    RewriterBase &rewriter, Flow::DispatchRegionOp &regionOp,
+    RewriterBase &rewriter, IREE::Flow::DispatchRegionOp &regionOp,
     TypeRange workloadTypes, ArrayRef<Location> workloadLocs) {
   Region &countRegion = regionOp.getWorkgroupCount();
   if (!countRegion.empty())
@@ -208,8 +208,9 @@ static void createWorkgroupCountFromDagRootRegion(
   rewriter.setInsertionPointToStart(body);
   Location loc = regionOp.getLoc();
   auto countOp =
-      rewriter.create<Flow::DispatchWorkgroupCountFromDagRootOp>(loc, args);
-  rewriter.create<Flow::ReturnOp>(loc, countOp->getResults());
+      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromDagRootOp>(loc,
+                                                                       args);
+  rewriter.create<IREE::Flow::ReturnOp>(loc, countOp->getResults());
 }
 
 /// Return `true` if the given type is a ShapedType and has at least one
@@ -222,8 +223,8 @@ static bool hasDynamicShape(Type t) {
 }
 
 /// Reify the dynamic dimensions of the given value.
-LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
-                                           SmallVector<Value> &dynamicDims) {
+LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
+                                     SmallVector<Value> &dynamicDims) {
   OpBuilder::InsertionGuard guard(b);
 
   // Case 1: No dynamic result dims.
@@ -292,8 +293,8 @@ LogicalResult Flow::reifyDynamicResultDims(OpBuilder &b, Value value,
 
 // Append a result to the given DispatchRegionOp. The newly created
 // DispatchRegionOp is returned.
-FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
-    RewriterBase &rewriter, Flow::DispatchRegionOp regionOp,
+FailureOr<IREE::Flow::DispatchRegionOp> appendDispatchRegionResults(
+    RewriterBase &rewriter, IREE::Flow::DispatchRegionOp regionOp,
     ArrayRef<Value> results, ArrayRef<SmallVector<Value>> dynamicDims) {
   if (results.empty()) {
     return regionOp;
@@ -309,7 +310,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
 
   // Collect the current dispatch yielded values.
   auto returnOp =
-      cast<Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+      cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
   SmallVector<Value> returnedValues(returnOp.getOperands().begin(),
                                     returnOp.getOperands().end());
 
@@ -328,7 +329,7 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
   rewriter.setInsertionPoint(regionOp);
 
   // Create new DispatchRegionOp and move over the body.
-  auto newRegionOp = rewriter.create<Flow::DispatchRegionOp>(
+  auto newRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
       regionOp->getLoc(), resultTypes, regionDynamicDims,
       regionOp.getWorkload());
   rewriter.inlineRegionBefore(regionOp.getBody(), newRegionOp.getBody(),
@@ -338,34 +339,32 @@ FailureOr<Flow::DispatchRegionOp> Flow::appendDispatchRegionResults(
 
   // Update terminator.
   auto newRegionReturnOp =
-      cast<Flow::ReturnOp>(newRegionOp.getBody().front().getTerminator());
+      cast<IREE::Flow::ReturnOp>(newRegionOp.getBody().front().getTerminator());
   rewriter.setInsertionPoint(newRegionReturnOp);
-  rewriter.replaceOpWithNewOp<Flow::ReturnOp>(newRegionReturnOp,
-                                              returnedValues);
+  rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(newRegionReturnOp,
+                                                    returnedValues);
 
   return newRegionOp;
 }
 
-Flow::DispatchRegionOp Flow::makeEmptyDispatchRegion(OpBuilder &builder,
-                                                     Location loc,
-                                                     ValueRange workload) {
+IREE::Flow::DispatchRegionOp
+makeEmptyDispatchRegion(OpBuilder &builder, Location loc, ValueRange workload) {
   OpBuilder::InsertionGuard guard(builder);
 
   // Create RegionOp.
-  auto regionOp = builder.create<Flow::DispatchRegionOp>(
+  auto regionOp = builder.create<IREE::Flow::DispatchRegionOp>(
       loc, /*resultTypes=*/TypeRange(), /*dynamicDims=*/ValueRange(), workload);
   Block &body = regionOp.getBody().emplaceBlock();
   builder.setInsertionPointToStart(&body);
-  builder.create<Flow::ReturnOp>(loc, ValueRange());
+  builder.create<IREE::Flow::ReturnOp>(loc, ValueRange());
   return regionOp;
 }
 
 // Clone a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
 FailureOr<Operation *>
-Flow::clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter,
-                                         Operation *target,
-                                         Flow::DispatchRegionOp regionOp) {
+clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                   IREE::Flow::DispatchRegionOp regionOp) {
   Block &body = regionOp.getBody().front();
 
   // Gather all uses of `target`.
@@ -403,10 +402,10 @@ Flow::clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter,
 
 // Move a `target` op that is preceding the given dispatch region op into the
 // dispatch region.
-FailureOr<Flow::DispatchRegionOp>
-Flow::movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
-                                         ArrayRef<Operation *> targets,
-                                         Flow::DispatchRegionOp regionOp) {
+FailureOr<IREE::Flow::DispatchRegionOp>
+movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
+                                   ArrayRef<Operation *> targets,
+                                   IREE::Flow::DispatchRegionOp regionOp) {
   // Values replaced by moving the `targets` into the dispatch region.
   SmallVector<Value> replacedValues;
 
@@ -455,8 +454,9 @@ Flow::movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
     rewriter.replaceOpWithinBlock(target, clonedTarget->getResults(), &body);
   }
 
-  FailureOr<Flow::DispatchRegionOp> newRegionOp = appendDispatchRegionResults(
-      rewriter, regionOp, yieldedResults, dispatchOpNewResultsDynamicDims);
+  FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =
+      appendDispatchRegionResults(rewriter, regionOp, yieldedResults,
+                                  dispatchOpNewResultsDynamicDims);
 
   if (failed(newRegionOp)) {
     return regionOp->emitOpError("failed to append results to op");
@@ -473,8 +473,8 @@ Flow::movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   return newRegionOp.value();
 }
 
-FailureOr<Flow::DispatchRegionOp>
-Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
+FailureOr<IREE::Flow::DispatchRegionOp>
+wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);
 
   SmallVector<Value> workload;
@@ -485,8 +485,8 @@ Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   }
 
   rewriter.setInsertionPointAfter(op);
-  Flow::DispatchRegionOp regionOp =
-      Flow::makeEmptyDispatchRegion(rewriter, op->getLoc(), workload);
+  IREE::Flow::DispatchRegionOp regionOp =
+      IREE::Flow::makeEmptyDispatchRegion(rewriter, op->getLoc(), workload);
 
   // Move the op into the dispatch region.
   auto newRegionOp = movePrecedingOpsIntoDispatchRegion(rewriter, op, regionOp);
@@ -504,120 +504,65 @@ Flow::wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
-/// Returns true if the operation is an generic op that represents dequant.
-/// This function checks that the genericOp:
-/// 1. Has a body like:
-///      arith.extui
-///      arith.uitofp
-///      arith.subf
-///      arith.mulf
-/// 2. scale, offset and result is f16 or f32, while weight is i4 or i8.
-/// 3. Has 3 parallel dims
-/// 4. Has 2 (weights, scales) or 3 (weights, scales, zero points)
-///    inputs and 1 output
-/// 5. Only weight has same shape as result.
-/// 6. Weight and result have identity indexing map.
-bool Flow::isGroupedDequantizationOp(Operation *op) {
+bool isDequantizationLikeOp(Operation *op) {
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
-  if (!genericOp)
+  if (!genericOp) {
     return false;
-  if (genericOp.getNumDpsInits() != 1)
+  }
+  if (genericOp.getNumDpsInits() != 1) {
     return false;
-  if (genericOp.getNumDpsInputs() != 2 && genericOp.getNumDpsInputs() != 3)
-    return false;
+  }
 
-  // Check that the rank is at least 3 and all loops are parallel
+  // Check that the all loops are parallel
   unsigned numLoops = genericOp.getNumLoops();
   unsigned numParallelLoops = genericOp.getNumParallelLoops();
-  if (numLoops < 3)
+  if (numLoops != numParallelLoops) {
     return false;
-  if (numLoops != numParallelLoops)
+  }
+
+  // Check that only one input has an identity map, and the rest are projected
+  // permutations and not full permutations
+  OpOperand *identityInput = nullptr;
+  for (OpOperand *input : genericOp.getDpsInputOperands()) {
+    auto inputMap = genericOp.getMatchingIndexingMap(input);
+    if (inputMap.isIdentity()) {
+      if (identityInput) {
+        return false;
+      }
+      identityInput = input;
+    } else if (!inputMap.isProjectedPermutation(true) ||
+               inputMap.isPermutation()) {
+      return false;
+    }
+  }
+
+  if (!identityInput) {
     return false;
+  }
 
-  auto inputs = genericOp.getInputs();
-  auto weight = inputs[0];
-  auto scales = inputs[1];
-  auto init = genericOp.getDpsInits()[0];
-  Type weightElType = getElementTypeOrSelf(weight.getType());
-  Type scaleElType = getElementTypeOrSelf(scales.getType());
-  Type initElType = getElementTypeOrSelf(init.getType());
-
-  // Check that init and weight have parallel indexing maps.
   auto indexingMaps = genericOp.getIndexingMapsArray();
-  const int kWeightIndex = 0;
-  const int kInitIndex = indexingMaps.size() - 1;
-  if (!indexingMaps[kWeightIndex].isIdentity())
-    return false;
-  if (!indexingMaps[kInitIndex].isIdentity())
-    return false;
-
-  // Dequant weight and init need to be same type and shape.
-  auto weightShape = weight.getType().dyn_cast<ShapedType>().getShape();
-  auto initShape = init.getType().dyn_cast<ShapedType>().getShape();
-  if (weightShape != initShape)
-    return false;
-
-  // Scale and init needs to be of same element type.
-  if (scaleElType != initElType)
-    return false;
-
-  // Check weight is i4 or i8.
-  if (!weightElType.isInteger(4) && !weightElType.isInteger(8)) {
+  if (!indexingMaps.back().isIdentity()) {
     return false;
   }
 
-  // Check scales is f16 or f32.
-  Type f32Type = Float32Type::get(op->getContext());
-  Type f16Type = Float16Type::get(op->getContext());
-  if (scaleElType != f32Type && scaleElType != f16Type) {
+  // Check that the identity input element bitwidth is smaller than the output
+  // element bitwidth.
+  Type inputElementType = getElementTypeOrSelf(identityInput->get().getType());
+  Type outputElementType = getElementTypeOrSelf(genericOp->getResultTypes()[0]);
+  if (!inputElementType.isIntOrFloat() || !outputElementType.isIntOrFloat()) {
+    return false;
+  }
+  if (inputElementType.getIntOrFloatBitWidth() >=
+      outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
 
-  // Work back from linalg.yield and check body of genericOp.
-  // The genericOp should yield the result of an arith.mulf,
-  // preceded by an arith.subf, arith.uitofp, and arith.extui
-  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
-  Value producerOutput;
-  Operation *producer;
-
-  // Producer of linalg.yield op is arith.mulf
-  {
-    producerOutput = yieldOp->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
+  for (auto &bodyOp : genericOp.getBody()->getOperations()) {
+    if (!isa<arith::ExtUIOp, arith::ExtSIOp, arith::MulFOp, arith::MulIOp,
+             arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
+             arith::SIToFPOp, arith::UIToFPOp, linalg::YieldOp>(bodyOp)) {
       return false;
-    if (!matchPattern(producer, m_Op<arith::MulFOp>()))
-      return false;
-  }
-
-  // Producer of arith.mulf op is arith.subf
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::SubFOp>()))
-      return false;
-  }
-
-  // Producer of arith.subf op is arith.uitofp
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer || producer->getNumOperands() == 0)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::UIToFPOp>()))
-      return false;
-  }
-
-  // Producer of arith.uitofp op is arith.extui
-  {
-    producerOutput = producer->getOperand(0);
-    producer = producerOutput.getDefiningOp();
-    if (!producer)
-      return false;
-    if (!matchPattern(producer, m_Op<arith::ExtUIOp>()))
-      return false;
+    }
   }
 
   return true;
@@ -629,7 +574,7 @@ bool Flow::isGroupedDequantizationOp(Operation *op) {
 
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
-bool Flow::isClonableIntoDispatchOp(Operation *op) {
+bool isClonableIntoDispatchOp(Operation *op) {
   // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
   // trivially clonable too, but they cause problems
   // with bufferization. Make them clonable when fixed.
@@ -638,7 +583,7 @@ bool Flow::isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (isGroupedDequantizationOp(op)) {
+  if (isDequantizationLikeOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
@@ -700,7 +645,7 @@ static bool hasUnfusableUseInDispatch(Value v, Operation *dispatchOp) {
 }
 
 SmallVector<Operation *>
-Flow::getCloneableOps(Flow::DispatchRegionOp regionOp) {
+getCloneableOps(IREE::Flow::DispatchRegionOp regionOp) {
   // Find values that are used inside of the dispatch region but defined outside
   // of the dispatch region.
   llvm::SetVector<Value> valuesDefinedAbove;
@@ -722,7 +667,7 @@ Flow::getCloneableOps(Flow::DispatchRegionOp regionOp) {
     visited.insert(outsideValue);
 
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !Flow::isClonableIntoDispatchOp(definingOp) ||
+    if (!definingOp || !IREE::Flow::isClonableIntoDispatchOp(definingOp) ||
         hasUnfusableUseInDispatch(outsideValue, regionOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
@@ -738,8 +683,8 @@ Flow::getCloneableOps(Flow::DispatchRegionOp regionOp) {
 }
 
 /// Clone producers into the dispatch region.
-LogicalResult Flow::cloneProducersToRegion(RewriterBase &rewriter,
-                                           Flow::DispatchRegionOp regionOp) {
+LogicalResult cloneProducersToRegion(RewriterBase &rewriter,
+                                     IREE::Flow::DispatchRegionOp regionOp) {
   SmallVector<Operation *> cloneableOps = getCloneableOps(regionOp);
   bool sortResult = mlir::computeTopologicalSorting(cloneableOps);
   (void)sortResult;
@@ -754,3 +699,5 @@ LogicalResult Flow::cloneProducersToRegion(RewriterBase &rewriter,
 
   return success();
 }
+
+} // namespace mlir::iree_compiler::IREE::Flow

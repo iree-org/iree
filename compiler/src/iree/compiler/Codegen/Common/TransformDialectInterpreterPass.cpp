@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
@@ -70,8 +70,7 @@ public:
 };
 } // namespace
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 extern llvm::cl::opt<std::string> clCodegenTransformDialectStrategyName;
 extern llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName;
@@ -82,5 +81,4 @@ std::unique_ptr<Pass> createTransformDialectInterpreterPass() {
       clCodegenTransformDialectLibraryFileName,
       clCodegenTransformDialectStrategyName);
 }
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

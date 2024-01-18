@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -23,8 +22,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
@@ -71,7 +69,7 @@ getInnerTileSizesOfr(OpBuilder &rewriter, Location loc,
 
   SmallVector<OpFoldResult> result(staticTileSizes.size());
   for (size_t i = 0; i < result.size(); ++i) {
-    if (staticTileSizes[i] == ShapedType::kDynamic) {
+    if (ShapedType::isDynamic(staticTileSizes[i])) {
       result[i] = innerTileSizeValues[i];
     } else if (tensorType.isDynamicDim(i)) {
       result[i] =
@@ -872,25 +870,6 @@ protected:
 
 } // namespace
 
-static FailureOr<MaterializeEncodingValueInfo>
-chooseDynamicEncodingInfoVMVXMicrokernels(RankedTensorType tensorType,
-                                          OpBuilder &builder, Location loc) {
-  SmallVector<Type> resultTypes(tensorType.getRank(), builder.getIndexType());
-  auto op = builder.create<IREE::Codegen::QueryTileSizesOp>(
-      loc, resultTypes, TypeAttr::get(tensorType));
-  MaterializeEncodingValueInfo result;
-  result.innerTileSizes = op.getResults();
-  return result;
-}
-
-MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  if (isVMVXBackend(targetAttr) && hasUkernel(targetAttr)) {
-    return chooseDynamicEncodingInfoVMVXMicrokernels;
-  }
-  return {};
-}
-
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
@@ -940,5 +919,4 @@ void populateMaterializeUpperBoundTileSizePatterns(
       patterns.getContext(), materializeEncodingFn);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

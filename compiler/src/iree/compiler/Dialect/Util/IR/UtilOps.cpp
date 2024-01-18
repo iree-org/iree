@@ -22,8 +22,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
 // Experimental
@@ -65,15 +64,6 @@ ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
   if (attrsSet.size() == arrayAttr.size())
     return arrayAttr;
   return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
-}
-
-Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes) {
-  assert(values[index].getType().isa<IREE::Util::SizeAwareTypeInterface>() &&
-         "must be a size-aware type to get dims");
-  unsigned sizeIndex = llvm::count_if(values.take_front(index), [](auto value) {
-    return isa<IREE::Util::SizeAwareTypeInterface>(value.getType());
-  });
-  return sizes[sizeIndex];
 }
 
 //===----------------------------------------------------------------------===//
@@ -120,7 +110,7 @@ ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
              << "expected attribute";
     }
 
-    if (auto typedAttr = llvm::dyn_cast<TypedAttr>(attr)) {
+    if (auto typedAttr = dyn_cast<TypedAttr>(attr)) {
       typeAttr = TypeAttr::get(typedAttr.getType());
     }
     return success();
@@ -145,7 +135,7 @@ ParseResult parseTypeOrAttr(OpAsmParser &parser, TypeAttr &typeAttr,
 void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr) {
   bool needsSpace = false;
-  auto typedAttr = llvm::dyn_cast_if_present<TypedAttr>(attr);
+  auto typedAttr = dyn_cast_if_present<TypedAttr>(attr);
   if (!typedAttr || typedAttr.getType() != type.getValue()) {
     p << ": ";
     p.printAttribute(type);
@@ -299,56 +289,80 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 }
 
 //===----------------------------------------------------------------------===//
-// custom<SizeAwareTypeList>
+// custom<ShapedTypeList>
 //===----------------------------------------------------------------------===//
 // type{%size0}, type, type{%size1}
 
 ParseResult
-parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
+parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
     if (failed(parser.parseType(type)))
       return failure();
-    if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
+      if (!shapedType.hasStaticShape()) {
+        SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
+        if (failed(parser.parseLBrace()) ||
+            failed(parser.parseOperandList(dynamicDims,
+                                           shapedType.getNumDynamicDims(),
+                                           OpAsmParser::Delimiter::None)) ||
+            failed(parser.parseRBrace())) {
+          return failure();
+        }
+        dims.append(dynamicDims);
+      }
+    } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
       }
-      sizes.push_back(size);
+      dims.push_back(size);
     }
     types.push_back(type);
   } while (succeeded(parser.parseOptionalComma()));
   return success();
 }
 
-void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
-                            OperandRange sizes) {
-  int sizeIndex = 0;
+void printShapedTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
+                         ValueRange dims) {
   llvm::interleaveComma(types, p, [&](Type type) {
     p.printType(type);
-    if (llvm::isa<IREE::Util::SizeAwareTypeInterface>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
+      if (!shapedType.hasStaticShape()) {
+        if (dims.empty()) {
+          p << "{<<INVALID>>}";
+          return;
+        }
+        p << "{";
+        llvm::interleaveComma(dims.take_front(shapedType.getNumDynamicDims()),
+                              p, [&](Value value) { p.printOperand(value); });
+        p << "}";
+        dims = dims.drop_front(shapedType.getNumDynamicDims());
+      }
+    } else if (isa<IREE::Util::SizeAwareTypeInterface>(type)) {
       p << "{";
-      p.printOperand(sizes[sizeIndex++]);
+      p.printOperand(dims.front());
       p << "}";
+      dims = dims.drop_front(1);
     }
   });
 }
 
 ParseResult
-parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
-                       SmallVectorImpl<Type> &types1,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
-  if (failed(parseSizeAwareTypeList(parser, types0, sizes)))
+parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+                    SmallVectorImpl<Type> &types1,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
+  if (failed(parseShapedTypeList(parser, types0, dims)))
     return failure();
   types1 = types0;
   return success();
 }
 
-void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
-                            TypeRange types1, OperandRange sizes) {
-  printSizeAwareTypeList(p, op, types0, sizes);
+void printShapedTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                         TypeRange types1, ValueRange dims) {
+  printShapedTypeList(p, op, types0, dims);
 }
 
 //===----------------------------------------------------------------------===//
@@ -378,7 +392,7 @@ ParseResult parseShapedTiedResult(
   }
   if (failed(parser.parseType(resultType)))
     return failure();
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
+  if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
     if (!shapedType.hasStaticShape()) {
       SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
       if (failed(parser.parseLBrace()) ||
@@ -391,8 +405,7 @@ ParseResult parseShapedTiedResult(
       resultDims.append(dynamicDims);
     }
   } else if (auto sizedType =
-                 llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
-                     resultType)) {
+                 dyn_cast<IREE::Util::SizeAwareTypeInterface>(resultType)) {
     OpAsmParser::UnresolvedOperand size;
     if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
         failed(parser.parseRBrace())) {
@@ -414,7 +427,7 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
     p << " as ";
   }
   p.printType(resultType);
-  if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
+  if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
     if (!shapedType.hasStaticShape()) {
       if (resultDims.empty()) {
         p << "{<<INVALID>>}";
@@ -428,8 +441,7 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
       resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
     }
   } else if (auto sizedType =
-                 llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
-                     resultType)) {
+                 dyn_cast<IREE::Util::SizeAwareTypeInterface>(resultType)) {
     p << "{";
     p.printOperand(resultDims.front());
     p << "}";
@@ -443,42 +455,9 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
 }
 
 //===----------------------------------------------------------------------===//
-// custom<ShapedFunctionType>
+// custom<ShapedResultList>
 //===----------------------------------------------------------------------===//
-// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
-
-static ParseResult
-parseShapedOperandList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
-  do {
-    Type type;
-    if (failed(parser.parseType(type)))
-      return failure();
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
-      if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
-        if (failed(parser.parseLBrace()) ||
-            failed(parser.parseOperandList(dynamicDims,
-                                           shapedType.getNumDynamicDims(),
-                                           OpAsmParser::Delimiter::None)) ||
-            failed(parser.parseRBrace())) {
-          return failure();
-        }
-        dims.append(dynamicDims);
-      }
-    } else if (auto sizedType =
-                   llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(type)) {
-      OpAsmParser::UnresolvedOperand size;
-      if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
-          failed(parser.parseRBrace())) {
-        return failure();
-      }
-      dims.push_back(size);
-    }
-    types.push_back(type);
-  } while (succeeded(parser.parseOptionalComma()));
-  return success();
-}
+// type{%dim2}, %operand4
 
 // Finds the operand index in |operands| that |tiedResult| references.
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
@@ -527,7 +506,7 @@ ParseResult parseShapedResultList(
     } else if (failed(parser.parseType(type))) {
       return failure();
     }
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
+    if (auto shapedType = dyn_cast<ShapedType>(type)) {
       if (!shapedType.hasStaticShape()) {
         SmallVector<OpAsmParser::UnresolvedOperand> dynamicDims;
         if (failed(parser.parseLBrace()) ||
@@ -540,7 +519,7 @@ ParseResult parseShapedResultList(
         resultDims.append(dynamicDims);
       }
     } else if (auto sizedType =
-                   llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(type)) {
+                   dyn_cast<IREE::Util::SizeAwareTypeInterface>(type)) {
       OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
@@ -580,7 +559,7 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
     if (printType) {
       p.printType(resultType);
     }
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(resultType)) {
+    if (auto shapedType = dyn_cast<ShapedType>(resultType)) {
       if (!shapedType.hasStaticShape()) {
         if (resultDims.empty()) {
           p << "{<<INVALID>>}";
@@ -594,8 +573,7 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
         resultDims = resultDims.drop_front(shapedType.getNumDynamicDims());
       }
     } else if (auto sizedType =
-                   llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(
-                       resultType)) {
+                   dyn_cast<IREE::Util::SizeAwareTypeInterface>(resultType)) {
       p << "{";
       p.printOperand(resultDims.front());
       p << "}";
@@ -605,6 +583,11 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
       p << ", ";
   }
 }
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedFunctionType>
+//===----------------------------------------------------------------------===//
+// (type, type{%dim0, %dim1}, type) -> (type{%dim2}, %operand4)
 
 ParseResult parseShapedFunctionType(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
@@ -616,7 +599,7 @@ ParseResult parseShapedFunctionType(
   if (failed(parser.parseLParen()))
     return failure();
   if (failed(parser.parseOptionalRParen())) {
-    if (failed(parseShapedOperandList(parser, operandTypes, operandDims)) ||
+    if (failed(parseShapedTypeList(parser, operandTypes, operandDims)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
@@ -651,29 +634,7 @@ void printShapedFunctionType(OpAsmPrinter &p, Operation *op,
                              OperandRange operandDims, TypeRange resultTypes,
                              OperandRange resultDims, ArrayAttr tiedOperands) {
   p << "(";
-  llvm::interleaveComma(operandTypes, p, [&](Type type) {
-    p.printType(type);
-    if (auto shapedType = llvm::dyn_cast<ShapedType>(type)) {
-      if (!shapedType.hasStaticShape()) {
-        if (operandDims.empty()) {
-          p << "{<<INVALID>>}";
-          return;
-        }
-        p << "{";
-        llvm::interleaveComma(
-            operandDims.take_front(shapedType.getNumDynamicDims()), p,
-            [&](Value value) { p.printOperand(value); });
-        p << "}";
-        operandDims = operandDims.drop_front(shapedType.getNumDynamicDims());
-      }
-    } else if (auto sizedType =
-                   llvm::dyn_cast<IREE::Util::SizeAwareTypeInterface>(type)) {
-      p << "{";
-      p.printOperand(operandDims.front());
-      p << "}";
-      operandDims = operandDims.drop_front(1);
-    }
-  });
+  printShapedTypeList(p, op, operandTypes, operandDims);
   p << ") -> ";
   if (resultTypes.size() != 1)
     p << "(";
@@ -781,7 +742,7 @@ static void printShapedFunctionResultList(OpAsmPrinter &p, Operation *op,
     }
     if (resultAttrs) {
       auto attrs =
-          llvm::dyn_cast_if_present<DictionaryAttr>(resultAttrs.getValue()[i]);
+          dyn_cast_if_present<DictionaryAttr>(resultAttrs.getValue()[i]);
       if (attrs && !attrs.empty()) {
         p.printOptionalAttrDict(attrs.getValue());
       }
@@ -833,7 +794,7 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
                                   TypeAttr functionTypeAttr,
                                   ArrayAttr tiedOperands, ArrayAttr argAttrs,
                                   ArrayAttr resultAttrs) {
-  auto functionType = llvm::cast<FunctionType>(functionTypeAttr.getValue());
+  auto functionType = cast<FunctionType>(functionTypeAttr.getValue());
   p << "(";
   int argIndex = 0;
   llvm::interleaveComma(functionType.getInputs(), p, [&](auto type) {
@@ -842,8 +803,8 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
     p << ": ";
     p.printType(type);
     if (argAttrs) {
-      auto attrs = llvm::dyn_cast_if_present<DictionaryAttr>(
-          argAttrs.getValue()[argIndex]);
+      auto attrs =
+          dyn_cast_if_present<DictionaryAttr>(argAttrs.getValue()[argIndex]);
       if (attrs && !attrs.empty()) {
         p.printOptionalAttrDict(attrs.getValue());
       }
@@ -863,8 +824,9 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
   }
 }
 
-namespace IREE {
-namespace Util {
+} // namespace mlir::iree_compiler
+
+namespace mlir ::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // util.optimization_barrier
@@ -913,8 +875,8 @@ ParseResult UnfoldableConstantOp::parse(OpAsmParser &parser,
 
   // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
-  if (!llvm::isa<SymbolRefAttr>(valueAttr))
-    type = llvm::cast<TypedAttr>(valueAttr).getType();
+  if (!isa<SymbolRefAttr>(valueAttr))
+    type = cast<TypedAttr>(valueAttr).getType();
   else if (parser.parseColonType(type))
     return failure();
 
@@ -932,7 +894,7 @@ void UnfoldableConstantOp::print(OpAsmPrinter &p) {
   p << getValue();
 
   // If the value is a symbol reference, print a trailing type.
-  if (llvm::isa<SymbolRefAttr>(getValue()))
+  if (isa<SymbolRefAttr>(getValue()))
     p << " : " << getType();
 }
 
@@ -948,8 +910,7 @@ bool CastOp::areCastCompatible(TypeRange inputs, TypeRange outputs) {
     // Both types are the same.
     return true;
   }
-  if (llvm::isa<IREE::Util::ObjectType>(a) ||
-      llvm::isa<IREE::Util::ObjectType>(b)) {
+  if (isa<IREE::Util::ObjectType>(a) || isa<IREE::Util::ObjectType>(b)) {
     // Either type is an opaque object.
     return true;
   }
@@ -1063,11 +1024,11 @@ Block *InitializerOp::addBlock() {
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (llvm::isa<ShapedType>(globalType) && llvm::isa<ShapedType>(accessType)) {
+  if (isa<ShapedType>(globalType) && isa<ShapedType>(accessType)) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType));
   }
 
-  if (auto knownType = llvm::dyn_cast<GlobalTypeInterface>(globalType)) {
+  if (auto knownType = dyn_cast<GlobalTypeInterface>(globalType)) {
     return knownType.isAccessStorageCompatible(accessType);
   }
 
@@ -1130,7 +1091,7 @@ void GlobalLoadOp::getEffects(
 LogicalResult GlobalLoadIndirectOp::verify() {
   Operation *op = getOperation();
   auto globalType =
-      llvm::cast<IREE::Util::PtrType>(getGlobal().getType()).getTargetType();
+      cast<IREE::Util::PtrType>(getGlobal().getType()).getTargetType();
   auto loadType = getResult().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
     return op->emitOpError() << "global type mismatch; global pointer is "
@@ -1150,7 +1111,7 @@ void GlobalStoreOp::build(OpBuilder &builder, OperationState &state,
 LogicalResult GlobalStoreIndirectOp::verify() {
   Operation *op = getOperation();
   auto globalType =
-      llvm::cast<IREE::Util::PtrType>(getGlobal().getType()).getTargetType();
+      cast<IREE::Util::PtrType>(getGlobal().getType()).getTargetType();
   auto storeType = getValue().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
     return op->emitOpError() << "global type mismatch; global pointer is "
@@ -1169,7 +1130,7 @@ static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
     return parser.emitError(parser.getCurrentLocation(),
                             "expected !util.list<T> type");
   }
-  auto listElementType = llvm::cast<ListType>(listType).getElementType();
+  auto listElementType = cast<ListType>(listType).getElementType();
   if (succeeded(parser.parseOptionalArrow())) {
     // Use overridden type - required for variants only.
     if (failed(parser.parseType(elementType))) {
@@ -1193,7 +1154,7 @@ static ParseResult parseListTypeGet(OpAsmParser &parser, Type &listType,
 static void printListTypeGet(OpAsmPrinter &printer, Operation *, Type listType,
                              Type elementType) {
   printer.printType(listType);
-  auto listElementType = llvm::cast<ListType>(listType).getElementType();
+  auto listElementType = cast<ListType>(listType).getElementType();
   if (listElementType != elementType) {
     printer.printArrowTypeList(ArrayRef<Type>{elementType});
   }
@@ -1208,24 +1169,24 @@ static ParseResult parseListTypeSet(OpAsmParser &parser, Type &listType,
   }
   if (succeeded(parser.parseOptionalArrow())) {
     elementType = leadingType;
-    if (failed(parser.parseType(listType)) || !llvm::isa<ListType>(listType)) {
+    if (failed(parser.parseType(listType)) || !isa<ListType>(listType)) {
       return parser.emitError(parser.getCurrentLocation(),
                               "expected an !util.list<T> type");
     }
   } else {
-    if (!llvm::isa<ListType>(leadingType)) {
+    if (!isa<ListType>(leadingType)) {
       return parser.emitError(parser.getCurrentLocation(),
                               "expected an !util.list<T> type");
     }
     listType = leadingType;
-    elementType = llvm::cast<ListType>(listType).getElementType();
+    elementType = cast<ListType>(listType).getElementType();
   }
   return success();
 }
 
 static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
                              Type elementType) {
-  auto listElementType = llvm::cast<ListType>(listType).getElementType();
+  auto listElementType = cast<ListType>(listType).getElementType();
   if (listElementType != elementType) {
     printer.printType(elementType);
     printer.printArrowTypeList(ArrayRef<Type>{listType});
@@ -1236,7 +1197,7 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
 
 LogicalResult ListGetOp::verify() {
   Operation *op = getOperation();
-  auto listType = llvm::cast<IREE::Util::ListType>(getList().getType());
+  auto listType = cast<IREE::Util::ListType>(getList().getType());
   auto elementType = listType.getElementType();
   auto resultType = getResult().getType();
   if (!ListType::canImplicitlyCast(elementType, resultType)) {
@@ -1248,7 +1209,7 @@ LogicalResult ListGetOp::verify() {
 
 LogicalResult ListSetOp::verify() {
   Operation *op = getOperation();
-  auto listType = llvm::cast<IREE::Util::ListType>(getList().getType());
+  auto listType = cast<IREE::Util::ListType>(getList().getType());
   auto elementType = listType.getElementType();
   auto valueType = getValue().getType();
   if (!ListType::canImplicitlyCast(valueType, elementType)) {
@@ -1268,7 +1229,7 @@ void BufferConstantOp::getAsmResultNames(
 }
 
 LogicalResult BufferConstantOp::verify() {
-  if (!llvm::isa<IREE::Util::SerializableAttrInterface>(getValue())) {
+  if (!isa<IREE::Util::SerializableAttrInterface>(getValue())) {
     return emitOpError("unsupported non-serializable constant attribute type");
   }
   if (auto minAlignmentAttr = getAlignmentAttr()) {
@@ -1506,10 +1467,26 @@ void BufferStoreOp::setSubrangeOperand(unsigned operandIndex,
   getLengthMutable().assign(operand.length);
 }
 
-} // namespace Util
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+SubrangeOperand BufferHashOp::getSubrangeOperand(unsigned operandIndex) {
+  if (operandIndex == 0) {
+    return SubrangeOperand{getSource(), getSourceSize(), getSourceOffset(),
+                           getLength()};
+  } else {
+    assert(false && "only source is a subrange");
+    return {};
+  }
+}
+
+void BufferHashOp::setSubrangeOperand(unsigned operandIndex,
+                                      SubrangeOperand operand) {
+  assert(operandIndex == 0 && "only source is a subrange");
+  getSourceMutable().assign(operand.resource);
+  getSourceSizeMutable().assign(operand.resourceSize);
+  getSourceOffsetMutable().assign(operand.offset);
+  getLengthMutable().assign(operand.length);
+}
+
+} // namespace mlir::iree_compiler::IREE::Util
 
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"

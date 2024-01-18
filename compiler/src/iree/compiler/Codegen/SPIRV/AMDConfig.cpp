@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
@@ -21,9 +22,7 @@
 
 #define DEBUG_TYPE "iree-spirv-amd-config"
 
-namespace mlir {
-namespace iree_compiler {
-namespace detail {
+namespace mlir::iree_compiler::detail {
 
 constexpr unsigned AMDSimtSoftwarePipelineDepth = 2;
 constexpr unsigned AMDSimtSoftwarePipelineStoreStage = 0;
@@ -49,7 +48,7 @@ static LogicalResult setAMDMatmulConfig(linalg::LinalgOp op,
   std::array<int64_t, 3> threadMNK;
   auto inputType =
       llvm::cast<ShapedType>(op.getDpsInputOperand(0)->get().getType());
-  if (inputType.getElementType().getIntOrFloatBitWidth() == 16) {
+  if (IREE::Util::getTypeBitWidth(inputType.getElementType()) == 16) {
     threadMNK = {8, 8, 32};
   } else {
     threadMNK = {8, 4, 16};
@@ -98,6 +97,4 @@ LogicalResult setAMDCodeGenConfig(const spirv::TargetEnv &targetEnv,
   return failure();
 }
 
-} // namespace detail
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::detail

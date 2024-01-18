@@ -13,7 +13,10 @@ package(
 )
 
 # In the CMake build, this library provides the arch-dependent symbols.
-# Not yet implemented on Bazel.
+# For now in Bazel, this just unconditionally uses the fallback to generic code.
 iree_runtime_cc_library(
     name = "ukernel_arch",
+    deps = [
+        "//runtime/src/iree/builtins/ukernel:fallback",
+    ],
 )

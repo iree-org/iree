@@ -12,11 +12,10 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 class TilingConfig;
 
@@ -26,7 +25,7 @@ createConvertToLLVMPass(bool reassociateFpReordering = false);
 
 /// Checks CPU backend specific IR constraints (like no stack allocations)
 std::unique_ptr<OperationPass<ModuleOp>>
-createLLVMCPUCheckIRBeforeLLVMConversionPass();
+createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds = true);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUEmitVectorizationRemarksPass();
@@ -63,11 +62,6 @@ createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Pass to pad operations on tensors in top-down order.
-enum class LLVMCPUTensorPadOption { ParallelDims, ReductionDims };
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUTensorPadPass(
-    LLVMCPUTensorPadOption option = LLVMCPUTensorPadOption::ParallelDims);
-
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
@@ -79,11 +73,28 @@ createLLVMCPUTilePass(int64_t tilingLevel = -1);
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 
-// Pass to lower Vector ops before conversion to LLVM.
+//------------------------------------------------------------------------------
+// Passes to lower Vector ops before conversion to LLVM.
+//------------------------------------------------------------------------------
+
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
 };
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "");
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorTransferLoweringPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorTransposeLoweringPass(
+    bool lowerVectorTransposeToAVX2 = false);
+
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUVectorShapeCastLoweringPass();
+
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options);
@@ -136,10 +147,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
                                                bool enableVectorMasking,
                                                bool enableAArch64SSVE = false);
 
-void addDoubleTilingPadExpertPassPipeline(OpPassManager &passManager,
-                                          TilingConfig &tilingConfig,
-                                          bool enableVectorMasking);
-
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
@@ -188,7 +195,8 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager);
 /// Populates passes needed to lower a XLA HLO op to LLVM dialect via the
 /// structured ops path. The pass manager `pm` in here should operate on the
 /// module within the IREE::HAL::ExecutableOp.
-void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
+void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager,
+                                     bool enableAArch64SME = false);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Linking Passes and Pipelines
@@ -215,7 +223,6 @@ void buildLLVMCPULinkingPassPipeline(OpPassManager &passManager);
 
 void registerCodegenLLVMCPUPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_PASSES_H_

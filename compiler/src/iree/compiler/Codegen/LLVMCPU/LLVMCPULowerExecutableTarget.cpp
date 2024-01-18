@@ -6,8 +6,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -28,8 +28,7 @@
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 namespace {
 /// Lowers an hal.executable.variant operation to scalar/native-vector
@@ -176,12 +175,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                      enableVectorMasking, lowerToAVX2);
     break;
   }
-  case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingPadExpert: {
-    TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addDoubleTilingPadExpertPassPipeline(pipeline, tilingConfig,
-                                         enableVectorMasking);
-    break;
-  }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUDoubleTilingPeelingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
@@ -228,5 +221,4 @@ createLLVMCPULowerExecutableTargetPass() {
   return std::make_unique<LLVMCPULowerExecutableTargetPass>();
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

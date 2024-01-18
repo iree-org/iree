@@ -10,8 +10,8 @@
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
 
 struct InitializerOpConversion
@@ -297,5 +297,4 @@ void populateUtilGlobalToVMPatterns(MLIRContext *context,
       context, typeConverter);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

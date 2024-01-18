@@ -216,6 +216,16 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "memory",
+    srcs = ["memory.c"],
+    hdrs = ["memory.h"],
+    deps = [
+        ":internal",
+        "//runtime/src/iree/base",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "path",
     srcs = ["path.c"],
     hdrs = ["path.h"],

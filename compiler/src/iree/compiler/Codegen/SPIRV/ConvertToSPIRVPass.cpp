@@ -15,7 +15,7 @@
 
 #include <tuple>
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
@@ -60,9 +60,10 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
 namespace {
+
 //===----------------------------------------------------------------------===//
 // Resource utilities
 //===----------------------------------------------------------------------===//
@@ -360,6 +361,7 @@ private:
   // Use 64 bits for index widths.
   unsigned indexBits;
 };
+
 } // namespace
 
 void ConvertToSPIRVPass::runOnOperation() {
@@ -560,5 +562,4 @@ createConvertToSPIRVPass(bool enableFastMath, unsigned indexBits) {
   return std::make_unique<ConvertToSPIRVPass>(enableFastMath, indexBits);
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

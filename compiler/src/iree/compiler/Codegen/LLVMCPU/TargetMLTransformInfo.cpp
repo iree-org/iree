@@ -8,8 +8,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler;
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -22,9 +21,6 @@ struct RISCVTargetMLTransformInfo : TargetMLTransformInfo {
 
 } // namespace
 
-namespace mlir {
-namespace iree_compiler {
-
 const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
     IREE::HAL::ExecutableTargetAttr targetAttr) {
   if (isRISCV(targetAttr)) {
@@ -34,5 +30,4 @@ const TargetMLTransformInfo TargetMLTransformInfo::getTargetMLTransformInfo(
   return TargetMLTransformInfo();
 };
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

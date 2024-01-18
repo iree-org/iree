@@ -20,8 +20,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Value.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 // static
 LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
@@ -334,5 +333,4 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
   return false;
 }
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler

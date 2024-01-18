@@ -47,8 +47,8 @@ struct LinalgTransformationFilter {
 
   LinalgTransformationFilter(LinalgTransformationFilter &&) = default;
   LinalgTransformationFilter(const LinalgTransformationFilter &) = default;
-  LogicalResult checkAndNotify(PatternRewriter &rewriter, Operation *op) const;
-  void replaceLinalgTransformationFilter(PatternRewriter &rewriter,
+  LogicalResult checkAndNotify(RewriterBase &rewriter, Operation *op) const;
+  void replaceLinalgTransformationFilter(RewriterBase &rewriter,
                                          Operation *op) const;
   bool hasReplacementFilter(Operation *op) const;
 
@@ -84,8 +84,6 @@ private:
   bool matchByDefault;
 };
 
-std::unique_ptr<OperationPass<func::FuncOp>> createTilingInterfaceTilingPass();
-
 std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
@@ -117,22 +115,22 @@ createTileAndDecomposeWinogradTransformPass();
 // tranformation.
 std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
 
-// Creates a pass to convert the softmax op into a sequence of
-// linalg generic ops.
-std::unique_ptr<Pass> createDecomposeSoftmaxPass();
-
 // Transform dialect version of tile and decompose attention wrapper.
+// The optional tile size specifies the step for the innermost for loop.
 void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                SmallVectorImpl<Operation *> &ops,
-                               RewriterBase &rewriter, bool onlyTile = false);
+                               RewriterBase &rewriter, bool onlyTile = false,
+                               std::optional<uint64_t> tileSize = std::nullopt);
 
-IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
-                                           SmallVectorImpl<Operation *> &ops,
-                                           RewriterBase &rewriter);
+IREE::LinalgExt::AttentionOp
+tileAttention(IREE::LinalgExt::AttentionOp attnOp,
+              SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
+              std::optional<uint64_t> tileSize = std::nullopt);
 
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
-                             RewriterBase &rewriter);
+                             RewriterBase &rewriter,
+                             std::optional<uint64_t> tileSize = std::nullopt);
 
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
@@ -144,55 +142,6 @@ const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
 //===---------------------------------------------------------------------===//
-using VectorSizeComputationFunction =
-    std::function<SmallVector<int64_t>(linalg::LinalgOp, ArrayRef<int64_t>)>;
-struct LinalgVectorizationOptions {
-  /// Enable vector masking during vectorization.
-  bool enableVectorMasking = false;
-
-  LinalgVectorizationOptions &setEnableVectorMasking(bool val) {
-    enableVectorMasking = val;
-    return *this;
-  }
-
-  /// Canonical vector sizes for the vector iteration space (i.e., vectorization
-  /// factors). They are optional for input code with full static shapes.
-  SmallVector<int64_t> canonicalVectorSizes;
-
-  LinalgVectorizationOptions &
-  setCanonicalVectorSizes(ArrayRef<int64_t> vecSizes) {
-    assert(canonicalVectorSizes.empty() &&
-           "Canonical vector sizes are already set");
-    canonicalVectorSizes.append(vecSizes.begin(), vecSizes.end());
-    return *this;
-  }
-
-  /// Computation function that returns the vector sizes to vectorize a given
-  /// Linalg operation and the canonical vector sizes of the iteration space.
-  VectorSizeComputationFunction vectorSizeComputationFunction = nullptr;
-
-  LinalgVectorizationOptions &
-  setVectorSizeComputationFunction(VectorSizeComputationFunction fun) {
-    vectorSizeComputationFunction = std::move(fun);
-    return *this;
-  }
-
-  /// Enable vectorization of padding operations.
-  bool vectorizePadding = false;
-
-  LinalgVectorizationOptions &setVectorizePadding(bool vecPad) {
-    vectorizePadding = vecPad;
-    return *this;
-  }
-
-  /// Enable vectorization of gather accesses.
-  bool vectorizeGatherAccesses = false;
-
-  LinalgVectorizationOptions &setVectorizeGatherAccesses(bool vecGather) {
-    vectorizeGatherAccesses = vecGather;
-    return *this;
-  }
-};
 
 void registerPasses();
 

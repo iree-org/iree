@@ -22,10 +22,7 @@
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
 #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace HAL {
+namespace mlir::iree_compiler::IREE::HAL {
 
 std::unique_ptr<llvm::TargetMachine>
 createTargetMachine(const LLVMTarget &target) {
@@ -137,7 +134,4 @@ LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
   return success();
 }
 
-} // namespace HAL
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::HAL

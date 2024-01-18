@@ -12,17 +12,18 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Get the `offsets`, `sizes` and `strides` for a `storeOp` (or `loadOp`). This
 /// method clones the operations that generate the `Value`s used for
@@ -148,7 +149,15 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
     ArrayRef<OpFoldResult> workgroupCount,
     int maxWorkgroupParallelDims = kNumMaxParallelDims);
 
-} // namespace iree_compiler
-} // namespace mlir
+/// Tiles LinalgOp ops that match filter.
+LogicalResult
+tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
+                        IREE::LinalgExt::LinalgTransformationFilter filter);
+/// Distributes LinalgOp ops that match filter.
+LogicalResult distributeLinalgOpsWithFilter(
+    func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,
+    IREE::LinalgExt::LinalgTransformationFilter filter);
+
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_TRANSFORMS_TRANSFORMS_H_

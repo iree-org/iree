@@ -7,23 +7,18 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_
 #define IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_
 
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-class Location;
-class LogicalResult;
-class OpBuilder;
-class RewriterBase;
-class Value;
+namespace mlir::iree_compiler::IREE::Flow {
 
-namespace tensor {
-class ExtractSliceOp;
-class InsertSliceOp;
-} // namespace tensor
-
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+/// Indicates whether the given offsets/sizes/strides representing a slice from
+/// baseShape is a contiguous slice, and this is mappable to Flow ops.
+bool isOffsetSizeAndStrideMappableToFlow(llvm::ArrayRef<OpFoldResult> offsets,
+                                         llvm::ArrayRef<OpFoldResult> sizes,
+                                         llvm::ArrayRef<OpFoldResult> strides,
+                                         llvm::ArrayRef<int64_t> baseShape);
 
 /// Rewrite the given InsertSliceOp into a Flow::TensorUpdateOp.
 LogicalResult
@@ -35,9 +30,6 @@ LogicalResult
 convertExtractSliceOpToFlowSliceOp(RewriterBase &rewriter,
                                    tensor::ExtractSliceOp sliceOp);
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
 
 #endif // IREE_COMPILER_DIALECT_FLOW_CONVERSION_TENSORTOFLOW_UTILS_H_

@@ -15,8 +15,7 @@
 // Forward declare from iree/compiler/PluginAPI/Client.h.
 class PipelineExtensions;
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 #define GEN_PASS_DECL
 #include "iree/compiler/InputConversion/Common/Passes.h.inc"
@@ -51,7 +50,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
 
 void registerCommonInputConversionPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_

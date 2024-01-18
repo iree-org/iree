@@ -17,10 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -40,7 +37,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
   }
 
   for (auto dim : llvm::enumerate(tensorType.getShape())) {
-    if (dim.value() != ShapedType::kDynamic)
+    if (!ShapedType::isDynamic(dim.value()))
       continue;
     argumentDims.push_back(
         b.createOrFold<tensor::DimOp>(loc, tensor, dim.index()));
@@ -50,7 +47,7 @@ static void appendDynamicDims(OpBuilder &b, Location loc,
 /// Follow the reverse SSA use-def chain of the given value (always taking the
 /// tied operand) and return the first value outside of `regionOp`.
 static std::optional<Value>
-findFirstTiedValueOutsideOfRegionOp(Flow::DispatchRegionOp regionOp,
+findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
                                     Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
@@ -83,9 +80,9 @@ findFirstTiedValueOutsideOfRegionOp(Flow::DispatchRegionOp regionOp,
 /// DispatchRegionOp is not isolated from above and may capture any SSA value
 /// that is in scope. The generated DispatchWorkgroupsOp captures all SSA values
 /// explicitly and makes them available inside the region via block arguments.
-FailureOr<Flow::DispatchWorkgroupsOp>
+FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-    Flow::DispatchRegionOp regionOp, RewriterBase &rewriter) {
+    IREE::Flow::DispatchRegionOp regionOp, RewriterBase &rewriter) {
   Region &region = regionOp.getBody();
   // Currently this does not handle empty `flow.dispatch.region` ops.
   if (region.empty()) {
@@ -120,9 +117,10 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   DenseSet<Value> tiedArgumentsSet;
   SmallVector<int64_t> tiedArguments(numResults,
                                      IREE::Util::TiedOpInterface::kUntiedIndex);
-  SmallVector<Flow::ReturnOp> origTerminators;
-  region.walk(
-      [&](Flow::ReturnOp returnOp) { origTerminators.push_back(returnOp); });
+  SmallVector<IREE::Flow::ReturnOp> origTerminators;
+  region.walk([&](IREE::Flow::ReturnOp returnOp) {
+    origTerminators.push_back(returnOp);
+  });
   assert(!origTerminators.empty() && "expected at least one terminator");
 
   // The logic to find the tied arguments only works for single block regions.
@@ -194,7 +192,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     }
     auto inputBbArg = workgroupsOp.getInputBlockArgument(it.index());
     auto dims =
-        Util::findVariadicDynamicDims(it.index(), arguments, argumentDims);
+        IREE::Util::findDynamicDimsInList(it.index(), arguments, argumentDims);
     assert(dims.size() == tensorType.getNumDynamicDims() &&
            "dynamic dims not found among arguments");
     SmallVector<Value> bbArgDims =
@@ -219,9 +217,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   }
 
   // Update terminator.
-  SmallVector<Flow::ReturnOp> terminators;
+  SmallVector<IREE::Flow::ReturnOp> terminators;
   newBody.walk(
-      [&](Flow::ReturnOp returnOp) { terminators.push_back(returnOp); });
+      [&](IREE::Flow::ReturnOp returnOp) { terminators.push_back(returnOp); });
   for (auto terminator : terminators) {
     rewriter.setInsertionPoint(terminator);
     for (const auto &it : llvm::enumerate(terminator->getOperands())) {
@@ -233,8 +231,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
       } else {
         // This assumes that the number of dynamic dims does not change when
         // following an SSA use-def chain of tied values.
-        dims = Util::findVariadicDynamicDims(tiedArguments[it.index()],
-                                             arguments, argumentDims);
+        dims = IREE::Util::findDynamicDimsInList(tiedArguments[it.index()],
+                                                 arguments, argumentDims);
       }
 #ifndef NDEBUG
       auto tensorType = it.value().getType().cast<RankedTensorType>();
@@ -260,15 +258,16 @@ namespace {
 struct ConvertRegionToWorkgroupsPass
     : public ConvertRegionToWorkgroupsBase<ConvertRegionToWorkgroupsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<Flow::FlowDialect, tensor::TensorDialect>();
+    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
-    SmallVector<Flow::DispatchRegionOp> ops;
-    getOperation()->walk([&](Flow::DispatchRegionOp op) { ops.push_back(op); });
+    SmallVector<IREE::Flow::DispatchRegionOp> ops;
+    getOperation()->walk(
+        [&](IREE::Flow::DispatchRegionOp op) { ops.push_back(op); });
 
     IRRewriter rewriter(getOperation()->getContext());
-    for (Flow::DispatchRegionOp regionOp : ops) {
+    for (IREE::Flow::DispatchRegionOp regionOp : ops) {
       if (failed(rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp,
                                                                    rewriter))) {
         signalPassFailure();
@@ -277,13 +276,11 @@ struct ConvertRegionToWorkgroupsPass
     }
   }
 };
+
 } // namespace
 
 std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass() {
   return std::make_unique<ConvertRegionToWorkgroupsPass>();
 }
 
-} // namespace Flow
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow

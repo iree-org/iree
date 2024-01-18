@@ -11,8 +11,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Container of information needed to materialize the pack operation.
 struct MaterializeEncodingInfo {
@@ -77,6 +76,15 @@ protected:
 /// Otherwise, returns null.
 IREE::LinalgExt::EncodingAttr getEncodingAttr(RankedTensorType type);
 
+/// Get the permutation that permutes the input shape to the canonical
+/// matmul input shape based on the IndexingMaps encoding attribute.
+std::optional<SmallVector<int64_t>>
+getPermutationToCanonicalMatmulShape(IREE::LinalgExt::EncodingAttr encoding);
+
+/// Returns a RankedTensorType that has been transposed into the canonical
+/// form for an ordinary matmul/batch_matmul op.
+RankedTensorType getCanonicalMatmulTypeWithEncoding(RankedTensorType type);
+
 /// Returns the original type that carried by encoding.
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type);
 
@@ -117,9 +125,6 @@ MaterializeEncodingInfo
 getEncodingInfoForMatmul(IREE::LinalgExt::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
-MaterializeEncodingValueFn
-getMaterializeEncodingValueFn(IREE::HAL::ExecutableTargetAttr targetAttr);
-
 void populateMaterializeEncodingIntoPackUnPackPatterns(
     RewritePatternSet &patterns, MaterializeEncodingConversionTarget &target,
     MaterializeEncodingTypeConverter &typeConverter,
@@ -128,6 +133,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 void populateMaterializeUpperBoundTileSizePatterns(
     RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
+
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_

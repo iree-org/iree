@@ -14,13 +14,12 @@
 
 #include <limits>
 
-#include "iree/compiler/Codegen/Dialect/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
 
 /// Function to register all dependent dialects for Transform Dialect based
 /// passes.
@@ -29,7 +28,8 @@ void registerTransformDialectTranslationDependentDialects(
 
 /// Passes that are done on all backends before target-specific code-generation
 /// kicks in.
-void addCommonTargetExecutablePreprocessingPasses(OpPassManager &passManager);
+void addCommonTargetExecutablePreprocessingPasses(
+    OpPassManager &passManager, bool useDecomposeSoftmaxFusion = true);
 
 /// Post-bufferization passes run to cleanup the IR
 /// (ResolveShapedTypeResultDims, Canonicalization/CSE and
@@ -98,6 +98,10 @@ std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 /// tiling and generalization. See implementation for more details.
 std::unique_ptr<OperationPass<func::FuncOp>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
+
+/// Creates a pass to convert the softmax op into a sequence of linalg generic
+/// ops.
+std::unique_ptr<Pass> createDecomposeSoftmaxPass(bool useFusion = true);
 
 /// A pass to eliminate tensor.empty ops that could turn into allocations
 /// during bufferization.
@@ -172,7 +176,7 @@ std::unique_ptr<OperationPass<func::FuncOp>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createHoistRedundantVectorTransfersPass();
+createOptimizeTensorInsertExtractSlicesPass();
 
 std::unique_ptr<OperationPass<func::FuncOp>>
 createHoistStaticallyBoundAllocationsPass();
@@ -302,7 +306,6 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_

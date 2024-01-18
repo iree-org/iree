@@ -15,27 +15,7 @@ if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_entry_points
-  ARCH
-    wasm_64
-  INTERNAL_HDRS
-    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
-    "common_x86_64.h"
-    "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
-  SRCS
-    "mmt4d_x86_64_entry_point.c"
-    "pack_x86_64_entry_point.c"
-    "query_tile_sizes_x86_64_entry_point.c"
-    "unpack_x86_64_entry_point.c"
-)
-
-iree_bitcode_library(
-  NAME
-    ukernel_bitcode_x86_64_avx2_fma
+    ukernel_bitcode_arch_x86_64_entry_points
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -44,12 +24,23 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
+  SRCS
+    "mmt4d_x86_64_entry_point.c"
+)
+
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arch_x86_64_avx2_fma
+  ARCH
+    x86_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
-    "pack_x86_64_avx2_fma.c"
-    "unpack_x86_64_avx2_fma.c"
   COPTS
     "-mavx"
     "-mavx2"
@@ -59,7 +50,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_base
+    ukernel_bitcode_arch_x86_64_avx512_base
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -68,12 +59,8 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
-    "pack_x86_64_avx512_base.c"
-    "unpack_x86_64_avx512_base.c"
   COPTS
     "-mavx"
     "-mavx2"
@@ -88,7 +75,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_vnni
+    ukernel_bitcode_arch_x86_64_avx512_vnni
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -97,8 +84,6 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -116,7 +101,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_bf16
+    ukernel_bitcode_arch_x86_64_avx512_bf16
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -125,8 +110,6 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_bf16.c"
   COPTS
@@ -144,18 +127,18 @@ iree_bitcode_library(
 
 iree_link_bitcode(
   NAME
-    ukernel_bitcode_x86_64
+    ukernel_bitcode_arch_x86_64
   SRCS
-    "ukernel_bitcode_x86_64_avx2_fma.bc"
-    "ukernel_bitcode_x86_64_avx512_base.bc"
-    "ukernel_bitcode_x86_64_avx512_bf16.bc"
-    "ukernel_bitcode_x86_64_avx512_vnni.bc"
+    "ukernel_bitcode_arch_x86_64_avx2_fma.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_base.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_bf16.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_vnni.bc"
+    "ukernel_bitcode_arch_x86_64_entry_points.bc"
 
 )
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64_entry_points.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_x86_64.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
