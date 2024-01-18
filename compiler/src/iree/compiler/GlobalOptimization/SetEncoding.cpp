@@ -212,14 +212,54 @@ static Type getContractionInputTypeWithSignedness(OpBuilder &builder,
   return elemType;
 }
 
+/// Returns true iff the linalgOp has a body like a regular matmul, i.e.
+/// yield(add(out, mul(cast(in0), cast(in1))))
+static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
+  auto outBlockArg =
+      linalgOp.getMatchingBlockArgument(linalgOp.getDpsInitOperand(0));
+  auto yieldOp =
+      dyn_cast<linalg::YieldOp>(outBlockArg.getParentBlock()->getTerminator());
+  if (!yieldOp) {
+    return false;
+  }
+  auto addOp = yieldOp->getOperand(0).getDefiningOp();
+  if (!addOp || !isa<arith::AddIOp, arith::AddFOp>(addOp)) {
+    return false;
+  }
+  auto addLhs = addOp->getOperand(0);
+  auto addRhs = addOp->getOperand(1);
+  auto addLhsOp = addLhs.getDefiningOp();
+  auto addRhsOp = addRhs.getDefiningOp();
+  if (!(addLhsOp && addRhs == outBlockArg) &&
+      !(addRhsOp && addLhs == outBlockArg)) {
+    return false;
+  }
+  Operation *mulOp = addLhsOp ? addLhsOp : addRhsOp;
+  if (!isa<arith::MulFOp, arith::MulIOp>(mulOp)) {
+    return false;
+  }
+  auto mulLhs = mulOp->getOperand(0);
+  auto mulRhs = mulOp->getOperand(1);
+  auto mulLhsOp = mulLhs.getDefiningOp<CastOpInterface>();
+  auto mulRhsOp = mulRhs.getDefiningOp<CastOpInterface>();
+  if (!isa<BlockArgument>(mulLhs) && !mulLhsOp && !isa<BlockArgument>(mulRhs) &&
+      !mulRhsOp) {
+    return false;
+  }
+  if ((mulLhsOp && !isa<BlockArgument>(mulLhsOp->getOperand(0))) ||
+      (mulRhsOp && !isa<BlockArgument>(mulRhsOp->getOperand(0)))) {
+    return false;
+  }
+  return true;
+}
+
 namespace {
 
 struct setContractionOpEncoding
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
     if (!linalgOp.hasTensorSemantics()) {
       return failure();
     }
@@ -236,7 +276,16 @@ struct setContractionOpEncoding
     if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
         cDims->n.size() > 1 || cDims->k.size() > 1) {
       return rewriter.notifyMatchFailure(
-          op, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
+          linalgOp, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
+    }
+    if ((cDims->n.empty() && cDims->m.empty()) || cDims->k.empty()) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Expected M or N dims and K dim to not be empty");
+    }
+    if (!hasMatmulLikeBody(linalgOp)) {
+      return rewriter.notifyMatchFailure(
+          linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
+                    "mul(cast(in0), cast(in1))))");
     }
 
     auto inputs = linalgOp.getDpsInputs();

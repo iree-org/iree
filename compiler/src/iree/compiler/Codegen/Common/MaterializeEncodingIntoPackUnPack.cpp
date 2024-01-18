@@ -115,41 +115,6 @@ RankedTensorType getExpandedType(RankedTensorType type, bool isBatched,
       type.getElementType());
 }
 
-// Value getMmt4dLhs(Value value, linalg::LinalgOp linalgOp,
-//                   RewriterBase &rewriter,
-//                   SmallVectorImpl<ReassociationIndices> &ri,
-//                   bool isTransposed) {
-//   auto cDims = linalg::inferContractionDims(linalgOp);
-//   if (cDims->m.size() && cDims->n.size()) {
-//     return value;
-//   }
-//   RankedTensorType type = value.getType().cast<RankedTensorType>();
-//   if (cDims->m.empty()) {
-//     RankedTensorType newType =
-//         getExpandedType(type, /*isBatched=*/!cDims->batch.empty(),
-//         isTransposed, ri);
-//     return rewriter
-//         .create<tensor::ExpandShapeOp>(linalgOp->getLoc(), newType, value,
-//         ri) .getResult();
-//   }
-//   return value;
-// }
-
-// Value getMmt4dRhs(Value value, linalg::LinalgOp linalgOp,
-//                   RewriterBase &rewriter,
-//                   SmallVectorImpl<ReassociationIndices> &ri,
-//                   bool isTransposed) {
-//   auto cDims = linalg::inferContractionDims(linalgOp);
-//   if (cDims->m.size() && cDims->n.size()) {
-//     return value;
-//   }
-//   RankedTensorType type = value.getType().cast<RankedTensorType>();
-//   RankedTensorType newType = getExpandedType(type,
-//   /*isBatched=*/!cDims->batch.empty(), isTransposed, ri); return rewriter
-//       .create<tensor::ExpandShapeOp>(linalgOp->getLoc(), newType, value, ri)
-//       .getResult();
-// }
-
 /// Given an input Value and a desired output element type, create and return
 /// an element-wise Linalg::GenericOp that extends the input Value to the
 /// output element type.
