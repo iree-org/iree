@@ -995,11 +995,26 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   return inputAndOutputElementTypes[0];
 }
 
-/// Utility to compute the tile sizes for AArch64 Neon/SVE.
-static void getMatmulAArch64NeonSVEVectorSizes(
+static void getFullRegisterHeuristicsMatmulVectorSizes(
     func::FuncOp entryPointFn, linalg::LinalgOp op, int64_t vectorSize,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
-  getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+}
+
+/// Compute or adjust existing vector sizes using a heuristic that will aim to
+/// fill at least one full vector register for all the element types of the
+/// matmul. For now, the current heuristics only look at the N dimension but we
+/// would introduce logic to also consider unrolling trade-offs between the M, N
+/// and K.
+///
+/// Example: for an (i32 <- i8, i8) matmul and a 128-bit vector register, vector
+/// size N would be at least 128/8=16.
+///
+/// NOTE: This function should not contain target-specific conditional code.
+static void getMatmulVectorSizesUsingFullVectorHeuristics(
+    func::FuncOp entryPointFn, linalg::LinalgOp op, int64_t vectorSize,
+    SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
+  if (sizes.empty())
+    getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
 
   // Find the smallest type size in the matmul.
   SmallVector<Type> matmulTypes;
@@ -1023,8 +1038,9 @@ static void getMatmulAArch64NeonSVEVectorSizes(
 
   // Make sure that the smallest type can at least fill a full vector register
   // given the tile size of the main vector dimension (N).
+  constexpr int64_t byteSizeInBits = 8;
   int64_t minNumElements =
-      (getNativeVectorSizeInBytes(entryPointFn) * 8) / minSize;
+      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / minSize;
   sizes[1] = std::max<int64_t>(sizes[1], minNumElements);
 }
 
@@ -1074,17 +1090,13 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
       // heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
     }
-
-    if (matmulTileSizes.empty()) {
-      getMatmulAArch64NeonSVEVectorSizes(entryPointFn, op, vectorSize,
-                                         matmulTileSizes, matmulScalableFlags);
-    }
   }
 
-  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  // If tile sizes were not computed by target-specific heuristics, use default
+  // generic heuristics.
   if (matmulTileSizes.empty()) {
-    getDefaultMatmulVectorSizes(op, vectorSize, matmulTileSizes,
-                                matmulScalableFlags);
+    getMatmulVectorSizesUsingFullVectorHeuristics(
+        entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
   }
   // Pad the scalable flags with false to match the tile sizes.
   matmulScalableFlags.resize(matmulTileSizes.size());
