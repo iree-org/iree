@@ -9,8 +9,6 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
-#include <cassert>
-#include <optional>
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
@@ -35,11 +33,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
-#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
-#include "mlir/IR/Value.h"
-#include "mlir/Interfaces/CastInterfaces.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "llvm/Support/Debug.h"
