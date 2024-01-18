@@ -33,6 +33,7 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
