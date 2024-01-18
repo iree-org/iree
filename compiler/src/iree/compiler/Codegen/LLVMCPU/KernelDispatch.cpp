@@ -1074,8 +1074,7 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
       // Note: This may not pick any sizes (which will fallback to the default
       // SVE) sizes below.
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
-    }
-    else {
+    } else {
       getMatmulAArch64NeonSVEVectorSizes(entryPointFn, op, vectorSize,
                                          matmulTileSizes, matmulScalableFlags);
     }
