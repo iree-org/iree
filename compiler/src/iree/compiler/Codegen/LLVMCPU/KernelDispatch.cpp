@@ -1070,8 +1070,8 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
 
   if (isAArch64(targetAttr)) {
     if (hasSMEFeature(targetAttr)) {
-      // Note: This may not pick any sizes (which will fallback to the default
-      // SVE) sizes below.
+      // Note: This may not pick any sizes (which will fallback to the SVE
+      // heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
     }
 
