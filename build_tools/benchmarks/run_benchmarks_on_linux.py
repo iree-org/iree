@@ -19,6 +19,7 @@ import requests
 import shutil
 import subprocess
 import tarfile
+import time
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
@@ -235,15 +236,28 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 )
             )
 
-        process = subprocess.Popen(
-            cmd, env={"TRACY_NO_EXIT": "1"}, stdout=subprocess.PIPE, text=True
+        capture_cmd = [capture_config.trace_capture_tool, "-f", "-o", capture_filename]
+        if self.verbose:
+            print(f"cmd: {capture_cmd}")
+        stdout_redirect = None if self.verbose else subprocess.DEVNULL
+
+        # The benchmark process can finish and exit quickly. So start the
+        # capture process first.
+        subprocess.Popen(capture_cmd, stdout=stdout_redirect)
+
+        # Then start the benchmark process and wait for it to stop.
+        execute_cmd(
+            cmd,
+            env={"TRACY_NO_EXIT": "1"},
+            stdout=stdout_redirect,
+            verbose=self.verbose,
         )
 
-        wait_for_iree_benchmark_module_start(process, self.verbose)
-
-        capture_cmd = [capture_config.trace_capture_tool, "-f", "-o", capture_filename]
-        stdout_redirect = None if self.verbose else subprocess.DEVNULL
-        execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
+        # Some extra grace time to let the capture process finish collection.
+        # Note that we will start the next model's benchmarking and capturing
+        # afterwards; so in theory we can overlap here and might not even
+        # need this, but just to be conservative.
+        time.sleep(2)
 
 
 def main(args):
