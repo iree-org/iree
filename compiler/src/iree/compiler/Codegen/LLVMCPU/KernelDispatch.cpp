@@ -1018,9 +1018,8 @@ static void getMatmulAArch64NeonSVEVectorSizes(
   }
 
   LLVM_DEBUG(KD_DBGS() << "Smallest type found: " << minSize << " bits\n");
-
-  if (minSize < 0 || minSize == std::numeric_limits<int64_t>::max())
-    return;
+  assert(minSize > 0 && minSize < std::numeric_limits<int64_t>::max() &&
+         "Min size couldn't be computed");
 
   // Make sure that the smallest type can at least fill a full vector register
   // given the tile size of the main vector dimension (N).
@@ -1074,7 +1073,9 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
       // Note: This may not pick any sizes (which will fallback to the default
       // SVE) sizes below.
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
-    } else {
+    }
+
+    if (matmulTileSizes.empty()) {
       getMatmulAArch64NeonSVEVectorSizes(entryPointFn, op, vectorSize,
                                          matmulTileSizes, matmulScalableFlags);
     }
