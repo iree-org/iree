@@ -152,7 +152,8 @@ function(iree_compiler_targeting_iree_arch DST_VAR SRC_ARCH)
   endif()
   
   iree_arch_to_llvm_target(_LLVM_TARGET "${SRC_ARCH}")
-  if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD)
+  # WebAssembly is unconditionally enabled, and not enumerated in LLVM_TARGETS_TO_BUILD.
+  if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD OR _LLVM_TARGET STREQUAL "WebAssembly")
     set(${DST_VAR} ON PARENT_SCOPE)
   else()
     set(${DST_VAR} OFF PARENT_SCOPE)
