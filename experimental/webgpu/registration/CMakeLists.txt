@@ -22,7 +22,7 @@ iree_cc_library(
 if(${EMSCRIPTEN})
   target_sources(
     iree_experimental_webgpu_registration_registration
-    PUBLIC
+    PRIVATE
       "driver_module_emscripten.c"
   )
   target_link_libraries(
@@ -33,7 +33,7 @@ if(${EMSCRIPTEN})
 else()
   target_sources(
     iree_experimental_webgpu_registration_registration
-    PUBLIC
+    PRIVATE
       "driver_module_native.c"
   )
   target_link_libraries(
