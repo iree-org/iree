@@ -17,7 +17,6 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
-        "CPUUtils.cpp",
         "GPUUtils.cpp",
         "LinalgOpInfo.cpp",
         "LinkingUtils.cpp",
@@ -25,7 +24,6 @@ iree_compiler_cc_library(
         "Utils.cpp",
     ],
     hdrs = [
-        "CPUUtils.h",
         "GPUUtils.h",
         "LinalgOpInfo.h",
         "LinkingUtils.h",
