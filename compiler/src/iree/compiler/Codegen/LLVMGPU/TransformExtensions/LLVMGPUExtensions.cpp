@@ -1532,11 +1532,11 @@ void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure
-transform_dialect::CreateMatmulMfmaTileSizesOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  Builder builder(getTarget().getContext());
+transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto payload = state.getPayloadOps(getTarget());
+  Operation *target = *payload.begin();
   ArrayRef<int64_t> shape =
       llvm::cast<ShapedType>(target->getResult(0).getType()).getShape();
   if (shape.size() != 2) {
@@ -1548,30 +1548,32 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::applyToOne(
   // TODO: cover all shape cases
   // (sz0[0] / sz1[0]) * (sz0[1] / sz1[1]) = 8
   if (shape == ArrayRef<int64_t>({8192, 320})) {
-    sz0 = {512, 64}, sz1 = {64, 64};
+    sz0 = {512, 64};
+    sz1 = {64, 64};
   } else if (shape[0] == 128) {
     if (shape[1] % 64 != 0) {
       return emitDefiniteFailure() << "dim #1 should be divisible by 64";
     }
-    sz0 = {128, 64}, sz1 = {32, 32};
+    sz0 = {128, 64};
+    sz1 = {32, 32};
   } else {
     // Default tiling configuration.
     if (shape[0] % 256 != 0 || shape[1] % 128 != 0) {
-      return emitDefiniteFailure()
-        << "dim #0 should be divisible by 256 and dim #1 should be divisible by 128";
+      return emitDefiniteFailure() << "dim #0 should be divisible by 256 and "
+                                      "dim #1 should be divisible by 128";
     }
-    sz0 = {256, 128}, sz1 = {64, 64};
+    sz0 = {256, 128};
+    sz1 = {64, 64};
   }
-
   for (auto i : sz0) {
-    paramsArray0.push_back(builder.getIntegerAttr(builder.getIndexType(), i));
+    paramsArray0.push_back(rewriter.getIntegerAttr(rewriter.getIndexType(), i));
   }
   for (auto i : sz1) {
-    paramsArray1.push_back(builder.getIntegerAttr(builder.getIndexType(), i));
+    paramsArray1.push_back(rewriter.getIntegerAttr(rewriter.getIndexType(), i));
   }
-  results.push_back({builder.getArrayAttr(paramsArray0)});
-  results.push_back({builder.getArrayAttr(paramsArray1)});
 
+  results.setParams(cast<OpResult>(getResult(0)), paramsArray0);
+  results.setParams(cast<OpResult>(getResult(1)), paramsArray0);
   return DiagnosedSilenceableFailure::success();
 }
 
