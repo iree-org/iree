@@ -125,7 +125,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      (rhs.isSignlessInteger(8) || rhs.isSignlessInteger(4)) &&
       out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
@@ -135,7 +136,7 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 8}, // Truncation of the above.
       };
     }
-    if (hasFeature(target, "+dotprod")) {
+    if (hasUkernel(target) && hasFeature(target, "+dotprod")) {
       return {
           TileMxNxK{8, 8, 4}, // Aim to use SDOT.
           TileMxNxK{4, 8, 4}, // Truncation of the above.
@@ -143,17 +144,22 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
+  }
+
+  if (!hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      (rhs.isSignlessInteger(8) || rhs.isSignlessInteger(4)) &&
+      (out.isSignlessInteger(32) || out.isF32())) {
     return {
-        TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
-        TileMxNxK{4, 8, 1}, // Truncation of the above.
-        TileMxNxK{2, 8, 1}, // Truncation of the above.
-        TileMxNxK{1, 8, 1}, // Truncation of the above.
+        TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
+        TileMxNxK{4, 16, 1}, // Truncation of the above.
+        TileMxNxK{2, 32, 1}, // Truncation of the above.
+        TileMxNxK{1, 64, 1}, // Truncation of the above.
     };
   }
 
   // Fallback - no architecture-optimized tile size for this case.
   return {};
-}
+  }
 
 // Enumerate tile sizes to choose from on x86-64.
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
