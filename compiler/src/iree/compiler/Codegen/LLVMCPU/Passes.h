@@ -83,6 +83,9 @@ struct LLVMCPUVectorLoweringPassOptions {
 };
 
 std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUOptimizeVectorUnitDimsPass();
+
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "");
 
 std::unique_ptr<OperationPass<func::FuncOp>>
