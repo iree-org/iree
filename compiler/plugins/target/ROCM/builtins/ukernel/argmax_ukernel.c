@@ -109,7 +109,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F32I64(float *inputBuffer,
   }
   // if there are multiple max value holder, find smallest index (argmax
   // semantics).
-  int32_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+  int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
   laneResult = __ockl_wfred_min_i64(indexVal);
   if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
@@ -191,7 +191,7 @@ extern "C" __device__ void __iree_uk_rocm_argmax_F16I64(half *inputBuffer,
   }
   // if there are multiple max value holder, find smallest index (argmax
   // semantics).
-  int32_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
+  int64_t indexVal = wgMax == laneMax ? laneResult : __INT64_MAX__;
   laneResult = __ockl_wfred_min_i64(indexVal);
   if (laneID == 0)
     outputBuffer[output_offset] = laneResult;
