@@ -140,6 +140,7 @@ func.func @nested_op_alloc_linalg_use(%arg0 : index) {
     %0 = affine.min #map(%iv)
     %1 = memref.alloc(%0) : memref<?xi32>
     linalg.fill ins(%c42 : i32) outs(%1 : memref<?xi32>)
+    memref.dealloc %1 : memref<?xi32>
     scf.yield
   }
   return
@@ -151,3 +152,4 @@ func.func @nested_op_alloc_linalg_use(%arg0 : index) {
 //       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]][0] [%[[SIZE]]] [1]
 //       CHECK:     linalg.fill
 //  CHECK-SAME:         outs(%[[SUBVIEW]] :
+//       CHECK:   memref.dealloc %[[ALLOC:.+]] : memref<16xi32>
