@@ -102,13 +102,6 @@ def configure_iree_submodule_deps(iree_repo_alias = "@", iree_path = "./"):
 
     maybe(
         native.new_local_repository,
-        name = "com_github_yaml_libyaml",
-        build_file = iree_repo_alias + "//:build_tools/third_party/libyaml/BUILD.overlay",
-        path = paths.join(iree_path, "third_party/libyaml"),
-    )
-
-    maybe(
-        native.new_local_repository,
         name = "vulkan_headers",
         build_file = iree_repo_alias + "//:build_tools/third_party/vulkan_headers/BUILD.overlay",
         path = paths.join(iree_path, "third_party/vulkan_headers"),
