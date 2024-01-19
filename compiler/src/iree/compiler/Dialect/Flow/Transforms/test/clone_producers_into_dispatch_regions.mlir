@@ -96,17 +96,14 @@ func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f
 
 // -----
 
-#map = affine_map<() -> ()>
-func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view {
+func.func @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> tensor<i32> {
   %c1 = arith.constant 1 : index
   %c2_i32 = arith.constant 2 : i32
   %c0 = arith.constant 0 : index
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<1xi32>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<1xi32>
   %2 = tensor.empty() : tensor<i32>
-  %extracted = tensor.extract %0[%c1] : tensor<1xi32>
+  %extracted = tensor.extract %arg0[%c1] : tensor<1xi32>
   %4 = flow.dispatch.region -> (tensor<i32>) {
-    %6 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%2 : tensor<i32>) {
+    %6 = linalg.generic {indexing_maps = [affine_map<() -> ()>], iterator_types = []} outs(%2 : tensor<i32>) {
     ^bb0(%out: i32):
       %7 = arith.addi %extracted, %c2_i32 : i32
       linalg.yield %7 : i32
@@ -115,8 +112,7 @@ func.func @use_in_dispatch_count(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
   } count() -> (index, index, index) {
     flow.return %c1, %c1, %c1 : index, index, index
   }
-  %5 = hal.tensor.export %4 "output 0" : tensor<i32> -> !hal.buffer_view
-  return %5 : !hal.buffer_view
+  return %4 : tensor<i32>
 }
 
 
@@ -194,16 +190,16 @@ module {
   func.func @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
     %c0_i32 = arith.constant 0 : i32
     %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
-    %1 = linalg.generic {indexing_maps = [#map, #map], 
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+    %1 = linalg.generic {indexing_maps = [#map, #map],
+                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
                          ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
     ^bb0(%in: i16, %out: i32):
       %7 = arith.extsi %in : i16 to i32
       linalg.yield %7 : i32
     } -> tensor<32x1x16x1x8xi32>
     %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
-    %3 = linalg.generic {indexing_maps = [#map, #map], 
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} 
+    %3 = linalg.generic {indexing_maps = [#map, #map],
+                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
                          ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
     ^bb0(%in: i4, %out: i32):
       %7 = arith.extui %in : i4 to i32

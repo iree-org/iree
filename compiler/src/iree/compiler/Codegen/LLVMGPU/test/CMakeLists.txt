@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
+    "ukernel_pipeline_transform.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "workgroup_specialization_pipeline_test.mlir"

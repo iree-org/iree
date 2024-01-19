@@ -131,6 +131,10 @@ createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 // This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass();
 
+/// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
+/// operation.
+std::unique_ptr<OperationPass<>> createGPULowerToUKernelsPass();
+
 /// Register Common GPU passes.
 void registerCodegenCommonGPUPasses();
 

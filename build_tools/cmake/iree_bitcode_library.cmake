@@ -31,6 +31,13 @@ function(iree_bitcode_library)
     set(_OUT "${_RULE_NAME}.bc")
   endif()
 
+  # Produce an empty file if the compiler wouldn't use bitcode for this arch anyway.
+  iree_compiler_targeting_iree_arch(_IREE_COMPILER_TARGETING_THIS_ARCH "${_RULE_ARCH}")
+  if (NOT _IREE_COMPILER_TARGETING_THIS_ARCH)
+    iree_make_empty_file("${_OUT}")
+    return()
+  endif()
+
   iree_arch_to_llvm_arch(_LLVM_ARCH "${_RULE_ARCH}")
 
   set(_COPTS
@@ -68,6 +75,20 @@ function(iree_bitcode_library)
   list(APPEND _COPTS "-I" "${IREE_SOURCE_DIR}/runtime/src")
   list(APPEND _COPTS "-I" "${IREE_BINARY_DIR}/runtime/src")
   list(APPEND _COPTS "${_RULE_COPTS}")
+
+  if (_RULE_ARCH STREQUAL "arm_32")
+    # Silence "warning: unknown platform, assuming -mfloat-abi=soft"
+    list(APPEND _COPTS "-mfloat-abi=soft")
+  elseif(_RULE_ARCH STREQUAL "riscv_32")
+    # On RISC-V, linking LLVM modules requires matching target-abi.
+    # https://lists.llvm.org/pipermail/llvm-dev/2020-January/138450.html
+    # The choice of ilp32d is simply what we have in existing riscv_32 tests.
+    # Open question - how do we scale to supporting all RISC-V ABIs?
+    list(APPEND _COPTS "-mabi=ilp32d")
+  elseif(_RULE_ARCH STREQUAL "riscv_64")
+    # Same comments as above riscv_32 case.
+    list(APPEND _COPTS "-mabi=lp64d")
+  endif()
 
   set(_BITCODE_FILES)
   foreach(_SRC ${_RULE_SRCS})

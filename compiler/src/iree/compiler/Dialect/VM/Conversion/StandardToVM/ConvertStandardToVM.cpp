@@ -46,6 +46,10 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     if (auto version = srcOp->getAttrOfType<IntegerAttr>("vm.version")) {
       newModuleOp.setVersionAttr(version);
     }
+    if (auto reflectionAttr =
+            srcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+      newModuleOp->setAttr("iree.reflection", reflectionAttr);
+    }
     Block *firstCreatedBlock = &newModuleOp.getBodyRegion().front();
     rewriter.inlineRegionBefore(srcOp.getBodyRegion(), firstCreatedBlock);
     auto blockRange = llvm::make_range(Region::iterator(firstCreatedBlock),

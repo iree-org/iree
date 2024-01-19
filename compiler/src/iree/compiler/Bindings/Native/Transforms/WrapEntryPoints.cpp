@@ -400,6 +400,12 @@ static void populateReflectionAttrs(IREE::ABI::InvocationModel invocationModel,
   auto *context = exportOp.getContext();
   SmallVector<NamedAttribute> attrs;
 
+  if (auto reflectionAttr =
+          exportOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+    attrs.append(reflectionAttr.getValue().begin(),
+                 reflectionAttr.getValue().end());
+  }
+
   if (auto abiAttr = exportOp->getAttr("iree.abi")) {
     attrs.emplace_back(StringAttr::get(context, "iree.abi"), abiAttr);
   }
@@ -487,6 +493,7 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
 
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
+  exportOp->removeAttr("iree.reflection");
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);

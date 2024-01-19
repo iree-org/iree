@@ -195,7 +195,9 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 #-------------------------------------------------------------------------------
 
 set(IREE_CUDA_AVAILABLE OFF)
-find_package(CUDAToolkit)
+# The IREE cuda2 driver requires CUDA >= 12.
+set(IREE_CUDA_MIN_VERSION_REQUIRED 12)
+find_package(CUDAToolkit ${IREE_CUDA_MIN_VERSION_REQUIRED})
 if(CUDAToolkit_FOUND)
   set(IREE_CUDA_AVAILABLE ON)
 else()
@@ -439,6 +441,7 @@ option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
+option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad

@@ -6,6 +6,10 @@
 
 iree_add_all_subdirs()
 
+if (NOT IREE_UK_ARCH_DEPS)
+  set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::fallback")
+endif()
+
 iree_cc_library(
   NAME
     ukernel_arch

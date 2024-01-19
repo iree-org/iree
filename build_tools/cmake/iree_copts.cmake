@@ -151,7 +151,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   # internally is very useful when importing. If you feel that some of these
   # should be different (especially more strict), please raise an issue!
   CLANG
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wall"
 
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
@@ -217,7 +217,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
   GCC
     "-Wall"
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
 
     "-Wno-address"  # https://github.com/openxla/iree/issues/16016

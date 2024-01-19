@@ -30,28 +30,16 @@ UKERNEL_X86_64_INTERNAL_HEADERS = [
     "common_x86_64.h",
     "common_x86_64_entry_point.h",
     "mmt4d_x86_64_internal.h",
-    "pack_x86_64_internal.h",
-    "unpack_x86_64_internal.h",
     "//runtime/src/iree/builtins/ukernel:internal_headers_filegroup",
     "//runtime/src/iree/schemas:cpu_data_headers_filegroup",
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_x86_64_entry_points",
+    name = "ukernel_bitcode_arch_x86_64_entry_points",
     srcs = [
         "mmt4d_x86_64_entry_point.c",
-        "pack_x86_64_entry_point.c",
-        "query_tile_sizes_x86_64_entry_point.c",
-        "unpack_x86_64_entry_point.c",
     ],
-    # wasm_64 here is a proxy for "some reasonable 64-bit architecture". This
-    # should match the `ukernel_bitcode_64bit_base` bitcode library, because we
-    # want this code inlined into the ukernel entry points so that code path
-    # selection logic can evaluate at compile time and unused code paths can be
-    # DCE'd. The entry points don't need to be architecture-specialized, all
-    # they do is return function pointers to the actual architecture-specialized
-    # symbols defined in the other iree_bitcode_library's below.
-    arch = "wasm_64",
+    arch = "x86_64",
     internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
 )
 
@@ -63,11 +51,9 @@ UKERNEL_X86_64_AVX2_FMA_COPTS = [
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_x86_64_avx2_fma",
+    name = "ukernel_bitcode_arch_x86_64_avx2_fma",
     srcs = [
         "mmt4d_x86_64_avx2_fma.c",
-        "pack_x86_64_avx2_fma.c",
-        "unpack_x86_64_avx2_fma.c",
     ],
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX2_FMA_COPTS,
@@ -83,11 +69,9 @@ UKERNEL_X86_64_AVX512_BASE_COPTS = UKERNEL_X86_64_AVX2_FMA_COPTS + [
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_x86_64_avx512_base",
+    name = "ukernel_bitcode_arch_x86_64_avx512_base",
     srcs = [
         "mmt4d_x86_64_avx512_base.c",
-        "pack_x86_64_avx512_base.c",
-        "unpack_x86_64_avx512_base.c",
     ],
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX512_BASE_COPTS,
@@ -99,7 +83,7 @@ UKERNEL_X86_64_AVX512_VNNI_COPTS = UKERNEL_X86_64_AVX512_BASE_COPTS + [
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_x86_64_avx512_vnni",
+    name = "ukernel_bitcode_arch_x86_64_avx512_vnni",
     srcs = [
         "mmt4d_x86_64_avx512_vnni.c",
     ],
@@ -113,7 +97,7 @@ UKERNEL_X86_64_AVX512_BF16_COPTS = UKERNEL_X86_64_AVX512_BASE_COPTS + [
 ]
 
 iree_bitcode_library(
-    name = "ukernel_bitcode_x86_64_avx512_bf16",
+    name = "ukernel_bitcode_arch_x86_64_avx512_bf16",
     srcs = [
         "mmt4d_x86_64_avx512_bf16.c",
     ],
@@ -123,20 +107,20 @@ iree_bitcode_library(
 )
 
 iree_link_bitcode(
-    name = "ukernel_bitcode_x86_64",
+    name = "ukernel_bitcode_arch_x86_64",
     bitcode_files = [
-        "ukernel_bitcode_x86_64_avx2_fma.bc",
-        "ukernel_bitcode_x86_64_avx512_base.bc",
-        "ukernel_bitcode_x86_64_avx512_vnni.bc",
-        "ukernel_bitcode_x86_64_avx512_bf16.bc",
+        "ukernel_bitcode_arch_x86_64_entry_points.bc",
+        "ukernel_bitcode_arch_x86_64_avx2_fma.bc",
+        "ukernel_bitcode_arch_x86_64_avx512_base.bc",
+        "ukernel_bitcode_arch_x86_64_avx512_vnni.bc",
+        "ukernel_bitcode_arch_x86_64_avx512_bf16.bc",
     ],
 )
 
 iree_cmake_extra_content(
     content = """
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64_entry_points.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_x86_64.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 """,
     inline = True,

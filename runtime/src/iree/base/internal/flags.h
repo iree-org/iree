@@ -227,13 +227,7 @@ int iree_flag_register(const char* file, int line, iree_flag_type_t type,
 // List flag utilities
 //===----------------------------------------------------------------------===//
 
-// A list of string views referencing flag storage.
-typedef struct iree_flag_string_list_t {
-  // Total number of values in the list.
-  iree_host_size_t count;
-  // Value list or NULL if no values.
-  const iree_string_view_t* values;
-} iree_flag_string_list_t;
+typedef struct iree_string_view_list_t iree_flag_string_list_t;
 
 #if IREE_FLAGS_ENABLE_CLI == 1
 
