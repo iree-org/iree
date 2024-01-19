@@ -584,8 +584,13 @@ def generate_call(
     op = op + generate_random_matrix("rhs", [shape.k, shape.n], lhs_rhs_type)
     if shape.accumulate:
         op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
+        # TODO(#16168): there's a bug with in-place input->output aliasing and
+        # we work around it here by passing in a unique copy.
+        global pseudorandom_generator_seed
+        pseudorandom_generator_seed = pseudorandom_generator_seed - 1
+        op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
         op = op + (
-            f"  %result = call @module.{function.name}(%lhs, %rhs, %acc) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+            f"  %result = call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
     else:
         op = op + (
