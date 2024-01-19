@@ -1010,6 +1010,8 @@ static void getFullRegisterHeuristicsMatmulVectorSizes(
 /// size N would be at least 128/8=16.
 ///
 /// NOTE: This function should not contain target-specific conditional code.
+/// TODO: Currently it's only use on Aarch64. We should generalize it to other
+/// targets.
 static void getMatmulVectorSizesUsingFullVectorHeuristics(
     func::FuncOp entryPointFn, linalg::LinalgOp op, int64_t vectorSize,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
@@ -1090,13 +1092,13 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
       // heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
     }
-  }
 
-  // Try to maximize the vector register utilization for all the matmul element
-  // types.
-  if (matmulTileSizes.empty()) {
-    getMatmulVectorSizesUsingFullVectorHeuristics(
-        entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
+    // Try to maximize the vector register utilization for all the matmul
+    // element types.
+    if (matmulTileSizes.empty()) {
+      getMatmulVectorSizesUsingFullVectorHeuristics(
+          entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
+    }
   }
 
   // If tile sizes were not computed by previous heuristics, use default
