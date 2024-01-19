@@ -1231,7 +1231,10 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
     llvm::install_out_of_memory_new_handler();
   }
 
-  llvm::cl::ParseCommandLineOptions(argc, argv, banner);
+  llvm::SmallVector<const char *> args(argv, argv + argc);
+  args.push_back("--partial-unrolling-threshold=16");
+
+  llvm::cl::ParseCommandLineOptions(args.size(), args.data(), banner);
 }
 
 void ireeCompilerGlobalInitialize() {
