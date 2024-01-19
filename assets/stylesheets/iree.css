@@ -1,21 +1,5 @@
 @import url(//fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined);
 
-[data-md-color-scheme="default"] {
-  --md-primary-fg-color: #1a344c; /* OpenXLA navy */
-  --md-typeset-a-color: #458ae5; /* OpenXLA blue 01 */
-  --md-accent-fg-color: #6fb6e0; /* OpenXLA blue 02 */
-}
-
-[data-md-color-scheme="slate"] {
-  --md-primary-fg-color: #1a344c; /* OpenXLA navy */
-  --md-typeset-a-color: #6fb6e0; /* OpenXLA blue 02 */
-  --md-accent-fg-color: #458ae5; /* OpenXLA blue 01 */
-  /* H1 color */
-  --md-default-fg-color--light: rgba(204, 234, 254, 0.6);
-  /* Button color */
-  --md-default-fg-color--lighter: rgba(204, 234, 254, 0.3);
-}
-
 .md-header__button.md-logo :is(img, svg),
 .md-header__button.md-logo :-webkit-any(img, svg) {
   height: 1.6rem;
