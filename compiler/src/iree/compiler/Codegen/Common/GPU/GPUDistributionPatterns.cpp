@@ -129,8 +129,8 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
 
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
-    auto vectorType = VectorType::get(
-        layout.getDistributedShape(constant.getType()), elementType);
+    auto vectorType =
+        VectorType::get(layout.getDistributedShape(), elementType);
     Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
@@ -165,9 +165,8 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
 
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-        resultType = VectorType::get(
-            resLayout.getDistributedShape(vectorResult.getType()),
-            vectorResult.getType().getElementType());
+        resultType = VectorType::get(resLayout.getDistributedShape(),
+                                     vectorResult.getType().getElementType());
       }
       resultTypes.push_back(resultType);
     }
@@ -301,7 +300,6 @@ struct DistributeTransferReadLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = readOp.getVector();
     LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.results[0]);
     if (!vectorLayout) {
       return failure();
@@ -310,8 +308,8 @@ struct DistributeTransferReadLayoutAttr final
     // TODO: Return failure if we need masking.
 
     Type elementType = readOp.getSource().getType().getElementType();
-    auto vectorType = VectorType::get(
-        vectorLayout.getDistributedShape(vector.getType()), elementType);
+    auto vectorType =
+        VectorType::get(vectorLayout.getDistributedShape(), elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
@@ -345,7 +343,6 @@ struct DistributeTransferWriteLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = writeOp.getVector();
     LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.operands[0]);
     if (!vectorLayout) {
       return failure();
@@ -354,8 +351,8 @@ struct DistributeTransferWriteLayoutAttr final
     // TODO: Return failure if we need masking.
 
     Type elementType = writeOp.getSource().getType().getElementType();
-    auto vectorType = VectorType::get(
-        vectorLayout.getDistributedShape(vector.getType()), elementType);
+    auto vectorType =
+        VectorType::get(vectorLayout.getDistributedShape(), elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         writeOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);

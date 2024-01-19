@@ -109,17 +109,41 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   return LayoutAttr::get(getContext(), newLayouts);
 }
 
-SmallVector<int64_t> LayoutAttr::getDistributedShape(VectorType) const {
-  LayoutDimension labels[] = {LayoutDimension::BATCHX, LayoutDimension::BATCHY,
-                              LayoutDimension::VECTORX};
+SmallVector<int64_t> LayoutAttr::getDistributedShape() const {
+  SmallVector<LayoutDimension> labels{
+      LayoutDimension::BATCHX, LayoutDimension::BATCHY,
+      LayoutDimension::VECTORY, LayoutDimension::VECTORX};
   SmallVector<int64_t> simtVectorShape;
+  std::optional<int64_t> vectorShape;
   for (LayoutDimension dim : labels) {
     ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
     for (PerDimLayoutAttr layout : layouts) {
       if (!layout.contains(dim))
         continue;
-      simtVectorShape.push_back(layout.getShape(dim).value());
+      int64_t shape = layout.getShape(dim).value();
+      if (isVectorDimension(dim)) {
+        vectorShape = shape * vectorShape.value_or(1);
+        continue;
+      }
+      simtVectorShape.push_back(shape);
     }
   }
+  if (vectorShape)
+    simtVectorShape.push_back(vectorShape.value());
   return simtVectorShape;
+}
+
+PerDimLayoutAttr LayoutAttr::getDimLayout(int64_t dim) const {
+  assert(dim >= 0 && dim < getLayouts().size());
+  return getLayouts()[dim];
+}
+
+std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
+  assert(dim < getLayouts().size());
+  PerDimLayoutAttr layout = getDimLayout(dim);
+  for (auto [name, shape] : llvm::zip(layout.getLabels(), layout.getShapes())) {
+    if (isBatchDimension(name.getValue()))
+      return shape;
+  }
+  return std::nullopt;
 }

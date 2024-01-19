@@ -929,32 +929,6 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 // TestVectorLayoutAnalysisOp
 //===----------------------------------------------------------------------===//
 
-static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                       Operation *root) {
-  root->walk([&](Operation *op) {
-    for (NamedAttribute attr : op->getAttrs()) {
-      StringRef name = attr.getName().strref();
-      if (name.find("__vector_layout_test_anchor_operand_") !=
-          std::string::npos) {
-        int operandNum;
-        name.substr(name.find_last_of("_") + 1)
-            .getAsInteger(/*Radix=*/10, operandNum);
-        assert(operandNum < op->getNumOperands() &&
-               "operand number out of range");
-        analysis.setAnchor(op->getOperand(operandNum), attr.getValue());
-      }
-      if (name.find("__vector_layout_test_anchor_result_") !=
-          std::string::npos) {
-        int resultNum;
-        name.substr(name.find_last_of("_") + 1)
-            .getAsInteger(/*Radix=*/10, resultNum);
-        assert(resultNum < op->getNumResults() && "result number out of range");
-        analysis.setAnchor(op->getResult(resultNum), attr.getValue());
-      }
-    }
-  });
-}
-
 static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
                               func::FuncOp funcOp) {
   funcOp.walk([&](Operation *op) {

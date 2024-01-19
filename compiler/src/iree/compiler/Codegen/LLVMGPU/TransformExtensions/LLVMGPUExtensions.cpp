@@ -8,6 +8,8 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -17,6 +19,7 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -56,6 +59,7 @@ iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.
   declareGeneratedDialect<gpu::GPUDialect>();
   declareGeneratedDialect<nvgpu::NVGPUDialect>();
+  declareGeneratedDialect<amdgpu::AMDGPUDialect>();
 
   registerTransformOps<
 #define GET_OP_LIST
@@ -1491,6 +1495,42 @@ transform_dialect::PackSharedMemoryAllocOp::applyToOne(
 }
 
 void transform_dialect::PackSharedMemoryAllocOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+class TestVectorLayoutOptions : public VectorLayoutOptions {
+public:
+  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+
+  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+    setAnchorOpsFromAttributes(analysis, root);
+  }
+};
+
+DiagnosedSilenceableFailure
+transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  TestVectorLayoutOptions options(target);
+  RewritePatternSet patterns(target.getContext());
+  int64_t m = getM();
+  int64_t n = getN();
+  int64_t k = getK();
+  MFMAType mfmaType;
+  if ((m == 16) && (n == 16) && (k == 16)) {
+    mfmaType = MFMAType::F16_16x16x16_F32;
+  } else {
+    mfmaType = MFMAType::F16_32x32x8_F32;
+  }
+  populateAMDGPUDistributionPatterns(patterns, mfmaType);
+  distributeVectorOps(target, patterns, options);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
