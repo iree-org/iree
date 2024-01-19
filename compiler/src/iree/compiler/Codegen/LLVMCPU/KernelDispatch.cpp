@@ -1000,11 +1000,11 @@ static void getFullRegisterHeuristicsMatmulVectorSizes(
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
 }
 
-/// Compute or adjust existing vector sizes using a heuristic that will aim to
-/// fill at least one full vector register for all the element types of the
-/// matmul. For now, the current heuristics only look at the N dimension but we
-/// would introduce logic to also consider unrolling trade-offs between the M, N
-/// and K.
+/// Compute or adjust existing vector sizes using a generic heuristic that will
+/// aim to fill at least one full vector register for all the element types of
+/// the matmul. For now, the current heuristics only look at the N dimension but
+/// we would introduce logic to also consider unrolling trade-offs between the
+/// M, N and K.
 ///
 /// Example: for an (i32 <- i8, i8) matmul and a 128-bit vector register, vector
 /// size N would be at least 128/8=16.
@@ -1092,11 +1092,18 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
     }
   }
 
-  // If tile sizes were not computed by target-specific heuristics, use default
-  // generic heuristics.
+  // Try to maximize the vector register utilization for all the matmul element
+  // types.
   if (matmulTileSizes.empty()) {
     getMatmulVectorSizesUsingFullVectorHeuristics(
         entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
+  }
+
+  // If tile sizes were not computed by previous heuristics, use default
+  // hard-coded tile sizes.
+  if (matmulTileSizes.empty()) {
+    getDefaultMatmulVectorSizes(op, vectorSize, matmulTileSizes,
+                                matmulScalableFlags);
   }
   // Pad the scalable flags with false to match the tile sizes.
   matmulScalableFlags.resize(matmulTileSizes.size());
