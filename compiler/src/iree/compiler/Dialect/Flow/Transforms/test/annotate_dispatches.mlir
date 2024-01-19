@@ -133,7 +133,7 @@ flow.executable private @ex0 {
   }
 }
 flow.executable private @ex1 {
-  // CHECK: flow.executable.export public @dispatch1_unset_encoding_MATMUL_LHS_DxD
+  // CHECK: flow.executable.export public @dispatch1_unset_encoding_LHS_DxD
   flow.executable.export public @dispatch1
   builtin.module {
     func.func @dispatch1(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>, %arg1: index, %arg2: index, %arg3: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
