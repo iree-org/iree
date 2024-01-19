@@ -42,16 +42,16 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
     gcr.io/iree-oss/nvidia-bleeding-edge@sha256:2eb17e2e8e0d5d25600e667e3b7a71e8d39d9d12a99ec2ad6bdabbc8919db43b \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
         --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
-        # TODO(#16157): Renable tracy capture after fixing unresponsiveness.
-        # --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
-        # --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
-        # --capture_tarball="${BENCHMARK_TRACES}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
         --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
+        # TODO(#16157): Renable tracy capture after fixing unresponsiveness.
+        # --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
+        # --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
+        # --capture_tarball="${BENCHMARK_TRACES}" \
 elif [[ "${TARGET_DEVICE_NAME}" =~ ^(c2-standard-16|c2-standard-60)$ ]]; then
   ${DOCKER_WRAPPER} \
     gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
