@@ -339,12 +339,10 @@ struct TensorExportBufferViewOpPattern
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
-    auto encodingType =
-        IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-    assert(encodingType.has_value() && "invalid tensor encoding");
-    auto elementType =
-        IREE::HAL::getElementTypeValue(tensorType.getElementType());
-    assert(elementType.has_value() && "invalid tensor element type");
+    auto encodingType = rewriter.create<IREE::HAL::EncodingTypeOp>(
+        loc, tensorType.getEncoding());
+    auto elementType = rewriter.create<IREE::HAL::ElementTypeOp>(
+        loc, tensorType.getElementType());
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -361,8 +359,7 @@ struct TensorExportBufferViewOpPattern
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
         exportOp, adaptor.getSource(),
         rewriter.create<arith::ConstantIndexOp>(loc, 0),
-        adaptor.getSourceSize(), elementType.value(), encodingType.value(),
-        dims);
+        adaptor.getSourceSize(), elementType, encodingType, dims);
     return success();
   }
 };
