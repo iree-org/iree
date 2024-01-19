@@ -1018,7 +1018,16 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getBody().front());
+  SmallVector<Value> threadGrid = {
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::z),
+  };
+
   populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(threadGrid, patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }
