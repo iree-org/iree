@@ -7,29 +7,6 @@
 include(CMakeParseArguments)
 
 ###############################################################################
-# Package detection
-###############################################################################
-
-# Checks whether the PyYAML package is available. Sets IREE_PYYAML_FOUND to
-# ON if so.
-function(iree_detect_pyyaml)
-  execute_process(
-      COMMAND ${Python3_EXECUTABLE} -c "import yaml"
-      RESULT_VARIABLE EXIT_CODE
-      OUTPUT_QUIET
-      ERROR_QUIET
-  )
-  if(EXIT_CODE)
-    message(STATUS "Looking for PyYAML - not found (some features may not be available: install with 'python -m pip install PyYAML' or equiv for your system)")
-    set(IREE_PYYAML_FOUND OFF PARENT_SCOPE)
-  else()
-    message(STATUS "Looking for PyYAML - found")
-    set(IREE_PYYAML_FOUND ON PARENT_SCOPE)
-  endif()
-endfunction()
-
-
-###############################################################################
 # Main user rules
 ###############################################################################
 

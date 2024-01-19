@@ -701,15 +701,6 @@ if(NOT "${Python_EXECUTABLE}" STREQUAL "${Python3_EXECUTABLE}")
   message(WARNING "FindPython and FindPython3 found different executables. You may need to pin -DPython_EXECUTABLE and -DPython3_EXECUTABLE (${Python_EXECUTABLE} vs ${Python3_EXECUTABLE})")
 endif()
 
-# Extended Python environment checks.
-if(Python3_FOUND)
-  iree_detect_pyyaml()
-endif()
-
-if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
-  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
-endif()
-
 #-------------------------------------------------------------------------------
 # Check if git submodules have been initialized.
 # This will only run if python3 is available.
@@ -910,9 +901,6 @@ endif()
 
 include(external_cc_library)
 include(flatbuffer_c_library)
-
-# libyaml
-add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
