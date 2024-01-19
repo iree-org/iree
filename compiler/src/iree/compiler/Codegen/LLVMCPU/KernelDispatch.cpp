@@ -105,7 +105,7 @@ enum class VectorPreProcStrategy {
   None,
   // A hint for the compiler to use its heuristics to determine an
   // actual pre-processing strategy.
-  Heuristics
+  Undefined
 };
 
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
@@ -124,9 +124,10 @@ static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
         clEnumValN(
             VectorPreProcStrategy::None, "none",
             "Do not apply any vectorization pre-processing transformation."),
-        clEnumValN(VectorPreProcStrategy::Heuristics, "heuristics",
-                   "To be determined by IREE's heuristics (default).")),
-    llvm::cl::init(VectorPreProcStrategy::Heuristics));
+        clEnumValN(VectorPreProcStrategy::Undefined, "undefined",
+                   "Not yet defined, IREE will attempt to select one using "
+                   "heurystics (default).")),
+    llvm::cl::init(VectorPreProcStrategy::Undefined));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -141,8 +142,8 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   case VectorPreProcStrategy::None:
     os << "None";
     break;
-  case VectorPreProcStrategy::Heuristics:
-    os << "Heuristics";
+  case VectorPreProcStrategy::Undefined:
+    os << "Undefined";
     break;
   }
   return os;
@@ -204,7 +205,7 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   // If set, use the strategy selected by a user.
-  if (clPProcStrategy != VectorPreProcStrategy::Heuristics) {
+  if (clPProcStrategy != VectorPreProcStrategy::Undefined) {
     return clPProcStrategy;
   }
 
