@@ -944,9 +944,10 @@ setMatmulRootConfig(func::FuncOp entryPointFn,
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
 /// should be introduced in this utility.
-static void getDefaultMatmulVectorSizes(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &sizes,
-    SmallVectorImpl<bool> &scalableSizeFlags, int64_t vectorSize) {
+static void
+getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
+                            SmallVectorImpl<int64_t> &sizes,
+                            SmallVectorImpl<bool> &scalableSizeFlags) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
     sizes.append({8, 32, 16});
@@ -994,6 +995,57 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
   return inputAndOutputElementTypes[0];
 }
 
+static void getFullRegisterHeuristicsMatmulVectorSizes(
+    func::FuncOp entryPointFn, linalg::LinalgOp op, int64_t vectorSize,
+    SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
+}
+
+/// Compute or adjust existing vector sizes using a generic heuristic that will
+/// aim to fill at least one full vector register for all the element types of
+/// the matmul. For now, the current heuristics only look at the N dimension but
+/// we would introduce logic to also consider unrolling trade-offs between the
+/// M, N and K.
+///
+/// Example: for an (i32 <- i8, i8) matmul and a 128-bit vector register, vector
+/// size N would be at least 128/8=16.
+///
+/// NOTE: This function should not contain target-specific conditional code.
+/// TODO: Currently it's only use on Aarch64. We should generalize it to other
+/// targets.
+static void getMatmulVectorSizesUsingFullVectorHeuristics(
+    func::FuncOp entryPointFn, linalg::LinalgOp op, int64_t vectorSize,
+    SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
+  if (sizes.empty())
+    getDefaultMatmulVectorSizes(op, vectorSize, sizes, scalableSizeFlags);
+
+  // Find the smallest type size in the matmul.
+  SmallVector<Type> matmulTypes;
+  auto operandTypes = op->getOperandTypes();
+  matmulTypes.append(operandTypes.begin(), operandTypes.end());
+  auto resultTypes = op->getResultTypes();
+  matmulTypes.append(resultTypes.begin(), resultTypes.end());
+
+  int64_t minSize = std::numeric_limits<int64_t>::max();
+  for (Type mmType : matmulTypes) {
+    if (auto shType = dyn_cast<ShapedType>(mmType))
+      mmType = shType.getElementType();
+
+    if (mmType.isSignlessIntOrFloat())
+      minSize = std::min<int64_t>(minSize, mmType.getIntOrFloatBitWidth());
+  }
+
+  LLVM_DEBUG(KD_DBGS() << "Smallest type found: " << minSize << " bits\n");
+  assert(minSize > 0 && minSize < std::numeric_limits<int64_t>::max() &&
+         "Min size couldn't be computed");
+
+  // Make sure that the smallest type can at least fill a full vector register
+  // given the tile size of the main vector dimension (N).
+  constexpr int64_t byteSizeInBits = 8;
+  int64_t minNumElements =
+      (getNativeVectorSizeInBytes(entryPointFn) * byteSizeInBits) / minSize;
+  sizes[1] = std::max<int64_t>(sizes[1], minNumElements);
+}
+
 /// Utility to compute the tile sizes for AArch64 SME. Unlike other targets, the
 /// tile sizes picked here must exactly match the SME hardware virtual tiles, as
 /// there is currently no support for lowering non-standard shapes.
@@ -1034,16 +1086,26 @@ static SizesAndScalableFlags getMatmulVectorSizes(func::FuncOp entryPointFn,
 
   // TODO: Compute vector tile sizes using heuristics.
 
-  if (isAArch64(targetAttr) && hasSMEFeature(targetAttr)) {
-    // Note: This may not pick any sizes (which will fallback to the default
-    // SVE) sizes below.
-    getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
+  if (isAArch64(targetAttr)) {
+    if (hasSMEFeature(targetAttr)) {
+      // Note: This may not pick any sizes (which will fallback to the SVE
+      // heuristics below).
+      getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
+    }
+
+    // Try to maximize the vector register utilization for all the matmul
+    // element types.
+    if (matmulTileSizes.empty()) {
+      getMatmulVectorSizesUsingFullVectorHeuristics(
+          entryPointFn, op, vectorSize, matmulTileSizes, matmulScalableFlags);
+    }
   }
 
-  // Get default hard-coded tile sizes if we couldn't compute anything better.
+  // If tile sizes were not computed by previous heuristics, use default
+  // hard-coded tile sizes.
   if (matmulTileSizes.empty()) {
-    getDefaultMatmulVectorSizes(op, matmulTileSizes, matmulScalableFlags,
-                                vectorSize);
+    getDefaultMatmulVectorSizes(op, vectorSize, matmulTileSizes,
+                                matmulScalableFlags);
   }
   // Pad the scalable flags with false to match the tile sizes.
   matmulScalableFlags.resize(matmulTileSizes.size());
