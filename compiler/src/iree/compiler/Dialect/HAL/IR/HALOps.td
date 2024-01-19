@@ -676,6 +676,80 @@ def OpGroupBufferViewOps : OpDocGroup {
 
 let opDocGroup = OpGroupBufferViewOps in {
 
+def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_element_type_t for the given MLIR type}];
+  let description = [{
+    Maps an MLIR type to a runtime `iree_hal_element_type_t` value for all types
+    that are convertable.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+  let results = (outs
+    HAL_ElementType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $type `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$type), [{
+      build($_builder, $_state, $_builder.getI32Type(), TypeAttr::get(type));
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR element type or nullopt if the
+    // type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Type type);
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_encoding_type_t for the given MLIR encoding}];
+  let description = [{
+    Maps an MLIR encoding to a runtime `iree_hal_encoding_type_t` value for all
+    encodings that are convertable.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<AnyAttr>:$encoding
+  );
+  let results = (outs
+    HAL_EncodingType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` ($encoding^):( `` `dense_row_major`)? `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Attribute":$encoding), [{
+      build($_builder, $_state, $_builder.getI32Type(), encoding);
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if
+    // the type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Attribute attr);
+  }];
+
+  let hasVerifier = 1;
+}
+
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
