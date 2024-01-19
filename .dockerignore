@@ -18,7 +18,5 @@
 # Avoid duplicating dependency requirement information
 !runtime/bindings/python/iree/runtime/build_requirements.txt
 !integrations/tensorflow/test/requirements.txt
-# Share Swiftshader installation script with user instructions
-!build_tools/third_party/swiftshader/build_vk_swiftshader.sh
 # Keep the Bazel version in only one place
 !.bazelversion

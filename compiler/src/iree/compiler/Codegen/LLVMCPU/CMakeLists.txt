@@ -66,7 +66,10 @@ iree_cc_library(
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
-    "LLVMCPUVectorLowering.cpp"
+    "LLVMCPUVectorShapeCastLowering.cpp"
+    "LLVMCPUVectorTransferLowering.cpp"
+    "LLVMCPUVectorTransposeLowering.cpp"
+    "LLVMCPUVirtualVectorLowering.cpp"
     "Passes.cpp"
     "TargetMLTransformInfo.cpp"
     "Utils.cpp"
@@ -135,6 +138,7 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     MLIRVectorTransforms
+    MLIRX86VectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass

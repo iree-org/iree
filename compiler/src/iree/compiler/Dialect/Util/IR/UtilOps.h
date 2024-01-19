@@ -24,9 +24,6 @@
 #include "mlir/Interfaces/ViewLikeInterface.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h.inc" // IWYU pragma: export
-
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
@@ -49,9 +46,6 @@ Value buildIfElseTree(
 
 // Removes duplicate attributes in the array (if any).
 ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr);
-
-// Returns the dynamic size of the value at |index|.
-Value findValueSizeInList(unsigned index, ValueRange values, ValueRange sizes);
 
 //===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
@@ -115,23 +109,6 @@ ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
 void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size);
 
 //===----------------------------------------------------------------------===//
-// custom<SizeAwareTypeList>
-//===----------------------------------------------------------------------===//
-// (type{%size0}, type, type{%size1})
-
-ParseResult
-parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
-void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
-                            OperandRange sizes);
-ParseResult
-parseSizeAwareTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
-                       SmallVectorImpl<Type> &types1,
-                       SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes);
-void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
-                            TypeRange types1, OperandRange sizes);
-
-//===----------------------------------------------------------------------===//
 // custom<ShapedTiedResult>
 //===----------------------------------------------------------------------===//
 // type{%dim0, %dim1}
@@ -179,6 +156,27 @@ inline void printShapedTiedResult(OpAsmPrinter &p, Operation *op,
                                   ArrayAttr tiedOperands) {
   printShapedTiedResult(p, op, resultType, ValueRange{resultDim}, tiedOperands);
 }
+//===----------------------------------------------------------------------===//
+// custom<ShapedTypeList>
+//===----------------------------------------------------------------------===//
+// i32, type{%size}, type{%dim0, %dim1}
+
+ParseResult
+parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims);
+void printShapedTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
+                         ValueRange dims);
+ParseResult
+parseShapedTypeList(OpAsmParser &parser, SmallVectorImpl<Type> &types0,
+                    SmallVectorImpl<Type> &types1,
+                    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims);
+void printShapedTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
+                         TypeRange types1, ValueRange dims);
+
+//===----------------------------------------------------------------------===//
+// custom<ShapedResultList>
+//===----------------------------------------------------------------------===//
+// type{%dim2}, %operand4
 
 ParseResult parseShapedResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
@@ -225,5 +223,8 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
                                   ArrayAttr resultAttrs);
 
 } // namespace mlir::iree_compiler
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h.inc" // IWYU pragma: export
 
 #endif // IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_

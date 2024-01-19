@@ -20,6 +20,7 @@ iree_lit_test_suite(
             "capture_dispatch_dynamic_dims.mlir",
             "cleanup_tensor_shapes.mlir",
             "clone_producers_into_dispatch_regions.mlir",
+            "collapse_dimensions.mlir",
             "collapse_reduction.mlir",
             "convert_region_to_workgroups.mlir",
             "deduplicate_executables.mlir",

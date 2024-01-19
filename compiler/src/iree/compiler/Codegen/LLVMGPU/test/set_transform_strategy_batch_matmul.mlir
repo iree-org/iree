@@ -51,33 +51,6 @@ module attributes {hal.device.targets = [#device_target_cuda]} {
       }
     }
   }
-  func.func @batch_matmul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
-    %c1310720 = arith.constant 1310720 : index
-    %c5242880 = arith.constant 5242880 : index
-    %c13107200 = arith.constant 13107200 : index
-    %c0 = arith.constant 0 : index
-    %c320 = arith.constant 320 : index
-    %c553648160_i32 = arith.constant 553648160 : i32
-    %c1_i32 = arith.constant 1 : i32
-    %c128 = arith.constant 128 : index
-    %c80 = arith.constant 80 : index
-    %c32 = arith.constant 32 : index
-    hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("input 0") shape([%c128, %c80, %c32]) type(%c553648160_i32) encoding(%c1_i32)
-    %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<128x80x32xf32> in !stream.resource<external>{%c1310720}
-    hal.buffer_view.assert<%arg1 : !hal.buffer_view> message("input 1") shape([%c128, %c32, %c320]) type(%c553648160_i32) encoding(%c1_i32)
-    %1 = stream.tensor.import %arg1 : !hal.buffer_view -> tensor<128x32x320xf32> in !stream.resource<external>{%c5242880}
-    %2 = stream.resource.alloc uninitialized : !stream.resource<external>{%c13107200}
-    %3 = stream.cmd.execute with(%0 as %arg3: !stream.resource<external>{%c1310720}, %1 as %arg4: !stream.resource<external>{%c5242880}, %2 as %arg5: !stream.resource<external>{%c13107200}) {
-      stream.cmd.dispatch @batch_matmul_dispatch_0::@cuda_nvptx_fb::@batch_matmul_dispatch_0_generic_128x80x320x32_f32 {
-        ro %arg3[%c0 for %c1310720] : !stream.resource<external>{%c1310720},
-        ro %arg4[%c0 for %c5242880] : !stream.resource<external>{%c5242880},
-        wo %arg5[%c0 for %c13107200] : !stream.resource<external>{%c13107200}
-      } attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]}
-    } => !stream.timepoint
-    %4 = stream.timepoint.await %3 => %2 : !stream.resource<external>{%c13107200}
-    %5 = stream.tensor.export %4 : tensor<128x80x320xf32> in !stream.resource<external>{%c13107200} -> !hal.buffer_view
-    return %5 : !hal.buffer_view
-  }
 }
 
 

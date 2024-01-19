@@ -1,0 +1,73 @@
+@import url(//fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined);
+
+.md-header__button.md-logo :is(img, svg),
+.md-header__button.md-logo :-webkit-any(img, svg) {
+  height: 1.6rem;
+}
+
+.md-typeset {
+  font-size: .75rem;
+  line-height: 1.2rem;
+}
+
+/* Set icon for anchor links (config must set toc permalink: 'link') */
+:root .headerlink {
+  font-family: "Material Icons";
+  position: relative;
+  top: 5px;
+  left: 0;
+}
+
+pre.highlight code {
+  border-radius: 4px;
+}
+
+.md-typeset table td {
+  line-height: 1rem;
+}
+
+.md-typeset table th {
+  background-color: var(--md-code-bg-color);
+}
+
+.md-typeset table td * {
+  word-break: normal;
+}
+
+/* Add "caution" admonition in the style of default "warning"
+   https://developers.google.com/style/notices#pick-a-notice-type */
+.md-typeset .admonition.caution,
+.md-typeset details.caution {
+  border-color: #ff9100;
+}
+
+.md-typeset .caution>.admonition-title,
+.md-typeset .caution>summary {
+  background-color: #ff91001a;
+}
+
+.md-typeset .caution>.admonition-title::before,
+.md-typeset .caution>summary::before {
+  background-color: #ff9100;
+  -webkit-mask-image: var(--md-admonition-icon--warning);
+  mask-image: var(--md-admonition-icon--warning);
+}
+
+/* Change "warning" admonition to the style of default "danger"
+   https://developers.google.com/style/notices#pick-a-notice-type */
+.md-typeset .admonition.warning,
+.md-typeset details.warning {
+  border-color: #ff1744;
+}
+
+.md-typeset .warning>.admonition-title,
+.md-typeset .warning>summary {
+  background-color: #ff17441a;
+}
+
+.md-typeset .warning>.admonition-title::before,
+.md-typeset .warning>summary::before {
+  background-color: #ff1744;
+  -webkit-mask-image: var(--md-admonition-icon--danger);
+  mask-image: var(--md-admonition-icon--danger);
+}

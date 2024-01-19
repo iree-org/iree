@@ -71,9 +71,11 @@ typedef struct iree_trace_replay_t {
   // be read on each event. Must remain valid for the lifetime of the replay.
   iree_const_byte_span_t stdin_contents;
 
+  // HAL driver registry used to enumerate and create devices.
   iree_hal_driver_registry_t* driver_registry;
-  iree_host_size_t device_uri_count;
-  const iree_string_view_t* device_uris;
+  // Unowned reference to a list of device URIs overriding the original devices
+  // specified in the trace.
+  iree_string_view_list_t device_uris;
 
   // All loaded modules, reset each context load unless
   // IREE_TRACE_REPLAY_FLAG_REUSE_MODULES is set to preserve them.
@@ -114,11 +116,10 @@ iree_status_t iree_trace_replay_initialize(
 void iree_trace_replay_deinitialize(iree_trace_replay_t* replay);
 
 // TODO(#5724): remove this and instead provide a device set on initialize.
-// Overrides the HAL driver used in the trace with the given |driver|.
+// Overrides the HAL driver used in the trace with the given devices.
 // |device_uris| must remain valid for the lifetime of the replay instance.
 void iree_trace_replay_set_hal_devices_override(
-    iree_trace_replay_t* replay, iree_host_size_t device_uri_count,
-    const iree_string_view_t* device_uris);
+    iree_trace_replay_t* replay, iree_string_view_list_t device_uris);
 
 // Resets replay input/output/blackboard state.
 void iree_trace_replay_reset(iree_trace_replay_t* replay);

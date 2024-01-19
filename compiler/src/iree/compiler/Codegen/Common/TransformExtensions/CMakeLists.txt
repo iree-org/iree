@@ -34,6 +34,7 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgExtDialect
     IREELinalgTransformDialect
+    IREEVectorExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils

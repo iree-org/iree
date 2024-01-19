@@ -197,7 +197,7 @@ hal.executable private @dispatch_0 {
 hal.executable private @dispatch_1 {
   hal.executable.variant @spirv target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
       %c0_i32 = arith.constant 0 : i32
       %c1_i32 = arith.constant 1 : i32
       %0 = arith.andi %value, %c1_i32 : i32
@@ -242,7 +242,7 @@ hal.executable private @dispatch_2 {
 hal.executable private @dispatch_3 {
   hal.executable.variant @spirv target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
       %c0_i32 = arith.constant 0 : i32
       %c1_i32 = arith.constant 1 : i32
       %0 = arith.andi %value, %c1_i32 : i32
@@ -302,7 +302,7 @@ func.func @two_target_environments() -> () {
 //      CHECK: hal.executable private @link_executables_linked_spirv_1 {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb target(#[[TARGET1]]) {
 //      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup")
+// CHECK-NEXT:       hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup")
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "baz"
 // CHECK-NEXT:       = arith.constant 2 : i32
 //      CHECK:     hal.executable.export public @dispatch_1 ordinal(0)
@@ -372,7 +372,7 @@ hal.executable private @dispatch_0 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
       %c0_i32 = arith.constant 0 : i32
       %c1_i32 = arith.constant 1 : i32
       %0 = arith.andi %value, %c1_i32 : i32
@@ -421,7 +421,7 @@ hal.executable private @dispatch_1 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_1) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
       %c0_i32 = arith.constant 0 : i32
       %c1_i32 = arith.constant 1 : i32
       %0 = arith.andi %value, %c1_i32 : i32
@@ -484,7 +484,7 @@ hal.executable private @dispatch_3 {
   }
   hal.executable.variant @spirv_1 target(#vulkan_target_2) {
     hal.executable.condition(%arg0: !hal.device) -> i1 {
-      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup") : i1, i32 = 0 : i32
+      %ok, %value = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup") : i1, i32 = 0 : i32
       %c0_i32 = arith.constant 0 : i32
       %c2_i32 = arith.constant 2 : i32
       %0 = arith.andi %value, %c2_i32 : i32
@@ -536,7 +536,7 @@ hal.executable private @dispatch_3 {
 //      CHECK:   }
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb_1 target(#[[TARGET1]]) {
 //      CHECK:     hal.executable.condition(%arg0: !hal.device) -> i1
-// CHECK-NEXT:       %{{.+}}, %[[V:.+]] = hal.device.query<%arg0 : !hal.device> key("hal.device.vulkan" :: "subgroup")
+// CHECK-NEXT:       %{{.+}}, %[[V:.+]] = hal.device.query<%arg0 : !hal.device> key("hal.dispatch" :: "subgroup")
 //      CHECK:       %[[TARGET:.+]] = arith.constant 1 : i32
 // CHECK-NEXT:       %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
 //      CHECK:     hal.executable.constant.block(%arg0: !hal.device) -> i32 as "foo"

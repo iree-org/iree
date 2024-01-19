@@ -193,6 +193,27 @@ canonicalizeModule(IREE::VM::BytecodeTargetOptions bytecodeOptions,
   return success();
 }
 
+// Returns a list of reflection AttrDefs with entries from |attrs| (or an
+// empty/null list).
+static iree_vm_AttrDef_vec_ref_t makeAttrDefs(DictionaryAttr attrs,
+                                              FlatbufferBuilder &fbb) {
+  if (!attrs || attrs.empty())
+    return 0;
+  SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
+  for (auto attr : attrs) {
+    auto key = attr.getName().strref();
+    auto value = llvm::dyn_cast<StringAttr>(attr.getValue());
+    if (!value || key.empty())
+      continue;
+    // NOTE: if we actually want to keep these we should dedupe them (as the
+    // keys and likely several of the values are shared across all functions).
+    auto valueRef = fbb.createString(value.getValue());
+    auto keyRef = fbb.createString(key);
+    attrRefs.push_back(iree_vm_AttrDef_create(fbb, keyRef, valueRef));
+  }
+  return iree_vm_AttrDef_vec_create(fbb, attrRefs.data(), attrRefs.size());
+}
+
 // Creates a FunctionSignatureDef based on the given function metadata.
 // Some fields are not used on all signature defs and added only when present on
 // the argument objects/attrs.
@@ -236,24 +257,9 @@ makeFunctionSignatureDef(IREE::VM::FuncOp funcOp,
   if (!cconv.has_value())
     return {};
 
-  // Reflection attributes.
-  iree_vm_AttrDef_vec_ref_t attrsRef = 0;
-  if (auto attrs = funcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
-    SmallVector<iree_vm_AttrDef_ref_t> attrRefs;
-    for (auto attr : attrs) {
-      auto key = attr.getName().strref();
-      auto value = llvm::dyn_cast<StringAttr>(attr.getValue());
-      if (!value || key.empty())
-        continue;
-      // NOTE: if we actually want to keep these we should dedupe them (as the
-      // keys and likely several of the values are shared across all functions).
-      auto valueRef = fbb.createString(value.getValue());
-      auto keyRef = fbb.createString(key);
-      attrRefs.push_back(iree_vm_AttrDef_create(fbb, keyRef, valueRef));
-    }
-    attrsRef =
-        iree_vm_AttrDef_vec_create(fbb, attrRefs.data(), attrRefs.size());
-  }
+  // Encode reflection attributes.
+  iree_vm_AttrDef_vec_ref_t attrsRef = makeAttrDefs(
+      funcOp->getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
 
   return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.value(), attrsRef, fbb);
@@ -474,6 +480,10 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
     return iree_vm_TypeDef_end(fbb);
   });
 
+  // Encode reflection attributes.
+  iree_vm_AttrDef_vec_ref_t attrsRef = makeAttrDefs(
+      moduleOp->getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
+
   // NOTE: we keep the vectors clustered here so that we can hopefully keep the
   // pages mapped at runtime; vector dereferences in FlatBuffers require
   // touching these structs to get length/etc and as such we don't want to be
@@ -525,7 +535,7 @@ buildFlatBufferModule(IREE::VM::TargetOptions vmOptions,
   iree_vm_BytecodeModuleDef_version_add(fbb,
                                         moduleOp.getVersion().value_or(0u));
   iree_vm_BytecodeModuleDef_requirements_add(fbb, moduleRequirements);
-  // TODO(benvanik): iree_vm_BytecodeModuleDef_attrs_add
+  iree_vm_BytecodeModuleDef_attrs_add(fbb, attrsRef);
   iree_vm_BytecodeModuleDef_types_add(fbb, typesRef);
   iree_vm_BytecodeModuleDef_dependencies_add(fbb, dependenciesRef);
   iree_vm_BytecodeModuleDef_imported_functions_add(fbb, importFuncsRef);

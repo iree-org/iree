@@ -358,15 +358,15 @@ hal.executable private @quant_matmul_fusion {
         %c-128_i32 = arith.constant -128 : i32
         %c127_i32 = arith.constant 127 : i32
         %c0_i32 = arith.constant 0 : i32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2304x24xi8>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<24x144xi8>>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2304x49xi8>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<49x144xi8>>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<144xi32>>
         %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<144xi32>>
         %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<144xi32>>
         %5 = hal.interface.binding.subspan set(0) binding(5) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<144xi8>>
         %6 = hal.interface.binding.subspan set(0) binding(6) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2304x144xi8>>
-        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2304, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2304x24xi8>> -> tensor<2304x24xi8>
-        %8 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [24, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<24x144xi8>> -> tensor<24x144xi8>
+        %7 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2304, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<2304x49xi8>> -> tensor<2304x49xi8>
+        %8 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [49, 144], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<49x144xi8>> -> tensor<49x144xi8>
         %9 = flow.dispatch.tensor.load %2, offsets = [0], sizes = [144], strides = [1] : !flow.dispatch.tensor<readonly:tensor<144xi32>> -> tensor<144xi32>
         %10 = flow.dispatch.tensor.load %3, offsets = [0], sizes = [144], strides = [1] : !flow.dispatch.tensor<readonly:tensor<144xi32>> -> tensor<144xi32>
         %11 = flow.dispatch.tensor.load %4, offsets = [0], sizes = [144], strides = [1] : !flow.dispatch.tensor<readonly:tensor<144xi32>> -> tensor<144xi32>
@@ -374,7 +374,7 @@ hal.executable private @quant_matmul_fusion {
         %13 = tensor.empty() : tensor<2304x144xi8>
         %14 = tensor.empty() : tensor<2304x144xi32>
         %15 = linalg.fill ins(%c0_i32 : i32) outs(%14 : tensor<2304x144xi32>) -> tensor<2304x144xi32>
-        %16 = linalg.matmul ins(%7, %8 : tensor<2304x24xi8>, tensor<24x144xi8>) outs(%15 : tensor<2304x144xi32>) -> tensor<2304x144xi32>
+        %16 = linalg.matmul ins(%7, %8 : tensor<2304x49xi8>, tensor<49x144xi8>) outs(%15 : tensor<2304x144xi32>) -> tensor<2304x144xi32>
         %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%9, %16, %10, %11, %12 : tensor<144xi32>, tensor<2304x144xi32>, tensor<144xi32>, tensor<144xi32>, tensor<144xi8>) outs(%13 : tensor<2304x144xi8>) {
         ^bb0(%in: i32, %in_0: i32, %in_1: i32, %in_2: i32, %in_3: i8, %out: i8):
           %18 = arith.muli %in_1, %c12_i32 : i32
