@@ -30,23 +30,23 @@ extern "C" {
 // may advance the given |pending_queue_actions| if new values are signaled.
 //
 // Thread-safe; multiple threads may signal/wait values on the same semaphore.
-iree_status_t iree_hal_cuda2_event_semaphore_create(
+iree_status_t iree_hal_event_semaphore_create(
     const iree_hal_event_impl_symtable_t* symbols, void* symbol_user_data,
-    uint64_t initial_value, iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_hal_cuda2_pending_queue_actions_t* pending_queue_actions,
+    uint64_t initial_value, iree_hal_timepoint_pool_t* timepoint_pool,
+    iree_hal_pending_queue_actions_t* pending_queue_actions,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Acquires a timepoint to signal the timeline to the given |to_value| from the
 // device. The underlying CUDA event is written into |out_event| for interacting
 // with CUDA APIs.
-iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_signal(
+iree_status_t iree_hal_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
     iree_hal_event_impl_t* out_event);
 
 // Acquires a timepoint to wait the timeline to reach at least the given
 // |min_value| on the device. The underlying CUDA event is written into
 // |out_event| for interacting with CUDA APIs.
-iree_status_t iree_hal_cuda2_event_semaphore_acquire_timepoint_device_wait(
+iree_status_t iree_hal_event_semaphore_acquire_timepoint_device_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
     iree_hal_event_impl_t* out_event);
 

@@ -75,37 +75,37 @@ typedef struct iree_hal_command_buffer_impl_symtable_t {
 // stream to wait on.
 //
 // Thread-safe; multiple threads may enqueue workloads.
-typedef struct iree_hal_cuda2_pending_queue_actions_t
-    iree_hal_cuda2_pending_queue_actions_t;
+typedef struct iree_hal_pending_queue_actions_t
+    iree_hal_pending_queue_actions_t;
 
 // Creates a pending actions queue.
 //
 // |stream_symbols|, |command_buffer_symbols|, and |symbol_user_data| must
 // outlive the created queue.
-iree_status_t iree_hal_cuda2_pending_queue_actions_create(
+iree_status_t iree_hal_pending_queue_actions_create(
     const iree_hal_stream_impl_symtable_t* stream_symbols,
     const iree_hal_command_buffer_impl_symtable_t* command_buffer_symbols,
     void* stream_symbol_user_data, iree_arena_block_pool_t* block_pool,
     iree_allocator_t host_allocator,
-    iree_hal_cuda2_pending_queue_actions_t** out_actions);
+    iree_hal_pending_queue_actions_t** out_actions);
 
 // Destroys the pending |actions| queue.
-void iree_hal_cuda2_pending_queue_actions_destroy(iree_hal_resource_t* actions);
+void iree_hal_pending_queue_actions_destroy(iree_hal_resource_t* actions);
 
 // Enqueues the given list of |command_buffers| that waits on
 // |wait_semaphore_list| and signals |signal_semaphore_lsit|.
-iree_status_t iree_hal_cuda2_pending_queue_actions_enqueue_execution(
+iree_status_t iree_hal_pending_queue_actions_enqueue_execution(
     iree_hal_device_t* device, iree_hal_stream_impl_t dispatch_stream,
     iree_hal_stream_impl_t callback_stream,
-    iree_hal_cuda2_pending_queue_actions_t* actions,
+    iree_hal_pending_queue_actions_t* actions,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
     iree_hal_command_buffer_t* const* command_buffers);
 
 // Tries to scan the pending actions and release ready ones to the GPU.
-iree_status_t iree_hal_cuda2_pending_queue_actions_issue(
-    iree_hal_cuda2_pending_queue_actions_t* actions);
+iree_status_t iree_hal_pending_queue_actions_issue(
+    iree_hal_pending_queue_actions_t* actions);
 
 #ifdef __cplusplus
 }  // extern "C"

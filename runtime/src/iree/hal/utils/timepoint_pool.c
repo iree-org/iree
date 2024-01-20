@@ -14,18 +14,18 @@
 #include "iree/hal/utils/event_pool.h"
 
 //===----------------------------------------------------------------------===//
-// iree_hal_cuda2_timepoint_t
+// iree_hal_timepoint_t
 //===----------------------------------------------------------------------===//
 
-static iree_status_t iree_hal_cuda2_timepoint_allocate(
-    iree_hal_cuda2_timepoint_pool_t* pool, iree_allocator_t host_allocator,
-    iree_hal_cuda2_timepoint_t** out_timepoint) {
+static iree_status_t iree_hal_timepoint_allocate(
+    iree_hal_timepoint_pool_t* pool, iree_allocator_t host_allocator,
+    iree_hal_timepoint_t** out_timepoint) {
   IREE_ASSERT_ARGUMENT(pool);
   IREE_ASSERT_ARGUMENT(out_timepoint);
   *out_timepoint = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda2_timepoint_t* timepoint = NULL;
+  iree_hal_timepoint_t* timepoint = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_allocator_malloc(host_allocator, sizeof(*timepoint),
                                 (void**)&timepoint));
@@ -41,17 +41,15 @@ static iree_status_t iree_hal_cuda2_timepoint_allocate(
 
 // Clears all data fields in the given |timepoint| except the original host
 // allocator and owning pool.
-static void iree_hal_cuda2_timepoint_clear(
-    iree_hal_cuda2_timepoint_t* timepoint) {
+static void iree_hal_timepoint_clear(iree_hal_timepoint_t* timepoint) {
   iree_allocator_t host_allocator = timepoint->host_allocator;
-  iree_hal_cuda2_timepoint_pool_t* pool = timepoint->pool;
+  iree_hal_timepoint_pool_t* pool = timepoint->pool;
   memset(timepoint, 0, sizeof(*timepoint));
   timepoint->host_allocator = host_allocator;
   timepoint->pool = pool;
 }
 
-static void iree_hal_cuda2_timepoint_free(
-    iree_hal_cuda2_timepoint_t* timepoint) {
+static void iree_hal_timepoint_free(iree_hal_timepoint_t* timepoint) {
   iree_allocator_t host_allocator = timepoint->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -62,17 +60,17 @@ static void iree_hal_cuda2_timepoint_free(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_cuda2_timepoint_pool_t
+// iree_hal_timepoint_pool_t
 //===----------------------------------------------------------------------===//
 
-struct iree_hal_cuda2_timepoint_pool_t {
+struct iree_hal_timepoint_pool_t {
   // The allocator used to create the timepoint pool.
   iree_allocator_t host_allocator;
 
   // The pool to acquire host events.
   iree_event_pool_t* host_event_pool;
   // The pool to acquire device events. Internally synchronized.
-  iree_hal_cuda2_event_pool_t* device_event_pool;
+  iree_hal_event_pool_t* device_event_pool;
 
   // Note that the above pools are internally synchronized; so we don't and
   // shouldn't use the following mutex to guard access to them.
@@ -90,22 +88,22 @@ struct iree_hal_cuda2_timepoint_pool_t {
   // Total number of currently available timepoint objects.
   iree_host_size_t available_count IREE_GUARDED_BY(timepoint_mutex);
   // The list of available_count timepoint objects.
-  iree_hal_cuda2_timepoint_t* available_list[] IREE_GUARDED_BY(timepoint_mutex);
+  iree_hal_timepoint_t* available_list[] IREE_GUARDED_BY(timepoint_mutex);
 };
 // + Additional inline allocation for holding timepoints up to the capacity.
 
-iree_status_t iree_hal_cuda2_timepoint_pool_allocate(
+iree_status_t iree_hal_timepoint_pool_allocate(
     iree_event_pool_t* host_event_pool,
-    iree_hal_cuda2_event_pool_t* device_event_pool,
+    iree_hal_event_pool_t* device_event_pool,
     iree_host_size_t available_capacity, iree_allocator_t host_allocator,
-    iree_hal_cuda2_timepoint_pool_t** out_timepoint_pool) {
+    iree_hal_timepoint_pool_t** out_timepoint_pool) {
   IREE_ASSERT_ARGUMENT(host_event_pool);
   IREE_ASSERT_ARGUMENT(device_event_pool);
   IREE_ASSERT_ARGUMENT(out_timepoint_pool);
   *out_timepoint_pool = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_cuda2_timepoint_pool_t* timepoint_pool = NULL;
+  iree_hal_timepoint_pool_t* timepoint_pool = NULL;
   iree_host_size_t total_size =
       sizeof(*timepoint_pool) +
       available_capacity * sizeof(*timepoint_pool->available_list);
@@ -122,7 +120,7 @@ iree_status_t iree_hal_cuda2_timepoint_pool_allocate(
 
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < available_capacity; ++i) {
-    status = iree_hal_cuda2_timepoint_allocate(
+    status = iree_hal_timepoint_allocate(
         timepoint_pool, host_allocator,
         &timepoint_pool->available_list[timepoint_pool->available_count++]);
     if (!iree_status_is_ok(status)) break;
@@ -131,19 +129,18 @@ iree_status_t iree_hal_cuda2_timepoint_pool_allocate(
   if (iree_status_is_ok(status)) {
     *out_timepoint_pool = timepoint_pool;
   } else {
-    iree_hal_cuda2_timepoint_pool_free(timepoint_pool);
+    iree_hal_timepoint_pool_free(timepoint_pool);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-void iree_hal_cuda2_timepoint_pool_free(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool) {
+void iree_hal_timepoint_pool_free(iree_hal_timepoint_pool_t* timepoint_pool) {
   iree_allocator_t host_allocator = timepoint_pool->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_host_size_t i = 0; i < timepoint_pool->available_count; ++i) {
-    iree_hal_cuda2_timepoint_free(timepoint_pool->available_list[i]);
+    iree_hal_timepoint_free(timepoint_pool->available_list[i]);
   }
   iree_slim_mutex_deinitialize(&timepoint_pool->timepoint_mutex);
   iree_allocator_free(host_allocator, timepoint_pool);
@@ -154,17 +151,16 @@ void iree_hal_cuda2_timepoint_pool_free(
 // Acquires |timepoint_count| timepoints from the given |timepoint_pool|.
 // The |out_timepoints| needs to be further initialized with proper kind and
 // payload values.
-static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda2_timepoint_t** out_timepoints) {
+static iree_status_t iree_hal_timepoint_pool_acquire_internal(
+    iree_hal_timepoint_pool_t* timepoint_pool, iree_host_size_t timepoint_count,
+    iree_hal_timepoint_t** out_timepoints) {
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   if (!timepoint_count) return iree_ok_status();
   IREE_ASSERT_ARGUMENT(out_timepoints);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // We'll try to get what we can from the pool and fall back to initializing
-  // new iree_hal_cuda2_timepoint_t objects.
+  // new iree_hal_timepoint_t objects.
   iree_host_size_t remaining_count = timepoint_count;
 
   // Try first to grab from the pool.
@@ -186,13 +182,13 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-acquire");
     iree_status_t status = iree_ok_status();
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      status = iree_hal_cuda2_timepoint_allocate(
+      status = iree_hal_timepoint_allocate(
           timepoint_pool, timepoint_pool->host_allocator,
           &out_timepoints[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
         // Must release all timepoints we've acquired so far.
-        iree_hal_cuda2_timepoint_pool_release(
-            timepoint_pool, from_pool_count + i, out_timepoints);
+        iree_hal_timepoint_pool_release(timepoint_pool, from_pool_count + i,
+                                        out_timepoints);
         IREE_TRACE_ZONE_END(z1);
         IREE_TRACE_ZONE_END(z0);
         return status;
@@ -205,10 +201,9 @@ static iree_status_t iree_hal_cuda2_timepoint_pool_acquire_internal(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda2_timepoint_pool_acquire_host_wait(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda2_timepoint_t** out_timepoints) {
+iree_status_t iree_hal_timepoint_pool_acquire_host_wait(
+    iree_hal_timepoint_pool_t* timepoint_pool, iree_host_size_t timepoint_count,
+    iree_hal_timepoint_t** out_timepoints) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Acquire host events to wrap up. This should happen before acquiring the
@@ -220,7 +215,7 @@ iree_status_t iree_hal_cuda2_timepoint_pool_acquire_host_wait(
                                   timepoint_count, host_events));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_timepoint_pool_acquire_internal(
+      z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT;
@@ -231,22 +226,21 @@ iree_status_t iree_hal_cuda2_timepoint_pool_acquire_host_wait(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda2_timepoint_pool_acquire_device_signal(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda2_timepoint_t** out_timepoints) {
+iree_status_t iree_hal_timepoint_pool_acquire_device_signal(
+    iree_hal_timepoint_pool_t* timepoint_pool, iree_host_size_t timepoint_count,
+    iree_hal_timepoint_t** out_timepoints) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Acquire device events to wrap up. This should happen before acquiring the
   // timepoints to avoid nested locks.
-  iree_hal_cuda2_event_t** device_events = iree_alloca(
+  iree_hal_wrapped_event_t** device_events = iree_alloca(
       timepoint_count * sizeof((*out_timepoints)->timepoint.device_signal));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_event_pool_acquire(timepoint_pool->device_event_pool,
-                                            timepoint_count, device_events));
+      z0, iree_hal_event_pool_acquire(timepoint_pool->device_event_pool,
+                                      timepoint_count, device_events));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_timepoint_pool_acquire_internal(
+      z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL;
@@ -257,22 +251,21 @@ iree_status_t iree_hal_cuda2_timepoint_pool_acquire_device_signal(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_cuda2_timepoint_pool_acquire_device_wait(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count,
-    iree_hal_cuda2_timepoint_t** out_timepoints) {
+iree_status_t iree_hal_timepoint_pool_acquire_device_wait(
+    iree_hal_timepoint_pool_t* timepoint_pool, iree_host_size_t timepoint_count,
+    iree_hal_timepoint_t** out_timepoints) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Acquire device events to wrap up. This should happen before acquiring the
   // timepoints to avoid nested locks.
-  iree_hal_cuda2_event_t** device_events = iree_alloca(
+  iree_hal_wrapped_event_t** device_events = iree_alloca(
       timepoint_count * sizeof((*out_timepoints)->timepoint.device_wait));
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_event_pool_acquire(timepoint_pool->device_event_pool,
-                                            timepoint_count, device_events));
+      z0, iree_hal_event_pool_acquire(timepoint_pool->device_event_pool,
+                                      timepoint_count, device_events));
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_timepoint_pool_acquire_internal(
+      z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT;
@@ -283,9 +276,9 @@ iree_status_t iree_hal_cuda2_timepoint_pool_acquire_device_wait(
   return iree_ok_status();
 }
 
-void iree_hal_cuda2_timepoint_pool_release(
-    iree_hal_cuda2_timepoint_pool_t* timepoint_pool,
-    iree_host_size_t timepoint_count, iree_hal_cuda2_timepoint_t** timepoints) {
+void iree_hal_timepoint_pool_release(iree_hal_timepoint_pool_t* timepoint_pool,
+                                     iree_host_size_t timepoint_count,
+                                     iree_hal_timepoint_t** timepoints) {
   IREE_ASSERT_ARGUMENT(timepoint_pool);
   if (!timepoint_count) return;
   IREE_ASSERT_ARGUMENT(timepoints);
@@ -302,10 +295,10 @@ void iree_hal_cuda2_timepoint_pool_release(
                                 &timepoints[i]->timepoint.host_wait);
         break;
       case IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL:
-        iree_hal_cuda2_event_release(timepoints[i]->timepoint.device_signal);
+        iree_hal_wrapped_event_release(timepoints[i]->timepoint.device_signal);
         break;
       case IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT:
-        iree_hal_cuda2_event_release(timepoints[i]->timepoint.device_wait);
+        iree_hal_wrapped_event_release(timepoints[i]->timepoint.device_wait);
         break;
       default:
         break;
@@ -323,7 +316,7 @@ void iree_hal_cuda2_timepoint_pool_release(
       timepoint_count);
   if (to_pool_count > 0) {
     for (iree_host_size_t i = 0; i < to_pool_count; ++i) {
-      iree_hal_cuda2_timepoint_clear(timepoints[i]);
+      iree_hal_timepoint_clear(timepoints[i]);
     }
     iree_host_size_t pool_base_index = timepoint_pool->available_count;
     memcpy(&timepoint_pool->available_list[pool_base_index], timepoints,
@@ -338,8 +331,8 @@ void iree_hal_cuda2_timepoint_pool_release(
   if (remaining_count > 0) {
     IREE_TRACE_ZONE_BEGIN_NAMED(z1, "timepoint-pool-unpooled-release");
     for (iree_host_size_t i = 0; i < remaining_count; ++i) {
-      iree_hal_cuda2_timepoint_clear(timepoints[to_pool_count + i]);
-      iree_hal_cuda2_timepoint_free(timepoints[to_pool_count + i]);
+      iree_hal_timepoint_clear(timepoints[to_pool_count + i]);
+      iree_hal_timepoint_free(timepoints[to_pool_count + i]);
     }
     IREE_TRACE_ZONE_END(z1);
   }

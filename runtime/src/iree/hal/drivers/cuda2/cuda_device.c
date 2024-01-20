@@ -75,15 +75,15 @@ typedef struct iree_hal_cuda2_device_t {
 
   // Host/device event pools, used for backing semaphore timepoints.
   iree_event_pool_t* host_event_pool;
-  iree_hal_cuda2_event_pool_t* device_event_pool;
+  iree_hal_event_pool_t* device_event_pool;
   // Timepoint pools, shared by various semaphores.
-  iree_hal_cuda2_timepoint_pool_t* timepoint_pool;
+  iree_hal_timepoint_pool_t* timepoint_pool;
 
   // A queue to order device workloads and relase to the GPU when constraints
   // are met. It buffers submissions and allocations internally before they
   // are ready. This queue couples with HAL semaphores backed by iree_event_t
   // and CUevent objects.
-  iree_hal_cuda2_pending_queue_actions_t* pending_queue_actions;
+  iree_hal_pending_queue_actions_t* pending_queue_actions;
 
   // Device memory pools and allocators.
   bool supports_memory_pools;
@@ -234,7 +234,7 @@ static iree_status_t iree_hal_cuda2_device_create_internal(
   device->callback_cu_stream = callback_stream;
   device->host_allocator = host_allocator;
 
-  iree_status_t status = iree_hal_cuda2_pending_queue_actions_create(
+  iree_status_t status = iree_hal_pending_queue_actions_create(
       &device->stream_impl_symtable, &device->command_buffer_impl_symtable,
       (void*)cuda_symbols, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
@@ -337,7 +337,7 @@ iree_status_t iree_hal_cuda2_device_create(
                                       host_allocator, &host_event_pool);
   }
 
-  iree_hal_cuda2_event_pool_t* device_event_pool = NULL;
+  iree_hal_event_pool_t* device_event_pool = NULL;
   if (iree_status_is_ok(status)) {
     device->event_impl_symtable.create = iree_hal_cuda2_event_impl_create;
     device->event_impl_symtable.destroy = iree_hal_cuda2_event_impl_destroy;
@@ -360,14 +360,14 @@ iree_status_t iree_hal_cuda2_device_create(
     device->command_buffer_impl_symtable.create_stream_command_buffer =
         iree_hal_cuda2_device_create_stream_command_buffer;
 
-    status = iree_hal_cuda2_event_pool_allocate(
+    status = iree_hal_event_pool_allocate(
         &device->event_impl_symtable, (void*)cuda_symbols,
         params->event_pool_capacity, host_allocator, &device_event_pool);
   }
 
-  iree_hal_cuda2_timepoint_pool_t* timepoint_pool = NULL;
+  iree_hal_timepoint_pool_t* timepoint_pool = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_cuda2_timepoint_pool_allocate(
+    status = iree_hal_timepoint_pool_allocate(
         host_event_pool, device_event_pool, params->event_pool_capacity,
         host_allocator, &timepoint_pool);
   }
@@ -380,8 +380,8 @@ iree_status_t iree_hal_cuda2_device_create(
     *out_device = (iree_hal_device_t*)device;
   } else {
     // Release resources we have accquired after HAL device creation.
-    if (timepoint_pool) iree_hal_cuda2_timepoint_pool_free(timepoint_pool);
-    if (device_event_pool) iree_hal_cuda2_event_pool_release(device_event_pool);
+    if (timepoint_pool) iree_hal_timepoint_pool_free(timepoint_pool);
+    if (device_event_pool) iree_hal_event_pool_release(device_event_pool);
     if (host_event_pool) iree_event_pool_free(host_event_pool);
 
     // Release other resources via the HAL device.
@@ -412,7 +412,7 @@ static void iree_hal_cuda2_device_destroy(iree_hal_device_t* base_device) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Destroy the pending workload queue.
-  iree_hal_cuda2_pending_queue_actions_destroy(
+  iree_hal_pending_queue_actions_destroy(
       (iree_hal_resource_t*)device->pending_queue_actions);
 
   // There should be no more buffers live that use the allocator.
@@ -428,10 +428,10 @@ static void iree_hal_cuda2_device_destroy(iree_hal_device_t* base_device) {
 
   // Destroy various pools for synchronization.
   if (device->timepoint_pool) {
-    iree_hal_cuda2_timepoint_pool_free(device->timepoint_pool);
+    iree_hal_timepoint_pool_free(device->timepoint_pool);
   }
   if (device->device_event_pool) {
-    iree_hal_cuda2_event_pool_release(device->device_event_pool);
+    iree_hal_event_pool_release(device->device_event_pool);
   }
   if (device->host_event_pool) iree_event_pool_free(device->host_event_pool);
 
@@ -714,7 +714,7 @@ static iree_status_t iree_hal_cuda2_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
-  return iree_hal_cuda2_event_semaphore_create(
+  return iree_hal_event_semaphore_create(
       &device->event_impl_symtable, (void*)device->cuda_symbols, initial_value,
       device->timepoint_pool, device->pending_queue_actions,
       device->host_allocator, out_semaphore);
@@ -856,15 +856,15 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
   iree_hal_cuda2_device_t* device = iree_hal_cuda2_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_status_t status = iree_hal_cuda2_pending_queue_actions_enqueue_execution(
+  iree_status_t status = iree_hal_pending_queue_actions_enqueue_execution(
       base_device, (iree_hal_stream_impl_t)device->dispatch_cu_stream,
       (iree_hal_stream_impl_t)device->callback_cu_stream,
       device->pending_queue_actions, wait_semaphore_list, signal_semaphore_list,
       command_buffer_count, command_buffers);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
-    status = iree_hal_cuda2_pending_queue_actions_issue(
-        device->pending_queue_actions);
+    status =
+        iree_hal_pending_queue_actions_issue(device->pending_queue_actions);
   }
 
   iree_hal_cuda2_tracing_context_collect(device->tracing_context);
@@ -878,7 +878,7 @@ static iree_status_t iree_hal_cuda2_device_queue_flush(
   IREE_TRACE_ZONE_BEGIN(z0);
   // Try to advance the pending workload queue.
   iree_status_t status =
-      iree_hal_cuda2_pending_queue_actions_issue(device->pending_queue_actions);
+      iree_hal_pending_queue_actions_issue(device->pending_queue_actions);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
