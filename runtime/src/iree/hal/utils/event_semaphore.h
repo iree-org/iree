@@ -22,9 +22,9 @@ extern "C" {
 //
 // |symbols| and |symbol_user_data| must outlive the created semaphore.
 //
-// The HAL semaphore are backed by iree_event_t or CUevent objects for different
-// timepoints along the timeline under the hood. Those timepoints will be
-// allocated from the |timepoint_pool|.
+// The HAL semaphore are backed by iree_event_t or CUevent/hipEvent_t objects
+// for different timepoints along the timeline under the hood. Those timepoints
+// will be allocated from the |timepoint_pool|.
 //
 // This semaphore is meant to be used together with a pending queue actions; it
 // may advance the given |pending_queue_actions| if new values are signaled.
@@ -37,15 +37,15 @@ iree_status_t iree_hal_event_semaphore_create(
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Acquires a timepoint to signal the timeline to the given |to_value| from the
-// device. The underlying CUDA event is written into |out_event| for interacting
-// with CUDA APIs.
+// device. The underlying CUDA/HIP event is written into |out_event| for
+// interacting with CUDA/HIP APIs.
 iree_status_t iree_hal_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
     iree_hal_event_impl_t* out_event);
 
 // Acquires a timepoint to wait the timeline to reach at least the given
-// |min_value| on the device. The underlying CUDA event is written into
-// |out_event| for interacting with CUDA APIs.
+// |min_value| on the device. The underlying CUDA/HIP event is written into
+// |out_event| for interacting with CUDA/HIP APIs.
 iree_status_t iree_hal_event_semaphore_acquire_timepoint_device_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
     iree_hal_event_impl_t* out_event);

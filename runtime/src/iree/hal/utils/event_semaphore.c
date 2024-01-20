@@ -18,7 +18,7 @@ typedef struct iree_hal_event_semaphore_t {
 
   // The allocator used to create this semaphore.
   iree_allocator_t host_allocator;
-  // The symbols used to issue CUDA API calls.
+  // The symbols used to issue CUDA/HIP API calls.
   const iree_hal_event_impl_symtable_t* symbols;
   // User data to the symbol table functions.
   void* symbol_user_data;
@@ -245,7 +245,7 @@ static bool iree_hal_event_semaphore_acquire_event_host_wait(
   for (iree_hal_semaphore_timepoint_t* tp = semaphore->base.timepoint_list.head;
        tp != NULL; tp = tp->next) {
     iree_hal_timepoint_t* signal_timepoint = (iree_hal_timepoint_t*)tp;
-    if (signal_timepoint->kind == IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL &&
+    if (signal_timepoint->kind == IREE_HAL_TIMEPOINT_KIND_DEVICE_SIGNAL &&
         signal_timepoint->base.minimum_value >= min_value) {
       *out_event = signal_timepoint->timepoint.device_signal;
       iree_hal_wrapped_event_retain(*out_event);
@@ -288,9 +288,9 @@ static iree_status_t iree_hal_event_semaphore_wait(
 
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
 
-  // Slow path: try to see if we can have a device CUevent to wait on. This
-  // should happen outside of the lock given that acquiring has its own internal
-  // locks. This is faster than waiting on a host timepoint.
+  // Slow path: try to see if we can have a device CUevent/hipEvent_t to wait
+  // on. This should happen outside of the lock given that acquiring has its own
+  // internal locks. This is faster than waiting on a host timepoint.
   iree_hal_wrapped_event_t* wait_event = NULL;
   if (iree_hal_event_semaphore_acquire_event_host_wait(semaphore, value,
                                                        &wait_event)) {
@@ -329,15 +329,15 @@ static iree_status_t iree_hal_event_semaphore_wait(
 // Handles device signal timepoints on the host when the |semaphore| timeline
 // advances past the given |value|.
 //
-// Note that this callback is invoked by the a host thread after the CUDA host
-// function callback function is triggered in the CUDA driver.
+// Note that this callback is invoked by the a host thread after the CUDA/HIP
+// host function callback function is triggered in the CUDA/HIP driver.
 static iree_status_t iree_hal_event_semaphore_timepoint_device_signal_callback(
     void* user_data, iree_hal_semaphore_t* semaphore, uint64_t value,
     iree_status_code_t status_code) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_timepoint_t* timepoint = (iree_hal_timepoint_t*)user_data;
   // Just release the timepoint back to the pool. This will decrease the
-  // reference count of the underlying CUDA event internally.
+  // reference count of the underlying CUDA/HIP event internally.
   iree_hal_timepoint_pool_release(timepoint->pool, 1, &timepoint);
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -375,7 +375,7 @@ iree_status_t iree_hal_event_semaphore_acquire_timepoint_device_signal(
   for (iree_hal_semaphore_timepoint_t* tp = semaphore->base.timepoint_list.head;
        tp != NULL; tp = tp->next) {
     iree_hal_timepoint_t* wait_timepoint = (iree_hal_timepoint_t*)tp;
-    if (wait_timepoint->kind == IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT &&
+    if (wait_timepoint->kind == IREE_HAL_TIMEPOINT_KIND_DEVICE_WAIT &&
         wait_timepoint->timepoint.device_wait == NULL &&
         wait_timepoint->base.minimum_value <= to_value) {
       iree_hal_wrapped_event_retain(event);

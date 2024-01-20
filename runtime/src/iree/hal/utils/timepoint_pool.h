@@ -23,16 +23,16 @@ extern "C" {
 // Forward declaration of the timepoint pool.
 typedef struct iree_hal_timepoint_pool_t iree_hal_timepoint_pool_t;
 
-// An enum to identify the timepoint kind in iree_hal_cuda_timepoint_t objects.
+// An enum to identify the timepoint kind in iree_hal_timepoint_t objects.
 typedef enum iree_hal_timepoint_kind_e {
   // None; for uninitialized timepoint objects.
-  IREE_HAL_CUDA_TIMEPOINT_KIND_NONE = 0,
+  IREE_HAL_TIMEPOINT_KIND_NONE = 0,
   // A timepoint waited by the host.
-  IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT,
+  IREE_HAL_TIMEPOINT_KIND_HOST_WAIT,
   // A timepoint signaled by the device.
-  IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL,
+  IREE_HAL_TIMEPOINT_KIND_DEVICE_SIGNAL,
   // A timepoint waited by the device.
-  IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT,
+  IREE_HAL_TIMEPOINT_KIND_DEVICE_WAIT,
 } iree_hal_timepoint_kind_t;
 
 // An object that wraps a host iree_event_t or device iree_hal_wrapped_event_t

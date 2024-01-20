@@ -53,7 +53,7 @@ static void iree_hal_timepoint_free(iree_hal_timepoint_t* timepoint) {
   iree_allocator_t host_allocator = timepoint->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  IREE_ASSERT(timepoint->kind == IREE_HAL_CUDA_TIMEPOINT_KIND_NONE);
+  IREE_ASSERT(timepoint->kind == IREE_HAL_TIMEPOINT_KIND_NONE);
   iree_allocator_free(host_allocator, timepoint);
 
   IREE_TRACE_ZONE_END(z0);
@@ -218,7 +218,7 @@ iree_status_t iree_hal_timepoint_pool_acquire_host_wait(
       z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT;
+    out_timepoints[i]->kind = IREE_HAL_TIMEPOINT_KIND_HOST_WAIT;
     out_timepoints[i]->timepoint.host_wait = host_events[i];
   }
 
@@ -243,7 +243,7 @@ iree_status_t iree_hal_timepoint_pool_acquire_device_signal(
       z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL;
+    out_timepoints[i]->kind = IREE_HAL_TIMEPOINT_KIND_DEVICE_SIGNAL;
     out_timepoints[i]->timepoint.device_signal = device_events[i];
   }
 
@@ -268,7 +268,7 @@ iree_status_t iree_hal_timepoint_pool_acquire_device_wait(
       z0, iree_hal_timepoint_pool_acquire_internal(
               timepoint_pool, timepoint_count, out_timepoints));
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-    out_timepoints[i]->kind = IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT;
+    out_timepoints[i]->kind = IREE_HAL_TIMEPOINT_KIND_DEVICE_WAIT;
     out_timepoints[i]->timepoint.device_wait = device_events[i];
   }
 
@@ -290,14 +290,14 @@ void iree_hal_timepoint_pool_release(iree_hal_timepoint_pool_t* timepoint_pool,
   // TODO: Release in batch to avoid lock overhead from separate calls.
   for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
     switch (timepoints[i]->kind) {
-      case IREE_HAL_CUDA_TIMEPOINT_KIND_HOST_WAIT:
+      case IREE_HAL_TIMEPOINT_KIND_HOST_WAIT:
         iree_event_pool_release(timepoint_pool->host_event_pool, 1,
                                 &timepoints[i]->timepoint.host_wait);
         break;
-      case IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_SIGNAL:
+      case IREE_HAL_TIMEPOINT_KIND_DEVICE_SIGNAL:
         iree_hal_wrapped_event_release(timepoints[i]->timepoint.device_signal);
         break;
-      case IREE_HAL_CUDA_TIMEPOINT_KIND_DEVICE_WAIT:
+      case IREE_HAL_TIMEPOINT_KIND_DEVICE_WAIT:
         iree_hal_wrapped_event_release(timepoints[i]->timepoint.device_wait);
         break;
       default:

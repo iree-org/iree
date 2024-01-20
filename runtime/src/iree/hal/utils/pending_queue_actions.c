@@ -20,8 +20,8 @@
 #include "iree/hal/utils/event_semaphore.h"
 #include "iree/hal/utils/resource_set.h"
 
-// The maximal number of CUevent objects a command buffer can wait.
-#define IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT 32
+// The maximal number of CUevent/hipEvent_t objects a command buffer can wait.
+#define IREE_HAL_MAX_WAIT_EVENT_COUNT 32
 
 //===----------------------------------------------------------------------===//
 // Queue action
@@ -54,13 +54,13 @@ typedef struct iree_hal_queue_action_t {
     } command_buffers;
   } payload;
 
-  // The device from which to allocate CUDA stream-based command buffers for
+  // The device from which to allocate CUDA/HIP stream-based command buffers for
   // applying deferred command buffers.
   iree_hal_device_t* device;
 
   // The stream to launch main GPU workload.
   iree_hal_stream_impl_t dispatch_cu_stream;
-  // The stream to launch CUDA host function callbacks.
+  // The stream to launch CUDA/HIP host function callbacks.
   iree_hal_stream_impl_t callback_cu_stream;
 
   // Resource set to retain all associated resources by the payload.
@@ -72,7 +72,7 @@ typedef struct iree_hal_queue_action_t {
   iree_hal_semaphore_list_t signal_semaphore_list;
 
   // Scratch fields for analyzing whether actions are ready to issue.
-  iree_hal_event_impl_t events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
+  iree_hal_event_impl_t events[IREE_HAL_MAX_WAIT_EVENT_COUNT];
   iree_host_size_t event_count;
   bool is_pending;
 } iree_hal_queue_action_t;
@@ -163,11 +163,11 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_queue_ready_action,
 
 // The ready-list processing worker's working/exiting state.
 typedef enum iree_hal_queue_worker_state_e {
-  IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING = 0,
-  IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING = 1,
-  IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED = -1,
-  IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED = -2,
-  IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR = -3,
+  IREE_HAL_QUEUE_WORKER_STATE_IDLE_WAITING = 0,
+  IREE_HAL_QUEUE_WORKER_STATE_WORKLOAD_PENDING = 1,
+  IREE_HAL_QUEUE_WORKER_STATE_EXIT_REQUESTED = -1,
+  IREE_HAL_QUEUE_WORKER_STATE_EXIT_COMMITTED = -2,
+  IREE_HAL_QUEUE_WORKER_STATE_EXIT_ERROR = -3,
 } iree_hal_queue_worker_state_t;
 
 // The data structure needed by a ready-list processing worker thread to issue
@@ -200,7 +200,7 @@ static void iree_hal_worker_working_area_initialize(
   iree_notification_initialize(&working_area->exit_notification);
   iree_hal_queue_ready_action_slist_initialize(&working_area->ready_worklist);
   iree_atomic_store_int32(&working_area->worker_state,
-                          IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING,
+                          IREE_HAL_QUEUE_WORKER_STATE_IDLE_WAITING,
                           iree_memory_order_release);
   iree_atomic_store_int32(&working_area->error_code, IREE_STATUS_OK,
                           iree_memory_order_release);
@@ -232,7 +232,7 @@ struct iree_hal_pending_queue_actions_t {
   // The block pool to allocate resource sets from.
   iree_arena_block_pool_t* block_pool;
 
-  // The symbols used to create and destroy CUevent objects.
+  // The symbols used to create and destroy CUevent/hipEvent_t objects.
   const iree_hal_stream_impl_symtable_t* stream_symbols;
   const iree_hal_command_buffer_impl_symtable_t* command_buffer_symbols;
   void* stream_symbol_user_data;
@@ -321,10 +321,11 @@ void iree_hal_pending_queue_actions_destroy(iree_hal_resource_t* base_actions) {
   iree_hal_queue_worker_state_t prev_state =
       (iree_hal_queue_worker_state_t)iree_atomic_exchange_int32(
           &working_area->worker_state,
-          IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED, iree_memory_order_acq_rel);
+          IREE_HAL_QUEUE_WORKER_STATE_EXIT_REQUESTED,
+          iree_memory_order_acq_rel);
   iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
 
-  if (prev_state != IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR) {
+  if (prev_state != IREE_HAL_QUEUE_WORKER_STATE_EXIT_ERROR) {
     // Wait until the worker acknowledged exiting.
     iree_notification_await(
         &working_area->exit_notification,
@@ -496,8 +497,8 @@ static void iree_hal_pending_queue_actions_cleanup_execution(
 // Releases resources after action completion on the GPU and advances timeline
 // and pending actions queue.
 //
-// This is the CUDA host function callback to cudaLaunchHostFunc, invoked by a
-// CUDA driver thread.
+// This is the cudaLaunchHostFunc/hipLaunchHostFunc callback, invoked by a
+// CUDA/HIP driver thread.
 static void iree_hal_execution_device_signal_host_callback(void* user_data) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_queue_action_t* action = (iree_hal_queue_action_t*)user_data;
@@ -527,7 +528,7 @@ static iree_status_t iree_hal_pending_queue_actions_issue_execution(
   // No need to lock given that this action is already detched from the pending
   // actions list; so only this thread is seeing it now.
 
-  // First wait all the device CUevent in the dispatch stream.
+  // First wait all the device CUevent/hipEvent_t in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->event_count; ++i) {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0,
@@ -566,9 +567,9 @@ static iree_status_t iree_hal_pending_queue_actions_issue_execution(
     }
   }
 
-  // Last record CUevent signals in the dispatch stream.
+  // Last record CUevent/hipEvent_t signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
-    // Grab a CUevent for this semaphore value signaling.
+    // Grab a CUevent/hipEvent_t for this semaphore value signaling.
     iree_hal_event_impl_t event = NULL;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_event_semaphore_acquire_timepoint_device_signal(
@@ -579,7 +580,7 @@ static iree_status_t iree_hal_pending_queue_actions_issue_execution(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, stream_symbols->record_event(symbol_user_data,
                                          action->dispatch_cu_stream, event));
-    // Let the callback stream to wait on the CUevent.
+    // Let the callback stream to wait on the CUevent/hipEvent_t.
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, stream_symbols->wait_event(symbol_user_data,
                                        action->callback_cu_stream, event));
@@ -651,9 +652,9 @@ iree_status_t iree_hal_pending_queue_actions_issue(
       if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
       if (value >= values[i]) continue;
 
-      // Try to acquire a CUevent from a device wait timepoint. If so, we can
-      // use that CUevent to wait on the device. Otherwise, this action is still
-      // not ready.
+      // Try to acquire a CUevent/hipEvent_t from a device wait timepoint. If
+      // so, we can use that CUevent/hipEvent_t to wait on the device.
+      // Otherwise, this action is still not ready.
       iree_hal_event_impl_t event = NULL;
       status = iree_hal_event_semaphore_acquire_timepoint_device_wait(
           semaphores[i], values[i], &event);
@@ -664,10 +665,9 @@ iree_status_t iree_hal_pending_queue_actions_issue(
         action->is_pending = true;
         break;
       }
-      if (IREE_UNLIKELY(action->event_count >=
-                        IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT)) {
+      if (IREE_UNLIKELY(action->event_count >= IREE_HAL_MAX_WAIT_EVENT_COUNT)) {
         status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                  "exceeded max wait CUevent limit");
+                                  "exceeded max wait event limit");
         break;
       }
       action->events[action->event_count++] = event;
@@ -720,13 +720,13 @@ iree_status_t iree_hal_pending_queue_actions_issue(
   iree_hal_queue_worker_state_t prev_state =
       (iree_hal_queue_worker_state_t)iree_atomic_exchange_int32(
           &actions->working_area.worker_state,
-          IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING,
+          IREE_HAL_QUEUE_WORKER_STATE_WORKLOAD_PENDING,
           iree_memory_order_acq_rel);
   iree_notification_post(&actions->working_area.state_notification,
                          IREE_ALL_WAITERS);
 
   // Handle potential error cases from the worker thread.
-  if (prev_state == IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR) {
+  if (prev_state == IREE_HAL_QUEUE_WORKER_STATE_EXIT_ERROR) {
     iree_status_code_t code = iree_atomic_load_int32(
         &actions->working_area.error_code, iree_memory_order_acquire);
     status = iree_status_from_code(code);
@@ -744,15 +744,15 @@ static bool iree_hal_queue_worker_has_incoming_request(
     iree_hal_worker_working_area_t* working_area) {
   iree_hal_queue_worker_state_t value = iree_atomic_load_int32(
       &working_area->worker_state, iree_memory_order_acquire);
-  return value == IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING ||
-         value == IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
+  return value == IREE_HAL_QUEUE_WORKER_STATE_WORKLOAD_PENDING ||
+         value == IREE_HAL_QUEUE_WORKER_STATE_EXIT_REQUESTED;
 }
 
 static bool iree_hal_queue_worker_committed_exiting(
     iree_hal_worker_working_area_t* working_area) {
   return iree_atomic_load_int32(&working_area->worker_state,
                                 iree_memory_order_acquire) ==
-         IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED;
+         IREE_HAL_QUEUE_WORKER_STATE_EXIT_COMMITTED;
 }
 
 // Processes all ready actions in the given |worklist|.
@@ -802,7 +802,7 @@ static int iree_hal_queue_worker_execute(
     // Check if we received request to stop processing and exit this thread.
     bool should_exit = iree_atomic_load_int32(&working_area->worker_state,
                                               iree_memory_order_acquire) ==
-                       IREE_HAL_CUDA_WORKER_STATE_EXIT_REQUESTED;
+                       IREE_HAL_QUEUE_WORKER_STATE_EXIT_REQUESTED;
 
     iree_status_t status = iree_hal_queue_worker_process_ready_list(
         working_area->host_allocator, worklist);
@@ -812,7 +812,7 @@ static int iree_hal_queue_worker_execute(
                               iree_status_code(status),
                               iree_memory_order_release);
       iree_atomic_store_int32(&working_area->worker_state,
-                              IREE_HAL_CUDA_WORKER_STATE_EXIT_ERROR,
+                              IREE_HAL_QUEUE_WORKER_STATE_EXIT_ERROR,
                               iree_memory_order_release);
       iree_notification_post(&working_area->exit_notification,
                              IREE_ALL_WAITERS);
@@ -822,7 +822,7 @@ static int iree_hal_queue_worker_execute(
     if (should_exit) {
       // Signal that this thread is committed to exit.
       iree_atomic_store_int32(&working_area->worker_state,
-                              IREE_HAL_CUDA_WORKER_STATE_EXIT_COMMITTED,
+                              IREE_HAL_QUEUE_WORKER_STATE_EXIT_COMMITTED,
                               iree_memory_order_release);
       iree_notification_post(&working_area->exit_notification,
                              IREE_ALL_WAITERS);
@@ -831,7 +831,7 @@ static int iree_hal_queue_worker_execute(
 
     // Signal that this thread is done processing and now waiting for more.
     iree_atomic_store_int32(&working_area->worker_state,
-                            IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING,
+                            IREE_HAL_QUEUE_WORKER_STATE_IDLE_WAITING,
                             iree_memory_order_release);
   }
   return 0;

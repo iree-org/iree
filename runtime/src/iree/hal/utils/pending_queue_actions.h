@@ -65,14 +65,15 @@ typedef struct iree_hal_command_buffer_impl_symtable_t {
 // semaphore as the unified mechanism for synchronization directions including
 // host to host, host to device, devie to device, and device to host. Plus, it
 // allows wait before signal. These flexible capabilities are not all supported
-// by CUevent objects. Therefore, we need supporting data structures to
-// implement them on top of CUevent objects. Thus this pending queue actions.
+// by CUevent/hipEvent_t objects. Therefore, we need supporting data structures
+// to implement them on top of CUevent/hipEvent_t objects. Thus this pending
+// queue actions.
 //
 // This buffers pending queue actions and their associated resources. It
 // provides an API to advance the wait list on demand--queue actions are
 // released to the GPU when all their wait semaphores are signaled past the
-// desired value, or we can have a CUevent already recorded to some CUDA
-// stream to wait on.
+// desired value, or we can have a CUevent/hipEvent_t already recorded to some
+// CUDA/HIP stream to wait on.
 //
 // Thread-safe; multiple threads may enqueue workloads.
 typedef struct iree_hal_pending_queue_actions_t

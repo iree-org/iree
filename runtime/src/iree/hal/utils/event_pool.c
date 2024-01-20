@@ -25,7 +25,7 @@ struct iree_hal_wrapped_event_t {
   // The allocator used to create the event.
   iree_allocator_t host_allocator;
 
-  // The symbols used to create and destroy CUevent objects.
+  // The symbols used to create and destroy CUevent/hipEvent_t objects.
   const iree_hal_event_impl_symtable_t* symbols;
   // User data to the symbol table functions.
   void* symbol_user_data;
@@ -33,7 +33,7 @@ struct iree_hal_wrapped_event_t {
   // The event pool that owns this event. This cannot be NULL. We retain it to
   // make sure the event outlive the pool.
   iree_hal_event_pool_t* pool;
-  // The underlying CUevent object.
+  // The underlying CUevent/hipEvent_t object.
   iree_hal_event_impl_t event_impl;
 };
 
@@ -118,7 +118,7 @@ struct iree_hal_event_pool_t {
   // The allocator used to create the event pool.
   iree_allocator_t host_allocator;
 
-  // The symbols used to create and destroy CUevent objects.
+  // The symbols used to create and destroy CUevent/hipEvent_t objects.
   const iree_hal_event_impl_symtable_t* symbols;
   // User data to the symbol table functions.
   void* symbol_user_data;

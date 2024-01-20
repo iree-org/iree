@@ -30,8 +30,8 @@ typedef struct iree_hal_event_impl_symtable_t {
                                            iree_hal_event_impl_t event);
 } iree_hal_event_impl_symtable_t;
 
-// An struct that wraps a CUevent object with a reference count for lifetime
-// management.
+// An struct that wraps a CUevent/hipEvent_t object with a reference count for
+// lifetime management.
 //
 // iree_hal_wrapped_event_t objects cannot be directly created; they should be
 // acquired from the event pool and released back to the pool once done.
@@ -39,7 +39,7 @@ typedef struct iree_hal_event_impl_symtable_t {
 // Thread-safe; multiple threads may retain and release the same event.
 typedef struct iree_hal_wrapped_event_t iree_hal_wrapped_event_t;
 
-// Returns the underlying CUevent handle behind |event|.
+// Returns the underlying CUevent/hipEvent_t handle behind |event|.
 iree_hal_event_impl_t iree_hal_wrapped_event_handle(
     const iree_hal_wrapped_event_t* event);
 
@@ -82,8 +82,8 @@ void iree_hal_event_pool_release(iree_hal_event_pool_t* event_pool);
 // Acquires one or more events from the event pool.
 //
 // Each returned event have an initial reference count of 1. The returned
-// CUevent objects may retain captured states of some queues from previous
-// uses; callers should record again to overwrite.
+// CUevent/hipEvent_t objects may retain captured states of some queues from
+// previous uses; callers should record again to overwrite.
 iree_status_t iree_hal_event_pool_acquire(
     iree_hal_event_pool_t* event_pool, iree_host_size_t event_count,
     iree_hal_wrapped_event_t** out_events);
