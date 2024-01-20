@@ -307,7 +307,6 @@ void iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni(
   const __m128i idx_2_mod_4 = _mm_set1_epi32(0x0e0a0602);
   const __m128i idx_3_mod_4 = _mm_set1_epi32(0x0f0b0703);
   const __m512i mask_0f = _mm512_set1_epi8(0x0f);
-  IREE_UK_ASSUME(params->K >= 1);
   for (iree_uk_int32_t k = 0; k < params->K; ++k) {
     // Load 8xs16 LHS data.
     __m128i lhs = _mm_loadu_si128((const __m128i*)lhs_ptr);

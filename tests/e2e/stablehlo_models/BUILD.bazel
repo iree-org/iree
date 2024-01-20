@@ -36,6 +36,7 @@ iree_lit_test_suite(
         "driver=metal",
         "driver=vulkan",
         "hostonly",
+        # TODO(scotttodd): Enable again, now that we don't have SwiftShader CI?
         "optonly",  # swiftshader is too slow in dbg
     ],
     tools = [

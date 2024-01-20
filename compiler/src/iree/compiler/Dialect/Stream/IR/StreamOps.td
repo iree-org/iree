@@ -2448,10 +2448,10 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     }
 
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), getResultSizes());
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
     }
   }];
 
@@ -2631,10 +2631,10 @@ def Stream_AsyncCallOp : Stream_Op<"async.call", [
     }
 
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), getResultSizes());
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
     }
 
     /// Get the argument operands to the called function as a mutable range, this is
@@ -2725,10 +2725,10 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), getResultSizes());
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
     }
     SmallVector<Value> getAwaitTimepoints() {
       if (getAwaitTimepoint()) return {getAwaitTimepoint()}; else return {};
@@ -2840,10 +2840,10 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
-      return findValueSizeInList(idx, getResults(), getResultSizes());
+      return IREE::Util::findValueSizeInList(idx, getResults(), getResultSizes());
     }
   }];
 
@@ -3104,7 +3104,7 @@ def Stream_CmdCollectiveOp : Stream_Op<"cmd.collective", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(
+      return IREE::Util::findValueSizeInList(
           idx - getODSOperandIndexAndLength(4).first,
           getResources(), getResourceSizes());
     }
@@ -3163,7 +3163,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
     }
 
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(
+      return IREE::Util::findValueSizeInList(
           idx - getODSOperandIndexAndLength(2).first,
           getResources(), getResourceSizes());
     }
@@ -3311,7 +3311,7 @@ def Stream_CmdCallOp : Stream_Op<"cmd.call", [
     }
 
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) { return {}; }
 
@@ -3388,7 +3388,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) {
       return {};
@@ -3791,7 +3791,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     (`on` `(` $affinity^ `)`)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
-    custom<SizeAwareTypeList>(type($resource_operands),
+    custom<ShapedTypeList>(type($resource_operands),
                               type($results), $resource_operand_sizes)
     attr-dict-with-keyword
   }];
@@ -4270,7 +4270,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
   let assemblyFormat = [{
     attr-dict
     ($resource_operands^ `:`
-        custom<SizeAwareTypeList>(type($resource_operands),
+        custom<ShapedTypeList>(type($resource_operands),
                                   $resource_operand_sizes))?
   }];
 
@@ -4283,7 +4283,7 @@ def Stream_YieldOp : Stream_Op<"yield", [
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) {
-      return findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
+      return IREE::Util::findValueSizeInList(idx, getOperands(), getResourceOperandSizes());
     }
     Value getResultSize(unsigned idx) { return {}; }
   }];

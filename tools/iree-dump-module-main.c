@@ -401,7 +401,7 @@ static iree_status_t iree_tooling_dump_module_metadata(
     fprintf(stdout, "Attributes:\n");
     iree_tooling_print_attr_defs(iree_vm_BytecodeModuleDef_attrs(module_def),
                                  2);
-    fprintf(stdout, "\n\n");
+    fprintf(stdout, "\n");
   }
 
   if (iree_vm_BytecodeModuleDef_types_is_present(module_def)) {

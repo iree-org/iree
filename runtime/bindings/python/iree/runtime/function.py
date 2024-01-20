@@ -25,7 +25,6 @@ from ._binding import (
     VmVariantList,
 )
 
-from . import tracing
 from .array_interop import (
     map_dtype_to_element_type,
     DeviceArray,
@@ -89,7 +88,6 @@ class FunctionInvoker:
         "_arg_packer",
         "_ret_descs",
         "_has_inlined_results",
-        "_tracer",
     ]
 
     def __init__(
@@ -97,7 +95,6 @@ class FunctionInvoker:
         vm_context: VmContext,
         device: HalDevice,
         vm_function: VmFunction,
-        tracer: Optional[tracing.ContextTracer],
     ):
         self._vm_context = vm_context
         # TODO: Needing to know the precise device to allocate on here is bad
@@ -105,7 +102,6 @@ class FunctionInvoker:
         # heterogenous dispatch.
         self._device = device
         self._vm_function = vm_function
-        self._tracer = tracer
         self._abi_dict = None
         self._arg_descs = None
         self._ret_descs = None
@@ -121,41 +117,30 @@ class FunctionInvoker:
         invoke_context = InvokeContext(self._device)
         arg_list = self._arg_packer.pack(invoke_context, args, kwargs)
 
-        call_trace = None  # type: Optional[tracing.CallTrace]
-        if self._tracer:
-            call_trace = self._tracer.start_call(self._vm_function)
-        try:
-            # Initialize the capacity to our total number of args, since we should
-            # be below that when doing a flat invocation. May want to be more
-            # conservative here when considering nesting.
-            inv = Invocation(self._device)
-            ret_descs = self._ret_descs
+        # Initialize the capacity to our total number of args, since we should
+        # be below that when doing a flat invocation. May want to be more
+        # conservative here when considering nesting.
+        inv = Invocation(self._device)
+        ret_descs = self._ret_descs
 
-            ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
-            if call_trace:
-                call_trace.add_vm_list(arg_list, "args")
-            self._invoke(arg_list, ret_list)
-            if call_trace:
-                call_trace.add_vm_list(ret_list, "results")
+        ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
+        self._invoke(arg_list, ret_list)
 
-            # Un-inline the results to align with reflection, as needed.
-            reflection_aligned_ret_list = ret_list
-            if self._has_inlined_results:
-                reflection_aligned_ret_list = VmVariantList(1)
-                reflection_aligned_ret_list.push_list(ret_list)
-            returns = _extract_vm_sequence_to_python(
-                inv, reflection_aligned_ret_list, ret_descs
-            )
-            return_arity = len(returns)
-            if return_arity == 1:
-                return returns[0]
-            elif return_arity == 0:
-                return None
-            else:
-                return tuple(returns)
-        finally:
-            if call_trace:
-                call_trace.end_call()
+        # Un-inline the results to align with reflection, as needed.
+        reflection_aligned_ret_list = ret_list
+        if self._has_inlined_results:
+            reflection_aligned_ret_list = VmVariantList(1)
+            reflection_aligned_ret_list.push_list(ret_list)
+        returns = _extract_vm_sequence_to_python(
+            inv, reflection_aligned_ret_list, ret_descs
+        )
+        return_arity = len(returns)
+        if return_arity == 1:
+            return returns[0]
+        elif return_arity == 0:
+            return None
+        else:
+            return tuple(returns)
 
     # Break out invoke so it shows up in profiles.
     def _invoke(self, arg_list, ret_list):

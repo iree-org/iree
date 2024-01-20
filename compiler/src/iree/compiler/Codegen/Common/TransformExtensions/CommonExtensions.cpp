@@ -9,8 +9,9 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
@@ -50,6 +51,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -266,10 +268,9 @@ transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
 
   WalkResult status = target->walk<WalkOrder::PreOrder>([&](Operation *op) {
     if (op->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+      DominanceInfo domInfo;
       lastOpVisited = op;
-      if (failed(eliminateCommonSubexpressions(op, /*domInfo=*/nullptr,
-                                               &listener)))
-        return WalkResult::interrupt();
+      eliminateCommonSubExpressions(rewriter, domInfo, op);
       if (listener.failed())
         return WalkResult::interrupt();
       return WalkResult::skip();
@@ -929,8 +930,8 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 static void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                       func::FuncOp funcOp) {
-  funcOp.walk([&](Operation *op) {
+                                       Operation *root) {
+  root->walk([&](Operation *op) {
     for (NamedAttribute attr : op->getAttrs()) {
       StringRef name = attr.getName().strref();
       if (name.find("__vector_layout_test_anchor_operand_") !=
@@ -992,6 +993,46 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
 }
 
 void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// TestGpuVectorDistribution
+//===----------------------------------------------------------------------===//
+
+class TestVectorLayoutOptions : public VectorLayoutOptions {
+public:
+  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+
+  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+    setAnchorOpsFromAttributes(analysis, root);
+  }
+};
+
+DiagnosedSilenceableFailure
+transform_dialect::TestGpuVectorDistribution::applyToOne(
+    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  TestVectorLayoutOptions options(target);
+  RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getBody().front());
+  SmallVector<Value> threadGrid = {
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::z),
+  };
+
+  populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(threadGrid, patterns);
+  distributeVectorOps(target, patterns, options);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestGpuVectorDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

@@ -2,7 +2,6 @@ third_party/benchmark
 third_party/cpuinfo
 third_party/flatcc
 third_party/googletest
-third_party/libyaml
 third_party/musl
 third_party/spirv_cross
 third_party/tracy

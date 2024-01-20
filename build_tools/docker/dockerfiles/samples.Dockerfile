@@ -6,10 +6,9 @@
 
 # An image for running IREE's samples. Includes support for:
 #   * CMake
-#   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/swiftshader@sha256:035ac89d3c357787052a836f4cbd227035260c05c95fa9a53d809600c454e819
+FROM gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can

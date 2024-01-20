@@ -420,10 +420,10 @@ def HAL_DispatchExternOp : HAL_PureOp<"dispatch.extern", [
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + getWorkload().size(); };
 
     ValueRange getOperandDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx - getWorkload().size(), getArguments(), getArgumentDims());
+      return IREE::Util::findDynamicDimsInList(idx - getWorkload().size(), getArguments(), getArgumentDims());
     }
     ValueRange getResultDynamicDims(unsigned idx) {
-      return IREE::Util::findVariadicDynamicDims(idx, getResults(), getResultDims());
+      return IREE::Util::findDynamicDimsInList(idx, getResults(), getResultDims());
     }
 
     IREE::HAL::ExecutableObjectsAttr getObjectsAttr() {
@@ -675,6 +675,80 @@ def OpGroupBufferViewOps : OpDocGroup {
 }
 
 let opDocGroup = OpGroupBufferViewOps in {
+
+def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_element_type_t for the given MLIR type}];
+  let description = [{
+    Maps an MLIR type to a runtime `iree_hal_element_type_t` value for all types
+    that are convertable.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+  let results = (outs
+    HAL_ElementType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $type `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$type), [{
+      build($_builder, $_state, $_builder.getI32Type(), TypeAttr::get(type));
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR element type or nullopt if the
+    // type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Type type);
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_encoding_type_t for the given MLIR encoding}];
+  let description = [{
+    Maps an MLIR encoding to a runtime `iree_hal_encoding_type_t` value for all
+    encodings that are convertable.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<AnyAttr>:$encoding
+  );
+  let results = (outs
+    HAL_EncodingType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` ($encoding^):( `` `dense_row_major`)? `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Attribute":$encoding), [{
+      build($_builder, $_state, $_builder.getI32Type(), encoding);
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if
+    // the type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Attribute attr);
+  }];
+
+  let hasVerifier = 1;
+}
 
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -2161,6 +2235,11 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     // Returns a map of constant key attributes to ordinals across all constant
     // blocks inside the variant.
     DenseMap<Attribute, int> gatherConstantOrdinals();
+
+    // Creates the new `hal.executable.condition` op in this variant op and sets
+    // the insertion point of the provided builder to the beginning of the new
+    // region.
+    Value createConditionOp(OpBuilder &builder);
 
     // Returns an i1 indicating whether this variant should be selected.
     Value buildCondition(Value device, OpBuilder &builder);

@@ -148,11 +148,13 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK: hal.fence.await until([%[[SIGNAL_FENCE]]])
     %result_ready = stream.timepoint.await %timepoint => %result_resource : !stream.resource<external>{%c16}
 
+    // CHECK-DAG: %[[ELEMENT_TYPE:.+]] = hal.element_type<f32>
+    // CHECK-DAG: %[[ENCODING_TYPE:.+]] = hal.encoding_type<dense_row_major>
     // CHECK: %[[RESULT_VIEW:.+]] = hal.buffer_view.create
     // CHECK-SAME: buffer(%[[RESULT_BUFFER]] : !hal.buffer)
     // CHECK-SAME: shape([%c4])
-    // CHECK-SAME: type(%c553648160_i32)
-    // CHECK-SAME: encoding(%c1_i32)
+    // CHECK-SAME: type(%[[ELEMENT_TYPE]])
+    // CHECK-SAME: encoding(%[[ENCODING_TYPE]])
     %result_view = stream.tensor.export %result_ready : tensor<4xf32> in !stream.resource<external>{%c16} -> !hal.buffer_view
     // CHECK: return
     return %result_view : !hal.buffer_view

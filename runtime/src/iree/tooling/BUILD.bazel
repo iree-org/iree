@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -217,49 +217,4 @@ iree_runtime_cc_test(
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/vm",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-# libyaml does not build cleanly on bare-metal systems
-if(IREE_ENABLE_THREADING)
-""",
-    inline = True,
-)
-
-iree_runtime_cc_library(
-    name = "trace_replay",
-    srcs = ["trace_replay.c"],
-    hdrs = ["trace_replay.h"],
-    deps = [
-        ":device_util",
-        ":numpy_io",
-        ":yaml_util",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:file_io",
-        "//runtime/src/iree/base/internal:path",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm/bytecode:module",
-        "@com_github_yaml_libyaml//:yaml",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "yaml_util",
-    srcs = ["yaml_util.c"],
-    hdrs = ["yaml_util.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "@com_github_yaml_libyaml//:yaml",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

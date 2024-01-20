@@ -50,9 +50,9 @@ vm.module @cmp_eq_i32_folds {
 vm.module @cmp_eq_f32_near_folds {
   // CHECK-LABEL: @eq_near_f32
   vm.func @eq_near_f32(%arg0 : f32, %arg1 : f32) -> i32 {
-    // CHECK-NEXT:   %zero = vm.const.f32.zero
-    // CHECK-NEXT:   %c1 = vm.const.i32 1
-    // CHECK-NEXT:   [[THRESHOLD:%.+]] = vm.const.i32
+    //  CHECK-DAG:   %zero = vm.const.f32.zero
+    //  CHECK-DAG:   %c1 = vm.const.i32 1
+    //  CHECK-DAG:   [[THRESHOLD:%.+]] = vm.const.i32
     // CHECK-NEXT:   %0 = vm.cmp.lt.f32.o %arg0, %zero : f32
     // CHECK-NEXT:   %1 = vm.xor.i32 %0, %c1 : i32
     // CHECK-NEXT:   %2 = vm.cmp.lt.f32.o %arg1, %zero : f32

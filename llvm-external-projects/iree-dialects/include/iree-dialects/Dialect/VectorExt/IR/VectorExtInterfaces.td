@@ -34,6 +34,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*retTy=*/"VectorLayoutInterface",
       /*methodName=*/"project",
       /*args=*/(ins "::llvm::ArrayRef<bool>":$projectedDims)
+    >,
+    InterfaceMethod<
+      /*description=*/"Get the distributed shape for the given vector type.",
+      /*retTy=*/"SmallVector<int64_t>",
+      /*methodName=*/"getDistributedShape",
+      /*args=*/(ins "VectorType":$type)
     >
   ];
 }

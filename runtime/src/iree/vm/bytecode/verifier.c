@@ -1270,6 +1270,12 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyOperandRegI64HostSize(target_offset);
       VM_VerifyOperandRegI64(value);
     });
+    VERIFY_OP(CORE, BufferHash, {
+      VM_VerifyOperandRegRef(source_buffer);
+      VM_VerifyOperandRegI64HostSize(source_offset);
+      VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyResultRegI64(result);
+    });
 
     //===------------------------------------------------------------------===//
     // Lists

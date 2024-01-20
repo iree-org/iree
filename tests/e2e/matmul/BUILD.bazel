@@ -6,7 +6,7 @@
 
 # End-to-end matrix multiplication tests.
 
-load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_runner_test")
+load("//build_tools/bazel:iree_e2e_matmul_test.bzl", "iree_generated_e2e_matmul_test")
 
 package(
     features = ["layering_check"],
@@ -25,7 +25,7 @@ py_binary(
 ###########################################################################
 
 # LLVMCPU, non-data-tiling, no microkernels
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
@@ -48,7 +48,7 @@ py_binary(
     target_cpu_features_variants = ["default"] +
                                    # Widening matmuls fail to lower for SVE.
                                    (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for (lhs_rhs_type, acc_type) in [
     # ("i8", "i32"),  # TODO(#15800): enable once compile time is reasonable
     # ("f32", "f32"),  # TODO(#15800): enable once compile time is reasonable
@@ -63,7 +63,7 @@ py_binary(
 ]]
 
 # LLVMCPU, non-data-tiling, no microkernels, ArmSME
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_arm_sme_nondt_%s_%s" % (dtype, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
@@ -78,7 +78,7 @@ py_binary(
         ("llvm-cpu", "local-task"),
     ],
     target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for dtype in [
     "f32",
     # "f64" (also supported for ArmSME, but not by the test generator)
@@ -111,7 +111,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ]
 
 # LLVMCPU, data-tiling, data-tiling + ukernels.
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_dt%s_%s_%s_%s" % (
         ("_uk" if use_uk else ""),
         lhs_rhs_type,
@@ -167,7 +167,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
                                        "x86_64:avx512bf16:" + ",".join(X86_64_AVX512_BF16),
                                        "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for use_uk in [
     False,
     True,
@@ -192,7 +192,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ###########################################################################
 
 # VMVX, data-tiling + microkernels.
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_dt_uk_%s_small" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
@@ -206,7 +206,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
     target_backends_and_drivers = [
         ("vmvx", "local-task"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -218,7 +218,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ##
 ###########################################################################
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt",
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -237,12 +237,12 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
 # Testing Ampere + TensorCore path.
 # WMMA TensorCore(F32): wmma.161616.f32.tf32
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -264,10 +264,10 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f32_gpu_large_unaligned",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -288,10 +288,10 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f16_gpu_large_unaligned",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -312,11 +312,11 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f32_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -338,11 +338,11 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
 # WMMA TensorCore(F16): wmma.161616.f16.f16
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f16_gpu_large_LLVMGPUMatmulTensorCore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -364,11 +364,11 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
 # MMA.SYNC TensorCore(F16): mma.sync.161616.f16.f16
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f16_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
@@ -390,10 +390,10 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )
 
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
     compiler_flags = [
         "--iree-flow-split-matmul-reduction=4",
@@ -416,7 +416,7 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("cuda", "cuda"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "f32",
 ]]
@@ -427,7 +427,7 @@ iree_generated_trace_runner_test(
 ##
 ###########################################################################
 
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_{0}_gpu_large_valhall".format(lhs_rhs_type),
     compiler_flags = [
         "--iree-vulkan-target-triple=valhall-unknown-android31",
@@ -446,14 +446,14 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f16",
     "f32",
 ]]
 
-[iree_generated_trace_runner_test(
+[iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_{0}_gpu_large_ampere".format(lhs_rhs_type),
     compiler_flags = [
         "--iree-vulkan-target-triple=ampere-unknown-linux",
@@ -471,14 +471,14 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f16",
     "f32",
 ]]
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
     name = "e2e_matmul_direct_f16_gpu_large_rdna3",
     compiler_flags = [
         "--iree-vulkan-target-triple=rdna3-unknown-linux",
@@ -500,5 +500,5 @@ iree_generated_trace_runner_test(
     target_backends_and_drivers = [
         ("vulkan-spirv", "vulkan"),
     ],
-    trace_runner = "//tools:iree-e2e-matmul-test",
+    test_runner = "//tools:iree-e2e-matmul-test",
 )

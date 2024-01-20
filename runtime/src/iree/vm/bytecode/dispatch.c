@@ -1176,6 +1176,24 @@ static iree_status_t iree_vm_bytecode_dispatch(
       vm_buffer_store_i64_inline(buffer, offset, value);
     });
 
+    DISPATCH_OP(CORE, BufferHash, {
+      bool source_buffer_is_move;
+      iree_vm_ref_t* source_buffer_ref =
+          VM_DecOperandRegRef("source_buffer", &source_buffer_is_move);
+      iree_vm_buffer_t* source_buffer =
+          iree_vm_buffer_deref(*source_buffer_ref);
+      if (IREE_UNLIKELY(!source_buffer)) {
+        return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                "source_buffer is null");
+      }
+      iree_host_size_t source_offset =
+          VM_DecOperandRegI64HostSize("source_offset");
+      iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
+      uint64_t* result = VM_DecResultRegI64("result");
+      IREE_RETURN_IF_ERROR(
+          iree_vm_buffer_hash(source_buffer, source_offset, length, result));
+    });
+
     //===------------------------------------------------------------------===//
     // Lists
     //===------------------------------------------------------------------===//

@@ -41,6 +41,7 @@ iree_lit_test_suite(
     "pipeline_vectorize_nd_extract_tests.mlir"
     "scalable_tile_and_vectorize_matmul.mlir"
     "select_aarch64_lowering_strategy.mlir"
+    "select_aarch64_sve_lowering_strategy_peeling.mlir"
     "select_lowering_strategy_without_distribution.mlir"
     "select_riscv_lowering_strategy.mlir"
     "select_x86_64_lowering_strategy.mlir"
@@ -53,6 +54,7 @@ iree_lit_test_suite(
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
     "vector_lowering.mlir"
+    "vectorize_with_masking_and_hoist.mlir"
     "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck

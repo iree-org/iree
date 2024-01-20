@@ -213,13 +213,13 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
     addString("static_library_output", staticLibraryOutput);
   }
   if (pipelineTuningOptions.LoopInterleaving != DEFAULT_LOOP_INTERLEAVING)
-    addBool("loop_interleaving", DEFAULT_LOOP_INTERLEAVING);
+    addBool("loop_interleaving", pipelineTuningOptions.LoopInterleaving);
   if (pipelineTuningOptions.LoopVectorization != DEFAULT_LOOP_VECTORIZATION)
-    addBool("loop_vectorization", DEFAULT_LOOP_VECTORIZATION);
+    addBool("loop_vectorization", pipelineTuningOptions.LoopVectorization);
   if (pipelineTuningOptions.LoopUnrolling != DEFAULT_LOOP_UNROLLING)
-    addBool("loop_unrolling", DEFAULT_LOOP_UNROLLING);
+    addBool("loop_unrolling", pipelineTuningOptions.LoopUnrolling);
   if (pipelineTuningOptions.SLPVectorization != DEFAULT_SLP_VECTORIZATION)
-    addBool("slp_vectorization", DEFAULT_SLP_VECTORIZATION);
+    addBool("slp_vectorization", pipelineTuningOptions.SLPVectorization);
   if (!llvmTargetOptions.MCOptions.ABIName.empty())
     addString("target_abi", llvmTargetOptions.MCOptions.ABIName);
   if (llvmTargetOptions.FloatABIType != DEFAULT_FLOAT_ABI) {

@@ -576,6 +576,43 @@ def TestVectorLayoutAnalysisOp :
     }];
 }
 
+def TestGpuVectorDistribution :
+  Op<Transform_Dialect, "iree.test_gpu_vector_distribution",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Run GPUVectorDistribution on the target as the root.
+
+    The anchor points are set by using the attribute
+    "__vector_layout_test_anchor_operand_x" and
+    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
+    number.
+
+    The distribution is done over a 3D thread grid, using the 
+    gpu.thread x, y, z thread grid.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
+    }];
+
+    let arguments = (ins TransformHandleTypeInterface:$target);
+    let results = (outs);
+
+    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+    let extraClassDeclaration = [{
+      ::mlir::DiagnosedSilenceableFailure applyToOne(
+          ::mlir::transform::TransformRewriter &rewriter,
+          ::mlir::func::FuncOp funcOp,
+          ::mlir::transform::ApplyToEachResultList &results,
+          ::mlir::transform::TransformState &state);
+    }];
+}
+
 def GpuDistributeSharedMemoryCopyOp :
   Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

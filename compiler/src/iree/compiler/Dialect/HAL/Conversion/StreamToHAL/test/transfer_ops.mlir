@@ -52,11 +52,13 @@ func.func @tensorExportBuffer(%arg0: !stream.resource<external>, %arg1: index) -
 // CHECK-LABEL: @tensorExportBufferView
 func.func @tensorExportBufferView(%arg0: !stream.resource<external>, %arg1: index) -> !hal.buffer_view {
   %c200 = arith.constant 200 : index
+  // CHECK-DAG: %[[ELEMENT_TYPE:.+]] = hal.element_type<f32> : i32
+  // CHECK-DAG: %[[ENCODING_TYPE:.+]] = hal.encoding_type<dense_row_major> : i32
   // CHECK: %[[VIEW:.+]] = hal.buffer_view.create
   // CHECK-SAME: buffer(%arg0 : !hal.buffer)
   // CHECK-SAME: shape([%arg1, %c1, %c10])
-  // CHECK-SAME: type(%c553648160_i32)
-  // CHECK-SAME: encoding(%c1_i32)
+  // CHECK-SAME: type(%[[ELEMENT_TYPE]])
+  // CHECK-SAME: encoding(%[[ENCODING_TYPE]])
   // CHECK-SAME: : !hal.buffer_view
   %0 = stream.tensor.export %arg0 : tensor<?x1x10xf32>{%arg1} in !stream.resource<external>{%c200} -> !hal.buffer_view
   // CHECK: return %[[VIEW]]

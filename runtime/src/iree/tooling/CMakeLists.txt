@@ -248,47 +248,6 @@ iree_cc_test(
     iree::vm
 )
 
-# libyaml does not build cleanly on bare-metal systems
-if(IREE_ENABLE_THREADING)
-
-iree_cc_library(
-  NAME
-    trace_replay
-  HDRS
-    "trace_replay.h"
-  SRCS
-    "trace_replay.c"
-  DEPS
-    ::device_util
-    ::numpy_io
-    ::yaml_util
-    iree::base
-    iree::base::internal
-    iree::base::internal::file_io
-    iree::base::internal::path
-    iree::hal
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode::module
-    yaml
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    yaml_util
-  HDRS
-    "yaml_util.h"
-  SRCS
-    "yaml_util.c"
-  DEPS
-    iree::base
-    yaml
-  PUBLIC
-)
-
-endif()
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # We're co-opting the VMVX module loader option for this as the inline-static

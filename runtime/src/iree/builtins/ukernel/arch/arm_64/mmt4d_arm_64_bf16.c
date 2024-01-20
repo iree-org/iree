@@ -75,7 +75,6 @@ static inline void iree_uk_mmt4d_tile_bf16bf16fXX_1x8x4_to_8x8x4_arm_64_bf16(
     }
   }
 
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     bfloat16x8_t rhs[4];
     for (int i = 0; i < 4; ++i) {

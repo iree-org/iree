@@ -1,6 +1,5 @@
 
 add_mlir_library(IREEDialectsTransforms
-  ListenerCSE.cpp
   TransformMatchers.cpp
 
   LINK_LIBS PRIVATE
