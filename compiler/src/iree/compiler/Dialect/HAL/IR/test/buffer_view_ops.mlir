@@ -1,5 +1,25 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
+// CHECK-LABEL: @element_type
+func.func @element_type() -> i32 {
+  // CHECK: %[[RET:.+]] = hal.element_type<f32> : i32
+  %element_type = hal.element_type<f32> : i32
+  // CHECK: return %[[RET]]
+  return %element_type : i32
+}
+
+// -----
+
+// CHECK-LABEL: @encoding_type
+func.func @encoding_type() -> i32 {
+  // CHECK: %[[RET:.+]] = hal.encoding_type<dense_row_major> : i32
+  %encoding_type = hal.encoding_type<dense_row_major> : i32
+  // CHECK: return %[[RET]]
+  return %encoding_type : i32
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_view_create
 func.func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {
   %c0 = arith.constant 0 : index

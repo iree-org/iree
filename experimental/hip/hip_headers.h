@@ -11,6 +11,7 @@
 #error "32-bit not supported on HIP backend"
 #endif  // defined(IREE_PTR_SIZE_32)
 
+#define __HIP_PLATFORM_AMD__
 #include "hip/hip_runtime_api.h"  // IWYU pragma: export
 
 #endif  // IREE_EXPERIMENTAL_HIP_HIP_HEADERS_H_

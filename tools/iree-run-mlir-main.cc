@@ -129,14 +129,13 @@ std::string InferTargetBackendFromDevice(iree_string_view_t device_uri) {
 // guesswork. If we can't produce a target backend flag value we bail.
 // Returns a comma-delimited list of target backends.
 StatusOr<std::string> InferTargetBackendsFromDevices(
-    iree_host_size_t device_flag_count,
-    const iree_string_view_t* device_flag_values) {
+    iree_string_view_list_t device_uris) {
   // No-op when no devices specified (probably no HAL).
-  if (device_flag_count == 0) return "";
+  if (device_uris.count == 0) return "";
   // If multiple devices were provided we need to target all of them.
   std::set<std::string> target_backends;
-  for (iree_host_size_t i = 0; i < device_flag_count; ++i) {
-    auto target_backend = InferTargetBackendFromDevice(device_flag_values[i]);
+  for (iree_host_size_t i = 0; i < device_uris.count; ++i) {
+    auto target_backend = InferTargetBackendFromDevice(device_uris.values[i]);
     if (!target_backend.empty()) {
       target_backends.insert(std::move(target_backend));
     }
@@ -176,20 +175,18 @@ Status ConfigureTargetBackends(iree_compiler_session_t* session,
 
   // Query the tooling utils for the --device= flag values. Note that zero or
   // more devices may be specified.
-  iree_host_size_t device_flag_count = 0;
-  const iree_string_view_t* device_flag_values = NULL;
-  iree_hal_get_devices_flag_list(&device_flag_count, &device_flag_values);
+  iree_string_view_list_t device_uris = iree_hal_device_flag_list();
 
   // No-op if no target backends or devices are specified - this can be an
   // intentional decision as the user may be running a program that doesn't use
   // the HAL.
-  if (target_backends_flag.empty() && device_flag_count == 0) {
+  if (target_backends_flag.empty() && device_uris.count == 0) {
     return OkStatus();
   }
 
   // No-op if both target backends and devices are set as the user has
   // explicitly specified a configuration.
-  if (!target_backends_flag.empty() && device_flag_count > 0) {
+  if (!target_backends_flag.empty() && device_uris.count > 0) {
     return OkStatus();
   }
 
@@ -197,7 +194,7 @@ Status ConfigureTargetBackends(iree_compiler_session_t* session,
   // the compiler configuration. This only works if there's a single backend
   // specified; if the user wants multiple target backends then they must
   // specify the device(s) to use.
-  if (device_flag_count == 0) {
+  if (device_uris.count == 0) {
     if (target_backends_flag.find(',') != std::string::npos) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
@@ -216,9 +213,8 @@ Status ConfigureTargetBackends(iree_compiler_session_t* session,
   // guesses. In the future we'll have more ways of configuring the compiler
   // from available runtime devices (not just the target backend but also
   // target-specific settings).
-  IREE_ASSIGN_OR_RETURN(
-      auto target_backends,
-      InferTargetBackendsFromDevices(device_flag_count, device_flag_values));
+  IREE_ASSIGN_OR_RETURN(auto target_backends,
+                        InferTargetBackendsFromDevices(device_uris));
   if (!target_backends.empty()) {
     auto target_backends_flag =
         std::string("--iree-hal-target-backends=") + target_backends;

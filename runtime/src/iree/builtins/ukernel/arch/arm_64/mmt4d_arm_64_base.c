@@ -25,7 +25,6 @@ static inline void iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_arm_64(
       acc[i] = vdupq_n_f32(0);
     }
   }
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     float32x4_t rhs[2];
     for (int i = 0; i < 2; ++i) {
@@ -110,7 +109,6 @@ static inline void iree_uk_mmt4d_tile_f16f16fXX_1x8x1_to_8x8x1_arm_64(
       acc[i] = vdupq_n_f32(0);
     }
   }
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     float32x4_t rhs[2];
     for (int i = 0; i < 2; ++i) {
@@ -218,7 +216,6 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x1_to_8x8x1_arm_64(
       acc[i] = vdupq_n_s32(0);
     }
   }
-  IREE_UK_ASSUME(params->K >= 1);
   for (int k = 0; k < params->K; ++k) {
     int16x8_t rhs = vmovl_s8(vld1_s8(rhs_ptr));
     rhs_ptr += 8;

@@ -101,6 +101,19 @@ def iree_bitcode_library(
         "-DIREE_DEVICE_STANDALONE=1",
     ]
 
+    if arch == "arm_32":
+        # Silence "warning: unknown platform, assuming -mfloat-abi=soft"
+        base_copts.append("-mfloat-abi=soft")
+    elif arch == "riscv_32":
+        # On RISC-V, linking LLVM modules requires matching target-abi.
+        # https://lists.llvm.org/pipermail/llvm-dev/2020-January/138450.html
+        # The choice of ilp32d is simply what we have in existing riscv_32 tests.
+        # Open question - how do we scale to supporting all RISC-V ABIs?
+        base_copts.append("-mabi=ilp32d")
+    elif arch == "riscv_64":
+        # Same comments as above riscv_32 case.
+        base_copts.append("-mabi=lp64d")
+
     bitcode_files = []
     for src in srcs:
         bitcode_out = "%s_%s.bc" % (name, src)
@@ -258,7 +271,7 @@ def iree_link_bitcode(
         **kwargs: any additional attributes to pass to the underlying rules.
     """
 
-    bitcode_files_qualified = [(("//" + native.package_name() + "/" + b) if b.count(":") else b) for b in bitcode_files]
+    bitcode_files_qualified = [("//" + native.package_name() + b) if b.startswith(":") else ("//" + native.package_name() + "/" + b) if b.count(":") else b for b in bitcode_files]
 
     if not out:
         out = "%s.bc" % (name)

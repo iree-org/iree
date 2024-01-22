@@ -51,6 +51,11 @@ def LegalizeChlo :
   let summary = "Legalizes from CHLO ops flow to StableHLO and Shape ops";
 }
 
+def LegalizeStableHLOCustomCalls :
+    Pass<"iree-stablehlo-legalize-custom-calls", "func::FuncOp"> {
+  let summary = "Legalizes specialized custom calls to decomposed implementations";
+}
+
 def LegalizeShapeComputations :
     Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
   let summary = "Legalizes StableHLO shape operations to core-mlir operations";

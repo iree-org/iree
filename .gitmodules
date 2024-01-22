@@ -26,9 +26,6 @@
 [submodule "third_party/cpuinfo"]
 	path = third_party/cpuinfo
 	url = https://github.com/pytorch/cpuinfo.git
-[submodule "third_party/libyaml"]
-	path = third_party/libyaml
-	url = https://github.com/yaml/libyaml.git
 [submodule "third_party/webgpu-headers"]
 	path = third_party/webgpu-headers
 	url = https://github.com/webgpu-native/webgpu-headers.git

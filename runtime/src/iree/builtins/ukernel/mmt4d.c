@@ -101,42 +101,17 @@ static void iree_uk_mmt4d_using_tile_func(const iree_uk_mmt4d_params_t* params,
   }
 }
 
-// Helper for early-return path when K==0 and we just need to clear the output.
-static void iree_uk_mmt4d_zero_out(const iree_uk_mmt4d_params_t* params) {
-  iree_uk_mmt4d_type_t mmt4d_type = iree_uk_mmt4d_type(params->flags);
-  iree_uk_type_t out_type = iree_uk_mmt4d_out_type(mmt4d_type);
-  int out_elem_size_log2 = iree_uk_type_size_log2(out_type);
-  iree_uk_index_t contiguous_size = params->N * params->M0 * params->N0
-                                    << out_elem_size_log2;
-  iree_uk_index_t stride = params->out_stride0 << out_elem_size_log2;
-  char* out_ptr =
-      (char*)params->out_buffer + (params->out_offset << out_elem_size_log2);
-  for (iree_uk_index_t i = 0; i < params->M; ++i) {
-    iree_uk_memset(out_ptr, 0, contiguous_size);
-    out_ptr += stride;
-  }
-}
-
 // Early-return code paths, including trivial or near-trivial cases (when one
 // of the dimensions is 0) and in the future, hardware ports that specialize
 // the entire loop nest.
 // Returns true if already done.
 static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   // Trivial cases
-  if (params->M == 0 || params->N == 0) {
+  if (params->M == 0 || params->N == 0 ||
+      (params->K == 0 && params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE)) {
     return true;
   }
-  if (params->K == 0) {
-    if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-      // Nothing to do!
-    } else {
-      iree_uk_mmt4d_zero_out(params);
-    }
-    return true;
-  }
-
   // Targets that want to specialize the entire loop nest can do so here.
-
   return false;
 }
 

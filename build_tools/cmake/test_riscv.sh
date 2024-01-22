@@ -34,6 +34,7 @@ ctest_args=(
 declare -a label_exclude_args=(
   "^nodocker$"
   "^driver=vulkan$"
+  "^driver=metal$"
   "^driver=cuda$"
   "^vulkan_uses_vk_khr_shader_float16_int8$"
   "^requires-filesystem$"

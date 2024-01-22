@@ -12,6 +12,10 @@
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
 
+//===----------------------------------------------------------------------===//
+// iree_hal_device_t
+//===----------------------------------------------------------------------===//
+
 #define _VTABLE_DISPATCH(device, method_name) \
   IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, method_name)
 
@@ -380,4 +384,63 @@ iree_hal_device_profiling_end(iree_hal_device_t* device) {
   iree_status_t status = _VTABLE_DISPATCH(device, profiling_end)(device);
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+//===----------------------------------------------------------------------===//
+// iree_hal_device_list_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_device_list_allocate(
+    iree_host_size_t capacity, iree_allocator_t host_allocator,
+    iree_hal_device_list_t** out_list) {
+  IREE_ASSERT_ARGUMENT(out_list);
+  *out_list = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_device_list_t* list = NULL;
+  iree_host_size_t total_size =
+      sizeof(*list) + capacity * sizeof(list->devices[0]);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, total_size, (void**)&list));
+  list->host_allocator = host_allocator;
+  list->capacity = capacity;
+  list->count = 0;
+  *out_list = list;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_hal_device_list_free(iree_hal_device_list_t* list) {
+  if (!list) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_allocator_t host_allocator = list->host_allocator;
+  for (iree_host_size_t i = 0; i < list->count; ++i) {
+    iree_hal_device_release(list->devices[i]);
+  }
+  iree_allocator_free(host_allocator, list);
+  IREE_TRACE_ZONE_END(z0);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_list_push_back(
+    iree_hal_device_list_t* list, iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(list);
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  if (list->count + 1 <= list->capacity) {
+    iree_hal_device_retain(device);
+    list->devices[list->count++] = device;
+  } else {
+    status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                              "list capacity %" PRIhsz
+                              " reached; no more devices can be added",
+                              list->capacity);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_hal_device_t* iree_hal_device_list_at(
+    const iree_hal_device_list_t* list, iree_host_size_t i) {
+  IREE_ASSERT_ARGUMENT(list);
+  return i < list->count ? list->devices[i] : NULL;
 }
