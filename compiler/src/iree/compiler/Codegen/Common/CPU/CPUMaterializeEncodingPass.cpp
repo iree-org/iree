@@ -59,8 +59,7 @@ enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileRiscv32(linalg::ContractionDimensions cDims,
-                           ExecutableTargetAttr target) {
+enumerateMatmulTileRiscv32(ExecutableTargetAttr target) {
   if (hasUkernel(target)) {
     return {
         TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
@@ -77,8 +76,7 @@ enumerateMatmulTileRiscv32(linalg::ContractionDimensions cDims,
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileArm64(linalg::ContractionDimensions cDims,
-                         TypeRange elementTypes, ExecutableTargetAttr target) {
+enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
   // Data-tiling for SVE is not implemented yet.
   if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
     return {};
@@ -150,8 +148,7 @@ enumerateMatmulTileArm64(linalg::ContractionDimensions cDims,
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileX86_64(linalg::ContractionDimensions cDims,
-                          TypeRange elementTypes, ExecutableTargetAttr target) {
+enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -349,13 +346,13 @@ enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
     return enumerateMatmulTilesVMVX(cDims, target);
   }
   if (isAArch64(target)) {
-    return enumerateMatmulTileArm64(cDims, elementTypes, target);
+    return enumerateMatmulTileArm64(elementTypes, target);
   }
   if (isX86_64(target)) {
-    return enumerateMatmulTileX86_64(cDims, elementTypes, target);
+    return enumerateMatmulTileX86_64(elementTypes, target);
   }
   if (isRISCV32(target)) {
-    return enumerateMatmulTileRiscv32(cDims, target);
+    return enumerateMatmulTileRiscv32(target);
   }
   return {};
 }

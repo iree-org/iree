@@ -264,7 +264,7 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
 /// These restrictions are required because data tiling currently creates
 /// an Mmt4DOp or BatchMmt4DOp on the packed inputs.
 ///
-/// TODO (#16176): Loosen restrictions on contraction ops once data tiling
+/// TODO(#16176): Loosen restrictions on contraction ops once data tiling
 /// can support more cases.
 static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
                                               linalg::LinalgOp linalgOp) {

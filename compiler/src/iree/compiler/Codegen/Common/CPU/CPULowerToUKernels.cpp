@@ -464,6 +464,8 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
 static uint32_t
 getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
+  // There are currently no batch_mmt4d ukernels, so check for no batch
+  // dimension.
   auto cDims = getEncodingContractionDims(encoding);
   if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;

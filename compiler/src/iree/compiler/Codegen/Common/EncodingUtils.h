@@ -86,7 +86,7 @@ getPermutationToCanonicalMatmulShape(IREE::LinalgExt::EncodingAttr encoding);
 /// form for an ordinary matmul/batch_matmul op.
 RankedTensorType getCanonicalMatmulTypeWithEncoding(RankedTensorType type);
 
-/// Returns the ContractionDimensions for the encoding user_indexing_maps
+/// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(IREE::LinalgExt::EncodingAttr encoding);
 
@@ -98,18 +98,6 @@ RankedTensorType dropEncoding(RankedTensorType type);
 
 /// Returns the integer contained in an IntegerAttr, or zero if it has none.
 int64_t getIntOrZero(IntegerAttr a);
-
-/// Returns true if the encoding is a vecmat.
-bool isVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
-
-/// Returns true if the encoding is a matvec.
-bool isMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
-
-/// Returns true if the encoding is a batch_vecmat.
-bool isBatchVecmatEncoding(IREE::LinalgExt::EncodingAttr encoding);
-
-/// Returns true if the encoding is a batch_matvec.
-bool isBatchMatvecEncoding(IREE::LinalgExt::EncodingAttr encoding);
 
 struct TileMxNxK {
   int64_t M = 1;
