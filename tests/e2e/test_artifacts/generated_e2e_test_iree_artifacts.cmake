@@ -70,6 +70,12 @@ iree_import_tflite_model(
   OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_MobileBertSquad_int8_tflite_.mlir"
 )
 
+iree_import_tflite_model(
+  TARGET_NAME "${PACKAGE_NAME}_iree-imported-model-Vit_int8_tflite_"
+  SOURCE "${ROOT_ARTIFACTS_DIR}/model_Vit_int8.tflite"
+  OUTPUT_MLIR_FILE "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+)
+
 iree_bytecode_module(
   NAME "iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_PersonDetect_int8_tflite_.mlir"
@@ -1440,6 +1446,20 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_/module.vmfb"
@@ -1500,6 +1520,21 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=true"
+    "--iree-llvmcpu-enable-ukernels=all"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
@@ -1556,6 +1591,21 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-ukernels=none"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=true"
+    "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
 
@@ -3437,6 +3487,24 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
@@ -3513,6 +3581,25 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=true"
+    "--iree-llvmcpu-enable-ukernels=all"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
   NAME "iree-module-DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/iree_DeepLabV3_fp32_tflite_.mlir"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_DeepLabV3_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
@@ -3585,6 +3672,25 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "GPT2_117M_TF_1X1XI32(stablehlo) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only,compile-stats]"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME "iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_"
+  SRC "${ROOT_ARTIFACTS_DIR}/iree_Vit_int8_tflite_.mlir"
+  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
+  FLAGS
+    "--iree-hal-target-backends=llvm-cpu"
+    "--iree-input-type=tosa"
+    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
+    "--iree-opt-data-tiling=true"
+    "--iree-llvmcpu-enable-ukernels=none"
+    "--iree-llvmcpu-target-cpu-features=+dotprod"
+    "--iree-vm-emit-polyglot-zip=true"
+    "--iree-llvmcpu-debug-symbols=false"
+    "--iree-scheduling-dump-statistics-format=json"
+    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
+  FRIENDLY_NAME "Vit_int8(tflite) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only,compile-stats]"
   PUBLIC
 )
 
@@ -3773,6 +3879,7 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_iree-imported-model-MobileSSD_fp32_tflite_
   ${PACKAGE_NAME}_iree-imported-model-PersonDetect_int8_tflite_
   ${PACKAGE_NAME}_iree-imported-model-PoseNet_fp32_tflite_
+  ${PACKAGE_NAME}_iree-imported-model-Vit_int8_tflite_
   ${PACKAGE_NAME}_model-BertForMaskedLMTF
   ${PACKAGE_NAME}_model-BertLargeTF
   ${PACKAGE_NAME}_model-EfficientNetV2STF
@@ -3814,6 +3921,8 @@ add_dependencies(iree-benchmark-suites-android-cpu
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
 )
 
 add_dependencies(iree-benchmark-suites-android-cpu-dt-only
@@ -3821,6 +3930,7 @@ add_dependencies(iree-benchmark-suites-android-cpu-dt-only
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X1XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-GPT2_117M_TF_1X4XI32_stablehlo___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
 )
 
 add_dependencies(iree-benchmark-suites-android-gpu
@@ -3928,6 +4038,9 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
@@ -4063,6 +4176,9 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
+  ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
