@@ -320,13 +320,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     return failure();
   }
 
-  auto cDims = getEncodingContractionDims(lhsEncoding);
-  if ((lhsEncoding.getUserIndexingMaps() != rhsEncoding.getUserIndexingMaps() &&
-       lhsEncoding.getUserIndexingMaps() !=
-           resultEncoding.getUserIndexingMaps()) ||
-      failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-      cDims->n.size() > 1 || cDims->k.size() > 1 ||
-      lhsEncoding.getRole().getValue() !=
+  if (lhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
@@ -352,6 +346,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
 
     Type newResultType = newResult.getType();
 
+    auto cDims = getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},

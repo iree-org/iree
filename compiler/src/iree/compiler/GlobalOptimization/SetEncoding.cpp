@@ -34,6 +34,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
 #include "mlir/IR/Types.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include "llvm/Support/Debug.h"
@@ -103,6 +104,8 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
         map.getResultPosition(getAffineDimExpr(dimPos, linalgOp->getContext()))
             .value());
   };
+  // M or N can be empty instead of having an explicit dim size of 1 for matvec
+  // and vecmat, so set to 1 if empty.
   int64_t M = cDims.m.empty() ? 1 : getOutputSizeAtDimPos(cDims.m[0]);
   int64_t N = cDims.n.empty() ? 1 : getOutputSizeAtDimPos(cDims.n[0]);
 
@@ -252,6 +255,37 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
   return true;
 }
 
+/// Not all contractions are supported by data tiling, so return true if:
+///   1) linalgOp has contraction indexingMaps.
+///   2) There are not more than one of each contraction dimension
+///   3) There is and M or N dimension, and there is a K dimension
+///   4) linalgOp has the same body as an ordinary int or float matmul
+///
+/// These restrictions are required because data tiling currently creates
+/// an Mmt4DOp or BatchMmt4DOp on the packed inputs.
+///
+/// TODO (#16176): Loosen restrictions on contraction ops once data tiling
+/// can support more cases.
+static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
+                                              linalg::LinalgOp linalgOp) {
+  auto cDims = linalg::inferContractionDims(linalgOp);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
+  }
+  if ((cDims->n.empty() && cDims->m.empty()) || cDims->k.empty()) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expected M or N dims and K dim to not be empty");
+  }
+  if (!hasMatmulLikeBody(linalgOp)) {
+    return rewriter.notifyMatchFailure(
+        linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
+                  "mul(cast(in0), cast(in1))))");
+  }
+  return success();
+}
+
 namespace {
 
 struct setContractionOpEncoding
@@ -268,25 +302,8 @@ struct setContractionOpEncoding
       return rewriter.notifyMatchFailure(
           linalgOp, "the op has preset compilation strategy, skip SetEncoding");
     }
-    if (!linalg::isaContractionOpInterface(linalgOp)) {
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "the op is not a contraction op");
-    }
-    auto maps = linalgOp.getIndexingMaps();
-    auto cDims = linalg::inferContractionDims(linalgOp);
-    if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
-        cDims->n.size() > 1 || cDims->k.size() > 1) {
-      return rewriter.notifyMatchFailure(
-          linalgOp, "Expected {|Batch|, |M|, |N|, |K|} <= 1");
-    }
-    if ((cDims->n.empty() && cDims->m.empty()) || cDims->k.empty()) {
-      return rewriter.notifyMatchFailure(
-          linalgOp, "Expected M or N dims and K dim to not be empty");
-    }
-    if (!hasMatmulLikeBody(linalgOp)) {
-      return rewriter.notifyMatchFailure(
-          linalgOp, "Expected op to have a matmul body, i.e. yield(add(out, "
-                    "mul(cast(in0), cast(in1))))");
+    if (failed(isSupportedContractionOp(rewriter, linalgOp))) {
+      return failure();
     }
 
     auto inputs = linalgOp.getDpsInputs();
@@ -333,6 +350,7 @@ struct setContractionOpEncoding
         cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
     operandTypes[1] =
         cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
+    auto maps = linalgOp.getIndexingMaps();
     Value encodedLhs = padAndSetEncoding(
         rewriter, loc, origLhs, IREE::LinalgExt::EncodingRole::LHS,
         operandTypes, narrowSizes, maps, maybeLhsCastOp);

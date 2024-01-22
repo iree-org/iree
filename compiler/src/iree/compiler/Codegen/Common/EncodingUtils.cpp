@@ -170,30 +170,6 @@ int64_t getIntOrZero(IntegerAttr a) {
   return a == IntegerAttr() ? 0 : a.getInt();
 }
 
-bool isVecmatEncoding(EncodingAttr encoding) {
-  auto cDims = getEncodingContractionDims(encoding);
-  return !failed(cDims) && cDims->batch.size() == 0 && cDims->m.size() == 0 &&
-         cDims->k.size() == 1 && cDims->n.size() == 1;
-}
-
-bool isMatvecEncoding(EncodingAttr encoding) {
-  auto cDims = getEncodingContractionDims(encoding);
-  return !failed(cDims) && cDims->batch.size() == 0 && cDims->m.size() == 1 &&
-         cDims->k.size() == 1 && cDims->n.size() == 0;
-}
-
-bool isBatchVecmatEncoding(EncodingAttr encoding) {
-  auto cDims = getEncodingContractionDims(encoding);
-  return !failed(cDims) && cDims->batch.size() == 1 && cDims->m.size() == 0 &&
-         cDims->k.size() == 1 && cDims->n.size() == 1;
-}
-
-bool isBatchMatvecEncoding(EncodingAttr encoding) {
-  auto cDims = getEncodingContractionDims(encoding);
-  return !failed(cDims) && cDims->batch.size() == 1 && cDims->m.size() == 1 &&
-         cDims->k.size() == 1 && cDims->n.size() == 0;
-}
-
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {

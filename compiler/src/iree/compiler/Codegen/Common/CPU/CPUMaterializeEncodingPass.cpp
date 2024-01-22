@@ -18,6 +18,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -35,12 +36,12 @@ using IREE::HAL::ExecutableTargetAttr;
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTilesVMVX(EncodingAttr encoding, ExecutableTargetAttr target) {
+enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+                         ExecutableTargetAttr target) {
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
   // batch_matmul.
-  if (hasUkernel(target) &&
-      getEncodingContractionDims(encoding)->batch.empty()) {
+  if (hasUkernel(target) && cDims.batch.empty()) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -58,7 +59,8 @@ enumerateMatmulTilesVMVX(EncodingAttr encoding, ExecutableTargetAttr target) {
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileRiscv32(EncodingAttr encoding, ExecutableTargetAttr target) {
+enumerateMatmulTileRiscv32(linalg::ContractionDimensions cDims,
+                           ExecutableTargetAttr target) {
   if (hasUkernel(target)) {
     return {
         TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
@@ -75,8 +77,8 @@ enumerateMatmulTileRiscv32(EncodingAttr encoding, ExecutableTargetAttr target) {
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileArm64(EncodingAttr encoding, TypeRange elementTypes,
-                         ExecutableTargetAttr target) {
+enumerateMatmulTileArm64(linalg::ContractionDimensions cDims,
+                         TypeRange elementTypes, ExecutableTargetAttr target) {
   // Data-tiling for SVE is not implemented yet.
   if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
     return {};
@@ -148,8 +150,8 @@ enumerateMatmulTileArm64(EncodingAttr encoding, TypeRange elementTypes,
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileX86_64(EncodingAttr encoding, TypeRange elementTypes,
-                          ExecutableTargetAttr target) {
+enumerateMatmulTileX86_64(linalg::ContractionDimensions cDims,
+                          TypeRange elementTypes, ExecutableTargetAttr target) {
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -340,20 +342,20 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   return bestRatedTile;
 }
 
-SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingAttr encoding,
-                                                TypeRange elementTypes,
-                                                ExecutableTargetAttr target) {
+SmallVector<TileMxNxK>
+enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
+                         TypeRange elementTypes, ExecutableTargetAttr target) {
   if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(encoding, target);
+    return enumerateMatmulTilesVMVX(cDims, target);
   }
   if (isAArch64(target)) {
-    return enumerateMatmulTileArm64(encoding, elementTypes, target);
+    return enumerateMatmulTileArm64(cDims, elementTypes, target);
   }
   if (isX86_64(target)) {
-    return enumerateMatmulTileX86_64(encoding, elementTypes, target);
+    return enumerateMatmulTileX86_64(cDims, elementTypes, target);
   }
   if (isRISCV32(target)) {
-    return enumerateMatmulTileRiscv32(encoding, target);
+    return enumerateMatmulTileRiscv32(cDims, target);
   }
   return {};
 }
@@ -411,7 +413,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
         return a.cast<TypeAttr>().getValue();
       }));
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTileMxNxK(encoding, elementTypes, targetAttr);
+      enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
@@ -425,9 +427,6 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // used. Generally it would be best to deal with narrow-N cases by transposing
   // the whole matmul and swapping LHS<->RHS, reducing the narrow-N case to
   // narrow-M.
-  auto getIntOrZero = [](IntegerAttr a) {
-    return a == IntegerAttr() ? 0 : a.getInt();
-  };
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
   int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
                               ? 0
