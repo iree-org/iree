@@ -1787,13 +1787,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#encodinguserattr" class="md-nav__link">
-    EncodingUserAttr
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -3528,13 +3521,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#encodinguserattr" class="md-nav__link">
-    EncodingUserAttr
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -3605,7 +3591,6 @@ cannot be represented efficiently/directly by the Linalg dialect.</p>
 <li><a href="#attributes_10">Attributes</a><ul>
 <li><a href="#encodingattr">EncodingAttr</a></li>
 <li><a href="#encodingroleattr">EncodingRoleAttr</a></li>
-<li><a href="#encodinguserattr">EncodingUserAttr</a></li>
 </ul>
 </li>
 </ul>
@@ -4511,7 +4496,6 @@ only the non-padded part of the output.</p>
 <p>information to decide how to data-tile a tensor</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_linalg_ext.encoding&lt;
-  EncodingUserAttr,   # user
   EncodingRoleAttr,   # role
   ArrayAttr,   # element_types
   TypeAttr,   # original_type
@@ -4539,11 +4523,6 @@ through operations like pack/unpack.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;">user</td>
-<td style="text-align: center;"><code>EncodingUserAttr</code></td>
-<td>kind of operation using this tensor</td>
-</tr>
-<tr>
 <td style="text-align: center;">role</td>
 <td style="text-align: center;"><code>EncodingRoleAttr</code></td>
 <td>role of this tensor as an operand</td>
@@ -4561,12 +4540,12 @@ through operations like pack/unpack.</p>
 <tr>
 <td style="text-align: center;">matmul_narrow_M</td>
 <td style="text-align: center;"><code>IntegerAttr</code></td>
-<td>optional M narrow dimension size (only for MATMUL and BATCH_MATMUL users)</td>
+<td>optional M narrow dimension size (only for contraction op user_indexing_maps)</td>
 </tr>
 <tr>
 <td style="text-align: center;">matmul_narrow_N</td>
 <td style="text-align: center;"><code>IntegerAttr</code></td>
-<td>optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)</td>
+<td>optional N narrow dimension size (only for contraction op user_indexing_maps)</td>
 </tr>
 <tr>
 <td style="text-align: center;">user_indexing_maps</td>
@@ -4600,33 +4579,6 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">value</td>
 <td style="text-align: center;"><code>::mlir::iree_compiler::IREE::LinalgExt::EncodingRole</code></td>
 <td>an enum of type EncodingRole</td>
-</tr>
-</tbody>
-</table>
-<h3 id="encodinguserattr">EncodingUserAttr<a class="headerlink" href="#encodinguserattr" title="Permanent link">link</a></h3>
-<p>Describes the operation that a tensor is an operand or a result of.</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_linalg_ext.user&lt;
-  ::mlir::iree_compiler::IREE::LinalgExt::EncodingUser   # value
-&gt;
-</code></pre></div>
-<p>Enum cases:
-* MATMUL (<code>MATMUL</code>)
-* BATCH_MATMUL (<code>BATCH_MATMUL</code>)</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::LinalgExt::EncodingUser</code></td>
-<td>an enum of type EncodingUser</td>
 </tr>
 </tbody>
 </table>
