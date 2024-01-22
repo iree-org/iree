@@ -314,11 +314,10 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto encoding = op.getResultType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
-        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
-                      loopRangesToString(shape);
+        bestSummary =
+            opName + "_" + role.str() + "_" + loopRangesToString(shape);
         ;
       })
       .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
@@ -326,11 +325,10 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto encoding = op.getSourceType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
-        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
-                      loopRangesToString(shape);
+        bestSummary =
+            opName + "_" + role.str() + "_" + loopRangesToString(shape);
       })
       .Case<IREE::LinalgExt::LinalgExtOp>(
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })

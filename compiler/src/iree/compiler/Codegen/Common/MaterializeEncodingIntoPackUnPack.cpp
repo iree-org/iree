@@ -320,13 +320,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     return failure();
   }
 
-  if (((!isMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-        !isMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-        !isMatmulEncodingUser(resultEncoding.getUser().getValue())) &&
-       (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-        !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-        !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()))) ||
-      lhsEncoding.getRole().getValue() !=
+  if (lhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
@@ -352,7 +346,8 @@ static FailureOr<Operation *> lowerOpWithEncoding(
 
     Type newResultType = newResult.getType();
 
-    if (isMatmulEncodingUser(resultEncoding.getUser().getValue())) {
+    auto cDims = getEncodingContractionDims(lhsEncoding);
+    if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
           ValueRange{newResult});

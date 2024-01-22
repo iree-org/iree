@@ -55,18 +55,6 @@ class IREELinalgExt_I32EnumAttr<string name, string summary, list<I32EnumAttrCas
 class IREELinalgExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREELinalgExt_Dialect, enumInfo, name>;
 
-def MATMUL : I32EnumAttrCase<"MATMUL", 0>;
-def BATCH_MATMUL : I32EnumAttrCase<"BATCH_MATMUL", 1>;
-
-def EncodingUser : IREELinalgExt_I32EnumAttr<"EncodingUser",
-    "Describes the operation that a tensor is an operand or a result of.", [
-      MATMUL,
-      BATCH_MATMUL,
-    ]>;
-
-def EncodingUserAttr :
-  IREELinalgExt_EnumAttr<EncodingUser, "user">;
-
 def LHS : I32EnumAttrCase<"LHS", 0>;
 def RHS : I32EnumAttrCase<"RHS", 1>;
 def RESULT : I32EnumAttrCase<"RESULT", 2>;
@@ -99,13 +87,12 @@ def EncodingAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    AttrParameter<"EncodingUserAttr", "kind of operation using this tensor">:$user,
     AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
-    OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_M,
-    OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for MATMUL and BATCH_MATMUL users)">:$matmul_narrow_N,
+    OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
+    OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps
   );
 
