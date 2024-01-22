@@ -1034,13 +1034,6 @@ void ConvertToLLVMPass::runOnOperation() {
   }
 
   LLVMConversionTarget target(getContext());
-  bool hasAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
-  if (hasAArch64SME) {
-    // Enable ArmSME to LLVM lowerings.
-    configureArmSMEToLLVMConversionLegality(target);
-    populateArmSMEToLLVMConversionPatterns(typeConverter, patterns);
-  }
-
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);
   cf::populateControlFlowToLLVMConversionPatterns(typeConverter, patterns);
@@ -1079,7 +1072,6 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
-  target.addIllegalOp<UnrealizedConversionCastOp>();
 
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();

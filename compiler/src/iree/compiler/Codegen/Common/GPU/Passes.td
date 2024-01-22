@@ -37,6 +37,14 @@ def GPUGeneralizeNamedOps :
   let constructor = "mlir::iree_compiler::createGPUGeneralizeNamedOpsPass()";
 }
 
+def GPULowerToUKernels :
+    Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
+  let summary =
+      "Separate out parts of the IR that lower to a micro-kernel";
+  let constructor =
+      "mlir::iree_compiler::createGPULowerToUKernelsPass()";
+}
+
 def GPUMultiBuffering :
     Pass<"iree-codegen-gpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";

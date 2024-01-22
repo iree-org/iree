@@ -92,23 +92,10 @@ struct ConvertTensorImportOp
                                                RankedTensorType tensorType,
                                                ValueRange dynamicDims,
                                                OpBuilder &builder) {
-    auto elementType =
-        IREE::HAL::getElementTypeValue(tensorType.getElementType());
-    if (!elementType.has_value()) {
-      return mlir::emitError(loc)
-             << "invalid tensor element type: " << tensorType.getElementType();
-    }
-    auto expectedElementType =
-        builder.create<arith::ConstantIntOp>(loc, elementType.value(), 32);
-
-    auto encodingType =
-        IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-    if (!encodingType.has_value()) {
-      return mlir::emitError(loc)
-             << "invalid tensor encoding: " << tensorType.getEncoding();
-    }
-    auto expectedEncodingType =
-        builder.create<arith::ConstantIntOp>(loc, encodingType.value(), 32);
+    auto expectedElementType = builder.create<IREE::HAL::ElementTypeOp>(
+        loc, tensorType.getElementType());
+    auto expectedEncodingType = builder.create<IREE::HAL::EncodingTypeOp>(
+        loc, tensorType.getEncoding());
 
     SmallVector<Value> shapeDims;
     if (tensorType.getRank() > 0) {

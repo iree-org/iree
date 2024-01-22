@@ -1610,7 +1610,7 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
-func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: tensor<32x1x128xi8>, %arg1: tensor<32x128x11008xi8>) -> tensor<32x1x11008xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c32 = arith.constant 32 : index
@@ -1620,9 +1620,7 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: !hal.buffer_view, %arg1:
   %c11008 = arith.constant 11008 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<32x1x128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<32x128x11008xi8>
-  %padded = tensor.pad %0 low[0, 0, 0] high[%c0, %c0, %c0] {
+  %padded = tensor.pad %arg0 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x1x128xi8> to tensor<?x?x?xi8>
@@ -1633,7 +1631,7 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: !hal.buffer_view, %arg1:
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0, 0, 0] high[%c0, %c0, %c0] {
+  %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128x11008xi8> to tensor<?x?x?xi8>
@@ -1649,15 +1647,12 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: !hal.buffer_view, %arg1:
   %12 = linalg.batch_matmul ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0, 0] [32, 1, 11008] [1, 1, 1] : tensor<?x?x?xi32> to tensor<32x1x11008xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<32x1x11008xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<32x1x11008xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-//      CHECK: func @extend_batch_vecmat_explicit_unit_dim(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func @extend_batch_vecmat_explicit_unit_dim(%[[LHS:.+]]: tensor<32x1x128xi8>, %[[RHS:.+]]: tensor<32x128x11008xi8>) -> tensor<32x1x11008xi32>
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<32x1x128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<32x128x11008xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<32x1x64x1x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [1, 2] into %[[INIT_LHS_PACK]] : tensor<32x1x128xi8> -> tensor<32x1x64x1x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<32x1x64x1x2xi32>
@@ -1677,8 +1672,7 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: !hal.buffer_view, %arg1:
 //      CHECK: %[[MMT4D:.+]] = linalg.batch_mmt4d ins(%[[LHS_EXT]], %[[RHS_EXT]] : tensor<32x1x64x1x2xi32>, tensor<32x688x64x16x2xi32>) outs(%[[FILL]] : tensor<32x1x688x1x16xi32>) -> tensor<32x1x688x1x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<32x1x11008xi32>
 //      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[MMT4D]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [1, 16] into %[[INIT_UNPACK]] : tensor<32x1x688x1x16xi32> -> tensor<32x1x11008xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<32x1x11008xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
@@ -1815,7 +1809,7 @@ func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<(d0, d1) -> (d0)>
-func.func @vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @vecmat(%arg0: tensor<128xi8>, %arg1: tensor<128x11008xi8>) -> tensor<11008xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c0 = arith.constant 0 : index
@@ -1824,9 +1818,7 @@ func.func @vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
   %c11008 = arith.constant 11008 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<128x11008xi8>
-  %padded = tensor.pad %0 low[0] high[%c0] {
+  %padded = tensor.pad %arg0 low[0] high[%c0] {
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
@@ -1837,7 +1829,7 @@ func.func @vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0, 0] high[%c0, %c0] {
+  %padded_0 = tensor.pad %arg1 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128x11008xi8> to tensor<?x?xi8>
@@ -1853,16 +1845,13 @@ func.func @vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
   %12 = linalg.vecmat ins(%6, %9 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [11008] [1] : tensor<?xi32> to tensor<11008xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<11008xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<11008xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-//      CHECK: func @vecmat(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func.func @vecmat(%[[LHS:.+]]: tensor<128xi8>, %[[RHS:.+]]: tensor<128x11008xi8>) -> tensor<11008xi32>
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<128x11008xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<64x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [2] into %[[INIT_LHS_PACK]] : tensor<128xi8> -> tensor<64x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<64x2xi32>
@@ -1884,16 +1873,15 @@ func.func @vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
 //      CHECK: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[EXPAND_LHS]], %[[RHS_EXT]] : tensor<1x64x1x2xi32>, tensor<688x64x16x2xi32>) outs(%[[FILL]] : tensor<1x688x1x16xi32>) -> tensor<1x688x1x16xi32>
 //      CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<1x688x1x16xi32> into tensor<688x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<11008xi32>
-//      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [16] into %11 : tensor<688x16xi32> -> tensor<11008xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<11008xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [16] into %[[INIT_UNPACK]] : tensor<688x16xi32> -> tensor<11008xi32>
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
-func.func @matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @matvec(%arg0: tensor<11008x128xi8>, %arg1: tensor<128xi8>) -> tensor<11008xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c0 = arith.constant 0 : index
@@ -1902,9 +1890,7 @@ func.func @matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
   %c11008 = arith.constant 11008 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<11008x128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<128xi8>
-  %padded = tensor.pad %0 low[0, 0] high[%c0, %c0] {
+  %padded = tensor.pad %arg0 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<11008x128xi8> to tensor<?x?xi8>
@@ -1915,7 +1901,7 @@ func.func @matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0] high[%c0] {
+  %padded_0 = tensor.pad %arg1 low[0] high[%c0] {
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
@@ -1931,16 +1917,13 @@ func.func @matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
   %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [11008] [1] : tensor<?xi32> to tensor<11008xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<11008xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<11008xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//      CHECK: func @matvec(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func.func @matvec(%[[LHS:.+]]: tensor<11008x128xi8>, %[[RHS:.+]]: tensor<128xi8>) -> tensor<11008xi32>
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<11008x128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<128xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<688x64x16x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %[[INIT_LHS_PACK]] : tensor<11008x128xi8> -> tensor<688x64x16x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<688x64x16x2xi32>
@@ -1963,15 +1946,14 @@ func.func @matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buff
 //      CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<688x1x16x1xi32> into tensor<688x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<11008xi32>
 //      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [16] into %[[INIT_UNPACK]] : tensor<688x16xi32> -> tensor<11008xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<11008xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
-func.func @matvec_with_narrow_M(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @matvec_with_narrow_M(%arg0: tensor<15x128xi8>, %arg1: tensor<128xi8>) -> tensor<15xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c0 = arith.constant 0 : index
@@ -1980,9 +1962,7 @@ func.func @matvec_with_narrow_M(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view
   %c15 = arith.constant 15 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<15x128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<128xi8>
-  %padded = tensor.pad %0 low[0, 0] high[%c0, %c0] {
+  %padded = tensor.pad %arg0 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<15x128xi8> to tensor<?x?xi8>
@@ -1993,7 +1973,7 @@ func.func @matvec_with_narrow_M(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0] high[%c0] {
+  %padded_0 = tensor.pad %arg1 low[0] high[%c0] {
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
@@ -2009,17 +1989,14 @@ func.func @matvec_with_narrow_M(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view
   %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [15] [1] : tensor<?xi32> to tensor<15xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<15xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<15xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//      CHECK: func @matvec_with_narrow_M(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func @matvec_with_narrow_M(%[[LHS:.+]]: tensor<15x128xi8>, %[[RHS:.+]]: tensor<128xi8>) -> tensor<15xi32>
 //  CHECK-DAG: %[[C0_I8:.+]] = arith.constant 0 : i8
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<15x128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<128xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<1x64x16x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] padding_value(%[[C0_I8]] : i8) outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %[[INIT_LHS_PACK]] : tensor<15x128xi8> -> tensor<1x64x16x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<1x64x16x2xi32>
@@ -2042,15 +2019,14 @@ func.func @matvec_with_narrow_M(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view
 //      CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<1x1x16x1xi32> into tensor<1x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<15xi32>
 //      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0] inner_dims_pos = [0] inner_tiles = [16] into %[[INIT_UNPACK]] : tensor<1x16xi32> -> tensor<15xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<15xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func.func @batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @batch_vecmat(%arg0: tensor<32x128xi8>, %arg1: tensor<32x128x11008xi8>) -> tensor<32x11008xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c32 = arith.constant 32 : index
@@ -2060,9 +2036,7 @@ func.func @batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
   %c11008 = arith.constant 11008 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<32x128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<32x128x11008xi8>
-  %padded = tensor.pad %0 low[0, 0] high[%c0, %c0] {
+  %padded = tensor.pad %arg0 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128xi8> to tensor<?x?xi8>
@@ -2073,7 +2047,7 @@ func.func @batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0, 0, 0] high[%c0, %c0, %c0] {
+  %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128x11008xi8> to tensor<?x?x?xi8>
@@ -2089,16 +2063,13 @@ func.func @batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
   %12 = linalg.batch_vecmat ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0] [32, 11008] [1, 1] : tensor<?x?xi32> to tensor<32x11008xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<32x11008xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<32x11008xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-//      CHECK: func @batch_vecmat(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func.func @batch_vecmat(%[[LHS:.+]]: tensor<32x128xi8>, %[[RHS:.+]]: tensor<32x128x11008xi8>) -> tensor<32x11008xi32>
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<32x128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<32x128x11008xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<32x64x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [2] into %[[INIT_LHS_PACK]] : tensor<32x128xi8> -> tensor<32x64x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<32x64x2xi32>
@@ -2121,15 +2092,14 @@ func.func @batch_vecmat(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
 //      CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x1x688x1x16xi32> into tensor<32x688x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<32x11008xi32>
 //      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [16] into %[[INIT_UNPACK]] : tensor<32x688x16xi32> -> tensor<32x11008xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<32x11008xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @batch_matvec(%arg0: tensor<32x11008x128xi8>, %arg1: tensor<32x128xi8>) -> tensor<32x11008xi32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c32 = arith.constant 32 : index
@@ -2139,9 +2109,7 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
   %c11008 = arith.constant 11008 : index
   %c0_i8 = arith.constant 0 : i8
   %c0_i32 = arith.constant 0 : i32
-  %0 = hal.tensor.import %arg0 "input 0" : !hal.buffer_view -> tensor<32x11008x128xi8>
-  %1 = hal.tensor.import %arg1 "input 1" : !hal.buffer_view -> tensor<32x128xi8>
-  %padded = tensor.pad %0 low[0, 0, 0] high[%c0, %c0, %c0] {
+  %padded = tensor.pad %arg0 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x11008x128xi8> to tensor<?x?x?xi8>
@@ -2152,7 +2120,7 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %padded_0 = tensor.pad %1 low[0, 0] high[%c0, %c0] {
+  %padded_0 = tensor.pad %arg1 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128xi8> to tensor<?x?xi8>
@@ -2163,21 +2131,18 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
   } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-%10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %12 = linalg.batch_matvec ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
   %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0] [32, 11008] [1, 1] : tensor<?x?xi32> to tensor<32x11008xi32>
-  %16 = hal.tensor.export %extracted_slice "output 0" : tensor<32x11008xi32> -> !hal.buffer_view
-  return %16 : !hal.buffer_view
+  return %extracted_slice : tensor<32x11008xi32>
 }
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-//      CHECK: func @batch_matvec(%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view attributes
+//      CHECK: func.func @batch_matvec(%[[LHS:.+]]: tensor<32x11008x128xi8>, %[[RHS:.+]]: tensor<32x128xi8>) -> tensor<32x11008xi32>
 //  CHECK-DAG: %[[C0_I32:.+]] = arith.constant 0 : i32
-//      CHECK: %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "input 0" : !hal.buffer_view -> tensor<32x11008x128xi8>
-//      CHECK: %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "input 1" : !hal.buffer_view -> tensor<32x128xi8>
 //      CHECK: %[[INIT_LHS_PACK:.+]] = tensor.empty() : tensor<32x688x64x16x2xi8>
 //      CHECK: %[[LHS_PACK:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %[[INIT_LHS_PACK]] : tensor<32x11008x128xi8> -> tensor<32x688x64x16x2xi8>
 //      CHECK: %[[INIT_LHS_EXT:.+]] = tensor.empty() : tensor<32x688x64x16x2xi32>
@@ -2199,9 +2164,8 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
 //      CHECK: %[[MMT4D:.+]] = linalg.batch_mmt4d ins(%[[LHS_EXT]], %[[EXPAND_RHS]] : tensor<32x688x64x16x2xi32>, tensor<32x1x64x1x2xi32>) outs(%[[FILL]] : tensor<32x688x1x16x1xi32>) -> tensor<32x688x1x16x1xi32>
 //      CHECK: %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x688x1x16x1xi32> into tensor<32x688x16xi32>
 //      CHECK: %[[INIT_UNPACK:.+]] = tensor.empty() : tensor<32x11008xi32>
-//      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [16] into %11 : tensor<32x688x16xi32> -> tensor<32x11008xi32>
-//      CHECK: %[[EXPORT:.+]] = hal.tensor.export %[[UNPACK]] "output 0" : tensor<32x11008xi32> -> !hal.buffer_view
-//      CHECK: return %[[EXPORT]] : !hal.buffer_view
+//      CHECK: %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSED]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [16] into %[[INIT_UNPACK]] : tensor<32x688x16xi32> -> tensor<32x11008xi32>
+//      CHECK: return %[[UNPACK]]
 
 // -----
 
@@ -2209,20 +2173,17 @@ func.func @batch_matvec(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !ha
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map3 = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
-func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tensor<256x512xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c256 = arith.constant 256 : index
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<256x128xf32>
-  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<256x512xf32>
-  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<128x512xf32>
   %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x128xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %4 = affine.apply #map3()[%3#0, %c256]
   %5 = affine.apply #map3()[%3#1, %c128]
-  %padded = tensor.pad %0 low[0, 0] high[%4, %5] {
+  %padded = tensor.pad %arg0 low[0, 0] high[%4, %5] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<256x128xf32> to tensor<?x?xf32>
@@ -2230,7 +2191,7 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %8 = affine.apply #map3()[%7#0, %c256]
   %9 = affine.apply #map3()[%7#1, %c512]
-  %padded_0 = tensor.pad %1 low[0, 0] high[%8, %9] {
+  %padded_0 = tensor.pad %arg1 low[0, 0] high[%8, %9] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<256x512xf32> to tensor<?x?xf32>
@@ -2238,7 +2199,7 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %12 = affine.apply #map3()[%11#0, %c128]
   %13 = affine.apply #map3()[%11#1, %c512]
-  %padded_1 = tensor.pad %2 low[0, 0] high[%12, %13] {
+  %padded_1 = tensor.pad %arg2 low[0, 0] high[%12, %13] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x512xf32> to tensor<?x?xf32>
@@ -2246,17 +2207,10 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %15 = linalg.matmul_transpose_a ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   %extracted_slice = tensor.extract_slice %16[0, 0] [128, 512] [1, 1] : tensor<?x?xf32> to tensor<128x512xf32>
-  %17 = hal.tensor.export %extracted_slice "output0" : tensor<128x512xf32> -> !hal.buffer_view
-  return %17 : !hal.buffer_view
+  return %extracted_slice : tensor<128x512xf32>
 }
 
-//      CHECK: func @matmul_transpose_a_f32f32f32(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: !hal.buffer_view
-//      CHECK:   %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "{{.*}}" : !hal.buffer_view -> tensor<256x128xf32>
-//      CHECK:   %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "{{.*}}" : !hal.buffer_view -> tensor<256x512xf32>
-//      CHECK:   %[[RESULT:.+]] = hal.tensor.import %[[ARG2]] "{{.*}}" : !hal.buffer_view -> tensor<128x512xf32>
+//      CHECK: func.func @matmul_transpose_a_f32f32f32(%[[LHS:.+]]: tensor<256x128xf32>, %[[RHS:.+]]: tensor<256x512xf32>, %[[RESULT:.+]]: tensor<128x512xf32>) -> tensor<128x512xf32>
 //  CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [8, 1] into %[[PACK_LHS_DEST]] : tensor<256x128xf32> -> tensor<16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<128x256x4x1xf32>
@@ -2268,6 +2222,7 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
 // CHECK-SAME:       outs(%[[PACK_RES]] :
 //  CHECK-DAG:   %[[UNPACK_DEST:.+]] = tensor.empty() : tensor<128x512xf32>
 //      CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[MMT4D]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 4] into %[[UNPACK_DEST]] : tensor<16x128x8x4xf32> -> tensor<128x512xf32>
+//      CHECK:   return %[[UNPACK]]
 
 // -----
 
@@ -2275,20 +2230,17 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map3 = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
-func.func @matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tensor<512x256xf32>, %arg2: tensor<128x512xf32>) -> tensor<128x512xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<128x256xf32>
-  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<512x256xf32>
-  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<128x512xf32>
   %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x256xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %4 = affine.apply #map3()[%3#0, %c128]
   %5 = affine.apply #map3()[%3#1, %c256]
-  %padded = tensor.pad %0 low[0, 0] high[%4, %5] {
+  %padded = tensor.pad %arg0 low[0, 0] high[%4, %5] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x256xf32> to tensor<?x?xf32>
@@ -2296,7 +2248,7 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<512x256xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %8 = affine.apply #map3()[%7#0, %c512]
   %9 = affine.apply #map3()[%7#1, %c256]
-  %padded_0 = tensor.pad %1 low[0, 0] high[%8, %9] {
+  %padded_0 = tensor.pad %arg1 low[0, 0] high[%8, %9] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<512x256xf32> to tensor<?x?xf32>
@@ -2304,7 +2256,7 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %12 = affine.apply #map3()[%11#0, %c128]
   %13 = affine.apply #map3()[%11#1, %c512]
-  %padded_1 = tensor.pad %2 low[0, 0] high[%12, %13] {
+  %padded_1 = tensor.pad %arg2 low[0, 0] high[%12, %13] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x512xf32> to tensor<?x?xf32>
@@ -2312,17 +2264,10 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
   %15 = linalg.matmul_transpose_b ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   %extracted_slice = tensor.extract_slice %16[0, 0] [128, 512] [1, 1] : tensor<?x?xf32> to tensor<128x512xf32>
-  %17 = hal.tensor.export %extracted_slice "output0" : tensor<128x512xf32> -> !hal.buffer_view
-  return %17 : !hal.buffer_view
+  return %extracted_slice : tensor<128x512xf32>
 }
 
-//      CHECK: func @matmul_transpose_b_f32f32f32(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: !hal.buffer_view
-//      CHECK:   %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "{{.*}}" : !hal.buffer_view -> tensor<128x256xf32>
-//      CHECK:   %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "{{.*}}" : !hal.buffer_view -> tensor<512x256xf32>
-//      CHECK:   %[[RESULT:.+]] = hal.tensor.import %[[ARG2]] "{{.*}}" : !hal.buffer_view -> tensor<128x512xf32>
+//      CHECK: func.func @matmul_transpose_b_f32f32f32(%[[LHS:.+]]: tensor<128x256xf32>, %[[RHS:.+]]: tensor<512x256xf32>, %[[RESULT:.+]]: tensor<128x512xf32>) -> tensor<128x512xf32>
 //  CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [8, 1] into %[[PACK_LHS_DEST]] : tensor<128x256xf32> -> tensor<16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<128x256x4x1xf32>
@@ -2341,7 +2286,7 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buf
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
-func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg1: tensor<2x256x512xf32>, %arg2: tensor<2x128x512xf32>) -> tensor<2x128x512xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c2 = arith.constant 2 : index
@@ -2349,14 +2294,11 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<2x256x128xf32>
-  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<2x256x512xf32>
-  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<2x128x512xf32>
   %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x256x128xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %4 = affine.apply #map3()[%3#0, %c2]
   %5 = affine.apply #map3()[%3#1, %c256]
   %6 = affine.apply #map3()[%3#2, %c128]
-  %padded = tensor.pad %0 low[0, 0, 0] high[%4, %5, %6] {
+  %padded = tensor.pad %arg0 low[0, 0, 0] high[%4, %5, %6] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x256x128xf32> to tensor<?x?x?xf32>
@@ -2365,7 +2307,7 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %9 = affine.apply #map3()[%8#0, %c2]
   %10 = affine.apply #map3()[%8#1, %c256]
   %11 = affine.apply #map3()[%8#2, %c512]
-  %padded_0 = tensor.pad %1 low[0, 0, 0] high[%9, %10, %11] {
+  %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%9, %10, %11] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x256x512xf32> to tensor<?x?x?xf32>
@@ -2374,7 +2316,7 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %14 = affine.apply #map3()[%13#0, %c2]
   %15 = affine.apply #map3()[%13#1, %c128]
   %16 = affine.apply #map3()[%13#2, %c512]
-  %padded_1 = tensor.pad %2 low[0, 0, 0] high[%14, %15, %16] {
+  %padded_1 = tensor.pad %arg2 low[0, 0, 0] high[%14, %15, %16] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x512xf32> to tensor<?x?x?xf32>
@@ -2382,17 +2324,10 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %18 = linalg.batch_matmul_transpose_a ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
   %extracted_slice = tensor.extract_slice %19[0, 0, 0] [2, 128, 512] [1, 1, 1] : tensor<?x?x?xf32> to tensor<2x128x512xf32>
-  %20 = hal.tensor.export %extracted_slice "output0" : tensor<2x128x512xf32> -> !hal.buffer_view
-  return %20 : !hal.buffer_view
+  return %extracted_slice : tensor<2x128x512xf32>
 }
 
-//      CHECK: func @batch_matmul_transpose_a_f32f32f32(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: !hal.buffer_view
-//      CHECK:   %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "{{.*}}" : !hal.buffer_view -> tensor<2x256x128xf32>
-//      CHECK:   %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "{{.*}}" : !hal.buffer_view -> tensor<2x256x512xf32>
-//      CHECK:   %[[RESULT:.+]] = hal.tensor.import %[[ARG2]] "{{.*}}" : !hal.buffer_view -> tensor<2x128x512xf32>
+//      CHECK: func.func @batch_matmul_transpose_a_f32f32f32(%[[LHS:.+]]: tensor<2x256x128xf32>, %[[RHS:.+]]: tensor<2x256x512xf32>, %[[RESULT:.+]]: tensor<2x128x512xf32>) -> tensor<2x128x512xf32>
 //  CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<2x16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 2, 1] inner_dims_pos = [2, 1] inner_tiles = [8, 1] into %[[PACK_LHS_DEST]] : tensor<2x256x128xf32> -> tensor<2x16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<2x128x256x4x1xf32>
@@ -2411,7 +2346,7 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 #map3 = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
-func.func @batch_matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view, %arg2: !hal.buffer_view) -> !hal.buffer_view attributes {
+func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg1: tensor<2x512x256xf32>, %arg2: tensor<2x128x512xf32>) -> tensor<2x128x512xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
 } {
   %c2 = arith.constant 2 : index
@@ -2419,14 +2354,11 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %0 = hal.tensor.import %arg0 "input0" : !hal.buffer_view -> tensor<2x128x256xf32>
-  %1 = hal.tensor.import %arg1 "input1" : !hal.buffer_view -> tensor<2x512x256xf32>
-  %2 = hal.tensor.import %arg2 "input2" : !hal.buffer_view -> tensor<2x128x512xf32>
   %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x256xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %4 = affine.apply #map3()[%3#0, %c2]
   %5 = affine.apply #map3()[%3#1, %c128]
   %6 = affine.apply #map3()[%3#2, %c256]
-  %padded = tensor.pad %0 low[0, 0, 0] high[%4, %5, %6] {
+  %padded = tensor.pad %arg0 low[0, 0, 0] high[%4, %5, %6] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x256xf32> to tensor<?x?x?xf32>
@@ -2435,7 +2367,7 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %9 = affine.apply #map3()[%8#0, %c2]
   %10 = affine.apply #map3()[%8#1, %c512]
   %11 = affine.apply #map3()[%8#2, %c256]
-  %padded_0 = tensor.pad %1 low[0, 0, 0] high[%9, %10, %11] {
+  %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%9, %10, %11] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x512x256xf32> to tensor<?x?x?xf32>
@@ -2444,7 +2376,7 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %14 = affine.apply #map3()[%13#0, %c2]
   %15 = affine.apply #map3()[%13#1, %c128]
   %16 = affine.apply #map3()[%13#2, %c512]
-  %padded_1 = tensor.pad %2 low[0, 0, 0] high[%14, %15, %16] {
+  %padded_1 = tensor.pad %arg2 low[0, 0, 0] high[%14, %15, %16] {
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x512xf32> to tensor<?x?x?xf32>
@@ -2452,17 +2384,10 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: !hal.buffer_view, %arg1: !h
   %18 = linalg.batch_matmul_transpose_b ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
   %extracted_slice = tensor.extract_slice %19[0, 0, 0] [2, 128, 512] [1, 1, 1] : tensor<?x?x?xf32> to tensor<2x128x512xf32>
-  %20 = hal.tensor.export %extracted_slice "output0" : tensor<2x128x512xf32> -> !hal.buffer_view
-  return %20 : !hal.buffer_view
+  return %extracted_slice : tensor<2x128x512xf32>
 }
 
-//      CHECK: func @batch_matmul_transpose_b_f32f32f32(
-// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: !hal.buffer_view
-// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: !hal.buffer_view
-//      CHECK:   %[[LHS:.+]] = hal.tensor.import %[[ARG0]] "{{.*}}" : !hal.buffer_view -> tensor<2x128x256xf32>
-//      CHECK:   %[[RHS:.+]] = hal.tensor.import %[[ARG1]] "{{.*}}" : !hal.buffer_view -> tensor<2x512x256xf32>
-//      CHECK:   %[[RESULT:.+]] = hal.tensor.import %[[ARG2]] "{{.*}}" : !hal.buffer_view -> tensor<2x128x512xf32>
+//      CHECK: func.func @batch_matmul_transpose_b_f32f32f32(%[[LHS:.+]]: tensor<2x128x256xf32>, %[[RHS:.+]]: tensor<2x512x256xf32>, %[[RESULT:.+]]: tensor<2x128x512xf32>) -> tensor<2x128x512xf32>
 //  CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<2x16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 1] into %[[PACK_LHS_DEST]] : tensor<2x128x256xf32> -> tensor<2x16x256x8x1xf32>
 //  CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<2x128x256x4x1xf32>

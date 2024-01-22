@@ -851,12 +851,12 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def iree_generated_trace_runner_test(
+    def iree_generated_e2e_matmul_test(
         self,
         name,
         generator,
         generator_args=None,
-        trace_runner=None,
+        test_runner=None,
         target_backends_and_drivers=None,
         compiler_flags=None,
         runner_args=None,
@@ -882,7 +882,7 @@ class BuildFileFunctions(object):
         generator_args_block = self._convert_string_list_block(
             "GENERATOR_ARGS", generator_args
         )
-        trace_runner_block = self._convert_target_block("TRACE_RUNNER", trace_runner)
+        test_runner_block = self._convert_target_block("TEST_RUNNER", test_runner)
         target_backends_block = self._convert_string_list_block(
             "TARGET_BACKENDS", target_backends
         )
@@ -897,11 +897,11 @@ class BuildFileFunctions(object):
         )
 
         self._converter.body += (
-            f"iree_generated_trace_runner_test(\n"
+            f"iree_generated_e2e_matmul_test(\n"
             f"{name_block}"
             f"{generator_block}"
             f"{generator_args_block}"
-            f"{trace_runner_block}"
+            f"{test_runner_block}"
             f"{target_backends_block}"
             f"{drivers_block}"
             f"{compiler_flags_block}"

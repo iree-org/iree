@@ -307,6 +307,12 @@ static iree_status_t iree_hal_configure_allocator_from_flags(
 // Collectives configuration
 //===----------------------------------------------------------------------===//
 
+// TODO(multi-device): support more provider types/have a provider registry.
+// MPI is insufficient for heterogeneous/multi-device configurations. Currently
+// we set the same provider for every device and that'll really confuse things
+// as MPI rank/count configuration is global in the environment and not per
+// device. Hosting frameworks/runtimes can set their own providers that have
+// more meaningful representation of multi-device/multi-node.
 iree_status_t iree_hal_device_set_default_channel_provider(
     iree_hal_device_t* device) {
   if (!iree_hal_mpi_is_configured()) return iree_ok_status();
@@ -330,63 +336,91 @@ IREE_FLAG_LIST(
     "Use --list_devices/--dump_devices to see available devices and their\n"
     "canonical URI used with this flag.");
 
-// TODO(#5724): remove this and replace with an iree_hal_device_set_t.
-void iree_hal_get_devices_flag_list(iree_host_size_t* out_count,
-                                    const iree_string_view_t** out_list) {
-  *out_count = FLAG_device_list().count;
-  *out_list = FLAG_device_list().values;
+iree_string_view_list_t iree_hal_device_flag_list(void) {
+  return FLAG_device_list();
 }
 
 iree_status_t iree_hal_create_device_from_flags(
     iree_hal_driver_registry_t* driver_registry,
     iree_string_view_t default_device, iree_allocator_t host_allocator,
     iree_hal_device_t** out_device) {
-  iree_string_view_t device_uri = default_device;
-  const iree_flag_string_list_t list = FLAG_device_list();
-  if (list.count == 0) {
+  iree_hal_device_list_t* device_list = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_create_devices_from_flags(
+      driver_registry, default_device, host_allocator, &device_list));
+  iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
+  iree_hal_device_retain(device);
+  iree_hal_device_list_free(device_list);
+  *out_device = device;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_create_devices_from_flags(
+    iree_hal_driver_registry_t* driver_registry,
+    iree_string_view_t default_device, iree_allocator_t host_allocator,
+    iree_hal_device_list_t** out_device_list) {
+  iree_flag_string_list_t flag_list = FLAG_device_list();
+  if (flag_list.count == 0) {
     // No devices specified. Use default if provided.
     if (iree_string_view_is_empty(default_device)) {
       return iree_make_status(
           IREE_STATUS_INVALID_ARGUMENT,
-          "no device specified; use --list_devices to see the "
-          "available devices and specify one with --device=");
+          "no devices specified; use --list_devices to see the "
+          "available devices and specify one or more with --device=");
     }
-  } else if (list.count > 1) {
-    // Too many devices for the single device creation function.
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "too many devices specified; only one --device= "
-                            "flag may be provided with this API");
-  } else {
-    // Exactly one device specified.
-    device_uri = list.values[0];
+    flag_list.count = 1;
+    flag_list.values = &default_device;
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE({
+    for (iree_host_size_t i = 0; i < flag_list.count; ++i) {
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, flag_list.values[i].data,
+                                  flag_list.values[i].size);
+    }
+  });
 
-  // Create the device, which may be slow and dynamically load big dependencies
-  // (CUDA, Vulkan, etc).
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_device(iree_hal_available_driver_registry(),
-                                 device_uri, host_allocator, &device));
+      z0, iree_hal_device_list_allocate(flag_list.count, host_allocator,
+                                        &device_list));
 
-  // Optionally wrap the base device allocator with caching/pooling.
-  // Doing this here satisfies the requirement that no buffers have been
-  // allocated yet - if we returned the device without doing this the caller can
-  // more easily break the rules.
-  iree_status_t status = iree_hal_configure_allocator_from_flags(device);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < flag_list.count; ++i) {
+    // Create the device, which may be slow and dynamically load big
+    // dependencies (CUDA, Vulkan, etc).
+    iree_hal_device_t* device = NULL;
+    status = iree_hal_create_device(driver_registry, flag_list.values[i],
+                                    host_allocator, &device);
 
-  // Optionally set a collective channel provider used by devices to initialize
-  // their default channels. Hosting libraries or applications can do the same
-  // to interface with their own implementations.
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_device_set_default_channel_provider(device);
+    // Optionally wrap the base device allocator with caching/pooling.
+    // Doing this here satisfies the requirement that no buffers have been
+    // allocated yet - if we returned the device without doing this the caller
+    // can more easily break the rules.
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_configure_allocator_from_flags(device);
+    }
+
+    // Optionally set a collective channel provider used by devices to
+    // initialize their default channels. Hosting libraries or applications can
+    // do the same to interface with their own implementations. Note that this
+    // currently sets the same provider for all devices.
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_set_default_channel_provider(device);
+    }
+
+    // Add the device to the list to retain it for the caller.
+    if (iree_status_is_ok(status)) {
+      status = iree_hal_device_list_push_back(device_list, device);
+    }
+    iree_hal_device_release(device);
+
+    if (!iree_status_is_ok(status)) break;
   }
 
   if (iree_status_is_ok(status)) {
-    *out_device = device;
+    *out_device_list = device_list;
   } else {
-    iree_hal_device_release(device);
+    iree_hal_device_list_free(device_list);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;

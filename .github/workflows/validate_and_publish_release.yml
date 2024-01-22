@@ -62,9 +62,6 @@ jobs:
       - name: Run iree-benchmark-module
         id: run_iree_benchmark_module
         run: ./bin/iree-benchmark-module --help
-      - name: Run iree-benchmark-trace
-        id: run_iree_benchmark_trace
-        run: ./bin/iree-benchmark-trace --help
       - name: Run iree-dump-module
         id: run_iree_dump_module
         run: ./bin/iree-dump-module --help
@@ -83,9 +80,6 @@ jobs:
       - name: Run iree-run-module
         id: run_iree_run_module
         run: ./bin/iree-run-module --help
-      - name: Run iree-run-trace
-        id: run_iree_run_trace
-        run: ./bin/iree-run-trace --help
       - name: Run iree-tblgen
         id: run_iree_tblgen
         run: ./bin/iree-tblgen --help
@@ -96,15 +90,9 @@ jobs:
       - name: Py iree-run-module
         id: py_iree-run-module
         run: iree-run-module --help
-      - name: Py iree-run-trace
-        id: py_iree-run-trace
-        run: iree-run-trace --help
       - name: Py iree-benchmark-module
         id: py_iree_benchmark_module
         run: iree-benchmark-module --help
-      - name: Py iree-benchmark-trace
-        id: py_iree_benchmark_trace
-        run: iree-benchmark-trace --help
       - name: Py iree-dump-module
         id: py_iree_dump_module
         run: iree-dump-module --help

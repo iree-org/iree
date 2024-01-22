@@ -196,18 +196,20 @@ static iree_status_t iree_tooling_load_hal_async_module(
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_module_register_all_types(instance));
 
-  // TODO(multi-device): create multiple devices (maybe with an
-  // iree_hal_device_list_t helper for retaining/managing the dynamic list).
-  // Create the device to use.
-  // In the future this will change to a set of available devices instead.
+  // Create the device(s) to use.
   if (iree_string_view_is_empty(default_device_uri)) {
     default_device_uri = iree_hal_default_device_uri();
   }
-  iree_hal_device_t* device = NULL;
+  iree_hal_device_list_t* device_list = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_create_device_from_flags(
+      z0, iree_hal_create_devices_from_flags(
               iree_hal_available_driver_registry(), default_device_uri,
-              host_allocator, &device));
+              host_allocator, &device_list));
+
+  // Pick a lead device we'll use for bookkeeping.
+  iree_hal_device_t* device = iree_hal_device_list_at(device_list, 0);
+  IREE_ASSERT(device, "require at least one device");
+  iree_hal_device_retain(device);
 
   // Fetch the allocator from the device to pass back to the caller.
   iree_hal_allocator_t* device_allocator = iree_hal_device_allocator(device);
@@ -216,8 +218,11 @@ static iree_status_t iree_tooling_load_hal_async_module(
   // Create HAL module wrapping the device created above.
   iree_hal_module_flags_t flags = IREE_HAL_MODULE_FLAG_NONE;
   iree_vm_module_t* module = NULL;
-  iree_status_t status = iree_hal_module_create(
-      instance, /*device_count=*/1, &device, flags, host_allocator, &module);
+  iree_status_t status =
+      iree_hal_module_create(instance, device_list->count, device_list->devices,
+                             flags, host_allocator, &module);
+
+  iree_hal_device_list_free(device_list);
 
   if (iree_status_is_ok(status)) {
     *out_module = module;

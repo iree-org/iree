@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Target/TargetMachine.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -16,8 +17,16 @@ namespace mlir::iree_compiler::IREE::HAL {
 void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
                           std::string bitCodeDir);
 
+// Links optimized Ukernel module.
+void linkUkernelBCFiles(llvm::Module *module, Location loc,
+                        StringRef enabledUkernelsStr, StringRef targetChip,
+                        StringRef bitCodeDir, unsigned linkerFlags,
+                        llvm::TargetMachine &targetMachine);
 // Compiles ISAToHsaco Code
 std::string createHsaco(Location loc, const std::string isa, StringRef name);
+
+// Returns true if the rocm archtecture target is supported for ukernels.
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

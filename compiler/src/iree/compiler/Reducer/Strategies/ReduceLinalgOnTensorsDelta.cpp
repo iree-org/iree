@@ -29,7 +29,7 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   SmallVector<linalg::LinalgOp> linalgOps;
   SmallVector<linalg::LinalgOp> keepOps;
   module.walk([&](linalg::LinalgOp op) {
-    if (!op.hasTensorSemantics())
+    if (!op.hasPureTensorSemantics())
       return;
     // Op should have at least one tensor input, otherwise the operation is
     // already a fill-like operation.

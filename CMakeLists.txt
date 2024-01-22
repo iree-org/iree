@@ -195,7 +195,9 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 #-------------------------------------------------------------------------------
 
 set(IREE_CUDA_AVAILABLE OFF)
-find_package(CUDAToolkit)
+# The IREE cuda2 driver requires CUDA >= 12.
+set(IREE_CUDA_MIN_VERSION_REQUIRED 12)
+find_package(CUDAToolkit ${IREE_CUDA_MIN_VERSION_REQUIRED})
 if(CUDAToolkit_FOUND)
   set(IREE_CUDA_AVAILABLE ON)
 else()
@@ -439,6 +441,7 @@ option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
+option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
@@ -563,7 +566,7 @@ include(iree_lit_test)
 include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
-include(iree_trace_runner_test)
+include(iree_e2e_matmul_test)
 include(iree_native_test)
 include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
@@ -696,15 +699,6 @@ endif()
 
 if(NOT "${Python_EXECUTABLE}" STREQUAL "${Python3_EXECUTABLE}")
   message(WARNING "FindPython and FindPython3 found different executables. You may need to pin -DPython_EXECUTABLE and -DPython3_EXECUTABLE (${Python_EXECUTABLE} vs ${Python3_EXECUTABLE})")
-endif()
-
-# Extended Python environment checks.
-if(Python3_FOUND)
-  iree_detect_pyyaml()
-endif()
-
-if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
-  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -907,9 +901,6 @@ endif()
 
 include(external_cc_library)
 include(flatbuffer_c_library)
-
-# libyaml
-add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)

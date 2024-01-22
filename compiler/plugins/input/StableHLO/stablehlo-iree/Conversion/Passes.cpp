@@ -42,6 +42,7 @@ void buildStableHLOInputConversionPassPipelineImpl(
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createLegalizeStableHLOCustomCalls());
   passManager.addNestedPass<func::FuncOp>(
       stablehlo::createLegalizeControlFlow());
 

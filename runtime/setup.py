@@ -565,9 +565,7 @@ setup(
             "iree._runtime_libs": [
                 f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
                 "iree-run-module*",
-                "iree-run-trace*",
                 "iree-benchmark-module*",
-                "iree-benchmark-trace*",
                 # These utilities are invariant wrt tracing and are only built for the default runtime.
                 "iree-create-parameters*",
                 "iree-convert-parameters*",
@@ -580,9 +578,7 @@ setup(
             "iree._runtime_libs_tracy": [
                 f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
                 "iree-run-module*",
-                "iree-run-trace*",
                 "iree-benchmark-module*",
-                "iree-benchmark-trace*",
             ]
             + (["iree-tracy-capture"] if ENABLE_TRACY_TOOLS else [])
         }
@@ -592,9 +588,7 @@ setup(
     entry_points={
         "console_scripts": [
             "iree-run-module = iree._runtime.scripts.iree_run_module.__main__:main",
-            "iree-run-trace = iree._runtime.scripts.iree_run_trace.__main__:main",
             "iree-benchmark-module = iree._runtime.scripts.iree_benchmark_module.__main__:main",
-            "iree-benchmark-trace = iree._runtime.scripts.iree_benchmark_trace.__main__:main",
             "iree-create-parameters = iree._runtime.scripts.iree_create_parameters.__main__:main",
             "iree-convert-parameters = iree._runtime.scripts.iree_convert_parameters.__main__:main",
             "iree-dump-module = iree._runtime.scripts.iree_dump_module.__main__:main",

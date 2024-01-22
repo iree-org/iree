@@ -33,6 +33,25 @@ func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) 
 
 // -----
 
+// Tests that an existing iree.reflection dictionary is merged with the new
+// reflection information.
+
+// CHECK-LABEL: func.func @existingReflection
+// CHECK-SAME: iree.reflection =
+// CHECK-SAME:     iree.abi.declaration = "sync func @existingReflection
+// CHECK-SAME:     some.attr = 4 : index
+// CHECK: func.func private @_existingReflection
+// CHECK-NOT: iree.reflection = {some.attr = 4 : index}
+func.func @existingReflection() attributes {
+  iree.reflection = {
+    some.attr = 4 : index
+  }
+} {
+  return
+}
+
+// -----
+
 // Tests that iree.abi.declaration is added when needed and otherwise the user
 // provided value is passed through.
 

@@ -42,7 +42,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.tensor.reassociative_reshape_folding
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %func_3 : !transform.any_op
+    transform.apply_cse to %func_3 : !transform.any_op
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
     transform.apply_patterns to %func_3 {
       transform.apply_patterns.linalg.erase_unnecessary_inputs

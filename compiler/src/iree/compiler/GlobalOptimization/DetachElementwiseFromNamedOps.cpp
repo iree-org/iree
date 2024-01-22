@@ -39,12 +39,12 @@ struct DetachElementwisePattern
         !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
       return failure();
     }
-    if (!linalgOp.hasTensorSemantics())
+    if (!linalgOp.hasPureTensorSemantics())
       return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
     SmallVector<OpOperand *> outputOperands;
-    if (!linalgOp.hasBufferSemantics()) {
+    if (!linalgOp.hasPureBufferSemantics()) {
       outputOperands = llvm::to_vector(
           llvm::map_range(linalgOp.getDpsInitsMutable(),
                           [](OpOperand &opOperand) { return &opOperand; }));

@@ -7,7 +7,12 @@ pip>=21.3
 setuptools>=62.4.0
 nanobind>=1.4.0
 numpy>=1.19.4
-pybind11>=2.10.1
 requests>=2.28.0
 wheel>=0.36.2
+
+# TODO: nanobind is used in the runtime but the compiler uses pybind and
+# removing this breaks CI bots; remove this.
+pybind11>=2.10.1
+
+# TODO: not required but needed for weird CI reasons; remove this.
 PyYAML>=5.4.1

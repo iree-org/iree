@@ -277,7 +277,7 @@ struct setContractionOpEncoding
   LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
                                 PatternRewriter &rewriter) const override {
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-    if (!linalgOp.hasTensorSemantics()) {
+    if (!linalgOp.hasPureTensorSemantics()) {
       return failure();
     }
     if (getCompilationInfo(linalgOp)) {

@@ -68,12 +68,24 @@ static DistributionSignature getOpSignature(Operation *op) {
 
   DistributionSignature signature;
   for (Attribute operandAttr : operandsAttr) {
+    // Ignore null attributes.
+    if (!operandAttr) {
+      signature.operands.push_back(VectorLayoutInterface());
+      continue;
+    }
+
     auto operandLayout = cast<VectorLayoutInterface>(operandAttr);
     assert(operandLayout && "Malformed signature attribute.");
     signature.operands.push_back(operandLayout);
   }
 
   for (Attribute resultAttr : resultsAttr) {
+    // Ignore null attributes.
+    if (!resultAttr) {
+      signature.results.push_back(VectorLayoutInterface());
+      continue;
+    }
+
     VectorLayoutInterface resultLayout =
         cast<VectorLayoutInterface>(resultAttr);
     assert(resultLayout && "Malformed signature attribute.");
@@ -145,7 +157,7 @@ debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
 
 /// A rewriter for the pattern rewriting driver.
 struct VectorDistributionRewriter : PatternRewriter {
-  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(context) {}
+  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
 };
 
 static void applyVectorDistribution(Operation *root,
@@ -189,10 +201,17 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   auto values = llvm::to_vector_of<Value>(op->getOperands());
   llvm::append_range(values, op->getResults());
 
+  // First check if any of them are vector values.
+  if (llvm::none_of(values, [](Value value) -> bool {
+        return isa<VectorValue>(value);
+      })) {
+    return false;
+  }
+
   // Check if all operands and results of this operation have a layout.
   return llvm::all_of(values, [&](Value value) -> bool {
     auto vectorValue = dyn_cast<VectorValue>(value);
-    return vectorValue && analysis.getLayout<Attribute>(vectorValue);
+    return !vectorValue || analysis.getLayout<Attribute>(vectorValue);
   });
 }
 

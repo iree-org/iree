@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
-#include "iree-dialects/Transforms/ListenerCSE.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
@@ -52,6 +51,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -252,46 +252,6 @@ void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
-}
-
-//===---------------------------------------------------------------------===//
-// ApplyCommonSubexpressionEliminationOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  ErrorCheckingTrackingListener listener(state, *this);
-  Operation *lastOpVisited = nullptr;
-
-  WalkResult status = target->walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (op->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-      lastOpVisited = op;
-      if (failed(eliminateCommonSubexpressions(op, /*domInfo=*/nullptr,
-                                               &listener)))
-        return WalkResult::interrupt();
-      if (listener.failed())
-        return WalkResult::interrupt();
-      return WalkResult::skip();
-    }
-    return WalkResult::advance();
-  });
-
-  if (!status.wasInterrupted())
-    return DiagnosedSilenceableFailure::success();
-
-  if (listener.failed())
-    return listener.checkAndResetError();
-
-  return mlir::emitDefiniteFailure(lastOpVisited, "CSE failed");
-}
-
-void transform_dialect::ApplyCommonSubexpressionEliminationOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -1019,7 +979,16 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getBody().front());
+  SmallVector<Value> threadGrid = {
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::z),
+  };
+
   populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(threadGrid, patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }

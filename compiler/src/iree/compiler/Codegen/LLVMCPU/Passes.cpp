@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -673,6 +674,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   if (clInstrumentMemoryAccesses) {
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
+  }
+  if (enableAArch64SME) {
+    passManager.addPass(createConvertArmSMEToLLVMPass());
   }
   passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
