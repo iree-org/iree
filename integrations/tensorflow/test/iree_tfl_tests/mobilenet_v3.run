@@ -1,2 +1,1 @@
 # RUN: %PYTHON -m iree_tfl_tests.mobilenet_v3_test --artifacts_dir=%t
-# XFAIL: *
