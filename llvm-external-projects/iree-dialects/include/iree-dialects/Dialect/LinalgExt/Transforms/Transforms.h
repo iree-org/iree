@@ -51,7 +51,7 @@ splitReduction(PatternRewriter &b, linalg::LinalgOp op,
                const linalg::ControlSplitReductionFn &controlSplitReductionFn,
                const LinalgTransformationFilter &filter,
                bool useAlloc = false) {
-  if (failed(filter.checkAndNotify(b, op)) || !op.hasTensorSemantics() ||
+  if (failed(filter.checkAndNotify(b, op)) || !op.hasPureTensorSemantics() ||
       op.getNumReductionLoops() != 1 || op.getNumDpsInits() != 1 ||
       !op.hasOnlyProjectedPermutations())
     return b.notifyMatchFailure(op, "precondition not met");

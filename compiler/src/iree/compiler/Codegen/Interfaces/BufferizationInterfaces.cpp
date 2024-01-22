@@ -281,12 +281,12 @@ static LogicalResult bufferizeLinalgExtOp(RewriterBase &rewriter,
   rewriter.setInsertionPoint(op);
 
   // Nothing to do. This op is already bufferized.
-  if (dspOp.hasBufferSemantics())
+  if (dspOp.hasPureBufferSemantics())
     return success();
 
   // Ensure op has only tensors. Allow mixed tensor-buffer mode on a per-need
   // basis.
-  if (!dspOp.hasTensorSemantics())
+  if (!dspOp.hasPureTensorSemantics())
     return op->emitError() << "op does not have tensor semantics";
 
   // New input operands for the cloned op.
