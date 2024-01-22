@@ -1,4 +1,11 @@
 iree_fetch_artifact(
+  NAME "model-PersonDetect_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-MobileNetV3Small_fp32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/MobileNetV3SmallStaticBatch.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV3Small_fp32.tflite"
@@ -13,6 +20,13 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-EfficientNet_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/efficientnet_lite0_int8_2.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNet_int8.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-MobileNetV1_fp32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v1_224_1.0_float.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV1_fp32.0_float.tflite"
@@ -23,6 +37,13 @@ iree_fetch_artifact(
   NAME "model-MobileNetV2_fp32"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_fp32.0_224.tflite"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileNetV2_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224_quantized.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileNetV2_int8.0_224_quantized.tflite"
   UNPACK
 )
 
@@ -240,5 +261,12 @@ iree_fetch_artifact(
   NAME "model-matmul_128x256x8192_f32t_tile_config_default"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_128x256x8192_f32t_f32t_f32t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_128x256x8192_f32t_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-MobileBertSquad_int8"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MobileBertSquad_int8.tflite"
   UNPACK
 )

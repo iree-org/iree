@@ -18,6 +18,18 @@ iree_benchmark_suite_module_test(
 )
 
 iree_benchmark_suite_module_test(
+  NAME "efficientnet_int8_correctness_test"
+  DRIVER "local-sync"
+  EXPECTED_OUTPUT "efficientnet_int8_expected_output.txt"
+  MODULES
+    "x86_64-Linux=iree_module_EfficientNet_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
+  RUNNER_ARGS
+    "--function=main"
+    "--device_allocator=caching"
+    "--input=1x224x224x3xui8=0"
+)
+
+iree_benchmark_suite_module_test(
   NAME "deeplab_v3_fp32_correctness_test"
   DRIVER "local-sync"
   EXPECTED_OUTPUT "https://storage.googleapis.com/iree-model-artifacts/deeplab_v3_fp32_input_0_expected_output.npy"
@@ -29,5 +41,19 @@ iree_benchmark_suite_module_test(
     "--device_allocator=caching"
     "--expected_f32_threshold=0.001"
     "--input=1x257x257x3xf32=0"
+)
+
+iree_benchmark_suite_module_test(
+  NAME "person_detect_int8_correctness_test"
+  DRIVER "local-sync"
+  EXPECTED_OUTPUT "1x2xi8=[72 -72]"
+  MODULES
+    "riscv_32-Linux=iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "riscv_64-Linux=iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "x86_64-Linux=iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
+  RUNNER_ARGS
+    "--function=main"
+    "--device_allocator=caching"
+    "--input=1x96x96x1xi8=0"
 )
 
