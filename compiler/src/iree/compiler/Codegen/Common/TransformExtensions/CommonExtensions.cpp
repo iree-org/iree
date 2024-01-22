@@ -255,45 +255,6 @@ void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyCommonSubexpressionEliminationOp
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure
-transform_dialect::ApplyCommonSubexpressionEliminationOp::applyToOne(
-    transform::TransformRewriter &rewriter, Operation *target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  ErrorCheckingTrackingListener listener(state, *this);
-  Operation *lastOpVisited = nullptr;
-
-  WalkResult status = target->walk<WalkOrder::PreOrder>([&](Operation *op) {
-    if (op->hasTrait<OpTrait::IsIsolatedFromAbove>()) {
-      DominanceInfo domInfo;
-      lastOpVisited = op;
-      eliminateCommonSubExpressions(rewriter, domInfo, op);
-      if (listener.failed())
-        return WalkResult::interrupt();
-      return WalkResult::skip();
-    }
-    return WalkResult::advance();
-  });
-
-  if (!status.wasInterrupted())
-    return DiagnosedSilenceableFailure::success();
-
-  if (listener.failed())
-    return listener.checkAndResetError();
-
-  return mlir::emitDefiniteFailure(lastOpVisited, "CSE failed");
-}
-
-void transform_dialect::ApplyCommonSubexpressionEliminationOp::getEffects(
-    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::modifiesPayload(effects);
-}
-
-//===---------------------------------------------------------------------===//
 // ApplyLoopIndependentCodeMotionOp
 //===---------------------------------------------------------------------===//
 

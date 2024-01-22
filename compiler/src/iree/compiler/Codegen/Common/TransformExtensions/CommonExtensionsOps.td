@@ -168,34 +168,6 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cse",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Apply common subexpression elimination. This transform is applied to all
-    ops within the target that are isolated from above.
-
-    #### Return modes
-
-    This operation does not consume the target handle and does not produce any
-    handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let assemblyFormat = "$target attr-dict `:` type($target)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
