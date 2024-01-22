@@ -263,6 +263,10 @@ static bool hasMatmulLikeBody(linalg::LinalgOp linalgOp) {
 /// can support more cases.
 static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
                                               linalg::LinalgOp linalgOp) {
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "Expected isaContractionOpInterface");
+  }
   auto cDims = linalg::inferContractionDims(linalgOp);
   if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
       cDims->n.size() > 1 || cDims->k.size() > 1) {
