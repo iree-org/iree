@@ -4,7 +4,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""iree_generated_trace_runner_test generator for e2e matmul tests.
+"""iree_generated_e2e_matmul_test generator for e2e matmul tests.
 """
 
 import argparse
@@ -396,6 +396,8 @@ def generate_function_name(
 @dataclasses.dataclass
 class MLIRFunction:
     name: str
+    signature: str
+    import_declaration: str
     definition: str
 
 
@@ -459,6 +461,8 @@ def generate_function(
         generate_function.compilation_index += 1
 
     if shape.accumulate:
+        signature = f"({lhs_tensor_type}, {rhs_tensor_type}, {acc_tensor_type}) -> {acc_tensor_type}"
+        import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view) -> !hal.buffer_view"
         func_definition = func_definition + (
             f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
             f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
@@ -467,8 +471,9 @@ def generate_function(
         )
     else:
         literal_zero_for_acc_type = "0.0" if "f" in acc_type.value else "0"
-        acc_dyn_sizes = []
         if acc_m == "?":
+            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
+            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
                 f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %c0 = arith.constant 0 : index\n"
@@ -483,6 +488,8 @@ def generate_function(
                 f"}}\n"
             )
         else:
+            signature = f"({lhs_tensor_type}, {rhs_tensor_type}) -> {acc_tensor_type}"
+            import_declaration = f"func.func private @module.{func_name}(%lhs: !hal.buffer_view, %rhs: !hal.buffer_view) -> !hal.buffer_view"
             func_definition = func_definition + (
                 f"func.func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}) -> {acc_tensor_type} {{\n"
                 f"  %init_acc = tensor.empty() : {acc_tensor_type}\n"
@@ -494,12 +501,22 @@ def generate_function(
             )
     return MLIRFunction(
         name=func_name,
+        signature=signature,
+        import_declaration=import_declaration,
         definition=func_definition,
     )
 
 
 # Counter for producing unique compilation info attrs
 generate_function.compilation_index = 0
+
+
+# Represents a call to a generated test function.
+@dataclasses.dataclass
+class TestCall:
+    function: MLIRFunction
+    op: str
+
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
 # and across machines.
@@ -519,54 +536,79 @@ def contents_generator_tag(generator: MatrixGenerator):
         raise ValueError(generator)
 
 
-# Generate a matrix function argument in the output trace, as a dictionary
-# to be passed to yaml.dump.
-def generate_trace_matrix_arg(
-    matrix_shape: list, element_type: MatrixElemTypeId, generator: MatrixGenerator
+# Generate a matrix function argument of the given size as `%name`.
+def generate_random_matrix(
+    name: str,
+    matrix_shape: list,
+    element_type: MatrixElemTypeId,
 ):
-    result = {
-        "type": "hal.buffer_view",
-        "shape": matrix_shape,
-        "element_type": element_type.value,
-    }
-    generator_tag = contents_generator_tag(generator)
-    if generator_tag:
-        result["contents_generator"] = generator_tag
-    return result
+    global pseudorandom_generator_seed
+    pseudorandom_generator_seed = pseudorandom_generator_seed + 1
+    return (
+        f"  %{name}_dim0 = arith.constant {matrix_shape[0]} : i64\n"
+        f"  %{name}_dim1 = arith.constant {matrix_shape[1]} : i64\n"
+        f"  %{name}_element_type = hal.element_type<{element_type.value}> : i32\n"
+        f"  %{name}_seed = arith.constant {pseudorandom_generator_seed} : i32\n"
+        f"  %{name} = call @matmul_test.generate_random_matrix(%device, %{name}_dim0, %{name}_dim1, %{name}_element_type, %{name}_seed) : (!hal.device, i64, i64, i32, i32) -> !hal.buffer_view\n"
+    )
+
+
+call_id = 0
 
 
 # Generates the output trace for a testcase i.e. a single test function call,
 # as a dictionary to be passed to yaml.dump.
-def generate_trace(
-    func_name: str,
+def generate_call(
+    function: MLIRFunction,
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shape: TestShape,
 ):
-    args = [
-        generate_trace_matrix_arg(
-            [shape.m, shape.k], lhs_rhs_type, MatrixGenerator.RANDOM
-        ),
-        generate_trace_matrix_arg(
-            [shape.k, shape.n], lhs_rhs_type, MatrixGenerator.RANDOM
-        ),
-    ]
+    global call_id
+    func_name = f"{function.name}_{shape.m}_{shape.k}_{shape.n}"
     if shape.accumulate:
-        args.append(
-            generate_trace_matrix_arg(
-                [shape.m, shape.n], acc_type, MatrixGenerator.RANDOM
-            )
+        func_name = f"{func_name}_acc"
+    func_name = f"{func_name}_{call_id}"
+    call_id = call_id + 1
+
+    description = f"Matmul shape (MxKxN): {shape.m}x{shape.k}x{shape.n}"
+    op = (
+        f"func.func @{func_name}() attributes {{\n"
+        f'  iree.reflection = {{description = "{description}"}}\n'
+        "} {\n"
+        "  %device_index = arith.constant 0 : index\n"
+        "  %device = hal.devices.get %device_index : !hal.device\n"
+    )
+
+    op = op + generate_random_matrix("lhs", [shape.m, shape.k], lhs_rhs_type)
+    op = op + generate_random_matrix("rhs", [shape.k, shape.n], lhs_rhs_type)
+    if shape.accumulate:
+        op = op + generate_random_matrix("acc", [shape.m, shape.n], acc_type)
+        # TODO(#16168): there's a bug with in-place input->output aliasing and
+        # we work around it here by passing in a unique copy.
+        global pseudorandom_generator_seed
+        pseudorandom_generator_seed = pseudorandom_generator_seed - 1
+        op = op + generate_random_matrix("acc_copy", [shape.m, shape.n], acc_type)
+        op = op + (
+            f"  %result = call @module.{function.name}(%lhs, %rhs, %acc_copy) : (!hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
+        )
+    else:
+        op = op + (
+            f"  %acc = util.null : !hal.buffer_view\n"
+            f"  %result = call @module.{function.name}(%lhs, %rhs) : (!hal.buffer_view, !hal.buffer_view) -> !hal.buffer_view\n"
         )
 
-    result = generate_trace_matrix_arg(
-        [shape.m, shape.n], acc_type, MatrixGenerator.ZERO
+    op = op + (
+        f"  %m = arith.constant {shape.m} : i64\n"
+        f"  %k = arith.constant {shape.k} : i64\n"
+        f"  %n = arith.constant {shape.n} : i64\n"
+        f"  call @matmul_test.check_matmul_results(%device, %m, %k, %n, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
-    return {
-        "type": "call",
-        "function": "module." + func_name,
-        "args": args,
-        "results": [result],
-    }
+
+    op = op + "  return\n"
+    op = op + "}\n"
+
+    return TestCall(function=function, op=op)
 
 
 # Generates all output files' contents as strings.
@@ -576,8 +618,8 @@ def generate(
     shapes_id: ShapesId,
     compilation_info_id: CompilationInfoId,
 ):
-    function_definitions = {}
-    traces = []
+    functions = {}
+    calls = []
 
     for compilation_info in get_test_compilation_infos(
         compilation_info_id, lhs_rhs_type
@@ -591,25 +633,26 @@ def generate(
                 # share the same code. For example, dynamic-shapes testcases
                 # share the same code involing tensor<?x?xf32> even though the runtime
                 # value in the trace are different. That's why we append conditionally
-                # to traces, but unconditionally to function_definitions.
-                if function.name not in function_definitions:
-                    function_definitions[function.name] = function.definition
-                traces.append(
-                    generate_trace(function.name, lhs_rhs_type, acc_type, shape)
-                )
+                # to calls, but unconditionally to function_definitions.
+                if function.name not in functions:
+                    functions[function.name] = function
+                calls.append(generate_call(function, lhs_rhs_type, acc_type, shape))
 
-    return (function_definitions, traces)
+    return (functions, calls)
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generator of e2e matmul tests")
     parser.add_argument(
-        "--output_code", type=str, help="Path of output .mlir file", required=True
+        "--output_matmuls_mlir",
+        type=str,
+        help="Path of output .mlir file containing the generated matmuls",
+        required=True,
     )
     parser.add_argument(
-        "--output_trace",
+        "--output_calls_mlir",
         type=str,
-        help="Path of output .yaml trace file",
+        help="Path of output .mlir file containing the calls",
         required=True,
     )
     parser.add_argument(
@@ -643,12 +686,6 @@ def parse_arguments():
         required=False,
     )
     parser.add_argument(
-        "--module_path",
-        type=str,
-        help="Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-compile command generating the module.",
-        required=True,
-    )
-    parser.add_argument(
         "--requirements",
         type=str,
         help="Target requirements for this module. Comma-separated. As in -iree-llvmcpu-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
@@ -657,56 +694,47 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def write_code_file(function_definitions, filename):
+def write_code_file(functions, filename):
     with open(filename, "w") as file:
-        for funcname in function_definitions:
-            file.write(function_definitions[funcname] + "\n")
+        for function in functions.values():
+            file.write(function.definition + "\n")
 
 
-def write_trace_file(traces, filename, module_path, requirements):
-    yaml_documents = [
-        {
-            "type": "context_load",
-        },
-        {
-            "type": "module_load",
-            "module": {
-                "name": "hal",
-                "type": "builtin",
-            },
-        },
-        {
-            "type": "module_load",
-            "module": {
-                "name": "module",
-                "type": "bytecode",
-                "path": os.path.relpath(module_path, os.path.dirname(filename)),
-            },
-        },
-    ]
+def write_calls_file(functions, calls, filename, requirements):
+    # Module-level reflection information used to control the test tool.
+    reflection = ""
     if requirements:
-        yaml_documents.append(
-            {
-                "type": "requirements",
-                "target_features": [req.lstrip("+") for req in requirements.split(",")],
-            }
+        reflection = (
+            "iree.reflection = {"
+            'target_features = "'
+            + ",".join([req.lstrip("+") for req in requirements.split(",")])
+            + '"'
+            "}"
         )
+    module_definition = (
+        f"builtin.module @calls attributes {{\n" f"  {reflection}\n" f"}} {{\n\n"
+    )
 
-    for trace in traces:
-        yaml_documents.append(trace)
+    # Declare the custom module that generates arguments.
+    module_definition = module_definition + (
+        "func.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
+        "func.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
+        "\n"
+    )
 
-    dumped_yaml = yaml.dump_all(yaml_documents)
+    # Declare the functions that will be called.
+    for function in functions.values():
+        module_definition = module_definition + function.import_declaration + "\n"
+    module_definition = module_definition + "\n"
 
-    # TODO: This regex substitution is a hack as I couldn't figure how to have
-    # PyYAML dump our custom contents_generator into the desired format, e.g.
-    #   contents_generator: !tag:iree:fully_specified_pseudorandom 368
-    # Someone with better knowledge of YAML is welcome to fix this, possibly by
-    # changing that format if that's appropriate! So long as the e2e_matmul tests
-    # pass.
-    processed_yaml = re.sub(r"'(![^']*)'", "\\1", dumped_yaml)
+    # Emit the test cases for each call.
+    for call in calls:
+        module_definition = module_definition + call.op + "\n"
+
+    module_definition = module_definition + "\n}\n"
 
     with open(filename, "w") as file:
-        file.write(processed_yaml)
+        file.write(module_definition)
 
 
 # For now, the accumulator type can always be inferred from the input LHS/RHS
@@ -727,12 +755,17 @@ def main(args):
     acc_type = infer_acc_type(lhs_rhs_type, acc_type)
     shapes_id = ShapesId(args.shapes)
     compilation_info_id = CompilationInfoId(args.compilation_info)
-    (function_definitions, traces) = generate(
+    (functions, calls) = generate(
         lhs_rhs_type, acc_type, shapes_id, compilation_info_id
     )
 
-    write_code_file(function_definitions, args.output_code)
-    write_trace_file(traces, args.output_trace, args.module_path, args.requirements)
+    write_code_file(functions, args.output_matmuls_mlir)
+    write_calls_file(
+        functions,
+        calls,
+        args.output_calls_mlir,
+        args.requirements,
+    )
 
 
 if __name__ == "__main__":

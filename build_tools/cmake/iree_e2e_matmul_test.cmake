@@ -6,14 +6,17 @@
 
 include(CMakeParseArguments)
 
-# iree_trace_runner_test()
+# iree_e2e_matmul_test()
 #
-# Creates a test using a specified trace-runner program for the specified
-# replay trace.
+# Creates a test using a specified test runner program for the specified
+# matmul test files.
 #
 # Parameters:
 #   NAME: Name of the target
-#   SRC: mlir source file to be compiled to an IREE module.
+#   MATMULS_SRC: mlir source file with matmuls to be compiled to an IREE module.
+#   MATMULS_VMFB: specifies the path to use for the generated IREE module.
+#   CALLS_SRC: mlir source file with calls to be compiled to an IREE module.
+#   CALLS_VMFB: specifies the path to use for the generated IREE module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode output
@@ -22,14 +25,10 @@ include(CMakeParseArguments)
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   TRACE_RUNNER: trace-runner program to run.
-#   TRACE: trace file input to the trace-runner program.
-#   MODULE_FILE_NAME: specifies the absolute path to the filename to use for the
-#       generated IREE module (.vmfb). Mandatory, unlike in iree_check_test,
-#       because trace files (.yaml) reference a specific module file path.
+#   TEST_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
-function(iree_trace_runner_test)
+function(iree_e2e_matmul_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -42,7 +41,7 @@ function(iree_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;TRACE_RUNNER;MODULE_FILE_NAME"
+    "NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -55,23 +54,32 @@ function(iree_trace_runner_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_MODULE_NAME "${_RULE_NAME}_module")
-
   set(_BASE_COMPILER_FLAGS
     "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
   )
-
   if (_RULE_TARGET_CPU_FEATURES)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
   iree_bytecode_module(
     NAME
-      "${_MODULE_NAME}"
+      "${_RULE_NAME}_matmuls_module"
     MODULE_FILE_NAME
-      "${_RULE_MODULE_FILE_NAME}"
+      "${_RULE_MATMULS_VMFB}"
     SRC
-      "${_RULE_SRC}"
+      "${_RULE_MATMULS_SRC}"
+    FLAGS
+      "${_BASE_COMPILER_FLAGS}"
+      "${_RULE_COMPILER_FLAGS}"
+  )
+
+  iree_bytecode_module(
+    NAME
+      "${_RULE_NAME}_calls_module"
+    MODULE_FILE_NAME
+      "${_RULE_CALLS_VMFB}"
+    SRC
+      "${_RULE_CALLS_SRC}"
     FLAGS
       "${_BASE_COMPILER_FLAGS}"
       "${_RULE_COMPILER_FLAGS}"
@@ -82,8 +90,9 @@ function(iree_trace_runner_test)
   add_custom_target("${_NAME}" ALL)
   add_dependencies(
     "${_NAME}"
-    "${_NAME}_module"
-    "${_RULE_TRACE_RUNNER}"
+    "${_NAME}_matmuls_module"
+    "${_NAME}_calls_module"
+    "${_RULE_TEST_RUNNER}"
   )
 
   add_dependencies(iree-test-deps "${_NAME}")
@@ -94,31 +103,28 @@ function(iree_trace_runner_test)
     DRIVER
       "${_RULE_DRIVER}"
     SRC
-      "${_RULE_TRACE_RUNNER}"
+      "${_RULE_TEST_RUNNER}"
     DATA
-      ${_MODULE_FILE_NAME}
+      ${_MATMULS_VMFB}
+      ${_CALLS_VMFB}
     ARGS
-      "{{${_RULE_TRACE}}}"
+      "--module={{${_MATMULS_VMFB}}}"
+      "--module={{${_CALLS_VMFB}}}"
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
   )
 endfunction()
 
-# iree_single_backend_generated_trace_runner_test()
-#
-# Variant of iree_trace_runner_test where instead of specifying
-# a source file (and possibly a trace file and module path), one passes a
-# generator program.
+# iree_single_backend_e2e_matmul_test()
 #
 # Parameters:
 #   NAME: Name of the target
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
-#         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
-#         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#         --output_matmuls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_matmuls.mlir
+#         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #       and if TARGET_CPU_FEATURES is not empty:
 #         --requirements=${TARGET_CPU_FEATURES}
 #   GENERATOR_ARGS: additional args to pass to the generator program.
@@ -130,10 +136,10 @@ endfunction()
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   TRACE_RUNNER: trace-runner program to run.
+#   TEST_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
-function(iree_single_backend_generated_trace_runner_test)
+function(iree_single_backend_e2e_matmul_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -143,17 +149,10 @@ function(iree_single_backend_generated_trace_runner_test)
     return()
   endif()
 
-  # Traces are YAML files and we assume that PyYAML is required. See the
-  # warning that is emitted in aggregate in the main CMakeLists.txt if this
-  # is not true.
-  if(NOT IREE_PYYAML_FOUND)
-    return()
-  endif()
-
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TRACE_RUNNER"
+    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -193,18 +192,16 @@ function(iree_single_backend_generated_trace_runner_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.mlir")
+  set(_MATMULS_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_matmuls.mlir")
+  set(_CALLS_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_calls.mlir")
+  set(_MATMULS_VMFB "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_matmuls.vmfb")
+  set(_CALLS_VMFB "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_calls.vmfb")
 
-  set(_GENERATOR_OUTPUT "${_SRC}")
-  set(_TRACE "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.yaml")
-  set(_MODULE_FILE_NAME "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}.vmfb")
-  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_code=${_SRC}")
-  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_trace=${_TRACE}")
-  list(APPEND _GENERATOR_STANDARD_FLAGS "--module_path=${_MODULE_FILE_NAME}")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_matmuls_mlir=${_MATMULS_SRC}")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_calls_mlir=${_CALLS_SRC}")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
   endif()
-  list(APPEND _GENERATOR_OUTPUT "${_TRACE}")
 
   add_custom_command(
     COMMAND
@@ -213,7 +210,8 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_GENERATOR_STANDARD_FLAGS}
       ${_RULE_GENERATOR_ARGS}
     OUTPUT
-      ${_GENERATOR_OUTPUT}
+      ${_MATMULS_SRC}
+      ${_CALLS_SRC}
     DEPENDS
       ${_RULE_GENERATOR}
   )
@@ -221,20 +219,23 @@ function(iree_single_backend_generated_trace_runner_test)
   add_custom_target(
     "${_NAME}_generated_files"
     DEPENDS
-      ${_GENERATOR_OUTPUT}
+      ${_MATMULS_SRC}
+      ${_CALLS_SRC}
   )
 
-  iree_trace_runner_test(
+  iree_e2e_matmul_test(
     NAME
       "${_RULE_NAME}"
-    SRC
-      "${_SRC}"
-    TRACE
-      "${_TRACE}"
-    TRACE_RUNNER
-      "${_RULE_TRACE_RUNNER}"
-    MODULE_FILE_NAME
-      "${_MODULE_FILE_NAME}"
+    MATMULS_SRC
+      "${_MATMULS_SRC}"
+    MATMULS_VMFB
+      "${_MATMULS_VMFB}"
+    CALLS_SRC
+      "${_CALLS_SRC}"
+    CALLS_VMFB
+      "${_CALLS_VMFB}"
+    TEST_RUNNER
+      "${_RULE_TEST_RUNNER}"
     TARGET_BACKEND
       ${_RULE_TARGET_BACKEND}
     DRIVER
@@ -250,15 +251,15 @@ function(iree_single_backend_generated_trace_runner_test)
   )
 
   # Note we are relying on the fact that the target created by
-  # iree_trace_runner_test is _NAME, even though we passed _RULE_NAME to it,
+  # iree_e2e_matmul_test is _NAME, even though we passed _RULE_NAME to it,
   # i.e. we are relying on the prefixing to be identical.
   add_dependencies("${_NAME}" "${_NAME}_generated_files")
 endfunction()
 
 
-# iree_generated_trace_runner_test()
+# iree_generated_e2e_matmul_test()
 #
-# Creates a set of iree_single_backend_generated_trace_runner_test's differing
+# Creates a set of iree_single_backend_e2e_matmul_test's differing
 # by target backend and driver.
 #
 # Mirrors the bzl rule of the same name.
@@ -269,9 +270,8 @@ endfunction()
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
-#         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
-#         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#         --output_matmuls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_matmuls.mlir
+#         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKENDS: backends to compile the module for. These form pairs with
 #       the DRIVERS argument (due to cmake limitations they are separate list
@@ -287,7 +287,7 @@ endfunction()
 #       and input file flags are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   TRACE_RUNNER: trace-runner program to run.
+#   TEST_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES_VARIANTS:list of target cpu features variants. Each
 #       entry is either "default" for the architecture defaults, or a colon-
 #       separated triple "arch:name:cpu_features" where "arch" filters
@@ -296,7 +296,7 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
-function(iree_generated_trace_runner_test)
+function(iree_generated_e2e_matmul_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -304,7 +304,7 @@ function(iree_generated_trace_runner_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TRACE_RUNNER"
+    "NAME;GENERATOR;TEST_RUNNER"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -350,15 +350,15 @@ function(iree_generated_trace_runner_test)
         set(_TARGET_CPU_FEATURES_SUFFIX "_${_TARGET_CPU_FEATURES_NAME}")
         list(APPEND _LABELS "cpu_features=${_TARGET_CPU_FEATURES_NAME}")
       endif()
-      iree_single_backend_generated_trace_runner_test(
+      iree_single_backend_e2e_matmul_test(
         NAME
           "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}${_TARGET_CPU_FEATURES_SUFFIX}"
         GENERATOR
           ${_RULE_GENERATOR}
         GENERATOR_ARGS
           ${_RULE_GENERATOR_ARGS}
-        TRACE_RUNNER
-          ${_RULE_TRACE_RUNNER}
+        TEST_RUNNER
+          ${_RULE_TEST_RUNNER}
         TARGET_BACKEND
           ${_TARGET_BACKEND}
         DRIVER

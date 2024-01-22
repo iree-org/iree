@@ -35,9 +35,7 @@ assert v.VERSION
 print("IREE version:", v.VERSION)
 
 check_tool("iree-benchmark-module", ["--help"], "IREE: iree-benchmark-module")
-check_tool("iree-benchmark-trace", ["--help"], "IREE: iree-benchmark-trace")
 check_tool("iree-run-module", ["--help"], "IREE: iree-run-module")
-check_tool("iree-run-trace", ["--help"], "IREE: iree-run-trace")
 check_tool("iree-create-parameters", ["--help"], "IREE: iree-create-parameters")
 check_tool("iree-convert-parameters", ["--help"], "IREE: iree-convert-parameters")
 check_tool("iree-dump-module", ["--help"], "IREE: iree-dump-module")

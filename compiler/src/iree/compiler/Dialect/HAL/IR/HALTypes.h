@@ -41,14 +41,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 // Utilities
 //===----------------------------------------------------------------------===//
 
-// Returns a stable identifier for the MLIR element type or nullopt if the
-// type is unsupported in the ABI.
-std::optional<int32_t> getElementTypeValue(Type type);
-
-// Returns a stable identifier for the MLIR encoding type or 0 (opaque) if the
-// type is unsupported in the ABI.
-std::optional<int32_t> getEncodingTypeValue(Attribute attr);
-
 template <typename T>
 inline bool allEnumBitsSet(T value, T required) {
   return (static_cast<uint32_t>(value) & static_cast<uint32_t>(required)) ==

@@ -51,7 +51,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(1, 2)
         self.assertEqual("[<VmVariantList(2): [1, 2]>]", vm_context.mock_arg_reprs)
         self.assertEqual((3, 4), result)
@@ -77,7 +77,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(-1, a=1, b=2)
         self.assertEqual("[<VmVariantList(3): [-1, 1, 2]>]", vm_context.mock_arg_reprs)
         self.assertEqual(3, result)
@@ -101,7 +101,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker([2, 3])
         self.assertEqual(
             "[<VmVariantList(1): [List[2, 3]]>]", vm_context.mock_arg_reprs
@@ -113,7 +113,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker([2, 3])
         self.assertEqual(
             "[<VmVariantList(1): [List[2, 3]]>]", vm_context.mock_arg_reprs
@@ -138,7 +138,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(
             ValueError, "expected a sequence with 2 values. got:"
         ):
@@ -163,7 +163,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker((2, 3))
         self.assertEqual(
             "[<VmVariantList(1): [List[2, 3]]>]", vm_context.mock_arg_reprs
@@ -188,7 +188,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker({"b": 3, "a": 2})
         self.assertEqual(
             "[<VmVariantList(1): [List[2, 3]]>]", vm_context.mock_arg_reprs
@@ -213,7 +213,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "expected a dict with 2 values. got:"):
             _ = invoker({"a": 2, "b": 3, "c": 4})
 
@@ -236,7 +236,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "could not get item 'b' from: "):
             _ = invoker({"a": 2, "c": 3})
 
@@ -246,7 +246,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker({"b": 3, "a": 2})
         self.assertEqual(
             "[<VmVariantList(1): [List[2, 3]]>]", vm_context.mock_arg_reprs
@@ -268,7 +268,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         self.assertEqual([3, 4], result)
 
@@ -301,7 +301,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         self.assertEqual((3, [{"bar": 100, "foo": 200}, 6]), result)
 
@@ -326,7 +326,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
             result = invoker(a=1, b=1)
 
@@ -351,7 +351,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
             result = invoker(a=1, b=1)
 
@@ -376,7 +376,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
             result = invoker(-1, a=1)
 
@@ -401,7 +401,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "mismatched call arity:"):
             result = invoker(-1, a=1)
 
@@ -426,7 +426,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         with self.assertRaisesRegex(ValueError, "specified kwarg 'c' is unknown"):
             result = invoker(-1, a=1, b=2, c=3)
 
@@ -450,7 +450,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(arg_array)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -483,7 +483,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(arg_array)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -515,7 +515,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker(arg_buffer_view)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -532,7 +532,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(arg_array)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -556,7 +556,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker(arg_array)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -579,7 +579,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         _ = invoker(arg_buffer_view)
         self.assertEqual(
             "<VmVariantList(1): [HalBufferView(2:0x20000011)]>", repr(invoked_arg_list)
@@ -609,7 +609,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         np.testing.assert_array_equal([1, 0], result)
 
@@ -628,7 +628,7 @@ class FunctionTest(unittest.TestCase):
 
         vm_context = MockVmContext(invoke)
         vm_function = MockVmFunction(reflection={})
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         np.testing.assert_array_equal([1, 0], result)
 
@@ -657,7 +657,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         # assertEqual on bool arrays is fraught for... reasons.
         np.testing.assert_array_equal([True, False], result)
@@ -681,7 +681,7 @@ class FunctionTest(unittest.TestCase):
                 )
             }
         )
-        invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+        invoker = FunctionInvoker(vm_context, self.device, vm_function)
         result = invoker()
         self.assertEqual("[1, 2]", repr(result))
 

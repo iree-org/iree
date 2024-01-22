@@ -566,7 +566,7 @@ include(iree_lit_test)
 include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
-include(iree_trace_runner_test)
+include(iree_e2e_matmul_test)
 include(iree_native_test)
 include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
@@ -699,15 +699,6 @@ endif()
 
 if(NOT "${Python_EXECUTABLE}" STREQUAL "${Python3_EXECUTABLE}")
   message(WARNING "FindPython and FindPython3 found different executables. You may need to pin -DPython_EXECUTABLE and -DPython3_EXECUTABLE (${Python_EXECUTABLE} vs ${Python3_EXECUTABLE})")
-endif()
-
-# Extended Python environment checks.
-if(Python3_FOUND)
-  iree_detect_pyyaml()
-endif()
-
-if(IREE_BUILD_TESTS AND NOT IREE_PYYAML_FOUND)
-  message(WARNING "IREE's regression test suite requires PyYAML to run all tests. It is not installed, so some tests will be disabled.")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -910,9 +901,6 @@ endif()
 
 include(external_cc_library)
 include(flatbuffer_c_library)
-
-# libyaml
-add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)

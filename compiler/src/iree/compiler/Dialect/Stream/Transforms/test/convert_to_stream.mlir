@@ -25,9 +25,11 @@ flow.executable private @executable {
 
 // CHECK-LABEL: @simple_mul
 func.func @simple_mul(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
-  // CHECK: %[[DIM0:.+]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
+  // CHECK-DAG: %[[DIM0:.+]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   %dim0 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
-  // CHECK: hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("tensor") shape([%0, %c4]) type(%c553648160_i32) encoding(%c1_i32)
+  // CHECK-DAG: %[[ELEMENT_TYPE:.+]] = hal.element_type<f32>
+  // CHECK-DAG: %[[ENCODING_TYPE:.+]] = hal.encoding_type<dense_row_major>
+  // CHECK: hal.buffer_view.assert<%arg0 : !hal.buffer_view> message("tensor") shape([%0, %c4]) type(%[[ELEMENT_TYPE]]) encoding(%[[ENCODING_TYPE]])
   // CHECK: %[[ARG0_SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
   // CHECK: %[[ARG0_IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x4xf32>{%[[DIM0]]} in !stream.resource<external>{%[[ARG0_SIZE]]}
   // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %[[ARG0_IMPORT]] : !stream.resource<external>{%[[ARG0_SIZE]]} -> !stream.resource<*>{%[[ARG0_SIZE]]}
