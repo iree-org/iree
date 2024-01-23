@@ -93,27 +93,27 @@ LayoutIterator::LayoutIterator(LayoutAttr &attr,
 
 LayoutIterator::LayoutIterator(LayoutAttr &attr) {
   DenseMap<LayoutDimension, int64_t> strides;
-  for (auto perDimAttr : llvm::enumerate(attr.getLayouts())) {
-    initialize(perDimAttr.value(), strides, perDimAttr.index());
+  for (auto [idx, attr] : llvm::enumerate(attr.getLayouts())) {
+    initialize(attr, strides, idx);
   }
 }
 
 LayoutIterator::LayoutIterator(LayoutAttr &attr,
                                DenseMap<LayoutDimension, int64_t> strides,
                                int64_t simtIndex) {
-  for (auto perDimAttr : llvm::enumerate(attr.getLayouts())) {
-    if (perDimAttr.index() != simtIndex)
+  for (auto [idx, attr] : llvm::enumerate(attr.getLayouts())) {
+    if (idx != simtIndex)
       continue;
-    initialize(perDimAttr.value(), strides, perDimAttr.index());
+    initialize(attr, strides, idx);
   }
 }
 
 LayoutIterator::LayoutIterator(LayoutAttr &attr, int64_t simtIndex) {
   DenseMap<LayoutDimension, int64_t> strides;
-  for (auto perDimAttr : llvm::enumerate(attr.getLayouts())) {
-    if (perDimAttr.index() != simtIndex)
+  for (auto [idx, attr] : llvm::enumerate(attr.getLayouts())) {
+    if (idx != simtIndex)
       continue;
-    initialize(perDimAttr.value(), strides, perDimAttr.index());
+    initialize(attr, strides, idx);
   }
 }
 
@@ -133,7 +133,7 @@ LayoutIterator &LayoutIterator::operator++() {
     }
     break;
   }
-  iterations++;
+  ++iterations;
   return *this;
 }
 
@@ -180,7 +180,7 @@ SmallVector<int64_t>
 LayoutIterator::State::computeIteratorProjectedSIMTIndex() const {
   SmallVector<int64_t> indices = computeSIMTIndex();
   SmallVector<int64_t> projectedIndices;
-  for (int i = 0; i < labels.size(); i++) {
+  for (size_t i = 0, e = labels.size(); i != e; ++i) {
     for (auto [name, it] : iterators) {
       if (name == labels[i])
         projectedIndices.push_back(indices[i]);

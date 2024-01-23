@@ -146,7 +146,8 @@ PerDimLayoutAttr LayoutAttr::getDimLayout(int64_t dim) const {
 std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
   assert(dim < getLayouts().size());
   PerDimLayoutAttr layout = getDimLayout(dim);
-  for (auto [name, shape] : llvm::zip(layout.getLabels(), layout.getShapes())) {
+  for (auto [name, shape] :
+       llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
     if (isBatchDimension(name.getValue()))
       return shape;
   }

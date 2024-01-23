@@ -70,14 +70,17 @@ struct DistributeContractions final
     if ((maps == infer({{m, k}, {k, n}, {m, n}})) ||
         (maps == infer({{n, k}, {k, m}, {n, m}}))) {
       return ContractType::MM;
-    } else if ((maps == infer({{m, k}, {n, k}, {m, n}})) ||
-               (maps == infer({{n, k}, {m, k}, {n, m}}))) {
+    }
+    if ((maps == infer({{m, k}, {n, k}, {m, n}})) ||
+        (maps == infer({{n, k}, {m, k}, {n, m}}))) {
       return ContractType::MMT;
-    } else if ((maps == infer({{k, m}, {k, n}, {m, n}})) ||
-               (maps == infer({{k, n}, {k, m}, {n, m}}))) {
+    }
+    if ((maps == infer({{k, m}, {k, n}, {m, n}})) ||
+        (maps == infer({{k, n}, {k, m}, {n, m}}))) {
       return ContractType::MTM;
-    } else if ((maps == infer({{k, m}, {n, k}, {m, n}})) ||
-               (maps == infer({{k, n}, {m, k}, {n, m}}))) {
+    }
+    if ((maps == infer({{k, m}, {n, k}, {m, n}})) ||
+        (maps == infer({{k, n}, {m, k}, {n, m}}))) {
       return ContractType::MTMT;
     }
     return ContractType::UNSUPPORTED;
@@ -110,12 +113,12 @@ struct DistributeContractions final
       LayoutDimension batchRowLabel, int64_t batchRow,
       LayoutDimension batchColLabel, int64_t batchCol) const {
     MLIRContext *ctx = getContext();
-    auto rowLayout = createPerDimLayout(
+    PerDimLayoutAttr rowLayout = createPerDimLayout(
         ctx, {batchRowLabel, LayoutDimension::LANEX}, {batchRow, 16});
-    auto colLayout = createPerDimLayout(
+    PerDimLayoutAttr colLayout = createPerDimLayout(
         ctx, {batchColLabel, LayoutDimension::LANEY, LayoutDimension::VECTORX},
         {batchCol, 4, 4});
-    return std::make_tuple(rowLayout, colLayout);
+    return {rowLayout, colLayout};
   }
 
   bool isCompatible16x16x16A(LayoutAttr layout, int64_t batchRow,
@@ -146,7 +149,7 @@ struct DistributeContractions final
                                 LayoutDimension batchColLabel, int64_t batchCol,
                                 ContractMatrixType matrixType) const {
     MLIRContext *ctx = getContext();
-    auto rowLayout = createPerDimLayout(
+    PerDimLayoutAttr rowLayout = createPerDimLayout(
         ctx, {batchRowLabel, LayoutDimension::LANEX}, {batchRow, 32});
     PerDimLayoutAttr colLayout;
     if (matrixType == ContractMatrixType::C) {
@@ -161,7 +164,7 @@ struct DistributeContractions final
           {batchColLabel, LayoutDimension::LANEY, LayoutDimension::VECTORX},
           {batchCol, 2, 4});
     }
-    return std::make_tuple(rowLayout, colLayout);
+    return {rowLayout, colLayout};
   }
 
   bool isCompatible32x32x8A(LayoutAttr layout, int64_t batchRow,
@@ -284,7 +287,7 @@ struct DistributeContractions final
     SmallVector<VectorValue> operands;
     SmallVector<LayoutAttr> layouts;
     for (auto [operand, layout] :
-         llvm::zip(contractOp->getOperands(), signature.operands)) {
+         llvm::zip_equal(contractOp->getOperands(), signature.operands)) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         if (auto vectorLayout = dyn_cast<LayoutAttr>(layout)) {
           operands.push_back(vectorOperand);

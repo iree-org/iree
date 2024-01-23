@@ -1027,8 +1027,7 @@ void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
   root->walk([&](Operation *op) {
     for (NamedAttribute attr : op->getAttrs()) {
       StringRef name = attr.getName().strref();
-      if (name.find("__vector_layout_test_anchor_operand_") !=
-          std::string::npos) {
+      if (name.contains("__vector_layout_test_anchor_operand_")) {
         int operandNum;
         name.substr(name.find_last_of("_") + 1)
             .getAsInteger(/*Radix=*/10, operandNum);
@@ -1036,8 +1035,7 @@ void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
                "operand number out of range");
         analysis.setAnchor(op->getOperand(operandNum), attr.getValue());
       }
-      if (name.find("__vector_layout_test_anchor_result_") !=
-          std::string::npos) {
+      if (name.contains("__vector_layout_test_anchor_result_")) {
         int resultNum;
         name.substr(name.find_last_of("_") + 1)
             .getAsInteger(/*Radix=*/10, resultNum);
