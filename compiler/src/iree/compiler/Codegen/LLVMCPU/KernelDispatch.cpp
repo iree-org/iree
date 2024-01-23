@@ -105,6 +105,8 @@ enum class VectorPreProcStrategy {
   None
 };
 
+// Use this flag to override IREE's heuristics for selecting the pre-processing
+// strategy.
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
     "iree-llvmcpu-vector-pproc-strategy",
     llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
@@ -120,8 +122,7 @@ static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
             "and out-of-bounds elements would be masked-out."),
         clEnumValN(
             VectorPreProcStrategy::None, "none",
-            "Do not apply any vectorization pre-processing transformation.")),
-    llvm::cl::init(VectorPreProcStrategy::None));
+            "Do not apply any vectorization pre-processing transformation.")));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
