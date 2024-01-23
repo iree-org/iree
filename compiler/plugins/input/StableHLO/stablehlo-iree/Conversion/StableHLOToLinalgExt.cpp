@@ -450,8 +450,7 @@ struct ReverseOpConversion final
     }
     SmallVector<Value> steps(operandRank, rewriter.create<arith::ConstantIndexOp>(loc, 1));
 
-    SmallVector<AffineMap> affineMaps = {
-        rewriter.getMultiDimIdentityMap(operandRank)};
+    SmallVector<AffineMap> affineMaps(2, rewriter.getMultiDimIdentityMap(operandRank));
   
     rewriter.create<linalg::GenericOp>(
         loc, operandType, 
