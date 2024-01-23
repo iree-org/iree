@@ -47,10 +47,12 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 // CHECK:           scf.for
 // CHECK:             scf.for
 // CHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:                 %[[RES:.+]] = arith.addi
-// CHECK:                 scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:                 %[[ADD:.+]] = arith.addi
+// CHECK:                 %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xi32> to vector<1x1x4xi32>
+// CHECK:                 scf.yield %[[BCAST]] : vector<1x1x4xi32>
 // CHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
-// CHECK:             arith.addi %{{.+}}, %{{.+}} : vector<1x4xi32>
+// CHECK:             %[[RES:.+]] = arith.addi %{{.+}}, %{{.+}} : vector<4xi32>
+// CHECK:             vector.store %[[RES]]
 
 // -----
 
@@ -103,10 +105,12 @@ hal.executable private @split_reduction_pass1_dispatch_0 {
 // REORDERCHECK:           scf.for
 // REORDERCHECK:             scf.for
 // REORDERCHECK:               scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// REORDERCHECK:                 %[[RES:.+]] = arith.addf
-// REORDERCHECK:                 scf.yield %[[RES]] : vector<1x1x4xf32>
+// REORDERCHECK:                 %[[ADD:.+]] = arith.addf
+// REORDERCHECK:                 %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xf32> to vector<1x1x4xf32>
+// REORDERCHECK:                 scf.yield %[[BCAST]] : vector<1x1x4xf32>
 // REORDERCHECK:               vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xf32> into f32
-// REORDERCHECK:             arith.addf %{{.+}}, %{{.+}} : vector<1x4xf32>
+// REORDERCHECK:             %[[RES:.+]] = arith.addf %{{.+}}, %{{.+}} : vector<4xf32>
+// REORDERCHECK:             vector.store %[[RES]]
 
 // -----
 
@@ -152,8 +156,9 @@ hal.executable private @split_reduction_pass2_dispatch_0 {
 // CHECK:            scf.for
 // CHECK:              scf.for
 // CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:                  %[[RES:.+]] = arith.addi
-// CHECK:                  scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:                  %[[ADD:.+]] = arith.addi
+// CHECK:                  %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xi32> to vector<1x1x4xi32>
+// CHECK:                  scf.yield %[[BCAST]] : vector<1x1x4xi32>
 // CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
@@ -196,8 +201,9 @@ hal.executable private @split_reduction_pass3_dispatch_0 {
 // CHECK:            scf.for
 // CHECK:              scf.for
 // CHECK:                scf.for %[[ARG3:.+]] = %[[C0]] to %[[C64]] step %[[C1]]
-// CHECK:                  %[[RES:.+]] = arith.addi
-// CHECK:                  scf.yield %[[RES]] : vector<1x1x4xi32>
+// CHECK:                  %[[ADD:.+]] = arith.addi
+// CHECK:                  %[[BCAST:.+]] = vector.broadcast %[[ADD]] : vector<4xi32> to vector<1x1x4xi32>
+// CHECK:                  scf.yield %[[BCAST]] : vector<1x1x4xi32>
 // CHECK:                vector.reduction <add>, %{{.+}} %{{.+}} : vector<4xi32> into i32
 
 // -----
