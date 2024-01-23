@@ -194,7 +194,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
             }));
     funcOp->walk([&](tensor::PackOp op) {
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-          scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+          scf::tileConsumerAndFuseProducersUsingSCF(
               rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
       if (failed(tileAndFuseResult))
         return signalPassFailure();
@@ -218,9 +218,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               return tileSizes;
             });
     funcOp->walk([&](tensor::UnPackOp op) {
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(op.getOperation()),
-          unpackTilingOptions);
+      FailureOr<scf::SCFTilingResult> tilingResult =
+          scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
+                            unpackTilingOptions);
       if (failed(tilingResult))
         return signalPassFailure();
       rewriter.replaceOp(op, tilingResult->replacements);

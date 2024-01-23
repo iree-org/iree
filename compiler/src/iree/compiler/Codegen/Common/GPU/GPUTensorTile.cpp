@@ -96,7 +96,7 @@ private:
     // First tile the current op as the consumer op.
     auto tilingOptions = scf::SCFTilingOptions().setTileSizes(tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
-        tileUsingSCFForOp(rewriter, consumer, tilingOptions);
+        tileUsingSCF(rewriter, consumer, tilingOptions);
     if (failed(tilingResult)) {
       return rewriter.notifyMatchFailure(consumer, "failed to tile consumer");
     }
@@ -136,15 +136,12 @@ private:
 
     // Fuse the candidate immeidate operands into the tiled loop.
     OpBuilder::InsertionGuard guard(rewriter);
-    auto forLoops =
-        llvm::to_vector(llvm::map_range(tilingResult->loops, [](Operation *op) {
-          return cast<scf::ForOp>(op);
-        }));
     while (!candidates.empty()) {
       tensor::ExtractSliceOp sliceOp = candidates.back();
       candidates.pop_back();
       std::optional<scf::SCFFuseProducerOfSliceResult> result =
-          tileAndFuseProducerOfSlice(rewriter, sliceOp, forLoops);
+          scf::tileAndFuseProducerOfSlice(rewriter, sliceOp,
+                                          tilingResult->loops);
       if (result) {
         // Mark the fused input producer for distribution when writing to shared
         // memory. We cannot use the current matmul op's tiling scheme here
@@ -156,8 +153,6 @@ private:
             rewriter, result->tiledAndFusedProducer.getDefiningOp());
       }
     }
-    tilingResult->loops = llvm::to_vector(
-        llvm::map_range(forLoops, [](auto op) -> Operation * { return op; }));
     return tilingResult;
   }
 
@@ -285,7 +280,7 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
       return success();
 
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+        scf::tileConsumerAndFuseProducersUsingSCF(
             rewriter, cast<TilingInterface>(consumerOp.getOperation()),
             scf::SCFTileAndFuseOptions().setTilingOptions(
                 scf::SCFTilingOptions().setTileSizes(tileSizes)));
@@ -306,7 +301,7 @@ static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
     // Fully unroll the generated loop. This allows us to remove the loop
     // for parallel output window dimension, so it helps future vector
     // transformations.
-    ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
+    ArrayRef<LoopLikeOpInterface> loops = tileAndFuseResult.value().loops;
     if (!loops.empty()) {
       assert(loops.size() == 1);
       scf::ForOp loopOp = cast<scf::ForOp>(loops.front());
