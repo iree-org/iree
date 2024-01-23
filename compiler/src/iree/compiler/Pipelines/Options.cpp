@@ -133,6 +133,23 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Strips debug assertions after any useful "
                                   "information has been extracted."),
                    llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-parameter-archive-export-file", parameterArchiveExportPath,
+      llvm::cl::desc(
+          "File path to create a parameter archive using any inline global "
+          "constants."),
+      llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-parameter-archive-export-scope", parameterExportScope,
+      llvm::cl::desc("Scope for parameters in the archive created in "
+                     "`iree-opt-export-parameter-archive-export-file`."),
+      llvm::cl::cat(category));
+  binder.opt<int64_t>(
+      "iree-opt-minimum-parameter-export-size", minimumParameterExportSize,
+      llvm::cl::desc(
+          "Minimum size of constants to export to the archive created in "
+          "`iree-opt-export-parameter-archive-export-file`."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {
