@@ -472,7 +472,7 @@ struct ReverseOpConversion final
             indices.push_back(currentIndex);
           }
 
-          Value extractedElement = nestedBuilder.create<tensor::ExtractOp>(nestedLoc, args[0], indices);
+          Value extractedElement = nestedBuilder.create<tensor::ExtractOp>(nestedLoc, operand, indices);
 
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, extractedElement);
         });
