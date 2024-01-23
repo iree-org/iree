@@ -742,6 +742,11 @@ static iree_status_t iree_hal_cuda2_device_queue_write(
   return loop_status;
 }
 
+static void iree_hal_cuda2_device_collect_tracing_context(void* user_data) {
+  iree_hal_cuda2_tracing_context_collect(
+      (iree_hal_cuda2_tracing_context_t*)user_data);
+}
+
 static iree_status_t iree_hal_cuda2_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -753,15 +758,16 @@ static iree_status_t iree_hal_cuda2_device_queue_execute(
 
   iree_status_t status = iree_hal_cuda2_pending_queue_actions_enqueue_execution(
       base_device, device->dispatch_cu_stream, device->callback_cu_stream,
-      device->pending_queue_actions, wait_semaphore_list, signal_semaphore_list,
-      command_buffer_count, command_buffers);
+      device->pending_queue_actions,
+      iree_hal_cuda2_device_collect_tracing_context, device->tracing_context,
+      wait_semaphore_list, signal_semaphore_list, command_buffer_count,
+      command_buffers);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
     status = iree_hal_cuda2_pending_queue_actions_issue(
         device->pending_queue_actions);
   }
 
-  iree_hal_cuda2_tracing_context_collect(device->tracing_context);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
