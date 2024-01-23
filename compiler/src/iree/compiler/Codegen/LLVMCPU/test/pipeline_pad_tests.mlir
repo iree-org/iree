@@ -133,12 +133,12 @@ hal.executable private @pad_with_producer {
 //       CHECK:           scf.for
 //   CHECK-DAG:             %[[INPUT_SLICE:.+]] = memref.subview %[[INPUT_SUBVIEW]]
 //       CHECK:             %[[ALLOC:.+]] = memref.alloca
-//       CHECK:             %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:             scf.for
 //   CHECK-DAG:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
 //   CHECK-DAG:               %[[FILTER_SLICE:.+]] = memref.subview %[[FILTER_SUBVIEW]]
 //       CHECK:               linalg.fill
 //  CHECK-SAME:                   outs(%[[ALLOC]]
+//   CHECK-DAG:               %[[CONV_OUTPUT:.+]] = memref.subview %[[ALLOC]]
 //       CHECK:               scf.for
 //   CHECK-DAG:                 %[[CONV_INPUT:.+]] = memref.subview %[[INPUT_SLICE]]
 //   CHECK-DAG:                 %[[CONV_FILTER:.+]] = memref.subview %[[FILTER_SLICE]]
