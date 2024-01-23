@@ -103,8 +103,7 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
     return cast<VectorValue>(toSIMD.getInput());
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
-  SmallVector<int64_t> distributedShape =
-      layout.getDistributedShape(value.getType());
+  SmallVector<int64_t> distributedShape = layout.getDistributedShape();
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(

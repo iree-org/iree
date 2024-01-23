@@ -32,6 +32,9 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp);
 /// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(func::FuncOp funcOp);
 
+// Add patterns to distribute contractions to MFMA ops.
+void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler
 
 #endif

@@ -109,6 +109,10 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   );
   let assemblyFormat = "`<`$layouts`>`";
   let genVerifyDecl = 0;
+  let extraClassDeclaration = [{
+    std::optional<int64_t> getBatchDim(int64_t dim);
+    PerDimLayoutAttr getDimLayout(int64_t dim) const;
+  }];
 }
 
 #endif // IREE_DIALECT_VECTOREXT_BASE

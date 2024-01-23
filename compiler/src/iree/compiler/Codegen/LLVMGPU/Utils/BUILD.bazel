@@ -17,6 +17,7 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
+        "AMDGPUDistributionPatterns.cpp",
         "LLVMGPULayoutAnalysisAndDistribution.cpp",
         "LLVMGPUUtils.cpp",
     ],
@@ -24,9 +25,13 @@ iree_compiler_cc_library(
         "LLVMGPUUtils.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
+        "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
