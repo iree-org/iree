@@ -102,10 +102,7 @@ enum class VectorPreProcStrategy {
   // be masked-out.
   Masking,
   // Do not apply any vectorization pre-processing transformation.
-  None,
-  // A hint for the compiler to use its heuristics to determine an
-  // actual pre-processing strategy.
-  Undefined
+  None
 };
 
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
@@ -123,11 +120,8 @@ static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
             "and out-of-bounds elements would be masked-out."),
         clEnumValN(
             VectorPreProcStrategy::None, "none",
-            "Do not apply any vectorization pre-processing transformation."),
-        clEnumValN(VectorPreProcStrategy::Undefined, "undefined",
-                   "Not yet defined, IREE will attempt to select one using "
-                   "heurystics (default).")),
-    llvm::cl::init(VectorPreProcStrategy::Undefined));
+            "Do not apply any vectorization pre-processing transformation.")),
+    llvm::cl::init(VectorPreProcStrategy::None));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -141,9 +135,6 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     break;
   case VectorPreProcStrategy::None:
     os << "None";
-    break;
-  case VectorPreProcStrategy::Undefined:
-    os << "Undefined";
     break;
   }
   return os;
@@ -199,13 +190,13 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 }
 
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
-/// given LinalgOp. It is based on either:
+/// given LinalgOp. It is based on either (in the priority order):
 ///   * user-specified value, or
-///   * heuristics (e.g. the op traits and the target architecture).
+///   * IREE's heuristics (e.g. the op traits and the target architecture).
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   // If set, use the strategy selected by a user.
-  if (clPProcStrategy != VectorPreProcStrategy::Undefined) {
+  if (clPProcStrategy.getNumOccurrences()) {
     return clPProcStrategy;
   }
 
