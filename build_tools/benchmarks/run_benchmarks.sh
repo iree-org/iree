@@ -52,7 +52,7 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
         # --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
         # --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
         # --capture_tarball="${BENCHMARK_TRACES}" \
-elif [[ "${TARGET_DEVICE_NAME}" =~ ^(c2-standard-16|c2-standard-60)$ ]]; then
+elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
   ${DOCKER_WRAPPER} \
     gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
