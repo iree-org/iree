@@ -32,16 +32,8 @@ void reorderTranspose(RewriterBase &rewriter, func::FuncOp funcOp);
 /// from the previous alias group before starting a new one.
 void packSharedMemoryAlloc(func::FuncOp funcOp);
 
-// The naming scheme for these operators is:
-// InputType_MxNxK_OutputType.
-enum class MFMAType {
-  F16_16x16x16_F32,
-  F16_32x32x8_F32,
-};
-
 // Add patterns to distribute contractions to MFMA ops.
-void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns,
-                                        MFMAType mfmaType);
+void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

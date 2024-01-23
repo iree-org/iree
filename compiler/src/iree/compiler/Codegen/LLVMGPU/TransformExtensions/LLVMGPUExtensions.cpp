@@ -1516,16 +1516,7 @@ transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
-  int64_t m = getM();
-  int64_t n = getN();
-  int64_t k = getK();
-  MFMAType mfmaType;
-  if ((m == 16) && (n == 16) && (k == 16)) {
-    mfmaType = MFMAType::F16_16x16x16_F32;
-  } else {
-    mfmaType = MFMAType::F16_32x32x8_F32;
-  }
-  populateAMDGPUDistributionPatterns(patterns, mfmaType);
+  populateAMDGPUDistributionPatterns(patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }

@@ -703,10 +703,7 @@ def TestAMDGPUContractionDistribution :
     This transform does not consume the target handle and always return success.
     }];
 
-    let arguments = (ins TransformHandleTypeInterface:$target,
-                         I64Attr:$m,
-                         I64Attr:$n,
-                         I64Attr:$k);
+    let arguments = (ins TransformHandleTypeInterface:$target);
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];

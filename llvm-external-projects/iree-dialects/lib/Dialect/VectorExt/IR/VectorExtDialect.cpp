@@ -109,6 +109,11 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   return LayoutAttr::get(getContext(), newLayouts);
 }
 
+// This function returns the distributed shape of the SIMT
+// vector and evaluates it in the following order:
+// BATCHX, BATCHY, VECTORY, VECTORX
+// The vector dimensions are combined into a single SIMT
+// vector dimension.
 SmallVector<int64_t> LayoutAttr::getDistributedShape() const {
   SmallVector<LayoutDimension> labels{
       LayoutDimension::BATCHX, LayoutDimension::BATCHY,
