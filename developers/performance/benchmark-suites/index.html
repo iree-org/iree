@@ -3432,7 +3432,7 @@ unnecessary builds</p>
 <span class="w">  </span>--normal_benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--e2e_test_artifacts_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--execution_benchmark_config<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/exec_config.json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;&lt;target_device_name, e.g. c2-standard-16&gt;&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;&lt;target_device_name, e.g. c2-standard-60&gt;&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/benchmark_results.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--verbose<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--cpu_uarch<span class="o">=</span><span class="s2">&quot;&lt;host CPU uarch, e.g. CascadeLake&gt;&quot;</span>
@@ -3445,7 +3445,7 @@ unnecessary builds</p>
 <ul>
 <li><code>&lt;target_device_name&gt;</code> selects a benchmark group targets a specific device:<ul>
 <li>Common options:<ul>
-<li><code>c2-standard-16</code> for x86_64 CPU benchmarks.</li>
+<li><code>c2-standard-60</code> for x86_64 CPU benchmarks.</li>
 <li><code>a2-highgpu-1g</code> for NVIDIA GPU benchmarks.</li>
 </ul>
 </li>
@@ -3463,7 +3463,7 @@ unnecessary builds</p>
 <span class="w">  </span>--normal_benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--e2e_test_artifacts_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--execution_benchmark_config<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/exec_config.json&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;c2-standard-16&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;c2-standard-60&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/benchmark_results.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--verbose<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--cpu_uarch<span class="o">=</span><span class="s2">&quot;CascadeLake&quot;</span><span class="w"> </span><span class="se">\</span>
