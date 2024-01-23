@@ -14,7 +14,7 @@
 #include "iree/hal/drivers/cuda2/api.h"
 
 IREE_FLAG(
-    bool, cuda2_use_streams, false,
+    bool, cuda2_use_streams, true,
     "Use CUDA streams (instead of graphs) for executing command buffers.");
 
 IREE_FLAG(bool, cuda2_allow_inline_execution, false,
@@ -70,8 +70,8 @@ static iree_status_t iree_hal_cuda2_driver_factory_enumerate(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   static const iree_hal_driver_info_t driver_infos[1] = {{
-      .driver_name = IREE_SVL("cuda2"),
-      .full_name = IREE_SVL("next-gen NVIDIA CUDA HAL driver (via dylib)"),
+      .driver_name = IREE_SVL("cuda"),
+      .full_name = IREE_SVL("NVIDIA CUDA HAL driver (via dylib)"),
   }};
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
   *out_driver_infos = driver_infos;
@@ -85,7 +85,7 @@ static iree_status_t iree_hal_cuda2_driver_factory_try_create(
     iree_hal_driver_t** out_driver) {
   IREE_ASSERT_ARGUMENT(out_driver);
 
-  if (!iree_string_view_equal(driver_name, IREE_SV("cuda2"))) {
+  if (!iree_string_view_equal(driver_name, IREE_SV("cuda"))) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "no driver '%.*s' is provided by this factory",
                             (int)driver_name.size, driver_name.data);

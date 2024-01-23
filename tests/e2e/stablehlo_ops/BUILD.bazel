@@ -414,7 +414,7 @@ iree_check_single_backend_test_suite(
         # TODO(#13984): memset emulation required for graphs.
         "--iree-stream-emulate-memset",
     ],
-    driver = "cuda",
+    driver = "cuda1",
     input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=false"],
     tags = [
@@ -499,7 +499,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [],
     ),
-    driver = "cuda",
+    driver = "cuda1",
     input_type = "stablehlo",
     runner_args = ["--cuda_use_streams=true"],
     tags = [
@@ -589,7 +589,7 @@ iree_check_single_backend_test_suite(
         "--iree-stream-emulate-memset",
         "--iree-hal-cuda-enable-legacy-sync=false",
     ],
-    driver = "cuda2",
+    driver = "cuda",
     input_type = "stablehlo",
     runner_args = ["--cuda2_use_streams=false"],
     tags = [
@@ -609,7 +609,7 @@ iree_check_single_backend_test_suite(
     compiler_flags = [
         "--iree-hal-cuda-enable-legacy-sync=false",
     ],
-    driver = "cuda2",
+    driver = "cuda",
     input_type = "stablehlo",
     runner_args = ["--cuda2_use_streams=true"],
     tags = [

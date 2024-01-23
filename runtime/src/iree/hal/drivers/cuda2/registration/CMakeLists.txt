@@ -23,7 +23,7 @@ iree_cc_library(
     iree::hal
     iree::hal::drivers::cuda2
   DEFINES
-    "IREE_HAVE_HAL_CUDA2_DRIVER_MODULE=1"
+    "IREE_HAVE_HAL_CUDA_DRIVER_MODULE=1"
   PUBLIC
 )
 

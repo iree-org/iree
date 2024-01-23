@@ -6,7 +6,7 @@
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
-    cuda
+    cuda1
   DRIVER_REGISTRATION_HDR
     "runtime/src/iree/hal/drivers/cuda/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
@@ -28,7 +28,7 @@ iree_hal_cts_test_suite(
 # Variant test suite using graph command buffers (--cuda_use_streams=0)
 iree_hal_cts_test_suite(
   DRIVER_NAME
-    cuda
+    cuda1
   VARIANT_SUFFIX
     graph
   DRIVER_REGISTRATION_HDR

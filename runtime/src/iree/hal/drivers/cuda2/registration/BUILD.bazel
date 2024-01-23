@@ -21,8 +21,9 @@ iree_runtime_cc_library(
         "driver_module.h",
     ],
     defines = [
-        "IREE_HAVE_HAL_CUDA2_DRIVER_MODULE=1",
+        "IREE_HAVE_HAL_CUDA_DRIVER_MODULE=1",
     ],
+    tags = ["driver=cuda"],
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
