@@ -114,7 +114,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
   SmallVector<OpFoldResult> tileSizesOfr =
       getAsIndexOpFoldResult(context, tileSizes);
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-      scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+      scf::tileConsumerAndFuseProducersUsingSCF(
           rewriter, cast<TilingInterface>(consumerOp.getOperation()),
           scf::SCFTileAndFuseOptions().setTilingOptions(
               scf::SCFTilingOptions().setTileSizes(tileSizesOfr)));
@@ -134,7 +134,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
   // We don't distribute here; instead, it will be done in a later step
   // after bufferization. So add attributes to the tiled loop nest to
   // indicate that they should be distributed to invocations.
-  ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
+  ArrayRef<LoopLikeOpInterface> loops = tileAndFuseResult.value().loops;
   const char *attrName = getSPIRVDistributeAttrName();
   // We can have more than 3 dimensions being tiled (e.g., for convolutions with
   // non-1 batch). But only the innermost 3 dimensions are distributed.
@@ -207,7 +207,7 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
     auto consumerOp = cast<linalg::LinalgOp>(*convOp);
     IRRewriter rewriter(funcOp.getContext());
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-        scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+        scf::tileConsumerAndFuseProducersUsingSCF(
             rewriter, cast<TilingInterface>(consumerOp.getOperation()),
             scf::SCFTileAndFuseOptions().setTilingOptions(
                 scf::SCFTilingOptions().setTileSizes(tileSizes)));
@@ -228,7 +228,7 @@ static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
     // for parallel output window dimension, so it helps future vector
     // transformations.
 
-    ArrayRef<Operation *> loops = tileAndFuseResult.value().loops;
+    ArrayRef<LoopLikeOpInterface> loops = tileAndFuseResult.value().loops;
     if (!loops.empty()) {
       assert(loops.size() == 1);
       scf::ForOp loopOp = cast<scf::ForOp>(loops.front());
