@@ -719,4 +719,23 @@ def TestAMDGPUContractionDistribution :
 }
 
 
+def CreateMatmulMfmaTileSizesOp :
+  Op<Transform_Dialect, "iree.create_matmul_mfma_tile_sizes",
+    [MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ParamProducerTransformOpTrait]> {
+  let description = [{
+    Create param of tile sizes based on the matmul sizes.
+    This operation won't succeed if the matmul shape size is not 2.
+    Now it only covers the shape of [256*, 128*], [128, 64*], [8192, 320].
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformParamTypeInterface:$workgroup_tile_sizes,
+                      TransformParamTypeInterface:$problem_specific_sizes);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
