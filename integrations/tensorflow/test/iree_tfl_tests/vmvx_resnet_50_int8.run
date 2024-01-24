@@ -1,4 +1,0 @@
-# REQUIRES: vmvx
-# RUN: %PYTHON -m iree_tfl_tests.resnet_50_int8_test --target_backend=vmvx -artifacts_dir=%t
-# TODO(#10514): Address vmvx numerical mismatch issue.
-# XFAIL: vmvx

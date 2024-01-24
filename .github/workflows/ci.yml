@@ -272,12 +272,7 @@ jobs:
   test_all:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_all')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
@@ -403,7 +398,7 @@ jobs:
   build_test_runtime:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime')
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
     steps:
@@ -460,7 +455,7 @@ jobs:
   build_test_runtime_windows:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_windows')
-    runs-on: windows-2022-64core
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash
@@ -489,12 +484,7 @@ jobs:
   test_tf_integrations:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tf_integrations')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
       BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
@@ -681,7 +671,7 @@ jobs:
   small_runtime:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'small_runtime')
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
     steps:
@@ -738,12 +728,7 @@ jobs:
   tracing:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'tracing')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-tracing
     steps:
@@ -874,12 +859,7 @@ jobs:
   process_benchmark_results:
     needs: [setup, compilation_benchmarks, execution_benchmarks]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'process_benchmark_results') && needs.setup.outputs.benchmark-presets != ''
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       COMPILE_STATS_RESULTS: ${{ needs.compilation_benchmarks.outputs.compile-stats-results }}
       COMPILE_STATS_RESULTS_GCS_ARTIFACT: ${{ needs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
@@ -966,12 +946,7 @@ jobs:
   cross_compile_and_test:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'cross_compile_and_test')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     strategy:
       matrix:
         target:

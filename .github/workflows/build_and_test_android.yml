@@ -45,12 +45,7 @@ env:
 
 jobs:
   cross_compile:
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ inputs.runner-group }}
-      - environment=${{ inputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       HOST_BUILD_DIR: ${{ inputs.build-dir }}
       HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
