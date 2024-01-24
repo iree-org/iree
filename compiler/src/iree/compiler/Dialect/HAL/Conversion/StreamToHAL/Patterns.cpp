@@ -1249,7 +1249,7 @@ struct GlobalTimepointConversionPattern
       return failure();
     if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
       return failure();
-    rewriter.updateRootInPlace(op, [&]() { op.removeInitialValueAttr(); });
+    rewriter.modifyOpInPlace(op, [&]() { op.removeInitialValueAttr(); });
     return success();
   }
 };

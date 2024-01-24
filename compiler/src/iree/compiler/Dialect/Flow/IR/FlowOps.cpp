@@ -623,7 +623,7 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
   for (const auto &it : llvm::enumerate(returnOp.getOperands()))
     if (!unusedResults.contains(it.index()))
       yieldedValues.push_back(it.value());
-  rewriter.updateRootInPlace(
+  rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.getOperandsMutable().assign(yieldedValues); });
 
   // Replace all uses of the old op.

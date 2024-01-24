@@ -225,7 +225,7 @@ createDefaultWorkgroupCountRegion(RewriterBase &rewriter,
   rewriter.create<Flow::ReturnOp>(loc, defaultCountOp.getResults());
 
   // Update the `workgroupsOp` region.
-  rewriter.updateRootInPlace(workgroupsOp, [&]() {
+  rewriter.modifyOpInPlace(workgroupsOp, [&]() {
     // Update the workload of the op.
     workgroupsOp.getWorkloadMutable().assign(workload);
 

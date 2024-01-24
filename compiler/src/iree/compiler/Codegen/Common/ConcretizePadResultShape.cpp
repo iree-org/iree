@@ -120,8 +120,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         staticShape, padOp.getResultType().getElementType(),
         padOp.getResultType().getEncoding());
 
-    rewriter.updateRootInPlace(
-        padOp, [&]() { padOp.getResult().setType(resultType); });
+    rewriter.modifyOpInPlace(padOp,
+                             [&]() { padOp.getResult().setType(resultType); });
     return success();
   }
 };

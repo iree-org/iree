@@ -181,7 +181,7 @@ struct FoldBindingSubspansIntoDispatchOp
     }
     if (!didChangeAny)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getBindingBuffersMutable().assign(bindingBuffers);
       op.getBindingOffsetsMutable().assign(bindingOffsets);
     });

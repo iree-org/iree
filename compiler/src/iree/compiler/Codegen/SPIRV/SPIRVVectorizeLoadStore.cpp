@@ -323,7 +323,7 @@ public:
                                       signatureConverter);
 
     // Creates a new function with the update signature.
-    rewriter.updateRootInPlace(funcOp, [&] {
+    rewriter.modifyOpInPlace(funcOp, [&] {
       funcOp.setType(rewriter.getFunctionType(
           signatureConverter.getConvertedTypes(), std::nullopt));
     });
@@ -735,8 +735,8 @@ public:
   LogicalResult
   matchAndRewrite(OpT op, typename OpT::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    rewriter.updateRootInPlace(op,
-                               [&] { op->setOperands(adaptor.getOperands()); });
+    rewriter.modifyOpInPlace(op,
+                             [&] { op->setOperands(adaptor.getOperands()); });
     return success();
   }
 };

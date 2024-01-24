@@ -345,7 +345,7 @@ struct ElideRedundantOperandsOfWorkgroupCountFromSliceOp
           rewriter.getIndexAttr(
               oldOrdinalPosToNewOrdinalPos.lookup(oldOrdinalPos)));
     }
-    rewriter.updateRootInPlace(op, []() {});
+    rewriter.modifyOpInPlace(op, []() {});
     return success();
   }
 };
@@ -459,7 +459,7 @@ static bool updateTensorOpDims(RewriterBase &rewriter, Operation *op,
   auto oldValues = llvm::to_vector(oldValueRange);
   for (unsigned i = 0; i < dynamicDims.size(); ++i) {
     if (oldValues[i] != dynamicDims[i]) {
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           op, [&]() { mutableDimValues.slice(i, 1).assign(dynamicDims[i]); });
       anyChanged = true;
     }
@@ -712,8 +712,8 @@ struct DeduplicateDispatchEntryRefs final
     auto newAttr = deduplicateArrayElements(originalAttr);
     if (newAttr == originalAttr)
       return failure();
-    rewriter.updateRootInPlace(
-        dispatchOp, [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
+    rewriter.modifyOpInPlace(dispatchOp,
+                             [&]() { dispatchOp.setEntryPointsAttr(newAttr); });
     return success();
   }
 };

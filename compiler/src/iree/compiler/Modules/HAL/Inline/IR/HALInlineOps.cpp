@@ -171,7 +171,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
     });

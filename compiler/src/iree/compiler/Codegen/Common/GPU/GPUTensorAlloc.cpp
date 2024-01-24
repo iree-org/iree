@@ -118,7 +118,7 @@ struct SwapAllocTensorPattern final
         allocOp.getLoc(), allocOp.getType(), allocOp.getDynamicSizes(),
         /*copy=*/Value(),
         memorySpace ? cast<IntegerAttr>(*memorySpace) : IntegerAttr());
-    rewriter.updateRootInPlace(linalgOp, [&]() {
+    rewriter.modifyOpInPlace(linalgOp, [&]() {
       linalgOp->setOperand(linalgOp.getNumDpsInputs() + resultNumber,
                            newAllocOp);
     });

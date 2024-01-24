@@ -40,8 +40,8 @@ struct TestPartitionableLoopsInterfacePattern
     auto constantAttr = DenseIntElementsAttr::get(type, partitionableLoops);
     rewriter.create<IREE::Util::UnfoldableConstantOp>(interfaceOp.getLoc(),
                                                       constantAttr);
-    rewriter.updateRootInPlace(
-        interfaceOp, [&] { interfaceOp->removeAttr(kAttributeName); });
+    rewriter.modifyOpInPlace(interfaceOp,
+                             [&] { interfaceOp->removeAttr(kAttributeName); });
     return success();
   }
 };

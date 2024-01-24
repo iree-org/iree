@@ -80,8 +80,8 @@ struct StripResourceConversionCastPattern
               dyn_cast<IREE::Stream::ResourceSizeOp>(use.getOwner())) {
         rewriter.replaceOp(sizeOp, sizeValue);
       } else {
-        rewriter.updateRootInPlace(use.getOwner(),
-                                   [&]() { use.set(resourceValue); });
+        rewriter.modifyOpInPlace(use.getOwner(),
+                                 [&]() { use.set(resourceValue); });
       }
     }
     rewriter.eraseOp(castOp);

@@ -142,7 +142,7 @@ struct AddOpCanon final : OpRewritePattern<mlir::stablehlo::AddOp> {
 
     // The canonical form has the constant operand as the RHS.
     if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
-      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+      rewriter.modifyOpInPlace(op, [op, lhs, rhs] {
         op->setOperands(ValueRange{rhs, lhs});
       });
       return success();
@@ -239,7 +239,7 @@ struct MulOpCanon final : OpRewritePattern<mlir::stablehlo::MulOp> {
 
     // The canonical form has the constant operand as the RHS.
     if (isa<IntegerType>(type.getElementType()) && lhsAttr && !rhsAttr) {
-      rewriter.updateRootInPlace(op, [op, lhs, rhs] {
+      rewriter.modifyOpInPlace(op, [op, lhs, rhs] {
         op->setOperands(ValueRange{rhs, lhs});
       });
       return success();
@@ -381,7 +381,7 @@ struct CompareOpCanon final : OpRewritePattern<mlir::stablehlo::CompareOp> {
 
     // The canonical form has the constant operand as the RHS.
     if (lhsAttr && !rhsAttr) {
-      rewriter.updateRootInPlace(op, [&op, direction, lhs, rhs] {
+      rewriter.modifyOpInPlace(op, [&op, direction, lhs, rhs] {
         op.setComparisonDirection(invertDirection(direction));
         op->setOperands(ValueRange{rhs, lhs});
       });
@@ -1101,7 +1101,7 @@ struct ZeroExtentTensorCanon final : RewritePattern {
       int operandNum = operand.getOperandNumber();
       auto emptyTensorOp = rewriter.create<tensor::EmptyOp>(
           loc, operandType->getShape(), operandType->getElementType());
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           owner, [&]() { owner->setOperand(operandNum, emptyTensorOp); });
       didUpdate = true;
     }

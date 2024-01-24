@@ -103,10 +103,10 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
   auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
-  rewriter.startRootUpdate(exportOp);
+  rewriter.startOpModification(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
-  rewriter.finalizeRootUpdate(exportOp);
+  rewriter.finalizeOpModification(exportOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -148,9 +148,9 @@ replaceAllUsesOfLaneWithin(RewriterBase &b,
   for (Operation *user : llvm::make_early_inc_range(laneId.getUsers())) {
     if (!executeOp->isProperAncestor(user))
       continue;
-    b.startRootUpdate(user);
+    b.startOpModification(user);
     user->replaceUsesOfWith(laneId, zero);
-    b.finalizeRootUpdate(user);
+    b.finalizeOpModification(user);
     applied = true;
   }
   return success(applied);
@@ -480,14 +480,14 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     // the yielded type depending on whether the op has "broadcast"
     // behavior (see the doc of WarpExecuteOnLane0Op).
     for (OpOperand &use : distributedVal.getUses()) {
-      rewriter.startRootUpdate(use.getOwner());
+      rewriter.startOpModification(use.getOwner());
       Value replacement = newRead;
       if (use.get().getType() != newRead.getType()) {
         replacement = rewriter.create<vector::BroadcastOp>(
             load.getLoc(), use.get().getType(), newRead);
       }
       use.getOwner()->setOperand(use.getOperandNumber(), replacement);
-      rewriter.finalizeRootUpdate(use.getOwner());
+      rewriter.finalizeOpModification(use.getOwner());
     }
     return success();
   }
