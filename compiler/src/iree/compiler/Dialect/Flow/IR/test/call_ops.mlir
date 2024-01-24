@@ -17,14 +17,14 @@ flow.func private @externArg2Attrs(%arg0: tensor<4x?xi32> {arg.attr0}, %arg1: i3
 flow.func private @externRet0()
 // CHECK-NEXT: flow.func private @externRet1() -> tensor<4x?xi32>
 flow.func private @externRet1() -> tensor<4x?xi32>
-// CHECK-NEXT: flow.func private @externRet1Attrs() -> tensor<4x?xi32> {arg.attr}
-flow.func private @externRet1Attrs() -> tensor<4x?xi32> {arg.attr}
+// CHECK-NEXT: flow.func private @externRet1Attrs() -> (tensor<4x?xi32> {ret.attr})
+flow.func private @externRet1Attrs() -> (tensor<4x?xi32> {ret.attr})
 // CHECK-NEXT: flow.func private @externRet2() -> (tensor<4x?xi32>, i32)
 flow.func private @externRet2() -> (tensor<4x?xi32>, i32)
-// CHECK-NEXT: flow.func private @externRet2Attrs() -> (tensor<4x?xi32> {arg.attr0}, i32 {arg.attr1})
-flow.func private @externRet2Attrs() -> (tensor<4x?xi32> {arg.attr0}, i32 {arg.attr1})
-// CHECK-NEXT: flow.func private @externRetAttributes() -> tensor<4x?xi32> {arg.attr} attributes {some.attr = 123 : index}
-flow.func private @externRetAttributes() -> tensor<4x?xi32> {arg.attr} attributes {some.attr = 123 : index}
+// CHECK-NEXT: flow.func private @externRet2Attrs() -> (tensor<4x?xi32> {ret.attr0}, i32 {ret.attr1})
+flow.func private @externRet2Attrs() -> (tensor<4x?xi32> {ret.attr0}, i32 {ret.attr1})
+// CHECK-NEXT: flow.func private @externRetAttributes() -> (tensor<4x?xi32> {ret.attr}) attributes {some.attr = 123 : index}
+flow.func private @externRetAttributes() -> (tensor<4x?xi32> {ret.attr}) attributes {some.attr = 123 : index}
 
 // -----
 

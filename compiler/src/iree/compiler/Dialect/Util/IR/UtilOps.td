@@ -579,9 +579,128 @@ def Util_InitializerOp : Util_Op<"initializer", [
   let hasCanonicalizer = 1;
 }
 
+def Util_FuncOp : Util_Op<"func", [
+  AffineScope,
+  AutomaticAllocationScope,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  OpAsmOpInterface,
+]> {
+  let summary = [{function operation containing a CFG region}];
+  let description = [{
+    An operation declaring a callable function.
+
+    An external function declaration (used when referring to a function declared
+    in some other module) has no body.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static FuncOp create(Location location, StringRef name, FunctionType type,
+                         ArrayRef<int64_t> tiedOperands = {},
+                         ArrayRef<NamedAttribute> attrs = {},
+                         ArrayRef<DictionaryAttr> argAttrs = {},
+                         ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return isExternal(); }
+
+    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Util_CallOp : Util_Op<"call", [
+  CallOpInterface,
+  Util_TiedOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+]> {
+  let summary = [{function call operation}];
+  let description = [{
+    Represents a direct call to a function that is within the same symbol scope
+    as the call. The operands and result types of the call must match the
+    specified function type.
+
+    Calls support tied operands which indicate that specific results alias
+    a specific operand. The operand and result types are allowed to differ if
+    a cast is performed within the callee.
+
+    Example:
+    ```mlir
+    util.func @fn(%arg0: i32, %arg1: tensor<f32>) -> (f32, %arg1 as tensor<i32>)
+    ...
+    %0 = util.call @fn(%0, %1) : (i32, tensor<f32>) -> (f32, %1 as tensor<i32>)
+    ```
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyType>:$operands,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)`
+    attr-dict `:`
+    custom<OperandTypeList>(type($operands))
+    `->`
+    custom<TiedFunctionResultList>(ref($operands),
+                                   ref(type($operands)),
+                                   type($results),
+                                   $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    operand_range getArgOperands() { return {arg_operand_begin(), arg_operand_end()}; }
+    MutableOperandRange getArgOperandsMutable() { return getOperandsMutable(); }
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+  }];
+}
+
 def Util_ReturnOp : Util_Op<"return", [
   ParentOneOf<[
     "IREE::Util::InitializerOp",
+    "IREE::Util::FuncOp",
   ]>,
   Pure,
   ReturnLike,

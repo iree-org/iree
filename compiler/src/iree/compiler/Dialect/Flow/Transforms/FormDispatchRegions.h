@@ -33,7 +33,7 @@ private:
 
 } // namespace mlir
 
-namespace mlir ::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.
