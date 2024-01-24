@@ -95,14 +95,15 @@ struct TorchSession
 
     bool hasTorch = false;
     bool hasOnnx = false;
+    // TODO: Retire the tm_tensor input pipeline
+    bool hasTmTensor = false;
 
     module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
       if (d == torchDialect || d == torchConversionDialect) {
         hasTorch = true;
       } else if (d == tmTensorDialect) {
-        // TODO: Retire the tm_tensor input pipeline
-        typeMnemonics.insert("tm_tensor");
+        hasTmTensor = true;
       }
       return WalkResult::advance();
     });
@@ -121,6 +122,10 @@ struct TorchSession
       typeMnemonics.insert("onnx");
     } else if (hasTorch) {
       typeMnemonics.insert("torch");
+    }
+
+    if (hasTmTensor) {
+      typeMnemonics.insert("tm_tensor");
     }
   }
 };
