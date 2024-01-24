@@ -338,7 +338,7 @@ public:
       return failure();
     }
 
-    if (!options.enableROCMUkernels.empty() ||
+    if (!options.enableROCMUkernels.empty() &&
         options.enableROCMUkernels != "none") {
       auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
       linkUkernelBCFiles(llvmModule.get(), variantOp.getLoc(),
