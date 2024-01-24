@@ -282,10 +282,18 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - name: "Check disk space before download"
+        run: df -h
       - name: "Downloading build dir archive"
         run: wget -q "${BUILD_DIR_GCS_ARTIFACT_URL}"
+      - name: "Check disk space after download"
+        run: df -h
       - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
+        run: |
+          tar -xf "${BUILD_DIR_ARCHIVE}"
+          rm "${BUILD_DIR_ARCHIVE}"
+      - name: "Check disk space after extract"
+        run: df -h
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
