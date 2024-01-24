@@ -38,6 +38,10 @@ declare -a CMAKE_ARGS=(
   "-DCMAKE_INSTALL_PREFIX=$(realpath ${INSTALL_DIR})"
   "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
 
+  # DO NOT SUBMIT - testing if this helps build dir size
+  "-DIREE_COMPILER_BUILD_SHARED_LIBS=ON"
+  "-DIREE_ENABLE_THIN_ARCHIVES=ON"
+
   # Use `lld` for faster linking.
   "-DIREE_ENABLE_LLD=ON"
 
