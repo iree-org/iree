@@ -282,6 +282,13 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -494,6 +501,13 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -873,6 +887,13 @@ jobs:
         with:
           # We need the full history (and main branch) to generate the report.
           fetch-depth: 0
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: Downloading compilation benchmark results
         run: |
           gcloud storage cp \
@@ -992,6 +1013,13 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - id: "gcp-auth"
+        name: "Authenticating to Google Cloud"
+        uses: "google-github-actions/auth@v1"
+        with:
+          token_format: "access_token"
+          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+          create_credentials_file: false
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
