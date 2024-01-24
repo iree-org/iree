@@ -58,6 +58,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
   // pass. We are abusing OptimizeVectorTransferPass with `flatten=true` in some
   // CPU pipelines.
   vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+  vector::populateDropUnitDimWithShapeCastPatterns(patterns);
   vector::populateVectorGatherLoweringPatterns(patterns);
   vector::populateVectorContractLoweringPatterns(
       patterns, vectorTransformOptions,
