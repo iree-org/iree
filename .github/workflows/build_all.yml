@@ -63,6 +63,7 @@ jobs:
       build-dir: ${{ env.BUILD_DIR }}
       build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      build-dir-gcs-artifact-url: ${{ steps.upload.outputs.build-dir-gcs-artifact-url }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
