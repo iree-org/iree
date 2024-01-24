@@ -56,10 +56,7 @@ iree_runtime_cc_library(
                "//runtime/src/iree/base",
                "//runtime/src/iree/hal",
            ] + select({
-               ":cuda_enabled": [
-                   "//runtime/src/iree/hal/drivers/cuda/registration",
-                   "//runtime/src/iree/hal/drivers/cuda2/registration",
-               ],
+               ":cuda_enabled": ["//runtime/src/iree/hal/drivers/cuda2/registration"],
                "//conditions:default": [],
            }) +
            select({
