@@ -148,11 +148,6 @@ class CustomModuleState final {
     return OkStatus();
   }
 
-  // Prints the contents of the string to stdout.
-  Status ThrowError() {
-    return iree_make_status(IREE_STATUS_UNKNOWN, "Forced failure");
-  }
-
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -164,7 +159,6 @@ static const vm::NativeFunction<CustomModuleState> kCustomModuleFunctions[] = {
     vm::MakeNativeFunction("string.from_tensor",
                            &CustomModuleState::StringFromTensor),
     vm::MakeNativeFunction("string.print", &CustomModuleState::StringPrint),
-    vm::MakeNativeFunction("error", &CustomModuleState::ThrowError),
 };
 
 // The module instance that will be allocated and reused across contexts.
