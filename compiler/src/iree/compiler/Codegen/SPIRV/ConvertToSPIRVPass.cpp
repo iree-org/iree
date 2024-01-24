@@ -435,13 +435,10 @@ void ConvertToSPIRVPass::runOnOperation() {
     RewritePatternSet patterns(context);
     arith::populateExpandBFloat16Patterns(patterns);
     arith::BitcastOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(moduleOp,
-                                            std::move(patterns)))) {
-      moduleOp.emitOpError() << "failed running expansion patterns";
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+      moduleOp.emitOpError() << "failed running bf16 extf/trunc patterns";
       return signalPassFailure();
     }
-    moduleOp.dump();
-
   }
 
   spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(moduleOp);
@@ -487,7 +484,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Pull in standard/math patterns to convert arithmetic ops and others.
   arith::populateCeilFloorDivExpandOpsPatterns(patterns);
   arith::populateArithToSPIRVPatterns(typeConverter, patterns);
-  arith::populateExpandBFloat16Patterns(patterns);
   populateFuncToSPIRVPatterns(typeConverter, patterns);
   populateMathToSPIRVPatterns(typeConverter, patterns);
   populateComplexToSPIRVPatterns(typeConverter, patterns);
