@@ -1,19 +1,19 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 //      CHECK: util.initializer {
-// CHECK-NEXT:   util.initializer.return
+// CHECK-NEXT:   util.return
 // CHECK-NEXT: }
 util.initializer {
-  util.initializer.return
+  util.return
 }
 
 // -----
 
 //      CHECK: util.initializer attributes {foo} {
-// CHECK-NEXT:   util.initializer.return
+// CHECK-NEXT:   util.return
 // CHECK-NEXT: }
 util.initializer attributes {foo} {
-  util.initializer.return
+  util.return
 }
 
 // -----
@@ -26,6 +26,6 @@ util.initializer {
   cf.br ^bb1(%zero: i32)
   // CHECK-NEXT: ^bb1(%0: i32):
 ^bb1(%0: i32):
-  // CHECK-NEXT:   util.initializer.return
-  util.initializer.return
+  // CHECK-NEXT:   util.return
+  util.return
 }

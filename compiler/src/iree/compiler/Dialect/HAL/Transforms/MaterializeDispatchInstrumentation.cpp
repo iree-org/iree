@@ -152,7 +152,7 @@ struct MaterializeDispatchInstrumentationPass
           /*uninitialized=*/true, /*affinity=*/nullptr);
       initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, buffer,
                                                            globalOp);
-      initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+      initializerBuilder.create<IREE::Util::ReturnOp>(loc);
     }
 
     FlatbufferBuilder metadataBuilder;

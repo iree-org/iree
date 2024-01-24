@@ -1014,6 +1014,32 @@ Block *InitializerOp::addBlock() {
 }
 
 //===----------------------------------------------------------------------===//
+// util.return
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReturnOp::verify() {
+  Operation *op = getOperation();
+  auto parentOp = cast<FunctionOpInterface>(op->getParentOp());
+  auto expectedTypes = parentOp.getResultTypes();
+  if (getNumOperands() != expectedTypes.size()) {
+    return emitOpError("has ")
+           << getNumOperands()
+           << " operands, but enclosing function-like op returns "
+           << expectedTypes.size();
+  }
+  for (auto [i, expectedType, actualType] :
+       llvm::enumerate(expectedTypes, getOperandTypes())) {
+    if (expectedType != actualType) {
+      return emitOpError() << "type of return operand " << i << " ("
+                           << actualType
+                           << ") doesn't match function result type ("
+                           << expectedType << ")";
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // util.global
 //===----------------------------------------------------------------------===//
 

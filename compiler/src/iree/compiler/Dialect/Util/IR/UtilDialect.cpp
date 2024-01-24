@@ -65,7 +65,7 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
   }
 
   void handleTerminator(Operation *op, Block *newDest) const final {
-    auto returnOp = dyn_cast<IREE::Util::InitializerReturnOp>(op);
+    auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op);
     if (!returnOp)
       return;
     // util.initialize.return takes no args - just branch to the new block.

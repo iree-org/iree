@@ -6,7 +6,7 @@ util.global private @v_initialized : tensor<4xi32>
 util.initializer {
   %0 = arith.constant dense<4> : tensor<4xi32>
   util.global.store %0, @v_initialized : tensor<4xi32>
-  util.initializer.return
+  util.return
 }
 
 // -----

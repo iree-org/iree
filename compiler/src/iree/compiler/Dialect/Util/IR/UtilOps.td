@@ -63,10 +63,10 @@ def Util_NullOp : Util_PureOp<"null"> {
 def Util_CastOp : Util_PureOp<"cast", [
   DeclareOpInterfaceMethods<CastOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-      "getTiedResult",
-      "getTiedResultOperand",
-      "getTiedResultOperandIndex",
-      "getTiedResultOperandIndices",
+    "getTiedResult",
+    "getTiedResultOperand",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
   ]>,
 ]> {
   let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
@@ -294,7 +294,7 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
 } // OpGroupRangeArithmeticOps
 
 //===----------------------------------------------------------------------===//
-// Address/offset Arithmetic
+// Address/offset arithmetic
 //===----------------------------------------------------------------------===//
 
 def OpGroupAddressOffsetArithmeticOps : OpDocGroup {
@@ -306,7 +306,7 @@ let opDocGroup = OpGroupAddressOffsetArithmeticOps in {
 
 def Util_AlignOp : Util_PureOp<"align", [
   SameOperandsAndResultType
-  ]> {
+]> {
   let summary = "Aligns up to a power-of-two alignment if required";
   let description = [{
      Aligns |value| up to the given power-of-two |alignment| if required.
@@ -474,10 +474,10 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
 }
 
 def Util_UnreachableOp : Util_Op<"unreachable", [
-    NoMemoryEffect,
-    ReturnLike,
-    Terminator
-  ]> {
+  NoMemoryEffect,
+  ReturnLike,
+  Terminator
+]> {
   let summary = [{unreachable assertion op}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.
@@ -516,11 +516,11 @@ def OpGroupStructuralOps : OpDocGroup {
 let opDocGroup = OpGroupStructuralOps in {
 
 def Util_InitializerOp : Util_Op<"initializer", [
-    IsolatedFromAbove,
-    FunctionOpInterface,
-    CallableOpInterface,
-    Util_InitializerOpInterface,
-  ]> {
+  IsolatedFromAbove,
+  FunctionOpInterface,
+  CallableOpInterface,
+  Util_InitializerOpInterface,
+]> {
   let summary = [{global initialization function}];
   let description = [{
     A function that is called in definition order upon module initialization.
@@ -579,8 +579,10 @@ def Util_InitializerOp : Util_Op<"initializer", [
   let hasCanonicalizer = 1;
 }
 
-def Util_InitializerReturnOp : Util_Op<"initializer.return", [
-  HasParent<"IREE::Util::InitializerOp">,
+def Util_ReturnOp : Util_Op<"return", [
+  ParentOneOf<[
+    "IREE::Util::InitializerOp",
+  ]>,
   Pure,
   ReturnLike,
   Terminator,
@@ -590,9 +592,22 @@ def Util_InitializerReturnOp : Util_Op<"initializer.return", [
     Returns control from an initializer function.
   }];
 
-  let arguments = (ins);
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
 
-  let assemblyFormat = "attr-dict";
+  let builders = [
+    OpBuilder<(ins), [{
+      build($_builder, $_state, std::nullopt);
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupStructuralOps
@@ -821,8 +836,9 @@ def OpGroupListOps : OpDocGroup {
 
 let opDocGroup = OpGroupListOps in {
 
-def Util_ListCreateOp : Util_PureOp<
-    "list.create", [MemoryEffects<[MemAlloc]>]> {
+def Util_ListCreateOp : Util_PureOp<"list.create", [
+  MemoryEffects<[MemAlloc]>,
+]> {
   let summary = [{creates a new empty list}];
   let description = [{
     Creates a new empty list with an optional initial capacity.
@@ -838,7 +854,9 @@ def Util_ListCreateOp : Util_PureOp<
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
 }
 
-def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
+def Util_ListSizeOp : Util_Op<"list.size", [
+  MemoryEffects<[MemRead]>,
+]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
@@ -854,7 +872,9 @@ def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
-def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
+def Util_ListResizeOp : Util_Op<"list.resize", [
+  MemoryEffects<[MemWrite]>,
+]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -870,7 +890,9 @@ def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
-def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
+def Util_ListGetOp : Util_Op<"list.get", [
+  MemoryEffects<[MemRead]>,
+]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -890,7 +912,9 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let hasVerifier = 1;
 }
 
-def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
+def Util_ListSetOp : Util_Op<"list.set", [
+  MemoryEffects<[MemWrite]>,
+]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.

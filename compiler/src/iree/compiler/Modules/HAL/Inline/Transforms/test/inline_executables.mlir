@@ -27,7 +27,7 @@ hal.executable private @ex {
       util.initializer {
         %buffer_cst = util.buffer.constant : !util.buffer = dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
         util.global.store %buffer_cst, @global_constant : !util.buffer
-        util.initializer.return
+        util.return
       }
       func.func @dispatch_0(
           %local_memory: !util.buffer,

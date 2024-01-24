@@ -81,7 +81,7 @@ util.global private mutable @mutable : index
 util.initializer {
   %c6 = arith.constant 6 : index
   util.global.store %c6, @immutable1 : index
-  util.initializer.return
+  util.return
 }
 func.func @foo(%arg0: index) -> (index, index, index) {
   // CHECK-DAG: %[[C5:.+]] = arith.constant 5
@@ -125,7 +125,7 @@ util.initializer {
   %c6 = arith.constant 6 : index
   // CHECK-NOT: util.global.store %c6, @unused1 : index
   util.global.store %c6, @unused1 : index
-  util.initializer.return
+  util.return
 }
 
 // -----
@@ -153,7 +153,7 @@ util.global private @nondupeCst1 = 6 : index
 util.initializer {
   %c7 = arith.constant 7 : index
   util.global.store %c7, @nondupeCst1 : index
-  util.initializer.return
+  util.return
 }
 func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index

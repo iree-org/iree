@@ -142,7 +142,7 @@ struct GlobalOpExpansion
           globalOp.getLoc(), initialValue, resourceOp.getSymName());
       rewriter.create<IREE::Util::GlobalStoreOp>(
           globalOp.getLoc(), initialValueSize, resourceSizeOp.getSymName());
-      rewriter.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
+      rewriter.create<IREE::Util::ReturnOp>(globalOp.getLoc());
     }
 
     expansionState->globalMap[globalOp.getSymName()] = ExpandedGlobalResource{
@@ -256,7 +256,7 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       });
 
   conversionTarget
-      .addLegalOp<IREE::Util::InitializerOp, IREE::Util::InitializerReturnOp>();
+      .addLegalOp<IREE::Util::InitializerOp, IREE::Util::ReturnOp>();
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&

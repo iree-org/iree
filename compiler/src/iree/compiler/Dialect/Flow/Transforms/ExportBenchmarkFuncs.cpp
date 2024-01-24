@@ -85,7 +85,7 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   // util.global.store
   initializerBuilder.create<IREE::Util::GlobalStoreOp>(
       loc, barrierOp.getResult(0), globalOp.getName());
-  initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+  initializerBuilder.create<IREE::Util::ReturnOp>(loc);
 
   return globalOp;
 }
