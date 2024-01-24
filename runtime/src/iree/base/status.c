@@ -6,8 +6,6 @@
 
 #include "iree/base/status.h"
 
-#include "iree/base/attributes.h"
-
 #if defined(IREE_PLATFORM_APPLE)
 #include <dlfcn.h>
 #include <execinfo.h>
@@ -1060,31 +1058,49 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
 
-static bool iree_status_format_message(iree_status_t status,
-                                       iree_host_size_t buffer_capacity,
-                                       char* buffer,
-                                       iree_host_size_t* out_buffer_length,
-                                       bool has_prefix) {
+IREE_API_EXPORT bool iree_status_format(iree_status_t status,
+                                        iree_host_size_t buffer_capacity,
+                                        char* buffer,
+                                        iree_host_size_t* out_buffer_length) {
   *out_buffer_length = 0;
 
   // Grab storage which may have a message and zero or more payloads.
-  iree_status_storage_t* storage = iree_status_storage(status);
-  // If no storage, nothing to do.
-  if (!storage) {
-    return true;
-  }
+  iree_status_storage_t* storage IREE_ATTRIBUTE_UNUSED =
+      iree_status_storage(status);
 
   // Prefix with source location and status code string (may be 'OK').
   iree_host_size_t buffer_length = 0;
+  iree_status_code_t status_code = iree_status_code(status);
   int n = 0;
+#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
+  if (storage && storage->file) {
+    n = snprintf(buffer ? buffer + buffer_length : NULL,
+                 buffer ? buffer_capacity - buffer_length : 0, "%s:%d: %s",
+                 storage->file, storage->line,
+                 iree_status_code_string(status_code));
+  } else {
+    n = snprintf(buffer ? buffer + buffer_length : NULL,
+                 buffer ? buffer_capacity - buffer_length : 0, "%s",
+                 iree_status_code_string(status_code));
+  }
+#else
+  n = snprintf(buffer ? buffer + buffer_length : NULL,
+               buffer ? buffer_capacity - buffer_length : 0, "%s",
+               iree_status_code_string(status_code));
+#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
+  if (IREE_UNLIKELY(n < 0)) {
+    return false;
+  } else if (buffer && n >= buffer_capacity - buffer_length) {
+    buffer = NULL;
+  }
+  buffer_length += n;
 
 #if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0
   // Append base storage message.
   if (storage && !iree_string_view_is_empty(storage->message)) {
     n = snprintf(buffer ? buffer + buffer_length : NULL,
-                 buffer ? buffer_capacity - buffer_length : 0,
-                 has_prefix ? "; %.*s" : "%.*s", (int)storage->message.size,
-                 storage->message.data);
+                 buffer ? buffer_capacity - buffer_length : 0, "; %.*s",
+                 (int)storage->message.size, storage->message.data);
     if (IREE_UNLIKELY(n < 0)) {
       return false;
     } else if (buffer && n >= buffer_capacity - buffer_length) {
@@ -1093,11 +1109,6 @@ static bool iree_status_format_message(iree_status_t status,
     buffer_length += n;
   }
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
-  if (IREE_UNLIKELY(n < 0)) {
-    return false;
-  } else if (buffer && n >= buffer_capacity) {
-    buffer = NULL;
-  }
 
 #if IREE_STATUS_FEATURES != 0
   // Append each payload separated by a newline.
@@ -1138,142 +1149,6 @@ static bool iree_status_format_message(iree_status_t status,
   *out_buffer_length = buffer_length;
   return true;
 }
-
-IREE_API_EXPORT bool iree_status_format(iree_status_t status,
-                                        iree_host_size_t buffer_capacity,
-                                        char* buffer,
-                                        iree_host_size_t* out_buffer_length) {
-  *out_buffer_length = 0;
-
-  // Grab storage which may have a message and zero or more payloads.
-  iree_status_storage_t* storage IREE_ATTRIBUTE_UNUSED =
-      iree_status_storage(status);
-
-  // Prefix with source location and status code string (may be 'OK').
-  iree_host_size_t prefix_buffer_length = 0;
-  iree_status_code_t status_code = iree_status_code(status);
-  int n = 0;
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
-  if (storage && storage->file) {
-    n = snprintf(buffer ? buffer : NULL, buffer ? buffer_capacity : 0,
-                 "%s:%d: %s", storage->file, storage->line,
-                 iree_status_code_string(status_code));
-  } else {
-    n = snprintf(buffer ? buffer : NULL, buffer ? buffer_capacity : 0, "%s",
-                 iree_status_code_string(status_code));
-  }
-#else
-  n = snprintf(buffer ? buffer + prefix_buffer_length : NULL,
-               buffer ? buffer_capacity - prefix_buffer_length : 0, "%s",
-               iree_status_code_string(status_code));
-#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
-  if (IREE_UNLIKELY(n < 0)) {
-    return false;
-  } else if (buffer && n >= buffer_capacity) {
-    buffer = NULL;
-  }
-  prefix_buffer_length += n;
-
-  iree_host_size_t message_buffer_length = 0;
-  bool ret = iree_status_format_message(
-      status, buffer_capacity, buffer ? buffer + prefix_buffer_length : NULL,
-      &message_buffer_length, /*has_prefix=*/true);
-  if (!ret) {
-    return false;
-  }
-  *out_buffer_length = message_buffer_length + prefix_buffer_length;
-  return true;
-}
-
-#if IREE_STATUS_FEATURES == 0
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
-iree_status_freeze(iree_status_t status) {
-  // Statuses are just codes; nothing to do.
-  return status;
-}
-#else
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
-iree_status_freeze(iree_status_t status) {
-  iree_status_code_t code = iree_status_code(status);
-  if (code == IREE_STATUS_OK) {
-    return iree_ok_status();
-  }
-
-  // Get the size of the formatted message alone. Source file annotations are
-  // handled separately.
-  iree_host_size_t message_buffer_size = 0;
-  if (IREE_UNLIKELY(!iree_status_format_message(
-          status, /*buffer_capacity=*/0,
-          /*buffer=*/NULL, &message_buffer_size, /*has_prefix=*/false))) {
-    iree_status_free(status);
-    return iree_status_from_code(code);
-  }
-  message_buffer_size++;  // NUL
-
-  // Compute the storage size for the status with additional room to store the
-  // formatted message and source file location if present.
-  size_t unaligned_storage_size =
-      sizeof(iree_status_storage_t) + message_buffer_size;
-
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
-  // Grab storage for the source file location.
-  iree_status_storage_t* storage = iree_status_storage(status);
-  const char* file = NULL;
-  uint32_t line = 0;
-  if (storage) {
-    file = storage->file;
-    line = storage->line;
-  }
-  size_t file_storage_size = file ? strlen(file) + 1 : 0;
-  unaligned_storage_size += file_storage_size;
-#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
-
-  size_t storage_alignment = (IREE_STATUS_CODE_MASK + 1);
-  size_t storage_size =
-      iree_host_align(unaligned_storage_size, storage_alignment);
-  iree_status_storage_t* new_storage =
-      (iree_status_storage_t*)iree_aligned_alloc(storage_alignment,
-                                                 storage_size);
-  if (IREE_UNLIKELY(!new_storage)) {
-    iree_status_free(status);
-    return iree_status_from_code(code);
-  }
-  memset(new_storage, 0, sizeof(*new_storage));
-
-  char* message_data = (char*)new_storage + sizeof(iree_status_storage_t);
-  size_t res_length;
-  // Format the status message directly into the region allocated for it.
-  bool ret =
-      iree_status_format_message(status, message_buffer_size, message_data,
-                                 &res_length, /*has_prefix=*/false);
-  new_storage->message.size = message_buffer_size - 1;
-  new_storage->message.data =
-      (const char*)new_storage + sizeof(iree_status_storage_t);
-  iree_status_t new_status =
-      (iree_status_t)((uintptr_t)new_storage | (code & IREE_STATUS_CODE_MASK));
-
-  if (IREE_UNLIKELY(!ret)) {
-    iree_status_free(new_status);
-    iree_status_free(status);
-    return iree_status_from_code(code);
-  }
-
-#if (IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_SOURCE_LOCATION) != 0
-  if (file) {
-    new_storage->file = storage->file;
-    char* storage_file = (char*)new_storage + sizeof(iree_status_storage_t) +
-                         message_buffer_size;
-    // Copy the file into the storage allocated for it.
-    memcpy(storage_file, file, file_storage_size);
-    new_storage->file = (const char*)storage_file;
-  }
-  new_storage->line = line;
-#endif  // has IREE_STATUS_FEATURE_SOURCE_LOCATION
-
-  iree_status_free(status);
-  return new_status;
-}
-#endif  // has any IREE_STATUS_FEATURES
 
 IREE_API_EXPORT bool iree_status_to_string(
     iree_status_t status, const iree_allocator_t* allocator, char** out_buffer,

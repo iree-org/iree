@@ -442,12 +442,6 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t iree_status_allocate_vf(
 IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
 iree_status_clone(iree_status_t status);
 
-// Freezes |status| into a new status instance. Formats all attached
-// annotations, payloads included, into a single message string allocated to
-// the new status. This always frees the original status.
-IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t
-iree_status_freeze(iree_status_t status);
-
 // Frees |status| if it has any associated storage.
 IREE_API_EXPORT void iree_status_free(iree_status_t status);
 
