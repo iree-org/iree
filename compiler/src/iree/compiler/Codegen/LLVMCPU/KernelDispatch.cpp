@@ -102,12 +102,11 @@ enum class VectorPreProcStrategy {
   // be masked-out.
   Masking,
   // Do not apply any vectorization pre-processing transformation.
-  None,
-  // A hint for the compiler to use its heuristics to determine an
-  // actual pre-processing strategy.
-  Heuristics
+  None
 };
 
+// Use this flag to override IREE's heuristics for selecting the pre-processing
+// strategy.
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
     "iree-llvmcpu-vector-pproc-strategy",
     llvm::cl::desc("Set the strategy for pre-processing Linalg operation "
@@ -123,10 +122,7 @@ static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
             "and out-of-bounds elements would be masked-out."),
         clEnumValN(
             VectorPreProcStrategy::None, "none",
-            "Do not apply any vectorization pre-processing transformation."),
-        clEnumValN(VectorPreProcStrategy::Heuristics, "heuristics",
-                   "To be determined by IREE's heuristics (default).")),
-    llvm::cl::init(VectorPreProcStrategy::Heuristics));
+            "Do not apply any vectorization pre-processing transformation.")));
 
 // TODO(dcaballe): Move operator<< to DebugUtils.h.
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -140,9 +136,6 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     break;
   case VectorPreProcStrategy::None:
     os << "None";
-    break;
-  case VectorPreProcStrategy::Heuristics:
-    os << "Heuristics";
     break;
   }
   return os;
@@ -198,13 +191,13 @@ static bool isFullyDynamicOp(linalg::LinalgOp op) {
 }
 
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
-/// given LinalgOp. It is based on either:
+/// given LinalgOp. It is based on either (in the priority order):
 ///   * user-specified value, or
-///   * heuristics (e.g. the op traits and the target architecture).
+///   * IREE's heuristics (e.g. the op traits and the target architecture).
 static VectorPreProcStrategy
 getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   // If set, use the strategy selected by a user.
-  if (clPProcStrategy != VectorPreProcStrategy::Heuristics) {
+  if (clPProcStrategy.getNumOccurrences()) {
     return clPProcStrategy;
   }
 
