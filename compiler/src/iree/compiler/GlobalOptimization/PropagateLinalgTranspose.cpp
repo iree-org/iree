@@ -211,8 +211,6 @@ public:
       // the transposed domain.
       int64_t transposedIdx = perm[idx];
       if (!rankReducingMask.contains(transposedIdx)) {
-        llvm::dbgs() << "rankReducedMap[" << invPerm[transposedIdx]
-                     << "]: " << dim << "\n";
         // Domain of `rankReducedMap` is in pre-transposed domain
         rankReducedMap[idx] = dim++;
       }
