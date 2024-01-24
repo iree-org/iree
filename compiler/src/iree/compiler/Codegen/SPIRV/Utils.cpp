@@ -35,17 +35,29 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
 
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
-spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
+DictionaryAttr getTargetConfigAttr(Operation *op) {
   auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variant)
     return nullptr;
   IREE::HAL::ExecutableTargetAttr targetAttr = variant.getTarget();
   if (!targetAttr)
     return nullptr;
-  auto config = targetAttr.getConfiguration();
+  return targetAttr.getConfiguration();
+}
+
+spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
+  DictionaryAttr config = getTargetConfigAttr(op);
   if (!config)
     return nullptr;
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
+}
+
+UnitAttr getIndirectBindingsAttr(Operation *op) {
+  DictionaryAttr config = getTargetConfigAttr(op);
+  if (!config)
+    return nullptr;
+
+  return config.getAs<UnitAttr>("hal.bindings.indirect");
 }
 
 std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp) {
