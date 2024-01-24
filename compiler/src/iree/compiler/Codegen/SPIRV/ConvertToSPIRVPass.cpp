@@ -518,7 +518,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   auto interfaceToResourceVars = createResourceVariables(moduleOp);
   // For using use them in conversion.
   patterns.add<HALInterfaceBindingSubspanConverter>(typeConverter, context,
-                                                       interfaceToResourceVars);
+                                                    interfaceToResourceVars);
 
   /// Fold certain operations as no-ops:
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
