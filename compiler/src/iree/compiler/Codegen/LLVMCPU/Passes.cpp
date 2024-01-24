@@ -286,15 +286,16 @@ void buildLLVMCPUVectorLoweringPipeline(
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
 
+  passManager.addNestedPass<func::FuncOp>(
+      createLLVMCPUVectorTransposeLoweringPass(
+          options.lowerVectorTransposeToAVX2));
+
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVectorTransferLoweringPass());
-  passManager.addNestedPass<func::FuncOp>(
-      createLLVMCPUVectorTransposeLoweringPass(
-          options.lowerVectorTransposeToAVX2));
 
   // 'vector.shape_cast' are very expensive operations that are even generated
   // by some of the lowerings above (e.g., transpose lowering). There are
