@@ -283,7 +283,7 @@ jobs:
         with:
           submodules: true
       - name: "Downloading build dir archive"
-        run: wget "${BUILD_DIR_GCS_ARTIFACT_URL}"
+        run: wget -q "${BUILD_DIR_GCS_ARTIFACT_URL}"
       - name: "Extracting build dir archive"
         run: tar -xf "${BUILD_DIR_ARCHIVE}"
       - name: "Testing all"

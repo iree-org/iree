@@ -81,17 +81,13 @@ jobs:
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
       # Remove unused files to save disk space.
-      # TODO(#16203): Switch to package-based CI.
-      - name: "Removing unused .o files"
-        run: |
-          find "${BUILD_DIR}" -type f -name "*.a" \
-            -print \
-            -delete
+      # TODO(#16203): Switch to package-based CI
+      #   This could also be an allow-list instead of a deny-list, but packages
+      #   are even more explicit.
       - name: "Removing unused .a files"
-        run: |
-          find "${BUILD_DIR}" -type f -name "*.o" \
-            -print \
-            -delete
+        run: find "${BUILD_DIR}" -type f -name "*.a" -print -delete
+      - name: "Removing unused .o files"
+        run: find "${BUILD_DIR}" -type f -name "*.o" -print -delete
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
