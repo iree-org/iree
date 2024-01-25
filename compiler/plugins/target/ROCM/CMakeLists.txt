@@ -21,9 +21,11 @@ iree_cc_library(
   NAME
     ROCM
   HDRS
+    "ROCMTargetFeatures.h"
     "ROCMTargetUtils.h"
   SRCS
     "ROCMTarget.cpp"
+    "ROCMTargetFeatures.cpp"
     "ROCMTargetUtils.cpp"
   DEPS
     LLVMAMDGPUCodeGen
@@ -52,6 +54,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTargetLLVMIRExport
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target

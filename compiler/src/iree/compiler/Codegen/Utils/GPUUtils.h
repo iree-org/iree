@@ -120,6 +120,12 @@ bool hasUkernelSupportedRocmArch(StringRef targetChip);
 /// Checks if targetAttr's GPU target has UKernel support.
 bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_

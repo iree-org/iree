@@ -100,8 +100,8 @@ createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
-// Creates a pass to tile reduction dimensions and create allocations for some
-// tensor values to use GPU shared memory.
+// Creates a pass to create allocations for some tensor values to use GPU
+// shared memory.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
                          GPUPromoteSharedMemPattern::ContractionOpPattern);
@@ -117,6 +117,11 @@ createGPUTensorTileToSerialLoops();
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTileReductionPass();
+
+// Creates a pass to create allocations for some vector values to use GPU
+// shared memory.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUVectorAlloc();
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the

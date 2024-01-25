@@ -4,12 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "./ROCMTargetFeatures.h"
 #include "./ROCMTargetUtils.h"
 
 #include <cstdint>
 #include <mutex>
 
+#include "compiler/plugins/target/ROCM/ROCMTargetFeatures.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -125,6 +129,8 @@ public:
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerROCDLDialectTranslation(registry);
     registry.insert<IREE::Codegen::IREECodegenDialect>();
+    registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
+    registry.insert<IREE::GPU::IREEGPUDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
   }
 
@@ -447,6 +453,12 @@ private:
     addConfig("target_arch", StringAttr::get(context, options.targetChip));
 
     addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
+
+    FailureOr<ArrayAttr> maybeMmaAttrs =
+        getROCMSupportedMmaAttrs(context, options.targetChip);
+    if (succeeded(maybeMmaAttrs)) {
+      addConfig("mma_types", *maybeMmaAttrs);
+    }
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(

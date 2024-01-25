@@ -1,0 +1,128 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files([
+    "IREEGPUAttrs.td",
+    "IREEGPUDialect.td",
+    "IREEGPUInterfaces.td",
+])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "IREEGPUAttrs.td",
+            "IREEGPUDialect.td",
+            "IREEGPUInterfaces.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IREEGPUDialect",
+    srcs = [
+        "IREEGPUAttrs.cpp",
+        "IREEGPUDialect.cpp",
+        "IREEGPUInterfaces.cpp",
+    ],
+    hdrs = [
+        "IREEGPUAttrs.h",
+        "IREEGPUDialect.h",
+        "IREEGPUInterfaces.h",
+    ],
+    textual_hdrs = [
+        "IREEGPUAttrs.cpp.inc",
+        "IREEGPUAttrs.h.inc",
+        "IREEGPUDialect.cpp.inc",
+        "IREEGPUDialect.h.inc",
+        "IREEGPUInterfaces.cpp.inc",
+        "IREEGPUInterfaces.h.inc",
+    ],
+    deps = [
+        ":IREEGPUAttrs",
+        ":IREEGPUDialectGen",
+        ":IREEGPUInterfaces",
+        "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEGPUDialectGen",
+    tbl_outs = [
+        (
+            ["--gen-dialect-decls"],
+            "IREEGPUDialect.h.inc",
+        ),
+        (
+            ["--gen-dialect-defs"],
+            "IREEGPUDialect.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUDialect.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEGPUAttrs",
+    tbl_outs = [
+        (
+            ["--gen-enum-decls"],
+            "IREEGPUEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "IREEGPUEnums.cpp.inc",
+        ),
+        (
+            ["--gen-attrdef-decls"],
+            "IREEGPUAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "IREEGPUAttrs.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUAttrs.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEGPUInterfaces",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "IREEGPUInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "IREEGPUInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUInterfaces.td",
+    deps = [":td_files"],
+)

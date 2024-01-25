@@ -920,4 +920,30 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+static constexpr char mmaTypeListName[] = "mma_types";
+static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  Attribute types = config.get(mmaTypeListName);
+  if (!types) {
+    return failure();
+  }
+  return llvm::cast<ArrayAttr>(types);
+}
+
+FailureOr<ArrayAttr>
+getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+    return getSupportedMmaTypes(targetAttr.getConfiguration());
+  }
+  return failure();
+}
+
 } // namespace mlir::iree_compiler
