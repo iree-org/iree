@@ -2399,3 +2399,78 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
 // CHECK-SAME:       outs(%[[PACK_RES]] :
 //  CHECK-DAG:   %[[UNPACK_DEST:.+]] = tensor.empty() : tensor<2x128x512xf32>
 //      CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[BATCH_MMT4D]] outer_dims_perm = [0, 1, 2] inner_dims_pos = [1, 2] inner_tiles = [8, 4] into %[[UNPACK_DEST]] : tensor<2x16x128x8x4xf32> -> tensor<2x128x512xf32>
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map3 = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
+func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %arg1: tensor<4096x32x128xi4>, %arg2: tensor<4096x32xi32>) -> tensor<4096x32xi32> attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512vnni"}>
+} {
+  %c0_i32 = arith.constant 0 : i32
+  %c0_i4 = arith.constant 0 : i4
+  %c4096 = arith.constant 4096 : index
+  %c0_i16 = arith.constant 0 : i16
+  %c128 = arith.constant 128 : index
+  %c32 = arith.constant 32 : index
+  %0:2 = iree_linalg_ext.upper_bound_tile_size tensor<32x128xi16, #iree_linalg_ext.encoding<role =  LHS, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %1 = affine.apply #map3()[%0#0, %c32]
+  %2 = affine.apply #map3()[%0#1, %c128]
+  %padded = tensor.pad %arg0 low[0, 0] high[%1, %2] {
+  ^bb0(%arg3: index, %arg4: index):
+    tensor.yield %c0_i16 : i16
+  } : tensor<32x128xi16> to tensor<?x?xi16>
+  %3 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi16> -> tensor<?x?xi16, #iree_linalg_ext.encoding<role =  LHS, element_types = [i16, ui4, i32], original_type = tensor<32x128xi16>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+  %4:3 = iree_linalg_ext.upper_bound_tile_size tensor<4096x32x128xi4, #iree_linalg_ext.encoding<role =  RHS, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %5 = affine.apply #map3()[%4#0, %c4096]
+  %6 = affine.apply #map3()[%4#1, %c32]
+  %7 = affine.apply #map3()[%4#2, %c128]
+  %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%5, %6, %7] {
+  ^bb0(%arg3: index, %arg4: index, %arg5: index):
+    tensor.yield %c0_i4 : i4
+  } : tensor<4096x32x128xi4> to tensor<?x?x?xi4>
+  %8 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xi4> -> tensor<?x?x?xi4, #iree_linalg_ext.encoding<role =  RHS, element_types = [i16, ui4, i32], original_type = tensor<4096x32x128xi4>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+  %9:2 = iree_linalg_ext.upper_bound_tile_size tensor<4096x32xi32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [i16, ui4, i32], matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %10 = affine.apply #map3()[%9#0, %c4096]
+  %11 = affine.apply #map3()[%9#1, %c32]
+  %padded_1 = tensor.pad %arg2 low[0, 0] high[%10, %11] {
+  ^bb0(%arg3: index, %arg4: index):
+    tensor.yield %c0_i32 : i32
+  } : tensor<4096x32xi32> to tensor<?x?xi32>
+  %12 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?xi32> -> tensor<?x?xi32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [i16, ui4, i32], original_type = tensor<4096x32xi32>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]} ins(%3, %8 : tensor<?x?xi16, #iree_linalg_ext.encoding<role =  LHS, element_types = [i16, ui4, i32], original_type = tensor<32x128xi16>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi4, #iree_linalg_ext.encoding<role =  RHS, element_types = [i16, ui4, i32], original_type = tensor<4096x32x128xi4>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>) outs(%12 : tensor<?x?xi32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [i16, ui4, i32], original_type = tensor<4096x32xi32>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>) {
+  ^bb0(%in: i16, %in_2: i4, %out: i32):
+    %15 = arith.extsi %in : i16 to i32
+    %16 = arith.extui %in_2 : i4 to i32
+    %17 = arith.muli %15, %16 : i32
+    %18 = arith.addi %17, %out : i32
+    linalg.yield %18 : i32
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [i16, ui4, i32], original_type = tensor<4096x32xi32>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+  %14 = iree_linalg_ext.unset_encoding %13 : tensor<?x?xi32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [i16, ui4, i32], original_type = tensor<4096x32xi32>, matmul_narrow_M = 1 : index, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
+  %extracted_slice = tensor.extract_slice %14[0, 0] [4096, 32] [1, 1] : tensor<?x?xi32> to tensor<4096x32xi32>
+  return %extracted_slice : tensor<4096x32xi32>
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
+//      CHECK: func.func @generic_batch_vecmat_transposed_i16u4i32(%[[LHS:.+]]: tensor<32x128xi16>, %[[RHS:.+]]: tensor<4096x32x128xi4>, %[[RESULT:.+]]: tensor<4096x32xi32>) -> tensor<4096x32xi32>
+//  CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<32x16x8xi16>
+//  CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [8] into %[[PACK_LHS_DEST]] : tensor<32x128xi16> -> tensor<32x16x8xi16>
+//  CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[PACK_LHS]] {{.*}} : tensor<32x16x8xi16> into tensor<32x1x16x1x8xi16>
+//  CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<32x128x16x32x8xi4>
+//  CHECK-DAG:   %[[PACK_RHS:.+]] = tensor.pack %[[RHS]] outer_dims_perm = [1, 0, 2] inner_dims_pos = [0, 2] inner_tiles = [32, 8] into %[[PACK_RHS_DEST]] : tensor<4096x32x128xi4> -> tensor<32x128x16x32x8xi4>
+//  CHECK-DAG:   %[[PACK_RES_DEST:.+]] = tensor.empty() : tensor<32x128x32xi32>
+//  CHECK-DAG:   %[[PACK_RES:.+]] = tensor.pack %[[RESULT]] outer_dims_perm = [1, 0] inner_dims_pos = [0] inner_tiles = [32] into %[[PACK_RES_DEST]] : tensor<4096x32xi32> -> tensor<32x128x32xi32>
+//      CHECK:   %[[EXTEND_DEST:.+]] = tensor.empty() : tensor<32x128x16x32x8xi32>
+//      CHECK:   %[[EXTEND:.+]] = linalg.generic
+// CHECK-SAME:       indexing_maps = [#[[MAP]], #[[MAP]]]
+// CHECK-SAME:       ins(%[[PACK_RHS]] : tensor<32x128x16x32x8xi4>)
+// CHECK-SAME:       outs(%[[EXTEND_DEST]] : tensor<32x128x16x32x8xi32>)
+//      CHECK:   %[[EXPAND_RES:.+]] = tensor.expand_shape %[[PACK_RES]] {{.*}} : tensor<32x128x32xi32> into tensor<32x1x128x1x32xi32>
+//      CHECK:   %[[BATCH_MMT4D:.+]] = linalg.batch_mmt4d
+// CHECK-SAME:       ins(%[[EXPAND_LHS]], %[[EXTEND]] :
+// CHECK-SAME:       outs(%[[EXPAND_RES]] :
+//      CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[BATCH_MMT4D]] {{.*}} : tensor<32x1x128x1x32xi32> into tensor<32x128x32xi32>
+//  CHECK-DAG:   %[[UNPACK_DEST:.+]] = tensor.empty() : tensor<4096x32xi32>
+//      CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSE]] outer_dims_perm = [1, 0] inner_dims_pos = [0] inner_tiles = [32] into %[[UNPACK_DEST]] : tensor<32x128x32xi32> -> tensor<4096x32xi32>
