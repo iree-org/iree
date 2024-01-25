@@ -11,15 +11,15 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-llvmcpu-optimize-vector-unit-dims"
+#define DEBUG_TYPE "iree-llvmcpu-drop-vector-unit-dims"
 
 namespace mlir::iree_compiler {
 namespace {
-class LLVMCPUOptimizeVectorUnitDimsPass
-    : public LLVMCPUOptimizeVectorUnitDimsBase<
-          LLVMCPUOptimizeVectorUnitDimsPass> {
+class LLVMCPUDropVectorUnitDimsPass
+    : public LLVMCPUDropVectorUnitDimsBase<
+          LLVMCPUDropVectorUnitDimsPass> {
 public:
-  using LLVMCPUOptimizeVectorUnitDimsBase::LLVMCPUOptimizeVectorUnitDimsBase;
+  using LLVMCPUDropVectorUnitDimsBase::LLVMCPUDropVectorUnitDimsBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
@@ -27,7 +27,7 @@ public:
   void runOnOperation() override;
 };
 
-void LLVMCPUOptimizeVectorUnitDimsPass::runOnOperation() {
+void LLVMCPUDropVectorUnitDimsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
 
@@ -47,8 +47,8 @@ void LLVMCPUOptimizeVectorUnitDimsPass::runOnOperation() {
 } // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMCPUOptimizeVectorUnitDimsPass() {
-  return std::make_unique<LLVMCPUOptimizeVectorUnitDimsPass>();
+createLLVMCPUDropVectorUnitDimsPass() {
+  return std::make_unique<LLVMCPUDropVectorUnitDimsPass>();
 }
 
 } // namespace mlir::iree_compiler
