@@ -11,8 +11,6 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-tensor-tile-to-serial-loops"
-
 namespace mlir::iree_compiler {
 
 namespace {
