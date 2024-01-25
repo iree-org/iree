@@ -41,7 +41,9 @@ void LLVMCPUDropVectorUnitDimsPass::runOnOperation() {
   vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
       patterns);
   vector::populateVectorTransferDropUnitDimsPatterns(patterns);
-  vector::ExtractOp::getCanonicalizationPatterns(patterns, &getContext());
+  vector::populateDropUnitDimWithShapeCastPatterns(patterns);
+  vector::InsertOp::getCanonicalizationPatterns(patterns, ctx);
+  vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 } // namespace
