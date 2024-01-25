@@ -13,6 +13,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/SynchronizationAnalysis.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -24,6 +25,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -38,11 +40,9 @@
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
-using mlir::bufferization::BufferizationOptions;
-using mlir::bufferization::OneShotAnalysisState;
-using mlir::bufferization::OneShotBufferizationOptions;
-
 namespace mlir::iree_compiler {
+
+using namespace bufferization;
 
 namespace {
 class EliminateEmptyTensorsPass
@@ -54,6 +54,17 @@ public:
 
   void runOnOperation() override;
 };
+
+namespace {
+class SynchronizeTensors : public SynchronizeTensorsBase<SynchronizeTensors> {
+public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<bufferization::BufferizationDialect, gpu::GPUDialect>();
+  }
+
+  void runOnOperation() override;
+};
+} // namespace
 
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
@@ -184,6 +195,111 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     return signalPassFailure();
 }
 
+void SynchronizeTensors::runOnOperation() {
+  ModuleOp moduleOp = getOperation();
+
+  IRRewriter rewriter(moduleOp->getContext());
+  auto bufferizationOptions = getBufferizationOptions();
+  OneShotAnalysisState state(moduleOp, bufferizationOptions);
+  // Analyze IR.
+  if (failed(analyzeOp(moduleOp, state)))
+    return signalPassFailure();
+
+  {
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::SparseConstantPropagation>();
+    solver.load<SynchronizationAnalysis>(state,
+                                         SynchronizationKind::ReadAfterWrite);
+    if (solver.initializeAndRun(moduleOp).failed()) {
+      return signalPassFailure();
+    }
+
+    // Print the analysis.
+    moduleOp->walk([&](Operation *op) {
+      const SetLattice *after = solver.lookupState<SetLattice>(op);
+      if (!after)
+        return;
+
+      // Get the operation before this one.
+      const SetLattice *before = nullptr;
+      Operation *beforeOp = op->getPrevNode();
+      if (beforeOp) {
+        before = solver.lookupState<SetLattice>(beforeOp);
+      } else {
+        before = solver.lookupState<SetLattice>(op->getBlock());
+      }
+
+      if (!before)
+        return;
+
+      // Get values that are in before but not in after.
+      SmallVector<Value, 4> values;
+      DenseSet<Value> beforeSet = before->getSet();
+      DenseSet<Value> afterSet = after->getSet();
+      for (Value val : beforeSet) {
+        if (!afterSet.contains(val)) {
+          values.push_back(val);
+        }
+      }
+
+      // Add barrier before this op.
+      if (!values.empty()) {
+        OpBuilder builder(op);
+        builder.setInsertionPoint(op);
+        builder.create<gpu::BarrierOp>(op->getLoc());
+      }
+    });
+  }
+
+  {
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::SparseConstantPropagation>();
+    solver.load<SynchronizationAnalysis>(state,
+                                         SynchronizationKind::WriteAfterRead);
+    if (solver.initializeAndRun(moduleOp).failed()) {
+      return signalPassFailure();
+    }
+
+    // Print the analysis.
+    moduleOp->walk([&](Operation *op) {
+      const SetLattice *after = solver.lookupState<SetLattice>(op);
+      if (!after)
+        return;
+
+      // Get the operation before this one.
+      const SetLattice *before = nullptr;
+      Operation *beforeOp = op->getPrevNode();
+      if (beforeOp) {
+        before = solver.lookupState<SetLattice>(beforeOp);
+      } else {
+        before = solver.lookupState<SetLattice>(op->getBlock());
+      }
+
+      if (!before)
+        return;
+
+      // Get values that are in before but not in after.
+      SmallVector<Value, 4> values;
+      DenseSet<Value> beforeSet = before->getSet();
+      DenseSet<Value> afterSet = after->getSet();
+      for (Value val : beforeSet) {
+        if (!afterSet.contains(val)) {
+          values.push_back(val);
+        }
+      }
+
+      // Add barrier before this op.
+      if (!values.empty()) {
+        OpBuilder builder(op);
+        builder.setInsertionPoint(op);
+        builder.create<gpu::BarrierOp>(op->getLoc());
+      }
+    });
+  }
+}
+
 // The following is copied from bufferization::runOneShotBufferize with
 // modifications.
 LogicalResult
@@ -224,6 +340,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
   return std::make_unique<EliminateEmptyTensorsPass>();
 }
 
+std::unique_ptr<OperationPass<ModuleOp>> createSynchronizeTensorsPass() {
+  return std::make_unique<SynchronizeTensors>();
+}
+
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
@@ -241,7 +361,8 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
-  // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
+  // memrefs are unified in CSE pass, so we can truely remove redundant
+  // memcpy.
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 }

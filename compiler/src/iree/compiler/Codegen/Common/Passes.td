@@ -431,6 +431,12 @@ def SplitFullPartialTransfer :
   ];
 }
 
+def SynchronizeTensors :
+    Pass<"iree-synchronize-tensors", "ModuleOp"> {
+  let summary = "Insert synchronization constructs for tensors requiring synchronization.";
+  let constructor = "mlir::iree_compiler::createSynchronizeTensorsPass()";
+}
+
 def TensorToVectorVectorizePad :
     Pass<"iree-codegen-vectorize-tensor-pad", "func::FuncOp"> {
   let summary = "Vectorize a very specific form of tensor.pad with "
