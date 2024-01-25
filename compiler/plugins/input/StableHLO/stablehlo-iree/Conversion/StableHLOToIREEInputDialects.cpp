@@ -318,7 +318,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
         convertedResultTypes);
 
     // Update the function in place.
-    rewriter.startRootUpdate(srcOp);
+    rewriter.startOpModification(srcOp);
     srcOp.setType(newFuncType);
     rewriteFuncAttrs(srcOp);
     setFuncEncodings(srcOp, oldFuncType, newFuncType);
@@ -330,7 +330,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
       return failure();
     }
 
-    rewriter.finalizeRootUpdate(srcOp);
+    rewriter.finalizeOpModification(srcOp);
     return success();
   }
 };
@@ -371,7 +371,7 @@ struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
       return rewriter.notifyMatchFailure(globalOp,
                                          "result type conversion failed");
     }
-    rewriter.updateRootInPlace(globalOp, [&]() {
+    rewriter.modifyOpInPlace(globalOp, [&]() {
       globalOp.setType(newType);
       if (Attribute oldValue = globalOp.getValueAttr()) {
         globalOp.setValueAttr(

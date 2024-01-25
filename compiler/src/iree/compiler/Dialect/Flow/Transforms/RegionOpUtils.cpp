@@ -391,7 +391,7 @@ clonePrecedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
 
   // Replace all uses in the dispatch region.
   for (OpOperand *use : usesInsideOfRegion) {
-    rewriter.updateRootInPlace(use->getOwner(), [&]() {
+    rewriter.modifyOpInPlace(use->getOwner(), [&]() {
       use->set(newTargetOp->getResult(
           llvm::cast<OpResult>(use->get()).getResultNumber()));
     });

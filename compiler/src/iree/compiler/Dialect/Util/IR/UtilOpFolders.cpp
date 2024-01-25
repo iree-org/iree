@@ -565,7 +565,7 @@ struct InlineConstantGlobalInitializer
       auto globalOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
 
       deadOps.push_back(storeOp);
@@ -744,7 +744,7 @@ struct FoldBufferSubspanOpsIntoConsumers
           fusedLoc, op.getSourceOffset(), oldRange.offset);
       auto newRange = SubrangeOperand{op.getSource(), op.getSourceSize(),
                                       newOffset, oldRange.length};
-      rewriter.updateRootInPlace(subrangeOp, [&]() {
+      rewriter.modifyOpInPlace(subrangeOp, [&]() {
         subrangeOp.setSubrangeOperand(use.getOperandNumber(), newRange);
       });
     }
@@ -893,7 +893,7 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
     rewriter.setInsertionPointAfter(op);
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, subspanOp.getSourceOffset(), op.getOffset());
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getOperandMutable().assign(subspanOp.getSource());
       op.getOperandSizeMutable().assign(subspanOp.getSourceSize());
       SmallPtrSet<Operation *, 2> exceptions;

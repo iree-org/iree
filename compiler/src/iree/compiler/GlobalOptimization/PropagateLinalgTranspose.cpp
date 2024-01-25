@@ -352,7 +352,7 @@ public:
     // To do the fusion, we can simply apply the permutation of the transpose
     // to the results of the associated input's indexing map, and then forward
     // the input to the transpose to the consumer generic.
-    rewriter.startRootUpdate(genericOp);
+    rewriter.startOpModification(genericOp);
 
     SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
     AffineMap inputMap = genericOp.getMatchingIndexingMap(transposeOperand);
@@ -366,7 +366,7 @@ public:
         rewriter.getAffineMapArrayAttr(newIndexingMaps));
 
     genericOp.setOperand(inputIndex, transposeOp.getInput());
-    rewriter.finalizeRootUpdate(genericOp);
+    rewriter.finalizeOpModification(genericOp);
     return success();
   }
 };

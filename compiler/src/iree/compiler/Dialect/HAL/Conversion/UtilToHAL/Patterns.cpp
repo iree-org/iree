@@ -27,7 +27,7 @@ struct GlobalConversionPattern
     auto newType = getTypeConverter()->convertType(op.getType());
     if (newType == op.getType())
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       // NOTE: the initial value may be invalid here! We rely on
       // dialect-specific conversions to handle it.
       op.setTypeAttr(TypeAttr::get(newType));

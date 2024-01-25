@@ -89,7 +89,7 @@ struct FoldBlockArgumentsPattern
       return failure(); // no dupes at all
     }
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
 
     // Iterate over all blocks after the entry block. We can't change the entry
     // block as it is part of the function signature.
@@ -154,7 +154,7 @@ struct FoldBlockArgumentsPattern
           auto operands = successorOperands.slice(
               successorOperands.getProducedOperandCount(),
               successorOperands.size());
-          rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
+          rewriter.modifyOpInPlace(blockSource.branchOp, [&]() {
             eraseOperands(operands, elidedArgs);
           });
         }
@@ -164,10 +164,10 @@ struct FoldBlockArgumentsPattern
     }
 
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
       return success();
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
       return failure();
     }
   }
@@ -216,7 +216,7 @@ struct ElideBranchOperandsPattern
       }
     }
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
 
     // Iterate over all blocks after the entry block. We can't change the entry
     // block as it is part of the function signature.
@@ -290,7 +290,7 @@ struct ElideBranchOperandsPattern
         auto operands =
             successorOperands.slice(successorOperands.getProducedOperandCount(),
                                     successorOperands.size());
-        rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
+        rewriter.modifyOpInPlace(blockSource.branchOp, [&]() {
           eraseOperands(operands, elidedArgs);
         });
       }
@@ -299,10 +299,10 @@ struct ElideBranchOperandsPattern
     }
 
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
       return success();
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
       return failure();
     }
   }

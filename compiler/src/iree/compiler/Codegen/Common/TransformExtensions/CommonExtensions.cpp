@@ -380,7 +380,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
     }
 
     // Promote extract_slice source to bbArg.
-    rewriter.updateRootInPlace(extractSliceOp, [&]() {
+    rewriter.modifyOpInPlace(extractSliceOp, [&]() {
       extractSliceOp.getSourceMutable().assign(bbArg);
     });
   }
@@ -475,7 +475,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
   // Step 6. RAUW thread indices to thread ops.
   for (Value blockIdx : forallOp.getInductionVars()) {
     for (Operation *user : llvm::make_early_inc_range(blockIdx.getUsers())) {
-      rewriter.updateRootInPlace(user, [&]() {
+      rewriter.modifyOpInPlace(user, [&]() {
         user->replaceUsesOfWith(blockIdx, bvm.lookup(blockIdx));
       });
     }

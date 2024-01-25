@@ -558,7 +558,7 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
       return rewriter.notifyMatchFailure(funcOp,
                                          "failed to convert region types");
     }
-    rewriter.updateRootInPlace(funcOp, []() {});
+    rewriter.modifyOpInPlace(funcOp, []() {});
     return success();
   }
 };

@@ -111,7 +111,7 @@ struct CanonicalizeForOpInductionVarShape final
         newResults.push_back(results[index]);
       }
     }
-    rewriter.updateRootInPlace(
+    rewriter.modifyOpInPlace(
         yieldOp, [&]() { yieldOp.getOperation()->setOperands(newResults); });
     return newResults;
   }

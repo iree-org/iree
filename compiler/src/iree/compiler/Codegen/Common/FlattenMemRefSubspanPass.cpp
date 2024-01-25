@@ -327,8 +327,8 @@ struct FlattenReinterpretCast
       return rewriter.notifyMatchFailure(op, "unhandled non-zero offset");
     }
 
-    rewriter.updateRootInPlace(op,
-                               [&] { op->setOperand(0, adaptor.getSource()); });
+    rewriter.modifyOpInPlace(op,
+                             [&] { op->setOperand(0, adaptor.getSource()); });
     return success();
   }
 };

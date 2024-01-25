@@ -162,10 +162,10 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
 
           if (dpsOp.isDpsInit(&operand) &&
               mapToIterArg.contains(sliceOp.getSource())) {
-            rewriter.startRootUpdate(sliceOp);
+            rewriter.startOpModification(sliceOp);
             sliceOp.getSourceMutable().assign(
                 mapToIterArg[sliceOp.getSource()]);
-            rewriter.finalizeRootUpdate(sliceOp);
+            rewriter.finalizeOpModification(sliceOp);
           }
         }
       };

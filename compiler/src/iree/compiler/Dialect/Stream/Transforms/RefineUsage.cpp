@@ -188,7 +188,7 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
   // Returns true if a change was made.
   bool applyRegionTransitions(Operation *op, PatternRewriter &rewriter) const {
     bool didChange = false;
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     for (auto &region : op->getRegions()) {
       for (auto &block : region) {
         rewriter.setInsertionPoint(&block, block.begin());
@@ -200,9 +200,9 @@ struct UsageRefinementPattern : public OpRewritePattern<OpT> {
       }
     }
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
     }
     return didChange;
   }
@@ -345,7 +345,7 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
   LogicalResult matchAndRewrite(Op op,
                                 PatternRewriter &rewriter) const override {
     bool didChange = this->applyRegionTransitions(op, rewriter);
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     rewriter.setInsertionPointAfter(op);
     for (unsigned i = 0; i < op->getNumResults(); ++i) {
       auto result = op->getResult(i);
@@ -355,9 +355,9 @@ struct ApplyGenericOp : public UsageRefinementPattern<Op> {
       }
     }
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
     }
     return success(didChange);
   }
@@ -376,7 +376,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
     bool didChange = this->applyRegionTransitions(op, rewriter);
     auto affinityAttr = getOpAffinity(op);
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     rewriter.setInsertionPointAfter(op);
 
     auto sizeAwareOp =
@@ -394,9 +394,9 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
     }
 
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
     }
     return success(didChange);
   }
