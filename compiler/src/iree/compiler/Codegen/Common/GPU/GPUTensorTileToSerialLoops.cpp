@@ -11,12 +11,12 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-tensor-alloc"
+#define DEBUG_TYPE "iree-codegen-gpu-tensor-tile-to-serial-loops"
 
 namespace mlir::iree_compiler {
 
 namespace {
-struct GPUTensorTensorTileToSerialLoopsPass
+struct GPUTensorTensorTileToSerialLoopsPass final
     : public GPUTensorTileToSerialLoopsBase<
           GPUTensorTensorTileToSerialLoopsPass> {
 public:
@@ -24,11 +24,9 @@ public:
     registry.insert<scf::SCFDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
-
     // Tile reductions based on the annotated tiling configuration.
-    if (failed(
-            tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/true))) {
+    if (failed(tileReductionToSerialLoops(getOperation(),
+                                          /*fuseInputProducer=*/true))) {
       return signalPassFailure();
     }
   }
