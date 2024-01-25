@@ -21,6 +21,7 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
@@ -28,6 +29,7 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
@@ -126,6 +128,10 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
 
+//===---------------------------------------------------------------------===//
+// Default Vectorization
+//===---------------------------------------------------------------------===//
+
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
 
@@ -161,6 +167,10 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeTensorInsertExtractSlicesPass());
 }
+
+//===---------------------------------------------------------------------===//
+// MatmulSIMT
+//===---------------------------------------------------------------------===//
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
@@ -219,6 +229,10 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // Pipeline memory operations.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
+
+//===---------------------------------------------------------------------===//
+// Matmul Tensor Core
+//===---------------------------------------------------------------------===//
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth) {
@@ -284,6 +298,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
       createLLVMGPUPackSharedMemoryAlloc());
 }
 
+//===---------------------------------------------------------------------===//
+// Matmul MMA.Sync
+//===---------------------------------------------------------------------===//
+
 void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
                                                unsigned pipelineDepth) {
   tileAndBufferize(pm);
@@ -347,6 +365,10 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
       createLLVMGPUPackSharedMemoryAlloc());
 }
 
+//===---------------------------------------------------------------------===//
+// Transpose
+//===---------------------------------------------------------------------===//
+
 void addGPUTransposePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -383,6 +405,115 @@ void addGPUTransposePassPipeline(OpPassManager &pm) {
   // May or may not need to reduce shared mememory conflicts
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
+//===---------------------------------------------------------------------===//
+// Vector Distribution
+//===---------------------------------------------------------------------===//
+
+// Matmul pipeline using vector distribution patterns to map to various tensor
+// core operations. The current implementation below is unstable and is missing
+// a few crucial pieces for performance (primarily software pipelining). The
+// current flow is as follows.
+//
+// 1. Tile + fuse and distribute to workgroups.
+// 2. Problem specific tiling, namely tiling the K dimension of the GEMM.
+// 3. Vectorize
+// 4. Materialize shared memory allocations as vectorized copies.
+// 5. Bufferize
+//
+// * Distribution to warps should happen here, but right now this pipeline
+//   is single subgroup. Pending improvements to vector distribution to allow
+//   distribution to warps.
+//
+// 6. Distribute to virtual lanes (i.e. threads in this case).
+//
+// Note that a few pieces here are subject to change in the immediate future.
+// First, the shared memory promotion done here is in a sense a stopgap, as it
+// won't compose well with what's available for bufferization/pipelining today.
+// Second, distribution to more than one warp depends on either layout changes,
+// or explicit distribution using `scf.forall`. For now this keeps it simple
+// and gives us a starting point for generating code for matmuls in the first
+// place.
+
+// We use vector ops to do the copy for this pipeline because distribution is
+// vector based.
+static LogicalResult gpuVectorCopyFn(OpBuilder &builder, Location loc,
+                                     Value from, Value to) {
+  bool needsBarrier = false;
+  MemRefType fromType = llvm::cast<MemRefType>(from.getType());
+  if (hasSharedMemoryAddressSpace(fromType)) {
+    needsBarrier = true;
+  }
+  if (hasSharedMemoryAddressSpace(llvm::cast<MemRefType>(to.getType()))) {
+    needsBarrier = true;
+  }
+  if (needsBarrier)
+    builder.create<gpu::BarrierOp>(loc);
+  VectorType vectorType =
+      VectorType::get(fromType.getShape(), fromType.getElementType());
+  Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+  SmallVector<Value> indices(vectorType.getRank(), c0);
+  SmallVector<bool> inBounds(vectorType.getRank(), true);
+  Value read = builder.create<vector::TransferReadOp>(loc, vectorType, from,
+                                                      indices, inBounds);
+  builder.create<vector::TransferWriteOp>(loc, read, to, indices, inBounds);
+  if (needsBarrier) {
+    builder.create<gpu::BarrierOp>(loc);
+  }
+  return success();
+}
+
+static void addVectorBufferizePasses(OpPassManager &passManager) {
+  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+}
+
+void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
+  tileAndDistributeToWorkgroup(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Problem specific (reduction) tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUTensorTileToSerialLoops());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeTensorInsertExtractSlicesPass());
+
+  // Linalg -> Vector
+  addGPUVectorizationPasses(nestedModulePM);
+
+  // Allocate tensors for copies to shared memory.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorAlloc());
+
+  // Tensor -> Memref
+  addVectorBufferizePasses(nestedModulePM);
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistStaticallyBoundAllocationsPass());
+
+  // Vector SIMD -> Vector SIMT
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }

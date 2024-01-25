@@ -38,6 +38,9 @@ getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
 /// Returns the workgroup size associated to the funcOp entry point.
 std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp);
 
+/// Returns the subgroup size associated to the funcOp entry point.
+std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp);
+
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -119,6 +122,12 @@ bool hasUkernelSupportedRocmArch(StringRef targetChip);
 
 /// Checks if targetAttr's GPU target has UKernel support.
 bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 
 } // namespace mlir::iree_compiler
 

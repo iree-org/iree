@@ -83,6 +83,12 @@ def LLVMGPUTileAndDistribute :
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
+def LLVMGPUVectorDistribute :
+    InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute vectorized functions.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorDistribute()";
+}
+
 def LLVMGPUVectorLowering :
     InterfacePass<"iree-llvmgpu-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";

@@ -96,6 +96,18 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp) {
   return workgroupSize;
 }
 
+std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      mlir::iree_compiler::getEntryPoint(funcOp);
+  if (failed(exportOp)) {
+    return std::nullopt;
+  }
+  if (IntegerAttr attr = exportOp->getSubgroupSizeAttr()) {
+    return attr.getValue().getSExtValue();
+  }
+  return std::nullopt;
+}
+
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -918,6 +930,32 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
   }
   // TODO: Once plumbed, add a CUDA backend and supported cuda arch check.
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+static constexpr char mmaTypeListName[] = "mma_types";
+static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  Attribute types = config.get(mmaTypeListName);
+  if (!types) {
+    return failure();
+  }
+  return llvm::cast<ArrayAttr>(types);
+}
+
+FailureOr<ArrayAttr>
+getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
+  if (auto variantOp =
+          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
+    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+    return getSupportedMmaTypes(targetAttr.getConfiguration());
+  }
+  return failure();
 }
 
 } // namespace mlir::iree_compiler
