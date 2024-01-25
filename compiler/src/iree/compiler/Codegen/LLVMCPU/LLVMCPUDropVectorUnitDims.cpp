@@ -16,8 +16,7 @@
 namespace mlir::iree_compiler {
 namespace {
 class LLVMCPUDropVectorUnitDimsPass
-    : public LLVMCPUDropVectorUnitDimsBase<
-          LLVMCPUDropVectorUnitDimsPass> {
+    : public LLVMCPUDropVectorUnitDimsBase<LLVMCPUDropVectorUnitDimsPass> {
 public:
   using LLVMCPUDropVectorUnitDimsBase::LLVMCPUDropVectorUnitDimsBase;
 
