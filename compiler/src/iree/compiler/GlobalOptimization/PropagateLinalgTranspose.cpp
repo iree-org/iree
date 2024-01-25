@@ -205,13 +205,12 @@ public:
     int64_t dim = 0;
     llvm::SmallDenseMap<int64_t, int64_t> rankReducedMap;
     // Since `dim` is in the pre-transposed domain, and is incrementing each
-    // iteration, `idx` must also be in the pre-transposed domain
+    // iteration, `idx` must also be in the pre-transposed domain.
     for (int64_t idx = 0, e = perm.size(); idx < e; ++idx) {
       // Get index in the transposed domain, since `rankReducingMask` is in
       // the transposed domain.
-      int64_t transposedIdx = perm[idx];
-      if (!rankReducingMask.contains(transposedIdx)) {
-        // Domain of `rankReducedMap` is in pre-transposed domain
+      if (!rankReducingMask.contains(perm[idx])) {
+        // Domain of `rankReducedMap` is in pre-transposed domain.
         rankReducedMap[idx] = dim++;
       }
     }
