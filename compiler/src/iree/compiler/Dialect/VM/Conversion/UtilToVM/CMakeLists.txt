@@ -22,6 +22,7 @@ iree_cc_library(
     "ConvertGlobalOps.cpp"
     "ConvertListOps.cpp"
     "ConvertStatusOps.cpp"
+    "ConvertStructuralOps.cpp"
     "ConvertUtilToVM.cpp"
   DEPS
     MLIRArithDialect

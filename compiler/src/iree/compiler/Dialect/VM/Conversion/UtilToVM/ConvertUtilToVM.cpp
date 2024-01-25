@@ -43,6 +43,10 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns);
+void populateUtilStructuralToVMPatterns(MLIRContext *context,
+                                        ConversionTarget &conversionTarget,
+                                        TypeConverter &typeConverter,
+                                        RewritePatternSet &patterns);
 
 namespace {
 
@@ -122,6 +126,8 @@ void populateUtilToVMPatterns(MLIRContext *context,
                                patterns);
   populateUtilStatusToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
+  populateUtilStructuralToVMPatterns(context, conversionTarget, typeConverter,
+                                     patterns);
 }
 
 } // namespace mlir::iree_compiler
