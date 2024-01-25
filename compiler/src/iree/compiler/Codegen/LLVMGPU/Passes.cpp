@@ -170,6 +170,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUTensorTileToSerialLoops());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 

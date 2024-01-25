@@ -108,6 +108,9 @@ createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUTensorTile(bool distributeToWarp = false);
 
+// Creates a pass to tile tensor (linalg) ops along reduction dimensions.
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTileToSerialLoops();
+
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
 

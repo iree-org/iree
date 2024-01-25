@@ -59,6 +59,7 @@ iree_cc_library(
     "GPUReduceBankConflicts.cpp"
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
+    "GPUTensorTileToSerialLoops.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorDistribution.cpp"
     "Passes.cpp"
