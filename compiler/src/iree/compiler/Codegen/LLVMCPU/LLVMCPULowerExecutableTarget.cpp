@@ -172,7 +172,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
                                      /*enablePeeling=*/false,
-                                     enableVectorMasking, lowerToAVX2);
+                                     enableVectorMasking, lowerToAVX2,
+                                     enableAArch64SSVE);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
