@@ -8,7 +8,7 @@
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -38,9 +38,9 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createAutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 std::unique_ptr<OperationPass<ModuleOp>> createImportMLProgramPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLinalgQuantizedConvToConvPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLinalgQuantizedMatmulToMatmulPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
 

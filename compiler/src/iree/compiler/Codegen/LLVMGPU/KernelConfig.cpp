@@ -122,7 +122,7 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
   }
 }
 
-static StringRef getTargetArch(func::FuncOp entryPoint) {
+static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
@@ -135,7 +135,7 @@ static StringRef getTargetArch(func::FuncOp entryPoint) {
   return "";
 }
 
-bool isCudaTarget(func::FuncOp entryPoint) {
+bool isCudaTarget(mlir::FunctionOpInterface entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
@@ -146,7 +146,7 @@ bool isCudaTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-bool isRocmTarget(func::FuncOp entryPoint) {
+bool isRocmTarget(mlir::FunctionOpInterface entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
@@ -157,7 +157,7 @@ bool isRocmTarget(func::FuncOp entryPoint) {
   return false;
 }
 
-static TargetInfo getCudaTargetInfo(func::FuncOp entryPoint) {
+static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
   TargetInfo info;
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
@@ -184,7 +184,7 @@ static TargetInfo getCudaTargetInfo(func::FuncOp entryPoint) {
 }
 
 // TODO: Plumb in WarpSize into TargetInfo for wave64 systems.
-static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
+static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
   TargetInfo info;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
@@ -209,7 +209,7 @@ static TargetInfo getRocmTargetInfo(func::FuncOp entryPoint) {
   return info;
 }
 
-static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
+static TargetInfo getTargetInfo(mlir::FunctionOpInterface entryPoint) {
   // TODO: fill out target info for other vendors.
   if (isCudaTarget(entryPoint))
     return getCudaTargetInfo(entryPoint);
@@ -218,7 +218,8 @@ static TargetInfo getTargetInfo(func::FuncOp entryPoint) {
   return {};
 }
 
-static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op,
+static bool supportsTensorCore(mlir::FunctionOpInterface entryPoint,
+                               linalg::LinalgOp op,
                                const TargetInfo &targetInfo) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
@@ -276,7 +277,7 @@ getTensorCorePipeline(Type elementType) {
   return codegenPipeline;
 }
 
-static LogicalResult setContractConfig(func::FuncOp entryPoint,
+static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
                                        linalg::LinalgOp op,
                                        const TargetInfo &targetInfo) {
   if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2) {
@@ -464,7 +465,7 @@ static LogicalResult setContractConfig(func::FuncOp entryPoint,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
-static LogicalResult setFftConfig(func::FuncOp entryPoint,
+static LogicalResult setFftConfig(mlir::FunctionOpInterface entryPoint,
                                   IREE::LinalgExt::FftOp op,
                                   const TargetInfo &targetInfo) {
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
@@ -496,7 +497,8 @@ static LogicalResult setFftConfig(func::FuncOp entryPoint,
       workgroupSize);
 }
 
-static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op,
+static LogicalResult setSortConfig(mlir::FunctionOpInterface entryPoint,
+                                   Operation *op,
                                    const TargetInfo &targetInfo) {
   TileSizesListType tileSizes;
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
@@ -555,7 +557,7 @@ getDefaultWorkgroupTileSizesForPackUnPack(TilingInterface op,
   return workgroupTileSizes;
 }
 
-static LogicalResult setPackConfig(func::FuncOp entryPoint,
+static LogicalResult setPackConfig(mlir::FunctionOpInterface entryPoint,
                                    tensor::PackOp packOp,
                                    const TargetInfo &targetInfo) {
   SmallVector<int64_t> tileSizes = getDefaultWorkgroupTileSizesForPackUnPack(
@@ -584,7 +586,7 @@ static LogicalResult setPackConfig(func::FuncOp entryPoint,
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
-static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
+static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
                                           Operation *op,
                                           const TargetInfo &targetInfo) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
@@ -716,9 +718,9 @@ static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
 }
 
 /// Set configuration for transform dialect based strategies.
-static LogicalResult setTransformDialectConfig(func::FuncOp entryPoint,
-                                               Operation *op,
-                                               const TargetInfo &targetInfo) {
+static LogicalResult
+setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
+                          const TargetInfo &targetInfo) {
   if (!clGPUEnableTransformDialectJit) {
     return failure();
   }
@@ -795,9 +797,9 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 }
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
-static LogicalResult setWarpReductionConfig(func::FuncOp entryPoint,
-                                            linalg::LinalgOp op,
-                                            const TargetInfo &targetInfo) {
+static LogicalResult
+setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
+                       linalg::LinalgOp op, const TargetInfo &targetInfo) {
   if (!targetInfo.hasWarpShuffle)
     return failure();
 
@@ -1007,7 +1009,7 @@ static bool hasTwoOrThreeLoopsInfo(linalg::LinalgOp linalgOp) {
          linalgOp.getNumParallelLoops() <= 3;
 }
 
-static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
+static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
                                         linalg::LinalgOp linalgOp) {
   LinalgOpInfo opInfo(linalgOp, sharedMemTransposeFilter);
 
@@ -1065,9 +1067,9 @@ static LogicalResult setTransposeConfig(func::FuncOp entryPoint,
 /// Set the configuration for argmax that can be mapped to argmax uKernel.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
-                                            linalg::GenericOp op,
-                                            const TargetInfo &targetInfo) {
+static LogicalResult
+setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
+                       linalg::GenericOp op, const TargetInfo &targetInfo) {
 
   // Checks if UKernels are enabled.
   if (auto variantOp =
@@ -1141,7 +1143,7 @@ static LogicalResult setArgmaxUkernelConfig(func::FuncOp entryPoint,
 
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
 static LogicalResult
-setUKernelConfig(func::FuncOp entryPoint,
+setUKernelConfig(mlir::FunctionOpInterface entryPoint,
                  IREE::Codegen::UKernelOpInterface ukernelOp) {
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPoint->getContext(),
@@ -1306,12 +1308,12 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   SmallVector<int64_t> windowTileSizes(4, 0);
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
-  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
+  auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);
 }
 
-static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   // First try to see if there is a transform dialect configuration existing.
@@ -1377,7 +1379,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
 
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
       continue;

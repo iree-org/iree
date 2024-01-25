@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIREmitCDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRSCFDialect
     MLIRSupport

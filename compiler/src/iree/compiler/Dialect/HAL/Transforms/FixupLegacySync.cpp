@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -159,7 +158,7 @@ struct FixupLegacySyncPass
 
     // This could use an interface but it'd be better to remove the need for
     // this pass instead.
-    for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       funcOp.walk([&](Operation *op) {
         TypeSwitch<Operation *, void>(op)
             .Case([&](IREE::HAL::CommandBufferCreateOp op) {

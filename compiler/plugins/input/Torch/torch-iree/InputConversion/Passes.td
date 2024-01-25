@@ -10,19 +10,19 @@
 include "mlir/Pass/PassBase.td"
 
 def BitCastQuantTensorPass :
-    Pass<"torch-iree-bitcast-quant-tensor", "func::FuncOp"> {
+    InterfacePass<"torch-iree-bitcast-quant-tensor", "mlir::FunctionOpInterface"> {
   let summary = "Bitcasts i8 packed tensors of sub-byte types to the actual bit width";
   let constructor = "mlir::iree_compiler::TorchInput::createBitCastQuantTensorPass()";
 }
 
 def ConvertTMTensorToLinalgExt :
-    Pass<"torch-iree-tm-tensor-to-linalg-ext", "func::FuncOp"> {
+    InterfacePass<"torch-iree-tm-tensor-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert from TMTensor ops to LinalgExt ops on tensors";
   let constructor = "mlir::iree_compiler::TorchInput::createConvertTMTensorToLinalgExtPass()";
 }
 
 def SetStrictSymbolicShapesPass :
-    Pass<"torch-iree-set-strict-symbolic-shapes", "func::FuncOp"> {
+    InterfacePass<"torch-iree-set-strict-symbolic-shapes", "mlir::FunctionOpInterface"> {
   let summary = "Adds the attribute indicating strict symbolic shapes in Torch IR";
   let constructor = "mlir::iree_compiler::TorchInput::createSetStrictSymbolicShapesPass()";
 }

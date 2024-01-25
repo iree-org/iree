@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect

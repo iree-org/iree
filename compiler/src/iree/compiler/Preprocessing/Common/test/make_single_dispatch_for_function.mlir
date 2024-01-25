@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-preprocessing-make-single-dispatch-for-function --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-make-single-dispatch-for-function))" --split-input-file %s | FileCheck %s
 
 func.func @simple_test() -> tensor<10x20xf32> {
   %0 = tensor.empty() : tensor<10x20xf32>

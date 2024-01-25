@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-gpu-tile-reduction --split-input-file -canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tile-reduction),canonicalize,cse)" --split-input-file %s | FileCheck %s
 
 func.func @warp_reduction_dispatch() {
   %cst = arith.constant 1.000000e+00 : f32

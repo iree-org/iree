@@ -35,7 +35,7 @@ void EraseDeadAllocAndStoresPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createEraseDeadAllocAndStoresPass() {
   return std::make_unique<EraseDeadAllocAndStoresPass>();
 }

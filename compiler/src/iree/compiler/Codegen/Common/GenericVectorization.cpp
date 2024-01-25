@@ -246,10 +246,11 @@ void GenericVectorizationPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGenericVectorizationPass() {
   return std::make_unique<GenericVectorizationPass>();
 }
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options) {
   return std::make_unique<GenericVectorizationPass>(options);
 }

@@ -18,7 +18,6 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
@@ -35,7 +34,7 @@ namespace mlir::iree_compiler {
 /// Tiles to workgroup level. Workgroup tiling is done at the flow level but we
 /// may have extra tiling for the reduction dimension. Therefore we tile again
 /// without distributing.
-static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
+static LogicalResult tileReductionLoops(mlir::FunctionOpInterface funcOp) {
   auto tileSizesFn = [](OpBuilder &builder,
                         Operation *op) -> SmallVector<OpFoldResult> {
     auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
@@ -68,7 +67,7 @@ static LogicalResult tileReductionLoops(func::FuncOp funcOp) {
   return tileLinalgOpsWithFilter(funcOp, tilingOptions, filter);
 }
 
-static LogicalResult tileToSerialLoops(func::FuncOp funcOp) {
+static LogicalResult tileToSerialLoops(mlir::FunctionOpInterface funcOp) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
@@ -131,7 +130,7 @@ calculateDistributedTileSize(ArrayRef<int64_t> numElements, OpBuilder &builder,
 }
 
 /// Tiles to warp.
-static LogicalResult tileToWarp(func::FuncOp funcOp,
+static LogicalResult tileToWarp(mlir::FunctionOpInterface funcOp,
                                 SmallVectorImpl<int64_t> &workgroupSize) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
@@ -164,7 +163,7 @@ static LogicalResult tileToWarp(func::FuncOp funcOp,
 }
 
 /// Patterns for thread level tiling.
-static LogicalResult tileToInvocation(func::FuncOp funcOp,
+static LogicalResult tileToInvocation(mlir::FunctionOpInterface funcOp,
                                       SmallVectorImpl<int64_t> &workgroupSize) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
@@ -307,7 +306,7 @@ public:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTileAndDistribute(bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }

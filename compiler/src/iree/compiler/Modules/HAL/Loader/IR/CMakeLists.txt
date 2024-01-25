@@ -25,6 +25,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRSideEffectInterfaces
     MLIRSupport
@@ -47,6 +48,7 @@ iree_cc_library(
     ::IR
     LLVMSupport
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRParser
     MLIRSupport

@@ -17,7 +17,7 @@
 namespace mlir::iree_compiler {
 namespace {
 
-static bool has16x16Transpose(func::FuncOp funcOp) {
+static bool has16x16Transpose(mlir::FunctionOpInterface funcOp) {
   bool res = false;
   funcOp.walk([&](vector::TransposeOp op) {
     auto srcGtOneDims = isTranspose2DSlice(op);
@@ -78,7 +78,7 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorTransposeLoweringPass(bool lowerVectorTransposeToAVX2) {
   return std::make_unique<LLVMCPUVectorTransposeLoweringPass>(
       lowerVectorTransposeToAVX2);

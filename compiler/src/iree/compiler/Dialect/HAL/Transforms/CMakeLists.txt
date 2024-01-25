@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRParser
     MLIRPass

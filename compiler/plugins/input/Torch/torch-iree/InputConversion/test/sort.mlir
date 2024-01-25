@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --torch-iree-tm-tensor-to-linalg-ext %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-tm-tensor-to-linalg-ext))" %s | FileCheck %s
 
 func.func @sort(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xi64>) -> (tensor<3x4xf32>, tensor<3x4xi64>) {
   %0:2 = tm_tensor.sort dimension(1) outs(%arg0, %arg1 : tensor<3x4xf32>, tensor<3x4xi64>) {

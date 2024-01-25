@@ -72,7 +72,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo) {
   return std::make_unique<LLVMCPUVirtualVectorLoweringPass>(
       splitVectorTransfersTo);

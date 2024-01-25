@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-linalg-quantized-matmul-to-matmul --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-quantized-matmul-to-matmul))" --split-input-file %s | FileCheck %s
 
 // Tests -iree-linalg-quantized-matmul-to-matmul, converting linalg.quantized_matmul
 // ops to linalg.matmul ops plus additional arithmetic to account for any

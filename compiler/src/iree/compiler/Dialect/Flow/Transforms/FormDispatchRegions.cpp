@@ -841,7 +841,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
-                   FunctionOpInterface funcOp,
+                   mlir::FunctionOpInterface funcOp,
                    DominanceInfo const &dominanceInfo,
                    FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an

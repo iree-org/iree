@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --split-input-file --iree-linalg-ext-to-loops %s | FileCheck %s
+// RUN: iree-dialects-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-to-loops))" %s | FileCheck %s
 
 func.func @sort_1d(%arg0: memref<128xi32>) {
   iree_linalg_ext.sort dimension(0)

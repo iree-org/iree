@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -66,7 +65,7 @@ struct GPUTileReductionPass
   }
 
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     SmallVector<linalg::LinalgOp> linalgOps;
     funcOp.walk([&](linalg::LinalgOp op) { linalgOps.push_back(op); });
     for (linalg::LinalgOp op : linalgOps) {
@@ -84,7 +83,8 @@ struct GPUTileReductionPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUTileReductionPass() {
   return std::make_unique<GPUTileReductionPass>();
 }
 

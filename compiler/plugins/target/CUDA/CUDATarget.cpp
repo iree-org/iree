@@ -503,14 +503,6 @@ public:
     } else {
       ModuleOp innerModuleOp = variantOp.getInnerModule();
 
-      // Remove all the functions that are not part of the CUDA kernel.
-      // TODO(thomasraoux): remove this? this should not be required.
-      auto illegalFuncOps =
-          llvm::to_vector<4>(innerModuleOp.getOps<func::FuncOp>());
-      for (auto funcOp : illegalFuncOps) {
-        funcOp.erase();
-      }
-
       auto llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
       if (!llvmModule) {

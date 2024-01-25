@@ -8,8 +8,8 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -48,16 +48,16 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 /// Tiles Linalg ops in the given `funcOp` along reduction dimensions to serial
 /// loops without distribution. If `fuseInputProducer` is true, input producers
 /// will be fused into the serial loop.
-LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
+LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer = false);
 
-LogicalResult swizzleWorkgroupsInFunc(func::FuncOp funcOp,
+LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile);
 
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory
 // marker.
-LogicalResult gpuDistributeSharedMemoryCopy(func::FuncOp funcOp);
+LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//
 // Passes
@@ -72,67 +72,72 @@ LogicalResult gpuDistributeSharedMemoryCopy(func::FuncOp funcOp);
 // indices. If this function is nullptr, this pass will query the datalayout to
 // get the index size.
 std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
-    std::function<unsigned(func::FuncOp)> getSharedMemoryLimit = nullptr,
-    std::function<unsigned(func::FuncOp)> getIndexBitwidth = nullptr);
+    std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit =
+        nullptr,
+    std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth =
+        nullptr);
 
 /// Creates a pass to distribute scf.forall ops to GPU processors.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUDistribute();
 
 /// Convert GPU shared memory copies to distributed
 /// transfer_read/transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUDistributeSharedMemoryCopy();
 
 /// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUMultiBuffering(unsigned numBuffers = 5);
 
 /// Apply software pipelining.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
                         PipeliningSchedulingStrategy schedule =
                             PipeliningSchedulingStrategy::loadGlobalStage0);
 
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 // Creates a pass to tile reduction dimensions and create allocations for some
 // tensor values to use GPU shared memory.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern =
                          GPUPromoteSharedMemPattern::ContractionOpPattern);
 
 // Creates a pass to tile tensor (linalg) ops within a GPU workgroup.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorTile(bool distributeToWarp = false);
 
 // Creates a pass to tile tensor (linalg) ops along reduction dimensions.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTensorTileToSerialLoops();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUTensorTileToSerialLoops();
 
 /// Tile reductions and generate serial loops around reductions.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUTileReductionPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUTileReductionPass();
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.
 // If nullptr, warp size 32 will be used.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(
     bool expandSubgroupReduction = true,
-    std::function<int(func::FuncOp)> getWarpSize = nullptr);
+    std::function<int(mlir::FunctionOpInterface)> getWarpSize = nullptr);
 
 /// Pass to specialize workgroup distribution loops
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkgroupSpecializationPass();
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
 // This pass generalizes named Linalg ops that are better off as generics.
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUGeneralizeNamedOpsPass();
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.

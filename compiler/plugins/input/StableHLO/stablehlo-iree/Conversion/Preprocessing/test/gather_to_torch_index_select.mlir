@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-preprocessing-gather-to-torch-index-select %s \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-preprocessing-gather-to-torch-index-select))" %s \
 // RUN:   | FileCheck %s
 
 // CHECK-LABEL: @gather_to_index_select

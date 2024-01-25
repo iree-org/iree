@@ -24,7 +24,6 @@
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Async/Passes.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -35,6 +34,7 @@
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
@@ -62,7 +62,7 @@ static LogicalResult nestedInFunc(PatternRewriter &rewriter,
   Operation *operation = pdlValues[0].cast<Operation *>();
   Attribute attr = pdlValues[1].cast<Attribute>();
 
-  auto func = operation->getParentOfType<func::FuncOp>();
+  auto func = operation->getParentOfType<mlir::FunctionOpInterface>();
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
   auto functionSymbol = attr.dyn_cast<SymbolRefAttr>();

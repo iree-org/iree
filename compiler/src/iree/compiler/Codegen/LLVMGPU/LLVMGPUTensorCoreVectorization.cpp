@@ -31,7 +31,7 @@ namespace mlir::iree_compiler {
 // Patterns for vectorization
 //====---------------------------------------------------------------------===//
 
-static void vectorizeLinalgOps(func::FuncOp funcOp) {
+static void vectorizeLinalgOps(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
   IREE::LinalgExt::LinalgTransformationFilter f(
@@ -167,7 +167,7 @@ private:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(GPUTensorCoreType tensorCoreType) {
   return std::make_unique<LLVMGPUTensorCoreVectorizationPass>(tensorCoreType);
 }

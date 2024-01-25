@@ -264,7 +264,7 @@ transform_dialect::ApplyLoopIndependentCodeMotionOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   ErrorCheckingTrackingListener listener(state, *this);
-  target->walk([&](func::FuncOp funcOp) {
+  target->walk([&](mlir::FunctionOpInterface funcOp) {
     // This assumes LICM never removes operations so we don't need tracking.
     // TODO: confirm / revisit this assumption and plumb a rewriter through
     // upstream moveLoopInvariantCode if necessary.
@@ -303,7 +303,7 @@ void transform_dialect::ApplyLoopIndependentCodeMotionOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   mlir::iree_compiler::hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
@@ -494,7 +494,7 @@ LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
 //===---------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
@@ -593,7 +593,7 @@ transform_dialect::IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
     workgroupCount = workgroupCountOrdered;
   }
 
-  auto funcOp = forAllOp->getParentOfType<func::FuncOp>();
+  auto funcOp = forAllOp->getParentOfType<mlir::FunctionOpInterface>();
   if (failed(
           lowerWorkgroupCountFromSliceOp(rewriter, funcOp, workgroupCount))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
@@ -873,7 +873,7 @@ void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   (void)swizzleWorkgroupsInFunc(target, getLogTile());
@@ -891,7 +891,7 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 //===----------------------------------------------------------------------===//
 
 static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
-                              func::FuncOp funcOp) {
+                              mlir::FunctionOpInterface funcOp) {
   funcOp.walk([&](Operation *op) {
     // Do not emit remarks for conflict operations.
     if (isa<VectorExt::LayoutConflictResolutionOp>(op)) {
@@ -914,7 +914,7 @@ static void emitLayoutRemarks(VectorLayoutAnalysis &analysis,
 
 DiagnosedSilenceableFailure
 transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
@@ -948,13 +948,13 @@ public:
 
 DiagnosedSilenceableFailure
 transform_dialect::TestGpuVectorDistribution::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
 
-  rewriter.setInsertionPointToStart(&target.getBody().front());
+  rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   SmallVector<Value> threadGrid = {
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
       rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),
@@ -979,7 +979,7 @@ void transform_dialect::TestGpuVectorDistribution::getEffects(
 
 DiagnosedSilenceableFailure
 transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
 

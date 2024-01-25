@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-vector-contract-custom-kernels))" %s | FileCheck %s
 
 // CHECK-LABEL: @vector_i8i8i32matmul(
 // CHECK-SAME:          %[[LHS:[^:[:space:]]+]]

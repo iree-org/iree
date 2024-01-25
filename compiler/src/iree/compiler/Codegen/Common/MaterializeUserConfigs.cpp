@@ -13,7 +13,6 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/iterator_range.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
@@ -98,11 +97,11 @@ struct MaterializeUserConfigsPass
     }
 
     LDBG("--start iterating over: "
-         << std::distance(moduleOp.getOps<func::FuncOp>().begin(),
-                          moduleOp.getOps<func::FuncOp>().end())
+         << std::distance(moduleOp.getOps<mlir::FunctionOpInterface>().begin(),
+                          moduleOp.getOps<mlir::FunctionOpInterface>().end())
          << " functions");
     std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       auto exportOp = exportOps.lookup(funcOp.getName());
       if (!exportOp) {
         continue;

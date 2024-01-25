@@ -47,7 +47,7 @@ void LLVMCPUDropVectorUnitDimsPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUDropVectorUnitDimsPass() {
   return std::make_unique<LLVMCPUDropVectorUnitDimsPass>();
 }

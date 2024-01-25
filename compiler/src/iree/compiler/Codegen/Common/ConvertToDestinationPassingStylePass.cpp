@@ -247,8 +247,9 @@ modifyResultToUseStoreBuffer(OpBuilder &b, OpResult resultValue,
 
 /// Main entry point to convert dispatch region to use destination passing
 /// style.
-static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
-                                                      func::FuncOp funcOp) {
+static LogicalResult
+convertToDestinationPassingStyle(OpBuilder &b,
+                                 mlir::FunctionOpInterface funcOp) {
   BufferizationPlan plan;
   if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return failure();
@@ -431,7 +432,7 @@ static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
 /// bufferizable without using a new stack. See
 /// https://github.com/openxla/iree/issues/8303.
 static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
-    func::FuncOp funcOp, bool useWARForCooperativeMatrixCodegen) {
+    mlir::FunctionOpInterface funcOp, bool useWARForCooperativeMatrixCodegen) {
   IRRewriter rewriter(funcOp.getContext());
 
   constexpr int kMaxNumIterations = 6;
@@ -483,8 +484,9 @@ static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
 /// created by tiling tensor.unpack op. It is intended because tiling unpack ops
 /// with non-perfect sizes needs extra elements. See the tiling implementation
 /// of tensor.unpack op for more details.
-static LogicalResult replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
-                                                       func::FuncOp funcOp) {
+static LogicalResult
+replaceUnpackEmptyWithAllocTensor(OpBuilder &b,
+                                  mlir::FunctionOpInterface funcOp) {
   funcOp.walk([&](tensor::UnPackOp unpackOp) {
     if (!unpackOp->hasOneUse() ||
         !isa<tensor::ExtractSliceOp>(*(unpackOp->user_begin()))) {
@@ -603,12 +605,12 @@ struct SwitchStoreOfIfResultValue
 } // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
-  func::FuncOp funcOp = getOperation();
+  auto funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Dont do anything for functions that have multiple blocks for now.
   // TODO: This needs to be fixed, but need to proceed incrementally.
-  if (!llvm::hasSingleElement(funcOp.getBody())) {
+  if (!llvm::hasSingleElement(funcOp.getFunctionBody())) {
     return;
   }
 
@@ -660,7 +662,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen) {
   return std::make_unique<ConvertToDestinationPassingStylePass>(

@@ -8,7 +8,7 @@
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_GPU_STRATEGIES_H_
 
 #include "llvm/ADT/StringRef.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir {
 class ImplicitLocOpBuilder;
@@ -138,7 +138,7 @@ void buildStagedReductionStrategy(ImplicitLocOpBuilder &b, Value variantH,
 //===----------------------------------------------------------------------===//
 
 /// Try to find an exisiting transform dialect strategy for a given entry point.
-LogicalResult matchAndSetTransformStrategy(func::FuncOp entryPoint,
+LogicalResult matchAndSetTransformStrategy(mlir::FunctionOpInterface entryPoint,
                                            Operation *op,
                                            const GPUModel &gpuModel);
 

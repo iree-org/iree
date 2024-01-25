@@ -16,9 +16,9 @@
 
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -98,7 +98,7 @@ private:
 /// Analysis the `tensor` values in `funcOp` and groups them together into
 /// equivalence classes such that each class contains tensors that can be mapped
 /// to the same buffer.
-LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
+LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
                                              BufferizationPlan &plan);
 
 } // namespace mlir::iree_compiler

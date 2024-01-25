@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-legalize-chlo \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-chlo))" \
 // RUN:   --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: func.func @asin_bf16(

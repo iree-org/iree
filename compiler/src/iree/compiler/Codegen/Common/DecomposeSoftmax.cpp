@@ -34,7 +34,7 @@ namespace {
 /// 4. Divide z and l. This gives the N-dimensional softmax.
 ///    softmax = z / l
 ///
-static LogicalResult convertSoftmaxToGenerics(func::FuncOp funcOp,
+static LogicalResult convertSoftmaxToGenerics(mlir::FunctionOpInterface funcOp,
                                               bool useFusion) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> toDelete;

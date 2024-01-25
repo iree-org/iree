@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/VMVX/IR/VMVXTypes.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -23,6 +22,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -65,10 +65,9 @@ enum EntryArgOrdinals {
 ///       %workgroup_count_y: i32,
 ///       %workgroup_count_z: i32
 ///   )
-LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
+LogicalResult updateHALToVMVXEntryFuncOp(mlir::FunctionOpInterface funcOp,
                                          TypeConverter &typeConverter) {
-  auto originalType = funcOp.getFunctionType();
-  if (originalType.getNumInputs() != 0 || originalType.getNumResults() != 0) {
+  if (funcOp.getNumArguments() != 0 || funcOp.getNumResults() != 0) {
     return funcOp.emitError() << "exported functions must have no I/O";
   }
 
@@ -116,7 +115,7 @@ struct ConvertHALInterfaceWorkgroupIDOp
 
     // Get the argument to the function corresponding to the workgroup dim.
     Value workgroupDimI32 =
-        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupX + dim);
     Value workgroupDim = rewriter.create<arith::IndexCastOp>(
         op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
@@ -140,7 +139,7 @@ struct ConvertHALInterfaceWorkgroupSizeOp
 
     // Get the argument to the function corresponding to the workgroup dim.
     Value workgroupDimI32 =
-        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupSizeX + dim);
     Value workgroupDim = rewriter.create<arith::IndexCastOp>(
         op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
@@ -164,7 +163,7 @@ struct ConvertHALInterfaceWorkgroupCountOp
 
     // Get the argument to the function corresponding to the workgroup dim.
     Value workgroupDimI32 =
-        op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgWorkgroupCountX + dim);
     Value workgroupDim = rewriter.create<arith::IndexCastOp>(
         op.getLoc(), rewriter.getIndexType(), workgroupDimI32);
@@ -181,8 +180,9 @@ struct ConvertHALInterfaceConstantLoadOp
   matchAndRewrite(IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
-    auto constantsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgConstants);
+    auto constantsArg =
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
+            kEntryArgConstants);
     assert(constantsArg && "entry point not conforming to requirements");
     // HACK: we could find the total push constant count and avoid this size op
     // but it'd require walking all the way up to the hal.executable export.
@@ -211,8 +211,9 @@ struct ConvertGetRawInterfaceBindingBufferOp
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
-    auto bindingsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgBindings);
+    auto bindingsArg =
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
+            kEntryArgBindings);
     assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 
@@ -243,8 +244,9 @@ struct ConvertHALInterfaceBindingSubspanOp
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
-    auto bindingsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
-        kEntryArgBindings);
+    auto bindingsArg =
+        op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
+            kEntryArgBindings);
     assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 

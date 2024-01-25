@@ -16,6 +16,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -68,7 +69,7 @@ using DispatchParamsMap =
 static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
   DispatchParamsMap map;
 
-  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       // TODO(benvanik): typed accessors for bindings.
       auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(

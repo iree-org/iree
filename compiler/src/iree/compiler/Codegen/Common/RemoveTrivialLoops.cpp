@@ -90,7 +90,7 @@ getWorkgroupRange(Value processorValue, SmallVectorImpl<Value> & /*dims*/,
   return std::nullopt;
 }
 
-static LogicalResult removeOneTripTiledLoops(func::FuncOp funcOp,
+static LogicalResult removeOneTripTiledLoops(mlir::FunctionOpInterface funcOp,
                                              ArrayRef<int64_t> workgroupSize,
                                              ArrayRef<int64_t> numWorkgroups) {
   auto getWorkgroupRangeFn = [numWorkgroups,
@@ -110,7 +110,7 @@ namespace {
 class RemoveSingleIterationLoopPass final
     : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
     if (failed(exportOp))
       return;
@@ -125,7 +125,7 @@ class RemoveSingleIterationLoopPass final
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveSingleIterationLoopPass() {
   return std::make_unique<RemoveSingleIterationLoopPass>();
 }

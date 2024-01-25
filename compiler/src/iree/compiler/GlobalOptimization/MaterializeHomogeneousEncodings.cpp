@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -21,6 +22,9 @@
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
+
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 class MaterializeHomogeneousEncodingsPass
     : public MaterializeHomogeneousEncodingsBase<
@@ -34,9 +38,8 @@ public:
 
   void runNopPipeline(ModuleOp &moduleOp) {
     OpPassManager passManager(moduleOp.getOperationName());
-    passManager.addNestedPass<func::FuncOp>(
-        createMaterializeEncodingIntoNopPass());
-    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    FunctionLikeNest(passManager).addPass(createMaterializeEncodingIntoNopPass);
+    FunctionLikeNest(passManager).addPass(createCanonicalizerPass);
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
     }
@@ -63,10 +66,12 @@ public:
     }
 
     OpPassManager passManager(moduleOp.getOperationName());
-    passManager.addNestedPass<func::FuncOp>(
-        createCPUMaterializeUpperBoundTileSizePass(executableTargets));
-    passManager.addNestedPass<func::FuncOp>(
-        createCPUMaterializeEncodingPass(executableTarget));
+    FunctionLikeNest(passManager).addPass([&]() {
+      return createCPUMaterializeUpperBoundTileSizePass(executableTargets);
+    });
+    FunctionLikeNest(passManager).addPass([&]() {
+      return createCPUMaterializeEncodingPass(executableTarget);
+    });
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
     }

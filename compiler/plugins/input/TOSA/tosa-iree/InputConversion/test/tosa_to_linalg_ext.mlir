@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-tosa-to-linalg-ext --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-tosa-to-linalg-ext))" --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @scatter_static
 func.func @scatter_static(%arg0 : tensor<1x4x5xf32>, %arg1 : tensor<1x2xi32>, %arg2 : tensor<1x2x5xf32>) ->  tensor<1x4x5xf32> {

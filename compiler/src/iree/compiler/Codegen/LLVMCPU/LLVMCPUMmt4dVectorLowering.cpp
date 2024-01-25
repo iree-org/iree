@@ -101,7 +101,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUMmt4dVectorLoweringPass() {
   return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
 }

@@ -7,8 +7,8 @@
 #ifndef TOSA_IREE_INPUTCONVERSION_PASSES_H_
 #define TOSA_IREE_INPUTCONVERSION_PASSES_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -30,14 +30,16 @@ void registerTOSAConversionPassPipeline();
 void populateTosaToLinalgExtPatterns(RewritePatternSet *patterns);
 
 // Converts i48 to i64.
-std::unique_ptr<OperationPass<func::FuncOp>> createConverti48Toi64();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConverti48Toi64();
 
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
 
 // Converts TOSA operations to linalg_ext.
-std::unique_ptr<OperationPass<func::FuncOp>> createTosaToLinalgExt();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTosaToLinalgExt();
 
 // Verifies that a module only contains IR structures that are supported by the
 // core compiler.

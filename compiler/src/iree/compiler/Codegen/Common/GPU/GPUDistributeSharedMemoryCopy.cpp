@@ -28,25 +28,25 @@
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute-shared-memory-copy"
 
-/// Prints the given `funcOp` after a leading `step` comment header.
-void debugPrint(mlir::func::FuncOp funcOp, const char *step) {
-  LLVM_DEBUG({
-    llvm::dbgs() << "//--- " << step << " ---//\n";
-    funcOp.print(llvm::dbgs(), mlir::OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-}
+namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
 //====---------------------------------------------------------------------===//
 
+/// Prints the given `funcOp` after a leading `step` comment header.
+static void debugPrint(Operation *op, const char *step) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "//--- " << step << " ---//\n";
+    op->print(llvm::dbgs(), mlir::OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+}
+
 // Markers for intermediate transformations.
 static const llvm::StringRef kCopyToDistribute = "copy_to_distribute";
 static const llvm::StringRef kCopyDistributed = "copy_distributed";
-
-namespace mlir::iree_compiler {
 
 // For optimal performance we always want to copy 128 bits
 static constexpr int copyVectorNumBits = 128;
@@ -54,7 +54,7 @@ static constexpr int copyVectorNumBits = 128;
 /// Tiles copy to shared memory mapping. Copy to shared memory are not part of
 /// the launch config but needs to be distributed on the workgroup picked by the
 /// root op.
-static LogicalResult tileCopyToWorkgroupMem(func::FuncOp funcOp,
+static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
                                             ArrayRef<int64_t> workgroupSize) {
   // Tile and distribute copy to workgroup memory.
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
@@ -156,7 +156,7 @@ getTileToDistributableSize(linalg::GenericOp copyOp,
 
 /// Tiles copies using serial loops into a shape that can be distributed onto
 /// thread.
-static LogicalResult tileToUnroll(func::FuncOp funcOp,
+static LogicalResult tileToUnroll(mlir::FunctionOpInterface funcOp,
                                   int64_t flatWorkgroupSize) {
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
@@ -230,7 +230,7 @@ SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
 }
 
 /// Distributes linalg copy onto threads based on the flat id.
-static LogicalResult tileAndDistribute(func::FuncOp funcOp,
+static LogicalResult tileAndDistribute(mlir::FunctionOpInterface funcOp,
                                        Value flatThreadId) {
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [](OpBuilder &builder, Operation *operation) {
@@ -267,7 +267,8 @@ static LogicalResult tileAndDistribute(func::FuncOp funcOp,
 
 /// Vectorizes generic ops that have CopyToWorkgroupMemoryMarker or
 // `kCopyDistributed` marker.
-static void vectorizeCopyToWorkgroupMemoryOps(func::FuncOp funcOp) {
+static void
+vectorizeCopyToWorkgroupMemoryOps(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
   auto filter = IREE::LinalgExt::LinalgTransformationFilter(
@@ -283,7 +284,7 @@ static void vectorizeCopyToWorkgroupMemoryOps(func::FuncOp funcOp) {
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
-static Value createFlatId(func::FuncOp funcOp,
+static Value createFlatId(mlir::FunctionOpInterface funcOp,
                           ArrayRef<int64_t> workgroupSize) {
   OpBuilder b(funcOp.getFunctionBody());
   Type indexType = b.getIndexType();
@@ -304,7 +305,7 @@ static Value createFlatId(func::FuncOp funcOp,
 }
 
 /// Hoist allocations to the top of the loop if they have no dependencies.
-static void hoistAlloc(func::FuncOp funcOp) {
+static void hoistAlloc(mlir::FunctionOpInterface funcOp) {
   SmallVector<memref::AllocOp> allocs;
   funcOp.walk([&](memref::AllocOp alloc) {
     if (alloc.getOperands().empty())
@@ -318,7 +319,7 @@ static void hoistAlloc(func::FuncOp funcOp) {
 
 /// We insert barriers conservatively, remove barriers that are obviously not
 /// needed.
-static void removeRedundantBarriers(func::FuncOp funcOp) {
+static void removeRedundantBarriers(mlir::FunctionOpInterface funcOp) {
   funcOp.walk([](linalg::GenericOp copyOp) {
     if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
       Operation *prevOp = copyOp->getPrevNode();
@@ -353,7 +354,7 @@ static int64_t numIteration(scf::ForOp forOp) {
 
 /// Fully unroll all the static loops unless they are part of the ignore map.
 static void
-unrollSharedMemoryLoops(func::FuncOp funcOp,
+unrollSharedMemoryLoops(mlir::FunctionOpInterface funcOp,
                         const llvm::SmallDenseSet<scf::ForOp> &loopsToIgnore) {
   SmallVector<scf::ForOp> forOpsToUnroll;
   funcOp.walk([&](scf::ForOp forOp) {
@@ -365,7 +366,7 @@ unrollSharedMemoryLoops(func::FuncOp funcOp,
   }
 }
 
-LogicalResult gpuDistributeSharedMemoryCopy(func::FuncOp funcOp) {
+LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp)) {
     // We cannot do anything because we do not have the workgroup size
@@ -462,7 +463,7 @@ class GPUDistributeSharedMemoryCopyPass
     registry.insert<gpu::GPUDialect, vector::VectorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     if (failed(gpuDistributeSharedMemoryCopy(funcOp))) {
       return signalPassFailure();
     }
@@ -471,7 +472,7 @@ class GPUDistributeSharedMemoryCopyPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUDistributeSharedMemoryCopy() {
   return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
 }

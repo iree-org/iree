@@ -26,13 +26,13 @@ struct HoistStaticallyBoundAllocationsPass
 } // namespace
 
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
-  func::FuncOp funcOp = getOperation();
+  auto funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
   hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(rewriter, funcOp);
   hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(rewriter, funcOp);
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createHoistStaticallyBoundAllocationsPass() {
   return std::make_unique<HoistStaticallyBoundAllocationsPass>();
 }

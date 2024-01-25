@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -222,7 +221,8 @@ struct LLVMGPUTensorPadPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUTensorPadPass() {
   return std::make_unique<LLVMGPUTensorPadPass>();
 }
 

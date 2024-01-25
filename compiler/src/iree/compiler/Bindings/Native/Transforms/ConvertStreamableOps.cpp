@@ -40,9 +40,9 @@ struct StreamableFunc {
 };
 
 // Returns true if |funcOp| is a valid result dimension calculation function.
-static LogicalResult verifyResultDimsFunc(FunctionType functionType,
-                                          int requiredResultDims,
-                                          FunctionOpInterface calculateFuncOp) {
+static LogicalResult
+verifyResultDimsFunc(FunctionType functionType, int requiredResultDims,
+                     mlir::FunctionOpInterface calculateFuncOp) {
   // Check arguments match the function exactly.
   if (functionType.getNumInputs() != calculateFuncOp.getNumArguments()) {
     return calculateFuncOp.emitOpError()
@@ -101,7 +101,7 @@ convertStreamableFunc(mlir::ModuleOp moduleOp, func::FuncOp funcOp,
       funcOp->getAttrOfType<SymbolRefAttr>("iree.abi.result_dims");
   if (streamableFunc.resultDimsFunc) {
     auto calculateFuncOp =
-        symbolTable.lookupNearestSymbolFrom<FunctionOpInterface>(
+        symbolTable.lookupNearestSymbolFrom<mlir::FunctionOpInterface>(
             funcOp, streamableFunc.resultDimsFunc);
     if (!calculateFuncOp) {
       funcOp.emitOpError()

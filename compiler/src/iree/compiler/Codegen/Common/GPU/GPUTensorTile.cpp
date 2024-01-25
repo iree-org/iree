@@ -177,7 +177,7 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
                                                  fuseInputProducer);
 }
 
-LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
+LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer) {
   {
     // Tile again at the workgroup level since redution dimension were
@@ -208,7 +208,7 @@ LogicalResult tileReductionToSerialLoops(func::FuncOp funcOp,
 
 /// Tile parallel dimensions according to the attribute tile sizes attached to
 /// each op.
-static LogicalResult tileParallelDims(func::FuncOp funcOp,
+static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
                                       SmallVectorImpl<int64_t> &workgroupSize,
                                       bool distributeToWarp) {
   std::array<int64_t, 3> elementPerWorkgroup = {
@@ -266,7 +266,7 @@ static LogicalResult tileParallelDims(func::FuncOp funcOp,
 }
 
 // Tile convolution output window dimension by 1 to prepare downsizing.
-static LogicalResult tileAndUnrollConv(func::FuncOp funcOp) {
+static LogicalResult tileAndUnrollConv(mlir::FunctionOpInterface funcOp) {
   SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
   funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
     convOps.push_back(convOp);
@@ -370,7 +370,7 @@ public:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorTile(bool distributeToWarp) {
   return std::make_unique<GPUTensorTilePass>(distributeToWarp);
 }

@@ -344,7 +344,8 @@ void ExFileFromMemoryOp::getAsmResultNames(
 LogicalResult ReturnOp::verify() {
   ReturnOp op = *this;
 
-  auto parentFuncOp = dyn_cast_or_null<FunctionOpInterface>(op->getParentOp());
+  auto parentFuncOp =
+      dyn_cast_or_null<mlir::FunctionOpInterface>(op->getParentOp());
   if (parentFuncOp) {
     auto expectedTypes = parentFuncOp.getResultTypes();
     if (op.getNumOperands() != expectedTypes.size()) {
@@ -1518,7 +1519,7 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
   ArrayRef<Type> argTypes = getArgumentTypes();
   ArrayRef<Type> resultTypes = getResultTypes();
   mlir::function_interface_impl::printFunctionSignature(
-      p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
+      p, cast<mlir::FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
       resultTypes);
   p << " as ";
   if (resultTypes.size() != 1)

@@ -113,7 +113,8 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {

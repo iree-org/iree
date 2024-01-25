@@ -82,6 +82,7 @@ iree_cc_library(
     MLIRComplexDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
@@ -122,6 +123,8 @@ iree_cc_library(
     ::PassHeaders
     ::StableHLOLegalization
     LLVMSupport
+    MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRLinalgTransforms
     MLIRMLProgramDialect
     MLIRPass

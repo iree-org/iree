@@ -232,7 +232,7 @@ void HoistUnrolledVectorExtractInsertSlicePass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createHoistUnrolledVectorExtractInsertSlicePass() {
   return std::make_unique<HoistUnrolledVectorExtractInsertSlicePass>();
 }
