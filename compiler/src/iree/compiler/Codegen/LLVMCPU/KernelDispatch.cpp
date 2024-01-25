@@ -772,23 +772,14 @@ static LogicalResult setMatmulPeelingRootConfig(
     int vectorSize) {
 
   // 0. Preprocess for scalable vectors
-  // Clamp vector tile sizes to have better hint about peeling + masking. This
-  // is critical for scalable vectorization, so it can resolve correct scalable
-  // vector sizes.
-  SmallVector<int64_t> clampedVecTileSizes(vecTileSizes);
-  for (const auto &[index, size] : llvm::enumerate(cacheTileSizes)) {
-    if (!size) {
-      continue;
-    }
-    clampedVecTileSizes[index] = std::min(clampedVecTileSizes[index], size);
-  }
+  SmallVector<int64_t> roundedVecTileSizes(vecTileSizes);
 
   // The LLVM backend struggles to legalize non-power-of-two scalable vectors,
   // hence the extra rounding up.
-  for (const auto &[index, size] : llvm::enumerate(clampedVecTileSizes)) {
+  for (const auto &[index, size] : llvm::enumerate(roundedVecTileSizes)) {
     if (!size)
       continue;
-    clampedVecTileSizes[index] =
+    roundedVecTileSizes[index] =
         roundUpToPow2(size,
                       /*predicate=*/inputVecScalableTileFlags[index]);
   }
@@ -803,8 +794,8 @@ static LogicalResult setMatmulPeelingRootConfig(
   SmallVector<int64_t> cacheReductionTileSizes(numTilingDims, 0);
   std::swap(cacheParallelTileSizes.back(), cacheReductionTileSizes.back());
 
-  SmallVector<int64_t> vectorParallelTileSizes(clampedVecTileSizes.begin(),
-                                               clampedVecTileSizes.end());
+  SmallVector<int64_t> vectorParallelTileSizes(roundedVecTileSizes.begin(),
+                                               roundedVecTileSizes.end());
   SmallVector<int64_t> vectorReductionTileSizes(numTilingDims, 0);
   std::swap(vectorParallelTileSizes.back(), vectorReductionTileSizes.back());
 
