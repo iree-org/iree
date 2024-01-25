@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/SynchronizationAnalysis.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -205,98 +206,12 @@ void SynchronizeTensors::runOnOperation() {
   if (failed(analyzeOp(moduleOp, state)))
     return signalPassFailure();
 
-  {
-    DataFlowSolver solver;
-    solver.load<dataflow::DeadCodeAnalysis>();
-    solver.load<dataflow::SparseConstantPropagation>();
-    solver.load<SynchronizationAnalysis>(state,
-                                         SynchronizationKind::ReadAfterWrite);
-    if (solver.initializeAndRun(moduleOp).failed()) {
-      return signalPassFailure();
-    }
+  auto sync = [&](OpBuilder builder) {
+    builder.create<gpu::BarrierOp>(builder.getInsertionPoint()->getLoc());
+  };
 
-    // Print the analysis.
-    moduleOp->walk([&](Operation *op) {
-      const SetLattice *after = solver.lookupState<SetLattice>(op);
-      if (!after)
-        return;
-
-      // Get the operation before this one.
-      const SetLattice *before = nullptr;
-      Operation *beforeOp = op->getPrevNode();
-      if (beforeOp) {
-        before = solver.lookupState<SetLattice>(beforeOp);
-      } else {
-        before = solver.lookupState<SetLattice>(op->getBlock());
-      }
-
-      if (!before)
-        return;
-
-      // Get values that are in before but not in after.
-      SmallVector<Value, 4> values;
-      DenseSet<Value> beforeSet = before->getSet();
-      DenseSet<Value> afterSet = after->getSet();
-      for (Value val : beforeSet) {
-        if (!afterSet.contains(val)) {
-          values.push_back(val);
-        }
-      }
-
-      // Add barrier before this op.
-      if (!values.empty()) {
-        OpBuilder builder(op);
-        builder.setInsertionPoint(op);
-        builder.create<gpu::BarrierOp>(op->getLoc());
-      }
-    });
-  }
-
-  {
-    DataFlowSolver solver;
-    solver.load<dataflow::DeadCodeAnalysis>();
-    solver.load<dataflow::SparseConstantPropagation>();
-    solver.load<SynchronizationAnalysis>(state,
-                                         SynchronizationKind::WriteAfterRead);
-    if (solver.initializeAndRun(moduleOp).failed()) {
-      return signalPassFailure();
-    }
-
-    // Print the analysis.
-    moduleOp->walk([&](Operation *op) {
-      const SetLattice *after = solver.lookupState<SetLattice>(op);
-      if (!after)
-        return;
-
-      // Get the operation before this one.
-      const SetLattice *before = nullptr;
-      Operation *beforeOp = op->getPrevNode();
-      if (beforeOp) {
-        before = solver.lookupState<SetLattice>(beforeOp);
-      } else {
-        before = solver.lookupState<SetLattice>(op->getBlock());
-      }
-
-      if (!before)
-        return;
-
-      // Get values that are in before but not in after.
-      SmallVector<Value, 4> values;
-      DenseSet<Value> beforeSet = before->getSet();
-      DenseSet<Value> afterSet = after->getSet();
-      for (Value val : beforeSet) {
-        if (!afterSet.contains(val)) {
-          values.push_back(val);
-        }
-      }
-
-      // Add barrier before this op.
-      if (!values.empty()) {
-        OpBuilder builder(op);
-        builder.setInsertionPoint(op);
-        builder.create<gpu::BarrierOp>(op->getLoc());
-      }
-    });
+  if (failed(synchronizeTensors(rewriter, moduleOp, state, sync))) {
+    return signalPassFailure();
   }
 }
 

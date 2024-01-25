@@ -58,6 +58,10 @@ FailureOr<IREETilingResult>
 tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
                           linalg::LinalgTilingOptions options);
 
+LogicalResult synchronizeTensors(RewriterBase &rewriter, ModuleOp moduleOp,
+                                 bufferization::OneShotAnalysisState &state,
+                                 std::function<void(OpBuilder builder)> sync);
+
 /// Populate patterns related to clean up the IR after tile and distribute
 /// to workgroups.
 void populateTileAndDistributeToWorkgroupsCleanupPatterns(

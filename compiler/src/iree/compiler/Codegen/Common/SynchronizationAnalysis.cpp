@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/SynchronizationAnalysis.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "llvm/ADT/SetOperations.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
@@ -14,6 +15,9 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 
 using namespace mlir::dataflow;
+using namespace mlir::bufferization;
+
+constexpr const char *kSyncBarrier = "__sync_barrier";
 
 namespace mlir::iree_compiler {
 
@@ -59,8 +63,13 @@ void SynchronizationAnalysis::visitOperation(Operation *op,
     // better analysis.
 
     for (OpOperand &operand : op->getOpOperands()) {
-      // TODO: Check encoding here.
-      if (!isa<TensorType>(operand.get().getType())) {
+      auto tensorType = dyn_cast<RankedTensorType>(operand.get().getType());
+      if (!tensorType) {
+        continue;
+      }
+
+      if (!isa_and_present<IREE::LinalgExt::RequiresSyncAttr>(
+              tensorType.getEncoding())) {
         continue;
       }
 
@@ -80,22 +89,16 @@ void SynchronizationAnalysis::visitOperation(Operation *op,
     getReadWriteSet(op, unionSet, subtractSet);
   }
 
-  op->dump();
-  llvm::errs() << "subtractSet: ";
-  for (auto value : subtractSet) {
-    llvm::errs() << value.getAsOpaquePointer() << " ";
+  DenseSet<Value> result;
+  if (op->hasAttr(kSyncBarrier)) {
+    // after = unionSet
+    result = unionSet;
+  } else {
+    // after = (before - subtractSet) U unionSet
+    result = llvm::set_difference(before.getSet(), subtractSet);
+    llvm::set_union(result, unionSet);
   }
-  llvm::errs() << "\n";
-  llvm::errs() << "unionSet: ";
-  for (auto value : unionSet) {
-    llvm::errs() << value.getAsOpaquePointer() << " ";
-  }
-  llvm::errs() << "\n";
 
-  // after = (before - subtractSet) U unionSet
-  DenseSet<Value> result = before.getSet();
-  llvm::set_subtract(result, subtractSet);
-  llvm::set_union(result, unionSet);
   // Propagate the change.
   propagateIfChanged(after, after->join(result));
 }
@@ -184,6 +187,71 @@ void SynchronizationAnalysis::visitRegionBranchControlFlowTransfer(
 
 void SynchronizationAnalysis::setToEntryState(SetLattice *lattice) {
   lattice->clear();
+}
+
+LogicalResult synchronizeTensors(RewriterBase &rewriter, ModuleOp moduleOp,
+                                 OneShotAnalysisState &state,
+                                 std::function<void(OpBuilder builder)> sync) {
+
+  for (SynchronizationKind kind : {SynchronizationKind::ReadAfterWrite,
+                                   SynchronizationKind::WriteAfterRead}) {
+    DataFlowSolver solver;
+    solver.load<dataflow::DeadCodeAnalysis>();
+    solver.load<dataflow::SparseConstantPropagation>();
+    solver.load<SynchronizationAnalysis>(state, kind);
+    if (solver.initializeAndRun(moduleOp).failed()) {
+      return failure();
+    }
+
+    moduleOp->walk([&](Operation *op) {
+      const SetLattice *after = solver.lookupState<SetLattice>(op);
+      if (!after)
+        return;
+
+      // Get the operation before this one.
+      const SetLattice *before = nullptr;
+      Operation *beforeOp = op->getPrevNode();
+      if (beforeOp) {
+        before = solver.lookupState<SetLattice>(beforeOp);
+      } else {
+        before = solver.lookupState<SetLattice>(op->getBlock());
+      }
+
+      if (!before)
+        return;
+
+      // Get values that are in before but not in after.
+      SmallVector<Value, 4> values;
+      DenseSet<Value> beforeSet = before->getSet();
+      DenseSet<Value> afterSet = after->getSet();
+      for (Value val : beforeSet) {
+        if (!afterSet.contains(val)) {
+          values.push_back(val);
+        }
+      }
+
+      if (!values.empty()) {
+        // Add a synchronization attribute to this operation.
+        op->setAttr(kSyncBarrier, UnitAttr::get(op->getContext()));
+      }
+    });
+  }
+
+  // Collect all operations with a synchronization attribute.
+  SmallVector<Operation *, 4> opRequiresSync;
+  moduleOp->walk([&](Operation *op) {
+    if (op->hasAttr(kSyncBarrier)) {
+      opRequiresSync.push_back(op);
+    }
+  });
+
+  // Insert synchronization before ops requiring it.
+  for (Operation *op : opRequiresSync) {
+    rewriter.setInsertionPoint(op);
+    sync(rewriter);
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler
