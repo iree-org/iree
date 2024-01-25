@@ -21,7 +21,7 @@ public:
   using LLVMCPUDropVectorUnitDimsBase::LLVMCPUDropVectorUnitDimsBase;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
+    registry.insert<memref::MemRefDialect, vector::VectorDialect>();
   }
   void runOnOperation() override;
 };
