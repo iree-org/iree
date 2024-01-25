@@ -11,7 +11,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -137,22 +136,10 @@ public:
   GPUTensorAllocPass(GPUPromoteSharedMemPattern promoteSharedMemPattern)
       : promoteSharedMemPattern(promoteSharedMemPattern) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<bufferization::BufferizationDialect, scf::SCFDialect>();
+    registry.insert<bufferization::BufferizationDialect>();
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
-
-    // Tile the reduction first to reduce the alloc size.
-    if (failed(
-            tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/true))) {
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "// --- After tiling to serial loops ---\n";
-      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
 
     SmallVector<Operation *> opsToPromote;
     funcOp.walk([&](Operation *op) {

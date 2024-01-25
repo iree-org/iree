@@ -80,8 +80,8 @@ def GPUReduceBankConflicts :
 
 def GPUTensorAlloc :
     Pass<"iree-codegen-gpu-tensor-alloc", "func::FuncOp"> {
-  let summary = "Pass to tile reduction dimensions and create allocations for "
-                "some tensor values to use GPU shared memory";
+  let summary = "Pass to create allocations for some tensor values to use"
+                "GPU shared memory";
   let constructor = "mlir::iree_compiler::createGPUTensorAlloc()";
 }
 
@@ -89,6 +89,12 @@ def GPUTensorTile :
     Pass<"iree-codegen-gpu-tensor-tile", "func::FuncOp"> {
   let summary = "Pass to tile tensor (linalg) ops within a GPU workgroup";
   let constructor = "mlir::iree_compiler::createGPUTensorTile()";
+}
+
+def GPUTensorTileToSerialLoops :
+    Pass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "func::FuncOp"> {
+  let summary = "Pass to tile reduction dimensions for certain GPU ops";
+  let constructor = "mlir::iree_compiler::createGPUTensorTileToSerialLoops()";
 }
 
 def GPUTileReduction :

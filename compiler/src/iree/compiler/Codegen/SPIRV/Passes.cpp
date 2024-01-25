@@ -503,6 +503,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
 
   // Promote to workgroups and tile to threads.
   auto &nestedPM = topPM.nest<ModuleOp>();
+  nestedPM.addNestedPass<func::FuncOp>(createGPUTensorTileToSerialLoops());
   nestedPM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
   nestedPM.addNestedPass<func::FuncOp>(
       createGPUTensorTile(/*distributeToWarp=*/false));
