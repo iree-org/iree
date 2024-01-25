@@ -23,17 +23,23 @@ on:
         type: string
     outputs:
       build-dir:
-        description: |
-          Local path that stores compiled artifacts.
+        description: Local path that stores compiled artifacts.
         value: ${{ jobs.build_all.outputs.build-dir }}
       build-dir-archive:
-        description: |
-          Local path to the zipped build directory.
+        description: Name of the zipped build directory.
         value: ${{ jobs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact:
-        description: |
-          GCS path to the uploaded build archive.
+        description: GCS path to the uploaded build archive.
         value: ${{ jobs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir:
+        description: Local path to the install directory.
+        value: ${{ jobs.build_all.outputs.install-dir }}
+      install-dir-archive:
+        description: Name of the zipped install directory.
+        value: ${{ jobs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact:
+        description: GCS path to the uploaded install archive.
+        value: ${{ jobs.build_all.outputs.install-dir-gcs-artifact }}
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
@@ -53,12 +59,16 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
+      INSTALL_DIR: full-build-dir/install
     outputs:
       # Pass through the build directory as output so it's available to
       # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
       build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ env.INSTALL_DIR }}
+      install-dir-archive: ${{ steps.install-archive.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ steps.install-upload.outputs.install-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -106,3 +116,20 @@ jobs:
         run: |
           gcloud storage cp "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR_GCS_ARTIFACT}"
           echo "build-dir-gcs-artifact=${BUILD_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
+      - name: "Creating install dir archive"
+        id: install-archive
+        env:
+          INSTALL_DIR_ARCHIVE: install_dir.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${INSTALL_DIR_ARCHIVE} ${INSTALL_DIR}
+          echo "install-dir-archive=${INSTALL_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading install dir archive"
+        id: install-upload
+        env:
+          INSTALL_DIR_ARCHIVE: ${{ steps.install-archive.outputs.install-dir-archive }}
+          INSTALL_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.install-archive.outputs.install-dir-archive }}
+        run: |
+          gcloud storage cp "${INSTALL_DIR_ARCHIVE}" "${INSTALL_DIR_GCS_ARTIFACT}"
+          echo "install-dir-gcs-artifact=${INSTALL_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"

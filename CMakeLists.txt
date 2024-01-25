@@ -69,11 +69,12 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_INTEGRATION_TESTS "Builds IREE integration tests." OFF)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings." OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
-option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
+cmake_dependent_option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON ${IREE_BUILD_COMPILER} OFF)
 
 option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
 
