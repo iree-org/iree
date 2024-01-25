@@ -75,14 +75,14 @@ jobs:
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
-      # The archive step below doesn't include these files. Remove them first to
-      # save disk space.
-      # TODO(#10739): This step can be removed once we enlarge the disk sapce.
-      - name: "Removing unused files"
-        run: |
-          find "${BUILD_DIR}" -type f -name "*.a" -o -type f -name "*.o" \
-            -print \
-            -delete
+      # Remove unused files to save disk space.
+      # TODO(#16203): Switch to package-based CI
+      #   This could also be an allow-list instead of a deny-list, but packages
+      #   are even more explicit.
+      - name: "Removing unused .a files"
+        run: find "${BUILD_DIR}" -type f -name "*.a" -print -delete
+      - name: "Removing unused .o files"
+        run: find "${BUILD_DIR}" -type f -name "*.o" -print -delete
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
