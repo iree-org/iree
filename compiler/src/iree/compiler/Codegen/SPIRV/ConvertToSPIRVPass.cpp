@@ -74,11 +74,11 @@ using InterfaceResourceMap =
     llvm::DenseMap<Operation *, spirv::GlobalVariableOp>;
 
 /// Creates a resource evariable of the given `type` at the beginning of
-/// `moduleOp`'s block via `symbolTable` and bind it to `set` and `binding`.
-spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
-                                               unsigned set, unsigned binding,
-                                               bool alias, ModuleOp moduleOp,
-                                               SymbolTable *symbolTable) {
+/// `moduleOp`'s block via `symbolTable` and binds it to `set` and `binding`.
+static spirv::GlobalVariableOp
+createResourceVariable(Location loc, Type type, unsigned set, unsigned binding,
+                       bool alias, ModuleOp moduleOp,
+                       SymbolTable *symbolTable) {
   std::string name = llvm::formatv("__resource_var_{0}_{1}_", set, binding);
   OpBuilder builder(moduleOp.getContext());
   auto variable =
@@ -90,7 +90,7 @@ spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
 }
 
 /// Returns the (set, binding) pair for the given interface op.
-std::pair<int32_t, int32_t>
+static std::pair<int32_t, int32_t>
 getInterfaceSetAndBinding(IREE::HAL::InterfaceBindingSubspanOp op) {
   return {op.getSet().getSExtValue(), op.getBinding().getSExtValue()};
 }
@@ -98,16 +98,19 @@ getInterfaceSetAndBinding(IREE::HAL::InterfaceBindingSubspanOp op) {
 /// Scans all hal.interface.binding.subspan ops in `module`, creates their
 /// corresponding spirv.GlobalVariables when needed, and returns the map.
 /// The created variables need to have their types fixed later.
-InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
+static InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceVars;
 
-  auto fns = llvm::to_vector<1>(module.getOps<func::FuncOp>());
-  for (func::FuncOp func : llvm::reverse(fns)) {
+  // We insert each new global variable at the begining of the module,
+  // therefore, to preserve the original order, we process all functions and all
+  // subspan ops in the reverse order.
+  auto functions = llvm::to_vector(module.getOps<func::FuncOp>());
+  for (func::FuncOp func : llvm::reverse(functions)) {
     // Collect all interface ops and their (set, binding) pairs in this
     // function. Use SmallVector here for a deterministic order.
-    SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> subspanOps;
-    SmallVector<std::pair<uint32_t, uint32_t>, 8> setBindings;
+    SmallVector<IREE::HAL::InterfaceBindingSubspanOp> subspanOps;
+    SmallVector<std::pair<uint32_t, uint32_t>> setBindings;
 
     // Use a map to see if we have different types for one (set, binding) pair,
     // which will require creating multiple SPIR-V global variables.
@@ -135,22 +138,19 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
     auto placeholderType = spirv::PointerType::get(
         NoneType::get(module.getContext()), spirv::StorageClass::StorageBuffer);
 
-    for (int i = subspanOps.size() - 1; i >= 0; --i) {
-      auto subspanOp = subspanOps[i];
-      const auto &setBinding = setBindings[i];
-
-      auto key = std::make_tuple(setBinding.first, setBinding.second,
-                                 subspanOp.getType());
+    for (auto [subspanOp, setBinding] :
+         llvm::reverse(llvm::zip_equal(subspanOps, setBindings))) {
+      const auto [set, binding] = setBinding;
+      std::tuple<unsigned, unsigned, Type> key = {set, binding,
+                                                  subspanOp.getType()};
       auto var = resourceVars.lookup(key);
       if (!var) {
         // If we have multiple SPIR-V global variables bound to the same (set,
         // binding) pair and they are used in the same function, those variables
         // need to have alias decoration.
-        bool alias = setBindingTypes[setBindings[i]].size() > 1;
-
-        var = createResourceVariable(subspanOp.getLoc(), placeholderType,
-                                     setBinding.first, setBinding.second, alias,
-                                     module, &symbolTable);
+        bool aliases = setBindingTypes[{set, binding}].size() > 1;
+        var = createResourceVariable(subspanOp.getLoc(), placeholderType, set,
+                                     binding, aliases, module, &symbolTable);
         resourceVars[key] = var;
       }
 
@@ -171,7 +171,7 @@ namespace {
 /// A pattern to convert hal.interface.constant.load into a sequence of SPIR-V
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
-    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
@@ -190,9 +190,9 @@ struct HALInterfaceLoadConstantConverter final
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly. This is expected to be
     // paired with a cast (i32 -> index) afterwards.
-    auto i32Type = rewriter.getIntegerType(32);
-    auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
-                                             i32Type, rewriter);
+    IntegerType i32Type = rewriter.getIntegerType(32);
+    Value value = spirv::getPushConstantValue(loadOp, elementCount, index,
+                                              i32Type, rewriter);
 
     rewriter.replaceOp(loadOp, value);
     return success();
@@ -203,7 +203,7 @@ struct HALInterfaceLoadConstantConverter final
 /// SPIR-V Builtin ops.
 template <typename InterfaceOpTy, spirv::BuiltIn builtin>
 struct HALInterfaceWorkgroupIdAndCountConverter final
-    : public OpConversionPattern<InterfaceOpTy> {
+    : OpConversionPattern<InterfaceOpTy> {
   using OpConversionPattern<InterfaceOpTy>::OpConversionPattern;
 
   LogicalResult
@@ -220,7 +220,7 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
     // Casting if Indexing type not 32-bit.
     auto &typeConverter =
         *this->template getTypeConverter<SPIRVTypeConverter>();
-    auto indexType = typeConverter.getIndexType();
+    Type indexType = typeConverter.getIndexType();
     if (indexType != i32Type) {
       spirvId = rewriter.create<spirv::UConvertOp>(spirvId.getLoc(), indexType,
                                                    spirvId);
@@ -234,7 +234,7 @@ struct HALInterfaceWorkgroupIdAndCountConverter final
 /// ops to get the address to a global variable representing the resource
 /// buffer.
 struct HALInterfaceBindingSubspanConverter final
-    : public OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
+    : OpConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
   HALInterfaceBindingSubspanConverter(
       TypeConverter &typeConverter, MLIRContext *context,
       const InterfaceResourceMap &interfaceToResourceVars,
@@ -259,12 +259,12 @@ struct HALInterfaceBindingSubspanConverter final
     }
 
     Type resultType = subspanOp.getOperation()->getResult(0).getType();
-    Type convertedType = this->getTypeConverter()->convertType(resultType);
+    Type convertedType = getTypeConverter()->convertType(resultType);
     if (!convertedType) {
       return subspanOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
-    auto varOp = interfaceToResourceVars.lookup(subspanOp);
+    spirv::GlobalVariableOp varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
     varOp.setTypeAttr(TypeAttr::get(convertedType));
 
@@ -279,7 +279,7 @@ private:
 
 /// Pattern to lower operations that become a no-ops at this level.
 template <typename OpTy>
-struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
+struct FoldAsNoOp final : OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
@@ -290,7 +290,7 @@ struct FoldAsNoOp final : public OpConversionPattern<OpTy> {
 };
 
 /// Removes memref.cast that converts static and dynamic shapes.
-struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
+struct RemoveStaticDynamicCast final : OpRewritePattern<memref::CastOp> {
   using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(memref::CastOp castOp,
@@ -309,7 +309,7 @@ struct RemoveStaticDynamicCast final : public OpRewritePattern<memref::CastOp> {
 /// Removes unrealized_conversion_cast ops introduced during progressive
 /// lowering when possible.
 struct RemoveIdentityConversionCast final
-    : public OpConversionPattern<UnrealizedConversionCastOp> {
+    : OpConversionPattern<UnrealizedConversionCastOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(UnrealizedConversionCastOp op, OpAdaptor adaptor,
@@ -331,10 +331,10 @@ struct RemoveIdentityConversionCast final
 
 /// A pass to perform the SPIR-V conversion.
 ///
-/// This pass converts remaining interface ops into SPIR-V global variables,
-/// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
-/// corresponding SPIR-V ops.
-class ConvertToSPIRVPass : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
+/// Converts remaining interface ops into SPIR-V global variables, GPU processor
+/// ID ops into SPIR-V global variables, loop/standard ops into corresponding
+/// SPIR-V ops.
+class ConvertToSPIRVPass final : public ConvertToSPIRVBase<ConvertToSPIRVPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<spirv::SPIRVDialect>();
@@ -401,7 +401,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     RewritePatternSet shapePatterns(context);
-    shapePatterns.insert<RemoveStaticDynamicCast>(context);
+    shapePatterns.add<RemoveStaticDynamicCast>(context);
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(shapePatterns)))) {
       funcOp.emitOpError() << "failed running shape patterns";
@@ -504,7 +504,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   populateBuiltinFuncToSPIRVPatterns(typeConverter, patterns);
 
   // Add IREE HAL interface op conversions.
-  patterns.insert<
+  patterns.add<
       HALInterfaceLoadConstantConverter,
       HALInterfaceWorkgroupIdAndCountConverter<
           IREE::HAL::InterfaceWorkgroupIDOp, spirv::BuiltIn::WorkgroupId>,
@@ -516,8 +516,8 @@ void ConvertToSPIRVPass::runOnOperation() {
   // and create spirv.GlobalVariables.
   auto interfaceToResourceVars = createResourceVariables(moduleOp);
   // For using use them in conversion.
-  patterns.insert<HALInterfaceBindingSubspanConverter>(typeConverter, context,
-                                                       interfaceToResourceVars);
+  patterns.add<HALInterfaceBindingSubspanConverter>(typeConverter, context,
+                                                    interfaceToResourceVars);
 
   /// Fold certain operations as no-ops:
   /// - linalg.reshape becomes a no-op since all memrefs are linearized in
@@ -525,7 +525,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// - tensor_to_memref can become a no-op since tensors are lowered to
   ///   !spirv.array.
   /// - unrealized_conversion_cast with the same source and target type.
-  patterns.insert<
+  patterns.add<
       FoldAsNoOp<memref::CollapseShapeOp>, FoldAsNoOp<memref::ExpandShapeOp>,
       FoldAsNoOp<bufferization::ToMemrefOp>, RemoveIdentityConversionCast>(
       typeConverter, context);
@@ -550,7 +550,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   // Collect all SPIR-V ops into a spirv.module.
-  auto builder = OpBuilder::atBlockBegin(moduleOp.getBody());
+  OpBuilder builder = OpBuilder::atBlockBegin(moduleOp.getBody());
   auto spvModule = builder.create<spirv::ModuleOp>(
       moduleOp.getLoc(), spirv::AddressingModel::Logical,
       spirv::MemoryModel::GLSL450);
