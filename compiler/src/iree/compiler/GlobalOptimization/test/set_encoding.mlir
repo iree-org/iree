@@ -1273,3 +1273,95 @@ func.func @dot(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>) -> tensor<f32> 
 
 // CHECK: func @dot(
 // CHECK: stablehlo.dot %{{.*}}, %{{.*}} : (tensor<1024xf32>, tensor<1024xf32>) -> tensor<f32>
+
+// -----
+
+func.func @multi_m_dim_generic(%arg0 : tensor<64x4x128xf32>, %arg1 : tensor<128x512xf32>,
+    %arg2 : tensor<64x4x512xf32>) -> tensor<64x4x512xf32> {
+    %4 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d1)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d3, d1)>],
+        iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+        ins(%arg0, %arg1 : tensor<64x4x128xf32>, tensor<128x512xf32>) outs(%arg2 : tensor<64x4x512xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.mulf %in, %in_0 : f32
+      %6 = arith.addf %5, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<64x4x512xf32>
+  return %4 : tensor<64x4x512xf32>
+}
+
+//      CHECK: func @multi_m_dim_generic(
+//      CHECK:   linalg.generic
+// CHECK-SAME:      ins(%{{.*}}, %{{.*}} : tensor<64x4x128xf32>, tensor<128x512xf32>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<64x4x512xf32>)
+
+// -----
+
+func.func @multi_n_dim_generic(%arg0 : tensor<256x128xf32>, %arg1 : tensor<128x64x8xf32>,
+    %arg2 : tensor<256x64x8xf32>) -> tensor<256x64x8xf32> {
+    %4 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2)>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d1, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+        ins(%arg0, %arg1 : tensor<256x128xf32>, tensor<128x64x8xf32>) outs(%arg2 : tensor<256x64x8xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.mulf %in, %in_0 : f32
+      %6 = arith.addf %5, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<256x64x8xf32>
+  return %4 : tensor<256x64x8xf32>
+}
+
+//      CHECK: func @multi_n_dim_generic(
+//      CHECK:   linalg.generic
+// CHECK-SAME:      ins(%{{.*}}, %{{.*}} : tensor<256x128xf32>, tensor<128x64x8xf32>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<256x64x8xf32>)
+
+// -----
+
+func.func @multi_k_dim_generic(%arg0 : tensor<256x64x2xf32>, %arg1 : tensor<64x2x512xf32>,
+    %arg2 : tensor<256x512xf32>) -> tensor<256x512xf32> {
+    %4 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>,
+                         affine_map<(d0, d1, d2, d3) -> (d2, d3, d1)>,
+                         affine_map<(d0, d1, d2, d3) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+        ins(%arg0, %arg1 : tensor<256x64x2xf32>, tensor<64x2x512xf32>) outs(%arg2 : tensor<256x512xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.mulf %in, %in_0 : f32
+      %6 = arith.addf %5, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<256x512xf32>
+  return %4 : tensor<256x512xf32>
+}
+
+//      CHECK: func @multi_k_dim_generic(
+//      CHECK:   linalg.generic
+// CHECK-SAME:      ins(%{{.*}}, %{{.*}} : tensor<256x64x2xf32>, tensor<64x2x512xf32>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<256x512xf32>)
+
+// -----
+
+func.func @multi_batch_dim_generic(%arg0 : tensor<4x8x256x128xf32>, %arg1 : tensor<4x8x128x512xf32>,
+    %arg2 : tensor<4x8x256x512xf32>) -> tensor<4x8x256x512xf32> {
+    %4 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d4)>,
+                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4, d3)>,
+                         affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+        ins(%arg0, %arg1 : tensor<4x8x256x128xf32>, tensor<4x8x128x512xf32>) outs(%arg2 : tensor<4x8x256x512xf32>) {
+    ^bb0(%in: f32, %in_0: f32, %out: f32):
+      %5 = arith.mulf %in, %in_0 : f32
+      %6 = arith.addf %5, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<4x8x256x512xf32>
+  return %4 : tensor<4x8x256x512xf32>
+}
+
+//      CHECK: func @multi_batch_dim_generic(
+//      CHECK:   linalg.generic
+// CHECK-SAME:      ins(%{{.*}}, %{{.*}} : tensor<4x8x256x128xf32>, tensor<4x8x128x512xf32>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<4x8x256x512xf32>)
