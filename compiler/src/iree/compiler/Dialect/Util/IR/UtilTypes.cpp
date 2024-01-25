@@ -25,6 +25,10 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
 
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Util/IR/UtilEnums.cpp.inc" // IWYU pragma: keep
+// clang-format on
+
 namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//

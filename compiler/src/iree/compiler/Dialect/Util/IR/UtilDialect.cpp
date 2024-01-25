@@ -48,6 +48,25 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
 
   bool isLegalToInline(Operation *call, Operation *callable,
                        bool wouldBeCloned) const final {
+    // Check the inlining policy specified on the callable first.
+    if (auto inliningPolicy =
+            callable->getAttrOfType<IREE::Util::InliningPolicyAttrInterface>(
+                "inlining_policy")) {
+      if (!inliningPolicy.isLegalToInline(call, callable))
+        return false;
+    }
+
+    // Check any extended inlining policies that may come from dialect
+    // attributes on both the callee and caller.
+    for (auto attr : callable->getDialectAttrs()) {
+      if (auto inliningPolicy =
+              dyn_cast<IREE::Util::InliningPolicyAttrInterface>(
+                  attr.getValue())) {
+        if (!inliningPolicy.isLegalToInline(call, callable))
+          return false;
+      }
+    }
+
     // Sure!
     return true;
   }
@@ -68,14 +87,26 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op);
     if (!returnOp)
       return;
-    // util.initialize.return takes no args - just branch to the new block.
     OpBuilder builder(op);
-    builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest, ValueRange{});
+    builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest,
+                                       returnOp.getOperands());
     op->erase();
   }
 
   void handleTerminator(Operation *op, ValueRange valuesToReplace) const final {
-    // util.initialize.return takes no args.
+    auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op);
+    if (!returnOp)
+      return;
+    assert(returnOp.getNumOperands() == valuesToReplace.size());
+    for (const auto &it : llvm::enumerate(returnOp.getOperands())) {
+      valuesToReplace[it.index()].replaceAllUsesWith(it.value());
+    }
+  }
+
+  Operation *materializeCallConversion(OpBuilder &builder, Value input,
+                                       Type resultType,
+                                       Location conversionLoc) const override {
+    return nullptr;
   }
 };
 

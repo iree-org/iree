@@ -35,9 +35,7 @@ struct Global {
   SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps;
   SmallVector<IREE::Util::GlobalStoreOpInterface> storeOps;
 
-  bool isCandidate() {
-    return !isIndirect && op.isGlobalPrivate() && !op->hasAttr("noinline");
-  }
+  bool isCandidate() { return !isIndirect && op.isGlobalPrivate(); }
 };
 
 struct GlobalTable {

@@ -45,7 +45,8 @@ createPrimitiveDefaultGlobalOp(std::string name, Location loc, Type type,
       loc, name,
       /*isMutable=*/false, type, initialValue);
   globalOp.setPrivate();
-  globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+  globalOp.setGlobalInliningPolicy(
+      moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
   symbolTable.insert(globalOp);
   return globalOp;
 }
@@ -61,7 +62,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
       loc, name,
       /*isMutable=*/false, globalType);
   globalOp.setPrivate();
-  globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+  globalOp.setGlobalInliningPolicy(
+      moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
   symbolTable.insert(globalOp);
 
   // Create an initializer that allocates the buffer storage.

@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_OPS
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
@@ -600,7 +601,8 @@ def Util_FuncOp : Util_Op<"func", [
     OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<StrAttr>:$sym_visibility,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
-    OptionalAttr<DictArrayAttr>:$res_attrs
+    OptionalAttr<DictArrayAttr>:$res_attrs,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy
   );
 
   let regions = (region AnyRegion:$body);
@@ -625,7 +627,7 @@ def Util_FuncOp : Util_Op<"func", [
 
     bool isDeclaration() { return isExternal(); }
 
-    ::mlir::Region *getCallableRegion() { return nullptr; }
+    ::mlir::Region *getCallableRegion() { return &getBody(); }
     ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
     ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
     ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
@@ -758,7 +760,8 @@ def Util_GlobalOp : Util_Op<"global", [
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<TypedAttrInterface>:$initial_value
+    OptionalAttr<TypedAttrInterface>:$initial_value,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy
   );
 
   let assemblyFormat = [{

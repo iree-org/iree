@@ -21,8 +21,8 @@ MM_TEST_ASM = r"""
   #map1 = affine_map<(d0, d1) -> (d1, d0)>
   #map2 = affine_map<(d0, d1) -> (d1)>
   module @main {
-    util.global private @_params.classifier.weight {noinline} = #stream.parameter.named<"params"::"weight"> : tensor<30x20xf32>
-    util.global private @_params.classifier.bias {noinline} = #stream.parameter.named<"params"::"bias"> : tensor<30xf32>
+    util.global private @_params.classifier.weight {inlining_policy = #util.inline.never} = #stream.parameter.named<"params"::"weight"> : tensor<30x20xf32>
+    util.global private @_params.classifier.bias {inlining_policy = #util.inline.never} = #stream.parameter.named<"params"::"bias"> : tensor<30xf32>
   func.func @run(%arg0: tensor<128x20xf32>) -> tensor<128x30xf32> {
     %0 = call @forward(%arg0) : (tensor<128x20xf32>) -> tensor<128x30xf32>
     return %0 : tensor<128x30xf32>

@@ -130,10 +130,10 @@ util.initializer {
 
 // -----
 
-// CHECK: util.global private @dupeCst0 {noinline} = 5 : index
-util.global private @dupeCst0 {noinline} = 5 : index
+// CHECK: util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
+util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
-util.global private @dupeCst1 {noinline} = 5 : index
+util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
 func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[VALUE0:.+]] = util.global.load @dupeCst0
   %0 = util.global.load @dupeCst0 : index
