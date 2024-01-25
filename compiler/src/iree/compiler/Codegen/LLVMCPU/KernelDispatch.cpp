@@ -1362,6 +1362,17 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
          op.getInnerDimsPos()[0] == 0 && op.getInnerDimsPos()[1] == 1;
 }
 
+static bool isPackMatmulRHS(tensor::PackOp op) {
+  // linalg.batch_matmul LHS shape
+  if (op.getSourceRank() == 3 && op.getInnerDimsPos().size() == 2 &&
+      op.getInnerDimsPos()[0] == 2 && op.getInnerDimsPos()[1] == 1) {
+    return true;
+  }
+  // linalg.matmul LHS shape
+  return op.getSourceRank() == 2 && op.getInnerDimsPos().size() == 2 &&
+         op.getInnerDimsPos()[0] == 1 && op.getInnerDimsPos()[1] == 0;
+}
+
 /// Returns vectorization tile sizes for a pack op. It is driven by pack op
 /// configurations and target CPU features.
 static SmallVector<int64_t>
@@ -1369,10 +1380,17 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
                        tensor::PackOp op) {
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (!hasAVX512fFeature(targetAttr)) {
+    return tileSizes;
+  }
+
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
   // TODO(#15421): Improve tile sizes selection for non f32 cases.
-  if (op.getSourceType().getElementType().isF32() &&
-      hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+  auto elemType = op.getSourceType().getElementType();
+  if (elemType.isF32() && isPackMatmulLHS(op)) {
+    tileSizes.back() = vectorSize;
+  }
+  if (!elemType.isF32() && isPackMatmulRHS(op)) {
     tileSizes.back() = vectorSize;
   }
   return tileSizes;
