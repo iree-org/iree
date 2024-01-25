@@ -99,4 +99,15 @@ def EncodingAttr :
   let genVerifyDecl = 0;
 }
 
+def RequiresSyncAttr : IREELinalgExt_Attr<"RequiresSync"> {
+  let mnemonic = "requires_sync";
+  let summary = [{A tensor encoding for tensors needing synchronization}];
+   let description = [{
+    A tensor encoding which is used to indicate that the buffer which this tensor
+    will eventually bufferize to, needs to be synchronized between reads and
+    writes, i.e. there needs to be explicit synchronization for Read-After-Write
+    and Write-After-Read.
+  }];
+}
+
 #endif // IREE_DIALECT_LINALGEXT_BASE
