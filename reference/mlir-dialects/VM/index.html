@@ -17005,6 +17005,7 @@ Initialized to zero unless an initial value is specified.</p>
 <tr><td><code>type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>is_mutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>initial_value</code></td><td>FloatAttr</td><td>32-bit floating-point value</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 </table>
 
@@ -17029,6 +17030,7 @@ Initialized to zero unless an initial value is specified.</p>
 <tr><td><code>type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>is_mutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>initial_value</code></td><td>FloatAttr</td><td>64-bit floating-point value</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 </table>
 
@@ -17053,6 +17055,7 @@ Initialized to zero unless an initial value is specified.</p>
 <tr><td><code>type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>is_mutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>initial_value</code></td><td>IntegerAttr</td><td>32-bit integer value</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 </table>
 
@@ -17077,6 +17080,7 @@ Initialized to zero unless an initial value is specified.</p>
 <tr><td><code>type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>is_mutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 <tr><td><code>initial_value</code></td><td>IntegerAttr</td><td>64-bit integer value</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 </table>
 
@@ -17431,6 +17435,7 @@ Initialized to null unless an initial value is specified.</p>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
 <tr><td><code>type</code></td><td>::mlir::TypeAttr</td><td>any type attribute</td></tr>
 <tr><td><code>is_mutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
 </table>
 
@@ -19848,7 +19853,7 @@ All flow control is performed by VM ops.</p>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
 <tr><td><code>ordinal</code></td><td>::mlir::IntegerAttr</td><td>ordinal value</td></tr>
-<tr><td><code>noinline</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+<tr><td><code>inlining_policy</code></td><td>::mlir::iree_compiler::IREE::Util::InliningPolicyAttrInterface</td><td>InliningPolicyAttrInterface instance</td></tr>
 <tr><td><code>arg_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 <tr><td><code>res_attrs</code></td><td>::mlir::ArrayAttr</td><td>Array of dictionary attributes</td></tr>
 </table>
