@@ -164,6 +164,7 @@ def iree_check_test_suite(
         srcs,
         target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
         compiler_flags = [],
+        input_type = None,
         runner_args = [],
         tags = [],
         target_cpu_features_variants = [],
@@ -179,6 +180,7 @@ def iree_check_test_suite(
           module, respectively.
       compiler_flags: additional flags to pass to the compiler. Bytecode output
           format and backend flags are passed automatically.
+      input_type: Value to pass to --iree-input-type.
       runner_args: additional runner_args to pass to the underlying
           iree-check-module tests. The driver and input file are passed
           automatically. To use different runner_args per test, create a
@@ -215,6 +217,7 @@ def iree_check_test_suite(
             driver = driver,
             target_backend = backend,
             compiler_flags = compiler_flags,
+            input_type = input_type,
             runner_args = runner_args,
             tags = tags,
             **kwargs

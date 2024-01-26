@@ -32,6 +32,8 @@ iree_check_test_suite(
     "local-task"
     "vulkan"
     "metal"
+  INPUT_TYPE
+    "stablehlo"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
