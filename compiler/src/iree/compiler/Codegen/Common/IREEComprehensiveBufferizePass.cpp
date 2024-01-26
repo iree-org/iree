@@ -13,7 +13,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -25,7 +24,6 @@
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -40,9 +38,11 @@
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
-namespace mlir::iree_compiler {
+using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotAnalysisState;
+using mlir::bufferization::OneShotBufferizationOptions;
 
-using namespace bufferization;
+namespace mlir::iree_compiler {
 
 namespace {
 class EliminateEmptyTensorsPass
@@ -241,8 +241,7 @@ void addIREEPostBufferizationPasses(OpPassManager &passManager) {
   passManager.addNestedPass<func::FuncOp>(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
-  // memrefs are unified in CSE pass, so we can truely remove redundant
-  // memcpy.
+  // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
   passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 }
