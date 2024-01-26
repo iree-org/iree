@@ -776,7 +776,9 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     return setOpConfigAndEntryPointFnTranslation(
         op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
+        /*subgroupSize=*/std::nullopt,
+        getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
+                                      storeStage));
   }
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
@@ -1102,7 +1104,9 @@ LogicalResult setCooperativeMatrixConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize, subgroupSize, pipelineDepth, storeStage);
+      workgroupSize, subgroupSize,
+      getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
+                                    storeStage));
 }
 
 } // namespace detail

@@ -90,15 +90,29 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
     addGPUMatmulSimtPassPipeline(pipeline);
     break;
-  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
-    addGPUMatmulTensorCorePassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    if (failed(maybeDepth)) {
+      variantOp.emitOpError(
+          "Invalid matmul configuration without pipelining config");
+      return signalPassFailure();
+    }
+    addGPUMatmulTensorCorePassPipeline(pipeline, *maybeDepth);
     break;
+  }
   case IREE::Codegen::DispatchLoweringPassPipeline::
-      LLVMGPUMatmulTensorCoreMmaSync:
-    addGPUMatmulTensorCoreMmaSyncPassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth());
+      LLVMGPUMatmulTensorCoreMmaSync: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    if (failed(maybeDepth)) {
+      variantOp.emitOpError(
+          "Invalid matmul configuration without pipelining config");
+      return signalPassFailure();
+    }
+    addGPUMatmulTensorCoreMmaSyncPassPipeline(pipeline, *maybeDepth);
     break;
+  }
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
     addGPUTransposePassPipeline(pipeline);
     break;

@@ -82,16 +82,34 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   case CodeGenPipeline::SPIRVSubgroupReduce:
     addSPIRVSubgroupReducePassPipeline(pipeline);
     break;
-  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-    addSPIRVCooperativeMatrixVectorizePassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-        translationInfo.value().getSoftwarePipelineStoreStage());
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    FailureOr<int64_t> maybeStage = getSoftwarePipelineStoreStage(
+        translationInfo.value().getConfiguration());
+    if (failed(maybeDepth) || failed(maybeStage)) {
+      variantOp.emitOpError("Invalid cooperative matrix pipeline without "
+                            "pipeline configuration.");
+      return signalPassFailure();
+    }
+    addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
+                                                   *maybeStage);
     break;
-  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-    addSPIRVMatmulPromoteVectorizePassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-        translationInfo.value().getSoftwarePipelineStoreStage());
+  }
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    FailureOr<int64_t> maybeStage = getSoftwarePipelineStoreStage(
+        translationInfo.value().getConfiguration());
+    if (failed(maybeDepth) || failed(maybeStage)) {
+      variantOp.emitOpError(
+          "Invalid matmul pipeline without pipeline configuration.");
+      return signalPassFailure();
+    }
+    addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
+                                               *maybeStage);
     break;
+  }
   case CodeGenPipeline::SPIRVWinogradVectorize:
     addSPIRVWinogradVectorizePassPipeline(pipeline);
     break;

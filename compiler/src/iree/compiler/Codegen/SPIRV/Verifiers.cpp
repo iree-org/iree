@@ -44,6 +44,15 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     llvm::dbgs() << "]\n";
   });
 
+  FailureOr<int64_t> maybeDepth =
+      getSoftwarePipelineDepth(translationInfo.getConfiguration());
+  FailureOr<int64_t> maybeStage =
+      getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+  if (failed(maybeDepth) || failed(maybeStage)) {
+    return op->emitOpError(
+        "Invalid matmul configuration without pipelining config");
+  }
+
   // Get spirv.target_env attributes
   const spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(op);
   const spirv::TargetEnv targetEnv(targetEnvAttr);
@@ -122,9 +131,6 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
     return op->emitOpError("RHS shape is indivisible by first level tile size");
   }
 
-  auto pipelineDepth = translationInfo.getSoftwarePipelineDepth();
-  pipelineDepth = pipelineDepth ? pipelineDepth : 1;
-
   return success();
 }
 
@@ -148,6 +154,15 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
     llvm::interleaveComma(workgroupSize, llvm::dbgs());
     llvm::dbgs() << "]\n";
   });
+
+  FailureOr<int64_t> maybeDepth =
+      getSoftwarePipelineDepth(translationInfo.getConfiguration());
+  FailureOr<int64_t> maybeStage =
+      getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+  if (failed(maybeDepth) || failed(maybeStage)) {
+    return op->emitOpError(
+        "Invalid cooperative matrix configuration without pipelining config");
+  }
 
   // Get spirv.target_env attributes
   const spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(op);

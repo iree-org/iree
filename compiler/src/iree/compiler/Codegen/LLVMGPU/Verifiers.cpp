@@ -96,16 +96,23 @@ verifyGPUMatmulPipeline(Operation *op,
     return op->emitOpError("expected workgroup size for GPU pipelines");
   }
 
-  assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
-         "Store to workgroup memory currently expected to happen in stage 1 of "
-         "software pipeline.");
+  FailureOr<int64_t> maybeDepth =
+      getSoftwarePipelineDepth(translationInfo.getConfiguration());
+  FailureOr<int64_t> maybeStage =
+      getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
+  if (failed(maybeDepth) || failed(maybeStage)) {
+    return op->emitOpError(
+        "Invalid matmul configuration without pipelining config");
+  }
+
+  if (*maybeStage != 1) {
+    return op->emitError(
+        "Store to workgroup memory currently expected to happen in stage 1 of "
+        "software pipeline.");
+  }
 
   // Get compilation pipeline.
   StringRef pipelineName = stringifyEnum(pipeline);
-
-  assert(translationInfo.getSoftwarePipelineStoreStage() == 1 &&
-         "Store to workgroup memory currently expected to happen in stage 1 of "
-         "software pipeline.");
 
   // Get Operand/Result types.
   mlir::Type lhsType = op->getOperand(0).getType();
