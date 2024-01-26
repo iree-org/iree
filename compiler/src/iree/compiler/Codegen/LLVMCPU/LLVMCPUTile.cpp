@@ -93,7 +93,7 @@ void LLVMCPUTilePass::runOnOperation() {
     setSCFTileSizes(options, op, std::move(tileSizes),
                     std::move(tileScalableFlags));
     FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, op, options);
+        scf::tileUsingSCF(rewriter, op, options);
     if (failed(tiledResults))
       continue;
     rewriter.replaceOp(op, tiledResults->replacements);

@@ -140,7 +140,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       RewritePatternSet patterns(&getContext());
       // These patterns only convert a subset of arith that target specific
       // rocdl intrinsics (e.g. fp8 conversions).
-      arith::populateArithToAMDGPUConversionPatterns(patterns);
+      arith::populateArithToAMDGPUConversionPatterns(
+          patterns, /*saturateFP8Truncf=*/false);
       populateConvertGPUToAMDGPUPatterns(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateDropSharedMemoryDeallocOpPatterns(patterns);

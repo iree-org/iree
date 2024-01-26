@@ -25,7 +25,7 @@ public:
 
 protected:
   void notifyOperationRemoved(Operation *op) override;
-  void notifyOperationInserted(Operation *op) override;
+  void notifyOperationInserted(Operation *op, InsertPoint previous) override;
 
 private:
   SmallPtrSet<Operation *, 16> dimOps;

@@ -33,10 +33,10 @@ transform.sequence failures(propagate) {
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
 //       CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
 //  CHECK-SAME:       iter_args(%[[INITY:.+]] = %[[ORIGINAL]])
-//   CHECK-DAG:     %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[D0]]]
 //       CHECK:     %[[RESULT_INNER:.+]] = scf.for %[[IV1:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZEX]]
 //  CHECK-SAME:         iter_args(%[[INITX:.+]] = %[[INITY]])
-//       CHECK:       %[[USED_TILESIZEX:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[D1]]]
+//   CHECK-DAG:     %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[D0]]]
+//   CHECK-DAG:       %[[USED_TILESIZEX:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[D1]]]
 //       CHECK:       %[[UPDATE_SLICE:.+]] = tensor.extract_slice %[[UPDATES]][%[[IV0]], %[[IV1]]]
 //  CHECK-SAME:           [%[[USED_TILESIZEY]], %[[USED_TILESIZEX]]]
 //       CHECK:       %[[INDEX_SLICE:.+]] = tensor.extract_slice %[[INDICES]][%[[IV0]], 0]
@@ -89,8 +89,8 @@ transform.sequence failures(propagate) {
 //   CHECK-DAG:   %[[D0:.+]] = memref.dim %[[UPDATES]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = memref.dim %[[UPDATES]], %[[C1]]
 //       CHECK:   scf.for %[[IV0:.+]] = %[[C0]] to %[[D0]] step %[[TILESIZEY]]
-//   CHECK-DAG:     %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[D0]]]
 //       CHECK:     scf.for %[[IV1:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZEX]]
+//   CHECK-DAG:       %[[USED_TILESIZEY:.+]] = affine.min #[[MAP0]](%[[IV0]])[%[[D0]]]
 //   CHECK-DAG:       %[[USED_TILESIZEX:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[D1]]]
 //       CHECK:       %[[UPDATE_SLICE:.+]] = memref.subview %[[UPDATES]][%[[IV0]], %[[IV1]]]
 //  CHECK-SAME:           [%[[USED_TILESIZEY]], %[[USED_TILESIZEX]]]
@@ -533,9 +533,9 @@ transform.sequence failures(propagate) {
 // CHECK:        %[[INIT:.+]] = tensor.empty(%[[D0]], %[[D1]]) : tensor<?x?xi32>
 // CHECK:        %[[RES:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C10]]
 // CHECK-SAME:     iter_args(%[[INIT2:.+]] = %[[INIT]]) -> (tensor<?x?xi32>) {
-// CHECK:          %[[SIZE_I:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
 // CHECK:          %[[RES2:.+]] = scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C20]]
 // CHECK-SAME:       iter_args(%[[INIT3:.+]] = %[[INIT2]]) -> (tensor<?x?xi32>) {
+// CHECK-DAG:        %[[SIZE_I:.+]] = affine.min #[[MAP0]](%[[I]])[%[[D0]]]
 // CHECK-DAG:        %[[SIZE_J:.+]] = affine.min #[[MAP1]](%[[J]])[%[[D1]]]
 // CHECK-DAG:        %[[IDX0:.+]] = affine.apply #[[MAP2]]()[%[[D0]], %[[I]], %[[SIZE_I]]]
 // CHECK-DAG:        %[[IDX1:.+]] = affine.apply #[[MAP2]]()[%[[D1]], %[[J]], %[[SIZE_J]]]
@@ -989,10 +989,10 @@ transform.sequence failures(propagate) {
 // CHECK-DAG:    %[[D0:.+]] = tensor.empty() : tensor<192x1024x64xf32>
 // CHECK:        %[[D1:.+]] = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C10]]
 // CHECK-SAME:     iter_args(%[[ARG4:[a-zA-Z0-9_]+]] = %[[D0]]) -> (tensor<192x1024x64xf32>) {
-// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG3]])
 // CHECK:          %[[D3:.+]] = scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C30]]
 // CHECK-SAME:       iter_args(%[[ARG6:[a-zA-Z0-9_]+]] = %[[ARG4]]) -> (tensor<192x1024x64xf32>) {
-// CHECK-DAG:          %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])
+// CHECK-DAG:        %[[D2:.+]] = affine.min #[[MAP]](%[[ARG3]])
+// CHECK-DAG:        %[[D4:.+]] = affine.min #[[MAP1]](%[[ARG5]])
 // CHECK:            %[[EXTRACTED_SLICE:.+]] = tensor.extract_slice %[[ARG0]][%[[ARG3]], %[[ARG5]], 0] [%[[D2]],
 // CHECK-SAME:         %[[D4]], 64] [1, 1, 1] : tensor<192x1024x64xf32> to tensor<?x?x64xf32>
 // CHECK:            %[[EXTRACTED_SLICE_0:.+]] = tensor.extract_slice %[[ARG1]][%[[ARG3]], 0, 0] [%[[D2]], 1024, 64] [1,
@@ -1035,9 +1035,9 @@ transform.sequence failures(propagate) {
 // CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
 // CHECK:        %[[C10:.+]] = arith.constant 10 : index
 // CHECK:        scf.for %[[ARG4:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C10]] {
-// CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])
 // CHECK:          scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C30]] {
-// CHECK-DAG:          %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])
+// CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])
+// CHECK-DAG:        %[[D1:.+]] = affine.min #[[MAP1]](%[[ARG5]])
 // CHECK:            %[[SUBVIEW:.+]] = memref.subview %[[ARG0]][%[[ARG4]], %[[ARG5]], 0] [%[[D0]], %[[D1]], 64] [1, 1,
 // CHECK-SAME:         1] : memref<192x1024x64xf32> to memref<?x?x64xf32, strided<[65536, 64, 1], offset: ?>>
 // CHECK:            %[[SUBVIEW_0:.+]] = memref.subview %[[ARG1]][%[[ARG4]], 0, 0] [%[[D0]], 1024, 64] [1, 1, 1] :
