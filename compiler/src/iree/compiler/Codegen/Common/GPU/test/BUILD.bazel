@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "gpu_generalize_named_ops.mlir",
             "gpu_lower_to_ukernels.mlir",
             "gpu_pipeline.mlir",
+            "gpu_synchronize_buffers.mlir",
             "gpu_tensor_alloc.mlir",
             "gpu_tensor_tile.mlir",
             "gpu_workgroup_swizzle.mlir",

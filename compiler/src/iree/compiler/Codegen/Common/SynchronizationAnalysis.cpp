@@ -174,18 +174,19 @@ void SynchronizationAnalysis::visitOperation(Operation *op,
   // Propagate the change.
   propagateIfChanged(after, after->join(pendingReads, pendingWrites));
 
-  llvm::errs() << "\n\n";
-  before.print(llvm::errs());
-  llvm::errs() << "\nReadSet=";
-  interleaveComma(readSet, llvm::errs(),
-                  [&](Attribute attr) { llvm::errs() << attr; });
-  llvm::errs() << "\nWriteSet=";
-  interleaveComma(writeSet, llvm::errs(),
-                  [&](Attribute attr) { llvm::errs() << attr; });
-  llvm::errs() << "\n";
-  op->dump();
-  after->print(llvm::errs());
-  llvm::errs() << "\n\n";
+  // TODO: Put this in LLVM_DEBUG.
+  // llvm::errs() << "\n\n";
+  // before.print(llvm::errs());
+  // llvm::errs() << "\nReadSet=";
+  // interleaveComma(readSet, llvm::errs(),
+  //                 [&](Attribute attr) { llvm::errs() << attr; });
+  // llvm::errs() << "\nWriteSet=";
+  // interleaveComma(writeSet, llvm::errs(),
+  //                 [&](Attribute attr) { llvm::errs() << attr; });
+  // llvm::errs() << "\n";
+  // op->dump();
+  // after->print(llvm::errs());
+  // llvm::errs() << "\n\n";
 }
 
 void SynchronizationAnalysis::setToEntryState(SetLattice *lattice) {
@@ -206,8 +207,14 @@ LogicalResult synchronizeBuffers(RewriterBase &rewriter, Operation *root,
   // Collect all operations with a synchronization attribute.
   SmallVector<Operation *, 4> opRequiresSync;
   root->walk([&](Operation *op) {
-    if (op->hasAttr(kRaWBarrier) || op->hasAttr(kWaRBarrier)) {
+    if (op->hasAttr(kRaWBarrier)) {
       opRequiresSync.push_back(op);
+      op->removeAttr(kRaWBarrier);
+    }
+
+    if (op->hasAttr(kWaRBarrier)) {
+      opRequiresSync.push_back(op);
+      op->removeAttr(kWaRBarrier);
     }
   });
 
