@@ -4,7 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT IREE_TARGET_BACKEND_VULKAN_SPIRV OR NOT IREE_HAL_DRIVER_VULKAN)
+# This sample needs runtime support...
+if(NOT IREE_HAL_DRIVER_VULKAN)
+  return()
+endif()
+
+# ... and compiler support, from either a source build or packages.
+if(NOT IREE_HOST_BIN_DIR AND NOT IREE_TARGET_BACKEND_VULKAN_SPIRV)
   return()
 endif()
 
