@@ -21,6 +21,10 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Util/IR/UtilEnums.h.inc" // IWYU pragma: keep
+// clang-format on
+
 namespace mlir::iree_compiler::IREE::Util {
 
 class GlobalOpInterface;

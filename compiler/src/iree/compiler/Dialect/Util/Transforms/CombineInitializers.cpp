@@ -70,7 +70,7 @@ public:
       builder.setInsertionPointToEnd(&newOp.back());
       initializerOp.erase();
     }
-    builder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
+    builder.create<IREE::Util::ReturnOp>(fusedLoc);
   }
 };
 

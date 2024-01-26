@@ -11,8 +11,8 @@ func.func @simpleMul(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.b
   return %3 : !hal.buffer_view
 }
 
-//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} : !hal.buffer_view
-//      CHECK: util.global private @[[GLOBAL_ARG1:.+]] {noinline} : !hal.buffer_view
+//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {inlining_policy = #util.inline.never} : !hal.buffer_view
+//      CHECK: util.global private @[[GLOBAL_ARG1:.+]] {inlining_policy = #util.inline.never} : !hal.buffer_view
 
 //      CHECK: func.func @simpleMul_benchmark() attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "entry"}} {
 //  CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : !hal.buffer_view
@@ -37,8 +37,8 @@ func.func @while(%start: i32, %bound: i32) -> i32 {
   return %5 : i32
 }
 
-//     CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} = 0 : i32
-//     CHECK: util.global private @[[GLOBAL_ARG1:.+]] {noinline} = 0 : i32
+//     CHECK: util.global private @[[GLOBAL_ARG0:.+]] {inlining_policy = #util.inline.never} = 0 : i32
+//     CHECK: util.global private @[[GLOBAL_ARG1:.+]] {inlining_policy = #util.inline.never} = 0 : i32
 
 //     CHECK: func.func @while_benchmark()
 // CHECK-DAG:   %[[ARG0:.+]] = util.global.load @[[GLOBAL_ARG0]] : i32
@@ -59,7 +59,7 @@ func.func @importBufferViewBitcasting(%view: !hal.buffer_view) -> !hal.buffer_vi
   return %2 : !hal.buffer_view
 }
 
-//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} : !hal.buffer_view
+//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {inlining_policy = #util.inline.never} : !hal.buffer_view
 //      CHECK: util.initializer {
 //  CHECK-DAG:   %[[SPLAT:.+]] = flow.tensor.splat %c0_i32
 //  CHECK-DAG:   %[[EXPORT:.+]] = hal.tensor.export %[[SPLAT]] : tensor<4xi32> -> !hal.buffer_view
@@ -99,14 +99,14 @@ func.func @exportBufferViewInPlace(%view: !hal.buffer_view, %storage: !hal.buffe
   return %2 : !hal.buffer_view
 }
 
-//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {noinline} : !hal.buffer_view
+//      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {inlining_policy = #util.inline.never} : !hal.buffer_view
 //      CHECK: util.initializer {
 //  CHECK-DAG:   %[[SPLAT0:.+]] = flow.tensor.splat %c0_i32
 //  CHECK-DAG:   %[[EXPORT0:.+]] = hal.tensor.export %[[SPLAT0]] : tensor<4xi32> -> !hal.buffer_view
 //  CHECK-DAG:   %[[DNO0:.+]] = util.optimization_barrier %[[EXPORT0]]
 // CHECK-NEXT:   util.global.store %[[DNO0]], @[[GLOBAL_ARG0]]
 
-//      CHECK: util.global private @[[GLOBAL_ARG1:.+]] {noinline} : !hal.buffer
+//      CHECK: util.global private @[[GLOBAL_ARG1:.+]] {inlining_policy = #util.inline.never} : !hal.buffer
 //      CHECK: util.initializer {
 //  CHECK-DAG:   %[[SPLAT1:.+]] = flow.tensor.splat %c0_i32
 //  CHECK-DAG:   %[[EXPORT1:.+]] = hal.tensor.export %[[SPLAT1]] : tensor<4xi32> -> !hal.buffer

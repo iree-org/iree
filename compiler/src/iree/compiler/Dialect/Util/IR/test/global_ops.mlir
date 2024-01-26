@@ -35,7 +35,7 @@ util.initializer {
   %0 = func.call @initializer() : () -> tensor<4xi32>
   // CHECK-NEXT: util.global.store %[[VALUE]], @v_initialized : tensor<4xi32>
   util.global.store %0, @v_initialized : tensor<4xi32>
-  util.initializer.return
+  util.return
 }
 func.func private @initializer() -> tensor<4xi32>
 

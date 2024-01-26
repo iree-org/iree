@@ -42,7 +42,7 @@ module @hoisted_tensor_i1_input {
       linalg.yield %2 : i32
     } -> tensor<4xi32>
     util.global.store %1, @hoisted : tensor<4xi32>
-    util.initializer.return
+    util.return
   }
 }
 

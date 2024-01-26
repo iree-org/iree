@@ -19,7 +19,7 @@ module @hoist_sub_byte_tensor_store {
 // CHECK:   %[[CEXPR:.+]] = "iree_unregistered.const_expr"
 // CHECK:   %[[CASTED_GLOBAL:.+]] = flow.tensor.bitcast %[[CEXPR]] : tensor<64xi4> -> tensor<32xi8>
 // CHECK:   util.global.store %[[CASTED_GLOBAL]]
-// CHECK:   util.initializer.return
+// CHECK:   util.return
 
 // -----
 
@@ -52,7 +52,7 @@ module @hoist_tree_const_expr_i4 {
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
   // CHECK:   %[[BITCAST_2:.*]] = flow.tensor.bitcast %[[CE0]] : tensor<8xi4> -> tensor<4xi8>
   // CHECK:   util.global.store %[[BITCAST_2]], @[[HOISTED_0]] : tensor<4xi8>
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
   // CHECK: util.initializer attributes {iree.compiler.consteval} {
   // CHECK:   %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : tensor<4xi8>
@@ -61,7 +61,7 @@ module @hoist_tree_const_expr_i4 {
   // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[BITCAST_3]], %[[LOAD_LATENT_GLOBAL]])
   // CHECK:   %[[BITCAST_4:.*]] = flow.tensor.bitcast %[[CE1]] : tensor<8xi4> -> tensor<4xi8>
   // CHECK:   util.global.store %[[BITCAST_4]], @[[HOISTED_1]] : tensor<4xi8>
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
 }
 

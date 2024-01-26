@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "range_folding.mlir"
     "range_ops.mlir"
     "structural_folding.mlir"
+    "structural_inlining.mlir"
     "structural_ops.mlir"
   TOOLS
     FileCheck

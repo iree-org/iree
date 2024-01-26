@@ -94,7 +94,6 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
   constexpr const char *kRetainedAttributes[] = {
       "iree.reflection",
       "sym_visibility",
-      "noinline",
       "nosideeffects",
   };
   auto retainedAttributes = ArrayRef<const char *>(
@@ -106,6 +105,10 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
     if (attr) {
       dstOp->setAttr(attrName, attr);
     }
+  }
+  if (srcOp->hasAttr("noinline")) {
+    dstOp->setAttr("inlining_policy",
+                   IREE::Util::InlineNeverAttr::get(dstOp->getContext()));
   }
 }
 
@@ -168,7 +171,6 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
 // override behavior during conversion and don't want to propagate them.
 static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
   constexpr const char *kRetainedAttributes[] = {
-      "noinline",
       "nosideeffects",
       "vm.fallback",
   };

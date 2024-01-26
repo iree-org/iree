@@ -8,7 +8,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-util.global private @"__transpose_4096_4096_input" {noinline} = dense<1.0> : tensor<4096x4096xf32>
+util.global private @"__transpose_4096_4096_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<4096x4096xf32>
 
 func.func @transpsoe_4096_4096() -> tensor<4096x4096xf32> {
   %input_ptr = util.global.address @"__transpose_4096_4096_input" : !util.ptr<tensor<4096x4096xf32>>
@@ -24,7 +24,7 @@ func.func @transpsoe_4096_4096() -> tensor<4096x4096xf32> {
  return %result : tensor<4096x4096xf32>
 }
 
-util.global private @"__transpose_10_2048_1024_input" {noinline} = dense<1.0> : tensor<10x2048x1024xf32>
+util.global private @"__transpose_10_2048_1024_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<10x2048x1024xf32>
 
 func.func @transpsoe_10_1024_2048() -> tensor<10x1024x2048xf32> {
   %input_ptr = util.global.address @"__transpose_10_2048_1024_input" : !util.ptr<tensor<10x2048x1024xf32>>
@@ -40,8 +40,8 @@ func.func @transpsoe_10_1024_2048() -> tensor<10x1024x2048xf32> {
  return %result : tensor<10x1024x2048xf32>
 }
 
-util.global private @"__transpose_10_2048_1024_lhs" {noinline} = dense<1.0> : tensor<10x2048x1024xf32>
-util.global private @"__transpose_10_2048_1024_rhs" {noinline} = dense<1.0> : tensor<10x2048x1024xf32>
+util.global private @"__transpose_10_2048_1024_lhs" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<10x2048x1024xf32>
+util.global private @"__transpose_10_2048_1024_rhs" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<10x2048x1024xf32>
 
 func.func @transpsoe_10_1024_2048_fusion() -> tensor<10x1024x2048xf32> {
   %lhs_ptr = util.global.address @"__transpose_10_2048_1024_lhs" : !util.ptr<tensor<10x2048x1024xf32>>
@@ -60,7 +60,7 @@ func.func @transpsoe_10_1024_2048_fusion() -> tensor<10x1024x2048xf32> {
  return %result : tensor<10x1024x2048xf32>
 }
 
-util.global private @"__transpose_10_2064_1024_input" {noinline} = dense<1.0> : tensor<10x2064x1024xf32>
+util.global private @"__transpose_10_2064_1024_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<10x2064x1024xf32>
 
 func.func @transpsoe_10_1024_2064_unaligned() -> tensor<10x1024x2064xf32> {
   %input_ptr = util.global.address @"__transpose_10_2064_1024_input" : !util.ptr<tensor<10x2064x1024xf32>>

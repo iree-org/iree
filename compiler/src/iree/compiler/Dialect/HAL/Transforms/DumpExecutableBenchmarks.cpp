@@ -194,7 +194,7 @@ appendGlobalBuffer(Location loc, StringRef baseName,
 
   initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.getResult(),
                                                 globalOp.getNameAttr());
-  initBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+  initBuilder.create<IREE::Util::ReturnOp>(loc);
 
   return globalOp;
 }

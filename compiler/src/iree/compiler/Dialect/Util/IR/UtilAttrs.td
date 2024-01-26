@@ -111,6 +111,48 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
 }
 
 //===----------------------------------------------------------------------===//
+// #util.inline.*
+//===----------------------------------------------------------------------===//
+
+def Util_InlineNeverAttr : AttrDef<Util_Dialect, "InlineNever", [
+  Util_InliningPolicyAttrInterface,
+]> {
+  let mnemonic = "inline.never";
+  let summary = [{disables inlining on the associated function}];
+  let description = [{
+    Disables inlining of the function the attribute is associated with into
+    any call-site.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+  let extraClassDeclaration = [{
+    bool isLegalToInline(Operation *inlineSite, Operation *inlinable) {
+      return false;
+    }
+  }];
+}
+
+def Util_InlineAlwaysAttr : AttrDef<Util_Dialect, "InlineAlways", [
+  Util_InliningPolicyAttrInterface,
+]> {
+  let mnemonic = "inline.always";
+  let summary = [{forces inlining on the associated function when possible}];
+  let description = [{
+    Skips any cost-model decisions as to whether a function should be inlined
+    into call-sites and allows the inlining to happen. Any policies that prevent
+    inlining will still be observed and inlining may fail if any are not
+    satisfied.
+  }];
+  let parameters = (ins);
+  let assemblyFormat = [{}];
+  let extraClassDeclaration = [{
+    bool isLegalToInline(Operation *inlineSite, Operation *inlinable) {
+      return true;
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // #util.uninitialized
 //===----------------------------------------------------------------------===//
 

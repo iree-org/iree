@@ -376,7 +376,7 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
           srcOp.getLoc(), srcOp.getInitializerAttr(), TypeRange{newType});
       rewriter.create<IREE::Util::GlobalStoreOp>(
           srcOp.getLoc(), callOp.getResult(0), srcOp.getName());
-      rewriter.create<IREE::Util::InitializerReturnOp>(srcOp.getLoc());
+      rewriter.create<IREE::Util::ReturnOp>(srcOp.getLoc());
       rewriter.restoreInsertionPoint(ip);
     }
     return success();

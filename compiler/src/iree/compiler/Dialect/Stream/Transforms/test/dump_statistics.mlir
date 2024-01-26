@@ -43,7 +43,7 @@ util.initializer {
   %did_map, %result = stream.resource.try_map %1[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c192}
   util.global.store %result, @_constant : !stream.resource<constant>
   util.global.store %0, @_constant__timepoint : !stream.timepoint
-  util.initializer.return
+  util.return
 }
 
 stream.executable private @func_a_ex_0 {

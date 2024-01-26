@@ -36,7 +36,7 @@ module @linalg_tensor_jit {
       linalg.yield %4 : f32
     } -> tensor<5x6xf32>
     util.global.store %3, @hoisted : tensor<5x6xf32>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -52,7 +52,7 @@ module @eval_splat_detection {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 2]> : tensor<2xi32>
     util.global.store %cst, @hoisted : tensor<2xi32>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -69,7 +69,7 @@ module @eval_f16_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xf16>
     util.global.store %cst, @hoisted : tensor<5x6xf16>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -86,7 +86,7 @@ module @eval_bf16_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xbf16>
     util.global.store %cst, @hoisted : tensor<5x6xbf16>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -102,7 +102,7 @@ module @eval_f32_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf32>
     util.global.store %cst, @hoisted : tensor<2xf32>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -118,7 +118,7 @@ module @eval_f64_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf64>
     util.global.store %cst, @hoisted : tensor<2xf64>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -137,7 +137,7 @@ module @eval_i1_tensor {
     %cst = arith.constant dense<[0, 1, 0, 1, 1, 0]> : tensor<6xi8>
     %casted = arith.trunci %cst : tensor<6xi8> to tensor<6xi1>
     util.global.store %casted, @hoisted : tensor<6xi1>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -153,7 +153,7 @@ module @eval_i4_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<3> : tensor<5x6xi4>
     util.global.store %cst, @hoisted : tensor<5x6xi4>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -169,7 +169,7 @@ module @eval_i8_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi8>
     util.global.store %cst, @hoisted : tensor<2xi8>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -185,7 +185,7 @@ module @eval_i16_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi16>
     util.global.store %cst, @hoisted : tensor<2xi16>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -201,7 +201,7 @@ module @eval_i32_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi32>
     util.global.store %cst, @hoisted : tensor<2xi32>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -217,7 +217,7 @@ module @eval_i64_tensor {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[2, 3]> : tensor<2xi64>
     util.global.store %cst, @hoisted : tensor<2xi64>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -234,7 +234,7 @@ module @eval_i64_tensor_splat {
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<2> : tensor<2xi64>
     util.global.store %cst, @hoisted : tensor<2xi64>
-    util.initializer.return
+    util.return
   }
 }
 
@@ -260,6 +260,6 @@ module @serializable_attrs {
       linalg.yield %2 : i8
     } -> tensor<5x6xi8>
     util.global.store %1, @hoisted : tensor<5x6xi8>
-    util.initializer.return
+    util.return
   }
 }

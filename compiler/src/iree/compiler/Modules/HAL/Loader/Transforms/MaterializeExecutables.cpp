@@ -57,7 +57,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
         loc, status,
         "none of the executable binaries in the module are supported by the "
         "runtime");
-    failBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    failBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Exit block takes the loaded executable and stores it.
@@ -67,7 +67,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
     auto executableArg = exitBlock->addArgument(executableType, loc);
     exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableArg,
                                                   globalOp.getName());
-    exitBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    exitBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Start with the first try.
