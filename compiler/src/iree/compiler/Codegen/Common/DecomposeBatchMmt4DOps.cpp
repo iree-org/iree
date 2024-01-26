@@ -182,7 +182,7 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
             scf::SCFTilingOptions().setTileSizes(
                 getAsIndexOpFoldResult(ctx, tileSizes)));
         FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-            scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+            scf::tileConsumerAndFuseProducersUsingSCF(
                 rewriter, tilingInterfaceOp, options);
         if (failed(tileAndFuseResult)) {
           errorOp = batchMmt4DOp;

@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "hint_ops.mlir"
     "list_ops.mlir"
     "status_ops.mlir"
+    "structural_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -64,8 +64,9 @@ void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
     dimOps.erase(op);
 }
 
-void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
-  IRRewriter::Listener::notifyOperationInserted(op);
+void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
+                                                        InsertPoint previous) {
+  IRRewriter::Listener::notifyOperationInserted(op, previous);
   if (isa<tensor::DimOp>(op))
     dimOps.insert(op);
 }

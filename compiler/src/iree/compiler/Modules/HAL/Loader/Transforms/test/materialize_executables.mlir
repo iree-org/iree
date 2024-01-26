@@ -14,10 +14,10 @@
 // CHECK:   cf.br ^bb4(%[[EXECUTABLE]] : !hal.executable)
 // CHECK: ^bb3:
 // CHECK:   util.status.check_ok
-// CHECK:   util.initializer.return
+// CHECK:   util.return
 // CHECK: ^bb4(%[[STORE_VALUE:.+]]: !hal.executable):
 // CHECK:   util.global.store %[[STORE_VALUE]], @ex0 : !hal.executable
-// CHECK:   util.initializer.return
+// CHECK:   util.return
 // CHECK: }
 hal.executable private @ex0 {
   hal.executable.binary public @binary attributes {data = dense<123> : vector<64xi8>, format = "embedded-elf-x86_64", mime_type = "application/x-elf"}

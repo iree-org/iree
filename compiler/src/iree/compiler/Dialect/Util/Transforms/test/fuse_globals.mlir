@@ -43,7 +43,7 @@ func.func @nonuniform_b(%arg0: index) {
 util.initializer {
   %0 = "some.op"() : () -> index
   util.global.store %0, @unfusable1 : index
-  util.initializer.return
+  util.return
 }
 
 // -----
@@ -101,7 +101,7 @@ util.initializer {
   util.global.store %v, @fusableSubset1 : index
   // CHECK-NEXT: util.global.store %[[V]], @unfusableSubset2
   util.global.store %v, @unfusableSubset2 : index
-  util.initializer.return
+  util.return
 }
 // CHECK: func.func @mutate_unfusable(%[[ARG0:.+]]: index)
 func.func @mutate_unfusable(%arg0: index) {

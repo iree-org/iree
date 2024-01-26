@@ -15,8 +15,8 @@ util.initializer {
   // CHECK-NEXT: cf.br {{.+}} {util.ordinal = 5 : index}
   cf.br ^bb2
 ^bb2:
-  // CHECK: util.initializer.return {util.ordinal = 6 : index}
-  util.initializer.return
+  // CHECK: util.return {util.ordinal = 6 : index}
+  util.return
 }
 
 // CHECK: util.global private mutable @globalB {util.ordinal = 7 : index}

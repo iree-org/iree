@@ -357,7 +357,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
       continue;
     }
     // Get the corresponding bbArg.
-    BlockArgument bbArg = forallOp.getOutputBlockArguments()[outputIdx];
+    BlockArgument bbArg = forallOp.getRegionIterArgs()[outputIdx];
 
     // Check if the extract_slice has a matching parallel_insert_slice
     // (i.e., same source/target, offsets, sizes and strides).

@@ -93,7 +93,8 @@ public:
       // By the time we've outlined things here we are sure we want them
       // outlined even if the user runs an arbitrary number of passes between
       // now and when we may use that information (HAL constant pooling, etc).
-      globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+      globalOp.setInliningPolicyAttr(
+          moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
     }
 
     // Replace all of the constants with lookups for the new variables.

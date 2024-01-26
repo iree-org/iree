@@ -12,7 +12,7 @@ util.initializer {
   util.global.store %t0, @global0 : !stream.timepoint
   %t1 = stream.cmd.execute await(%t0) => with() {} => !stream.timepoint
   util.global.store %t1, @global1 : !stream.timepoint
-  util.initializer.return
+  util.return
 }
 
 // CHECK-LABEL: @initializedGlobals

@@ -9,7 +9,7 @@ util.global private mutable @global0 : index
 util.initializer {
   %value0 = func.call @extern() : () -> index
   util.global.store %value0, @global0 : index
-  util.initializer.return
+  util.return
 }
 // CHECK-NEXT: util.global private @global1 : index
 util.global private @global1 : index
@@ -20,7 +20,7 @@ util.initializer {
   util.global.store %value1, @global1 : index
   %value2 = func.call @extern() : () -> index
   util.global.store %value2, @global2 : index
-  util.initializer.return
+  util.return
 }
 // CHECK-NEXT: util.initializer {
 // CHECK-NEXT: %[[VALUE0:.+]] = func.call @extern()
@@ -29,7 +29,7 @@ util.initializer {
 // CHECK-NEXT: util.global.store %[[VALUE1]], @global1
 // CHECK-NEXT: %[[VALUE2:.+]] = func.call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE2]], @global2
-// CHECK-NEXT: util.initializer.return
+// CHECK-NEXT: util.return
 
 // CHECK-LABEL: @orderedCombining
 func.func @orderedCombining(%arg0: index) -> (index, index, index) {
@@ -59,14 +59,14 @@ util.initializer {
   util.global.store %c200, @globalA : index
   cf.br ^bb3
 ^bb3:
-  util.initializer.return
+  util.return
 }
 // CHECK-NEXT: util.global private @globalB : index
 util.global private @globalB : index
 util.initializer {
   %c300 = arith.constant 300 : index
   util.global.store %c300, @globalB : index
-  util.initializer.return
+  util.return
 }
 // CHECK: util.initializer {
 // CHECK: ^bb1:
@@ -76,5 +76,5 @@ util.initializer {
 // CHECK: ^bb3:
 // CHECK:   cf.br ^bb4
 // CHECK: ^bb4:
-// CHECK:   util.initializer.return
+// CHECK:   util.return
 // CHECK: }

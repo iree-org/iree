@@ -780,7 +780,7 @@ tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
     }
 
     FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, target, options);
+        scf::tileUsingSCF(rewriter, target, options);
     if (failed(tiledResults)) {
       return failure();
     }
