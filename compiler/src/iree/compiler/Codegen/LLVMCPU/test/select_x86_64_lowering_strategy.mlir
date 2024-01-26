@@ -1488,18 +1488,18 @@ hal.executable private @transpose_16x16 {
       func.func @transpose_16x16() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>>
-        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x1024xf32>> -> tensor<512x1024xf32>
-        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>> -> tensor<1024x512xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<511x1023xf32>>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1023x511xf32>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [511, 1023], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<511x1023xf32>> -> tensor<511x1023xf32>
+        %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1023, 511], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<1023x511xf32>> -> tensor<1023x511xf32>
         %6 = linalg.generic {
           indexing_maps = [ affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>],
           iterator_types = ["parallel", "parallel"]}
-          ins(%3 : tensor<512x1024xf32>) outs(%5 : tensor<1024x512xf32>) {
+          ins(%3 : tensor<511x1023xf32>) outs(%5 : tensor<1023x511xf32>) {
           ^bb0(%arg1: f32, %arg2: f32):
             linalg.yield %arg1 : f32
-          } -> tensor<1024x512xf32>
-        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : tensor<1024x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x512xf32>>
+          } -> tensor<1023x511xf32>
+        flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [1023, 511], strides = [1, 1] : tensor<1023x511xf32> -> !flow.dispatch.tensor<writeonly:tensor<1023x511xf32>>
         return
       }
     }

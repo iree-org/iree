@@ -483,19 +483,39 @@ static int64_t roundUpToPow2(int64_t size, bool predicate) {
   return llvm::PowerOf2Ceil(size);
 }
 
+/// Returns the nearest multiple of `vectorSize` of `size` if `predicate` is
+/// true. Otherwise, returns `size`.
+static int64_t roundUpToMultipleOfVectorSize(int64_t size, int64_t vectorSize,
+                                             bool predicate) {
+  if (!predicate) {
+    return size;
+  }
+  assert(size > 0 && "Negative size");
+  return llvm::alignTo(size, vectorSize);
+}
+
 /// Computes the maximum tile size that can be used to distribute a dimension
 /// based on its number of iterations and the native vector size used of the
 /// target. The resulting tile size will be a multiple of the provided vector
-/// size, except when `allowIncompleteTile` is set to true.
-static int64_t getMaxDistributionTileSize(int64_t lb, int64_t ub,
-                                          int64_t maxSize, int64_t vectorSize,
-                                          bool allowIncompleteTile = false) {
+/// size, except when `allowIncompleteTile` is set to true. If
+/// `enforceMultipleOfVectorSize` is set to true, the resulting tile size will
+/// be a multiple of `vectorSize`.
+static int64_t
+getMaxDistributionTileSize(int64_t lb, int64_t ub, int64_t maxSize,
+                           int64_t vectorSize, bool allowIncompleteTile = false,
+                           bool enforceMultipleOfVectorSize = false) {
   if (ShapedType::isDynamic(ub) || ShapedType::isDynamic(lb)) {
-    return maxSize;
+    return roundUpToMultipleOfVectorSize(maxSize, vectorSize,
+                                         enforceMultipleOfVectorSize);
   }
   int64_t numIters = ub - lb;
   if (numIters <= maxSize && numIters < vectorSize) {
-    return numIters;
+    return roundUpToMultipleOfVectorSize(numIters, vectorSize,
+                                         enforceMultipleOfVectorSize);
+  }
+  if (enforceMultipleOfVectorSize) {
+    return roundUpToMultipleOfVectorSize(maxSize, vectorSize,
+                                         enforceMultipleOfVectorSize);
   }
 
   int64_t scaledUB = std::min(maxSize, numIters) / vectorSize * vectorSize;
@@ -573,6 +593,7 @@ struct DistributionHeuristicConfig {
   // vectorize all the shapes. Allowing incomplete tile is critical for odd
   // shapes (e.g., some dim sizes could be prime number).
   bool allowIncompleteTile = false;
+  bool enforceMultipleOfVectorSize = false;
 
   SmallVector<int64_t> minTileSizes;
   SmallVector<int64_t> maxTileSizes;
@@ -639,7 +660,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
       continue;
     distributedTileSizes[i] = getMaxDistributionTileSize(
         lbs[i], ubs[i], distributedTileSizes[i], adjustedMinTileSizes[i],
-        config.allowIncompleteTile);
+        config.allowIncompleteTile, config.enforceMultipleOfVectorSize);
   }
   LLVM_DEBUG(KD_DBGS() << "Distributed tile sizes after fixups: "
                        << distributedTileSizes << "\n");
@@ -1656,7 +1677,7 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
                        << vecPreProcStrategy << "\n");
   if (vecPreProcStrategy != VectorPreProcStrategy::None) {
-    distConfig.allowIncompleteTile = true;
+    distConfig.enforceMultipleOfVectorSize = true;
   }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(genericOp, distConfig);
