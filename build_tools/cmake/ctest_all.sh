@@ -48,6 +48,8 @@ export IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT="${IREE_CTEST_REPEAT_UNTIL_FAIL_COUNT:
 export IREE_CTEST_TESTS_REGEX="${IREE_CTEST_TESTS_REGEX:-}"
 # Respect the user setting, default to no --label-regex
 export IREE_CTEST_LABEL_REGEX="${IREE_CTEST_LABEL_REGEX:-}"
+# Respect the user setting, default to skipping check-iree-dialects tests.
+export IREE_CTEST_IREE_DIALECTS_TESTS_DISABLE="${IREE_CTEST_RUN_IREE_DIALECTS_TESTS:-1}"
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with its directory.
@@ -169,7 +171,12 @@ if (( ${#excluded_tests[@]} )); then
   ctest_args+=("--exclude-regex ${excluded_tests_regex}")
 fi
 
-echo "*************** Running CTest ***************"
-
 set -x
+
+echo "*************** Running CTest ***************"
 ctest ${ctest_args[@]}
+
+if (( IREE_CTEST_IREE_DIALECTS_TESTS_DISABLE != 1 )); then
+  echo "**************** Running llvm-external-projects tests ***************"
+  cmake --build ${BUILD_DIR} --target check-iree-dialects -- -k 0
+fi

@@ -294,6 +294,7 @@ jobs:
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+            --env IREE_CTEST_IREE_DIALECTS_TESTS_DISABLE=0 \
             --env IREE_CUDA_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
