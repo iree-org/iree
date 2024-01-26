@@ -36,7 +36,6 @@ void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   RewritePatternSet patterns(ctx);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
   auto vectorTransferToSCFOptions =
