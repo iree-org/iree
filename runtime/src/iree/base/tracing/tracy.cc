@@ -224,19 +224,14 @@ void iree_tracing_register_custom_file_contents(
       [](void* data, const char* filename, size_t& size) -> char* {
         tracy_file_mapping const* file_mapping =
             (tracy_file_mapping const*)data;
-        fprintf(stdout, "Tracy source callback queried file: '%s'\n", filename);
-
         tracy_file_contents* found_file_contents =
             (tracy_file_contents*)bsearch(filename, file_mapping->file_contents,
                                           file_mapping->file_mapping_length,
                                           sizeof(*file_mapping->file_contents),
                                           tracy_file_contents_search_cmp);
-
         if (!found_file_contents) {
           return nullptr;
         }
-
-        fprintf(stdout, "...Found match: %s\n", found_file_contents->file_name);
         auto buf = (char*)tracy::tracy_malloc_fast(
             found_file_contents->file_contents_length);
         strcpy(buf, found_file_contents->file_contents);

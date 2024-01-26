@@ -219,7 +219,6 @@ static iree_status_t iree_hal_system_executable_create(
     const iree_hal_executable_params_t* executable_params,
     const iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator, iree_hal_executable_t** out_executable) {
-  printf("iree_hal_system_executable_create()\n");
   IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(executable_params->executable_data.data &&
                        executable_params->executable_data.data_length);
@@ -328,9 +327,6 @@ static iree_status_t iree_hal_system_executable_issue_call(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "entry point ordinal out of bounds");
   }
-  // printf("iree_hal_system_executable_issue_call(): ordinal %zu\n", ordinal);
-  // printf("iree_hal_system_executable_issue_call(): identifier %s\n",
-  // executable->identifier.data);
 
   IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN(z0, executable->identifier,
                                                     library, ordinal);

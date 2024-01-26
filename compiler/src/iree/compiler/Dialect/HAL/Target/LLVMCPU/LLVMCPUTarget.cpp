@@ -374,18 +374,12 @@ public:
       std::string sourceContents = "";
       if (options.debugLevel >= 1) {
         if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-          llvm::dbgs() << "The first loc for target: " << loc << "\n";
-          // exportOp.dump();
-          // llvm::dbgs() << "---------------------- " << loc << "\n";
-
           sourceFile = loc->getFilename().str();
           sourceLine = loc->getLine();
-
           if (options.debugLevel >= 3) {
             std::string error;
             auto file = mlir::openInputFile(loc->getFilename(), &error);
             if (file) {
-              // TODO(KoolJBlack): Exclude src contents above a certain size?
               sourceContents = std::string(file->getBuffer().begin(),
                                            file->getBuffer().end());
             } else {

@@ -26,10 +26,6 @@ namespace {
 
 static void dumpExecutableToStream(IREE::HAL::ExecutableOp executableOp,
                                    StringRef filePath, llvm::raw_ostream &os) {
-  llvm::dbgs() << "I'm dumping a source for: " << executableOp.getName()
-               << " with file: " << filePath << "\n";
-  mlir::Location location = executableOp.getLoc();
-  location.dump();
   OpPrintingFlags flags;
   flags.useLocalScope();
   mlir::generateLocationsFromIR(os, filePath, executableOp, flags);

@@ -7,7 +7,6 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 
 #include "iree/compiler/Utils/StringUtils.h"
-#include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -19,11 +18,7 @@
 namespace mlir::iree_compiler {
 
 std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
-  llvm::dbgs() << "findFirstFileLoc(): ";
-  baseLoc.dump();
-
   if (auto loc = llvm::dyn_cast<FileLineColLoc>(baseLoc)) {
-    llvm::dbgs() << "Found FileLineColLoc!" << "\n";
     return loc;
   }
 
@@ -35,28 +30,22 @@ std::optional<FileLineColLoc> findFirstFileLoc(Location baseLoc) {
         return childResult;
     }
   } else if (auto loc = llvm::dyn_cast<CallSiteLoc>(baseLoc)) {
-    llvm::dbgs() << "Ok, CallSiteLoc -->" << "\n";
     // First check caller...
-    llvm::dbgs() << "Searching caller..." << "\n";
     auto callerResult = findFirstFileLoc(loc.getCaller());
     if (callerResult)
       return callerResult;
     // Then check callee...
-    llvm::dbgs() << "Searching callee..." << "\n";
     auto calleeResult = findFirstFileLoc(loc.getCallee());
     if (calleeResult)
       return calleeResult;
   } else if (auto loc = llvm::dyn_cast<NameLoc>(baseLoc)) {
-    llvm::dbgs() << "Searching childLoc..." << "\n";
     auto childResult = findFirstFileLoc(loc.getChildLoc());
     if (childResult)
       return childResult;
   } else if (auto loc = llvm::dyn_cast<OpaqueLoc>(baseLoc)) {
     // TODO(scotttodd): Use loc.fallbackLocation()?
-    llvm::dbgs() << "Found OpaqueLoc!" << "\n";
   } else if (auto loc = llvm::dyn_cast<UnknownLoc>(baseLoc)) {
     // ¯\_(ツ)_/¯
-    llvm::dbgs() << "Found UnknownLoc!" << "\n";
   }
 
   return std::nullopt;
