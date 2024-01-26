@@ -14,7 +14,7 @@
 # or they can be updated independently
 set(IREE_TINT_TAG          "fdb8787e9c1b79770bd98a8faf37fbe48a3077a4")  # 2023-03-06
 set(IREE_SPIRV_HEADERS_TAG "b730938c033ede3572b660ab019b438509ba24d9")  # 2023-08-10
-set(IREE_SPIRV_TOOLS_TAG   "43b8886490eb6af81fc61e0ff071c51a922af864")  # 2023-08-11
+set(IREE_SPIRV_TOOLS_TAG   "80bc99c3d4a33fe07ae5dc93147bdd9495688b10")  # 2024-01-26
 message(STATUS "Configuring WebGPU target deps (SPIRV-Headers, SPIRV-Tools, Tint)")
 list(APPEND CMAKE_MESSAGE_INDENT "  ")
 add_subdirectory(spirv-headers EXCLUDE_FROM_ALL)
