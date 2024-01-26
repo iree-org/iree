@@ -5,43 +5,31 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Tests for end-to-end IREE support of *simple* models or their close
-# derivatives. This does not use our standard test infrastructure and instead
-# JIT-compiles and runs models with iree-run-mlir. It is intended for small
-# example programs that can be manually read and updated.
+# derivatives.
 
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
+iree_check_test_suite(
+    name = "check",
     srcs = enforce_glob(
         [
             "collatz.mlir",
             "edge_detection.mlir",
-            "fragment_000.mlir",
             "fullyconnected.mlir",
-            "mnist_fake_weights.mlir",
-            "unidirectional_lstm.mlir",
         ],
         include = ["*.mlir"],
     ),
-    cfg = "//tests:lit.cfg.py",
-    tags = [
-        "driver=local-task",
-        "driver=metal",
-        "driver=vulkan",
-        "hostonly",
-        # TODO(scotttodd): Enable again, now that we don't have SwiftShader CI?
-        "optonly",  # swiftshader is too slow in dbg
-    ],
-    tools = [
-        "//tools:iree-run-mlir",
-        "@llvm-project//lld",
-        "@llvm-project//llvm:FileCheck",
+    input_type = "stablehlo",
+    target_backends_and_drivers = [
+        ("vmvx", "local-task"),
+        ("llvm-cpu", "local-task"),
+        ("vulkan-spirv", "vulkan"),
+        ("metal-spirv", "metal"),
     ],
 )

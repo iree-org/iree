@@ -15,61 +15,26 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_lit_test_suite(
+iree_check_test_suite(
   NAME
-    lit
+    check
   SRCS
     "collatz.mlir"
     "edge_detection.mlir"
-    "fragment_000.mlir"
     "fullyconnected.mlir"
-    "mnist_fake_weights.mlir"
-    "unidirectional_lstm.mlir"
-  TOOLS
-    ${IREE_LLD_TARGET}
-    FileCheck
-    iree-run-mlir
-  LABELS
-    "driver=local-task"
-    "driver=metal"
-    "driver=vulkan"
-    "hostonly"
-    "optonly"
+  TARGET_BACKENDS
+    "vmvx"
+    "llvm-cpu"
+    "vulkan-spirv"
+    "metal-spirv"
+  DRIVERS
+    "local-task"
+    "local-task"
+    "vulkan"
+    "metal"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-iree_static_linker_test(
-  NAME
-    mnist_fake_weights_llvm_cpu_static_bytecode_test
-  SRC
-    "mnist_fake_weights.mlir"
-  STATIC_LIB_PREFIX
-    mnist_fake_weights_linked_llvm_cpu
-  ENTRY_FUNCTION
-    "predict"
-  FUNCTION_INPUTS
-    "1x28x28x1xf32"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
-)
-
-iree_static_linker_test(
-  NAME
-    mnist_fake_weights_llvm_cpu_static_c_test
-  SRC
-    "mnist_fake_weights.mlir"
-  STATIC_LIB_PREFIX
-    mnist_fake_weights_linked_llvm_cpu
-  ENTRY_FUNCTION
-    "predict"
-  FUNCTION_INPUTS
-    "1x28x28x1xf32"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
-    "--iree-vm-target-index-bits=32"
-  EMITC
-)
 
 iree_static_linker_test(
   NAME
