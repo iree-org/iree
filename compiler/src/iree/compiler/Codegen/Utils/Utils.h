@@ -225,6 +225,15 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
 
+/// Replace the memory space of all memref types recursively in the given
+/// `root` operation. The replace function takes the current memory space
+/// attribute and returns the new memory space attribute. If no replacement is
+/// returned, this type does not need to be replaced. A null attribute
+/// replacement will remove the memory space attribute.
+LogicalResult replaceMemRefMemorySpace(
+    Operation *root,
+    std::function<std::optional<Attribute>(Attribute)> replace);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_UTILS_H_

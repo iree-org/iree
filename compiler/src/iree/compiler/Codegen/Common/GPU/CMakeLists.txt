@@ -57,6 +57,7 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUReduceBankConflicts.cpp"
+    "GPUSynchronizeBuffers.cpp"
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTileReduction.cpp"

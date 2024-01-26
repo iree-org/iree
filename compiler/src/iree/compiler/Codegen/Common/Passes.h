@@ -243,9 +243,6 @@ createSplitFullPartialTransferPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createSplitFullPartialTransferPass(StringRef option);
 
-/// Pass to insert synchronization points for tensors that need synchronization.
-std::unique_ptr<OperationPass<ModuleOp>> createSynchronizeTensorsPass();
-
 /// Tests iree-hal-preprocess-executables-with behavior.
 std::unique_ptr<OperationPass<void>> createTestExecutablePreprocessingPass();
 

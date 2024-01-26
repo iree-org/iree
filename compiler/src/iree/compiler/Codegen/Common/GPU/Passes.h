@@ -98,6 +98,8 @@ createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
 std::unique_ptr<OperationPass<func::FuncOp>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUSynchronizeBuffersPass();
+
 // Creates a pass to tile reduction dimensions and create allocations for some
 // tensor values to use GPU shared memory.
 std::unique_ptr<OperationPass<func::FuncOp>>

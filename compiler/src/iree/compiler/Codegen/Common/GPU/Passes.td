@@ -78,6 +78,48 @@ def GPUReduceBankConflicts :
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 
+def GPUSynchronizeBuffers :
+    Pass<"iree-codegen-gpu-synchronize-buffers", "func::FuncOp"> {
+  let summary = "Pass to insert barriers for buffers marked with a #requires_sync memory space attribute.";
+  let description = [{
+    Insert gpu.barrier operations based on a Read-After-Write and
+    Write-After-Read analysis. The barrier operations are only inserted
+    for memrefs with a #requires_sync memory space.
+    
+    The user is expected to have set the memory space on the memref with
+    #requires_sync, which takes the address space and a barrier token as
+    parameters.
+     
+    The barrier token is used to determine which buffers need to be synchronized
+    for RaW and WaR conflicts i.e. only buffers with same barrier token can
+    have conflicts with each other. If no barrier token is specified, the
+    buffer is assumed to conflict with everything.
+
+    The pass will replace #requires_sync memory spaces with the memory space
+    given in #requires_sync attribute.
+
+    Example:
+
+    ```
+    %mem = memref.alloc() 
+      : memref<10x10xf32, #iree_linalg_ext.requires_sync<#gpu.address_space<workgroup>, 1>>
+    %a = transfer_read %mem[0, 0] : vector<10xf32>
+    transfer_write %a, %mem
+    ```
+
+    The pass will convert his to
+
+    ```
+    %mem = memref.alloc() 
+      : memref<10x10xf32, #gpu.address_space<workgroup>>
+    %a = transfer_read %mem[0, 0] : vector<10xf32>
+    gpu.barrier
+    transfer_write %a, %mem
+    ```
+  }];
+  let constructor = "mlir::iree_compiler::createGPUSynchronizeBuffersPass()";
+}
+
 def GPUTensorAlloc :
     Pass<"iree-codegen-gpu-tensor-alloc", "func::FuncOp"> {
   let summary = "Pass to tile reduction dimensions and create allocations for "

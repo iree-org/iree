@@ -13,7 +13,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/SynchronizationAnalysis.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -55,17 +54,6 @@ public:
 
   void runOnOperation() override;
 };
-
-namespace {
-class SynchronizeTensors : public SynchronizeTensorsBase<SynchronizeTensors> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<bufferization::BufferizationDialect, gpu::GPUDialect>();
-  }
-
-  void runOnOperation() override;
-};
-} // namespace
 
 /// Pass to convert from tensor based ops to memref based ops.
 class IREEComprehensiveBufferizePass
@@ -196,19 +184,6 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     return signalPassFailure();
 }
 
-void SynchronizeTensors::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
-  IRRewriter rewriter(moduleOp->getContext());
-
-  auto sync = [&](OpBuilder builder) {
-    builder.create<gpu::BarrierOp>(builder.getInsertionPoint()->getLoc());
-  };
-
-  if (failed(synchronizeTensors(rewriter, moduleOp, sync))) {
-    return signalPassFailure();
-  }
-}
-
 // The following is copied from bufferization::runOneShotBufferize with
 // modifications.
 LogicalResult
@@ -247,10 +222,6 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 
 std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
   return std::make_unique<EliminateEmptyTensorsPass>();
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> createSynchronizeTensorsPass() {
-  return std::make_unique<SynchronizeTensors>();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(

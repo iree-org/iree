@@ -1124,4 +1124,148 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   });
 }
 
+namespace {
+
+using ReplaceTypeFn = std::function<std::optional<Attribute>(Attribute)>;
+
+//===----------------------------------------------------------------------===//
+// Conversion Target
+//===----------------------------------------------------------------------===//
+
+/// Returns true if the given `type` is considered as legal.
+static bool isLegalType(Type type, ReplaceTypeFn replacer) {
+  if (auto memRefType = llvm::dyn_cast<BaseMemRefType>(type)) {
+    Attribute spaceAttr = memRefType.getMemorySpace();
+    if (!spaceAttr) {
+      return true;
+    }
+    return !replacer(spaceAttr).has_value();
+  }
+  return true;
+}
+
+/// Returns true if the given `op` is considered as legal.
+static bool isLegalOp(Operation *op, ReplaceTypeFn replacer) {
+  auto curryIsLegalType = [&](Type type) -> bool {
+    return isLegalType(type, replacer);
+  };
+
+  if (!llvm::all_of(op->getOperandTypes(), curryIsLegalType) ||
+      !llvm::all_of(op->getResultTypes(), curryIsLegalType)) {
+    return false;
+  }
+
+  for (Region &region : op->getRegions()) {
+    for (Block &block : region) {
+      if (!llvm::all_of(block.getArgumentTypes(), curryIsLegalType)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+// Type Converter
+//===----------------------------------------------------------------------===//
+
+struct MemRefTypeConverter final : public TypeConverter {
+  MemRefTypeConverter(ReplaceTypeFn replacer) {
+
+    // Pass through for all other types.
+    addConversion([](Type type) { return type; });
+
+    addConversion([&](BaseMemRefType memRefType) -> std::optional<Type> {
+      // Check if we have the expected memory space.
+      Attribute spaceAttr = memRefType.getMemorySpace();
+      if (!spaceAttr)
+        return std::nullopt;
+
+      std::optional<Attribute> maybeReplacement = replacer(spaceAttr);
+      if (!maybeReplacement)
+        return std::nullopt;
+
+      Attribute replacement = maybeReplacement.value();
+
+      // Replace the memory space.
+      if (auto rankedType = llvm::dyn_cast<MemRefType>(memRefType)) {
+        if (replacement) {
+          return MemRefType::get(memRefType.getShape(),
+                                 memRefType.getElementType(),
+                                 rankedType.getLayout(), replacement);
+        } else {
+          return MemRefType::get(memRefType.getShape(),
+                                 memRefType.getElementType(),
+                                 rankedType.getLayout());
+        }
+      }
+
+      if (replacement) {
+        return UnrankedMemRefType::get(memRefType.getElementType(),
+                                       /*memorySpace=*/replacement);
+      } else {
+        return UnrankedMemRefType::get(memRefType.getElementType(),
+                                       /*memorySpace=*/0);
+      }
+    });
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Conversion Pattern
+//===----------------------------------------------------------------------===//
+
+struct ReplaceMemorySpacePattern final : public ConversionPattern {
+  ReplaceMemorySpacePattern(MLIRContext *context, TypeConverter &converter)
+      : ConversionPattern(converter, MatchAnyOpTypeTag(), 1, context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *op, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override;
+};
+
+LogicalResult ReplaceMemorySpacePattern::matchAndRewrite(
+    Operation *op, ArrayRef<Value> operands,
+    ConversionPatternRewriter &rewriter) const {
+  const TypeConverter &typeConverter = *getTypeConverter();
+  llvm::SmallVector<Type> newResults;
+  if (failed(typeConverter.convertTypes(op->getResultTypes(), newResults))) {
+    op->emitError("Can't convert results");
+  }
+
+  OperationState state(op->getLoc(), op->getName().getStringRef(), operands,
+                       newResults, op->getAttrs(), op->getSuccessors());
+
+  for (Region &region : op->getRegions()) {
+    Region *newRegion = state.addRegion();
+    rewriter.inlineRegionBefore(region, *newRegion, newRegion->begin());
+    if (failed(rewriter.convertRegionTypes(newRegion, typeConverter))) {
+      return op->emitError("Cant'convert region types");
+    }
+  }
+
+  Operation *newOp = rewriter.create(state);
+  rewriter.replaceOp(op, newOp->getResults());
+  return success();
+}
+
+} // namespace
+
+LogicalResult replaceMemRefMemorySpace(
+    Operation *root,
+    std::function<std::optional<Attribute>(Attribute)> replace) {
+  MLIRContext *ctx = root->getContext();
+  ConversionTarget target(*ctx);
+
+  target.markUnknownOpDynamicallyLegal(
+      [&](Operation *op) { return isLegalOp(op, replace); });
+
+  MemRefTypeConverter typeConverter(replace);
+  RewritePatternSet patterns(ctx);
+  patterns.add<ReplaceMemorySpacePattern>(ctx, typeConverter);
+
+  return applyFullConversion(root, target, std::move(patterns));
+}
+
 } // namespace mlir::iree_compiler

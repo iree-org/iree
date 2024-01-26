@@ -4,18 +4,67 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/SynchronizationAnalysis.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "llvm/ADT/SetOperations.h"
+#include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
+#include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Analysis/DataFlow/DenseAnalysis.h"
 
 using namespace mlir::dataflow;
+
+namespace mlir::iree_compiler {
+
+namespace {
 
 constexpr const char *kRaWBarrier = "__sync_barrier_raw";
 constexpr const char *kWaRBarrier = "__sync_barrier_war";
 
-namespace mlir::iree_compiler {
+class SetLattice final : public dataflow::AbstractDenseLattice {
+public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SetLattice)
+
+  using AbstractDenseLattice::AbstractDenseLattice;
+
+  virtual ~SetLattice() = default;
+
+  ChangeResult join(const AbstractDenseLattice &rhs) override;
+
+  ChangeResult join(const DenseSet<Attribute> &rhsReads,
+                    const DenseSet<Attribute> &rhsWrites);
+
+  void clear();
+
+  void print(raw_ostream &os) const override;
+
+  const DenseSet<Attribute> getPendingReads() const { return pendingReads; }
+  const DenseSet<Attribute> getPendingWrites() const { return pendingWrites; }
+
+private:
+  DenseSet<Attribute> pendingReads;
+  DenseSet<Attribute> pendingWrites;
+};
+
+class SynchronizationAnalysis final
+    : public dataflow::DenseForwardDataFlowAnalysis<SetLattice> {
+public:
+  SynchronizationAnalysis(DataFlowSolver &solver)
+      : DenseForwardDataFlowAnalysis(solver) {}
+
+  virtual ~SynchronizationAnalysis() = default;
+
+  void visitOperation(Operation *op, const SetLattice &before,
+                      SetLattice *after) override;
+
+private:
+  std::tuple<DenseSet<Attribute>, DenseSet<Attribute>>
+  getReadAndWriteSet(Operation *op);
+
+  void setToEntryState(SetLattice *lattice) override;
+};
+
+}; // namespace
 
 ChangeResult SetLattice::join(const AbstractDenseLattice &rhs) {
   auto &rhsSet = static_cast<const SetLattice &>(rhs);
@@ -100,6 +149,8 @@ void SynchronizationAnalysis::visitOperation(Operation *op,
     // Sync.
     pendingReads.clear();
     pendingWrites.clear();
+    // TODO: Does this keep the analysis monotonic? The analysis should still
+    // converge, but maybe we need to expand the lattice.
     after->clear();
   } else if (op->hasAttr(kRaWBarrier)) {
     op->removeAttr(kRaWBarrier);
@@ -110,6 +161,8 @@ void SynchronizationAnalysis::visitOperation(Operation *op,
     // Sync.
     pendingReads.clear();
     pendingWrites.clear();
+    // TODO: Does this keep the analysis monotonic? The analysis should still
+    // converge, but maybe we need to expand the lattice.
     after->clear();
   } else if (op->hasAttr(kWaRBarrier)) {
     op->removeAttr(kWaRBarrier);
@@ -139,20 +192,20 @@ void SynchronizationAnalysis::setToEntryState(SetLattice *lattice) {
   lattice->clear();
 }
 
-LogicalResult synchronizeTensors(RewriterBase &rewriter, ModuleOp moduleOp,
+LogicalResult synchronizeBuffers(RewriterBase &rewriter, Operation *root,
                                  std::function<void(OpBuilder builder)> sync) {
 
   DataFlowSolver solver;
   solver.load<dataflow::DeadCodeAnalysis>();
   solver.load<dataflow::SparseConstantPropagation>();
   solver.load<SynchronizationAnalysis>();
-  if (solver.initializeAndRun(moduleOp).failed()) {
+  if (solver.initializeAndRun(root).failed()) {
     return failure();
   }
 
   // Collect all operations with a synchronization attribute.
   SmallVector<Operation *, 4> opRequiresSync;
-  moduleOp->walk([&](Operation *op) {
+  root->walk([&](Operation *op) {
     if (op->hasAttr(kRaWBarrier) || op->hasAttr(kWaRBarrier)) {
       opRequiresSync.push_back(op);
     }
@@ -164,7 +217,18 @@ LogicalResult synchronizeTensors(RewriterBase &rewriter, ModuleOp moduleOp,
     sync(rewriter);
   }
 
-  return success();
+  // Replace #requires_sync<#memory_space, ...> with #memory_space on memref
+  // types.
+  auto replaceRequiresSync =
+      [](Attribute memorySpace) -> std::optional<Attribute> {
+    if (auto requiresSync =
+            dyn_cast<IREE::LinalgExt::RequiresSyncAttr>(memorySpace)) {
+      return requiresSync.getMemorySpace();
+    }
+    return std::nullopt;
+  };
+
+  return replaceMemRefMemorySpace(root, replaceRequiresSync);
 }
 
 } // namespace mlir::iree_compiler

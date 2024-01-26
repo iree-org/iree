@@ -55,7 +55,6 @@ iree_cc_library(
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
     "Passes.h"
-    "SynchronizationAnalysis.h"
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
