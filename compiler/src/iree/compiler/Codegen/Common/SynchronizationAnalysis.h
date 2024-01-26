@@ -16,7 +16,6 @@
 #include "mlir/Analysis/DataFlow/ConstantPropagationAnalysis.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Analysis/DataFlow/DenseAnalysis.h"
-#include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 
 namespace mlir::iree_compiler {
 
@@ -28,48 +27,37 @@ public:
 
   ChangeResult join(const AbstractDenseLattice &rhs) override;
 
-  ChangeResult join(const DenseSet<Value> &rhs);
+  ChangeResult join(const DenseSet<Attribute> &rhsReads,
+                    const DenseSet<Attribute> &rhsWrites);
 
   void clear();
 
   void print(raw_ostream &os) const override;
 
-  const DenseSet<Value> getSet() const { return set; }
+  const DenseSet<Attribute> getPendingReads() const { return pendingReads; }
+  const DenseSet<Attribute> getPendingWrites() const { return pendingWrites; }
 
 private:
-  DenseSet<Value> set;
-};
-
-enum class SynchronizationKind {
-  ReadAfterWrite,
-  WriteAfterRead,
+  DenseSet<Attribute> pendingReads;
+  DenseSet<Attribute> pendingWrites;
 };
 
 class SynchronizationAnalysis final
     : public dataflow::DenseForwardDataFlowAnalysis<SetLattice> {
 public:
-  SynchronizationAnalysis(DataFlowSolver &solver,
-                          bufferization::OneShotAnalysisState &state,
-                          SynchronizationKind kind)
-      : DenseForwardDataFlowAnalysis(solver), oneShotState(state), kind(kind) {}
+  SynchronizationAnalysis(DataFlowSolver &solver)
+      : DenseForwardDataFlowAnalysis(solver) {}
 
   virtual ~SynchronizationAnalysis() = default;
 
   void visitOperation(Operation *op, const SetLattice &before,
                       SetLattice *after) override;
 
-  void visitRegionBranchControlFlowTransfer(RegionBranchOpInterface branch,
-                                            std::optional<unsigned> regionFrom,
-                                            std::optional<unsigned> regionTo,
-                                            const SetLattice &before,
-                                            SetLattice *after) override;
-
 private:
+  std::tuple<DenseSet<Attribute>, DenseSet<Attribute>>
+  getReadAndWriteSet(Operation *op);
+
   void setToEntryState(SetLattice *lattice) override;
-
-  bufferization::OneShotAnalysisState &oneShotState;
-
-  SynchronizationKind kind;
 };
 
 } // namespace mlir::iree_compiler

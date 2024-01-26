@@ -198,19 +198,13 @@ void EliminateEmptyTensorsPass::runOnOperation() {
 
 void SynchronizeTensors::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-
   IRRewriter rewriter(moduleOp->getContext());
-  auto bufferizationOptions = getBufferizationOptions();
-  OneShotAnalysisState state(moduleOp, bufferizationOptions);
-  // Analyze IR.
-  if (failed(analyzeOp(moduleOp, state)))
-    return signalPassFailure();
 
   auto sync = [&](OpBuilder builder) {
     builder.create<gpu::BarrierOp>(builder.getInsertionPoint()->getLoc());
   };
 
-  if (failed(synchronizeTensors(rewriter, moduleOp, state, sync))) {
+  if (failed(synchronizeTensors(rewriter, moduleOp, sync))) {
     return signalPassFailure();
   }
 }
