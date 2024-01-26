@@ -1619,16 +1619,9 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
     return failure();
   }
 
-  unsigned numLoops = genericOp.getNumLoops();
   DistributionHeuristicConfig distConfig;
   distConfig.minTileSizes = getMinTilingSizesForEachDim(
       entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  if (llvm::all_of(distConfig.minTileSizes,
-                   [](int64_t vs) { return vs == 1; })) {
-    // Nothing to vectorize just lower to loops.
-    return failure();
-  }
-
   if (llvm::count_if(distConfig.minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
     // Transpose patterns are not applicable if vectorizing more or less than
@@ -1636,32 +1629,38 @@ setTransposeLikeOpRootConfig(func::FuncOp entryPointFn,
     return failure();
   }
 
-  // Make sure that the original tile sizes are multiple of the tile sizes
-  // to be used for the transpose op (i.e., 8x8).
-  // TODO(diegocaballero): Enable 4x8 tile sizes if we find it useful.
-  if (llvm::any_of(distConfig.minTileSizes, [](int64_t tileSize) {
-        return tileSize > 1 && (tileSize % 8) != 0;
+  // Make sure that the original tile sizes are greater than or equal to the
+  // tile sizes to be used for the transpose op (e.g., 8x8, 16x16, etc).
+  int64_t targetVectorSize = 8;
+  if (llvm::any_of(distConfig.minTileSizes, [&](int64_t tileSize) {
+        return tileSize > 1 && tileSize < targetVectorSize;
       })) {
     return failure();
   }
 
-  // Replace dims to be vectorized with the new 8x8 tile sizes.
+  // Target 16x16 tile sizes if there are AVX512 features and all the tile sizes
+  // are greater than or equal to 16.
+  if (hasAVX512fFeature(targetAttr) &&
+      llvm::all_of(distConfig.minTileSizes, [](int64_t tileSize) {
+        return tileSize == 1 || tileSize >= 16;
+      })) {
+    targetVectorSize = 16;
+  }
+
+  // Replace dims to be vectorized with the new tile sizes.
   std::replace_if(
       distConfig.minTileSizes.begin(), distConfig.minTileSizes.end(),
-      [](int64_t tileSize) { return tileSize > 1; }, 8);
-
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(genericOp, distConfig);
+      [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
   LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
                        << vecPreProcStrategy << "\n");
-
-  // Set the next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes,
-                        distConfig.minTileSizes, distConfig.maxTileSizes,
-                        vecPreProcStrategy, parallelTileSizes);
+  if (vecPreProcStrategy != VectorPreProcStrategy::None) {
+    distConfig.allowIncompleteTile = true;
+  }
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(genericOp, distConfig);
+  SmallVector<int64_t> parallelTileSizes = distConfig.minTileSizes;
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes};
   // No need for tiling reduction dims and inner parallel dims.
