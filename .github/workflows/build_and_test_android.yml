@@ -106,7 +106,7 @@ jobs:
 
   test:
     # These physical devices are not scalable. Only run on postsubmit for now.
-    # if: (! inputs.is-pr)
+    if: (! inputs.is-pr)
     needs: cross_compile
     strategy:
       matrix:
