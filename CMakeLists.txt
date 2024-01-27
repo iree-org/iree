@@ -195,7 +195,7 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 #-------------------------------------------------------------------------------
 
 set(IREE_CUDA_AVAILABLE OFF)
-# The IREE cuda2 driver requires CUDA >= 12.
+# The IREE cuda driver requires CUDA >= 12.
 set(IREE_CUDA_MIN_VERSION_REQUIRED 12)
 find_package(CUDAToolkit ${IREE_CUDA_MIN_VERSION_REQUIRED})
 if(CUDAToolkit_FOUND)
