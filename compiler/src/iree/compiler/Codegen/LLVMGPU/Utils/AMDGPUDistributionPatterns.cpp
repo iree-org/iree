@@ -281,23 +281,30 @@ struct DistributeContractions final
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    VectorValue result = dyn_cast<VectorValue>(contractOp.getResult());
+    if (!result) {
+      return failure();
+    }
+
     constexpr int LHS = 0;
     constexpr int RHS = 1;
     constexpr int ACC = 2;
     SmallVector<VectorValue> operands;
     SmallVector<LayoutAttr> layouts;
-    for (auto [operand, layout] :
-         llvm::zip_equal(contractOp->getOperands(), signature.operands)) {
+    for (Value operand : contractOp->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
+        auto layout = signature[vectorOperand];
         if (auto vectorLayout = dyn_cast<LayoutAttr>(layout)) {
           operands.push_back(vectorOperand);
           layouts.push_back(vectorLayout);
         }
       }
     }
-    LayoutAttr resultLayout = dyn_cast<LayoutAttr>(signature.results[0]);
+
+    LayoutAttr resultLayout = dyn_cast<LayoutAttr>(signature[result]);
     if (!resultLayout)
       return failure();
+
     std::optional<MFMAType> mfmaType = inferCompatibleMFMAType(layouts);
     if (!mfmaType)
       return failure();
