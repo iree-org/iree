@@ -33,7 +33,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorOperand));
       continue;
     }
-    operands.push_back(VectorLayoutInterface());
+    operands.push_back(UnitAttr::get(op->getContext()));
   }
 
   for (Value result : op->getResults()) {
@@ -42,7 +42,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorResult));
       continue;
     }
-    results.push_back(VectorLayoutInterface());
+    results.push_back(UnitAttr::get(op->getContext()));
   }
 
   ArrayAttr operandsAttr = ArrayAttr::get(op->getContext(), operands);
@@ -74,14 +74,14 @@ static DistributionSignature getOpSignature(Operation *op) {
 
   auto addLayoutToSignature([&](Value value, Attribute layout) {
     // Ignore null attributes.
-    if (!layout) {
+    if (isa<UnitAttr>(layout)) {
       assert(!isa<VectorValue>(value) &&
-             "Malformed signature attribute: null attribute for vector value.");
+             "Malformed signature attribute: unit attribute for vector value.");
       return;
     }
 
     assert(isa<VectorValue>(value) &&
-           "Malformed signature attribute: non-null attribute for non-vector "
+           "Malformed signature attribute: non-unit attribute for non-vector "
            "value.");
     auto vector = cast<VectorValue>(value);
 
