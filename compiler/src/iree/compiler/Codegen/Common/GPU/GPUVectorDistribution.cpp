@@ -70,16 +70,14 @@ static DistributionSignature getOpSignature(Operation *op) {
   assert(resultsAttr.size() == op->getNumResults() &&
          "Malformed signature attribute.");
 
-  auto values = llvm::concat<Value>(op->getOperands(), op->getResults());
-  auto layouts = llvm::concat<Attribute>(operandsAttr, resultsAttr);
-
   DistributionSignature signature;
-  for (auto [value, layout] : llvm::zip_equal(values, layouts)) {
+
+  auto addLayoutToSignature([&](Value value, Attribute layout) {
     // Ignore null attributes.
     if (!layout) {
       assert(!isa<VectorValue>(value) &&
              "Malformed signature attribute: null attribute for vector value.");
-      continue;
+      return;
     }
 
     assert(isa<VectorValue>(value) &&
@@ -90,6 +88,14 @@ static DistributionSignature getOpSignature(Operation *op) {
     auto vectorLayout = cast<VectorLayoutInterface>(layout);
     assert(vectorLayout && "Malformed signature attribute.");
     signature[vector] = vectorLayout;
+  });
+
+  for (auto [value, layout] :
+       llvm::zip_equal(op->getOperands(), operandsAttr)) {
+    addLayoutToSignature(value, layout);
+  }
+  for (auto [value, layout] : llvm::zip_equal(op->getResults(), resultsAttr)) {
+    addLayoutToSignature(value, layout);
   }
 
   return signature;
