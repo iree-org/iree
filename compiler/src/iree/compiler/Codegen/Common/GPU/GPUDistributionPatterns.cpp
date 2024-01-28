@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -91,17 +92,16 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    Value constantResult = constantOp.getResult();
-    if (!isa<VectorType>(constantResult.getType()))
+    auto constant = dyn_cast<VectorValue>(constantOp.getResult());
+    if (!constant)
       return failure();
-    auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
     auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!attr)
       return failure();
 
-    VectorLayoutInterface layout = signature.results[0];
+    VectorLayoutInterface layout = signature[constant];
 
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
@@ -124,23 +124,22 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
                                 PatternRewriter &rewriter) const override {
     // Get the distributed operands.
     SmallVector<Value> operands;
-    for (auto [operand, opLayout] :
-         llvm::zip(op->getOperands(), signature.operands)) {
+    for (Value operand : op->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      opLayout);
+                                                      signature[vectorOperand]);
       }
       operands.push_back(operand);
     }
 
     // Get the new distributed vector types for the operation.
     SmallVector<Type> resultTypes;
-    for (auto [result, resLayout] :
-         llvm::zip(op->getResults(), signature.results)) {
+    for (Value result : op->getResults()) {
       Type resultType = result.getType();
 
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
+        VectorLayoutInterface resLayout = signature[vectorResult];
         resultType = VectorType::get(resLayout.getDistributedShape(),
                                      vectorResult.getType().getElementType());
       }
@@ -276,7 +275,8 @@ struct DistributeTransferReadLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.results[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[readOp.getResult()]);
     if (!vectorLayout) {
       return failure();
     }
@@ -319,7 +319,8 @@ struct DistributeTransferWriteLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.operands[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[writeOp.getVector()]);
     if (!vectorLayout) {
       return failure();
     }

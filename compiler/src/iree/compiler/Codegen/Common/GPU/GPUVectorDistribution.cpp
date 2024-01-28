@@ -65,31 +65,31 @@ static DistributionSignature getOpSignature(Operation *op) {
   ArrayAttr operandsAttr = dyn_cast<ArrayAttr>(signatureAttr[0]);
   ArrayAttr resultsAttr = dyn_cast<ArrayAttr>(signatureAttr[1]);
   assert(operandsAttr && resultsAttr && "Malformed signature attribute.");
+  assert(operandsAttr.size() == op->getNumOperands() &&
+         "Malformed signature attribute.");
+  assert(resultsAttr.size() == op->getNumResults() &&
+         "Malformed signature attribute.");
+
+  auto values = llvm::concat<Value>(op->getOperands(), op->getResults());
+  auto layouts = llvm::concat<Attribute>(operandsAttr, resultsAttr);
 
   DistributionSignature signature;
-  for (Attribute operandAttr : operandsAttr) {
+  for (auto [value, layout] : llvm::zip_equal(values, layouts)) {
     // Ignore null attributes.
-    if (!operandAttr) {
-      signature.operands.push_back(VectorLayoutInterface());
+    if (!layout) {
+      assert(!isa<VectorValue>(value) &&
+             "Malformed signature attribute: null attribute for vector value.");
       continue;
     }
 
-    auto operandLayout = cast<VectorLayoutInterface>(operandAttr);
-    assert(operandLayout && "Malformed signature attribute.");
-    signature.operands.push_back(operandLayout);
-  }
+    assert(isa<VectorValue>(value) &&
+           "Malformed signature attribute: non-null attribute for non-vector "
+           "value.");
+    auto vector = cast<VectorValue>(value);
 
-  for (Attribute resultAttr : resultsAttr) {
-    // Ignore null attributes.
-    if (!resultAttr) {
-      signature.results.push_back(VectorLayoutInterface());
-      continue;
-    }
-
-    VectorLayoutInterface resultLayout =
-        cast<VectorLayoutInterface>(resultAttr);
-    assert(resultLayout && "Malformed signature attribute.");
-    signature.results.push_back(resultLayout);
+    auto vectorLayout = cast<VectorLayoutInterface>(layout);
+    assert(vectorLayout && "Malformed signature attribute.");
+    signature[vector] = vectorLayout;
   }
 
   return signature;
