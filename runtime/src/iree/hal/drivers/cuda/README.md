@@ -3,15 +3,109 @@
 This document lists technical details regarding the CUDA implemenation of
 IREE's [Hardware Abstraction Layer (HAL)][iree-hal], called a CUDA HAL driver.
 
-Note that there is another CUDA HAL driver under the
-[`iree/hal/drivers/cuda/`][iree-cuda] directory; what this directory holds is
-a rewrite for it. Once this rewrite is mature enough, it will replace the
-other one. For the rewrite rationale, goals, and plans, please see
-[Issue #13245][iree-cuda-rewrite].
+## Overall design choices
+
+### CUDA driver vs runtime API
+
+IREE HAL's design draws inspiration from modern GPU APIs--it provides explicit
+control of low-level GPU objects. The compiler is expected to plan the object
+lifetime and schedule workload and synchronization in an optimized way; IREE
+HAL implementation and the underlying GPU driver stack is expected to be a thin
+layer without much smarts and magic.
+
+Therefore when implementing the IREE HAL using CUDA, we use the
+[driver API][cuda-driver-api] instead of the [runtime API][cuda-runtime-api].
+At runtime the HAL CUDA driver will load the `libcuda.so`/`nvcuda.dll` library
+dynamically and query a subset of the CUDA driver API used in HAL via
+[the `cuGetProcAddress()` API][cu-get-proc-address].
+
+## GPU Objects
+
+### Driver
+
+There is no direct CUDA construct that map to the IREE HAL `iree_hal_driver_t`
+abstraction. We use it to hold the dynamic symbols loaded for all devices,
+and device enumeration and creation.
+
+### Device
+
+`iree_hal_cuda_device_t` implements [`iree_hal_device_t`][hal-device] to provide
+the interface to CUDA GPU device by wrapping a [`CUdevice`][cu-device].
+For each device, right now we create two `CUstream`s--one for issuing commands
+for memory allocation and kernel lauches as instructed by the program; the other
+for issue host callback functions after dispatched command buffers completes.
+See [synchronization](#synchronization) section regarding the details.
+
+#### Async allocation
+
+The CUDA HAL drivers supports async allocation
+(`iree_hal_device_queue_alloca()` and `iree_hal_device_queue_dealloca()`)
+via [CUDA stream ordered memory allocation][cuda-stream-ordered-alloc].
+
+The `async_allocations` in the `iree_hal_cuda_device_params_t` struct allows
+to enable this feature.
+
+### Command buffer
+
+[`iree_hal_command_buffer_t`][hal-command-buffer] is a recording of commands to
+issue to the GPU; when the command buffer is submitted to the device it's then
+actually executed on the GPU asynchronously.
+
+Two implementations of `iree_hal_command_buffer_t` exist in the CUDA HAL
+driver--[one][cuda-graph-command-buffer] backed by [`CUgraph`][cu-graph] and
+[the other][cuda-stream-command-buffer] backed by `CUstream`.
+
+`CUgraph` conceptually matches `iree_hal_command_buffer_t` better given it's
+a recording of commands to issue to the GPU. Also using the `CUgraph` API allows
+to easily encode fine grain dependencies between dispatch without having to
+create multiple streams. Therefore, the `CUgraph`-backed implementation is a
+more natural one.
+Though note that `CUgraph` API is meant to be used for recording once and
+replying multiple times and there may be a performance penalty to using
+`CUgraph` API for one-shot command buffer.
+
+The `CUstream`-backed implementation just issues commands directly to a
+`CUstream` when recording. Commands issued to `CUstream` can be immediately
+sent to the GPU for execution; there is no recording and replaying separation.
+In order to match the recording semantics of `iree_hal_command_buffer_t`, to
+use the `CUstream`-backed command buffer, we need to first record the command
+buffer into an in-memory
+[`iree_hal_deferred_command_buffer_t`][hal-deferred-command-buffer], and then
+when applying the command buffer, we create a new `CUstream`-backed
+implementation.
+
+The `command_buffer_mode` in the `iree_hal_cuda_device_params_t` struct allows
+to select which implementation to use.
+
+### Allocator
+
+The allocator will forward allocation requests to `cuMemHostAlloc()` for host
+local memory, `cuMemAlloc()` for device local and host invisible memory, and
+`cuMemAllocManaged()` for device local and host visible memory.
+
+### Buffer
+
+CUDA buffers are represented either as a host pointer or a device pointer of
+type `CUdeviceptr`.
+
+### Executable
+
+[`iree_hal_executable_t`][hal-executable] maps naturally to `CUmodule`.
+
+The compiler generates a FlatBuffer containing a PTX image as well as a
+list of entry point functions and their associated metadata (names,
+workgroup size, dynamic shared memory size, etc.). At runtime, the CUDA HAL
+driver loads the PTX image and creates `CUfunction`s out of it for various
+entry points.
 
 ## Synchronization
 
-### HAL Semaphore
+### Event
+
+[`iree_hal_event_t`][hal-event] right now is not used in the compiler so it's
+not yet implemented in the CUDA HAL driver.
+
+### Semaphore
 
 The IREE HAL uses semaphores to synchronize work between host CPU threads and
 device GPU streams. It's a unified primitive that covers all directions--host
@@ -166,11 +260,29 @@ To summarize, we need the following data structures to implement HAL semaphore:
   recorded to some `CUstream` to wait on.
 
 
-[iree-hal]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal
-[iree-cuda]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/drivers/cuda
-[iree-cuda-rewite]: https://github.com/openxla/iree/issues/13245
+[cuda-driver-api]: https://docs.nvidia.com/cuda/cuda-driver-api/index.html
+[cuda-runtime-api]: https://docs.nvidia.com/cuda/cuda-runtime-api/index.html
 [vulkan-timeline-semaphore]: https://www.khronos.org/blog/vulkan-timeline-semaphores
+[iree-hal]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal
+[hal-allocator]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/allocator.h
+[hal-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/buffer.h
+[hal-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h
+[hal-descriptor-set-layout]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
+[hal-pipeline-layout]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
+[hal-device]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h
+[hal-driver]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/driver.h
+[hal-executable]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h
+[hal-executable-cache]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable_cache.h
+[hal-semaphore]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/semaphore.h
+[hal-event]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h
+[hal-deferred-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
+[cu-device]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
+[cu-get-proc-address]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DRIVER__ENTRY__POINT.html#group__CUDA__DRIVER__ENTRY__POINT_1gcae5adad00590572ab35b2508c2d6e0d
 [cu-mem-ops]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEMOP.html
 [cu-external-resource]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html
 [cu-event]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EVENT.html
+[cu-graph]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__GRAPH.html#group__CUDA__GRAPH
 [cu-launch-host-func]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXEC.html#group__CUDA__EXEC_1gab95a78143bae7f21eebb978f91e7f3f
+[cuda-stream-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/stream_command_buffer.c
+[cuda-graph-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/graph_command_buffer.c
+[cuda-stream-ordered-alloc]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MALLOC__ASYNC.html#group__CUDA__MALLOC__ASYNC
