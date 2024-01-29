@@ -1050,9 +1050,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
                                           /*memberName=*/"allocator",
                                           /*operand=*/module,
                                           /*value=*/allocatorArg);
+
     auto &typeTable = moduleAnalysis.typeTable;
-    attachAttribute(moduleOp, "vm.num_types",
-                    builder.getI32IntegerAttr(typeTable.size()));
     if (!typeTable.empty()) {
       Type typeRefType = emitc::OpaqueType::get(ctx, "iree_vm_ref_type_t");
       Type typeRefArrayType = emitc::PointerType::get(typeRefType);
@@ -1185,7 +1184,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///       - vm.emit_at_end
 ///       - vm.export_name
 ///       - vm.module.constructor
-///       - vm.num_types
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1283,10 +1281,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     // interior of structs (just VLA at the tail).
     auto countOrEmpty = [](uint32_t count) { return count ? count : 1; };
 
-    const int64_t numTypes =
-        llvm::cast<IntegerAttr>(
-            moduleOp.getOperation()->getAttr("vm.num_types"))
-            .getInt();
+    const int64_t numTypes = typeConverter.analysis.typeTable.size();
 
     std::string moduleStructName = moduleOp.getName().str() + "_t";
     SmallVector<emitc_builders::StructField> moduleStructFields{
