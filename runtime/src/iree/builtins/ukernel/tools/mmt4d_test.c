@@ -167,6 +167,27 @@ static void iree_mmt4d_reference_innerloop_s8s8s32(
   *out_ptr = acc;
 }
 
+static void iree_mmt4d_reference_innerloop_s8s4s32(
+    int32_t* out_ptr, const int8_t* lhs_ptr, const int8_t* rhs_ptr,
+    const iree_uk_mmt4d_params_t* params) {
+  // K0 must be even.
+  IREE_UK_ASSERT(!(params->K0 % 2));
+  iree_uk_int16_t K0half = params->K0 / 2;
+  int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+  for (iree_uk_index_t k = 0; k < params->K; ++k) {
+    // As K0 must be even, we 2x-unroll the K0 loop, writing a 2D dot product.
+    for (iree_uk_index_t k0h = 0; k0h < K0half; ++k0h) {
+      int32_t lhs_0 = lhs_ptr[k * params->M0 * params->K0 + 2 * k0h];
+      int32_t lhs_1 = lhs_ptr[k * params->M0 * params->K0 + 2 * k0h + 1];
+      int8_t rhs_byte = rhs_ptr[k * params->N0 * K0half + k0h];
+      int32_t rhs_0 = rhs_byte & 0xf;
+      int32_t rhs_1 = rhs_byte >> 4;
+      acc += lhs_0 * rhs_0 + lhs_1 * rhs_1;
+    }
+  }
+  *out_ptr = acc;
+}
+
 static void iree_mmt4d_reference_innerloop_s16s16s32(
     int32_t* out_ptr, const int16_t* lhs_ptr, const int16_t* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
@@ -276,6 +297,11 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
               break;
             case IREE_UK_FLAG_MMT4D_TYPE_S8S8S32:
               iree_mmt4d_reference_innerloop_s8s8s32(
+                  (int32_t*)out_ptr, (const int8_t*)lhs_ptr,
+                  (const int8_t*)rhs_ptr, params);
+              break;
+            case IREE_UK_FLAG_MMT4D_TYPE_S8S4S32:
+              iree_mmt4d_reference_innerloop_s8s4s32(
                   (int32_t*)out_ptr, (const int8_t*)lhs_ptr,
                   (const int8_t*)rhs_ptr, params);
               break;
@@ -498,6 +524,7 @@ int main(int argc, char** argv) {
   // in a power-of-two assumption
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 9, 12, 2, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
@@ -519,6 +546,7 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 16, 2, "");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
