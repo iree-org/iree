@@ -992,6 +992,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_create", funcType);
+    funcOp.setPublic();
 
     moduleAnalysis.addDummy(funcOp);
 
@@ -999,10 +1000,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     // by the CModuleTarget at the moment. So we add a marker to this function
     // and delay the printing of it.
     attachAttribute(funcOp, "vm.emit_at_end", UnitAttr::get(ctx));
-
-    // This functions is the only one users need and it is therefore declared
-    // separatly from all other functions.
-    attachAttribute(funcOp, "vm.module.constructor", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1173,7 +1170,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - remove all uses of `attachAttribute`
 ///       - vm.emit_at_end
 ///       - vm.export_name
-///       - vm.module.constructor
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1203,13 +1199,14 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
                                           "//  __cplusplus");
 
+    // Emit declarations for public functions.
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
-      if (!funcOp->hasAttr("vm.module.constructor"))
-        continue;
-      auto declOp =
-          emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
-      if (failed(declOp))
-        return failure();
+      if (funcOp.isPublic()) {
+        auto declOp =
+            emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
+        if (failed(declOp))
+          return failure();
+      }
     }
 
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFDEF,
@@ -1301,15 +1298,14 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     if (failed(structStateOp))
       return failure();
 
-    // function declarations
+    // Emit declarations for private functions.
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
-      Operation *op = funcOp.getOperation();
-      if (op->hasAttr("vm.module.constructor"))
-        continue;
-      auto declOp =
-          emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
-      if (failed(declOp))
-        return failure();
+      if (funcOp.isPrivate()) {
+        auto declOp =
+            emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
+        if (failed(declOp))
+          return failure();
+      }
     }
 
     // global descriptors
