@@ -24,6 +24,7 @@ iree_cc_library(
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRAMDGPUTransforms
     MLIRAffineDialect
     MLIRArithDialect
     MLIRFuncDialect
