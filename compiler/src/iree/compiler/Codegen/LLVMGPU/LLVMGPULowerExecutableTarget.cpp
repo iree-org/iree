@@ -95,7 +95,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
     if (failed(maybeDepth)) {
       variantOp.emitOpError(
-          "Invalid matmul configuration without pipelining config");
+          "invalid matmul configuration without software pipelining config");
       return signalPassFailure();
     }
     addGPUMatmulTensorCorePassPipeline(pipeline, *maybeDepth);
@@ -107,7 +107,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
     if (failed(maybeDepth)) {
       variantOp.emitOpError(
-          "Invalid matmul configuration without pipelining config");
+          "invalid matmul configuration without software pipelining config");
       return signalPassFailure();
     }
     addGPUMatmulTensorCoreMmaSyncPassPipeline(pipeline, *maybeDepth);
@@ -130,7 +130,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
   default:
-    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    variantOp.emitOpError("unsupported pipeline on GPU target.");
     return signalPassFailure();
   }
 

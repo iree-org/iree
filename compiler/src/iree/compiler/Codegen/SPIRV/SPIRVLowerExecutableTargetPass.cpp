@@ -88,8 +88,8 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     FailureOr<int64_t> maybeStage = getSoftwarePipelineStoreStage(
         translationInfo.value().getConfiguration());
     if (failed(maybeDepth) || failed(maybeStage)) {
-      variantOp.emitOpError("Invalid cooperative matrix pipeline without "
-                            "pipeline configuration.");
+      variantOp.emitOpError("invalid cooperative matrix pipeline without "
+                            "software pipelining configuration.");
       return signalPassFailure();
     }
     addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
@@ -103,7 +103,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         translationInfo.value().getConfiguration());
     if (failed(maybeDepth) || failed(maybeStage)) {
       variantOp.emitOpError(
-          "Invalid matmul pipeline without pipeline configuration.");
+          "invalid matmul pipeline without software pipelining configuration.");
       return signalPassFailure();
     }
     addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
@@ -120,7 +120,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   case CodeGenPipeline::None:
     return;
   default:
-    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    variantOp.emitOpError("unsupported pipeline on GPU target.");
     return signalPassFailure();
   }
 

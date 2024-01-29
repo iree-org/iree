@@ -50,7 +50,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
       getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
   if (failed(maybeDepth) || failed(maybeStage)) {
     return op->emitOpError(
-        "Invalid matmul configuration without pipelining config");
+        "invalid matmul configuration without pipelining config");
   }
 
   // Get spirv.target_env attributes
@@ -161,7 +161,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
       getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
   if (failed(maybeDepth) || failed(maybeStage)) {
     return op->emitOpError(
-        "Invalid cooperative matrix configuration without pipelining config");
+        "invalid cooperative matrix configuration without pipelining config");
   }
 
   // Get spirv.target_env attributes

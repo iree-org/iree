@@ -102,12 +102,12 @@ verifyGPUMatmulPipeline(Operation *op,
       getSoftwarePipelineStoreStage(translationInfo.getConfiguration());
   if (failed(maybeDepth) || failed(maybeStage)) {
     return op->emitOpError(
-        "Invalid matmul configuration without pipelining config");
+        "invalid matmul configuration without pipelining config");
   }
 
   if (*maybeStage != 1) {
     return op->emitError(
-        "Store to workgroup memory currently expected to happen in stage 1 of "
+        "store to workgroup memory currently expected to happen in stage 1 of "
         "software pipeline.");
   }
 
