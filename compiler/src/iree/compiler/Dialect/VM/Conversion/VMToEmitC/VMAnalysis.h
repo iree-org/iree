@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
+#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -24,15 +25,27 @@ public:
     registerAllocation = RegisterAllocation(op);
     valueLiveness = ValueLiveness(op);
     originalFunctionType = funcOp.getFunctionType();
+    callingConvention = makeCallingConventionString(funcOp).value();
   }
-  FuncAnalysis(FunctionType functionType) {
+  FuncAnalysis(IREE::VM::ImportOp importOp) {
+    originalFunctionType = importOp.getFunctionType();
+    callingConvention = makeImportCallingConventionString(importOp).value();
+  }
+  FuncAnalysis(FunctionType functionType, StringRef cconv) {
     originalFunctionType = functionType;
+    callingConvention = cconv.str();
+  }
+  FuncAnalysis(FuncAnalysis &analysis) {
+    originalFunctionType = analysis.getFunctionType();
+    callingConvention = analysis.getCallingConvention().str();
   }
 
   FuncAnalysis(FuncAnalysis &&) = default;
   FuncAnalysis &operator=(FuncAnalysis &&) = default;
   FuncAnalysis(const FuncAnalysis &) = delete;
   FuncAnalysis &operator=(const FuncAnalysis &) = delete;
+
+  StringRef getCallingConvention() { return callingConvention; }
 
   FunctionType getFunctionType() { return originalFunctionType; }
 
@@ -77,6 +90,7 @@ private:
   ValueLiveness valueLiveness;
   DenseMap<int64_t, Operation *> refs;
   FunctionType originalFunctionType;
+  std::string callingConvention;
 };
 
 struct ModuleAnalysis {
@@ -96,8 +110,17 @@ struct ModuleAnalysis {
     functions[func.getOperation()] = FuncAnalysis();
   }
 
-  void add(mlir::func::FuncOp func, FunctionType type) {
-    functions[func.getOperation()] = FuncAnalysis(type);
+  void addFromExport(mlir::func::FuncOp func, IREE::VM::ExportOp exportOp) {
+    mlir::func::FuncOp funcOp =
+        exportOp->getParentOfType<IREE::VM::ModuleOp>()
+            .lookupSymbol<mlir::func::FuncOp>(exportOp.getFunctionRefAttr());
+
+    auto &funcAnalysis = lookupFunction(funcOp);
+    functions[func.getOperation()] = FuncAnalysis(funcAnalysis);
+  }
+
+  void addFromImport(mlir::func::FuncOp func, IREE::VM::ImportOp import) {
+    functions[func.getOperation()] = FuncAnalysis(import);
   }
 
   void move(mlir::func::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {

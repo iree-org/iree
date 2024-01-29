@@ -14,7 +14,6 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCBuilders.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
@@ -116,14 +115,6 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
   newFuncOp.setPrivate();
-
-  std::optional<std::string> callingConvention =
-      makeCallingConventionString(funcOp);
-
-  // Annotate new function with calling convention string which gets used in
-  // the CModuleTarget.
-  attachAttribute(newFuncOp, "vm.calling_convention",
-                  StringAttr::get(ctx, callingConvention.value()));
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
   newFuncOp.getFunctionBody().getBlocks().splice(
@@ -1180,7 +1171,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - structured preprocessor directive
 ///     - struct definition
 ///     - remove all uses of `attachAttribute`
-///       - vm.calling_convention
 ///       - vm.emit_at_end
 ///       - vm.export_name
 ///       - vm.module.constructor
@@ -1411,16 +1401,13 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       });
       for (auto funcOp : exportedFunctions) {
         StringAttr exportName = extractExportName(funcOp);
-        StringAttr callingConvention = llvm::cast<StringAttr>(
-            funcOp.getOperation()->getAttr("vm.calling_convention"));
-        if (!callingConvention) {
-          return funcOp.emitError("Couldn't find calling convention attribute");
-        }
+        StringRef callingConvention =
+            typeConverter.analysis.lookupFunction(funcOp)
+                .getCallingConvention();
 
         // TODO(simon-camp): support function-level reflection attributes
         exports += "{" + printStringView(exportName) + ", " +
-                   printStringView(callingConvention.getValue()) +
-                   ", 0, NULL},";
+                   printStringView(callingConvention) + ", 0, NULL},";
       }
     }
     exports += "};";
@@ -1659,8 +1646,6 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
-    auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
-
     std::string newFuncName = funcOp.getName().str() + "_export_shim";
 
     Type stackType =
@@ -1688,12 +1673,8 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
         rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
     newFuncOp.setPrivate();
 
-    FunctionType functionType = funcAnalysis.getFunctionType();
+    getModuleAnalysis().addFromExport(newFuncOp, exportOp);
 
-    getModuleAnalysis().add(newFuncOp, functionType);
-
-    attachAttribute(newFuncOp, "vm.calling_convention",
-                    funcOp.getOperation()->getAttr("vm.calling_convention"));
     attachAttribute(newFuncOp, "vm.export_name", exportOp.getExportNameAttr());
 
     // Populate newly generated function.
@@ -2185,7 +2166,7 @@ private:
         loc, newFuncName.value(), newFuncType.value());
     newFuncOp.setPrivate();
 
-    typeConverter.analysis.add(newFuncOp, importOp.getFunctionType());
+    typeConverter.analysis.addFromImport(newFuncOp, importOp);
 
     // Populate newly generated function.
     {

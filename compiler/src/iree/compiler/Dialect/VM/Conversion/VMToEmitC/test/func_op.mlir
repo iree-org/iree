@@ -12,7 +12,6 @@ vm.module @my_module {
   // CHECK-SAME:               %arg5: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>,
   // CHECK-SAME:               %arg6: !emitc.ptr<i32>)
   // CHECK-SAME:               -> !emitc.opaque<"iree_status_t">
-  // CHECK-SAME: attributes {vm.calling_convention = "0ri_ri"}
   vm.func @fn(%arg0 : !vm.ref<?>, %arg1 : i32) -> (!vm.ref<?>, i32) {
     vm.return %arg0, %arg1 : !vm.ref<?>, i32
   }

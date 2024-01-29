@@ -697,7 +697,7 @@ vm.module @my_module {
   // Create a new function to export with the adapted signature.
   //      CHECK: func.func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
   // CHECK-SAME:                                %arg4: !emitc.ptr<!emitc.opaque<"void">>, %arg5: !emitc.ptr<!emitc.opaque<"void">>)
-  // CHECK-SAME:     -> !emitc.opaque<"iree_status_t"> attributes {vm.calling_convention = "0i_i", vm.export_name = "fn"}
+  // CHECK-SAME:     -> !emitc.opaque<"iree_status_t"> attributes {vm.export_name = "fn"}
 
   // Cast module and module state structs.
   // CHECK-NEXT: %[[MODULECASTED:.+]] = emitc.cast %arg4 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"struct my_module_t">>
