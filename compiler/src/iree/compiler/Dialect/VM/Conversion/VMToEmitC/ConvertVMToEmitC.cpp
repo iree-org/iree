@@ -1186,16 +1186,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///       - vm.export_name
 ///       - vm.module.constructor
 ///       - vm.num_types
-///       - vm.verbatim.emit_at_start
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
-  auto ctx = moduleOp.getContext();
   auto loc = moduleOp.getLoc();
-
-  auto mark = [ctx](Operation *op) {
-    attachAttribute(op, "vm.verbatim.emit_at_start", UnitAttr::get(ctx));
-  };
 
   OpBuilder builder(moduleOp);
 
@@ -1206,26 +1200,20 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     std::string includeGuard = moduleOp.getName().upper() + "_H_";
 
-    auto op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::IFNDEF, includeGuard);
-    mark(op);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFNDEF,
+                                          includeGuard);
 
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::DEFINE, includeGuard);
-    mark(op);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::DEFINE,
+                                          includeGuard);
 
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/api.h\"");
-    mark(op);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
+                                          "\"iree/vm/api.h\"");
 
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::IFDEF, "__cplusplus");
-    mark(op);
-    op = builder.create<emitc::VerbatimOp>(loc, "extern \"C\" {");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::ENDIF, "//  __cplusplus");
-    mark(op);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFDEF,
+                                          "__cplusplus");
+    builder.create<emitc::VerbatimOp>(loc, "extern \"C\" {");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
+                                          "//  __cplusplus");
 
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
       if (!funcOp->hasAttr("vm.module.constructor"))
@@ -1234,33 +1222,23 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
           emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
       if (failed(declOp))
         return failure();
-      mark(declOp.value());
     }
 
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::IFDEF, "__cplusplus");
-    mark(op);
-    op = builder.create<emitc::VerbatimOp>(loc, "}  // extern \"C\" {");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::ENDIF, "//  __cplusplus");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::ENDIF,
-        std::string("//  ") + includeGuard);
-    mark(op);
-    op = emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IF,
-                                               "defined(EMITC_IMPLEMENTATION)");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/ops.h\"");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/ops_emitc.h\"");
-    mark(op);
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::INCLUDE, "\"iree/vm/shims_emitc.h\"");
-    mark(op);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFDEF,
+                                          "__cplusplus");
+    builder.create<emitc::VerbatimOp>(loc, "}  // extern \"C\" {");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
+                                          "//  __cplusplus");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
+                                          std::string("//  ") + includeGuard);
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IF,
+                                          "defined(EMITC_IMPLEMENTATION)");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
+                                          "\"iree/vm/ops.h\"");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
+                                          "\"iree/vm/ops_emitc.h\"");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
+                                          "\"iree/vm/shims_emitc.h\"");
 
     // rodata ops
     // TODO: Make this a conversion
@@ -1295,8 +1273,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
             static_cast<unsigned int>(static_cast<unsigned char>(value)));
       }
       stmt += "};";
-      auto op = builder.create<emitc::VerbatimOp>(loc, stmt);
-      mark(op);
+      builder.create<emitc::VerbatimOp>(loc, stmt);
       opsToRemove.push_back(rodataOp.getOperation());
     }
 
@@ -1320,7 +1297,6 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                                                moduleStructFields);
     if (failed(structOp))
       return failure();
-    mark(structOp.value());
 
     auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
 
@@ -1339,7 +1315,6 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
         builder, loc, moduleStructStateName, moduleStructStateFields);
     if (failed(structStateOp))
       return failure();
-    mark(structStateOp.value());
 
     // function declarations
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
@@ -1350,7 +1325,6 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
           emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
       if (failed(declOp))
         return failure();
-      mark(declOp.value());
     }
 
     // global descriptors
@@ -1384,8 +1358,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       }
     }
     deps += "};";
-    op = builder.create<emitc::VerbatimOp>(loc, deps);
-    mark(op);
+    builder.create<emitc::VerbatimOp>(loc, deps);
 
     // imports
     SmallVector<IREE::VM::ImportOp> importOps(
@@ -1412,8 +1385,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       }
     }
     imports += "};";
-    op = builder.create<emitc::VerbatimOp>(loc, imports);
-    mark(op);
+    builder.create<emitc::VerbatimOp>(loc, imports);
 
     for (auto op : moduleOp.getOps<IREE::VM::ImportOp>()) {
       opsToRemove.push_back(op);
@@ -1457,8 +1429,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       }
     }
     exports += "};";
-    op = builder.create<emitc::VerbatimOp>(loc, exports);
-    mark(op);
+    builder.create<emitc::VerbatimOp>(loc, exports);
 
     // functions
     std::string functionName = moduleOp.getName().str() + "_funcs_";
@@ -1481,8 +1452,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       }
     }
     functions += "};";
-    op = builder.create<emitc::VerbatimOp>(loc, functions);
-    mark(op);
+    builder.create<emitc::VerbatimOp>(loc, functions);
 
     // module descriptor
     // TODO(simon-camp): support module-level reflection attributes
@@ -1513,8 +1483,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
         + std::to_string(exportedFunctions.size()) + "," + functionName + "," +
         "};";
 
-    op = builder.create<emitc::VerbatimOp>(loc, descriptor);
-    mark(op);
+    builder.create<emitc::VerbatimOp>(loc, descriptor);
 
     // move functions marked with vm.emit_at_end to the end of the module
     for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
@@ -1525,8 +1494,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     }
 
     builder.setInsertionPoint(moduleOp.getBlock().getTerminator());
-    op = emitc_builders::preprocessorDirective(
-        builder, loc, emitc_builders::ENDIF, "  // EMITC_IMPLEMENTATION");
+    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
+                                          "  // EMITC_IMPLEMENTATION");
 
     // insert a verbatim op before private functions
     for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
