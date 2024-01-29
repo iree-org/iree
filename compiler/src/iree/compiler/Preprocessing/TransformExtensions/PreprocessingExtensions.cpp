@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Value.h"
 
@@ -153,13 +154,14 @@ static bool isCastableToTensorType(Type from, RankedTensorType to) {
 // Compares the regions between two operations in lockstep for equality.
 static DiagnosedSilenceableFailure
 compareOperationRegions(transform::TransformOpInterface transformOp,
+                        OperationEquivalenceCache &cache, IRMapping &mapping,
                         Operation *target, Operation *payload) {
   if (target->getNumRegions() != payload->getNumRegions()) {
     return transformOp.emitSilenceableError() << "region count mismatch";
   }
   for (auto [r0, r1] :
        llvm::zip_equal(target->getRegions(), payload->getRegions())) {
-    if (!isStructurallyEquivalentTo(r0, r1)) {
+    if (!isStructurallyEquivalentTo(cache, r0, r1, mapping)) {
       return transformOp.emitSilenceableError()
              << "target op does not match specified body";
     }
@@ -204,8 +206,7 @@ compareCastCompatibleOperations(transform::TransformOpInterface transformOp,
       return transformOp.emitSilenceableError() << "operand type mismatch";
     }
   }
-
-  return compareOperationRegions(transformOp, target, payload);
+  return DiagnosedSilenceableFailure::success();
 }
 
 DiagnosedSilenceableFailure
@@ -222,13 +223,10 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
   // Maps from target/payload op to the order in which they were first
   // processed. This is used to verify that two uses actually point to the
   // same node in the dag.
-  llvm::MapVector<Operation *, int64_t> targetDagOrder;
-  llvm::MapVector<Operation *, int64_t> payloadDagOrder;
-  int64_t index = 0;
+  llvm::MapVector<Operation *, Operation *> targetToPayloadMapping;
 
-  auto compareDagOrder = [&](Operation *target, Operation *payload) {
-    return targetDagOrder.find(target) == payloadDagOrder.find(payload);
-  };
+  // Step 1. First just walk from root op "upwards" to match basic
+  // producer-consumer match (without checking regions).
 
   // Populate the paired worklist with the current target and payload root ops.
   SmallVector<Operation *> targetWorklist = {targetDagRoot};
@@ -248,15 +246,14 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
 
     // Verify that if already processed, both operations are at the same
     // position.
-    if (targetDagOrder.contains(targetOp) ||
-        payloadDagOrder.contains(payloadOp)) {
-      if (!compareDagOrder(targetOp, payloadOp)) {
+    if (targetToPayloadMapping.contains(targetOp)) {
+      if (targetToPayloadMapping.lookup(targetOp) != payloadOp) {
         return emitSilenceableError() << "dag mismatch";
       }
       continue;
     }
 
-    // Verify general operation equality (name, attributes, regions).
+    // Verify general operation equality (name, attributes).
     DiagnosedSilenceableFailure diag =
         compareCastCompatibleOperations(*this, targetOp, payloadOp);
     if (!diag.succeeded()) {
@@ -290,21 +287,38 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
       // Check whether the producer was already processed, and if so make sure
       // the target and payload match.
       Operation *targetDefiningOp = targetOperand.getDefiningOp();
-      if (targetDagOrder.contains(targetDefiningOp) ||
-          payloadDagOrder.contains(payloadDefiningOp)) {
-        if (!compareDagOrder(targetDefiningOp, payloadDefiningOp)) {
+      if (targetToPayloadMapping.contains(targetDefiningOp)) {
+        if (targetToPayloadMapping.lookup(targetDefiningOp) !=
+            payloadDefiningOp) {
           return emitSilenceableError() << "dag mismatch";
         }
         continue;
       }
+
       // Pop the producer of this value onto the worklist.
       targetWorklist.push_back(targetDefiningOp);
       payloadWorklist.push_back(payloadDefiningOp);
     }
 
     // Mark the current target + payload as processed.
-    targetDagOrder[targetOp] = index;
-    payloadDagOrder[payloadOp] = index++;
+    targetToPayloadMapping[targetOp] = payloadOp;
+  }
+
+  // Step 2. Now check regions of all the ops match.
+  OperationEquivalenceCache cache(getContext());
+  auto mapping = cache.acquireMapping();
+  for (auto [targetOp, payloadOp] : llvm::reverse(targetToPayloadMapping)) {
+    DiagnosedSilenceableFailure diag =
+        compareOperationRegions(*this, cache, *mapping, targetOp, payloadOp);
+    if (!diag.succeeded()) {
+      diag.attachNote() << "While processing region of operation "
+                        << *payloadOp;
+      return diag;
+    }
+    for (auto [targetOpResult, payloadOpResult] :
+         llvm::zip_equal(targetOp->getResults(), payloadOp->getResults())) {
+      mapping->map(targetOpResult, payloadOpResult);
+    }
   }
 
   // Verify that all input arguments were successfully matched.
@@ -387,7 +401,10 @@ IREE::transform_dialect::MatchRegionsOp::matchOperation(
     Operation *current, transform::TransformResults &results,
     transform::TransformState &state) {
   Operation *comparisonTarget = &getRegion().front().front();
-  return compareOperationRegions(*this, comparisonTarget, current);
+  OperationEquivalenceCache cache(current->getContext());
+  auto mapping = cache.acquireMapping();
+  return compareOperationRegions(*this, cache, *mapping, comparisonTarget,
+                                 current);
 }
 
 LogicalResult IREE::transform_dialect::MatchRegionsOp::verify() {
