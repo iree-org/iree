@@ -98,7 +98,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
-          true);
+          getSyncAfterDistribution());
   if (!diag.succeeded())
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());

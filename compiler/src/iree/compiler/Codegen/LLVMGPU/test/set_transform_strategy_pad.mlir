@@ -84,7 +84,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:   transform.memref.erase_dead_alloc_and_stores {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.forall_to_workgroup {{.*}} : (!transform.any_op) -> ()
-//       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 : (!transform.any_op) -> ()
+//       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 sync_after_distribution = true : (!transform.any_op) -> ()
 //       CHECK:     transform.apply_patterns.vector.lower_masks
 //       CHECK:     transform.apply_patterns.vector.materialize_masks
 //       CHECK:   apply_patterns to %{{.*}} {
