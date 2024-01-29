@@ -264,3 +264,120 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
     iree_uk_mmt4d_tile_s8s8s32_2x8x1_arm_64,
     iree_uk_mmt4d_tile_s8s8s32_4x8x1_arm_64,
     iree_uk_mmt4d_tile_s8s8s32_8x8x1_arm_64)
+
+static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 4 && iree_uk_is_po2_u32(M0));
+  IREE_UK_ASSERT(!(params->K0 % 2));
+  const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+
+  iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
+  int32x4_t acc[16];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    for (int i = 0; i < 4 * M0; ++i) {
+      acc[i] = vld1q_s32(out_ptr + 4 * i);
+    }
+  } else {
+    for (int i = 0; i < 4 * M0; ++i) {
+      acc[i] = vdupq_n_s32(0);
+    }
+  }
+  const int8x8_t vmask0f = vmov_n_s8(INT8_C(0x0F));
+  for (int k = 0; k < params->K; ++k) {
+    // Handle 1x16x2.
+    int16x8_t lhs = vmovl_s8(vld1_s8(lhs_ptr));
+    lhs_ptr += 2 * M0;
+
+    int8x8_t rhs_0 = vld1_s8(rhs_ptr);
+    rhs_ptr += 8;
+    int8x8_t rhs_1 = vld1_s8(rhs_ptr);
+    rhs_ptr += 8;
+
+    int16x8_t rhs_a = vmovl_s8(vand_s8(rhs_0, vmask0f));
+    int16x8_t rhs_b = vmovl_s8(vshr_n_s8(rhs_0, 4));
+    int16x8_t rhs_c = vmovl_s8(vand_s8(rhs_1, vmask0f));
+    int16x8_t rhs_d = vmovl_s8(vshr_n_s8(rhs_1, 4));
+
+    acc[0] = vmlal_lane_s16(acc[0], vget_low_s16(rhs_a), vget_low_s16(lhs), 0);
+    acc[1] = vmlal_lane_s16(acc[1], vget_high_s16(rhs_a), vget_low_s16(lhs), 0);
+    acc[2] = vmlal_lane_s16(acc[2], vget_low_s16(rhs_c), vget_low_s16(lhs), 0);
+    acc[3] = vmlal_lane_s16(acc[3], vget_high_s16(rhs_c), vget_low_s16(lhs), 0);
+
+    acc[0] = vmlal_lane_s16(acc[0], vget_low_s16(rhs_b), vget_low_s16(lhs), 1);
+    acc[1] = vmlal_lane_s16(acc[1], vget_high_s16(rhs_b), vget_low_s16(lhs), 1);
+    acc[2] = vmlal_lane_s16(acc[2], vget_low_s16(rhs_d), vget_low_s16(lhs), 1);
+    acc[3] = vmlal_lane_s16(acc[3], vget_high_s16(rhs_d), vget_low_s16(lhs), 1);
+
+    if (M0 >= 2) {
+      // Handle 2x16x2.
+      acc[4] =
+          vmlal_lane_s16(acc[4], vget_low_s16(rhs_a), vget_low_s16(lhs), 2);
+      acc[5] =
+          vmlal_lane_s16(acc[5], vget_high_s16(rhs_a), vget_low_s16(lhs), 2);
+      acc[6] =
+          vmlal_lane_s16(acc[6], vget_low_s16(rhs_c), vget_low_s16(lhs), 2);
+      acc[7] =
+          vmlal_lane_s16(acc[7], vget_high_s16(rhs_c), vget_low_s16(lhs), 2);
+
+      acc[4] =
+          vmlal_lane_s16(acc[4], vget_low_s16(rhs_b), vget_low_s16(lhs), 3);
+      acc[5] =
+          vmlal_lane_s16(acc[5], vget_high_s16(rhs_b), vget_low_s16(lhs), 3);
+      acc[6] =
+          vmlal_lane_s16(acc[6], vget_low_s16(rhs_d), vget_low_s16(lhs), 3);
+      acc[7] =
+          vmlal_lane_s16(acc[7], vget_high_s16(rhs_d), vget_low_s16(lhs), 3);
+
+      if (M0 == 4) {
+        // Handle 4x16x2.
+        acc[8] =
+            vmlal_lane_s16(acc[8], vget_low_s16(rhs_a), vget_high_s16(lhs), 0);
+        acc[9] =
+            vmlal_lane_s16(acc[9], vget_high_s16(rhs_a), vget_high_s16(lhs), 0);
+        acc[10] =
+            vmlal_lane_s16(acc[10], vget_low_s16(rhs_c), vget_high_s16(lhs), 0);
+        acc[11] = vmlal_lane_s16(acc[11], vget_high_s16(rhs_c),
+                                 vget_high_s16(lhs), 0);
+
+        acc[8] =
+            vmlal_lane_s16(acc[8], vget_low_s16(rhs_b), vget_high_s16(lhs), 1);
+        acc[9] =
+            vmlal_lane_s16(acc[9], vget_high_s16(rhs_b), vget_high_s16(lhs), 1);
+        acc[10] =
+            vmlal_lane_s16(acc[10], vget_low_s16(rhs_d), vget_high_s16(lhs), 1);
+        acc[11] = vmlal_lane_s16(acc[11], vget_high_s16(rhs_d),
+                                 vget_high_s16(lhs), 1);
+
+        acc[12] =
+            vmlal_lane_s16(acc[12], vget_low_s16(rhs_a), vget_high_s16(lhs), 2);
+        acc[13] = vmlal_lane_s16(acc[13], vget_high_s16(rhs_a),
+                                 vget_high_s16(lhs), 2);
+        acc[14] =
+            vmlal_lane_s16(acc[14], vget_low_s16(rhs_c), vget_high_s16(lhs), 2);
+        acc[15] = vmlal_lane_s16(acc[15], vget_high_s16(rhs_c),
+                                 vget_high_s16(lhs), 2);
+
+        acc[12] =
+            vmlal_lane_s16(acc[12], vget_low_s16(rhs_b), vget_high_s16(lhs), 3);
+        acc[13] = vmlal_lane_s16(acc[13], vget_high_s16(rhs_b),
+                                 vget_high_s16(lhs), 3);
+        acc[14] =
+            vmlal_lane_s16(acc[14], vget_low_s16(rhs_d), vget_high_s16(lhs), 3);
+        acc[15] = vmlal_lane_s16(acc[15], vget_high_s16(rhs_d),
+                                 vget_high_s16(lhs), 3);
+      }
+    }
+  }
+  for (int i = 0; i < 4 * M0; ++i) {
+    vst1q_s32(out_ptr + 4 * i, acc[i]);
+  }
+}
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4(
+    iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_1x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_2x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_4x16x2_arm_64)
