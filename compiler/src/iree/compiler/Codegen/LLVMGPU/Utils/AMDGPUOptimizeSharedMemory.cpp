@@ -10,15 +10,14 @@
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/AMDGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/AMDGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-
 
 namespace mlir::iree_compiler {
 
@@ -31,7 +30,7 @@ void optimizeSharedMemoryReadsAndWrites(mlir::FunctionOpInterface funcOp) {
   });
   for (auto allocOp : shmAllocOps) {
     if (failed(amdgpu::optimizeSharedMemoryReadsAndWrites(funcOp,
-                                                  allocOp.getMemref())))
+                                                          allocOp.getMemref())))
       return;
   }
 }
