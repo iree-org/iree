@@ -1169,7 +1169,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - struct definition
 ///     - remove all uses of `attachAttribute`
 ///       - vm.emit_at_end
-///       - vm.export_name
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1375,13 +1374,12 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     // exports
     SmallVector<func::FuncOp> exportedFunctions;
     for (auto func : moduleOp.getOps<func::FuncOp>()) {
-      if (func.getOperation()->hasAttr("vm.export_name")) {
+      if (typeConverter.analysis.lookupFunction(func).isExported()) {
         exportedFunctions.push_back(func);
       }
     }
-    auto extractExportName = [](func::FuncOp funcOp) {
-      return llvm::cast<StringAttr>(
-          funcOp.getOperation()->getAttr("vm.export_name"));
+    auto extractExportName = [&typeConverter](func::FuncOp funcOp) {
+      return typeConverter.analysis.lookupFunction(funcOp).getExportName();
     };
     std::string exportName = moduleOp.getName().str() + "_exports_";
     std::string exports;
@@ -1396,7 +1394,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
         return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
       });
       for (auto funcOp : exportedFunctions) {
-        StringAttr exportName = extractExportName(funcOp);
+        StringRef exportName = extractExportName(funcOp);
         StringRef callingConvention =
             typeConverter.analysis.lookupFunction(funcOp)
                 .getCallingConvention();
@@ -1670,8 +1668,6 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     newFuncOp.setPrivate();
 
     getModuleAnalysis().addFromExport(newFuncOp, exportOp);
-
-    attachAttribute(newFuncOp, "vm.export_name", exportOp.getExportNameAttr());
 
     // Populate newly generated function.
     {

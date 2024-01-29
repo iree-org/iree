@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_VMANALYSIS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_VMANALYSIS_H_
 
+#include <optional>
+
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
@@ -27,6 +29,9 @@ public:
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
   }
+  FuncAnalysis(mlir::func::FuncOp funcOp) {
+    originalFunctionType = funcOp.getFunctionType();
+  }
   FuncAnalysis(IREE::VM::ImportOp importOp) {
     originalFunctionType = importOp.getFunctionType();
     callingConvention = makeImportCallingConventionString(importOp).value();
@@ -35,9 +40,10 @@ public:
     originalFunctionType = functionType;
     callingConvention = cconv.str();
   }
-  FuncAnalysis(FuncAnalysis &analysis) {
+  FuncAnalysis(FuncAnalysis &analysis, StringRef exportName_) {
     originalFunctionType = analysis.getFunctionType();
     callingConvention = analysis.getCallingConvention().str();
+    exportName = exportName_.str();
   }
 
   FuncAnalysis(FuncAnalysis &&) = default;
@@ -46,6 +52,10 @@ public:
   FuncAnalysis &operator=(const FuncAnalysis &) = delete;
 
   StringRef getCallingConvention() { return callingConvention; }
+
+  StringRef getExportName() { return exportName.value(); }
+
+  bool isExported() { return exportName.has_value(); }
 
   FunctionType getFunctionType() { return originalFunctionType; }
 
@@ -91,12 +101,16 @@ private:
   DenseMap<int64_t, Operation *> refs;
   FunctionType originalFunctionType;
   std::string callingConvention;
+  std::optional<std::string> exportName;
 };
 
 struct ModuleAnalysis {
   ModuleAnalysis(IREE::VM::ModuleOp module) {
     typeTable = buildTypeTable(module);
     for (auto func : module.getOps<IREE::VM::FuncOp>()) {
+      functions[func.getOperation()] = FuncAnalysis(func);
+    }
+    for (auto func : module.getOps<mlir::func::FuncOp>()) {
       functions[func.getOperation()] = FuncAnalysis(func);
     }
   }
@@ -116,7 +130,8 @@ struct ModuleAnalysis {
             .lookupSymbol<mlir::func::FuncOp>(exportOp.getFunctionRefAttr());
 
     auto &funcAnalysis = lookupFunction(funcOp);
-    functions[func.getOperation()] = FuncAnalysis(funcAnalysis);
+    functions[func.getOperation()] =
+        FuncAnalysis(funcAnalysis, exportOp.getExportName());
   }
 
   void addFromImport(mlir::func::FuncOp func, IREE::VM::ImportOp import) {
