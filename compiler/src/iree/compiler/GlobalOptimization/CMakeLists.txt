@@ -50,6 +50,7 @@ iree_cc_library(
     "FuseDequantizationMatmul.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
+    "GlobalLoopInvariantCodeMotion.cpp"
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"

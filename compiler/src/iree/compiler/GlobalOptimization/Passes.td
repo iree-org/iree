@@ -128,4 +128,9 @@ def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSimplifyPackUnpackPass()";
 }
 
+def GlobalLoopInvariantCodeMotion : InterfacePass<"iree-global-opt-loop-invariant-code-motion", "mlir::FunctionOpInterface"> {
+  let summary = "TODO";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createGlobalLoopInvariantCodeMotionPass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES
