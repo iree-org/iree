@@ -1527,6 +1527,21 @@ void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
   transform::modifiesPayload(effects);
 }
 
+DiagnosedSilenceableFailure
+transform_dialect::OptimizeSharedMemoryReadsAndWritesOp::applyToOne(
+    transform::TransformRewriter &rewriter, ::mlir::FunctionOpInterface funcOp,
+    ::mlir::transform::ApplyToEachResultList &results,
+    ::mlir::transform::TransformState &state) {
+  optimizeSharedMemoryReadsAndWrites(funcOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::OptimizeSharedMemoryReadsAndWritesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
 //===----------------------------------------------------------------------===//
 // CreateMatmulMfmaTileSizesOp
 //===----------------------------------------------------------------------===//

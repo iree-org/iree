@@ -35,6 +35,8 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp);
 // Add patterns to distribute contractions to MFMA ops.
 void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
 
+void optimizeSharedMemoryReadsAndWrites(mlir::FunctionOpInterface funcOp);
+
 } // namespace mlir::iree_compiler
 
 #endif
