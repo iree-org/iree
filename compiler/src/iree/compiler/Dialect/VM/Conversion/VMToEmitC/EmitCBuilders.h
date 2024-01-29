@@ -151,7 +151,7 @@ emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
 
 FailureOr<emitc::VerbatimOp>
 func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
-          bool as_static, IREE::VM::EmitCTypeConverter &typeConverter);
+          IREE::VM::EmitCTypeConverter &typeConverter);
 
 FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
                                         StringRef name,

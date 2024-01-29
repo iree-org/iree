@@ -465,9 +465,9 @@ emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
 
 FailureOr<emitc::VerbatimOp>
 func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
-          bool as_static, IREE::VM::EmitCTypeConverter &typeConverter) {
+          IREE::VM::EmitCTypeConverter &typeConverter) {
   std::string decl;
-  if (as_static)
+  if (func.isPrivate())
     decl += "static ";
   if (func.getNumResults() == 0) {
     decl += "void";
@@ -516,9 +516,9 @@ FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
 
 void makeFuncStatic(OpBuilder builder, Location location,
                     mlir::func::FuncOp func) {
-  if (!func->hasAttr("emitc.static"))
+  if (!func.isPrivate())
     return;
-  func->removeAttr("emitc.static");
+  func.setPublic();
   builder.setInsertionPoint(func);
   builder.create<emitc::VerbatimOp>(location, "static ");
 }

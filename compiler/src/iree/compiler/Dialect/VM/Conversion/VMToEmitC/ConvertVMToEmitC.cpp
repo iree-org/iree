@@ -115,8 +115,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
       ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
   auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
-
-  attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
+  newFuncOp.setPrivate();
 
   std::optional<std::string> callingConvention =
       makeCallingConventionString(funcOp);
@@ -593,10 +592,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_destroy", funcType);
+    funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp);
-
-    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
     const BlockArgument moduleArg = funcOp.getArgument(moduleArgIndex);
@@ -646,10 +644,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_alloc_state", funcType);
+    funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp);
-
-    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -827,10 +824,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_free_state", funcType);
+    funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp);
-
-    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -927,10 +923,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
+    funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp);
-
-    attachAttribute(funcOp, "emitc.static", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1186,7 +1181,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - structured preprocessor directive
 ///     - struct definition
 ///     - remove all uses of `attachAttribute`
-///       - emitc.static
 ///       - vm.calling_convention
 ///       - vm.emit_at_end
 ///       - vm.export_name
@@ -1236,8 +1230,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
       if (!funcOp->hasAttr("vm.module.constructor"))
         continue;
-      auto declOp = emitc_builders::func_decl(
-          builder, loc, funcOp, funcOp->hasAttr("emitc.static"), typeConverter);
+      auto declOp =
+          emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
       if (failed(declOp))
         return failure();
       mark(declOp.value());
@@ -1352,8 +1346,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       Operation *op = funcOp.getOperation();
       if (op->hasAttr("vm.module.constructor"))
         continue;
-      auto declOp = emitc_builders::func_decl(
-          builder, loc, funcOp, funcOp->hasAttr("emitc.static"), typeConverter);
+      auto declOp =
+          emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
       if (failed(declOp))
         return failure();
       mark(declOp.value());
@@ -1534,8 +1528,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     op = emitc_builders::preprocessorDirective(
         builder, loc, emitc_builders::ENDIF, "  // EMITC_IMPLEMENTATION");
 
-    // remove emitc.static attributes from function by inserting a verbatim op
-    // before the func op
+    // insert a verbatim op before private functions
     for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
       emitc_builders::makeFuncStatic(builder, loc, func);
     }
@@ -1729,12 +1722,12 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
     auto newFuncOp =
         rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
+    newFuncOp.setPrivate();
 
     FunctionType functionType = funcAnalysis.getFunctionType();
 
     getModuleAnalysis().add(newFuncOp, functionType);
 
-    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
     attachAttribute(newFuncOp, "vm.calling_convention",
                     funcOp.getOperation()->getAttr("vm.calling_convention"));
     attachAttribute(newFuncOp, "vm.export_name", exportOp.getExportNameAttr());
@@ -2203,7 +2196,6 @@ private:
   LogicalResult createImportShim(IREE::VM::ImportOp &importOp,
                                  DenseIntElementsAttr segmentSizes,
                                  OpBuilder &builder) const {
-    auto ctx = importOp.getContext();
     auto loc = importOp.getLoc();
 
     auto moduleOp =
@@ -2227,10 +2219,9 @@ private:
 
     auto newFuncOp = builder.create<mlir::func::FuncOp>(
         loc, newFuncName.value(), newFuncType.value());
+    newFuncOp.setPrivate();
 
     typeConverter.analysis.add(newFuncOp, importOp.getFunctionType());
-
-    attachAttribute(newFuncOp, "emitc.static", UnitAttr::get(ctx));
 
     // Populate newly generated function.
     {
