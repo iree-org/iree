@@ -23,6 +23,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -293,8 +294,8 @@ public:
   explicit LastUseAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
-    explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+        TraversalAction::RECURSE);
     explorer.setDialectAction<IREE::Stream::StreamDialect>(
         TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).

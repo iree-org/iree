@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --torch-iree-tm-tensor-to-linalg-ext %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-tm-tensor-to-linalg-ext))" %s | FileCheck %s
 
 func.func @scatter_update(
     %original: tensor<8xi32>, %indices: tensor<3x1xi32>,

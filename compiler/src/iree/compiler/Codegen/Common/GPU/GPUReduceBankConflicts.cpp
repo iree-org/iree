@@ -80,7 +80,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
   return std::make_unique<GPUReduceBankConflictsPass>(paddingSizeBits);
 }

@@ -37,7 +37,7 @@ void LLVMCPUVectorShapeCastLoweringPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorShapeCastLoweringPass() {
   return std::make_unique<LLVMCPUVectorShapeCastLoweringPass>();
 }

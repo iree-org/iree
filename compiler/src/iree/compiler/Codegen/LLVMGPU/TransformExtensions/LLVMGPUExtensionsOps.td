@@ -104,7 +104,7 @@ def MapNestedForallToGpuThreadsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -325,7 +325,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -518,7 +518,7 @@ def CreateAsyncGroupsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -558,7 +558,7 @@ def LayoutAnalysisAndDistributionOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -604,7 +604,7 @@ def ReorderTransposeOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -642,7 +642,7 @@ def EliminateGpuBarriersOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -676,7 +676,7 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -712,7 +712,7 @@ def TestAMDGPUContractionDistribution :
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::func::FuncOp funcOp,
+          ::mlir::FunctionOpInterface funcOp,
           ::mlir::transform::ApplyToEachResultList &results,
           ::mlir::transform::TransformState &state);
     }];

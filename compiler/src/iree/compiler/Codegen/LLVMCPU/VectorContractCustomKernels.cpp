@@ -17,7 +17,6 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -1173,7 +1172,7 @@ void populateVectorContractCustomKernelsPatterns(
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createVectorContractCustomKernelsPass() {
   return std::make_unique<VectorContractCustomKernelsPass>();
 }

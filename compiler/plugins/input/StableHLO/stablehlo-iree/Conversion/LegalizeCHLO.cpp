@@ -9,13 +9,13 @@
 
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo-iree/Conversion/Passes.h"
@@ -2194,8 +2194,8 @@ struct LegalizeChlo final : impl::LegalizeChloBase<LegalizeChlo> {
       conversionTarget.addLegalOp<chlo::MinimumBroadcastShapesOp>();
       conversionTarget.addLegalDialect<
           mlir::stablehlo::StablehloDialect, mlir::arith::ArithDialect,
-          mlir::func::FuncDialect, mlir::shape::ShapeDialect,
-          mlir::scf::SCFDialect, mlir::tensor::TensorDialect>();
+          mlir::shape::ShapeDialect, mlir::scf::SCFDialect,
+          mlir::tensor::TensorDialect>();
 
       populateLegalizeChloPatterns(ctx, &conversionPatterns);
       if (failed(applyPartialConversion(getOperation(), conversionTarget,

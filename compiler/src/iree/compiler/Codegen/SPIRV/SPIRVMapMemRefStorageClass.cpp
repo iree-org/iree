@@ -106,7 +106,7 @@ struct SPIRVMapMemRefStorageClassPass final
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVMapMemRefStorageClassPass() {
   return std::make_unique<SPIRVMapMemRefStorageClassPass>();
 }

@@ -10,7 +10,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -1461,7 +1460,7 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 
 LogicalResult ReturnOp::verify() {
   Operation *op = getOperation();
-  auto parentOp = cast<FunctionOpInterface>(op->getParentOp());
+  auto parentOp = cast<mlir::FunctionOpInterface>(op->getParentOp());
   auto expectedTypes = parentOp.getResultTypes();
   if (getNumOperands() != expectedTypes.size()) {
     return emitOpError("has ")

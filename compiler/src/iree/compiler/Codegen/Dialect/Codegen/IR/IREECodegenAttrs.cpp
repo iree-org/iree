@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -377,7 +376,7 @@ std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   return {};
 }
 
-LogicalResult setDispatchConfig(func::FuncOp entryPoint,
+LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
                                 std::optional<int64_t> subgroupSize) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
@@ -394,7 +393,7 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
 }
 
 LogicalResult
-setTranslationInfo(func::FuncOp entryPoint,
+setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
   if (failed(exportOp))

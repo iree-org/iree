@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-preprocessing-dot-general-to-dot \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-preprocessing-dot-general-to-dot))" \
 // RUN:   --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @testDebatch1

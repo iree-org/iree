@@ -297,7 +297,7 @@ struct ForOpCanonicalizationPass
   }
 
   void runOnOperation() override {
-    func::FuncOp fn = getOperation();
+    auto fn = getOperation();
     // These patterns collide so we apply them one after another. The
     // canonicalization pattern will be blocked by the packing pattern
     // so we apply that first.
@@ -316,7 +316,8 @@ struct ForOpCanonicalizationPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
 

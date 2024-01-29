@@ -90,6 +90,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRGPUToNVVMTransforms
     MLIRGPUToROCDLTransforms

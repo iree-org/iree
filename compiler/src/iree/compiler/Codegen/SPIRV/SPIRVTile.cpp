@@ -43,7 +43,7 @@ namespace mlir::iree_compiler {
 
 /// Collects computation ops which we will use as anchor to tile and fuse.
 static FailureOr<IREE::Codegen::LoweringConfigAttr>
-collectComputeOps(func::FuncOp funcOp,
+collectComputeOps(mlir::FunctionOpInterface funcOp,
                   SmallVectorImpl<Operation *> &computeOps) {
   // If there are `scf.if` ops which have linalg ops, we have both a fast and
   // slow paths for padding handling. Then we need to scan both regions to
@@ -146,7 +146,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 
 /// Tiles reduction dimensions.
 static LogicalResult
-tileReduction(func::FuncOp funcOp,
+tileReduction(mlir::FunctionOpInterface funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
   auto filter =
       IREE::LinalgExt::LinalgTransformationFilter().setMatchByDefault();
@@ -164,7 +164,7 @@ tileReduction(func::FuncOp funcOp,
 
 /// Fuses `tensor.pad` ops into the the materalized loop nests containing
 /// their consumer ops.
-static void fusePadIntoConsumer(func::FuncOp funcOp) {
+static void fusePadIntoConsumer(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   RewritePatternSet patterns(context);
   patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
@@ -179,7 +179,7 @@ static void fusePadIntoConsumer(func::FuncOp funcOp) {
 };
 
 /// Concretizes `tensor.pad` ops' result shapes.
-static void concretizePadShape(func::FuncOp funcOp) {
+static void concretizePadShape(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   RewritePatternSet patterns(context);
   SmallVector<int64_t> numWorkgroups = getStaticNumWorkgroups(funcOp);
@@ -196,7 +196,7 @@ static void concretizePadShape(func::FuncOp funcOp) {
 
 /// Tiles one of the convolution output window dimensions with size 1 to prepare
 /// for downsizing 2-D convolution ops into 1-D ones.
-static LogicalResult tileAndUnrollConvWindow(func::FuncOp funcOp,
+static LogicalResult tileAndUnrollConvWindow(mlir::FunctionOpInterface funcOp,
                                              ArrayRef<OpFoldResult> tileSizes) {
   SmallVector<linalg::ConvolutionOpInterface, 1> convOps;
   funcOp.walk([&convOps](linalg::ConvolutionOpInterface convOp) {
@@ -264,7 +264,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
@@ -332,7 +332,8 @@ public:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createSPIRVTilePass() {
   return std::make_unique<SPIRVTilePass>();
 }
 

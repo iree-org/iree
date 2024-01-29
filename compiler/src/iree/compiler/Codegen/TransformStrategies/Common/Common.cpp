@@ -93,7 +93,7 @@ mlir::iree_compiler::maxDivisorOfValueBelowLimit(int64_t value, int64_t limit) {
 }
 
 void mlir::iree_compiler::createTransformRegion(
-    func::FuncOp entryPoint, StrategyBuilderFn buildStrategy) {
+    mlir::FunctionOpInterface entryPoint, StrategyBuilderFn buildStrategy) {
   MLIRContext *ctx = entryPoint.getContext();
   Location loc = entryPoint.getLoc();
   OpBuilder b(ctx);

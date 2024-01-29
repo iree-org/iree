@@ -78,22 +78,23 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createConvertToSPIRVPass(bool enableFastMath = false, unsigned indexWidth = 32);
 
 /// Annotates the innermost Winograd loops with the spirv distribute attribute.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVAnnotateWinogradLoopsPass();
 
 /// Breaks down large vectors not natively supported by SPIR-V.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVBreakDownLargeVectorPass();
 
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need
 // padding, while the slow path is for boundary tiles where we do need
 // padding.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVCreateFastSlowPathPass();
 
 /// Pass to distribute tiled loop nests to invocations.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVDistributePass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createSPIRVDistributePass();
 
 /// Emulates bfloat 16 ops with 32-bit float ops.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass();
@@ -102,19 +103,19 @@ std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateBf16Pass();
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass();
 
 /// Turns static shaped storage buffer subspan ops into dynamic shaped ones.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVEraseStorageBufferStaticShapePass();
 
 /// Pass to perform final vector ops lowering to meet SPIR-V requirements.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVFinalVectorLoweringPass();
 
 /// Creates a pass to fold processor ID uses where possible.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVFoldProcessorIDUsesPass();
 
 /// Pass to perform initial vector ops lowering to meet SPIR-V requirements.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVInitialVectorLoweringPass();
 
 /// Links SPIR-V HAL executables within the top-level program module.
@@ -131,7 +132,7 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVMapMemRefStorageClassPass();
 
 /// Pass to materialize SPIR-V target requirements of hal.exectuable.variant ops
@@ -141,20 +142,21 @@ createSPIRVMaterializeExecutableConditionsPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to
 /// invocations.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createSPIRVTileAndDistributePass();
 
 /// Pass to promote Linalg ops with buffer semantics to use workgroup memory
 /// and then tile to invocations.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVTileAndPromotePass(bool promoteCMatrix = false,
                               bool skipThreadLevel = false);
 
 /// Pass to tile Linalg ops with tensor semantics to invocations.
-std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createSPIRVTilePass();
 
 /// Pass to tile Linalg ops with buffer semantics suitable for lowering to
 /// SPIR-V cooperative ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVTileToCooperativeOpsPass();
 
 // Trims the SPIR-V target environment of a HAL executable variant to the
@@ -163,7 +165,7 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVTrimExecutableTargetEnvPass();
 
 /// Converts vector ops to gpu subgroup MMA ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVVectorToGPUSubgroupMMAOpsPass();
 
 /// Converts memref of scalar to memref of vector of efficent size. This will
@@ -172,7 +174,7 @@ createSPIRVVectorToGPUSubgroupMMAOpsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
 /// Pass to do vectorization suitable for lowering to SPIR-V cooperative ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVVectorizeToCooperativeOpsPass();
 
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing to

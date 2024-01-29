@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-unfuse-fma-pass %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-unfuse-fma-pass))" %s | FileCheck %s
 
 func.func @fma_unfused(%a : f32, %b: f32, %c: f32) -> f32 {
     %0 = "llvm.intr.fma"(%a, %b, %c) : (f32, f32, f32) -> f32

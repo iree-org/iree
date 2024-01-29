@@ -96,7 +96,7 @@ static Value buildDefaultVectorLoweringStrategy(
 
 /// Take care of the last common steps in a CPU strategy (i.e. vectorize,
 /// bufferize and map to blocks).
-/// Return the handles to the updated variant and the func::FuncOp ops under
+/// Return the handles to the updated variant and the function ops under
 /// the variant op.
 std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
     ImplicitLocOpBuilder &b, Value variantH,
@@ -124,7 +124,7 @@ std::pair<Value, Value> mlir::iree_compiler::cpu::buildCommonTrailingStrategy(
 
   // Step N-1. Post-bufferization mapping to blocks only.
   // Need to match again since bufferize invalidated all handles.
-  // TODO: assumes a single func::FuncOp to transform, may need hardening.
+  // TODO: assumes a single function to transform, may need hardening.
   funcH = b.create<MatchOp>(variantH, func::FuncOp::getOperationName());
   b.create<ForallToWorkgroupOp>(funcH);
 
@@ -145,7 +145,8 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
 }
 
 LogicalResult iree_compiler::cpu::matchAndSetReductionStrategy(
-    func::FuncOp entryPoint, linalg::LinalgOp op, const CPUModel &cpuModel) {
+    mlir::FunctionOpInterface entryPoint, linalg::LinalgOp op,
+    const CPUModel &cpuModel) {
   // 1. Match a reduction and surrounding ops.
   StructuredOpMatcher *reduction;
   transform_ext::MatchedReductionCaptures captures;

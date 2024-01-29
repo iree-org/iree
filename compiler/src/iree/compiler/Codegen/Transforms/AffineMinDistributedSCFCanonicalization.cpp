@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -181,7 +180,7 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 /// individually.
 struct AffineMinDistributedSCFCanonicalizationPass
     : public PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
-                         OperationPass<func::FuncOp>> {
+                         InterfacePass<mlir::FunctionOpInterface>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
       AffineMinDistributedSCFCanonicalizationPass)
 
@@ -195,7 +194,7 @@ struct AffineMinDistributedSCFCanonicalizationPass
   }
 
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     RewritePatternSet foldPattern(&getContext());
     populateAffineMinSCFCanonicalizationPattern(foldPattern);
     FrozenRewritePatternSet frozenPatterns(std::move(foldPattern));

@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIREmitCDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRMathDialect
     MLIRPass

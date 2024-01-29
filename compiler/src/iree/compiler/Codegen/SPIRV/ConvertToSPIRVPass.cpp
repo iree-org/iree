@@ -39,7 +39,6 @@
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
@@ -55,6 +54,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -102,11 +102,11 @@ static InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   SymbolTable symbolTable(module);
   InterfaceResourceMap interfaceToResourceVars;
 
-  // We insert each new global variable at the begining of the module,
+  // We insert each new global variable at the beginning of the module,
   // therefore, to preserve the original order, we process all functions and all
   // subspan ops in the reverse order.
-  auto functions = llvm::to_vector(module.getOps<func::FuncOp>());
-  for (func::FuncOp func : llvm::reverse(functions)) {
+  auto functions = llvm::to_vector(module.getOps<mlir::FunctionOpInterface>());
+  for (auto func : llvm::reverse(functions)) {
     // Collect all interface ops and their (set, binding) pairs in this
     // function. Use SmallVector here for a deterministic order.
     SmallVector<IREE::HAL::InterfaceBindingSubspanOp> subspanOps;
@@ -373,7 +373,7 @@ void ConvertToSPIRVPass::runOnOperation() {
 
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
       continue;
@@ -399,7 +399,7 @@ void ConvertToSPIRVPass::runOnOperation() {
         spirv::getEntryPointABIAttr(context, workgroupSize32, subgroupSize32));
   }
 
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     RewritePatternSet shapePatterns(context);
     shapePatterns.add<RemoveStaticDynamicCast>(context);
     if (failed(
@@ -420,7 +420,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   /// `EmulateNarrotType` pass but dont trigger there due to missing support for
   /// emulation of `vector.transfer_read` in the emulation path. Remove the
   /// patterns from here after that is done.
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     RewritePatternSet narrowingPatterns(context);
     vector::populateVectorNarrowTypeRewritePatterns(narrowingPatterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
@@ -535,15 +535,15 @@ void ConvertToSPIRVPass::runOnOperation() {
   // Disallow all other ops.
   target->markUnknownOpDynamicallyLegal([](Operation *) { return false; });
 
-  SmallVector<func::FuncOp, 1> functions;
-  for (func::FuncOp fn : moduleOp.getOps<func::FuncOp>()) {
+  SmallVector<mlir::FunctionOpInterface, 1> functions;
+  for (auto fn : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     if (!fn.isPublic())
       continue;
     functions.push_back(fn);
   }
 
   FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-  for (func::FuncOp fn : functions) {
+  for (auto fn : functions) {
     if (failed(applyFullConversion(fn, *target, frozenPatterns))) {
       return signalPassFailure();
     }

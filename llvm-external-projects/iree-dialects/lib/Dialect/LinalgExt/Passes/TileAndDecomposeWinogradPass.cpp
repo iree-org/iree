@@ -16,6 +16,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "llvm/ADT/DenseSet.h"
@@ -50,10 +51,10 @@ static LogicalResult tileWinogradInputTransformOp(
     WinogradInputTransformOp inputOp, RewriterBase &rewriter,
     WinogradInputTransformOp &tiledWinogradInputTransformOp) {
   Location loc = inputOp.getLoc();
-  auto funcOp = inputOp->getParentOfType<func::FuncOp>();
+  auto funcOp = inputOp->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp) {
     return rewriter.notifyMatchFailure(inputOp,
-                                       "Could not find parent of type funcOp");
+                                       "Could not find parent function");
   }
 
   const int64_t inputTileSize = inputOp.getInputTileSize();
@@ -81,7 +82,7 @@ static LogicalResult tileWinogradInputTransformOp(
                                                 imageDims.end());
   SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
 
-  rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
 
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
@@ -182,12 +183,13 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
     WinogradInputTransformOp tiledWinogradInputTransformOp,
     RewriterBase &rewriter) {
   Location loc = tiledWinogradInputTransformOp.getLoc();
-  auto funcOp = tiledWinogradInputTransformOp->getParentOfType<func::FuncOp>();
+  auto funcOp = tiledWinogradInputTransformOp
+                    ->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp) {
     return rewriter.notifyMatchFailure(tiledWinogradInputTransformOp,
-                                       "Could not find parent of type funcOp");
+                                       "Could not find parent function");
   }
-  rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
 
   Value dynamicSlice = tiledWinogradInputTransformOp.input();
   Value outputSlice = tiledWinogradInputTransformOp.output();
@@ -303,10 +305,10 @@ static LogicalResult tileWinogradOutputTransformOp(
     WinogradOutputTransformOp outputOp, RewriterBase &rewriter,
     WinogradOutputTransformOp &tiledWinogradOutputTransformOp) {
   Location loc = outputOp.getLoc();
-  auto funcOp = outputOp->getParentOfType<func::FuncOp>();
+  auto funcOp = outputOp->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp) {
     return rewriter.notifyMatchFailure(outputOp,
-                                       "Could not find parent of type funcOp");
+                                       "Could not find parent function");
   }
 
   const int64_t inputTileSize = outputOp.getInputTileSize();
@@ -329,7 +331,7 @@ static LogicalResult tileWinogradOutputTransformOp(
                                                 imageDims.end());
   SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
 
-  rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
 
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, input, numImageDims, loc, rewriter);
@@ -421,12 +423,13 @@ static LogicalResult decomposeTiledWinogradOutputTransformOp(
     WinogradOutputTransformOp tiledWinogradOutputTransformOp,
     RewriterBase &rewriter) {
   Location loc = tiledWinogradOutputTransformOp.getLoc();
-  auto funcOp = tiledWinogradOutputTransformOp->getParentOfType<func::FuncOp>();
+  auto funcOp = tiledWinogradOutputTransformOp
+                    ->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp) {
     return rewriter.notifyMatchFailure(tiledWinogradOutputTransformOp,
-                                       "Could not find parent of type funcOp");
+                                       "Could not find parent function");
   }
-  rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
   Value inputSlice = tiledWinogradOutputTransformOp.input();
   Value outputSlice = tiledWinogradOutputTransformOp.output();
   assert(tiledWinogradOutputTransformOp.getInputOperandRank() == 2 &&
@@ -521,7 +524,8 @@ struct TileAndDecomposeWinogradTransformPass
 };
 } // namespace
 
-LogicalResult reifyWinogradTransform(func::FuncOp funcOp, bool onlyTile) {
+LogicalResult reifyWinogradTransform(mlir::FunctionOpInterface funcOp,
+                                     bool onlyTile) {
   IRRewriter rewriter(funcOp.getContext());
   LogicalResult resultOfTransformations = success();
   funcOp.walk([&](WinogradInputTransformOp inputOp) {
@@ -544,7 +548,7 @@ void TileAndDecomposeWinogradTransformPass::runOnOperation() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDecomposeWinogradTransformPass() {
   return std::make_unique<TileAndDecomposeWinogradTransformPass>();
 }

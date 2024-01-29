@@ -176,7 +176,7 @@ MutableOperandRange UKernelGenericOp::getDpsInitsMutable() {
   return getOutputsMutable();
 }
 
-FailureOr<func::CallOp>
+FailureOr<mlir::CallOpInterface>
 UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
   return lowerUKernelGenericToFunctionCall(rewriter, *this, getUKernelFnName(),
                                            getStridedOuterDimsAttr());

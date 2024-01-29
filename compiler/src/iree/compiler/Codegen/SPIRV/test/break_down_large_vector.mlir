@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-breakdown-large-vector %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-breakdown-large-vector))" %s | FileCheck %s
 
 // CHECK-LABEL: func @extract_strided_slice_8_elements
 func.func @extract_strided_slice_8_elements(%input: vector<8xf16>) -> vector<4xf16> {

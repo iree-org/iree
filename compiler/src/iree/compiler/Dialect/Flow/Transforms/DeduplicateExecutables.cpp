@@ -77,7 +77,7 @@ replaceSymbolRefs(Operation *scopeOp,
                           WalkResult::skip());
   });
   for (auto &region : scopeOp->getRegions()) {
-    for (auto funcOp : region.getOps<FunctionOpInterface>()) {
+    for (auto funcOp : region.getOps<mlir::FunctionOpInterface>()) {
       funcOp->walk([&](Operation *op) {
         replacer.replaceElementsIn(op);
         return WalkResult::advance();

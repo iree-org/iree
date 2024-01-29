@@ -536,7 +536,8 @@ namespace {
 ///    j. Compute matmul(s, v) and add new_accumulator
 ///
 ///
-LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile,
+LogicalResult reifyAttentionTransform(mlir::FunctionOpInterface funcOp,
+                                      bool onlyTile,
                                       std::optional<uint64_t> tileSize) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {

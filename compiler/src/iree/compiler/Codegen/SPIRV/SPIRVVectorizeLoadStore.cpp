@@ -253,7 +253,7 @@ private:
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<func::FuncOp>([this](func::FuncOp funcOp) {
+        .Case<mlir::FunctionOpInterface>([this](auto funcOp) {
           for (Value arg : funcOp.getArguments()) {
             analyzeMemRefValue(arg);
           }
@@ -1038,7 +1038,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.
-  for (func::FuncOp func : module.getOps<func::FuncOp>()) {
+  for (auto func : module.getOps<mlir::FunctionOpInterface>()) {
     auto result = func.walk([](VectorTransferOpInterface transferOp) {
       if (cast<VectorType>(transferOp.getVectorType()).getRank() > 1) {
         transferOp.emitOpError(
@@ -1094,7 +1094,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
     return signalPassFailure();
   }
 
-  for (func::FuncOp func : module.getOps<func::FuncOp>()) {
+  for (auto func : module.getOps<mlir::FunctionOpInterface>()) {
     RewritePatternSet rewritingPatterns(context);
     rewritingPatterns.add<ScalarizeVectorTransferRead, ScalarizeVectorLoad,
                           ScalarizeVectorTransferWrite>(context);

@@ -10,7 +10,6 @@
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -209,7 +208,7 @@ public:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorAlloc(GPUPromoteSharedMemPattern promoteSharedMemPattern) {
   return std::make_unique<GPUTensorAllocPass>(promoteSharedMemPattern);
 }

@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/TargetParser/Triple.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -20,6 +19,7 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
 namespace mlir::iree_compiler {
@@ -31,14 +31,15 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 //===----------------------------------------------------------------------===//
 
 /// Returns true if the given `func` is a kernel dispatch entry point.
-bool isEntryPoint(func::FuncOp func);
+bool isEntryPoint(mlir::FunctionOpInterface func);
 
 /// Returns a map from function symbol name to corresponding entry point op.
 llvm::StringMap<IREE::HAL::ExecutableExportOp>
 getAllEntryPoints(ModuleOp module);
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp);
+FailureOr<IREE::HAL::ExecutableExportOp>
+getEntryPoint(mlir::FunctionOpInterface funcOp);
 
 /// Returns the ExecutableVariableOp enclosing `op`. Returns `nullptr` on
 /// failure.
@@ -103,7 +104,7 @@ bool isReadOnly(Value v);
 
 /// Return the static number of workgroup dispatched if it is known and
 /// constant. Return an empty vector otherwise.
-SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp);
+SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
@@ -168,7 +169,7 @@ struct LoopTilingAndDistributionInfo {
 /// Returns the list of TilingInterface ops in the functions. If there are no
 /// `scf.for` operations in the function return the TilingInterface operations
 /// in the body of the function if it has a single basic block.
-SmallVector<Operation *> getComputeOps(func::FuncOp funcOp);
+SmallVector<Operation *> getComputeOps(mlir::FunctionOpInterface funcOp);
 
 /// If the given `forOp` is a tiled and distributed loop, returns its tiling and
 /// distribution information.
@@ -177,7 +178,7 @@ isTiledAndDistributedLoop(scf::ForOp forOp);
 
 /// Collects information about loops matching tiled+distribute pattern.
 SmallVector<LoopTilingAndDistributionInfo>
-getTiledAndDistributedLoopInfo(func::FuncOp funcOp);
+getTiledAndDistributedLoopInfo(mlir::FunctionOpInterface funcOp);
 
 /// Sets the tile sizes of the SCFTilingOptions. If `tileScalableFlags` are
 /// provided the corresponding tile size will be multiplied by a vector.vscale

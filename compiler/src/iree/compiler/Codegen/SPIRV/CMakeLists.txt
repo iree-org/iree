@@ -101,6 +101,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRGPUToSPIRV
     MLIRGPUTransforms

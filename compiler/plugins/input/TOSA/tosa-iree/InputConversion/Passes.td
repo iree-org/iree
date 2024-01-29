@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 def Converti48Toi64 :
-    Pass<"iree-tosa-convert-i48-to-i64", "mlir::func::FuncOp"> {
+    InterfacePass<"iree-tosa-convert-i48-to-i64", "mlir::FunctionOpInterface"> {
   let summary = "Converts all i48s to i64s";
   let constructor = "mlir::iree_compiler::createConverti48Toi64()";
 }
@@ -22,7 +22,7 @@ def StripSignedness :
 }
 
 def TosaToLinalgExt :
-    Pass<"iree-tosa-to-linalg-ext", "mlir::func::FuncOp"> {
+    InterfacePass<"iree-tosa-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary = "Convert TOSA operations to their equivalent linalg-ext operations.";
   let constructor = "mlir::iree_compiler::createTosaToLinalgExt()";
   let dependentDialects = [

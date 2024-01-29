@@ -15,8 +15,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser/Parser.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Inline {
+namespace mlir::iree_compiler::IREE::HAL::Inline {
 
 namespace {
 
@@ -54,5 +53,4 @@ HALInlineDialect::HALInlineDialect(MLIRContext *context)
       >();
 }
 
-} // namespace Inline
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Inline

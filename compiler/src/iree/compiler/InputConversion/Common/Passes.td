@@ -22,13 +22,13 @@ def ImportMLProgram :
 }
 
 def LinalgQuantizedConvToConvPass
-    : Pass<"iree-linalg-quantized-conv-to-conv", "func::FuncOp"> {
+    : InterfacePass<"iree-linalg-quantized-conv-to-conv", "mlir::FunctionOpInterface"> {
   let summary = "lower quantized_conv to conv";
   let constructor = "mlir::iree_compiler::createLinalgQuantizedConvToConvPass()";
 }
 
 def LinalgQuantizedMatmulToMatmulPass
-    : Pass<"iree-linalg-quantized-matmul-to-matmul", "func::FuncOp"> {
+    : InterfacePass<"iree-linalg-quantized-matmul-to-matmul", "mlir::FunctionOpInterface"> {
   let summary = "lower quantized_matmul to matmul";
   let constructor = "mlir::iree_compiler::createLinalgQuantizedMatmulToMatmulPass()";
 }

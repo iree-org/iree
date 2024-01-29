@@ -51,7 +51,7 @@ public:
   }
 };
 
-static void loopInvariantCodeMotion(func::FuncOp funcOp) {
+static void loopInvariantCodeMotion(mlir::FunctionOpInterface funcOp) {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
@@ -64,7 +64,7 @@ struct OptimizeVectorTransferPass
   OptimizeVectorTransferPass(bool flatten, bool dropUnitDims)
       : flatten(flatten), dropUnitDims(dropUnitDims) {}
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     LDBG("before optimize vector transfer\n" << funcOp);
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
@@ -84,11 +84,11 @@ struct OptimizeVectorTransferPass
 
     LDBG("after dropping leading unit dims\n" << funcOp);
 
-    // Workaround, run loop invariant code motion before hoist redudant vector
+    // Workaround, run loop invariant code motion before hoist redundant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
     loopInvariantCodeMotion(funcOp);
-    linalg::hoistRedundantVectorTransfers(funcOp);
+    linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
     IRRewriter rewriter(funcOp->getContext());
     vector::transferOpflowOpt(rewriter, funcOp);
 
@@ -152,7 +152,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createOptimizeVectorTransferPass(bool flatten, bool dropUnitDims) {
   return std::make_unique<OptimizeVectorTransferPass>(flatten, dropUnitDims);
 }

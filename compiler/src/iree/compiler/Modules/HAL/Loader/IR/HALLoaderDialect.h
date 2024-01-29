@@ -10,8 +10,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Loader {
+namespace mlir::iree_compiler::IREE::HAL::Loader {
 
 class HALLoaderDialect : public Dialect {
 public:
@@ -19,7 +18,6 @@ public:
   static StringRef getDialectNamespace() { return "hal_loader"; }
 };
 
-} // namespace Loader
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Loader
 
 #endif // IREE_COMPILER_MODULES_HAL_LOADER_IR_HALLOADERDIALECT_H_

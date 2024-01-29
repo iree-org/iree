@@ -111,7 +111,7 @@ static FailureOr<LoweringConfigAttr> getRootLoweringConfig(ModuleOp moduleOp) {
     }
   }
 
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     getAllEntryPoints(moduleOp);
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     // Check for self first.

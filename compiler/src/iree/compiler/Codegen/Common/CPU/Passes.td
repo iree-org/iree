@@ -14,7 +14,7 @@ include "mlir/Pass/PassBase.td"
 //===---------------------------------------------------------------------===//
 
 def CPUMaterializeEncoding :
-    Pass<"iree-codegen-cpu-materialize-encoding", "func::FuncOp"> {
+    InterfacePass<"iree-codegen-cpu-materialize-encoding", "mlir::FunctionOpInterface"> {
   let summary = "Materialize the encoding for tensor as specified by the backend";
   let constructor = "mlir::iree_compiler::createCPUMaterializeEncodingPass()";
 }

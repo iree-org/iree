@@ -26,6 +26,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/VMVX/IR:VMVXDialect",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MathDialect",

@@ -90,7 +90,7 @@ iree_cc_library(
     "UKernelOpInterface.cpp"
   DEPS
     ::UKernelOpInterfaceGen
-    MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
   PUBLIC
 )

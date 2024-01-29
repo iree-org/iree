@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRArithTransforms
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRMathDialect
     MLIRMemRefDialect

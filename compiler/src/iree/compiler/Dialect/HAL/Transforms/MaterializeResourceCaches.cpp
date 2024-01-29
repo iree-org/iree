@@ -46,10 +46,7 @@ struct MaterializeResourceCachesPass
         descriptorSetLayoutLookupOps;
     SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
-    for (Operation &funcLikeOp : moduleOp.getOps()) {
-      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp)
-        continue;
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {

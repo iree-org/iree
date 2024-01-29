@@ -34,7 +34,8 @@ namespace mlir::iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-FailureOr<IREE::HAL::ExecutableExportOp> getEntryPoint(func::FuncOp funcOp) {
+FailureOr<IREE::HAL::ExecutableExportOp>
+getEntryPoint(mlir::FunctionOpInterface funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variantOp)
     return failure();
@@ -58,7 +59,7 @@ getExecutableVariantOp(Operation *op) {
   return failure();
 }
 
-bool isEntryPoint(func::FuncOp func) {
+bool isEntryPoint(mlir::FunctionOpInterface func) {
   return func.isPublic() && succeeded(getEntryPoint(func));
 }
 
@@ -631,7 +632,7 @@ isTiledAndDistributedLoop(scf::ForOp forOp) {
   return loopInfo;
 }
 
-SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
+SmallVector<Operation *> getComputeOps(mlir::FunctionOpInterface funcOp) {
   SmallVector<Operation *> computeOps;
   funcOp.walk([&](Operation *op) {
     if (isa<TilingInterface, IREE::Codegen::UKernelOpInterface>(op)) {
@@ -642,7 +643,7 @@ SmallVector<Operation *> getComputeOps(func::FuncOp funcOp) {
 }
 
 SmallVector<LoopTilingAndDistributionInfo>
-getTiledAndDistributedLoopInfo(func::FuncOp funcOp) {
+getTiledAndDistributedLoopInfo(mlir::FunctionOpInterface funcOp) {
   SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {
@@ -994,7 +995,7 @@ void replaceMemrefUsesAndPropagateType(RewriterBase &rewriter, Location loc,
       for (OpOperand &use : original.getUses()) {
         Operation *user = use.getOwner();
         // Some uses cannot be replaced.
-        if (isa<func::ReturnOp, scf::YieldOp>(user)) {
+        if (user->hasTrait<OpTrait::ReturnLike>()) {
           LLVM_DEBUG({
             llvm::dbgs() << "\tUnhandled user : ";
             user->print(llvm::dbgs(), OpPrintingFlags().assumeVerified());
@@ -1080,7 +1081,7 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 }
 
 /// Infer the number of workgroups from exportOp.
-SmallVector<int64_t> getStaticNumWorkgroups(func::FuncOp funcOp) {
+SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
   SmallVector<int64_t> result;
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp))

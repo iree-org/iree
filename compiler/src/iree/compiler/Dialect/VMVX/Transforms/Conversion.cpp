@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -50,7 +51,7 @@ public:
     typeConverter.addConversion([](Type type) { return type; });
 
     // Run a pre-pass that updates the entry function signature.
-    for (auto funcOp : getOperation().getOps<func::FuncOp>()) {
+    for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       if (funcOp.isPublic()) {
         if (failed(updateHALToVMVXEntryFuncOp(funcOp, typeConverter))) {
           return signalPassFailure();

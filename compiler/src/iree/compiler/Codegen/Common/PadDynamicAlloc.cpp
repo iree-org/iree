@@ -92,7 +92,8 @@ struct PadDynamicAllocPass : public PadDynamicAllocBase<PadDynamicAllocPass> {
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createPadDynamicAlloc() {
   return std::make_unique<PadDynamicAllocPass>();
 }
 
