@@ -45,15 +45,6 @@ enum {
   CCONV_ARGUMENT_MODULE_STATE,
 };
 
-/// The EmitC dialect is currently missing operations to cleanly represent some
-/// constructs we need for the C target. This includes storage class specifiers
-/// on functions, forward declarations of functions, globals and arrays.
-/// As a workaround the conversion currently adds bits of information via
-/// attributes that later get used by the CModuleTarget.
-void attachAttribute(Operation *op, StringRef name, Attribute value) {
-  op->setAttr(name, value);
-}
-
 /// Create a call to memset to clear a struct
 LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto loc = structValue.getLoc();
@@ -1168,7 +1159,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - global
 ///     - structured preprocessor directive
 ///     - struct definition
-///     - remove all uses of `attachAttribute`
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
