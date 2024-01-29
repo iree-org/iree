@@ -197,6 +197,17 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     linalg::DistributionMethod distributionMethod,
     int32_t maxWorkgroupParallelDims = kNumMaxParallelDims);
 
+// Helper to construct the strategy attribute dictionary for a pipeline that
+// does software pipelining.
+DictionaryAttr
+getSoftwarePipeliningAttrDict(MLIRContext *context,
+                              unsigned softwarePipelineDepth = 0,
+                              unsigned softwarePipelineStoreStage = 1);
+
+// Helpers to extract the pipelining configuration from the config dictionary.
+FailureOr<int64_t> getSoftwarePipelineDepth(DictionaryAttr);
+FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr);
+
 //===---------------------------------------------------------------------===//
 // Misc. utility functions.
 //===---------------------------------------------------------------------===//

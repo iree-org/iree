@@ -348,8 +348,9 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
 
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize, subgroupSize,
-            softwarePipelineDepth,
-            /*softwarePipelineStoreStage=*/1);
+            getSoftwarePipeliningAttrDict(op->getContext(),
+                                          softwarePipelineDepth,
+                                          /*softwarePipelineStoreStage=*/1));
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =

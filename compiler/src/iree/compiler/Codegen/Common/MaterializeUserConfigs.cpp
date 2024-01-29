@@ -89,10 +89,9 @@ struct MaterializeUserConfigsPass
               : clCodegenTransformDialectStrategyName;
       clTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
           context, tdPipeline,
-          /*softwarePipelineDepth=*/0,
-          /*softwarePipelineStoreStage=*/1,
           /*codegenSpec=*/
-          SymbolRefAttr::get(context, llvm::StringRef(strategyName)));
+          SymbolRefAttr::get(context, llvm::StringRef(strategyName)),
+          /*configuration=*/DictionaryAttr());
       LDBG("--clTranslationInfo: " << clTranslationInfo);
     }
 
