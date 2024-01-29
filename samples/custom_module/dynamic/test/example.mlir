@@ -6,6 +6,14 @@
 // RUN:     --function=main | \
 // RUN: FileCheck %s
 
+// RUN: ( iree-compile %s --iree-hal-target-backends=vmvx | \
+// RUN: iree-run-module \
+// RUN:     --device=local-sync \
+// RUN:     --module=$IREE_BINARY_DIR/samples/custom_module/dynamic/module$IREE_DYLIB_EXT@create_custom_module \
+// RUN:     --module=- \
+// RUN:     --function=error 2>&1 || [[ $? == 1 ]] ) | \
+// RUN: FileCheck %s --check-prefix=CERROR
+
 module @example {
   //===--------------------------------------------------------------------===//
   // Imports
@@ -20,6 +28,9 @@ module @example {
 
   // Prints the contents of the string to stdout.
   func.func private @custom.string.print(!custom.string)
+
+  // Always returns unknown status with a custom annotation.
+  func.func private @custom.error()
 
   //===--------------------------------------------------------------------===//
   // Sample methods
@@ -41,4 +52,13 @@ module @example {
 
     return
   }
+
+  // CERROR-LABEL: EXEC @error
+  func.func @error() {
+    // Show an example of emitting an error
+    // CERROR-NEXT: UNKNOWN
+    call @custom.error() : () -> ()
+    return
+  }
+
 }

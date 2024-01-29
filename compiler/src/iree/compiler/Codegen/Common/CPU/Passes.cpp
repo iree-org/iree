@@ -22,7 +22,8 @@ static FailureOr<Value> cpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
                                         unsigned alignment) {
-  auto funcOp = builder.getInsertionPoint()->getParentOfType<func::FuncOp>();
+  auto funcOp =
+      builder.getInsertionPoint()->getParentOfType<mlir::FunctionOpInterface>();
   if (funcOp) {
     std::optional<Value> hoistedAllocation =
         hoistOneStaticallyBoundAllocation<memref::AllocaOp>(

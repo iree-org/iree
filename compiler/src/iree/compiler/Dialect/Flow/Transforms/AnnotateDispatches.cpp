@@ -14,7 +14,6 @@
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -314,11 +313,10 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto encoding = op.getResultType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
-        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
-                      loopRangesToString(shape);
+        bestSummary =
+            opName + "_" + role.str() + "_" + loopRangesToString(shape);
         ;
       })
       .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
@@ -326,11 +324,10 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto encoding = op.getSourceType()
                             .getEncoding()
                             .template cast<IREE::LinalgExt::EncodingAttr>();
-        auto user = stringifyEnum(encoding.getUser().getValue());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
-        bestSummary = opName + "_" + user.str() + "_" + role.str() + "_" +
-                      loopRangesToString(shape);
+        bestSummary =
+            opName + "_" + role.str() + "_" + loopRangesToString(shape);
       })
       .Case<IREE::LinalgExt::LinalgExtOp>(
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })
@@ -379,7 +376,7 @@ public:
             &getContext(), executableOp.getName(),
             {SymbolRefAttr::get(&getContext(), exportOp.getSymName())});
 
-        auto funcOp = innerModuleOp.lookupSymbol<FunctionOpInterface>(
+        auto funcOp = innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
             exportOp.getFunctionRef());
         if (!funcOp)
           continue; // extern module, maybe
@@ -402,8 +399,8 @@ public:
 
     // Replace each usage of an entry point with its original symbol name with a
     // new symbol name.
-    for (auto funcLikeOp : getOperation().getOps<FunctionOpInterface>()) {
-      funcLikeOp->walk([&](IREE::Flow::DispatchOp dispatchOp) {
+    for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
+      funcOp->walk([&](IREE::Flow::DispatchOp dispatchOp) {
         SmallVector<Attribute> replacementRefs;
         for (auto originalRef : dispatchOp.getEntryPointRefs()) {
           auto it = entryPointRefReplacements.find(originalRef);

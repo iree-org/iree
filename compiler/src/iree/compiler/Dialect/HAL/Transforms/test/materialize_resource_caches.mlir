@@ -250,7 +250,7 @@ util.initializer {
   %device = hal.devices.get %c0 : !hal.device
   %descriptor_set_layout = hal.descriptor_set_layout.create device(%device : !hal.device) flags("None") bindings([#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]) : !hal.descriptor_set_layout
   util.global.store %descriptor_set_layout, @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-  util.initializer.return
+  util.return
 }
 
 util.global private @_pipeline_layout_0 : !hal.pipeline_layout
@@ -260,7 +260,7 @@ util.initializer {
   %device = hal.devices.get %c0 : !hal.device
   %pipeline_layout = hal.pipeline_layout.create device(%device : !hal.device) push_constants(0) layouts([%_descriptor_set_layout_0]) : !hal.pipeline_layout
   util.global.store %pipeline_layout, @_pipeline_layout_0 : !hal.pipeline_layout
-  util.initializer.return
+  util.return
 }
 
 util.global private @_executable_exe : !hal.executable
@@ -281,7 +281,7 @@ util.initializer {
     scf.yield %null : !hal.executable
   }
   util.global.store %selected, @_executable_exe : !hal.executable
-  util.initializer.return
+  util.return
 }
 
 hal.executable @exe {

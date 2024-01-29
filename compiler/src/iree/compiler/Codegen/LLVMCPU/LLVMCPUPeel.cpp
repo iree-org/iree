@@ -93,7 +93,8 @@ void LLVMCPUPeelPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUPeelPass() {
   return std::make_unique<LLVMCPUPeelPass>();
 }
 

@@ -30,7 +30,6 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/Path.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/WithColor.h"
@@ -59,7 +58,7 @@ struct CUDAOptions {
   bool clUsePtxas = false;
   std::string clUsePtxasFrom;
   std::string clUsePtxasParams;
-  bool enableLegacySync = true;
+  bool enableLegacySync = false;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("CUDA HAL Target");
@@ -502,14 +501,6 @@ public:
       }
     } else {
       ModuleOp innerModuleOp = variantOp.getInnerModule();
-
-      // Remove all the functions that are not part of the CUDA kernel.
-      // TODO(thomasraoux): remove this? this should not be required.
-      auto illegalFuncOps =
-          llvm::to_vector<4>(innerModuleOp.getOps<func::FuncOp>());
-      for (auto funcOp : illegalFuncOps) {
-        funcOp.erase();
-      }
 
       auto llvmModule =
           mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);

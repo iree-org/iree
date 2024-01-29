@@ -10,9 +10,9 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-spirv-verifier"
 
@@ -50,7 +50,7 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
   const auto limits = targetEnv.getResourceLimits();
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
-  auto funcOp = op->getParentOfType<func::FuncOp>();
+  auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize)
     return funcOp->emitError("failed to query subgroup size");
@@ -155,7 +155,7 @@ LogicalResult verifySPIRVCooperativeMatrixVectorizePassPipeline(
   const auto limits = targetEnv.getResourceLimits();
   LLVM_DEBUG(llvm::dbgs() << "target environment: " << targetEnvAttr << "\n");
 
-  auto funcOp = op->getParentOfType<func::FuncOp>();
+  auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   const std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize)
     return funcOp->emitError("failed to query subgroup size");

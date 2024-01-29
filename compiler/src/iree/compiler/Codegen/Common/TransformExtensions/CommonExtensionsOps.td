@@ -168,34 +168,6 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyCommonSubexpressionEliminationOp : Op<Transform_Dialect, "iree.apply_cse",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Apply common subexpression elimination. This transform is applied to all
-    ops within the target that are isolated from above.
-
-    #### Return modes
-
-    This operation does not consume the target handle and does not produce any
-    handle.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let assemblyFormat = "$target attr-dict `:` type($target)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
 def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
@@ -248,7 +220,7 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -384,7 +356,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -533,7 +505,7 @@ def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -570,7 +542,7 @@ def TestVectorLayoutAnalysisOp :
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::func::FuncOp funcOp,
+          ::mlir::FunctionOpInterface funcOp,
           ::mlir::transform::ApplyToEachResultList &results,
           ::mlir::transform::TransformState &state);
     }];
@@ -590,7 +562,7 @@ def TestGpuVectorDistribution :
     "__vector_layout_test_anchor_result_x", where "x" is the operand/result
     number.
 
-    The distribution is done over a 3D thread grid, using the 
+    The distribution is done over a 3D thread grid, using the
     gpu.thread x, y, z thread grid.
 
     #### Return modes
@@ -607,7 +579,7 @@ def TestGpuVectorDistribution :
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::func::FuncOp funcOp,
+          ::mlir::FunctionOpInterface funcOp,
           ::mlir::transform::ApplyToEachResultList &results,
           ::mlir::transform::TransformState &state);
     }];
@@ -636,7 +608,7 @@ def GpuDistributeSharedMemoryCopyOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-cleanup-buffer-alloc-view --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-codegen-cleanup-buffer-alloc-view))" --split-input-file | FileCheck %s
 
 func.func @alloc_remove(%arg0: index, %arg1: index) {
   %0 = memref.alloc(%arg0, %arg1) : memref<?x?xf32>

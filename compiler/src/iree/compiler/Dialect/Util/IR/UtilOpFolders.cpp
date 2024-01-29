@@ -12,7 +12,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -538,7 +537,7 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
     if (op.getBody().getBlocks().size() != 1)
       return failure();
     auto &block = op.getBody().front();
-    if (block.empty() || isa<InitializerReturnOp>(block.front())) {
+    if (block.empty() || isa<IREE::Util::ReturnOp>(block.front())) {
       rewriter.eraseOp(op);
       return success();
     }
@@ -565,7 +564,7 @@ struct InlineConstantGlobalInitializer
       auto globalOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
 
       deadOps.push_back(storeOp);
@@ -744,7 +743,7 @@ struct FoldBufferSubspanOpsIntoConsumers
           fusedLoc, op.getSourceOffset(), oldRange.offset);
       auto newRange = SubrangeOperand{op.getSource(), op.getSourceSize(),
                                       newOffset, oldRange.length};
-      rewriter.updateRootInPlace(subrangeOp, [&]() {
+      rewriter.modifyOpInPlace(subrangeOp, [&]() {
         subrangeOp.setSubrangeOperand(use.getOperandNumber(), newRange);
       });
     }
@@ -893,7 +892,7 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
     rewriter.setInsertionPointAfter(op);
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, subspanOp.getSourceOffset(), op.getOffset());
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getOperandMutable().assign(subspanOp.getSource());
       op.getOperandSizeMutable().assign(subspanOp.getSourceSize());
       SmallPtrSet<Operation *, 2> exceptions;

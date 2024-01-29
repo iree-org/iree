@@ -218,13 +218,6 @@ public:
 
     ModuleOp innerModuleOp = variantOp.getInnerModule();
 
-    // Remove all the functions that are not part of the ROCM kernel.
-    // TODO: Find a better solution to handle this.
-    auto illegalFuncOps = llvm::to_vector(innerModuleOp.getOps<func::FuncOp>());
-    for (auto funcOp : illegalFuncOps) {
-      funcOp.erase();
-    }
-
     auto llvmModule =
         mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
     if (!llvmModule) {
@@ -338,7 +331,7 @@ public:
       return failure();
     }
 
-    if (!options.enableROCMUkernels.empty() ||
+    if (!options.enableROCMUkernels.empty() &&
         options.enableROCMUkernels != "none") {
       auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
       linkUkernelBCFiles(llvmModule.get(), variantOp.getLoc(),

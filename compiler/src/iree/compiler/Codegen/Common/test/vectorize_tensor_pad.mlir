@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --mlir-print-local-scope --iree-codegen-vectorize-tensor-pad --canonicalize -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --mlir-print-local-scope --pass-pipeline="builtin.module(func.func(iree-codegen-vectorize-tensor-pad),canonicalize,cse)" %s | FileCheck %s
 
 // Note: A pull request is open to upstream this pattern:
 //   https://reviews.llvm.org/D117021

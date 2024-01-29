@@ -82,7 +82,7 @@ util.initializer {
   %c0_i64 = arith.constant 0 : i64
   // CHECK: = stream.async.dispatch @__builtin_splat_i64::@__builtin_splat_i64
   %0 = stream.async.splat %c0_i64 : i64 -> !stream.resource<*>{%c128}
-  util.initializer.return
+  util.return
 }
 
 // CHECK: stream.executable private @__builtin_splat_i64

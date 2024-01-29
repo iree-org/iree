@@ -120,8 +120,8 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
         staticShape, padOp.getResultType().getElementType(),
         padOp.getResultType().getEncoding());
 
-    rewriter.updateRootInPlace(
-        padOp, [&]() { padOp.getResult().setType(resultType); });
+    rewriter.modifyOpInPlace(padOp,
+                             [&]() { padOp.getResult().setType(resultType); });
     return success();
   }
 };
@@ -135,7 +135,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     {
       RewritePatternSet patterns(context);
@@ -156,7 +156,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConcretizePadResultShapePass() {
   return std::make_unique<ConcretizePadResultShapePass>();
 }

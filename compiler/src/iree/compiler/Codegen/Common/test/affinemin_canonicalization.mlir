@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-affinemin-scf-canonicalization -canonicalize %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-affinemin-scf-canonicalization),canonicalize)" %s | FileCheck %s
 
 // CHECK-LABEL: scf_for_distributed
 func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,

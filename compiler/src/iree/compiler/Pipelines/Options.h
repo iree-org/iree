@@ -94,6 +94,15 @@ struct GlobalOptimizationOptions {
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
+  // File path to create a parameter archive out of global initial values.
+  std::string parameterArchiveExportPath = "";
+
+  // Optional scope to use for the created parameter archive.
+  std::string parameterExportScope = "";
+
+  // Minimum size of constants to export as parameters.
+  int64_t minimumParameterExportSize = 256;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
 };

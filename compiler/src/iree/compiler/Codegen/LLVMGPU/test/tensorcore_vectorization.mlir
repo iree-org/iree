@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmgpu-tensorcore-vectorization %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tensorcore-vectorization))" %s | FileCheck %s
 
 func.func @dot() {
   %c16 = arith.constant 16 : index

@@ -259,7 +259,7 @@ def _parse_arguments():
         "--shard_count",
         type=_parse_shard_count,
         default={},
-        help="Accepts a comma-separated list of device-name to shard-count mappings. Use reserved keyword 'default' for setting a default shard count: c2-standard-16=3,default=2",
+        help="Accepts a comma-separated list of device-name to shard-count mappings. Use reserved keyword 'default' for setting a default shard count: c2-standard-60=3,default=2",
     )
 
     compilation_parser = subparser.add_parser(

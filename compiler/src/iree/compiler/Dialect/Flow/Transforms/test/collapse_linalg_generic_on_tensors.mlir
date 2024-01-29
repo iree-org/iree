@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-form-dispatch-regions{fuse-multi-use=true}, iree-flow-clone-producers-into-dispatch-regions, iree-flow-collapse-dimensions, cse))" %s | FileCheck %s
 !type = tensor<2x4x8x16x32x64xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 
 func.func @collapse1() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
@@ -35,7 +35,7 @@ func.func @collapse1() -> !type {
 // -----
 
 !type = tensor<2x4x8x32x32x64x128xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 
 func.func @collapse2() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
@@ -70,7 +70,7 @@ func.func @collapse2() -> !type {
 
 // -----
 !type = tensor<2x4x8x16x32x64x128x256xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 
 func.func @collapse3() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
@@ -105,7 +105,7 @@ func.func @collapse3() -> !type {
 // -----
 
 !type = tensor<2x4x8x16x64x64x128x256xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 func.func @collapse4() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -140,7 +140,7 @@ func.func @collapse4() -> !type {
 // -----
 
 !type = tensor<2x4x32x32x32x64x128x256xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 func.func @collapse5() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -183,7 +183,7 @@ func.func @collapse5() -> !type {
 // -----
 
 !type = tensor<32x2x4x8x16x16x64x128xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 func.func @collapse6() -> !type {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -219,7 +219,7 @@ func.func @collapse6() -> !type {
 
 !type_out = tensor<2x4x8x16xf32>
 !type_in = tensor<2x4x8xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type_in
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type_in
 func.func @collapse7() -> !type_out {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -310,7 +310,7 @@ func.func @dont_collapse() -> !type_out {
 
 !type_in = tensor<2x4x8x16x32x64x128x256xf32>
 !type_out = tensor<2x4x16x64x32x128x256xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type_in
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type_in
 
 func.func @collapse9() -> !type_out {
   %cst = arith.constant 0.000000e+00 : f32
@@ -421,7 +421,7 @@ func.func @dont_collapse_dueto_index(%height : index, %width : index) -> !type {
 // -----
 
 !type = tensor<2x4x8x16x32x64xf32>
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : !type
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : !type
 
 func.func @collapse12() -> (!type,!type,!type,!type) {
   %cst = arith.constant 0.000000e+00 : f32

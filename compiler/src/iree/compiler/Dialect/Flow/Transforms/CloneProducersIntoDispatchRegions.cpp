@@ -25,7 +25,7 @@ struct CloneProducersIntoDispatchRegionPass
     : public CloneProducersIntoDispatchRegionsBase<
           CloneProducersIntoDispatchRegionPass> {
   void runOnOperation() override {
-    FunctionOpInterface funcOp = getOperation();
+    mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
 
     funcOp->walk([&](DispatchRegionOp regionOp) {

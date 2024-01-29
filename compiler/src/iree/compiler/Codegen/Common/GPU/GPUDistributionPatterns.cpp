@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -85,52 +86,27 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
   return simdIndex;
 }
 
-/// Given the state of the iterator, compute the indices of the distributed
-/// vector that the current iterator state is iterating over. The indices
-/// are not parameterized by thread, and it is expected that the indices for
-/// all threads are same.
-static SmallVector<int64_t> computeSIMTIndex(const LayoutIterator::State &state,
-                                             LayoutAttr layout) {
-  constexpr LayoutDimension labels[] = {
-      LayoutDimension::BATCHX, LayoutDimension::BATCHY,
-      LayoutDimension::VECTORZ, LayoutDimension::VECTORY,
-      LayoutDimension::VECTORX};
-
-  SmallVector<int64_t> offset;
-  for (LayoutDimension label : labels) {
-    std::optional shape = findDimShape(layout, label);
-    if (!shape) {
-      continue;
-    }
-    // Get current position for the label.
-    int64_t position = state.lookup(label).getPosition();
-    offset.push_back(position);
-  }
-  return offset;
-}
-
 struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    Value constantResult = constantOp.getResult();
-    if (!isa<VectorType>(constantResult.getType()))
+    auto constant = dyn_cast<VectorValue>(constantOp.getResult());
+    if (!constant)
       return failure();
-    auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
     auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!attr)
       return failure();
 
-    VectorLayoutInterface layout = signature.results[0];
+    VectorLayoutInterface layout = signature[constant];
 
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
-    auto vectorType = VectorType::get(
-        layout.getDistributedShape(constant.getType()), elementType);
+    auto vectorType =
+        VectorType::get(layout.getDistributedShape(), elementType);
     Operation *distirbutedOp = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), vectorType,
         SplatElementsAttr::get(vectorType, attr.getSplatValue<Attribute>()));
@@ -148,26 +124,24 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
                                 PatternRewriter &rewriter) const override {
     // Get the distributed operands.
     SmallVector<Value> operands;
-    for (auto [operand, opLayout] :
-         llvm::zip(op->getOperands(), signature.operands)) {
+    for (Value operand : op->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      opLayout);
+                                                      signature[vectorOperand]);
       }
       operands.push_back(operand);
     }
 
     // Get the new distributed vector types for the operation.
     SmallVector<Type> resultTypes;
-    for (auto [result, resLayout] :
-         llvm::zip(op->getResults(), signature.results)) {
+    for (Value result : op->getResults()) {
       Type resultType = result.getType();
 
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
-        resultType = VectorType::get(
-            resLayout.getDistributedShape(vectorResult.getType()),
-            vectorResult.getType().getElementType());
+        VectorLayoutInterface resLayout = signature[vectorResult];
+        resultType = VectorType::get(resLayout.getDistributedShape(),
+                                     vectorResult.getType().getElementType());
       }
       resultTypes.push_back(resultType);
     }
@@ -248,7 +222,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     iterator.apply([&](const LayoutIterator::State &state) {
       SmallVector<Value> memoryIndices =
           getMemoryIndices(state, memoryLayout, xferOp.getIndices(), rewriter);
-      SmallVector<int64_t> accIndices = computeSIMTIndex(state, vectorLayout);
+      SmallVector<int64_t> accIndices = state.computeSIMTIndex();
       accumulator = accessUnit(xferOp, memoryIndices, accIndices, accumulator,
                                vectorLayout, memoryLayout, rewriter);
     });
@@ -301,8 +275,8 @@ struct DistributeTransferReadLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = readOp.getVector();
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.results[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[readOp.getResult()]);
     if (!vectorLayout) {
       return failure();
     }
@@ -310,8 +284,8 @@ struct DistributeTransferReadLayoutAttr final
     // TODO: Return failure if we need masking.
 
     Type elementType = readOp.getSource().getType().getElementType();
-    auto vectorType = VectorType::get(
-        vectorLayout.getDistributedShape(vector.getType()), elementType);
+    auto vectorType =
+        VectorType::get(vectorLayout.getDistributedShape(), elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
@@ -345,8 +319,8 @@ struct DistributeTransferWriteLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    VectorValue vector = writeOp.getVector();
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.operands[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[writeOp.getVector()]);
     if (!vectorLayout) {
       return failure();
     }
@@ -354,8 +328,8 @@ struct DistributeTransferWriteLayoutAttr final
     // TODO: Return failure if we need masking.
 
     Type elementType = writeOp.getSource().getType().getElementType();
-    auto vectorType = VectorType::get(
-        vectorLayout.getDistributedShape(vector.getType()), elementType);
+    auto vectorType =
+        VectorType::get(vectorLayout.getDistributedShape(), elementType);
     Value zero = rewriter.create<arith::ConstantOp>(
         writeOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);

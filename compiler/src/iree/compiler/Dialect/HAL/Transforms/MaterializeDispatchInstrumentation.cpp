@@ -152,7 +152,7 @@ struct MaterializeDispatchInstrumentationPass
           /*uninitialized=*/true, /*affinity=*/nullptr);
       initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, buffer,
                                                            globalOp);
-      initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+      initializerBuilder.create<IREE::Util::ReturnOp>(loc);
     }
 
     FlatbufferBuilder metadataBuilder;
@@ -183,22 +183,17 @@ struct MaterializeDispatchInstrumentationPass
             instrumentedExports.size();
 
         // Update function signature to add the ringbuffer and dispatch ID.
-        auto funcType = funcOp.getFunctionType();
-        SmallVector<Type> argTypes(funcType.getInputs());
+        SmallVector<Type> argTypes(funcOp.getArgumentTypes());
         argTypes.push_back(bindingType);
         argTypes.push_back(i32Type);
-        funcOp.setFunctionType(
-            FunctionType::get(&getContext(), argTypes, funcType.getResults()));
+        funcOp.setType(FunctionType::get(&getContext(), argTypes,
+                                         funcOp.getResultTypes()));
         auto bindingArg = funcOp.front().addArgument(bindingType, loc);
         auto dispatchIdArg = funcOp.front().addArgument(i32Type, loc);
-
-        // Fix up arg attrs (yuck).
-        SmallVector<DictionaryAttr> argAttrs;
-        funcOp.getAllArgAttrs(argAttrs);
-        argAttrs.push_back(DictionaryAttr::get(
-            &getContext(), {NamedAttribute(alignmentKey, alignment64)}));
-        argAttrs.push_back(DictionaryAttr::get(&getContext(), {}));
-        funcOp.setAllArgAttrs(argAttrs);
+        funcOp.setArgAttrs(
+            bindingArg.getArgNumber(),
+            DictionaryAttr::get(&getContext(),
+                                {NamedAttribute(alignmentKey, alignment64)}));
 
         // Insert the workgroup instrumentation. Note that this happens before
         // codegen would do tile-and-distribute, but that's ok as it should just
@@ -232,8 +227,8 @@ struct MaterializeDispatchInstrumentationPass
     // instrumentation buffer.
     SmallVector<iree_instruments_DispatchSiteDef_ref_t> dispatchSiteRefs;
     uint32_t dispatchSiteCount = 0;
-    for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-      funcLikeOp.walk([&](IREE::Stream::CmdExecuteOp executeOp) {
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+      funcOp.walk([&](IREE::Stream::CmdExecuteOp executeOp) {
         auto parentBuilder = OpBuilder(executeOp);
 
         // Load the ringbuffer and capture it for use within the execute region.

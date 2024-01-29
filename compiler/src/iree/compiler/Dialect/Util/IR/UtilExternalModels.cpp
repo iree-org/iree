@@ -100,14 +100,30 @@ struct GlobalOpInterfaceExternalModel
     ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(*ctx);
   }
 
-  Attribute getGlobalInitialValue(::mlir::Operation *op) const {
+  Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
   }
-  void setGlobalInitialValue(::mlir::Operation *op, Attribute value) const {
+  void setGlobalInitialValue(Operation *op, Attribute value) const {
     if (value) {
       cast<ml_program::GlobalOp>(op).setValueAttr(value);
     } else {
       cast<ml_program::GlobalOp>(op).removeValueAttr();
+    }
+  }
+
+  IREE::Util::InliningPolicyAttrInterface
+  getGlobalInliningPolicy(Operation *op) const {
+    if (op->hasAttr("noinline"))
+      return IREE::Util::InlineNeverAttr::get(op->getContext());
+    return {};
+  }
+  void
+  setGlobalInliningPolicy(Operation *op,
+                          IREE::Util::InliningPolicyAttrInterface value) const {
+    if (isa_and_nonnull<IREE::Util::InlineNeverAttr>(value)) {
+      op->setAttr("noinline", UnitAttr::get(op->getContext()));
+    } else {
+      op->removeAttr("noinline");
     }
   }
 };

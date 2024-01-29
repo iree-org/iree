@@ -17,8 +17,8 @@ namespace mlir::iree_compiler {
 /// Constructs a pipeline of passes across multiple nested op types.
 ///
 /// Usage:
-///   using FunctionLikeNest = MultiOpNest<func::FuncOp,
-///                                        IREE::Util::InitializerOp>;
+///   using FunctionLikeNest = MultiOpNest<IREE::Util::InitializerOp,
+///                                        IREE::Util::FuncOp>;
 ///
 ///   FunctionLikeNest(passManager)
 ///     .addPass(createMyPass)

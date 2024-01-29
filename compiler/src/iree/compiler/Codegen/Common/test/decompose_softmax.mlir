@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --iree-codegen-decompose-softmax -cse %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-codegen-decompose-softmax=use-fusion=true -cse %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-codegen-decompose-softmax=use-fusion=false -cse %s | FileCheck %s --check-prefix=CHECK-NO-FUSE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax),cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax{use-fusion=true}),cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax{use-fusion=false}),cse)" %s | FileCheck %s --check-prefix=CHECK-NO-FUSE
 
 func.func @softmax(%arg0: tensor<2x16x32xf32>) -> tensor<2x16x32xf32> {
   %0 = tensor.empty() : tensor<2x16x32xf32>

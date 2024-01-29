@@ -8,7 +8,6 @@
 #include "iree/compiler/Reducer/Strategies/DeltaStrategies.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 

@@ -181,7 +181,7 @@ vm.module @control_flow_ops {
 
   vm.func private @_return_arg_cycling(%arg0 : !vm.buffer, %arg1: !vm.buffer,
                                        %arg2: !vm.buffer)
-      -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {noinline} {
+      -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {inlining_policy = #util.inline.never} {
     vm.return %arg1, %arg2, %arg0 : !vm.buffer, !vm.buffer, !vm.buffer
   }
 
@@ -203,7 +203,7 @@ vm.module @control_flow_ops {
 
   vm.func private @_branch_arg_cycling(%arg0 : !vm.buffer, %arg1: !vm.buffer,
                                        %arg2: !vm.buffer, %arg3: i32)
-      -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {noinline} {
+      -> (!vm.buffer, !vm.buffer, !vm.buffer) attributes {inlining_policy = #util.inline.never} {
     vm.cond_br %arg3,
                ^bb1(%arg0, %arg1, %arg2: !vm.buffer, !vm.buffer, !vm.buffer),
                ^bb2(%arg1, %arg2, %arg0, %arg3: !vm.buffer, !vm.buffer, !vm.buffer, i32)
@@ -214,7 +214,7 @@ vm.module @control_flow_ops {
     vm.return %d, %e, %f : !vm.buffer, !vm.buffer, !vm.buffer
   }
 
-  vm.func private @_side_effect(%arg0: i32) attributes {noinline}
+  vm.func private @_side_effect(%arg0: i32) attributes {inlining_policy = #util.inline.never}
   {
     vm.return
   }

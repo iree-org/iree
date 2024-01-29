@@ -33,7 +33,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorOperand));
       continue;
     }
-    operands.push_back(VectorLayoutInterface());
+    operands.push_back(UnitAttr::get(op->getContext()));
   }
 
   for (Value result : op->getResults()) {
@@ -42,7 +42,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorResult));
       continue;
     }
-    results.push_back(VectorLayoutInterface());
+    results.push_back(UnitAttr::get(op->getContext()));
   }
 
   ArrayAttr operandsAttr = ArrayAttr::get(op->getContext(), operands);
@@ -65,31 +65,37 @@ static DistributionSignature getOpSignature(Operation *op) {
   ArrayAttr operandsAttr = dyn_cast<ArrayAttr>(signatureAttr[0]);
   ArrayAttr resultsAttr = dyn_cast<ArrayAttr>(signatureAttr[1]);
   assert(operandsAttr && resultsAttr && "Malformed signature attribute.");
+  assert(operandsAttr.size() == op->getNumOperands() &&
+         "Malformed signature attribute.");
+  assert(resultsAttr.size() == op->getNumResults() &&
+         "Malformed signature attribute.");
 
   DistributionSignature signature;
-  for (Attribute operandAttr : operandsAttr) {
+
+  auto addLayoutToSignature([&](Value value, Attribute layout) {
     // Ignore null attributes.
-    if (!operandAttr) {
-      signature.operands.push_back(VectorLayoutInterface());
-      continue;
+    if (isa<UnitAttr>(layout)) {
+      assert(!isa<VectorValue>(value) &&
+             "Malformed signature attribute: unit attribute for vector value.");
+      return;
     }
 
-    auto operandLayout = cast<VectorLayoutInterface>(operandAttr);
-    assert(operandLayout && "Malformed signature attribute.");
-    signature.operands.push_back(operandLayout);
+    assert(isa<VectorValue>(value) &&
+           "Malformed signature attribute: non-unit attribute for non-vector "
+           "value.");
+    auto vector = cast<VectorValue>(value);
+
+    auto vectorLayout = cast<VectorLayoutInterface>(layout);
+    assert(vectorLayout && "Malformed signature attribute.");
+    signature[vector] = vectorLayout;
+  });
+
+  for (auto [value, layout] :
+       llvm::zip_equal(op->getOperands(), operandsAttr)) {
+    addLayoutToSignature(value, layout);
   }
-
-  for (Attribute resultAttr : resultsAttr) {
-    // Ignore null attributes.
-    if (!resultAttr) {
-      signature.results.push_back(VectorLayoutInterface());
-      continue;
-    }
-
-    VectorLayoutInterface resultLayout =
-        cast<VectorLayoutInterface>(resultAttr);
-    assert(resultLayout && "Malformed signature attribute.");
-    signature.results.push_back(resultLayout);
+  for (auto [value, layout] : llvm::zip_equal(op->getResults(), resultsAttr)) {
+    addLayoutToSignature(value, layout);
   }
 
   return signature;
@@ -103,8 +109,7 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
     return cast<VectorValue>(toSIMD.getInput());
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
-  SmallVector<int64_t> distributedShape =
-      layout.getDistributedShape(value.getType());
+  SmallVector<int64_t> distributedShape = layout.getDistributedShape();
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-annotate-winograd-loops %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-annotate-winograd-loops))" %s | FileCheck %s
 
 func.func @_wino_input_dispatch_0() {
   %c0 = arith.constant 0 : index

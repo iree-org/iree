@@ -88,9 +88,8 @@ struct TensorPadToTensorInsertSlicePass
   TensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
       : skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
-                mlir::math::MathDialect, mlir::arith::ArithDialect>();
+    registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
+                    mlir::math::MathDialect, mlir::arith::ArithDialect>();
   }
 
   LogicalResult initializeOptions(StringRef options) override {

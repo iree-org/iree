@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 using namespace mlir;
 

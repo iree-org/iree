@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
@@ -21,6 +22,7 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -170,6 +172,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUTensorTileToSerialLoops());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
 
@@ -430,7 +434,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-  auto getSubgroupSizeFn = [](func::FuncOp func) -> int {
+  auto getSubgroupSizeFn = [](mlir::FunctionOpInterface func) -> int {
     auto moduleOp = func->getParentOfType<ModuleOp>();
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
         getAllEntryPoints(moduleOp);
@@ -558,8 +562,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  auto getSharedMemoryLimit = [](func::FuncOp) { return 163 * 1024; };
-  auto getIndexBitwidth = [](func::FuncOp) { return 64; };
+  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface) {
+    return 163 * 1024;
+  };
+  auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
@@ -574,8 +580,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   // Convert BF16 operations to occur as F32.
   pm.addPass(createConvertBf16ArithToF32Pass());
   pm.addPass(createConvertBf16ToUInt16BuffersPass());
-
-  pm.addNestedPass<func::FuncOp>(arith::createArithExpandOpsPass());
 
   // math dialect elementry functions -> polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());

@@ -78,7 +78,7 @@ module attributes {transform.with_named_sequence} {
         transform.apply_patterns.canonicalization
         transform.apply_patterns.linalg.tiling_canonicalization
       } : !transform.any_op
-      transform.iree.apply_cse %func : !transform.any_op
+      transform.apply_cse to %func : !transform.any_op
       transform.yield
     }
 }

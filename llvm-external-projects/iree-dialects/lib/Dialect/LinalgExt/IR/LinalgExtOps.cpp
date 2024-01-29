@@ -10,7 +10,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -823,7 +822,7 @@ FftOp::getTiledImplementation(OpBuilder &builder,
   for (auto out : getOutputs()) {
     tiledOperands.push_back(
         getSlice(builder, getLoc(), out, offsets, sizes, strides));
-    if (hasTensorSemantics()) {
+    if (hasPureTensorSemantics()) {
       resultTypes.push_back(tiledOperands.back().getType());
     }
   }
@@ -1037,7 +1036,7 @@ ScanOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
+  if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[1].getType());
     resultTypes.push_back(tiledOperands[2].getType());
   }
@@ -1182,7 +1181,7 @@ ReverseOp::getTiledImplementation(OpBuilder &builder,
       getSlice(builder, loc, input(), offsets, sizes, strides));
 
   SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
+  if (hasPureTensorSemantics()) {
     tiledOperands.emplace_back(
         getSlice(builder, loc, output(), mirrorOffsets, sizes, strides));
     resultTypes.push_back(tiledOperands[1].getType());
@@ -1462,7 +1461,7 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(
       getSlice(builder, loc, getOutputs()[1], offsets, outputSizes, strides));
   SmallVector<Type, 2> resultTypes;
-  if (hasTensorSemantics()) {
+  if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 2].getType());
     resultTypes.push_back(tiledOperands[tiledOperands.size() - 1].getType());
   }
@@ -2224,7 +2223,7 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
                                       outputSizes, outputStrides));
 
   SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
+  if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[1].getType());
   }
 
@@ -2396,7 +2395,7 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
                                       outputSizes, outputStrides));
 
   SmallVector<Type, 4> resultTypes;
-  if (hasTensorSemantics()) {
+  if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[1].getType());
   }
 
@@ -2583,7 +2582,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
                                       queryOutputStrides));
 
   SmallVector<Type> resultTypes;
-  if (hasTensorSemantics())
+  if (hasPureTensorSemantics())
     resultTypes.push_back(tiledOperands[3].getType());
 
   Operation *tiledOp =

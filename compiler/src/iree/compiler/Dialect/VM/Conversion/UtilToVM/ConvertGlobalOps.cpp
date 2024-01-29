@@ -38,12 +38,11 @@ struct InitializerOpConversion
   }
 };
 
-struct InitializerReturnOpConversion
-    : public OpConversionPattern<IREE::Util::InitializerReturnOp> {
+struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult
-  matchAndRewrite(IREE::Util::InitializerReturnOp op, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(op);
     return success();
@@ -282,10 +281,10 @@ void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns) {
-  conversionTarget.addIllegalOp<IREE::Util::InitializerOp,
-                                IREE::Util::InitializerReturnOp>();
-  patterns.insert<InitializerOpConversion, InitializerReturnOpConversion>(
-      typeConverter, context);
+  conversionTarget
+      .addIllegalOp<IREE::Util::InitializerOp, IREE::Util::ReturnOp>();
+  patterns.insert<InitializerOpConversion, ReturnOpConversion>(typeConverter,
+                                                               context);
 
   conversionTarget.addIllegalOp<
       IREE::Util::GlobalOp, IREE::Util::GlobalAddressOp,

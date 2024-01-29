@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-hoist-vector-extract-insert-slice %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-hoist-vector-extract-insert-slice))" %s | FileCheck %s
 
 func.func @hoist_unrolled_vector_for_mma() {
   %c0 = arith.constant 0 : index

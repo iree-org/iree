@@ -40,7 +40,7 @@ module attributes { transform.with_named_sequence } {
     transform.apply_patterns to %variant_op {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %variant_op : !transform.any_op
+    transform.apply_cse to %variant_op : !transform.any_op
 
     // Step 2. Second level of tiling + fusion parallelizes to threads.
     // ================================================================

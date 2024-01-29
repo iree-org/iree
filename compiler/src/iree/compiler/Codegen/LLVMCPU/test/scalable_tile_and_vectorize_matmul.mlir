@@ -1,7 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN: --iree-llvmcpu-tile-and-fuse=tiling-level=1 \
-// RUN: --iree-llvmcpu-tile=tiling-level=2 \
-// RUN: --iree-codegen-generic-vectorization=enable-vector-masking %s | FileCheck %s
+// RUN: --pass-pipeline="builtin.module(func.func(iree-llvmcpu-tile-and-fuse{tiling-level=1},iree-llvmcpu-tile{tiling-level=2},iree-codegen-generic-vectorization{enable-vector-masking}))" %s | FileCheck %s
 
 // -----
 

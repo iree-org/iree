@@ -304,7 +304,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     ArrayRef<Value> operands, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
-  if (!linalgOp.hasTensorSemantics())
+  if (!linalgOp.hasPureTensorSemantics())
     return failure();
 
   auto inputs = linalgOp.getDpsInputOperands();
@@ -320,13 +320,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     return failure();
   }
 
-  if (((!isMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-        !isMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-        !isMatmulEncodingUser(resultEncoding.getUser().getValue())) &&
-       (!isBatchMatmulEncodingUser(lhsEncoding.getUser().getValue()) ||
-        !isBatchMatmulEncodingUser(rhsEncoding.getUser().getValue()) ||
-        !isBatchMatmulEncodingUser(resultEncoding.getUser().getValue()))) ||
-      lhsEncoding.getRole().getValue() !=
+  if (lhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
           mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
@@ -352,7 +346,8 @@ static FailureOr<Operation *> lowerOpWithEncoding(
 
     Type newResultType = newResult.getType();
 
-    if (isMatmulEncodingUser(resultEncoding.getUser().getValue())) {
+    auto cDims = getEncodingContractionDims(lhsEncoding);
+    if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
           ValueRange{newResult});
@@ -376,7 +371,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::FillOp fillOp,
                     ValueRange convertedInputOperands,
                     ValueRange convertedOutputOperands, MaterializeEncodingFn,
                     MaterializeEncodingValueFn) {
-  if (!fillOp.hasTensorSemantics())
+  if (!fillOp.hasPureTensorSemantics())
     return failure();
   Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
       fillOp.getLoc(), convertedOutputOperands[0].getType(),
@@ -429,7 +424,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
                     ValueRange convertedInputOperands,
                     ValueRange convertedOutputOperands, MaterializeEncodingFn,
                     MaterializeEncodingValueFn) {
-  if (!genericOp.hasTensorSemantics() || !isElementwise(genericOp) ||
+  if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
       genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
     return rewriter.notifyMatchFailure(genericOp,
                                        "linalg.generic op is not elementwise "

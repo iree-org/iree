@@ -9,8 +9,10 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
+#include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
+#include "iree/hal/drivers/cuda/cuda_headers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,10 +44,10 @@ extern "C" {
 // multiple threads (same as with CUstream itself).
 typedef struct iree_hal_cuda_tracing_context_t iree_hal_cuda_tracing_context_t;
 
-// Allocates a tracing context for the given CUDA stream.
+// Allocates a tracing context for the given CUDA |stream|.
 // Each context must only be used with the stream it was created for.
 iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda_tracing_context_t** out_context);
@@ -61,7 +63,7 @@ void iree_hal_cuda_tracing_context_free(
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
@@ -110,7 +112,7 @@ void iree_hal_cuda_tracing_zone_end_impl(
     function_name_length, name, name_length)
 #define IREE_CUDA_TRACE_ZONE_END(context, stream)
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -68,35 +68,32 @@ namespace {
 struct VMInlinerInterface : public DialectInlinerInterface {
   using DialectInlinerInterface::DialectInlinerInterface;
 
-  // Allow all call operations to be inlined.
   bool isLegalToInline(Operation *call, Operation *callable,
                        bool wouldBeCloned) const final {
+    // Check the inlining policy specified on the callable first.
+    if (auto inliningPolicy =
+            callable->getAttrOfType<IREE::Util::InliningPolicyAttrInterface>(
+                "inlining_policy")) {
+      if (!inliningPolicy.isLegalToInline(call, callable))
+        return false;
+    }
+    // Sure!
     return true;
   }
 
   bool isLegalToInline(Region *dest, Region *src, bool wouldBeCloned,
                        IRMapping &valueMapping) const final {
-    // TODO(benvanik): disallow inlining across async calls.
-
-    // Don't inline functions with the 'noinline' attribute.
-    // Useful primarily for benchmarking.
-    if (auto funcOp = dyn_cast<VM::FuncOp>(src->getParentOp())) {
-      if (funcOp.getNoinline()) {
-        return false;
-      }
-    }
-
+    // Sure!
     return true;
   }
 
   bool isLegalToInline(Operation *op, Region *dest, bool wouldBeCloned,
                        IRMapping &valueMapping) const final {
-    // TODO(benvanik): disallow inlining across async calls.
+    // Sure!
     return true;
   }
 
   void handleTerminator(Operation *op, Block *newDest) const final {
-    // TODO(benvanik): handle other terminators (break/etc).
     auto returnOp = dyn_cast<VM::ReturnOp>(op);
     if (!returnOp) {
       return;

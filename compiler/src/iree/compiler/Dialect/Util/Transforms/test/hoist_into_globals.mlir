@@ -19,7 +19,7 @@ module @hoist_simple_const_expr {
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
   // CHECK:   util.global.store %[[CE0]], @[[HOISTED_SYM]] : i32
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
 }
 
@@ -131,14 +131,14 @@ module @hoist_tree_const_expr {
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
   // CHECK:   util.global.store %[[CE0]], @[[HOISTED_0]] : i32
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
   // CHECK: util.initializer attributes {iree.compiler.consteval} {
   // CHECK:   %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
   // CHECK:   %[[LOAD_LATENT_GLOBAL:.*]] = util.global.load @latent_global : i32
   // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[LOAD_HOISTED_0]], %[[LOAD_LATENT_GLOBAL]])
   // CHECK:   util.global.store %[[CE1]], @[[HOISTED_1]] : i32
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
 }
 
@@ -163,7 +163,7 @@ module @hoist_const_expr_with_ineligible_consumer {
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
   // CHECK:   util.global.store %[[CE0]], @[[HOISTED_0]] : i32
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
 }
 
@@ -192,7 +192,7 @@ module @hoist_non_leaf_const_expr {
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.non_leaf_const_expr"(%[[C0]], %[[C1]])
   // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[CE0]])
   // CHECK:   util.global.store %[[CE1]], @[[HOISTED]] : i32
-  // CHECK:   util.initializer.return
+  // CHECK:   util.return
   // CHECK: }
 }
 
@@ -224,7 +224,7 @@ module @hoist_implicit_capture {
   // CHECK:         ^bb0(%[[B0:.*]]: i32):
   // CHECK:         arith.addi %[[B0]], %[[C1]]
   // CHECK:       util.global.store %[[CE0]], @[[HOISTED_SYM]] : i32
-  // CHECK:       util.initializer.return
+  // CHECK:       util.return
   // CHECK: }
 }
 

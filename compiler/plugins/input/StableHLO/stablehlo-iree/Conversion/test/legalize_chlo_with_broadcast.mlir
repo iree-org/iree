@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-legalize-chlo --cse \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-chlo),cse)" \
 // RUN:   --split-input-file --verify-diagnostics %s | FileCheck %s
 
 // Check the non-broadcast case for each registered op, then just check a

@@ -17,7 +17,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -623,7 +622,7 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
   for (const auto &it : llvm::enumerate(returnOp.getOperands()))
     if (!unusedResults.contains(it.index()))
       yieldedValues.push_back(it.value());
-  rewriter.updateRootInPlace(
+  rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.getOperandsMutable().assign(yieldedValues); });
 
   // Replace all uses of the old op.

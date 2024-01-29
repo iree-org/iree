@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,11 +10,19 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/drivers/cuda/native_executable.h"
 
 typedef struct iree_hal_cuda_nop_executable_cache_t {
+  // Abstract resource used for injecting reference counting and vtable;
+  // must be at offset 0.
   iree_hal_resource_t resource;
-  iree_hal_cuda_context_wrapper_t* context;
+
+  iree_allocator_t host_allocator;
+
+  const iree_hal_cuda_dynamic_symbols_t* symbols;
+
+  CUdevice device;
 } iree_hal_cuda_nop_executable_cache_t;
 
 static const iree_hal_executable_cache_vtable_t
@@ -28,32 +36,36 @@ iree_hal_cuda_nop_executable_cache_cast(
 }
 
 iree_status_t iree_hal_cuda_nop_executable_cache_create(
-    iree_hal_cuda_context_wrapper_t* context, iree_string_view_t identifier,
+    iree_string_view_t identifier,
+    const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache) {
   IREE_ASSERT_ARGUMENT(out_executable_cache);
-  *out_executable_cache = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  *out_executable_cache = NULL;
   iree_hal_cuda_nop_executable_cache_t* executable_cache = NULL;
-  iree_status_t status =
-      iree_allocator_malloc(context->host_allocator, sizeof(*executable_cache),
-                            (void**)&executable_cache);
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_nop_executable_cache_vtable,
-                                 &executable_cache->resource);
-    executable_cache->context = context;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*executable_cache),
+                                (void**)&executable_cache));
 
-    *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
-  }
+  iree_hal_resource_initialize(&iree_hal_cuda_nop_executable_cache_vtable,
+                               &executable_cache->resource);
+  executable_cache->host_allocator = host_allocator;
+  executable_cache->symbols = symbols;
+  executable_cache->device = device;
+
+  *out_executable_cache = (iree_hal_executable_cache_t*)executable_cache;
+
   IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda_nop_executable_cache_destroy(
     iree_hal_executable_cache_t* base_executable_cache) {
   iree_hal_cuda_nop_executable_cache_t* executable_cache =
       iree_hal_cuda_nop_executable_cache_cast(base_executable_cache);
-  iree_allocator_t host_allocator = executable_cache->context->host_allocator;
+  iree_allocator_t host_allocator = executable_cache->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_free(host_allocator, executable_cache);
@@ -76,7 +88,8 @@ static iree_status_t iree_hal_cuda_nop_executable_cache_prepare_executable(
   iree_hal_cuda_nop_executable_cache_t* executable_cache =
       iree_hal_cuda_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_cuda_native_executable_create(
-      executable_cache->context, executable_params, out_executable);
+      executable_cache->symbols, executable_cache->device, executable_params,
+      executable_cache->host_allocator, out_executable);
 }
 
 static const iree_hal_executable_cache_vtable_t

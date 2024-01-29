@@ -20,14 +20,14 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.scf.for_loop_canonicalization
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
     %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
     %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3
       : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
 
     // CSE is needed on the workgroup_count region to pass this particular test.
-    transform.iree.apply_cse %variant_op_3 : !transform.any_op
+    transform.apply_cse to %variant_op_3 : !transform.any_op
     %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %none_attr = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
     transform.annotate %exports "translation_info" = %none_attr : !transform.any_op, !transform.any_param

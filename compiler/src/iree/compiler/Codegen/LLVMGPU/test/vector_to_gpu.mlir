@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-llvmgpu-vector-to-gpu --canonicalize --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-llvmgpu-vector-to-gpu),canonicalize)" --split-input-file | FileCheck %s
 
 // CHECK-LABEL: func.func @copies_to_asyncs
 func.func @copies_to_asyncs(%a: memref<1024x1024xf32>) {

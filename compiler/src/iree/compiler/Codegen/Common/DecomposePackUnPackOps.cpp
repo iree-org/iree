@@ -128,9 +128,8 @@ struct DecomposePackUnPackOpsPass
     this->tileOuterToOne = tileOuterToOne;
   }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
-                scf::SCFDialect, tensor::TensorDialect>();
+    registry.insert<linalg::LinalgDialect, arith::ArithDialect, scf::SCFDialect,
+                    tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -194,7 +193,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
             }));
     funcOp->walk([&](tensor::PackOp op) {
       FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-          scf::tileConsumerAndFuseProducerGreedilyUsingSCFForOp(
+          scf::tileConsumerAndFuseProducersUsingSCF(
               rewriter, cast<TilingInterface>(op.getOperation()), packOptions);
       if (failed(tileAndFuseResult))
         return signalPassFailure();
@@ -218,9 +217,9 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
               return tileSizes;
             });
     funcOp->walk([&](tensor::UnPackOp op) {
-      FailureOr<scf::SCFTilingResult> tilingResult = scf::tileUsingSCFForOp(
-          rewriter, cast<TilingInterface>(op.getOperation()),
-          unpackTilingOptions);
+      FailureOr<scf::SCFTilingResult> tilingResult =
+          scf::tileUsingSCF(rewriter, cast<TilingInterface>(op.getOperation()),
+                            unpackTilingOptions);
       if (failed(tilingResult))
         return signalPassFailure();
       rewriter.replaceOp(op, tilingResult->replacements);
@@ -271,7 +270,7 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne) {
   return std::make_unique<DecomposePackUnPackOpsPass>(tileOuterToOne);
 }

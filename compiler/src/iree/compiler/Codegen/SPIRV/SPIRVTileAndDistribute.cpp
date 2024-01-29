@@ -24,7 +24,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -52,7 +51,7 @@ namespace mlir::iree_compiler {
 
 /// Tiles LinalgOp to target invocations.
 static LogicalResult
-tileToInvocation(func::FuncOp funcOp,
+tileToInvocation(mlir::FunctionOpInterface funcOp,
                  const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
@@ -95,7 +94,7 @@ tileToInvocation(func::FuncOp funcOp,
 //====---------------------------------------------------------------------===//
 
 static LogicalResult
-tileReduction(func::FuncOp funcOp,
+tileReduction(mlir::FunctionOpInterface funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
@@ -135,7 +134,7 @@ public:
 
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  func::FuncOp funcOp = getOperation();
+  auto funcOp = getOperation();
   if (!isEntryPoint(funcOp))
     return;
 
@@ -210,7 +209,7 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVTileAndDistributePass() {
   return std::make_unique<SPIRVTileAndDistributePass>();
 }

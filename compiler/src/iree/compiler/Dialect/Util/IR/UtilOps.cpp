@@ -10,7 +10,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
@@ -19,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/FunctionImplementation.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -64,6 +64,35 @@ ArrayAttr deduplicateArrayElements(ArrayAttr arrayAttr) {
   if (attrsSet.size() == arrayAttr.size())
     return arrayAttr;
   return ArrayAttr::get(arrayAttr.getContext(), attrsSet.takeVector());
+}
+
+// Finds the operand index in |operands| that |tiedResult| references.
+// Returns TiedOpInterface::kUntiedIndex if no operand is found.
+static int64_t
+findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
+                ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
+  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+  for (int64_t i = 0; i < operands.size(); ++i) {
+    if (operands[i].name == tiedResult.name &&
+        operands[i].number == tiedResult.number) {
+      operandIndex = i;
+      break;
+    }
+  }
+  return operandIndex;
+}
+
+static int64_t findTiedArgument(OpAsmParser::UnresolvedOperand tiedResult,
+                                ArrayRef<OpAsmParser::Argument> arguments) {
+  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+  for (int64_t i = 0; i < arguments.size(); ++i) {
+    if (arguments[i].ssaName.name == tiedResult.name &&
+        arguments[i].ssaName.number == tiedResult.number) {
+      operandIndex = i;
+      break;
+    }
+  }
+  return operandIndex;
 }
 
 //===----------------------------------------------------------------------===//
@@ -289,6 +318,227 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 }
 
 //===----------------------------------------------------------------------===//
+// custom<OperandTypeList>
+//===----------------------------------------------------------------------===//
+// ()
+// (type, type)
+
+ParseResult parseOperandTypeList(OpAsmParser &parser,
+                                 SmallVectorImpl<Type> &operandTypes) {
+  if (failed(parser.parseLParen()))
+    return failure();
+  while (!succeeded(parser.parseOptionalRParen())) {
+    Type type;
+    if (failed(parser.parseType(type)))
+      return failure();
+    operandTypes.push_back(type);
+  }
+  return success();
+}
+
+void printOperandTypeList(OpAsmPrinter &p, Operation *op,
+                          TypeRange operandTypes) {
+  p << '(';
+  llvm::interleaveComma(operandTypes, p.getStream());
+  p << ')';
+}
+
+//===----------------------------------------------------------------------===//
+// custom<TiedResultList>
+//===----------------------------------------------------------------------===//
+// type, %operand0, %operand1 as type
+
+ParseResult
+parseTiedResultList(OpAsmParser &parser,
+                    ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+                    TypeRange operandTypes, SmallVectorImpl<Type> &resultTypes,
+                    ArrayAttr &tiedOperands) {
+  SmallVector<int64_t> tiedOperandIndices;
+  do {
+    OpAsmParser::UnresolvedOperand tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    Type type;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+    if (res.has_value() && succeeded(res.value())) {
+      tiedOperandIndex = findTiedOperand(tiedResult, operands);
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
+      }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(type)))
+          return failure();
+      } else {
+        // Use the operands type.
+        type = operandTypes[tiedOperandIndex];
+      }
+    } else if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    resultTypes.push_back(type);
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
+}
+
+void printTiedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
+                         TypeRange operandTypes, TypeRange resultTypes,
+                         ArrayAttr tiedOperands) {
+  auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op);
+  for (unsigned i = 0; i < resultTypes.size(); ++i) {
+    auto resultType = resultTypes[i];
+    auto tiedOperandIndex =
+        tiedOp ? tiedOp.getTiedResultOperandIndex(i) : std::nullopt;
+    bool printType = true;
+    if (tiedOperandIndex.has_value()) {
+      auto tiedOperand = op->getOperand(tiedOperandIndex.value());
+      p.printOperand(tiedOperand);
+      if (tiedOperand.getType() != resultType) {
+        p << " as ";
+      } else {
+        // Type elided as it matches the operand.
+        printType = false;
+      }
+    }
+    if (printType) {
+      p.printType(resultType);
+    }
+    if (i < resultTypes.size() - 1)
+      p << ", ";
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<TiedFunctionResultList>
+//===----------------------------------------------------------------------===//
+// ()
+// type
+// (type, %operand0 {some.attr}, %operand1 as type)
+
+static ParseResult
+parseTiedFunctionResultListImpl(OpAsmParser &parser,
+                                ArrayRef<OpAsmParser::Argument> arguments,
+                                SmallVectorImpl<Type> &resultTypes,
+                                SmallVectorImpl<DictionaryAttr> &resultAttrs,
+                                ArrayAttr &tiedOperands, bool allowAttrs) {
+  SmallVector<int64_t> tiedOperandIndices;
+  do {
+    OpAsmParser::UnresolvedOperand tiedResult;
+    auto res = parser.parseOptionalOperand(tiedResult);
+    Type type;
+    int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
+    if (res.has_value() && succeeded(res.value())) {
+      tiedOperandIndex = findTiedArgument(tiedResult, arguments);
+      if (tiedOperandIndex == IREE::Util::TiedOpInterface::kUntiedIndex) {
+        return parser.emitError(tiedResult.location,
+                                "tied operand not found for result reference ")
+               << tiedResult.name;
+      }
+      if (succeeded(parser.parseOptionalKeyword("as"))) {
+        // Type _may_ differ from the operand.
+        if (failed(parser.parseType(type)))
+          return failure();
+      } else {
+        // Use the operands type.
+        type = arguments[tiedOperandIndex].type;
+      }
+    } else if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    DictionaryAttr resultAttrDict;
+    if (allowAttrs) {
+      NamedAttrList resultAttrList;
+      if (succeeded(parser.parseOptionalAttrDict(resultAttrList))) {
+        resultAttrDict = parser.getBuilder().getDictionaryAttr(resultAttrList);
+      }
+    }
+    resultTypes.push_back(type);
+    resultAttrs.push_back(resultAttrDict);
+    tiedOperandIndices.push_back(tiedOperandIndex);
+  } while (succeeded(parser.parseOptionalComma()));
+  if (!tiedOperandIndices.empty()) {
+    tiedOperands = parser.getBuilder().getIndexArrayAttr(tiedOperandIndices);
+  }
+  return success();
+}
+
+static ParseResult parseTiedFunctionResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::Argument> arguments,
+    SmallVectorImpl<Type> &resultTypes,
+    SmallVectorImpl<DictionaryAttr> &resultAttrs, ArrayAttr &tiedOperands) {
+  SmallVector<OpAsmParser::UnresolvedOperand> operands;
+  SmallVector<Type> operandTypes;
+  operands.reserve(arguments.size());
+  operandTypes.reserve(arguments.size());
+  for (auto argument : arguments) {
+    operands.push_back(argument.ssaName);
+    operandTypes.push_back(argument.type);
+  }
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (succeeded(parser.parseOptionalRParen())) {
+      // Empty list/no results `()`.
+    } else {
+      // One or more result types.
+      if (failed(parseTiedFunctionResultListImpl(parser, arguments, resultTypes,
+                                                 resultAttrs, tiedOperands,
+                                                 /*allowAttrs=*/true)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
+    }
+  } else {
+    // Single result with omitted `()`.
+    if (failed(parseTiedFunctionResultListImpl(parser, arguments, resultTypes,
+                                               resultAttrs, tiedOperands,
+                                               /*allowAttrs=*/false))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+ParseResult parseTiedFunctionResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    ArrayRef<Type> operandTypes, SmallVectorImpl<Type> &resultTypes,
+    ArrayAttr &tiedOperands) {
+  if (succeeded(parser.parseOptionalLParen())) {
+    if (succeeded(parser.parseOptionalRParen())) {
+      // Empty list/no results `()`.
+    } else {
+      // One or more result types.
+      if (failed(parseTiedResultList(parser, operands, operandTypes,
+                                     resultTypes, tiedOperands)) ||
+          failed(parser.parseRParen())) {
+        return failure();
+      }
+    }
+  } else {
+    // Single result with omitted `()`.
+    if (failed(parseTiedResultList(parser, operands, operandTypes, resultTypes,
+                                   tiedOperands))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+void printTiedFunctionResultList(OpAsmPrinter &p, Operation *op,
+                                 ValueRange operands, TypeRange operandTypes,
+                                 TypeRange resultTypes,
+                                 ArrayAttr tiedOperands) {
+  if (resultTypes.size() != 1)
+    p << "(";
+  printTiedResultList(p, op, operands, operandTypes, resultTypes, tiedOperands);
+  if (resultTypes.size() != 1)
+    p << ")";
+}
+
+//===----------------------------------------------------------------------===//
 // custom<ShapedTypeList>
 //===----------------------------------------------------------------------===//
 // type{%size0}, type, type{%size1}
@@ -458,22 +708,6 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
 // custom<ShapedResultList>
 //===----------------------------------------------------------------------===//
 // type{%dim2}, %operand4
-
-// Finds the operand index in |operands| that |tiedResult| references.
-// Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t
-findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
-                ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
-  int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
-  for (int64_t i = 0; i < operands.size(); ++i) {
-    if (operands[i].name == tiedResult.name &&
-        operands[i].number == tiedResult.number) {
-      operandIndex = i;
-      break;
-    }
-  }
-  return operandIndex;
-}
 
 ParseResult parseShapedResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
@@ -675,7 +909,7 @@ static ParseResult parseShapedFunctionArgumentList(
 static ParseResult parseShapedFunctionResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> args,
     TypeRange argTypes, SmallVectorImpl<Type> &resultTypes,
-    ArrayAttr &resultAttrs, ArrayAttr &tiedOperands) {
+    ArrayAttr &resultAttrs, ArrayAttr &tiedOperands, bool allowResultAttrs) {
   SmallVector<Attribute> resultAttrsVec;
   SmallVector<int64_t> tiedOperandIndices;
   do {
@@ -702,7 +936,7 @@ static ParseResult parseShapedFunctionResultList(
       return failure();
     }
     NamedAttrList attrs;
-    if (failed(parser.parseOptionalAttrDict(attrs))) {
+    if (allowResultAttrs && failed(parser.parseOptionalAttrDict(attrs))) {
       return failure();
     }
     resultTypes.push_back(type);
@@ -771,16 +1005,16 @@ ParseResult parseShapedFunctionSignature(OpAsmParser &parser,
   }
   if (succeeded(parser.parseOptionalArrow())) {
     if (succeeded(parser.parseOptionalLParen())) {
-      if (failed(parseShapedFunctionResultList(parser, args, argTypes,
-                                               resultTypes, resultAttrs,
-                                               tiedOperands)) ||
+      if (failed(parseShapedFunctionResultList(
+              parser, args, argTypes, resultTypes, resultAttrs, tiedOperands,
+              /*allowResultAttrs=*/true)) ||
           failed(parser.parseRParen())) {
         return failure();
       }
     } else {
-      if (failed(parseShapedFunctionResultList(parser, args, argTypes,
-                                               resultTypes, resultAttrs,
-                                               tiedOperands))) {
+      if (failed(parseShapedFunctionResultList(
+              parser, args, argTypes, resultTypes, resultAttrs, tiedOperands,
+              /*allowResultAttrs=*/false))) {
         return failure();
       }
     }
@@ -805,9 +1039,8 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
     if (argAttrs) {
       auto attrs =
           dyn_cast_if_present<DictionaryAttr>(argAttrs.getValue()[argIndex]);
-      if (attrs && !attrs.empty()) {
+      if (attrs && !attrs.empty())
         p.printOptionalAttrDict(attrs.getValue());
-      }
     }
     ++argIndex;
   });
@@ -815,18 +1048,22 @@ void printShapedFunctionSignature(OpAsmPrinter &p, Operation *op,
   auto resultTypes = functionType.getResults();
   if (!resultTypes.empty()) {
     p << " -> ";
-    if (resultTypes.size() != 1)
+    bool anyResultAttrs =
+        resultAttrs && !resultAttrs.empty() &&
+        llvm::any_of(resultAttrs.getAsValueRange<DictionaryAttr>(),
+                     [](auto attr) { return !attr.empty(); });
+    if (resultTypes.size() != 1 || anyResultAttrs)
       p << "(";
     printShapedFunctionResultList(p, op, functionType.getInputs(), resultTypes,
                                   resultAttrs, tiedOperands);
-    if (resultTypes.size() != 1)
+    if (resultTypes.size() != 1 || anyResultAttrs)
       p << ")";
   }
 }
 
 } // namespace mlir::iree_compiler
 
-namespace mlir ::iree_compiler::IREE::Util {
+namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//
 // util.optimization_barrier
@@ -1011,6 +1248,236 @@ Block *InitializerOp::addBlock() {
   assert(!empty() && "function should at least have an entry block");
   push_back(new Block());
   return &back();
+}
+
+//===----------------------------------------------------------------------===//
+// util.func
+//===----------------------------------------------------------------------===//
+
+FuncOp FuncOp::create(Location location, StringRef name, FunctionType type,
+                      ArrayRef<int64_t> tiedOperands,
+                      ArrayRef<NamedAttribute> attrs,
+                      ArrayRef<DictionaryAttr> argAttrs,
+                      ArrayRef<DictionaryAttr> resAttrs) {
+  OpBuilder builder(location->getContext());
+  OperationState state(location, getOperationName());
+  FuncOp::build(builder, state, name, type,
+                builder.getIndexArrayAttr(tiedOperands), attrs, argAttrs,
+                resAttrs);
+  return cast<FuncOp>(Operation::create(state));
+}
+
+void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
+                   FunctionType type, ArrayAttr tiedOperands,
+                   ArrayRef<NamedAttribute> attrs,
+                   ArrayRef<DictionaryAttr> argAttrs,
+                   ArrayRef<DictionaryAttr> resAttrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder.getStringAttr(name));
+  state.addAttribute(SymbolTable::getVisibilityAttrName(),
+                     builder.getStringAttr("private"));
+  state.addAttribute("function_type", TypeAttr::get(type));
+  state.attributes.append(attrs.begin(), attrs.end());
+  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
+  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                     tiedOperands);
+  state.addRegion();
+  if (!argAttrs.empty() || !resAttrs.empty()) {
+    assert(type.getNumInputs() == argAttrs.size());
+    assert(type.getNumResults() == resAttrs.size());
+    function_interface_impl::addArgAndResultAttrs(
+        builder, state, argAttrs, resAttrs, builder.getStringAttr("arg_attrs"),
+        builder.getStringAttr("res_attrs"));
+  }
+}
+
+static ParseResult
+parseFunctionArgumentList(OpAsmParser &parser,
+                          SmallVectorImpl<OpAsmParser::Argument> &arguments) {
+  return parser.parseCommaSeparatedList(
+      OpAsmParser::Delimiter::Paren, [&]() -> ParseResult {
+        OpAsmParser::Argument argument;
+        auto argPresent = parser.parseOptionalArgument(
+            argument, /*allowType=*/true, /*allowAttrs=*/true);
+        if (argPresent.has_value()) {
+          if (failed(argPresent.value()))
+            return failure(); // Present but malformed.
+          if (!arguments.empty() && arguments.back().ssaName.name.empty())
+            return parser.emitError(argument.ssaName.location,
+                                    "expected type instead of SSA identifier");
+
+        } else {
+          argument.ssaName.location = parser.getCurrentLocation();
+          if (!arguments.empty() && !arguments.back().ssaName.name.empty())
+            return parser.emitError(argument.ssaName.location,
+                                    "expected SSA identifier");
+          NamedAttrList attrs;
+          if (parser.parseType(argument.type) ||
+              parser.parseOptionalAttrDict(attrs) ||
+              parser.parseOptionalLocationSpecifier(argument.sourceLoc))
+            return failure();
+          argument.attrs = attrs.getDictionary(parser.getContext());
+        }
+        arguments.push_back(argument);
+        return success();
+      });
+}
+
+ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+
+  StringAttr symVisibilityAttr;
+  if (failed(parseSymbolVisibility(parser, symVisibilityAttr)))
+    return failure();
+  if (symVisibilityAttr)
+    result.addAttribute(SymbolTable::getVisibilityAttrName(),
+                        symVisibilityAttr);
+
+  StringAttr nameAttr;
+  if (parser.parseSymbolName(nameAttr, SymbolTable::getSymbolAttrName(),
+                             result.attributes))
+    return failure();
+
+  SmallVector<OpAsmParser::Argument> arguments;
+  if (parseFunctionArgumentList(parser, arguments))
+    return failure();
+
+  SmallVector<Type> resultTypes;
+  SmallVector<DictionaryAttr> resultAttrs;
+  ArrayAttr tiedOperands;
+  if (succeeded(parser.parseOptionalArrow())) {
+    if (failed(parseTiedFunctionResultList(parser, arguments, resultTypes,
+                                           resultAttrs, tiedOperands)))
+      return failure();
+  }
+  if (tiedOperands)
+    result.addAttribute("tied_operands", tiedOperands);
+
+  SmallVector<Type> argumentTypes;
+  for (auto argument : arguments)
+    argumentTypes.push_back(argument.type);
+  result.addAttribute("function_type", TypeAttr::get(builder.getFunctionType(
+                                           argumentTypes, resultTypes)));
+
+  NamedAttrList parsedAttributes;
+  SMLoc attributeDictLocation = parser.getCurrentLocation();
+  if (parser.parseOptionalAttrDictWithKeyword(parsedAttributes))
+    return failure();
+  for (StringRef disallowed : {
+           SymbolTable::getVisibilityAttrName(),
+           SymbolTable::getSymbolAttrName(),
+           StringRef("function_type"),
+       }) {
+    if (parsedAttributes.get(disallowed))
+      return parser.emitError(attributeDictLocation, "'")
+             << disallowed
+             << "' is an inferred attribute and should not be specified in the "
+                "explicit attribute dictionary";
+  }
+  result.attributes.append(parsedAttributes);
+
+  assert(resultAttrs.size() == resultTypes.size());
+  function_interface_impl::addArgAndResultAttrs(
+      builder, result, arguments, resultAttrs,
+      builder.getStringAttr("arg_attrs"), builder.getStringAttr("res_attrs"));
+
+  auto *body = result.addRegion();
+  SMLoc loc = parser.getCurrentLocation();
+  auto parseResult = parser.parseOptionalRegion(*body, arguments,
+                                                /*enableNameShadowing=*/false);
+  if (parseResult.has_value()) {
+    if (failed(*parseResult))
+      return failure();
+    if (body->empty())
+      return parser.emitError(loc, "expected non-empty function body");
+  }
+  return success();
+}
+
+void FuncOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  printSymbolVisibility(p, *this, getSymVisibilityAttr());
+  p << ' ';
+  p.printSymbolName(getSymName());
+  printShapedFunctionSignature(p, *this, getFunctionTypeAttr(),
+                               getTiedOperandsAttr(), getArgAttrsAttr(),
+                               getResAttrsAttr());
+  p.printOptionalAttrDictWithKeyword((*this)->getAttrs(),
+                                     /*elidedAttrs=*/{
+                                         "sym_name",
+                                         "function_type",
+                                         "tied_operands",
+                                         "sym_visibility",
+                                         "arg_attrs",
+                                         "res_attrs",
+                                     });
+  if (!getBody().empty()) {
+    p << ' ';
+    p.printRegion(getBody(), /*printEntryBlockArgs=*/false);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// util.call
+//===----------------------------------------------------------------------===//
+
+FunctionType CallOp::getCalleeType() {
+  return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
+}
+
+LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+
+  // Only support calls to util.func.
+  auto calleeOp = symbolTable.lookupNearestSymbolFrom<IREE::Util::FuncOp>(
+      op, getCalleeAttr());
+  if (!calleeOp) {
+    return op->emitOpError("undefined/incompatible callee: ") << getCallee();
+  }
+
+  // Ensure that the arg/result types match.
+  auto expectedType = getCalleeType();
+  auto calleeType = calleeOp.getFunctionType();
+  if (calleeType != expectedType) {
+    return emitOpError("function type mismatch; expected ")
+           << expectedType << " but callee is " << calleeType;
+  }
+
+  // Ensure tied operands are consistent.
+  auto expectedTiedOperands = getTiedOperandsAttr();
+  auto calleeTiedOperands = calleeOp.getTiedOperandsAttr();
+  if (calleeTiedOperands != expectedTiedOperands) {
+    return emitOpError("function tied operands mismatch; expected ")
+           << expectedTiedOperands << " but callee is " << calleeTiedOperands;
+  }
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// util.return
+//===----------------------------------------------------------------------===//
+
+LogicalResult ReturnOp::verify() {
+  Operation *op = getOperation();
+  auto parentOp = cast<mlir::FunctionOpInterface>(op->getParentOp());
+  auto expectedTypes = parentOp.getResultTypes();
+  if (getNumOperands() != expectedTypes.size()) {
+    return emitOpError("has ")
+           << getNumOperands()
+           << " operands, but enclosing function-like op returns "
+           << expectedTypes.size();
+  }
+  for (auto [i, expectedType, actualType] :
+       llvm::enumerate(expectedTypes, getOperandTypes())) {
+    if (expectedType != actualType) {
+      return emitOpError() << "type of return operand " << i << " ("
+                           << actualType
+                           << ") doesn't match function result type ("
+                           << expectedType << ")";
+    }
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

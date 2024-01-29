@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -37,7 +38,7 @@ public:
 
 void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   auto funcOp = getOperation();
-  linalg::hoistRedundantVectorTransfers(funcOp);
+  linalg::hoistRedundantVectorTransfers(cast<func::FuncOp>(funcOp));
   IRRewriter rewriter(funcOp->getContext());
   // TODO: walking in some reverse / inside-out order would be more efficient
   // and would capture more cases.
@@ -60,7 +61,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createOptimizeTensorInsertExtractSlicesPass() {
   return std::make_unique<OptimizeTensorInsertExtractSlicesPass>();
 }

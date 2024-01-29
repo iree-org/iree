@@ -1019,3 +1019,31 @@ void VectorLayoutAnalysis::dump() {
   print(llvm::dbgs());
   llvm::dbgs() << "\n";
 }
+
+namespace mlir::iree_compiler {
+
+void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
+                                Operation *root) {
+  root->walk([&](Operation *op) {
+    for (NamedAttribute attr : op->getAttrs()) {
+      StringRef name = attr.getName().strref();
+      if (name.contains("__vector_layout_test_anchor_operand_")) {
+        int operandNum;
+        name.substr(name.find_last_of("_") + 1)
+            .getAsInteger(/*Radix=*/10, operandNum);
+        assert(operandNum < op->getNumOperands() &&
+               "operand number out of range");
+        analysis.setAnchor(op->getOperand(operandNum), attr.getValue());
+      }
+      if (name.contains("__vector_layout_test_anchor_result_")) {
+        int resultNum;
+        name.substr(name.find_last_of("_") + 1)
+            .getAsInteger(/*Radix=*/10, resultNum);
+        assert(resultNum < op->getNumResults() && "result number out of range");
+        analysis.setAnchor(op->getResult(resultNum), attr.getValue());
+      }
+    }
+  });
+}
+
+} // namespace mlir::iree_compiler

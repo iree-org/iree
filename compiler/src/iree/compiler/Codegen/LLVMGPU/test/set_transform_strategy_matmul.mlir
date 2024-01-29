@@ -123,7 +123,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK-DAG:   transform.apply_patterns.canonicalization
 // CHECK: } : !transform.any_op
 // CHECK: transform.iree.apply_licm
-// CHECK: transform.iree.apply_cse
+// CHECK: transform.apply_cse to
 
 // WITH_OPTIONS-LABEL: func @matmul_1
 
@@ -196,7 +196,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // WITH_OPTIONS:   transform.apply_patterns.canonicalization
 // WITH_OPTIONS  }
 // WITH_OPTIONS: transform.iree.apply_licm
-// WITH_OPTIONS: transform.iree.apply_cse
+// WITH_OPTIONS: transform.apply_cse to
 
 
 // WITH_OPTIONS_2-LABEL: func @matmul_1
@@ -334,7 +334,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
-// CHECK:      transform.iree.apply_cse
+// CHECK:      transform.apply_cse to
 // CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
 // CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
@@ -350,7 +350,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
-// CHECK:      transform.iree.apply_cse
+// CHECK:      transform.apply_cse to
 
 // alignLhs
 // CHECK:      transform.structured.vectorize %[[TILED_LHS]] vector_sizes [4, 4]
@@ -408,7 +408,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
-// CHECK:      transform.iree.apply_cse
+// CHECK:      transform.apply_cse to
 // CHECK:      %[[RES_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK:      %[[RES_COPY:.+]] = transform.structured.rewrite_in_destination_passing_style %[[RES_PAD]]
 // CHECK:      %[[LHS_PAD:.+]] = transform.get_producer_of_operand %{{.*}}[0]
@@ -422,7 +422,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // CHECK:        transform.apply_patterns.canonicalization
 // CHECK       }
 // CHECK:      transform.iree.apply_licm
-// CHECK:      transform.iree.apply_cse
+// CHECK:      transform.apply_cse to
 
 // Verify we don't go down the path without the flag.
 // WITH_OPTIONS-LABEL: func @aligned_matmul

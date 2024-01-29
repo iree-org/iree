@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -88,6 +88,8 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
+  IREE_ASSERT_ARGUMENT(base_buffer);
+  IREE_ASSERT_ARGUMENT(mapping);
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
 
   // TODO(benvanik): add upload/download for unmapped buffers.
@@ -119,21 +121,21 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
 static iree_status_t iree_hal_cuda_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  // Nothing to do (today).
+  // Nothing to do today.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_buffer_invalidate_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  // Nothing to do.
+  // Nothing to do today.
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_buffer_flush_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  // Nothing to do.
+  // Nothing to do today.
   return iree_ok_status();
 }
 

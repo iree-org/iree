@@ -8,6 +8,8 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
+#include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -17,10 +19,10 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -56,6 +58,7 @@ iree_compiler::IREE::transform_dialect::LLVMGPUExtensions::LLVMGPUExtensions() {
   // CreateAsyncGroupsOp depends on the following two dialects.
   declareGeneratedDialect<gpu::GPUDialect>();
   declareGeneratedDialect<nvgpu::NVGPUDialect>();
+  declareGeneratedDialect<amdgpu::AMDGPUDialect>();
 
   registerTransformOps<
 #define GET_OP_LIST
@@ -77,7 +80,7 @@ void mlir::iree_compiler::registerTransformDialectLLVMGPUExtension(
 // TODO: synchronizations for imperfectly nested stuff.
 DiagnosedSilenceableFailure
 transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
@@ -90,7 +93,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
 
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
-  rewriter.setInsertionPointToStart(&target.getBody().front());
+  rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
@@ -99,10 +102,10 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     return diag;
   auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
   auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
-  rewriter.startRootUpdate(exportOp);
+  rewriter.startOpModification(exportOp);
   exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
   exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
-  rewriter.finalizeRootUpdate(exportOp);
+  rewriter.finalizeOpModification(exportOp);
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -144,9 +147,9 @@ replaceAllUsesOfLaneWithin(RewriterBase &b,
   for (Operation *user : llvm::make_early_inc_range(laneId.getUsers())) {
     if (!executeOp->isProperAncestor(user))
       continue;
-    b.startRootUpdate(user);
+    b.startOpModification(user);
     user->replaceUsesOfWith(laneId, zero);
-    b.finalizeRootUpdate(user);
+    b.finalizeOpModification(user);
     applied = true;
   }
   return success(applied);
@@ -273,7 +276,7 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
 // TODO: Refactor in a generic util that can be reused.
 static HAL::ExecutableExportOp
 getExecutableExportOpForFunc(HAL::ExecutableVariantOp halExecutableVariantOp,
-                             func::FuncOp funcOp) {
+                             mlir::FunctionOpInterface funcOp) {
   if (!halExecutableVariantOp || !funcOp)
     return {};
   HAL::ExecutableExportOp exportOp;
@@ -305,7 +308,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
 
   auto halExecutableVariantOp =
       target->getParentOfType<HAL::ExecutableVariantOp>();
-  auto funcOp = target->getParentOfType<func::FuncOp>();
+  auto funcOp = target->getParentOfType<mlir::FunctionOpInterface>();
   HAL::ExecutableExportOp exportOp =
       getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
   if (!halExecutableVariantOp || !funcOp || !exportOp) {
@@ -476,14 +479,14 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
     // the yielded type depending on whether the op has "broadcast"
     // behavior (see the doc of WarpExecuteOnLane0Op).
     for (OpOperand &use : distributedVal.getUses()) {
-      rewriter.startRootUpdate(use.getOwner());
+      rewriter.startOpModification(use.getOwner());
       Value replacement = newRead;
       if (use.get().getType() != newRead.getType()) {
         replacement = rewriter.create<vector::BroadcastOp>(
             load.getLoc(), use.get().getType(), newRead);
       }
       use.getOwner()->setOperand(use.getOperandNumber(), replacement);
-      rewriter.finalizeRootUpdate(use.getOwner());
+      rewriter.finalizeOpModification(use.getOwner());
     }
     return success();
   }
@@ -598,7 +601,7 @@ static void populateWarpExecuteOnLane0ToScf(
 
 DiagnosedSilenceableFailure
 transform_dialect::VectorWarpDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
@@ -688,7 +691,7 @@ transform_dialect::VectorToMMAConversionOp::applyToOne(
     return emitDefaultDefiniteFailure(target);
   }
 
-  auto funcOp = dyn_cast<func::FuncOp>(target);
+  auto funcOp = dyn_cast<mlir::FunctionOpInterface>(target);
   if (!funcOp) {
     target->emitOpError("Must apply to a func op");
     return emitDefaultDefiniteFailure(target);
@@ -839,11 +842,11 @@ void transform_dialect::CreateAsyncGroupsOp::getEffects(
 }
 
 DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  iree_compiler::createAsyncGroups(rewriter, cast<func::FuncOp>(target),
-                                   getUseMmaSync());
+  iree_compiler::createAsyncGroups(
+      rewriter, cast<mlir::FunctionOpInterface>(target), getUseMmaSync());
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -852,11 +855,11 @@ DiagnosedSilenceableFailure transform_dialect::CreateAsyncGroupsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure
 transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  iree_compiler::doLayoutAnalysisAndDistribution(rewriter,
-                                                 cast<func::FuncOp>(target));
+  iree_compiler::doLayoutAnalysisAndDistribution(
+      rewriter, cast<mlir::FunctionOpInterface>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
@@ -865,10 +868,11 @@ transform_dialect::LayoutAnalysisAndDistributionOp::applyToOne(
 // ReorderTransposeOp
 //===---------------------------------------------------------------------===//
 DiagnosedSilenceableFailure transform_dialect::ReorderTransposeOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  iree_compiler::reorderTranspose(rewriter, cast<func::FuncOp>(target));
+  iree_compiler::reorderTranspose(rewriter,
+                                  cast<mlir::FunctionOpInterface>(target));
   results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
@@ -1459,7 +1463,7 @@ void transform_dialect::EliminateGpuBarriersOp::build(OpBuilder &builder,
 
 DiagnosedSilenceableFailure
 transform_dialect::EliminateGpuBarriersOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   RewritePatternSet patterns(target.getContext());
@@ -1483,7 +1487,7 @@ transform_dialect::EliminateGpuBarriersOp::applyToOne(
 
 DiagnosedSilenceableFailure
 transform_dialect::PackSharedMemoryAllocOp::applyToOne(
-    transform::TransformRewriter &rewriter, func::FuncOp target,
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   packSharedMemoryAlloc(target);
@@ -1494,6 +1498,83 @@ void transform_dialect::PackSharedMemoryAllocOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
+}
+
+class TestVectorLayoutOptions : public VectorLayoutOptions {
+public:
+  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+
+  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+    setAnchorOpsFromAttributes(analysis, root);
+  }
+};
+
+DiagnosedSilenceableFailure
+transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  TestVectorLayoutOptions options(target);
+  RewritePatternSet patterns(target.getContext());
+  populateAMDGPUDistributionPatterns(patterns);
+  distributeVectorOps(target, patterns, options);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// CreateMatmulMfmaTileSizesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto payload = state.getPayloadOps(getTarget());
+  Operation *target = *payload.begin();
+  ArrayRef<int64_t> shape =
+      llvm::cast<ShapedType>(target->getResult(0).getType()).getShape();
+  if (shape.size() != 2) {
+    return emitDefiniteFailure() << "matmul shape size should be 2";
+  }
+  SmallVector<int64_t> sz0, sz1;
+  SmallVector<Attribute> paramsArray0, paramsArray1;
+
+  // TODO: cover all shape cases
+  // (sz0[0] / sz1[0]) * (sz0[1] / sz1[1]) = 8
+  if (shape == ArrayRef<int64_t>({8192, 320})) {
+    sz0 = {512, 64};
+    sz1 = {64, 64};
+  } else if (shape[0] == 128) {
+    if (shape[1] % 64 != 0) {
+      return emitDefiniteFailure() << "dim #1 should be divisible by 64";
+    }
+    sz0 = {128, 64};
+    sz1 = {32, 32};
+  } else {
+    // Default tiling configuration.
+    if (shape[0] % 256 != 0 || shape[1] % 128 != 0) {
+      return emitDefiniteFailure() << "dim #0 should be divisible by 256 and "
+                                      "dim #1 should be divisible by 128";
+    }
+    sz0 = {256, 128};
+    sz1 = {64, 64};
+  }
+  for (auto i : sz0) {
+    paramsArray0.push_back(rewriter.getIntegerAttr(rewriter.getIndexType(), i));
+  }
+  for (auto i : sz1) {
+    paramsArray1.push_back(rewriter.getIntegerAttr(rewriter.getIndexType(), i));
+  }
+
+  results.setParams(cast<OpResult>(getResult(0)), paramsArray0);
+  results.setParams(cast<OpResult>(getResult(1)), paramsArray0);
+  return DiagnosedSilenceableFailure::success();
 }
 
 #define GET_OP_CLASSES

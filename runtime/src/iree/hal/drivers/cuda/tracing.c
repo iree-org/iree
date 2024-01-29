@@ -6,9 +6,10 @@
 
 #include "iree/hal/drivers/cuda/tracing.h"
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-#include "iree/hal/drivers/cuda/status_util.h"
+#include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
+#include "iree/hal/drivers/cuda/cuda_status_util.h"
 
 // Total number of events per tracing context. This translates to the maximum
 // number of outstanding timestamp queries before collection is required.
@@ -16,7 +17,8 @@
 #define IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
 struct iree_hal_cuda_tracing_context_t {
-  iree_hal_cuda_context_wrapper_t* cuda_context;
+  const iree_hal_cuda_dynamic_symbols_t* symbols;
+
   CUstream stream;
   iree_arena_block_pool_t* block_pool;
   iree_allocator_t host_allocator;
@@ -40,7 +42,7 @@ struct iree_hal_cuda_tracing_context_t {
 };
 
 static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
-    iree_hal_cuda_context_wrapper_t* cuda_context, CUstream stream,
+    const iree_hal_cuda_dynamic_symbols_t* symbols, CUstream stream,
     CUevent base_event, int64_t* out_cpu_timestamp, int64_t* out_gpu_timestamp,
     float* out_timestamp_period) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -51,13 +53,11 @@ static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
   // Record event to the stream; in the absence of a synchronize this may not
   // flush immediately.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, CU_RESULT_TO_STATUS(cuda_context->syms,
-                              cuEventRecord(base_event, stream)));
+      z0, IREE_CURESULT_TO_STATUS(symbols, cuEventRecord(base_event, stream)));
 
   // Force flush the event and wait for it to complete.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      CU_RESULT_TO_STATUS(cuda_context->syms, cuEventSynchronize(base_event)));
+      z0, IREE_CURESULT_TO_STATUS(symbols, cuEventSynchronize(base_event)));
 
   // Track when we know the event has completed and has a reasonable timestamp.
   // This may drift from the actual time differential between host/device but is
@@ -69,12 +69,12 @@ static iree_status_t iree_hal_cuda_tracing_context_initial_calibration(
 }
 
 iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda_tracing_context_t** out_context) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_ASSERT_ARGUMENT(cuda_context);
+  IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(stream);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_context);
@@ -84,7 +84,7 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*context), (void**)&context);
   if (iree_status_is_ok(status)) {
-    context->cuda_context = cuda_context;
+    context->symbols = symbols;
     context->stream = stream;
     context->block_pool = block_pool;
     context->host_allocator = host_allocator;
@@ -98,9 +98,8 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
     IREE_TRACE_ZONE_APPEND_VALUE_I64(z_event_pool,
                                      (int64_t)context->query_capacity);
     for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
-      status = CU_RESULT_TO_STATUS(
-          cuda_context->syms,
-          cuEventCreate(&context->event_pool[i], CU_EVENT_DEFAULT));
+      status = IREE_CURESULT_TO_STATUS(
+          symbols, cuEventCreate(&context->event_pool[i], CU_EVENT_DEFAULT));
       if (!iree_status_is_ok(status)) break;
     }
     IREE_TRACE_ZONE_END(z_event_pool);
@@ -112,14 +111,13 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
   int64_t gpu_timestamp = 0;
   float timestamp_period = 0.0f;
   if (iree_status_is_ok(status)) {
-    status = CU_RESULT_TO_STATUS(
-        cuda_context->syms,
-        cuEventCreate(&context->base_event, CU_EVENT_DEFAULT));
+    status = IREE_CURESULT_TO_STATUS(
+        symbols, cuEventCreate(&context->base_event, CU_EVENT_DEFAULT));
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_tracing_context_initial_calibration(
-        cuda_context, stream, context->base_event, &cpu_timestamp,
-        &gpu_timestamp, &timestamp_period);
+        symbols, stream, context->base_event, &cpu_timestamp, &gpu_timestamp,
+        &timestamp_period);
   }
 
   // Allocate the GPU context and pass initial calibration data.
@@ -152,14 +150,14 @@ void iree_hal_cuda_tracing_context_free(
                               "iree_hal_cuda_tracing_context_free_event_pool");
   for (iree_host_size_t i = 0; i < context->query_capacity; ++i) {
     if (context->event_pool[i]) {
-      CUDA_IGNORE_ERROR(context->cuda_context->syms,
-                        cuEventDestroy(context->event_pool[i]));
+      IREE_CUDA_IGNORE_ERROR(context->symbols,
+                             cuEventDestroy(context->event_pool[i]));
     }
   }
   IREE_TRACE_ZONE_END(z_event_pool);
   if (context->base_event) {
-    CUDA_IGNORE_ERROR(context->cuda_context->syms,
-                      cuEventDestroy(context->base_event));
+    IREE_CUDA_IGNORE_ERROR(context->symbols,
+                           cuEventDestroy(context->base_event));
   }
 
   iree_allocator_t host_allocator = context->host_allocator;
@@ -176,7 +174,6 @@ void iree_hal_cuda_tracing_context_collect(
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_cuda_dynamic_symbols_t* syms = context->cuda_context->syms;
 
   while (context->query_tail != context->query_head) {
     // Compute the contiguous range of queries ready to be read.
@@ -196,14 +193,15 @@ void iree_hal_cuda_tracing_context_collect(
       // recorded but not retired or any other deferred error.
       uint16_t query_id = (uint16_t)(query_base + i);
       CUevent query_event = context->event_pool[query_id];
-      CUresult result = syms->cuEventQuery(query_event);
+      CUresult result = context->symbols->cuEventQuery(query_event);
       if (result != CUDA_SUCCESS) break;
 
       // Calculate context-relative time and notify tracy.
       float relative_millis = 0.0f;
-      CUDA_IGNORE_ERROR(
-          syms, cuEventElapsedTime(&relative_millis, context->base_event,
-                                   query_event));
+      IREE_CUDA_IGNORE_ERROR(
+          context->symbols,
+          cuEventElapsedTime(&relative_millis, context->base_event,
+                             query_event));
       int64_t gpu_timestamp = (int64_t)((double)relative_millis * 1000000.0);
       iree_tracing_gpu_zone_notify(context->id, query_id, gpu_timestamp);
 
@@ -235,7 +233,7 @@ static uint16_t iree_hal_cuda_tracing_context_insert_query(
   IREE_ASSERT_NE(context->query_head, context->query_tail);
 
   CUevent event = context->event_pool[query_id];
-  CUDA_IGNORE_ERROR(context->cuda_context->syms, cuEventRecord(event, stream));
+  IREE_CUDA_IGNORE_ERROR(context->symbols, cuEventRecord(event, stream));
 
   return query_id;
 }
@@ -278,7 +276,7 @@ void iree_hal_cuda_tracing_zone_end_impl(
 #else
 
 iree_status_t iree_hal_cuda_tracing_context_allocate(
-    iree_hal_cuda_context_wrapper_t* cuda_context,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
     iree_string_view_t queue_name, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_cuda_tracing_context_t** out_context) {
@@ -292,4 +290,4 @@ void iree_hal_cuda_tracing_context_free(
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context) {}
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION

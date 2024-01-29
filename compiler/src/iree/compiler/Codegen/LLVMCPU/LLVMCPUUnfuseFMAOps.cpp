@@ -59,7 +59,8 @@ void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUUnfuseFMAOpsPass() {
   return std::make_unique<LLVMCPUUnfuseFMAOpsPass>();
 }
 

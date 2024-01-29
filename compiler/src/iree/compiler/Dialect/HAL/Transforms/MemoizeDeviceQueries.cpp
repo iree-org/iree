@@ -101,7 +101,7 @@ struct MemoizeDeviceQueriesPass
                                                     okGlobalOp.getName());
       funcBuilder.create<IREE::Util::GlobalStoreOp>(
           fusedLoc, queryOp.getValue(), valueGlobalOp.getName());
-      funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
+      funcBuilder.create<IREE::Util::ReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);

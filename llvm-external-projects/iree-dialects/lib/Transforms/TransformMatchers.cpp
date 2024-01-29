@@ -8,10 +8,10 @@
 
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Debug.h"
@@ -1458,7 +1458,7 @@ void transform_ext::makeReductionMatcher(
                          captures.maybeTrailingOutputElementalTypeBitWidth));
   reduction = reduction.result(0, HasAnyUse(), trailing, OptionalMatch());
   if (mustMatchEntireFunc)
-    reduction = reduction.allTilableOpsCaptured<func::FuncOp>();
+    reduction = reduction.allTilableOpsCaptured<mlir::FunctionOpInterface>();
   trailingCapture = &trailing;
 }
 
@@ -1495,7 +1495,7 @@ void transform_ext::makeMatmulMatcher(
   auto &trailing = m_StructuredOp<linalg::GenericOp>(matcherContext);
   matmul = matmul.result(0, HasAnyUse(), trailing, OptionalMatch());
   if (mustMatchEntireFunc)
-    matmul = matmul.allTilableOpsCaptured<func::FuncOp>();
+    matmul = matmul.allTilableOpsCaptured<mlir::FunctionOpInterface>();
   trailingCapture = &trailing;
 }
 
@@ -1524,7 +1524,7 @@ void transform_ext::makeBatchMatmulMatcher(
   fillCapture = &fill;
 
   if (mustMatchEntireFunc)
-    bmm = bmm.allTilableOpsCaptured<func::FuncOp>();
+    bmm = bmm.allTilableOpsCaptured<mlir::FunctionOpInterface>();
 }
 
 /// Match sum(%src, broadcast(%reduction))
@@ -1750,7 +1750,8 @@ void transform_ext::makeConvolutionMatcher(
   // windowing operation for now.
   convolution = convolution.result(0, HasAnyUse(), trailing, OptionalMatch());
   if (mustMatchEntireFunc)
-    convolution = convolution.allTilableOpsCaptured<func::FuncOp>();
+    convolution =
+        convolution.allTilableOpsCaptured<mlir::FunctionOpInterface>();
   trailingCapture = &trailing;
 }
 
@@ -1777,6 +1778,6 @@ void transform_ext::makePadMatcher(MatcherContext &context,
                         .low(AllDims(), 0)
                         .yieldsExternalValue();
   if (mustMatchEntireFunc)
-    opMatcher = opMatcher.allTilableOpsCaptured<func::FuncOp>();
+    opMatcher = opMatcher.allTilableOpsCaptured<mlir::FunctionOpInterface>();
   padCapture = &opMatcher;
 }

@@ -51,7 +51,7 @@ splitReduction(PatternRewriter &b, linalg::LinalgOp op,
                const linalg::ControlSplitReductionFn &controlSplitReductionFn,
                const LinalgTransformationFilter &filter,
                bool useAlloc = false) {
-  if (failed(filter.checkAndNotify(b, op)) || !op.hasTensorSemantics() ||
+  if (failed(filter.checkAndNotify(b, op)) || !op.hasPureTensorSemantics() ||
       op.getNumReductionLoops() != 1 || op.getNumDpsInits() != 1 ||
       !op.hasOnlyProjectedPermutations())
     return b.notifyMatchFailure(op, "precondition not met");
@@ -106,14 +106,14 @@ struct LinalgBasePromotionPattern : public RewritePattern {
     // So to fail properly, we should be cloning
     // the op and deleting the previous op. This
     // needs more investigation.
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
     std::optional<linalg::LinalgOp> promotedOp =
         promoteSubViews(rewriter, cast<linalg::LinalgOp>(op), options);
     if (!promotedOp) {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
       return op->emitError("subview promotion failed");
     }
-    rewriter.finalizeRootUpdate(op);
+    rewriter.finalizeOpModification(op);
     filter.replaceLinalgTransformationFilter(rewriter, op);
     return success();
   }

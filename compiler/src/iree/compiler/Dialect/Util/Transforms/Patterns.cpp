@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/EquivalenceClasses.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
@@ -89,7 +88,7 @@ struct FoldBlockArgumentsPattern
       return failure(); // no dupes at all
     }
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
 
     // Iterate over all blocks after the entry block. We can't change the entry
     // block as it is part of the function signature.
@@ -154,7 +153,7 @@ struct FoldBlockArgumentsPattern
           auto operands = successorOperands.slice(
               successorOperands.getProducedOperandCount(),
               successorOperands.size());
-          rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
+          rewriter.modifyOpInPlace(blockSource.branchOp, [&]() {
             eraseOperands(operands, elidedArgs);
           });
         }
@@ -164,10 +163,10 @@ struct FoldBlockArgumentsPattern
     }
 
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
       return success();
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
       return failure();
     }
   }
@@ -216,7 +215,7 @@ struct ElideBranchOperandsPattern
       }
     }
 
-    rewriter.startRootUpdate(op);
+    rewriter.startOpModification(op);
 
     // Iterate over all blocks after the entry block. We can't change the entry
     // block as it is part of the function signature.
@@ -290,7 +289,7 @@ struct ElideBranchOperandsPattern
         auto operands =
             successorOperands.slice(successorOperands.getProducedOperandCount(),
                                     successorOperands.size());
-        rewriter.updateRootInPlace(blockSource.branchOp, [&]() {
+        rewriter.modifyOpInPlace(blockSource.branchOp, [&]() {
           eraseOperands(operands, elidedArgs);
         });
       }
@@ -299,10 +298,10 @@ struct ElideBranchOperandsPattern
     }
 
     if (didChange) {
-      rewriter.finalizeRootUpdate(op);
+      rewriter.finalizeOpModification(op);
       return success();
     } else {
-      rewriter.cancelRootUpdate(op);
+      rewriter.cancelOpModification(op);
       return failure();
     }
   }

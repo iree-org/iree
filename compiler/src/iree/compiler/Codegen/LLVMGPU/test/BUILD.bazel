@@ -18,11 +18,13 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "amdgpu_contraction_distribution.mlir",
             "attention.mlir",
             "conv_pipeline_test.mlir",
             "convert_to_nvvm.mlir",
             "convert_to_rocdl.mlir",
             "create_async_groups.mlir",
+            "create_tile_sizes.mlir",
             "distribute_to_thread.mlir",
             "elementwise_pipeline.mlir",
             "cast_address_space_function.mlir",

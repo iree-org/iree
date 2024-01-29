@@ -33,7 +33,7 @@ struct TestVectorExtIteratorPass
   }
   // Prints the layout so that LIT can test it for correctness.
   static void printFn(const LayoutIterator::State &state) {
-    for (const auto &[dim, it] : state) {
+    for (const auto &[dim, it] : state.iterators) {
       llvm::outs() << stringifyLayoutDimension(dim).str() + ":" +
                           std::to_string(*it) + ", ";
     }
@@ -66,7 +66,7 @@ struct TestVectorExtIteratorPass
     DenseMap<LayoutDimension, int64_t> strides;
     LayoutIterator iterator(layout, strides);
     auto frozenIterator = createFrozenIterator(op->getContext(), strides);
-    iterator.maybeFreezeAndConcatenate(frozenIterator);
+    iterator.maybeFreezeAndConcatenate(frozenIterator.getState());
     iterator.apply(printFn);
   }
   void runOnOperation() override {

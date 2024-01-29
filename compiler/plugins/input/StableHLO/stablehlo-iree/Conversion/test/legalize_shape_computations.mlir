@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-legalize-shape-computations \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-shape-computations))" \
 // RUN:          --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @get_dimension_size

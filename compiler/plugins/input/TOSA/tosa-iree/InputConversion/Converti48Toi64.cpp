@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Tosa/Transforms/Passes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 using namespace mlir;
@@ -57,7 +58,7 @@ public:
   matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
     llvm::SmallVector<Type, 4> newResults;
-    if (isa<func::FuncOp>(op)) {
+    if (isa<mlir::FunctionOpInterface>(op)) {
       return rewriter.notifyMatchFailure(op, "is a func op");
     }
 
@@ -138,12 +139,12 @@ void Converti48Toi64Pass::runOnOperation() {
 
   // Operations are legal if they don't contain any illegal type.
   target.markUnknownOpDynamicallyLegal([](Operation *op) {
-    if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
-      for (Type type : funcOp.getFunctionType().getInputs()) {
+    if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
+      for (Type type : funcOp.getArgumentTypes()) {
         if (isIllegalType(type))
           return false;
       }
-      for (Type type : funcOp.getFunctionType().getResults()) {
+      for (Type type : funcOp.getResultTypes()) {
         if (isIllegalType(type))
           return false;
       }
@@ -179,7 +180,8 @@ void Converti48Toi64Pass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createConverti48Toi64() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConverti48Toi64() {
   return std::make_unique<Converti48Toi64Pass>();
 }
 

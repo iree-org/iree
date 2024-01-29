@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
@@ -318,7 +319,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
         convertedResultTypes);
 
     // Update the function in place.
-    rewriter.startRootUpdate(srcOp);
+    rewriter.startOpModification(srcOp);
     srcOp.setType(newFuncType);
     rewriteFuncAttrs(srcOp);
     setFuncEncodings(srcOp, oldFuncType, newFuncType);
@@ -330,7 +331,7 @@ struct BuiltinFuncOpPattern final : OpConversionPattern<func::FuncOp> {
       return failure();
     }
 
-    rewriter.finalizeRootUpdate(srcOp);
+    rewriter.finalizeOpModification(srcOp);
     return success();
   }
 };
@@ -371,7 +372,7 @@ struct GlobalOpPattern final : OpConversionPattern<ml_program::GlobalOp> {
       return rewriter.notifyMatchFailure(globalOp,
                                          "result type conversion failed");
     }
-    rewriter.updateRootInPlace(globalOp, [&]() {
+    rewriter.modifyOpInPlace(globalOp, [&]() {
       globalOp.setType(newType);
       if (Attribute oldValue = globalOp.getValueAttr()) {
         globalOp.setValueAttr(
