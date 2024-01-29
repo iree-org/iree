@@ -196,7 +196,6 @@ nav:
           - "developers/performance/profiling-gpu-vulkan.md"
           - "developers/performance/profiling-with-tracy.md"
       - "Design docs":
-          - "developers/design-docs/cuda-backend.md"
           - "developers/design-docs/design-roadmap.md"
           - "developers/design-docs/function-abi.md"
           - "developers/design-docs/invocation-execution-model.md"
