@@ -126,11 +126,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/developers/design-docs/cuda-backend/</loc>
-         <lastmod>2024-01-29</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://iree.dev/developers/design-docs/design-roadmap/</loc>
          <lastmod>2024-01-29</lastmod>
          <changefreq>daily</changefreq>

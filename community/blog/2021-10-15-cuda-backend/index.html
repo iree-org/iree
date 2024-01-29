@@ -2494,8 +2494,6 @@
       
         
       
-        
-      
     
     
       
@@ -2527,26 +2525,6 @@
             Design docs
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../../developers/design-docs/cuda-backend/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    CUDA backend design
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -3261,7 +3239,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 20a8 8 0 0 0 8-8 8 8 0 0 0-8-8 8 8 0 0 0-8 8 8 8 0 0 0 8 8m0-18a10 10 0 0 1 10 10 10 10 0 0 1-10 10C6.47 22 2 17.5 2 12A10 10 0 0 1 12 2m.5 5v5.25l4.5 2.67-.75 1.23L11 13V7h1.5Z"/></svg>
                     <span class="md-ellipsis">
                       
-                        6 min read
+                        7 min read
                       
                     </span>
                   </div>
@@ -3372,8 +3350,39 @@ in the IR, it is then de-serialized by the HAL layer.</p>
 <p>Together those 3 steps are enough to provide most of the functionality and we
 can now successfully compile full models.</p>
 <p><img alt="Compilation diagram" src="../cuda-bring_up.png" /></p>
-<p>The steps to reproduce running a simple op end to end through CUDA backend are
-described <a href="../../../developers/design-docs/cuda-backend/#example">here</a>.</p>
+<p>To reproduce running a simple op end to end through CUDA backend, save the
+following mlir in <code>/tmp/add.mlir</code> and then run the following given commands:</p>
+<div class="highlight"><pre><span></span><code>func.func @add(%arg0: tensor&lt;4xf32&gt;, %arg1: tensor&lt;4xf32&gt;) -&gt; tensor&lt;4xf32&gt; {
+  %0 = tensor.empty() : tensor&lt;4xf32&gt;
+  %1 = linalg.generic {
+    indexing_maps = [
+      affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;, affine_map&lt;(d0) -&gt; (d0)&gt;], iterator_types = [&quot;parallel&quot;]}
+      ins(%arg0, %arg1 : tensor&lt;4xf32&gt;, tensor&lt;4xf32&gt;)
+      outs(%0 : tensor&lt;4xf32&gt;) {
+  ^bb0(%in: f32, %in_0: f32, %out: f32):
+    %2 = arith.addf %in, %in_0 : f32
+    linalg.yield %2 : f32
+  } -&gt; tensor&lt;4xf32&gt;
+  return %1 : tensor&lt;4xf32&gt;
+}
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="c1"># First compile into a VM bytecode module.</span>
+$<span class="w"> </span>../iree-build/tools/iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>/tmp/add.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-o<span class="w"> </span>/tmp/add.vmfb
+
+<span class="c1"># Run the module through CUDA HAL backend.</span>
+$<span class="w"> </span>../iree-build/tools/iree-run-module<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--device<span class="o">=</span>cuda<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--module<span class="o">=</span>/tmp/add.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--function<span class="o">=</span>add<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[1 2 3 4]&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="o">=</span><span class="s2">&quot;4xf32=[2 2 2 2]&quot;</span>
+
+EXEC<span class="w"> </span>@add
+<span class="nv">4xf32</span><span class="o">=</span><span class="m">3</span><span class="w"> </span><span class="m">4</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">6</span>
+</code></pre></div>
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">link</a></h2>
 <p>Now that we have enabled functionality we need to look at the performance. Once
 again we can leverage existing MLIR transformations to speed up the developement
