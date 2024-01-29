@@ -134,7 +134,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: Downloading markdownlint
-        run: npm install -g markdownlint-cli
+        run: npm install -g markdownlint-cli@0.38.0
       - name: Running markdownlint
         run: ./build_tools/scripts/run_markdownlint.sh
 
