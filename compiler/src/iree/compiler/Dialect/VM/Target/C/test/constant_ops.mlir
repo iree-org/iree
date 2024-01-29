@@ -46,7 +46,7 @@ vm.module @rodata_ops {
 // -----
 
 vm.module @constant_ops {
-  // CHECK-LABEL: constant_ops_neg_constant
+  // CHECK: constant_ops_neg_constant([[ARGS:[^)]*]]) {
   vm.func @neg_constant() -> i32 {
     // CHECK: int32_t [[CONST:[^ ]*]];
     // CHECK-NOT: [[CONST]] = 4294967292;

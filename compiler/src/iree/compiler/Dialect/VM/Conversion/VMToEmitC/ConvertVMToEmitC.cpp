@@ -370,14 +370,17 @@ void releaseRefs(OpBuilder &builder, Location location,
 
   auto &funcAnalysis = moduleAnalysis.lookupFunction(funcOp);
 
-  for (auto pair : funcAnalysis.localRefs()) {
-    Operation *op = pair.second;
+  if (funcAnalysis.hasLocalRefs()) {
 
-    assert(isa<emitc::ApplyOp>(op));
+    for (auto pair : funcAnalysis.localRefs()) {
+      Operation *op = pair.second;
 
-    Value localRef = cast<emitc::ApplyOp>(op).getResult();
+      assert(isa<emitc::ApplyOp>(op));
 
-    emitc_builders::ireeVmRefRelease(builder, location, localRef);
+      Value localRef = cast<emitc::ApplyOp>(op).getResult();
+
+      emitc_builders::ireeVmRefRelease(builder, location, localRef);
+    }
   }
 
   // We only release the original arguments not the results which were appended
@@ -585,7 +588,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         loc, moduleName + "_destroy", funcType);
     funcOp.setPrivate();
 
-    moduleAnalysis.addDummy(funcOp);
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
 
     Block *entryBlock = funcOp.addEntryBlock();
     const BlockArgument moduleArg = funcOp.getArgument(moduleArgIndex);
@@ -637,7 +640,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         loc, moduleName + "_alloc_state", funcType);
     funcOp.setPrivate();
 
-    moduleAnalysis.addDummy(funcOp);
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -817,7 +820,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         loc, moduleName + "_free_state", funcType);
     funcOp.setPrivate();
 
-    moduleAnalysis.addDummy(funcOp);
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -916,7 +919,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         loc, moduleName + "_resolve_import", funcType);
     funcOp.setPrivate();
 
-    moduleAnalysis.addDummy(funcOp);
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -994,12 +997,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         loc, moduleName + "_create", funcType);
     funcOp.setPublic();
 
-    moduleAnalysis.addDummy(funcOp);
-
     // This function needs an iree_vm_native_module_descriptor_t that is emitted
     // by the CModuleTarget at the moment. So we add a marker to this function
     // and delay the printing of it.
-    attachAttribute(funcOp, "vm.emit_at_end", UnitAttr::get(ctx));
+    moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/true);
 
     Block *entryBlock = funcOp.addEntryBlock();
 
@@ -1168,7 +1169,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 ///     - structured preprocessor directive
 ///     - struct definition
 ///     - remove all uses of `attachAttribute`
-///       - vm.emit_at_end
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1462,10 +1462,11 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     builder.create<emitc::VerbatimOp>(loc, descriptor);
 
     // move functions marked with vm.emit_at_end to the end of the module
-    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
-      if (func->hasAttr("vm.emit_at_end")) {
+    auto funcs =
+        SmallVector<mlir::func::FuncOp>(moduleOp.getOps<mlir::func::FuncOp>());
+    for (auto func : funcs) {
+      if (typeConverter.analysis.lookupFunction(func).shouldEmitAtEnd()) {
         func->moveBefore(moduleOp.getBlock().getTerminator());
-        func->removeAttr("vm.emit_at_end");
       }
     }
 

@@ -22,12 +22,14 @@ namespace mlir::iree_compiler::IREE::VM {
 struct FuncAnalysis {
 public:
   FuncAnalysis() = default;
+  FuncAnalysis(bool emitAtEnd) : emitAtEnd(emitAtEnd) {}
   FuncAnalysis(IREE::VM::FuncOp funcOp) {
     Operation *op = funcOp.getOperation();
     registerAllocation = RegisterAllocation(op);
     valueLiveness = ValueLiveness(op);
     originalFunctionType = funcOp.getFunctionType();
     callingConvention = makeCallingConventionString(funcOp).value();
+    refs = DenseMap<int64_t, Operation *>{};
   }
   FuncAnalysis(mlir::func::FuncOp funcOp) {
     originalFunctionType = funcOp.getFunctionType();
@@ -51,57 +53,76 @@ public:
   FuncAnalysis(const FuncAnalysis &) = delete;
   FuncAnalysis &operator=(const FuncAnalysis &) = delete;
 
-  StringRef getCallingConvention() { return callingConvention; }
+  StringRef getCallingConvention() {
+    assert(callingConvention.has_value());
+    return callingConvention.value();
+  }
 
   StringRef getExportName() { return exportName.value(); }
 
   bool isExported() { return exportName.has_value(); }
 
-  FunctionType getFunctionType() { return originalFunctionType; }
+  bool shouldEmitAtEnd() { return emitAtEnd.value_or(false); }
+
+  FunctionType getFunctionType() {
+    assert(originalFunctionType.has_value());
+    return originalFunctionType.value();
+  }
 
   int getNumRefRegisters() {
-    return registerAllocation.getMaxRefRegisterOrdinal() + 1;
+    assert(registerAllocation.has_value());
+    return registerAllocation.value().getMaxRefRegisterOrdinal() + 1;
   }
 
   int getNumRefArguments() {
-    assert(originalFunctionType);
-    return llvm::count_if(originalFunctionType.getInputs(), [](Type inputType) {
-      return isa<IREE::VM::RefType>(inputType);
-    });
+    assert(originalFunctionType.has_value());
+    return llvm::count_if(
+        originalFunctionType.value().getInputs(),
+        [](Type inputType) { return isa<IREE::VM::RefType>(inputType); });
   }
 
   int getNumLocalRefs() { return getNumRefRegisters() - getNumRefArguments(); }
 
   uint16_t getRefRegisterOrdinal(TypedValue<IREE::VM::RefType> ref) {
-    return registerAllocation.mapToRegister(ref).ordinal();
+    assert(registerAllocation.has_value());
+    return registerAllocation.value().mapToRegister(ref).ordinal();
   }
 
   bool isMove(Value ref, Operation *op) {
     assert(isa<IREE::VM::RefType>(ref.getType()));
-    bool lastUse = valueLiveness.isLastValueUse(ref, op);
+    assert(valueLiveness.has_value());
+    bool lastUse = valueLiveness.value().isLastValueUse(ref, op);
     return lastUse && false;
   }
 
   void cacheLocalRef(int64_t ordinal, emitc::ApplyOp applyOp) {
-    assert(!refs.count(ordinal) && "ref was already cached");
-    refs[ordinal] = applyOp.getOperation();
+    assert(refs.has_value());
+    assert(!refs.value().count(ordinal) && "ref was already cached");
+    refs.value()[ordinal] = applyOp.getOperation();
   }
 
   emitc::ApplyOp lookupLocalRef(int64_t ordinal) {
-    assert(refs.count(ordinal) && "ref not found in cache");
-    Operation *op = refs[ordinal];
+    assert(refs.has_value());
+    assert(refs.value().count(ordinal) && "ref not found in cache");
+    Operation *op = refs.value()[ordinal];
     return cast<emitc::ApplyOp>(op);
   }
 
-  DenseMap<int64_t, Operation *> &localRefs() { return refs; }
+  bool hasLocalRefs() { return refs.has_value(); }
+
+  DenseMap<int64_t, Operation *> &localRefs() {
+    assert(refs.has_value());
+    return refs.value();
+  }
 
 private:
-  RegisterAllocation registerAllocation;
-  ValueLiveness valueLiveness;
-  DenseMap<int64_t, Operation *> refs;
-  FunctionType originalFunctionType;
-  std::string callingConvention;
+  std::optional<RegisterAllocation> registerAllocation;
+  std::optional<ValueLiveness> valueLiveness;
+  std::optional<DenseMap<int64_t, Operation *>> refs;
+  std::optional<FunctionType> originalFunctionType;
+  std::optional<std::string> callingConvention;
   std::optional<std::string> exportName;
+  std::optional<bool> emitAtEnd;
 };
 
 struct ModuleAnalysis {
@@ -120,8 +141,8 @@ struct ModuleAnalysis {
   ModuleAnalysis(const ModuleAnalysis &) = delete;
   ModuleAnalysis &operator=(const ModuleAnalysis &) = delete;
 
-  void addDummy(mlir::func::FuncOp func) {
-    functions[func.getOperation()] = FuncAnalysis();
+  void addDummy(mlir::func::FuncOp func, bool emitAtEnd) {
+    functions[func.getOperation()] = FuncAnalysis(emitAtEnd);
   }
 
   void addFromExport(mlir::func::FuncOp func, IREE::VM::ExportOp exportOp) {
