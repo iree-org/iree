@@ -6,7 +6,7 @@ tags:
   - CUDA
 ---
 
-# CUDA HAL Driver
+# CUDA HAL driver
 
 This document lists technical details regarding the CUDA implemenation of
 IREE's Hardware Abstraction Layer, called a CUDA HAL driver.

@@ -6,7 +6,7 @@ tags:
   - Metal
 ---
 
-# Metal HAL Driver
+# Metal HAL driver
 
 This document lists technical details regarding the Metal implemenation of
 IREE's Hardware Abstraction Layer, called a Metal HAL driver.
