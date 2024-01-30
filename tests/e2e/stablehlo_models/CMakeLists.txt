@@ -38,6 +38,38 @@ iree_lit_test_suite(
 
 iree_static_linker_test(
   NAME
+    mnist_fake_weights_llvm_cpu_static_bytecode_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+)
+
+iree_static_linker_test(
+  NAME
+    mnist_fake_weights_llvm_cpu_static_c_test
+  SRC
+    "mnist_fake_weights.mlir"
+  STATIC_LIB_PREFIX
+    mnist_fake_weights_linked_llvm_cpu
+  ENTRY_FUNCTION
+    "predict"
+  FUNCTION_INPUTS
+    "1x28x28x1xf32"
+  COMPILER_FLAGS
+    "--iree-input-type=stablehlo"
+    "--iree-vm-target-index-bits=32"
+  EMITC
+)
+
+iree_static_linker_test(
+  NAME
     simple_mul_llvm_cpu_static_bytecode_test
   SRC
     "${IREE_ROOT_DIR}/samples/static_library/simple_mul.mlir"
