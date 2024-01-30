@@ -18,6 +18,8 @@ guides, and instructions on building from source.
 git clone https://github.com/openxla/iree
 cmake -G Ninja -B ../iree-build/ .
 cmake --build ../iree-build/
+```
+
 #### Project Status
 
 IREE is still in its early phase. We have settled down on the overarching
