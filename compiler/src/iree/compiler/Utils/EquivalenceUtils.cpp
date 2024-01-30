@@ -34,7 +34,7 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
 static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping);
 
-static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
+bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
   IRMapping mapping;
   return isStructurallyEquivalentTo(lhs, rhs, mapping);
 }

@@ -132,6 +132,7 @@ fi
 excluded_tests+=(
   "iree/samples/custom_dispatch/cpu/embedded/example_hal.mlir.test"
   "iree/samples/custom_dispatch/cpu/embedded/example_stream.mlir.test"
+  "iree/samples/custom_dispatch/cpu/embedded/example_transform.mlir.test"
 )
 
 ctest_args=(

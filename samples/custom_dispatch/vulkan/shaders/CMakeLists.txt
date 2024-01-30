@@ -44,7 +44,18 @@ add_custom_command(
       ${CMAKE_CURRENT_SOURCE_DIR}/simple_mul_inplace.glsl
   VERBATIM
 )
+add_custom_command(
+  OUTPUT one_workgroup_argmax_subgroup_f32.spv
+  DEPENDS one_workgroup_argmax_subgroup_f32.glsl
+  COMMAND ${GLSLC}
+      -fshader-stage=compute
+      --target-spv=spv1.3
+      -o one_workgroup_argmax_subgroup_f32.spv
+      ${CMAKE_CURRENT_SOURCE_DIR}/one_workgroup_argmax_subgroup_f32.glsl
+  VERBATIM
+)
 add_custom_target(iree_samples_custom_dispatch_vulkan_shaders_spv DEPENDS
+  ${CMAKE_CURRENT_BINARY_DIR}/one_workgroup_argmax_subgroup_f32.spv
   ${CMAKE_CURRENT_BINARY_DIR}/simple_mul.spv
   ${CMAKE_CURRENT_BINARY_DIR}/simple_mul_inplace.spv
 )
@@ -56,8 +67,10 @@ iree_lit_test_suite(
   SRCS
     "example.mlir"
     "example_inline.mlir"
+    "example_transform.mlir"
   DATA
     ${_SPV_TARGET}
+    iree::samples::custom_dispatch::vulkan::shaders::example_transform_spec.mlir
   TOOLS
     FileCheck
     iree-compile

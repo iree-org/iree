@@ -11,6 +11,12 @@
 
 namespace mlir::iree_compiler {
 
+// Recursively compares two regions for structural equivalence.
+//
+// Structural equivalence ensures that operations in both regions
+// |lhs| and |rhs| have the same attributes and same use-def structure.
+bool isStructurallyEquivalentTo(Region &lhs, Region &rhs);
+
 // Recursively compares two operations for structural equivalence.
 //
 // Structural equivalence ensures that operations in the regions of both the

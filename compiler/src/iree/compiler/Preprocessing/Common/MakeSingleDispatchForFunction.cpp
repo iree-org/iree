@@ -19,10 +19,6 @@ namespace {
 struct MakeSingleDispatchForFunctionPass
     : public MakeSingleDispatchForFunctionBase<
           MakeSingleDispatchForFunctionPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
-  }
-
   void runOnOperation() override;
 };
 } // namespace
