@@ -26,13 +26,13 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -49,7 +49,11 @@ static llvm::cl::opt<int>
 
 namespace {
 
-static StringRef getTargetArch(func::FuncOp entryPoint) {
+// HACK: this is not the proper way to do this; each function may have a
+// locally-scoped arch in cases of multi-versioning and randomly picking any
+// function is going to produce bad results.
+
+static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
@@ -63,7 +67,7 @@ static StringRef getTargetArch(func::FuncOp entryPoint) {
 }
 
 static StringRef getChipset(ModuleOp m) {
-  for (func::FuncOp funcOp : m.getOps<func::FuncOp>()) {
+  for (auto funcOp : m.getOps<mlir::FunctionOpInterface>()) {
     if (isEntryPoint(funcOp)) {
       return getTargetArch(funcOp);
     }
@@ -208,8 +212,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
       StringRef chipset = getChipset(m);
       FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
-      populateAMDGPUToROCDLConversionPatterns(converter, llvmPatterns,
-                                              *maybeChipset);
+      populateAMDGPUToROCDLConversionPatterns(
+          converter, llvmPatterns, maybeChipset.value_or(amdgpu::Chipset()));
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
                                            gpu::amd::Runtime::Unknown);

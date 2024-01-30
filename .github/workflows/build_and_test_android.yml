@@ -111,10 +111,6 @@ jobs:
     strategy:
       matrix:
         target:
-          # Pixel 4 ships an old Adreno GPU driver. There are quite a few bugs
-          # triggered by our tests. Disable running tests entirely on Pixel 4.
-          - device-name: pixel-4
-            label-exclude: "vulkan"
           - device-name: pixel-6-pro
             label-exclude: "^requires-gpu"
           - device-name: moto-edge-x30

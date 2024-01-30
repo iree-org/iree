@@ -51,16 +51,16 @@ static inline iree_uk_mmt4d_type_t iree_uk_mmt4d_type(iree_uk_uint32_t flags) {
     case IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16:
       return iree_uk_mmt4d_type_bf16bf16bf16;
     default:
-      // This unreachable statement is not just an optimization, it also works
-      // around a LLVM/riscv32 miscompile.
-
-      // When we used to have a iree_uk_mmt4d_type_none value equal to 0 and
-      // were returning it here, that caused this whole switch statement to be
-      // miscompiled by LLVM/riscv32 as if it were UB. That value was passed to
+      // Work around a LLVM/riscv32 miscompile. Without the unreachable here,
+      // returning (iree_uk_mmt4d_type_t)0 causes this whole switch statement to
+      // be miscompiled by LLVM/riscv32 as if it were UB, as the 0 was passed to
       // `iree_uk_type_bit_count(x)`, which evaluates to `1<<(x - 3)`, which is
-      // UB if x<3. So it was fair to treat that default: clause as UB, but
-      // LLVM/riscv32 was incorrectly treating the whole switch as UB.
-      IREE_UK_ASSUME_UNREACHABLE;
+      // UB if x<3.
+#if defined(IREE_UK_COMPILER_CLANG) && defined(IREE_UK_ARCH_RISCV_32)
+      __builtin_unreachable();
+#endif
+      // Shouldn't happen, validated earlier.
+      return (iree_uk_mmt4d_type_t)0;
   }
 }
 

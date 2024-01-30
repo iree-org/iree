@@ -23,6 +23,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -152,9 +153,9 @@ materializeExecutablesFromSourceOps(mlir::ModuleOp moduleOp,
 //===----------------------------------------------------------------------===//
 
 // Verifies that all types used with the given entry point are supportable.
-static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
-  for (auto inputType :
-       llvm::enumerate(entryFuncOp.getFunctionType().getInputs())) {
+static LogicalResult
+verifyEntryPointTypes(mlir::FunctionOpInterface entryFuncOp) {
+  for (auto inputType : llvm::enumerate(entryFuncOp.getArgumentTypes())) {
     if (llvm::isa<IREE::Stream::BindingType>(inputType.value()) ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
@@ -195,7 +196,7 @@ makePipelineLayoutAttr(const PipelineLayout &pipelineLayout,
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
-static void convertOperandUsage(mlir::func::FuncOp sourceFuncOp,
+static void convertOperandUsage(mlir::FunctionOpInterface sourceFuncOp,
                                 BlockArgument arg, unsigned pushConstantIdx,
                                 OpBuilder &builder) {
   auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
@@ -210,7 +211,7 @@ static void convertOperandUsage(mlir::func::FuncOp sourceFuncOp,
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
 static void
-convertBindingUsage(mlir::func::FuncOp sourceFuncOp, BlockArgument arg,
+convertBindingUsage(mlir::FunctionOpInterface sourceFuncOp, BlockArgument arg,
                     IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
                     IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
   if (arg.use_empty())

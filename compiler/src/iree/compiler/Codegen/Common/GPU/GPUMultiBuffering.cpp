@@ -73,7 +73,7 @@ private:
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUMultiBuffering(unsigned numBuffers) {
   return std::make_unique<GPUMultiBufferingPass>(numBuffers);
 }

@@ -45,7 +45,7 @@ struct UsageInfo {
   // stream.executable ops mapped by name.
   llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
   // stream.executable exported function -> dispatches to it.
-  llvm::MapVector<mlir::func::FuncOp, SmallVector<IREE::Stream::CmdDispatchOp>>
+  llvm::MapVector<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>
       exportDispatchOps;
 
   // TODO(benvanik): resource allocations.
@@ -67,8 +67,8 @@ struct UsageInfo {
     for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
       executableOps[executableOp.getName()] = executableOp;
     }
-    for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-      funcLikeOp.walk([&](Operation *op) {
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+      funcOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
             .Case<IREE::Util::BufferConstantOp>(
                 [&](auto op) { bufferConstantOps.push_back(op); })
@@ -291,7 +291,7 @@ static void prettyPrintSyncInfo(const UsageInfo &usageInfo, bool verbose,
 static void prettyPrintStreamInfo(const UsageInfo &usageInfo,
                                   IREE::Stream::CmdExecuteOp executeOp,
                                   llvm::raw_fd_ostream &os) {
-  auto parentOp = executeOp->getParentOfType<FunctionOpInterface>();
+  auto parentOp = executeOp->getParentOfType<mlir::FunctionOpInterface>();
 
   prettyPrintItemHeader(
       llvm::formatv("stream.cmd.execute", parentOp->getName().getStringRef()),

@@ -48,7 +48,7 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   return config.getAs<spirv::TargetEnvAttr>(spirv::getTargetEnvAttrName());
 }
 
-std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
+std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
       getAllEntryPoints(moduleOp);
@@ -64,8 +64,8 @@ std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp) {
   return target.getResourceLimits().getSubgroupSize();
 }
 
-FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
-                                                 int tilingLevel) {
+FailureOr<SmallVector<int64_t>>
+getSPIRVTileSize(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   auto config = getLoweringConfig(computeOps);
   if (failed(config)) {
@@ -76,7 +76,7 @@ FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
 }
 
 FailureOr<linalg::TileSizeComputationFunction>
-getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
+getSPIRVTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   auto tileSizes = getSPIRVTileSize(funcOp, tilingLevel);
   if (failed(tileSizes))
     return failure();
@@ -91,7 +91,8 @@ getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
 }
 
 FailureOr<scf::SCFTileSizeComputationFunction>
-getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel) {
+getSPIRVScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp,
+                             int tilingLevel) {
   FailureOr<SmallVector<int64_t>> tileSizes =
       getSPIRVTileSize(funcOp, tilingLevel);
   if (failed(tileSizes))

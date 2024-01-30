@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-tosa-convert-i48-to-i64 --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-tosa-convert-i48-to-i64))" --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @test_all_i48_converted
 func.func @test_all_i48_converted(%arg0: tensor<2x2xi48>) -> tensor<2x2xi48> {

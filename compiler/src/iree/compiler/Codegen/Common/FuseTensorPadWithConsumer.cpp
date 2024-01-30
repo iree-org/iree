@@ -18,7 +18,7 @@ struct FuseTensorPadWithConsumerPass final
     : public FuseTensorPadWithConsumerBase<FuseTensorPadWithConsumerPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     RewritePatternSet patterns(context);
     patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
@@ -31,7 +31,7 @@ struct FuseTensorPadWithConsumerPass final
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseTensorPadWithConsumerPass() {
   return std::make_unique<FuseTensorPadWithConsumerPass>();
 }

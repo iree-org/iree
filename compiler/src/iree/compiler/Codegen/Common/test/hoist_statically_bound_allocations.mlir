@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hoist-statically-bound-allocations %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations))" %s | FileCheck %s
 
 func.func @non_entry_bb_allocas() {
   cf.br ^bb1

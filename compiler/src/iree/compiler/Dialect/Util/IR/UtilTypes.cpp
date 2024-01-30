@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -177,7 +176,8 @@ bool isValueUsableForOp(Value value, Block *block,
       return true;
     }
   } else if (definingBlock->isEntryBlock() &&
-             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
+             llvm::isa<mlir::FunctionOpInterface>(
+                 definingBlock->getParentOp())) {
     // Function entry block always dominates - fast path for constants.
     return true;
   } else {

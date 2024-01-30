@@ -48,7 +48,8 @@ void GPUGeneralizeNamedOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUGeneralizeNamedOpsPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUGeneralizeNamedOpsPass() {
   return std::make_unique<GPUGeneralizeNamedOpsPass>();
 }
 

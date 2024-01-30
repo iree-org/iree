@@ -47,7 +47,7 @@ getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp);
 /// Returns the translation info for the `funcOp` (by looking at the entry
 /// point). Returns `nullptr` on failure.
 inline IREE::Codegen::TranslationInfoAttr
-getTranslationInfo(func::FuncOp funcOp) {
+getTranslationInfo(mlir::FunctionOpInterface funcOp) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp))
     return nullptr;
@@ -79,7 +79,7 @@ std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
 /// Sets and overwrites the dispatch workgroup/subgroup size for the given entry
 /// point function. Returns failure if the given entry point is not exported via
 /// hal.executable.export.
-LogicalResult setDispatchConfig(func::FuncOp entryPoint,
+LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
                                 std::optional<int64_t> subgroupSize);
 
@@ -87,7 +87,7 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
 /// Returns failure if the given entry point is not exported via
 /// hal.executable.export.
 LogicalResult
-setTranslationInfo(func::FuncOp entryPoint,
+setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo);
 
 //===----------------------------------------------------------------------===//
@@ -133,13 +133,13 @@ void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 /// tile sizes to use for the operation, and pass pipeline to use for the
 /// translation.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
+    mlir::FunctionOpInterface entryPointFn, Operation *op,
+    TileSizesListTypeRef tileSizes,
     ScalableTileFlagsListTypeRef scalableTileFlags,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    unsigned softwarePipelineDepth = 0,
-    unsigned softwarePipelineStoreStage = 1) {
+    DictionaryAttr pipelineConfig = DictionaryAttr()) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
@@ -147,23 +147,22 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
     return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, softwarePipelineDepth,
-      softwarePipelineStoreStage);
+      entryPointFn.getContext(), passPipeline, SymbolRefAttr(), pipelineConfig);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
 /// Overload of setOpConfigAndEntryPointFnTranslation() for the "no scalable
 /// flags" case.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
+    mlir::FunctionOpInterface entryPointFn, Operation *op,
+    TileSizesListTypeRef tileSizes,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    unsigned softwarePipelineDepth = 0,
-    unsigned softwarePipelineStoreStage = 1) {
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, {}, passPipeline, workgroupSize,
-      subgroupSize, softwarePipelineDepth, softwarePipelineStoreStage);
+    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizes, {},
+                                               passPipeline, workgroupSize,
+                                               subgroupSize, pipelineConfig);
 }
 
 //===----------------------------------------------------------------------===//

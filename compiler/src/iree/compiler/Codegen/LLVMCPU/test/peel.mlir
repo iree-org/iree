@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-peel -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-peel))" -split-input-file %s | FileCheck %s
 
 func.func @peel_static_matmul() {
   %c16 = arith.constant 16 : index

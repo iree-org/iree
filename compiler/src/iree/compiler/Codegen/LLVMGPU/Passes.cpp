@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+
 #include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
@@ -21,6 +22,7 @@
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
@@ -432,7 +434,7 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-  auto getSubgroupSizeFn = [](func::FuncOp func) -> int {
+  auto getSubgroupSizeFn = [](mlir::FunctionOpInterface func) -> int {
     auto moduleOp = func->getParentOfType<ModuleOp>();
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
         getAllEntryPoints(moduleOp);
@@ -560,8 +562,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  auto getSharedMemoryLimit = [](func::FuncOp) { return 163 * 1024; };
-  auto getIndexBitwidth = [](func::FuncOp) { return 64; };
+  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface) {
+    return 163 * 1024;
+  };
+  auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 

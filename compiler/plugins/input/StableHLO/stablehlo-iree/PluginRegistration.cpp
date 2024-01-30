@@ -49,14 +49,13 @@ struct StableHLOOptions {
 };
 
 static bool checkOpForTuples(Operation *op) {
-  if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
-    FunctionType type = dyn_cast<FunctionType>(funcOp.getFunctionType());
-    for (auto t : type.getResults()) {
+  if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
+    for (auto t : funcOp.getArgumentTypes()) {
       if (isa<TupleType>(t)) {
         return true;
       }
     }
-    for (auto t : type.getInputs()) {
+    for (auto t : funcOp.getResultTypes()) {
       if (isa<TupleType>(t)) {
         return true;
       }

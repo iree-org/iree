@@ -7,7 +7,7 @@
 #ifndef TORCH_IREE_INPUTCONVERSION_PASSES_H_
 #define TORCH_IREE_INPUTCONVERSION_PASSES_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::TorchInput {
@@ -19,12 +19,13 @@ struct TorchToIREELoweringPipelineOptions
       llvm::cl::desc("Use strict symbolic shapes."), llvm::cl::init(true)};
 };
 
-std::unique_ptr<OperationPass<func::FuncOp>> createBitCastQuantTensorPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createBitCastQuantTensorPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertTMTensorToLinalgExtPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSetStrictSymbolicShapesPass();
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.

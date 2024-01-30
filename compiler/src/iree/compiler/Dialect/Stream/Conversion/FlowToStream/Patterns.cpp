@@ -12,9 +12,9 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -803,7 +803,7 @@ struct ConvertExecutableOp
       // Update the entry point signatures in the module.
       // Dispatch tensor arguments become bindings and all others are preserved
       // as adaptor. Note that we only touch public (exported) functions.
-      for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+      for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
         if (!funcOp.isPublic())
           continue;
 

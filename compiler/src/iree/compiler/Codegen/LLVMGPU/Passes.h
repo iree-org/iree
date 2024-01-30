@@ -73,7 +73,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCastAddressSpaceFunction();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUDistribute();
 
 /// Create pass selecting the lowering strategy for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -85,7 +86,7 @@ createLLVMGPULowerExecutableTargetPass();
 
 // Pass to pack shared memory allocations in order to reduce shared memory
 // usage.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPackSharedMemoryAlloc();
 
 enum class GPUTensorCoreType {
@@ -94,22 +95,25 @@ enum class GPUTensorCoreType {
 };
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 //. Pass to pad out tensors up to static dimensions.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUTensorPadPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTileAndDistribute(bool distributeToWarp = false);
 
 /// Lower vector ops before convertion to LLVM.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorLoweringPass();
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 /// Lowering calling vectorization patterns.

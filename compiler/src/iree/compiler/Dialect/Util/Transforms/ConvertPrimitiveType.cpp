@@ -245,17 +245,21 @@ struct ConvertTypesPass : public Base {
 
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
+    populateFunctionOpInterfaceTypeConversionPattern<IREE::Util::InitializerOp>(
+        patterns, typeConverter);
+    populateFunctionOpInterfaceTypeConversionPattern<IREE::Util::FuncOp>(
+        patterns, typeConverter);
 
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
         return typeConverter.isLegal(globalOp.getGlobalType());
-      } else if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
-        for (Type type : funcOp.getFunctionType().getInputs()) {
+      } else if (auto funcOp = dyn_cast<mlir::FunctionOpInterface>(op)) {
+        for (Type type : funcOp.getArgumentTypes()) {
           if (!typeConverter.isLegal(type))
             return false;
         }
-        for (Type type : funcOp.getFunctionType().getResults()) {
+        for (Type type : funcOp.getResultTypes()) {
           if (!typeConverter.isLegal(type))
             return false;
         }

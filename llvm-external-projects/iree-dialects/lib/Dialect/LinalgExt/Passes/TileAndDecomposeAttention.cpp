@@ -195,7 +195,8 @@ static Value computeQKTranspose(Value query, Value key, Value output,
 static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
                           ArrayRef<Value> ivs, OpFoldResult keyValueTileLength,
                           OpFoldResult headDimension, Type elementType,
-                          Location loc, OpBuilder &builder) {
+                          Location loc, OpBuilder &builder,
+                          bool swapLastTwoDims = false) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   SmallVector<OpFoldResult> strides(keyShape.size(), one);
@@ -206,6 +207,11 @@ static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
   if (!ivs.empty())
     offsets[1] = ivs[0];
   SmallVector<int64_t> tensorShape{keyShape[1], keyShape[2]};
+  if (swapLastTwoDims) {
+    std::swap(sizes[1], sizes[2]);
+    std::swap(offsets[1], offsets[2]);
+    std::swap(tensorShape[0], tensorShape[1]);
+  }
   auto tensorType = RankedTensorType::get(tensorShape, elementType);
   Value keySlice = builder.create<tensor::ExtractSliceOp>(
       loc, tensorType, key, offsets, sizes, strides);
@@ -251,7 +257,7 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
                     OpFoldResult sequenceTileLength,
                     OpFoldResult keyValueTileLength, OpFoldResult headDimension,
                     Type elementType, SmallVectorImpl<Operation *> &ops,
-                    Location loc, OpBuilder &builder) {
+                    bool transposeV, Location loc, OpBuilder &builder) {
 
   Type f32Type = builder.getF32Type();
   // Compute matmul(q, transpose(k))
@@ -283,11 +289,18 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
       scaleAccumulator(outputSlice, scaleFactor, loc, builder, ops);
 
   // Compute matmul(softmax, v)
-  auto matmulOp = builder.create<linalg::MatmulOp>(
-      loc, scaledAcc.getType(), ValueRange{partialSoftmax, valueSlice},
-      scaledAcc);
+  Operation *matmulOp;
+  if (transposeV) {
+    matmulOp = builder.create<linalg::MatmulTransposeBOp>(
+        loc, scaledAcc.getType(), ValueRange{partialSoftmax, valueSlice},
+        scaledAcc);
+  } else {
+    matmulOp = builder.create<linalg::MatmulOp>(
+        loc, scaledAcc.getType(), ValueRange{partialSoftmax, valueSlice},
+        scaledAcc);
+  }
   ops.push_back(matmulOp);
-  Value result = matmulOp.getResult(0);
+  Value result = matmulOp->getResult(0);
   return std::make_tuple(result, newMax, newSum);
 }
 
@@ -416,8 +429,9 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Extract slices
   Value keySlice = extractSlice(key, keyShape, ivs, keyValueTileLength,
                                 headDimension, elementType, loc, rewriter);
-  Value valueSlice = extractSlice(value, keyShape, ivs, keyValueTileLength,
-                                  headDimension, elementType, loc, rewriter);
+  Value valueSlice =
+      extractSlice(value, keyShape, ivs, keyValueTileLength, headDimension,
+                   elementType, loc, rewriter, attnOp.getTransposeV());
   Value querySlice = extractSlice(query, queryShape, {}, sequenceTileLength,
                                   headDimension, elementType, loc, rewriter);
 
@@ -426,6 +440,9 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
       SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
       SmallVector<Value>{querySlice, keySlice, valueSlice},
       SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
+
+  if (attnOp.getTransposeV())
+    tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());
 
   Value tiledResult = tiledAttentionOp.getResult(0);
   Value newMax = tiledAttentionOp.getResult(1);
@@ -486,10 +503,10 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
-  auto [result, newMax, newSum] =
-      createAttentionBody(keySlice, valueSlice, querySlice, tiledResult, max,
-                          sum, sequenceTileLength, keyValueTileLength,
-                          headDimension, elementType, ops, loc, rewriter);
+  auto [result, newMax, newSum] = createAttentionBody(
+      keySlice, valueSlice, querySlice, tiledResult, max, sum,
+      sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
+      tiledAttnOp.getTransposeV(), loc, rewriter);
 
   rewriter.replaceOp(tiledAttnOp, ValueRange{result, newMax, newSum});
 }
@@ -536,7 +553,8 @@ namespace {
 ///    j. Compute matmul(s, v) and add new_accumulator
 ///
 ///
-LogicalResult reifyAttentionTransform(func::FuncOp funcOp, bool onlyTile,
+LogicalResult reifyAttentionTransform(mlir::FunctionOpInterface funcOp,
+                                      bool onlyTile,
                                       std::optional<uint64_t> tileSize) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {

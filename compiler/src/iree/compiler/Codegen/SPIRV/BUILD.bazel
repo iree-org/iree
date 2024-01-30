@@ -122,6 +122,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FuncToSPIRV",
         "@llvm-project//mlir:FuncTransforms",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",

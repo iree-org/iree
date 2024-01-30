@@ -23,7 +23,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
@@ -218,10 +217,10 @@ getReductionConfig(const transform_ext::MatchedReductionCaptures &captures,
 /// successful match, configure a reduction strategy based on a proxy model of
 /// the hardware and construct transform dialect IR that implements the
 /// reduction strategy. The transform dialect IR is added in a top-level
-/// ModuleOp after the `entryPoint` func::FuncOp.
-static LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
-                                                  linalg::LinalgOp op,
-                                                  const GPUModel &gpuModel) {
+/// ModuleOp after the `entryPoint` mlir::FunctionOpInterface.
+static LogicalResult
+matchAndSetReductionStrategy(mlir::FunctionOpInterface entryPoint,
+                             linalg::LinalgOp op, const GPUModel &gpuModel) {
   if (!gpuModel.hasWarpShuffle) {
     LDBG("--Reduction strategy no warp shuffle\n");
     return failure();
@@ -392,9 +391,9 @@ static BatchMatmulStrategy getBatchMatmulConfig(MLIRContext *context,
 
 /// Match the supported batch matmuls and set the transform dialect strategy for
 /// them.
-static LogicalResult matchAndSetBatchMatmulStrategy(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op,
-                                                    const GPUModel &gpuModel) {
+static LogicalResult
+matchAndSetBatchMatmulStrategy(mlir::FunctionOpInterface entryPoint,
+                               linalg::LinalgOp op, const GPUModel &gpuModel) {
   if (!clGPUEnableTransformDialectBatchMatmulStrategy) {
     LDBG("--Batch matmul strategy flag turned off\n");
     return failure();
@@ -434,9 +433,9 @@ static LogicalResult matchAndSetBatchMatmulStrategy(func::FuncOp entryPoint,
   return success();
 }
 
-static LogicalResult matchAndSetMatmulStrategy(func::FuncOp entryPoint,
-                                               linalg::LinalgOp op,
-                                               const GPUModel &gpuModel) {
+static LogicalResult
+matchAndSetMatmulStrategy(mlir::FunctionOpInterface entryPoint,
+                          linalg::LinalgOp op, const GPUModel &gpuModel) {
   if (!clGPUEnableTransformDialectMatmulTensorCoreStrategy) {
     LDBG("--Matmul strategy flag turned off\n");
     return failure();
@@ -600,9 +599,9 @@ getConvolutionConfig(MLIRContext *context,
   return strategy;
 }
 
-static LogicalResult matchAndSetConvolutionStrategy(func::FuncOp entryPoint,
-                                                    linalg::LinalgOp op,
-                                                    const GPUModel &gpuModel) {
+static LogicalResult
+matchAndSetConvolutionStrategy(mlir::FunctionOpInterface entryPoint,
+                               linalg::LinalgOp op, const GPUModel &gpuModel) {
   if (!clGPUEnableTransformDialectImplicitGemmStrategy) {
     LDBG("--Implicit gemm strategy flag turned off\n");
     return failure();
@@ -715,9 +714,9 @@ static PadConfig getPadConfig(const transform_ext::MatchedPadCaptures &captures,
   return PadConfig{};
 }
 
-static LogicalResult matchAndSetPadStrategy(func::FuncOp entryPoint,
-                                            tensor::PadOp op,
-                                            const GPUModel &gpuModel) {
+static LogicalResult
+matchAndSetPadStrategy(mlir::FunctionOpInterface entryPoint, tensor::PadOp op,
+                       const GPUModel &gpuModel) {
   if (!clGPUEnableTransformDialectPadStrategy) {
     LDBG("--Pad strategy flag turned off\n");
     return failure();
@@ -773,7 +772,8 @@ static LogicalResult matchAndSetPadStrategy(func::FuncOp entryPoint,
 // Switch between strategies depending on matched IR.
 //===--------------------------------------------------------------------===//
 LogicalResult mlir::iree_compiler::gpu::matchAndSetTransformStrategy(
-    func::FuncOp entryPoint, Operation *op, const GPUModel &gpuModel) {
+    mlir::FunctionOpInterface entryPoint, Operation *op,
+    const GPUModel &gpuModel) {
   LDBG("Look up a TD strategy for entryPoint:\n" << entryPoint << "\n");
   auto padOp = dyn_cast<tensor::PadOp>(op);
   if (padOp) {

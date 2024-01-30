@@ -217,7 +217,7 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);

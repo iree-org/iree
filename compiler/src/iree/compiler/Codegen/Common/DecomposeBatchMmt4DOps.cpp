@@ -151,9 +151,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
 struct DecomposeBatchMmt4DOpsPass
     : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<linalg::LinalgDialect, func::FuncDialect, arith::ArithDialect,
-                tensor::TensorDialect, scf::SCFDialect>();
+    registry.insert<linalg::LinalgDialect, arith::ArithDialect,
+                    tensor::TensorDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override;
@@ -212,7 +211,7 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposeBatchMmt4DOpsPass() {
   return std::make_unique<DecomposeBatchMmt4DOpsPass>();
 }

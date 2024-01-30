@@ -24,24 +24,24 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   ];
 }
 
-def SPIRVAnnotateWinogradLoops : Pass<"iree-spirv-annotate-winograd-loops", "func::FuncOp"> {
+def SPIRVAnnotateWinogradLoops : InterfacePass<"iree-spirv-annotate-winograd-loops", "mlir::FunctionOpInterface"> {
   let summary = "Annotate innermost Winograd loops with spirv distribute attribute";
   let constructor = "mlir::iree_compiler::createSPIRVAnnotateWinogradLoopsPass()";
 }
 
-def SPIRVBreakDownLargeVector : Pass<"iree-spirv-breakdown-large-vector",
-                                     "func::FuncOp"> {
+def SPIRVBreakDownLargeVector : InterfacePass<"iree-spirv-breakdown-large-vector",
+                                     "mlir::FunctionOpInterface"> {
   let summary = "Break down vectors not natively supported by SPIR-V";
   let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
 def SPIRVCreateFastSlowPath :
-    Pass<"iree-spirv-create-fast-slow-path", "func::FuncOp"> {
+    InterfacePass<"iree-spirv-create-fast-slow-path", "mlir::FunctionOpInterface"> {
   let summary = "Create separate fast and slow paths to handle padding";
   let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
 }
 
-def SPIRVDistribute : Pass<"iree-spirv-distribute", "func::FuncOp"> {
+def SPIRVDistribute : InterfacePass<"iree-spirv-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Distribute tiled loop nests to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVDistributePass()";
 }
@@ -53,19 +53,19 @@ def SPIRVEmulateI64 :
 }
 
 def SPIRVEraseStorageBufferStaticShape :
-    Pass<"iree-spirv-erase-storage-buffer-static-shape", "func::FuncOp"> {
+    InterfacePass<"iree-spirv-erase-storage-buffer-static-shape", "mlir::FunctionOpInterface"> {
   let summary = "Turn static shaped storage buffer subspan ops into dynamic shaped ones";
   let constructor = "mlir::iree_compiler::createSPIRVEraseStorageBufferStaticShapePass()";
 }
 
-def SPIRVFinalVectorLowering : Pass<
-    "iree-spirv-final-vector-lowering", "func::FuncOp"> {
+def SPIRVFinalVectorLowering : InterfacePass<
+    "iree-spirv-final-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Perform final lowering of vectors ops to fit SPIR-V";
   let constructor = "mlir::iree_compiler::createSPIRVFinalVectorLoweringPass()";
 }
 
-def SPIRVInitialVectorLowering : Pass<
-    "iree-spirv-initial-vector-lowering", "func::FuncOp"> {
+def SPIRVInitialVectorLowering : InterfacePass<
+    "iree-spirv-initial-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Perform initial lowering of vectors ops to fit SPIR-V";
   let constructor = "mlir::iree_compiler::createSPIRVInitialVectorLoweringPass()";
 }
@@ -86,7 +86,7 @@ def SPIRVLowerExecutableTarget :
 }
 
 def SPIRVMapMemRefStorageClass :
-    Pass<"iree-spirv-map-memref-storage-class", "func::FuncOp"> {
+    InterfacePass<"iree-spirv-map-memref-storage-class", "mlir::FunctionOpInterface"> {
   let summary = "Map MemRef memory spaces to SPIR-V storage classes";
   let constructor = "mlir::iree_compiler::createSPIRVMapMemRefStorageClassPass()";
 }
@@ -109,18 +109,18 @@ def SPIRVSelectLoweringStrategy :
       "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
 }
 
-def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {
+def SPIRVTile : InterfacePass<"iree-spirv-tile", "mlir::FunctionOpInterface"> {
   let summary = "Tile Linalg ops with tensor semantics to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
 }
 
-def SPIRVTileAndDistribute : Pass<"iree-spirv-tile-and-distribute", "func::FuncOp"> {
+def SPIRVTileAndDistribute : InterfacePass<"iree-spirv-tile-and-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
                 "invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTileAndDistributePass()";
 }
 
-def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
+def SPIRVTileAndPromote : InterfacePass<"iree-spirv-tile-and-promote", "mlir::FunctionOpInterface"> {
   let summary = "Promote tiled Linalg ops with buffer semantics to use "
                 "workgroup memory and then tile to invocations";
   let constructor =
@@ -133,8 +133,8 @@ def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
   ];
 }
 
-def SPIRVTileToCooperativeOps : Pass<
-    "iree-spirv-tile-to-cooperative-ops", "func::FuncOp"> {
+def SPIRVTileToCooperativeOps : InterfacePass<
+    "iree-spirv-tile-to-cooperative-ops", "mlir::FunctionOpInterface"> {
   let summary = "Tile Linalg ops with buffer semantics to subgroups and "
                 "vectorize to vector ops suitable for lowering to SPIR-V "
                 "cooperative ops";
@@ -158,8 +158,8 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
-def SPIRVVectorizeToCooperativeOps : Pass<
-    "iree-spirv-vectorize-to-cooperative-ops", "func::FuncOp"> {
+def SPIRVVectorizeToCooperativeOps : InterfacePass<
+    "iree-spirv-vectorize-to-cooperative-ops", "mlir::FunctionOpInterface"> {
   let summary = "Tile Linalg ops with buffer semantics to subgroups and "
                 "vectorize to vector ops suitable for lowering to SPIR-V "
                 "cooperative ops";
@@ -168,7 +168,7 @@ def SPIRVVectorizeToCooperativeOps : Pass<
 }
 
 def SPIRVVectorToGPUSubgroupMMA :
-    Pass<"iree-spirv-vector-to-gpu-subgroup-mma-ops", "func::FuncOp"> {
+    InterfacePass<"iree-spirv-vector-to-gpu-subgroup-mma-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert vector ops to GPU subgroup MMA ops.";
   let constructor = "mlir::iree_compiler::createSPIRVVectorToGPUSubgroupMMAOpsPass()";
 }

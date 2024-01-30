@@ -34,6 +34,7 @@ iree_cc_library(
     IREELinalgExtDialect
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRLinalgDialect
     MLIRPass
     MLIRTensorDialect

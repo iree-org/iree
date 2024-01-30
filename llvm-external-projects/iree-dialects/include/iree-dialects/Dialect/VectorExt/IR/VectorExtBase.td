@@ -111,6 +111,9 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   let genVerifyDecl = 0;
   let extraClassDeclaration = [{
     std::optional<int64_t> getBatchDim(int64_t dim);
+
+    // Returns the grid of lane ids. Assumes a valid layout.
+    ::std::tuple<int64_t, int64_t, int64_t> getLaneGrid();
     PerDimLayoutAttr getDimLayout(int64_t dim) const;
   }];
 }

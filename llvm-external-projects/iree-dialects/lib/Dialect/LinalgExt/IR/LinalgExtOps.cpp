@@ -10,7 +10,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -2479,8 +2478,13 @@ LogicalResult AttentionOp::verify() {
     return failure();
   ArrayRef<int64_t> queryShape = queryType.getShape();
   ArrayRef<int64_t> keyShape = keyType.getShape();
-  ArrayRef<int64_t> valueShape = valueType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
+  SmallVector<int64_t> valueShape(valueType.getShape());
+  bool transposeV = getTransposeV();
+  if (transposeV) {
+    size_t lastIdx = valueShape.size() - 1;
+    std::swap(valueShape[lastIdx - 1], valueShape[lastIdx]);
+  }
   if (failed(verifyCompatibleShape(keyShape, valueShape)))
     return op->emitOpError("incompatible value shape");
   if (failed(verifyCompatibleShape(queryShape, outputShape)))

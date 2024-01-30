@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stablehlo-to-linalg-ext %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stablehlo-to-linalg-ext))" %s | FileCheck %s
 
 // TODO(#12678): Also ensure that full lowering to linalg does not error.
 

@@ -17,7 +17,6 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
-    "context_wrapper.h"
     "cuda_allocator.c"
     "cuda_allocator.h"
     "cuda_buffer.c"
@@ -25,8 +24,8 @@ iree_cc_library(
     "cuda_device.c"
     "cuda_device.h"
     "cuda_driver.c"
-    "cuda_event.c"
-    "cuda_event.h"
+    "event_pool.c"
+    "event_pool.h"
     "event_semaphore.c"
     "event_semaphore.h"
     "graph_command_buffer.c"
@@ -39,19 +38,27 @@ iree_cc_library(
     "nccl_channel.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "pending_queue_actions.c"
+    "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
+    "timepoint_pool.c"
+    "timepoint_pool.h"
     "tracing.c"
     "tracing.h"
   DEPS
     ::dynamic_symbols
     iree::base
+    iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::atomic_slist
+    iree::base::internal::event_pool
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::hal
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
@@ -60,7 +67,6 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::cuda_executable_def_c_fbs
-    nccl::headers
   PUBLIC
 )
 
@@ -68,14 +74,20 @@ iree_cc_library(
   NAME
     dynamic_symbols
   HDRS
-    "dynamic_symbols.h"
-    "status_util.h"
+    "cuda_dynamic_symbols.h"
+    "cuda_status_util.h"
+    "nccl_dynamic_symbols.h"
+    "nccl_status_util.h"
   TEXTUAL_HDRS
-    "dynamic_symbol_tables.h"
+    "cuda_dynamic_symbol_table.h"
+    "nccl_dynamic_symbol_table.h"
   SRCS
+    "cuda_dynamic_symbols.c"
     "cuda_headers.h"
-    "dynamic_symbols.c"
-    "status_util.c"
+    "cuda_status_util.c"
+    "nccl_dynamic_symbols.c"
+    "nccl_headers.h"
+    "nccl_status_util.c"
   DEPS
     iree::base
     iree::base::internal::dynamic_library

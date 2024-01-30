@@ -126,7 +126,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
 
   // Create the executable with the region cloned into it.
   auto parentFuncOp =
-      dispatchWorkgroupsOp->getParentOfType<FunctionOpInterface>();
+      dispatchWorkgroupsOp->getParentOfType<mlir::FunctionOpInterface>();
   auto executableOp =
       createExecutable(dispatchWorkgroupsOp.getLoc(), name, {workgroupFuncOp},
                        parentFuncOp->getParentOfType<mlir::ModuleOp>());
@@ -165,7 +165,7 @@ public:
     // Convert each dispatch region into a flow.executable + dispatch op.
     int initializerCount = 0;
     int funcLikeCount = 0;
-    for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
+    for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Generate a nice name if possible. All ops we outline in the same scope
       // will have the same root name.
       std::string namePrefix;

@@ -14,7 +14,6 @@
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -377,7 +376,7 @@ public:
             &getContext(), executableOp.getName(),
             {SymbolRefAttr::get(&getContext(), exportOp.getSymName())});
 
-        auto funcOp = innerModuleOp.lookupSymbol<FunctionOpInterface>(
+        auto funcOp = innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
             exportOp.getFunctionRef());
         if (!funcOp)
           continue; // extern module, maybe
@@ -400,8 +399,8 @@ public:
 
     // Replace each usage of an entry point with its original symbol name with a
     // new symbol name.
-    for (auto funcLikeOp : getOperation().getOps<FunctionOpInterface>()) {
-      funcLikeOp->walk([&](IREE::Flow::DispatchOp dispatchOp) {
+    for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
+      funcOp->walk([&](IREE::Flow::DispatchOp dispatchOp) {
         SmallVector<Attribute> replacementRefs;
         for (auto originalRef : dispatchOp.getEntryPointRefs()) {
           auto it = entryPointRefReplacements.find(originalRef);

@@ -10,7 +10,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -104,9 +103,9 @@ namespace {
 struct LinalgExtToLoopsPass
     : public LinalgExtToLoopsBase<LinalgExtToLoopsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, func::FuncDialect,
-                    mlir::arith::ArithDialect, math::MathDialect,
-                    memref::MemRefDialect, scf::SCFDialect>();
+    registry
+        .insert<linalg::LinalgDialect, mlir::arith::ArithDialect,
+                math::MathDialect, memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -122,7 +121,7 @@ struct LinalgExtToLoopsPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 IREE::LinalgExt::createLinalgExtToLoopsPass() {
   return std::make_unique<LinalgExtToLoopsPass>();
 }

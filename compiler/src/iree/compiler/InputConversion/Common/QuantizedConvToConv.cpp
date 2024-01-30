@@ -354,7 +354,7 @@ struct LinalgQuantizedConvToConvPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLinalgQuantizedConvToConvPass() {
   return std::make_unique<LinalgQuantizedConvToConvPass>();
 }

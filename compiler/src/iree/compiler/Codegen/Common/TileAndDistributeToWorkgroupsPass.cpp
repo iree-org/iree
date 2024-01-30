@@ -206,7 +206,7 @@ static LogicalResult lowerDispatchWorkgroupCountForDagRootOp(
 /// Lowers the computation within the workgroup count region for the ops
 /// that are handled by default.
 static LogicalResult lowerWorkgroupCount(
-    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, ArrayRef<int64_t> tileSizes,
     ArrayRef<int64_t> staticLoopRanges, ArrayRef<int64_t> interchange,
     ArrayRef<unsigned> partitionedLoops, int maxWorkgroupParallelDims) {
@@ -291,7 +291,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         "maxWorkgroupParallelDims set to more than allowed MaxParallelDims");
   }
 
-  for (func::FuncOp funcOp : innerModule.getOps<func::FuncOp>()) {
+  for (auto funcOp : innerModule.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp)
       continue;

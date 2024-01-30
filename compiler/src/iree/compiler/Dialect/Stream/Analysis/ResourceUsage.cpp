@@ -829,8 +829,8 @@ const char ValueResourceUsage::ID = 0;
 
 ResourceUsageAnalysis::ResourceUsageAnalysis(Operation *rootOp)
     : explorer(rootOp, TraversalAction::SHALLOW), solver(explorer, allocator) {
-  explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-  explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+  explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+      TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::ForOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
   explorer.setOpAction<mlir::scf::WhileOp>(TraversalAction::RECURSE);

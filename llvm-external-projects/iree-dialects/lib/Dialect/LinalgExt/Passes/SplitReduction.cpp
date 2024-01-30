@@ -10,7 +10,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -375,9 +374,9 @@ namespace {
 struct TopkSplitReductionPass
     : public TopkSplitReductionBase<TopkSplitReductionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, func::FuncDialect,
-                    mlir::arith::ArithDialect, math::MathDialect,
-                    memref::MemRefDialect, scf::SCFDialect>();
+    registry
+        .insert<linalg::LinalgDialect, mlir::arith::ArithDialect,
+                math::MathDialect, memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
@@ -424,7 +423,7 @@ void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
                                      f);
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass() {
   return std::make_unique<TopkSplitReductionPass>();
 }

@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-stablehlo-preprocessing-unfuse-batch-norm \
-// RUN:   --cse --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stablehlo-preprocessing-unfuse-batch-norm),cse)" \
+// RUN:          --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @batchNormInference_2D_inner_features(
 // CHECK-SAME: %[[X:[^:]+]]

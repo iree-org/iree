@@ -12,7 +12,6 @@
 #include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
@@ -57,7 +56,6 @@ public:
                     arith::ArithDialect,
                     affine::AffineDialect,
                     bufferization::BufferizationDialect,
-                    func::FuncDialect,
                     linalg::LinalgDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,

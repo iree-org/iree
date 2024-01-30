@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_COMMON_COMMON_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 // Needed until IREE builds its own gpu::GPUBlockMappingAttr / gpu::Blocks
 // attributes that are reusable across all targets.
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -57,10 +57,10 @@ FailureOr<int64_t> maxDivisorOfValueBelowLimit(int64_t value, int64_t limit);
 using StrategyBuilderFn = std::function<void(ImplicitLocOpBuilder &, Value)>;
 
 /// Use `buildStrategy` to build a ModuleOp containing transform dialect IR,
-/// right after func::FuncOp `entryPoint`.
+/// right after function `entryPoint`.
 /// This embed the transform into the IR and allows applying it either in debug
 /// mode or within the IREE pipeline.
-void createTransformRegion(func::FuncOp entryPoint,
+void createTransformRegion(mlir::FunctionOpInterface entryPoint,
                            StrategyBuilderFn buildStrategy);
 
 //===----------------------------------------------------------------------===//

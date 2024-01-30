@@ -462,7 +462,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 }
 
-// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
+// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 // CHECK-LABEL: func @matmul_5_small
 
 // This matmul is considered "too small"/"degenerate" for a tensor core strategy,
@@ -505,7 +505,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 }
 
-// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt>
+// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 // CHECK-LABEL: func @f16_matmul
 // CHECK-NOT: transform.sequence
 // CHECK-NOT: transform.named_sequence

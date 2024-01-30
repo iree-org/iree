@@ -31,7 +31,7 @@ struct SetStrictSymbolicShapesPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSetStrictSymbolicShapesPass() {
   return std::make_unique<SetStrictSymbolicShapesPass>();
 }

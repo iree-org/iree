@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-enable-workgroup-specialization --iree-codegen-workgroup-specialization --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-enable-workgroup-specialization --pass-pipeline="builtin.module(func.func(iree-codegen-workgroup-specialization),canonicalize,cse)" --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 0], [0, 0, 64]]>
 #map = affine_map<()[s0] -> (s0 * 64)>

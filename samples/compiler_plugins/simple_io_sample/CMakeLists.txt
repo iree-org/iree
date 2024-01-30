@@ -57,6 +57,7 @@ iree_cc_library(
     ::defs
     LLVMSupport
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRSupport
   PUBLIC
@@ -87,6 +88,7 @@ iree_cc_library(
     ::PassesIncGen
     ::defs
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
   PUBLIC

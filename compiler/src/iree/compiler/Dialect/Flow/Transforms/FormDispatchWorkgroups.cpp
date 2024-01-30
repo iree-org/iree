@@ -40,7 +40,7 @@ namespace mlir::iree_compiler::IREE::Flow {
 /// DispatchWorkgroupsOp
 static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
 createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
-                         FunctionOpInterface funcOp,
+                         mlir::FunctionOpInterface funcOp,
                          DominanceInfo const &dominanceInfo) {
   SmallVector<Flow::DispatchRegionOp> regionOps;
   funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });

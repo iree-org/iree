@@ -6,7 +6,7 @@
 
 // Implements logic for lowering StableHLO einsum op to dot_general ops.
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"

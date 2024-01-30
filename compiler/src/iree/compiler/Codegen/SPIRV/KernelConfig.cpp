@@ -30,6 +30,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-spirv-kernel-config"
 
@@ -82,7 +83,7 @@ static bool fusedOpMayUseExtraSharedMemory(linalg::LinalgOp matmul) {
   if (matmul->getNumResults() != 1)
     return true;
 
-  func::FuncOp entryPoint = matmul->getParentOfType<func::FuncOp>();
+  auto entryPoint = matmul->getParentOfType<mlir::FunctionOpInterface>();
 
   auto getResultBits = [](linalg::LinalgOp linalgOp) {
     auto shapedType = llvm::cast<ShapedType>(linalgOp->getResult(0).getType());
@@ -346,7 +347,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   windowTileSizes[ohIndex] = 1;
   tileSizes.push_back(windowTileSizes);
 
-  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
+  auto funcOp = linalgOp->getParentOfType<mlir::FunctionOpInterface>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);
 }
@@ -773,9 +774,11 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
     tileSizes.push_back(workgroupTileSizes);
 
     return setOpConfigAndEntryPointFnTranslation(
-        op->getParentOfType<func::FuncOp>(), op, tileSizes,
+        op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
         CodeGenPipeline::SPIRVMatmulPromoteVectorize, workgroupSize,
-        /*subgroupSize=*/std::nullopt, pipelineDepth, storeStage);
+        /*subgroupSize=*/std::nullopt,
+        getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
+                                      storeStage));
   }
 
   SmallVector<int64_t> threadTileSizes(numLoops, 0);
@@ -791,7 +794,7 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
   tileSizes.push_back(threadTileSizes);
   tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes,
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
 }
 
@@ -1100,8 +1103,10 @@ LogicalResult setCooperativeMatrixConfig(
   }
 
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
-      workgroupSize, subgroupSize, pipelineDepth, storeStage);
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
+      workgroupSize, subgroupSize,
+      getSoftwarePipeliningAttrDict(op->getContext(), pipelineDepth,
+                                    storeStage));
 }
 
 } // namespace detail
@@ -1141,7 +1146,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
   }
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
       workgroupSize);
 }
 
@@ -1159,7 +1164,7 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   TileSizesListType tileSizes = {{1, 32}};
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
       workgroupSize);
 }
 
@@ -1256,7 +1261,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
     tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
     std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
-            op->getParentOfType<func::FuncOp>(), op, tileSizes,
+            op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
             CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
       return failure();
     }
@@ -1358,7 +1363,7 @@ static LogicalResult setReductionConfig(const spirv::TargetEnv &targetEnv,
   tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
   tileSizes.emplace_back(std::move(reductionTileSizes)); // reduction level
   if (failed(setOpConfigAndEntryPointFnTranslation(
-          op->getParentOfType<func::FuncOp>(), op, tileSizes,
+          op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
           CodeGenPipeline::SPIRVSubgroupReduce, workgroupSize))) {
     return failure();
   }
@@ -1415,7 +1420,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op,
                                         bool allowVectorization = true) {
   LLVM_DEBUG(llvm::dbgs() << "trying to deduce as default op...\n");
-  func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
+  auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
   auto interfaceOp = cast<PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -1644,7 +1649,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult
-setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
+setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
                           const spirv::TargetEnv &targetEnv) {
   if (!clSPIRVEnableTransformDialectJit) {
     return failure();
@@ -1693,7 +1698,7 @@ setTransformDialectConfig(func::FuncOp entryPoint, Operation *op,
 /// Sets the CodeGen configuration as attributes to the given `rootOp` if it's a
 /// known Linalg matmul/convolution op with good configurations.
 static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
-                                      func::FuncOp entryPointFn,
+                                      mlir::FunctionOpInterface entryPointFn,
                                       Operation *rootOp) {
   // First try to see if there is a matching transform dialect configuration.
   if (succeeded(setTransformDialectConfig(entryPointFn, rootOp, targetEnv))) {
@@ -1800,7 +1805,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 
 static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
                                         IREE::HAL::ExecutableExportOp exportOp,
-                                        func::FuncOp funcOp) {
+                                        mlir::FunctionOpInterface funcOp) {
   // First check whether we already have workgroup count set--it's a "contract"
   // to indicate that we should bypass all tiling and distribution to go down
   // just the most basic lowering flow.
@@ -1865,7 +1870,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   }
   spirv::TargetEnv targetEnv(targetEnvAttr);
 
-  for (auto funcOp : module.getOps<func::FuncOp>()) {
+  for (auto funcOp : module.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
     if (!exportOp)
       continue;

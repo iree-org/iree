@@ -4,7 +4,7 @@
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64, 16]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 2>,
+    translation_info = <SPIRVMatmulPromoteVectorize, {pipeline_depth = 2, store_stage = 1}>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -57,7 +57,7 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 2)>
-//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2>
+//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize
 //           CHECK: hal.executable.export public @matmul_f32_128x256x64
 //      CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK-SAME:   workgroup_size = [16 : index, 8 : index, 1 : index]
@@ -149,7 +149,7 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 3)>
-//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize pipeline_depth = 2 store_stage = 0>
+//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize
 //           CHECK: hal.executable.export public @matmul_f32_128x256x64
 //      CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK-SAME:   workgroup_size = [16 : index, 8 : index, 1 : index]
@@ -206,7 +206,7 @@ hal.executable @matmul_f32_128x256x64 {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 256, 32]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize pipeline_depth = 1>,
+    translation_info = <SPIRVMatmulPromoteVectorize, {pipeline_depth = 1, store_stage = 1}>,
     workgroup_size = [32, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

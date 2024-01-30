@@ -10,8 +10,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Inline {
+namespace mlir::iree_compiler::IREE::HAL::Inline {
 
 class HALInlineDialect : public Dialect {
 public:
@@ -19,7 +18,6 @@ public:
   static StringRef getDialectNamespace() { return "hal_inline"; }
 };
 
-} // namespace Inline
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Inline
 
 #endif // IREE_COMPILER_MODULES_HAL_INLINE_IR_HALINLINEDIALECT_H_

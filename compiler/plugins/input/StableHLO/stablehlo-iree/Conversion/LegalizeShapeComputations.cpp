@@ -7,10 +7,10 @@
 // Implements logic for lowering StableHLO dialect to scalar shape operations.
 
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo-iree/Conversion/MapStableHLOToScalarOp.h"
 #include "stablehlo-iree/Conversion/Passes.h"
@@ -160,7 +160,7 @@ struct ReshapeConverter : OpRewritePattern<mlir::stablehlo::ReshapeOp> {
 struct LegalizeShapeComputations final
     : impl::LegalizeShapeComputationsBase<LegalizeShapeComputations> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, math::MathDialect, func::FuncDialect,
+    registry.insert<arith::ArithDialect, math::MathDialect,
                     tensor::TensorDialect>();
   }
 
@@ -168,7 +168,7 @@ struct LegalizeShapeComputations final
     MLIRContext &ctx = this->getContext();
     RewritePatternSet patterns(&ctx);
 
-    func::FuncOp func = this->getOperation();
+    auto func = this->getOperation();
     populateLegalizeShapeComputationPatterns(&ctx, &patterns);
     if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
       this->signalPassFailure();

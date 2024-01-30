@@ -16,7 +16,7 @@ def ConvertConv2DToImg2Col :
 }
 
 def MakeSingleDispatchForFunction :
-    Pass<"iree-preprocessing-make-single-dispatch-for-function", "func::FuncOp"> {
+    InterfacePass<"iree-preprocessing-make-single-dispatch-for-function", "mlir::FunctionOpInterface"> {
   let summary = "Convert entire function into a single dispatch";
   let constructor = "mlir::iree_compiler::Preprocessing::createMakeSingleDispatchForFunctionPass()";
 }

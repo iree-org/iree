@@ -23,6 +23,7 @@ iree_lit_test_suite(
     cfg = "//tests:lit.cfg.py",
     tags = [
         "driver=local-task",
+        "hostonly",
     ],
     tools = [
         "//tools:iree-compile",
