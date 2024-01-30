@@ -159,6 +159,9 @@ std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
   int64_t laneY = 1;
   int64_t laneZ = 1;
   for (PerDimLayoutAttr dimLayout : getLayouts()) {
+    // Note that valid layouts only include at most one instance of each
+    // dimension type, so this is simply doing assignment on the first instance
+    // of each lane index, not an accumulative product.
     auto maybeXShape = dimLayout.getShape(LayoutDimension::LANEX);
     laneX *= maybeXShape.value_or(1);
     auto maybeYShape = dimLayout.getShape(LayoutDimension::LANEY);
