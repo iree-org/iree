@@ -304,8 +304,6 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_gpu')
     env:
       BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      # BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      # BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
@@ -335,7 +333,7 @@ jobs:
               cmake -B ${BUILD_DIR} -S . -G Ninja \
                   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                   -DIREE_BUILD_COMPILER=OFF \
-                  -DIREE_BUILD_INTEGRATION_TESTS=ON \
+                  -DLLVM_EXTERNAL_LIT=./third_party/llvm-project/llvm/utils/lit/lit.py \
                   -DIREE_HOST_BIN_DIR=${INSTALL_DIR}/bin
       - name: "Building runtime"
         run: |
@@ -347,16 +345,12 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
               gcr.io/iree-oss/nvidia@sha256:892fefbdf90c93b407303adadfa87f22c0f1e84b7e819e69643c78fc5927c2ba \
               cmake --build ${BUILD_DIR} --target iree-test-deps
-      - name: "Testing all"
-        env:
-          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
-          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
+      - name: "Running GPU tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-              --env IREE_NVIDIA_SM80_TESTS_DISABLE \
-              --env IREE_MULTI_DEVICE_TESTS_DISABLE \
-              --env IREE_CTEST_LABEL_REGEX \
+              --env IREE_NVIDIA_SM80_TESTS_DISABLE=1 \
+              --env IREE_MULTI_DEVICE_TESTS_DISABLE=1 \
+              --env IREE_CTEST_LABEL_REGEX=^requires-gpu|^driver=vulkan$|^driver=cuda$ \
               --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \
