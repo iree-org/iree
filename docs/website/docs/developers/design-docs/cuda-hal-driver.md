@@ -280,7 +280,6 @@ To summarize, we need the following data structures to implement HAL semaphore:
 [hal-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h
 [hal-device]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h
 [hal-executable]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h
-[hal-executable-cache]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable_cache.h
 [hal-event]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h
 [hal-deferred-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
 [cu-device]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
