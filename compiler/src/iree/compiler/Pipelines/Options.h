@@ -92,7 +92,7 @@ struct GlobalOptimizationOptions {
 
   // Maximum byte size increase allowed for constant expr hoisting policy to
   // allow hoisting. The threshold is 1MB by default.
-  int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
+  int64_t constExprMaxSizeIncreaseThreshold = 0;
 
   // File path to create a parameter archive out of global initial values.
   std::string parameterArchiveExportPath = "";
