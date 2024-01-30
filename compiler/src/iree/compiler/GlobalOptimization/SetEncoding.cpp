@@ -203,7 +203,8 @@ static Type getContractionInputTypeWithSignedness(OpBuilder &builder,
   Value blockArg = linalgOp.getMatchingBlockArgument(operand);
   for (auto bodyCastOp : blockArg.getParentBlock()->getOps<arith::ExtUIOp>()) {
     if (bodyCastOp->getOperand(0) == blockArg) {
-      return builder.getIntegerType(elemType.getIntOrFloatBitWidth(), false);
+      return builder.getIntegerType(elemType.getIntOrFloatBitWidth(),
+                                    /*isSigned=*/false);
     }
   }
   return elemType;
