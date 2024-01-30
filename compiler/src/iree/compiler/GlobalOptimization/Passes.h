@@ -65,6 +65,9 @@ createEraseUnusedLinalgOperands();
 /// Expands tensor shape dimensions into SSA values across the program.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
 
+/// Folds unit dims in util.global ops.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalUnitDimsPass();
+
 /// Fuses dequantization and matmul linalg.generic ops
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(

@@ -83,6 +83,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperands());
+  mainPassManager.addPass(createFoldGlobalUnitDimsPass());
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the

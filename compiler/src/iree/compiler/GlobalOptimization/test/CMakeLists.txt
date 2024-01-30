@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "detach_elementwise_from_named_ops.mlir"
     "expand_tensor_shapes.mlir"
     "flow_hoist_into_globals.mlir"
+    "fold_global_unit_dims.mlir"
     "fuse_dequantization_matmul.mlir"
     "fuse_silu_horizontal_matmul.mlir"
     "generalize_named_ops.mlir"
