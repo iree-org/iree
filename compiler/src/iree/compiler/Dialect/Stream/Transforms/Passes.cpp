@@ -125,6 +125,10 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
 
   addCleanupPatterns(passManager);
 
+  // Everything must now be in stream.async.* form but we don't yet have
+  // lifetime assigned.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
+
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides
   // ones that aren't needed. This is easier to verify than if there was one
