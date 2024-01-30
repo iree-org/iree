@@ -33,16 +33,13 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
 template <typename AccessorTy>
 static inline bool isAccessorParameterized(SymbolTable moduleSymbols,
                                            AccessorTy op) {
-  auto global = moduleSymbols.lookup(op.getGlobalName());
-  if (!global) {
+  auto global =
+      moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
+  if (!global)
     return true;
-  }
-  auto utilGlobal = cast<Util::GlobalOpInterface>(global);
-  if (!utilGlobal.getGlobalInitialValue()) {
+  if (!global.getGlobalInitialValue())
     return false;
-  }
-  return !isa<Util::SerializableAttrInterface>(
-      utilGlobal.getGlobalInitialValue());
+  return !isa<Util::SerializableAttrInterface>(global.getGlobalInitialValue());
 }
 
 // Today the only way to interact with a global is with loads, stores, and
@@ -51,20 +48,26 @@ static inline bool isAccessorParameterized(SymbolTable moduleSymbols,
 // interfaces for detecting whether something is evaluatable at compile time.
 static bool isParameterized(SymbolTable moduleSymbols, Operation *initializer) {
   WalkResult res = initializer->walk([&](Operation *op) {
-    if (auto accessor = dyn_cast<GlobalLoadOpInterface>(op)) {
-      if (isAccessorParameterized(moduleSymbols, accessor)) {
-        return WalkResult::interrupt();
-      }
-    }
-    if (auto accessor = dyn_cast<GlobalStoreOpInterface>(op)) {
-      if (isAccessorParameterized(moduleSymbols, accessor)) {
-        return WalkResult::interrupt();
-      }
-    }
-    if (auto accessor = dyn_cast<GlobalAddressOpInterface>(op)) {
-      if (isAccessorParameterized(moduleSymbols, accessor)) {
-        return WalkResult::interrupt();
-      }
+    bool parameterized =
+        llvm::TypeSwitch<Operation *, bool>(op)
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](CallOpInterface accessor) {
+              // Pessimistic case for calls that could transitively load a
+              // parameter. Today const-expr hoisting does not model calls
+              // properly so we don't hit this path.
+              return true;
+            })
+            .Default([=](auto) { return false; });
+    if (parameterized) {
+      return WalkResult::interrupt();
     }
     return WalkResult::advance();
   });
