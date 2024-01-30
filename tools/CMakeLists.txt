@@ -264,17 +264,21 @@ if(IREE_BUILD_COMPILER)
     )
   endif()
 
-  install(
-    TARGETS FileCheck
-    COMPONENT IREETools-CompilerDev
-    RUNTIME DESTINATION bin
-  )
+  if(IREE_FILECHECK_TARGET)
+    install(
+      TARGETS FileCheck
+      COMPONENT IREETools-CompilerDev
+      RUNTIME DESTINATION bin
+    )
+  endif()
 
-  install(
-    TARGETS not
-    COMPONENT IREETools-CompilerDev
-    RUNTIME DESTINATION bin
-  )
+  if(IREE_NOT_TARGET)
+    install(
+      TARGETS not
+      COMPONENT IREETools-CompilerDev
+      RUNTIME DESTINATION bin
+    )
+  endif()
 
   # Tablegen binaries are special snowflakes among special snowflakes.
   # They must be statically linked against internal LLVM libraries, and they
