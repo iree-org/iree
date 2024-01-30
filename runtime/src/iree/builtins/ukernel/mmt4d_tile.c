@@ -437,8 +437,7 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
                  ? iree_uk_mmt4d_tile_bf16bf16bf16_generic_skipround
                  : iree_uk_mmt4d_tile_bf16bf16bf16_generic_noskipround;
     default:
-      // shouldn't happen, validated earlier.
-      IREE_UK_ASSUME_UNREACHABLE;
+      // Shouldn't happen, validated earlier.
       return 0;
   }
 }
