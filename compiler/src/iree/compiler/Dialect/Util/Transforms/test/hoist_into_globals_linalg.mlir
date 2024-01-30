@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-util-hoist-into-globals{max-size-increase-threshold=1024})' %s | FileCheck %s
 // Spot verification that policies for linalg ops is respected.
 
 // CHECK-LABEL: @compute_hoisted

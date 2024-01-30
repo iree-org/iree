@@ -378,7 +378,7 @@ static bool doesHoistingIncreaseSizeSignificantly(
         getRoundedPhysicalStorageSize(elementCount, type.getElementType());
   }
 
-  return outSize > inSize + threshold;
+  return outSize - threshold > inSize;
 }
 
 void ConstExprHoistingPolicy::makeInvariantDecision(
