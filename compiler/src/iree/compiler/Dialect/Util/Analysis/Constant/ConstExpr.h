@@ -152,8 +152,10 @@ public:
 private:
   // Expands the frontier to include all results of a given op in an UNKNOWN
   // state. This also checks that all of its operands are known, adding
-  // them recusrively if not.
+  // them recursively if not.
   void expandToOp(Operation *op);
+  void expandToOpStep(Operation *op,
+                      SmallVectorImpl<Operation *> &expandWorklist);
 
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);
