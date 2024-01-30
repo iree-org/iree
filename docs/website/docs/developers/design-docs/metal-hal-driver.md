@@ -1,8 +1,15 @@
-# IREE Metal HAL Driver
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - Metal
+---
 
-This document lists technical details regarding the Metal HAL driver. Note that
-the Metal HAL driver is a work in progress; this document is expected to be
-updated along the way.
+# Metal HAL Driver
+
+This document lists technical details regarding the Metal implemenation of
+IREE's Hardware Abstraction Layer, called a Metal HAL driver.
 
 IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
 interface to different compute accelerators. IREE HAL's design draws inspiration

@@ -196,9 +196,11 @@ nav:
           - "developers/performance/profiling-gpu-vulkan.md"
           - "developers/performance/profiling-with-tracy.md"
       - "Design docs":
+          - "developers/design-docs/cuda-hal-driver.md"
           - "developers/design-docs/design-roadmap.md"
           - "developers/design-docs/function-abi.md"
           - "developers/design-docs/invocation-execution-model.md"
+          - "developers/design-docs/metal-hal-driver.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
           - "developers/vulkan-environment-setup.md"

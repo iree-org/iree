@@ -1,7 +1,21 @@
-# IREE CUDA HAL Driver
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - CUDA
+---
+
+# CUDA HAL Driver
 
 This document lists technical details regarding the CUDA implemenation of
-IREE's [Hardware Abstraction Layer (HAL)][iree-hal], called a CUDA HAL driver.
+IREE's Hardware Abstraction Layer, called a CUDA HAL driver.
+
+IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
+interface to different compute accelerators. IREE HAL's design draws inspiration
+from modern GPU architecture and APIs; so implementing a HAL driver using CUDA
+is mostly straightforward; though there are places we need emulation given no
+direct mapping concepts or mechanisms.
 
 ## Overall design choices
 
