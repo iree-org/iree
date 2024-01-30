@@ -56,8 +56,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
-        "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformDialectTransforms",
+        "@llvm-project//mlir:Transforms",
     ],
 )
