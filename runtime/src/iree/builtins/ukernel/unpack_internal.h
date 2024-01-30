@@ -29,7 +29,8 @@ static inline iree_uk_unpack_type_t iree_uk_unpack_type(
     case IREE_UK_FLAG_UNPACK_TYPE_BF16BF16:
       return iree_uk_unpack_type_bf16bf16;
     default:
-      IREE_UK_ASSUME_UNREACHABLE;
+      // Shouldn't happen, validated earlier.
+      return (iree_uk_unpack_type_t)0;
   }
 }
 

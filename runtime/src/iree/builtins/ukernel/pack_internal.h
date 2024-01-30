@@ -31,7 +31,8 @@ static inline iree_uk_pack_type_t iree_uk_pack_type(iree_uk_uint32_t flags) {
     case IREE_UK_FLAG_PACK_TYPE_BF16BF16:
       return iree_uk_pack_type_bf16bf16;
     default:
-      IREE_UK_ASSUME_UNREACHABLE;
+      // Shouldn't happen, validated earlier.
+      return (iree_uk_pack_type_t)0;
   }
 }
 
