@@ -160,14 +160,11 @@ std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
   int64_t laneZ = 1;
   for (PerDimLayoutAttr dimLayout : getLayouts()) {
     auto maybeXShape = dimLayout.getShape(LayoutDimension::LANEX);
-    if (maybeXShape)
-      laneX = *maybeXShape;
+    laneX *= maybeXShape.value_or(1);
     auto maybeYShape = dimLayout.getShape(LayoutDimension::LANEY);
-    if (maybeYShape)
-      laneY = *maybeYShape;
+    laneY *= maybeYShape.value_or(1);
     auto maybeZShape = dimLayout.getShape(LayoutDimension::LANEZ);
-    if (maybeZShape)
-      laneZ = *maybeZShape;
+    laneZ *= maybeZShape.value_or(1);
   }
   return std::make_tuple(laneX, laneY, laneZ);
 }

@@ -81,7 +81,7 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
         rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimZ),
         rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimY),
         rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimX)};
-    auto maybeReversedLaneGridVals =
+    FailureOr<SmallVector<Value>> maybeReversedLaneGridVals =
         affine::delinearizeIndex(rewriter, laneId.getLoc(), laneId, laneGrid);
     assert(succeeded(maybeReversedLaneGridVals) &&
            "Failed to delinearize lane index");
