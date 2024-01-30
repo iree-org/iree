@@ -89,35 +89,37 @@ replaceSymbolRefs(Operation *scopeOp,
 // Returns the total number of objects deduplicated, if any.
 // The provided |objects| array may have dead ops upon return.
 static int deduplicateObjects(Operation *scopeOp,
-                              ArrayRef<Operation *> objectOps) {
+                              ArrayRef<Operation *> allObjectOps) {
   // Bucket based on the hash of the names of at most the first 5 ops.
   // 5 was randomly chosen to be small enough to not increase overhead much,
   // but giving at least enough of a sample that there is some bucketing. This
   // was not empirically determined.
-  llvm::MapVector<uint32_t, SmallVector<Operation *>> objectMap;
-  for (auto objectOp : objectOps) {
+  llvm::MapVector<uint32_t, SmallVector<SymbolOpInterface>> objectMap;
+  for (auto objectOp : allObjectOps) {
     int count = 0;
     llvm::hash_code hash(1);
     objectOp->walk([&](Operation *it) {
       hash = llvm::hash_combine(hash, it->getName());
       return (++count >= 5) ? WalkResult::interrupt() : WalkResult::advance();
     });
-    objectMap[hash_value(hash)].push_back(objectOp);
+    objectMap[hash_value(hash)].push_back(cast<SymbolOpInterface>(objectOp));
   }
 
   // For each object find the first object which it is equivalent to and record
   // the replacement.
   SmallVector<Operation *> deadOps;
   DenseMap<Attribute, SymbolRefAttr> symbolReplacements;
+  OperationEquivalenceCache equivalenceCache(scopeOp->getContext());
   for (auto &[key, objectOps] : objectMap) {
     (void)key;
     for (int i = objectOps.size() - 1; i >= 0; --i) {
-      auto duplicateOp = cast<SymbolOpInterface>(objectOps[i]);
+      auto duplicateOp = objectOps[i];
       for (int j = 0; j < i; ++j) {
-        auto referenceOp = cast<SymbolOpInterface>(objectOps[j]);
+        auto referenceOp = objectOps[j];
 
         // Compare this potentially duplicate object to the reference one.
-        if (!isStructurallyEquivalentTo(*duplicateOp, *referenceOp)) {
+        if (!isStructurallyEquivalentTo(equivalenceCache, *duplicateOp,
+                                        *referenceOp)) {
           continue;
         }
 
