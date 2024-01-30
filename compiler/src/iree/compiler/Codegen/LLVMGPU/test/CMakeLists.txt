@@ -55,6 +55,7 @@ iree_lit_test_suite(
     "transform_dialect_vector_distribution.mlir"
     "transform_distribute_forall.mlir"
     "transform_gpu_pipelining.mlir"
+    "transform_optimize_shmem_reads_writes.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
     "ukernel_pipeline_transform.mlir"
