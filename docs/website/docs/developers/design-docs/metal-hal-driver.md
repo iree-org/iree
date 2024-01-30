@@ -1,8 +1,15 @@
-# IREE Metal HAL Driver
+---
+hide:
+  - tags
+tags:
+  - GPU
+  - Metal
+---
 
-This document lists technical details regarding the Metal HAL driver. Note that
-the Metal HAL driver is a work in progress; this document is expected to be
-updated along the way.
+# Metal HAL driver
+
+This document lists technical details regarding the Metal implemenation of
+IREE's Hardware Abstraction Layer, called a Metal HAL driver.
 
 IREE provides a [Hardware Abstraction Layer (HAL)][iree-hal] as a common
 interface to different compute accelerators. IREE HAL's design draws inspiration
@@ -94,11 +101,11 @@ Each execution takes a batch of command buffers, together with a list of waiting
 There is no direct mapping of such structure in Metal; so we performs the submission
 in three steps:
 
-1.  Create a new `MTLCommandBuffer` to `encodeWaitForEvent:value` for all
-    waiting `iree_hal_semaphore_t`s and commit this command buffer.
-1.  Commit all command buffers in the submmision batch.
-1.  Create a new `MTLCommandBuffer` to `encodeSignalEvent:value` for all
-    signaling `iree_hal_semaphore_t`s and commit this command buffer.
+1. Create a new `MTLCommandBuffer` to `encodeWaitForEvent:value` for all
+   waiting `iree_hal_semaphore_t`s and commit this command buffer.
+1. Commit all command buffers in the submmision batch.
+1. Create a new `MTLCommandBuffer` to `encodeSignalEvent:value` for all
+   signaling `iree_hal_semaphore_t`s and commit this command buffer.
 
 Such submission enables asynchronous execution of the workload on the GPU.
 
@@ -329,12 +336,10 @@ with the current active `MTLComputeCommandEncoder`:
 [mtl-argument-encoder]: https://developer.apple.com/documentation/metal/mtlargumentencoder?language=objc
 [mtl-buffer]: https://developer.apple.com/documentation/metal/mtlbuffer?language=objc
 [mtl-command-buffer]: https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc
-[mtl-command-encoder]: https://developer.apple.com/documentation/metal/mtlcommandencoder?language=objc
 [mtl-device]: https://developer.apple.com/documentation/metal/mtldevice?language=objc
 [mtl-function]: https://developer.apple.com/documentation/metal/mtlfunction?language=objc
 [mtl-library]: https://developer.apple.com/documentation/metal/mtllibrary?language=objc
 [mtl-shared-event]: https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc
-[mtl-storage-mode]: https://developer.apple.com/documentation/metal/mtlstoragemode?language=objc
 [msl-spec]: https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf
 [msl-cl-library]: https://developer.apple.com/documentation/metal/libraries/building_a_library_with_metal_s_command-line_tools?language=objc
 [objc-arc]: https://en.wikipedia.org/wiki/Automatic_Reference_Counting
