@@ -13,15 +13,11 @@ guides, and instructions on building from source.
 [![IREE Discord Status](https://discordapp.com/api/guilds/689900678990135345/widget.png?style=shield)](https://discord.gg/26P4xW4)
 
 #### Set Up IREE
+
 ```bash
-# Clone
 git clone https://github.com/openxla/iree
-# Configure
 cmake -G Ninja -B ../iree-build/ .
-# Build
 cmake --build ../iree-build/
-```
-See more instructions at: https://iree.dev/building-from-source/getting-started/
 #### Project Status
 
 IREE is still in its early phase. We have settled down on the overarching
