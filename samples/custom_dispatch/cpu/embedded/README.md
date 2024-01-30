@@ -149,17 +149,16 @@ for instructions for CMake setup and building from source.
         --module=/tmp/example.vmfb
     ```
 
-## Udon Kernel Instructions
+## Custom Kernel Match and Replace Scripting Instructions
 
-(Pronounced U-DO-U, the second `u` is upside-down) Follow the first two steps
-above to build the samples, and then compile with one additional flag to
-include the path to the kernel matcher and replacer.
+Follow the first two steps above to build the samples, and then compile with one
+additional flag to include the path to the kernel matcher and replacer.
 
     ```
     iree-compile \
         --iree-hal-executable-object-search-path=../iree-build/ \
-        --iree-preprocessing-transform-spec-filename=samples/custom_dispatch/cpu/embedded/udon_spec.mlir \
-        samples/custom_dispatch/cpu/embedded/example_udon.mlir \
+        --iree-preprocessing-transform-spec-filename=samples/custom_dispatch/cpu/embedded/example_transform_spec.mlir \
+        samples/custom_dispatch/cpu/embedded/example_transform.mlir \
         -o=/tmp/example.vmfb
     ```
 

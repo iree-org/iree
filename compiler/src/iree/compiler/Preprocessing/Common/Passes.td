@@ -22,7 +22,7 @@ def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
   let summary = "transform dialect interpreter";
   let description = [{
     This pass runs the transform dialect interpreter and applies the named
-    sequence transformation named `__preprocessing_main`.
+    sequence transformation named `__transform_main`.
 
     TODO: Drop this pass in favor of the one upstream. The one upstream requires
     separate loading of the module and thus isn't suited for single-use

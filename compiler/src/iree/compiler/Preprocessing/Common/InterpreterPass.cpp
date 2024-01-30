@@ -33,7 +33,7 @@ public:
       return signalPassFailure();
     Operation *payloadRoot = getOperation();
     Operation *transformEntryPoint = transform::detail::findTransformEntryPoint(
-        getOperation(), *transformModule, "__preprocessing_main");
+        getOperation(), *transformModule, "__transform_main");
     if (!transformEntryPoint) {
       getOperation()->emitError() << "could not find transform entry point "
                                      "__preprocessing_main in transform module";

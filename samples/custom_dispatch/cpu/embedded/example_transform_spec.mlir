@@ -153,7 +153,7 @@ module attributes {transform.with_named_sequence} {
   // Entry point for the transform interpreter, nested on the full module. This
   // is because the rewrites needed for importing the custom kernel needs to
   // add a new symbol to the module's symbol table.
-  transform.named_sequence @__preprocessing_main(%module: !transform.any_op) {
+  transform.named_sequence @__transform_main(%module: !transform.any_op) {
     // Gather the set of functions within the module.
     %funcs = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op   
     // For each function in the module, run the matcher on all contained

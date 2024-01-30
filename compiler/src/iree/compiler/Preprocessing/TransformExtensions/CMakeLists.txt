@@ -33,8 +33,10 @@ iree_cc_library(
     ::PreprocessingExtensionsOpGen
     IREEDialectsTransforms
     IREELinalgTransformDialect
+    LLVMSupport
     MLIRIR
     MLIRPDLDialect
+    MLIRSupport
     MLIRTransformDialect
     MLIRTransformUtils
     iree::compiler::Utils

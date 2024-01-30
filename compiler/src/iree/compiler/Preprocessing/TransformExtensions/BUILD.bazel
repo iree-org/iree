@@ -59,9 +59,11 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
         "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Support",
     ],
 )

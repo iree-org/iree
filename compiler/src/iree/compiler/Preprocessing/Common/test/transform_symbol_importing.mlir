@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-preprocessing-transform-interpreter{transform-spec-path=%p/external_function_spec.mlir})' %s | FileCheck %s
+// RUN: iree-opt --transform-preload-library='transform-library-paths=%p/external_function_spec.mlir' --transform-interpreter %s | FileCheck %s
 
 module @example {
   // empty

@@ -1,6 +1,6 @@
 // RUN: iree-compile %s \
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR \
-// RUN:     --iree-preprocessing-transform-spec-filename=%p/udon_spec.mlir | \
+// RUN:     --iree-preprocessing-transform-spec-filename=%p/example_transform_spec.mlir | \
 // RUN: iree-run-module \
 // RUN:     --device=local-sync \
 // RUN:     --module=- \

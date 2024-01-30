@@ -61,10 +61,10 @@ iree_lit_test_suite(
   SRCS
     "example.mlir"
     "example_inline.mlir"
-    "example_udon.mlir"
+    "example_transform.mlir"
   DATA
     ${_SPV_TARGET}
-    iree::samples::custom_dispatch::vulkan::shaders::udon_spec.mlir
+    iree::samples::custom_dispatch::vulkan::shaders::example_transform_spec.mlir
   TOOLS
     FileCheck
     iree-compile

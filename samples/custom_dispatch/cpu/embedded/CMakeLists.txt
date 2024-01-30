@@ -66,11 +66,11 @@ iree_lit_test_suite(
   SRCS
     "example_hal.mlir"
     "example_stream.mlir"
-    "example_udon.mlir"
+    "example_transform.mlir"
   DATA
   functions_arm_64.o
   functions_x86_64.o
-  udon_spec.mlir
+  example_transform_spec.mlir
   TOOLS
     FileCheck
     iree-compile

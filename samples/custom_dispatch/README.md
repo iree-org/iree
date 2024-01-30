@@ -285,9 +285,9 @@ Statically matched and imported external functions
 **Samples**:
 
 * CPU: [custom_dispatch/cpu/embedded/](./cpu/embedded/) (.c -> .o)
-  * [custom_dispatch/cpu/embedded/](./cpu/embedded/udon_spec.mlir) (.mlir)
+  * [custom_dispatch/cpu/embedded/](./cpu/embedded/example_transform_spec.mlir) (.mlir)
 * Vulkan/SPIR-V: [custom_dispatch/vulkan/shaders/](./vulkan/shaders/) (.glsl -> .spv)
-  * [custom_dispatch/vulkan/shaders/](./vulkan/shaders/udon_spec.mlir) (.mlir)
+  * [custom_dispatch/vulkan/shaders/](./vulkan/shaders/example_transform_spec.mlir) (.mlir)
 
 The above two samples build on top of a couple of the static workflows shown
 above, but should work with any of the other approaches. The idea is to separate
@@ -297,8 +297,8 @@ set of compiler tools around IREE to generate the necessary IR.
 
 There are a number of possible points at which the match and replace can happen;
 the above shows it after import + input conversion. Other plugin points are
-possible (e.g. before input conversion or after global optimization), but might
-require additional ergonomics on the matching side plumbed through.
+possible (e.g. before input conversion or after global optimization), but
+currently are missing some ergonomics on the available matchers.
 
 ### Others
 
