@@ -14,7 +14,6 @@
   >
 }>
 
-#ENCODING = array<i1: false, true>
 module attributes {transform.with_named_sequence} {
   func.func private @argmax_1d_f32_entry_point(%arg0: tensor<1x?xf32>) -> tensor<1xi64> {
     %c1 = arith.constant 1 : index
@@ -83,12 +82,11 @@ module attributes {transform.with_named_sequence} {
       transform.match.structured.yield %argmax : !transform.any_op 
     }
 
-    // Verify the operand shapes of the linalg op. The optional tensor encoding
-    // attribute indicates whether the static value in that dimension
-    // represents an alignment requirement. For example, in the below, dim 0
-    // must be statically 1, and dim 1 must be statically divisible by 64.
+    // Verify the operand shapes of the linalg op. For example, in the below,
+    // dim 0 must be statically 1, and dim 1 must be statically divisible by 64.
     %in0 = transform.get_operand %matched[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %in0 = tensor<1x64xf32, #ENCODING > : !transform.any_value
+    transform.iree.match.cast_compatible_type %in0 = tensor<1x?xf32> : !transform.any_value
+    transform.iree.match.dim_is_multiple_of %in0[1], 64 : !transform.any_value
     %out0 = transform.get_operand %matched[1] : (!transform.any_op) -> !transform.any_value
     transform.iree.match.cast_compatible_type %out0 = tensor<1xf32> : !transform.any_value
     %out1 = transform.get_operand %matched[2] : (!transform.any_op) -> !transform.any_value

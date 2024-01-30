@@ -135,35 +135,15 @@ static bool isCastableToTensorType(Type from, RankedTensorType to) {
   if (tensorType.getElementType() != to.getElementType()) {
     return false;
   }
-  auto isAlignment = to.getEncoding()
-                         ? dyn_cast<DenseBoolArrayAttr>(to.getEncoding())
-                         : nullptr;
-  // Bail if the alignment attribute is present and not the same size as the
-  // tensor rank.
-  if (isAlignment && isAlignment.getSize() != to.getRank()) {
-    return false;
-  }
-  SmallVector<bool> alignmentStatuses(tensorType.getRank(), false);
-  for (auto [fromSize, toSize, align] : llvm::zip_equal(
-           tensorType.getShape(), to.getShape(),
-           isAlignment ? isAlignment.asArrayRef() : alignmentStatuses)) {
-    bool fromIsDynamic = ShapedType::isDynamic(fromSize);
-    bool toIsDynamic = ShapedType::isDynamic(toSize);
-    // Alignment check is invalid for dynamic dimensions. If the target
-    // dimension is dynamic we can always cast to it.
-    if (toIsDynamic) {
+  for (auto [fromSize, toSize] :
+       llvm::zip_equal(tensorType.getShape(), to.getShape())) {
+    // If the target dimension is dynamic we can always cast to it.
+    if (ShapedType::isDynamic(toSize)) {
       continue;
     }
-    // Casting a dynamic dimension to a static one is never valid.
-    if (fromIsDynamic) {
-      return false;
-    }
-    // Check for either the static alignment or size equality.
-    if (align) {
-      if (fromSize % toSize != 0) {
-        return false;
-      }
-    } else if (toSize != fromSize) {
+    // Casting a dynamic dimension to a static one is never valid, and static
+    // sizes must always match.
+    if (toSize != fromSize) {
       return false;
     }
   }
@@ -355,15 +335,47 @@ DiagnosedSilenceableFailure
 IREE::transform_dialect::MatchCastCompatibleTypesOp::matchValue(
     Value current, transform::TransformResults &results,
     transform::TransformState &state) {
-  if (auto targetTensorType = dyn_cast<RankedTensorType>(getTargetType())) {
+  Type targetType = getTargetType();
+  if (auto targetTensorType = dyn_cast<RankedTensorType>(targetType)) {
     if (!isCastableToTensorType(current.getType(), targetTensorType)) {
       return emitSilenceableError()
-             << "Type " << current.getType() << " is not castable to "
+             << "type " << current.getType() << " is not castable to "
              << targetTensorType;
     }
     return DiagnosedSilenceableFailure::success();
   }
-  return emitSilenceableError() << "unhandled target type: " << getTargetType();
+  if (current.getType() != targetType) {
+    return emitSilenceableError()
+           << "type " << current.getType() << " does not match " << targetType;
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// MatchDimIsMultipleOfOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+IREE::transform_dialect::MatchDimIsMultipleOfOp::matchValue(
+    Value current, transform::TransformResults &results,
+    transform::TransformState &state) {
+  auto shapedType = dyn_cast<ShapedType>(current.getType());
+  if (!shapedType) {
+    return emitSilenceableError()
+           << "type " << current.getType() << " is not a shaped type";
+  }
+  int64_t dim = getDim();
+  if (dim > shapedType.getRank()) {
+    return emitSilenceableError()
+           << "dim " << dim << " out of range for shaped type " << shapedType;
+  }
+  int64_t size = getSize();
+  if (shapedType.getShape()[dim] % size != 0) {
+    return emitSilenceableError()
+           << "dim " << dim << " of shaped type " << shapedType
+           << " is not a multiple of " << size;
+  }
+  return DiagnosedSilenceableFailure::success();
 }
 
 //===----------------------------------------------------------------------===//

@@ -129,17 +129,15 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
     [IsolatedFromAbove,
      MatchOpInterface,
      SingleValueMatcher,
-     SingleBlockImplicitTerminator<"::mlir::transform::YieldOp">,
      MemoryEffectsOpInterface]> {
   let summary =
       "Checks if the body of the target op matches the body of the single contained op";
   let description = [{
     Checks whether the given value is cast-compatible with the given target
-    type attribute. If the target type attribute is a tensor type, an additional
-    encoding can be specified to indicate whether the given static size is an
-    alignment requirement.
+    type attribute.
 
-    Currently this operation only supports tensor types.
+    Currently this operation only allows casting of tensor types. Other types
+    must match exactly.
 
     #### Return modes
 
@@ -151,6 +149,34 @@ def MatchCastCompatibleTypesOp : Op<Transform_Dialect, "iree.match.cast_compatib
   let arguments = (ins TransformValueHandleTypeInterface:$operand_handle,
                        TypeAttr:$target_type);
   let assemblyFormat = "$operand_handle `=` $target_type attr-dict `:` type($operand_handle)";
+  let extraClassDeclaration = SingleValueMatcher.extraDeclaration;
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def MatchDimIsMultipleOfOp : Op<Transform_Dialect, "iree.match.dim_is_multiple_of",
+    [IsolatedFromAbove,
+     MatchOpInterface,
+     SingleValueMatcher,
+     MemoryEffectsOpInterface]> {
+  let summary =
+      "Checks if the body of the target op matches the body of the single contained op";
+  let description = [{
+    Checks whether the given dimension given shaped value is a multiple of the
+    given size.
+
+    #### Return modes
+
+    Succeeds if the value's type is compatible with the target type, and
+    produces a silenceable failure otherwise. Produces a definite failure
+    if the operand is not associated with a single payload value.
+  }];
+
+  let arguments = (ins TransformValueHandleTypeInterface:$operand_handle,
+                       I64Attr:$dim,
+                       I64Attr:$size);
+  let assemblyFormat = "$operand_handle `[` $dim `]` `,` $size "
+                       "attr-dict `:` type($operand_handle)";
   let extraClassDeclaration = SingleValueMatcher.extraDeclaration;
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

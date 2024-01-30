@@ -96,7 +96,6 @@ func.func @call_external(%input: tensor<?xf32>,
   return
 }
 
-#ENCODING = array<i1: true>
 module attributes {transform.with_named_sequence} {
   transform.named_sequence @static_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
@@ -108,7 +107,8 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @static_alignment_match(%call: !transform.any_op {transform.readonly}) -> (!transform.any_op, !transform.any_param) {
     transform.match.operation_name %call ["func.call"] : !transform.any_op
     %in0 = transform.get_operand %call[0] : (!transform.any_op) -> !transform.any_value
-    transform.iree.match.cast_compatible_type %in0 = tensor<20xf32, #ENCODING> : !transform.any_value
+    transform.iree.match.cast_compatible_type %in0 = tensor<?xf32> : !transform.any_value
+    transform.iree.match.dim_is_multiple_of %in0[0], 20 : !transform.any_value
     %0 = transform.param.constant "aligned_match" -> !transform.any_param
     transform.yield %call, %0 : !transform.any_op, !transform.any_param
   }
