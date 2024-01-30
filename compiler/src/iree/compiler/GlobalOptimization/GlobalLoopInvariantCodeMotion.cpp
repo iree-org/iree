@@ -21,7 +21,7 @@ struct GlobalLoopInvariantCodeMotionPass
           GlobalLoopInvariantCodeMotionPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     if (funcOp.isDeclaration())
       return;
 
@@ -43,7 +43,9 @@ struct GlobalLoopInvariantCodeMotionPass
             return isMemoryEffectFree(invOp) && isSpeculatable(invOp);
           },
           [&](Operation *invOp, Region *region) {
-            hoistedOps.push_back(invOp);
+            if (region == &whileOp.getAfter()) {
+              hoistedOps.push_back(invOp);
+            }
             whileOp.moveOutOfLoop(invOp);
             return;
           });
@@ -128,8 +130,6 @@ struct GlobalLoopInvariantCodeMotionPass
           });
 
       rewriter.replaceOp(whileOp, ifOp);
-
-      funcOp->dump();
     }
   }
 };
