@@ -992,9 +992,6 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   set(IREE_E2E_TEST_ARTIFACTS_DIR "${IREE_BINARY_DIR}/e2e_test_artifacts")
 endif()
 
-# Note: Test deps are not built as part of all (use the iree-test-deps target).
-add_subdirectory(tests EXCLUDE_FROM_ALL)
-
 # tools/ can depend on compiler/ and runtime/.
 # Note: tools sub directory is added before compiler/ so that phony targets for
 # files with the same names from different rules are disambiguated towards
@@ -1002,6 +999,9 @@ add_subdirectory(tests EXCLUDE_FROM_ALL)
 add_subdirectory(tools)
 add_subdirectory(compiler)
 add_subdirectory(runtime)
+
+# Note: Test deps are not built as part of all (use the iree-test-deps target).
+add_subdirectory(tests EXCLUDE_FROM_ALL)
 
 if(IREE_ENABLE_CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY "")
