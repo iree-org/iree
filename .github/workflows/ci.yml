@@ -333,7 +333,7 @@ jobs:
               cmake -B ${BUILD_DIR} -S . -G Ninja \
                   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
                   -DIREE_BUILD_COMPILER=OFF \
-                  -DLLVM_EXTERNAL_LIT=./third_party/llvm-project/llvm/utils/lit/lit.py \
+                  -DLLVM_EXTERNAL_LIT=$PWD/third_party/llvm-project/llvm/utils/lit/lit.py \
                   -DIREE_HOST_BIN_DIR=${INSTALL_DIR}/bin
       - name: "Building runtime"
         run: |
