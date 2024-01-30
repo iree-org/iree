@@ -23,6 +23,7 @@ iree_lit_test_suite(
     iree-run-module
   LABELS
     "driver=local-task"
+    "hostonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
