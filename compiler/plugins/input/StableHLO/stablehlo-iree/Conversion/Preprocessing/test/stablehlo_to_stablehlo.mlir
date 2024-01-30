@@ -510,3 +510,20 @@ func.func @custom_call_bottomk(%arg0 : tensor<1x160xf32>, %arg1 : tensor<f32>, %
   // CHECK: return %[[TOPK]], %[[IND]]
   return %approx#0, %approx#1 : tensor<1x16xf32>, tensor<1x16xi32>
 }
+
+
+// -----
+
+// CHECK-LABEL: @no_dot_i4_absorption
+// CHECK-SAME: %[[ARG0:.+]]: tensor<1x16xi8>
+// CHECK-SAME: %[[ARG1:.+]]: tensor<16x18xi8>
+func.func @no_dot_i4_absorption(%arg0: tensor<1x16xi8>, %arg1: tensor<16x18xi8>) -> (tensor<1x18xi32>) {
+    %0 = stablehlo.convert %arg0 : (tensor<1x16xi8>) -> tensor<1x16xi4>
+    %1 = stablehlo.convert %0 : (tensor<1x16xi4>) -> tensor<1x16xi8>
+    // CHECK %[[VAL0:.+]] = stablehlo.convert %[[ARG0]] -> tensor<1x16xi4>
+    // CHECK %[[VAL1:.+]] = stablehlo.convert %[[VAL0]] -> tensor<16xi8>
+    // CHECK-DAG: %[[VAL2:.+]] = stablehlo.reshape
+    // CHECK-DAG: %[[RESULT1:.+]] = stablehlo.dot %[[VAL2]], %[[ARG1]]
+    %2 = stablehlo.dot_general %1, %arg1, contracting_dims = [1] x [0], precision = [DEFAULT, DEFAULT] : (tensor<1x16xi8>, tensor<16x18xi8>) -> tensor<1x18xi32>
+    return %2 : tensor<1x18xi32>
+}

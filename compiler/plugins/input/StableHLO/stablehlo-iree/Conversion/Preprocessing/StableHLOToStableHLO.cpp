@@ -1218,9 +1218,9 @@ struct FuseWidenOperands final : OpRewritePattern<Op> {
               op, "non-integer or floating point type");
           ;
         }
-
-        if (inputType.getIntOrFloatBitWidth() <
-            castedType.getIntOrFloatBitWidth()) {
+        unsigned int inputBitWidth = inputType.getIntOrFloatBitWidth();
+        if (inputBitWidth >= 8 &&
+            inputBitWidth < castedType.getIntOrFloatBitWidth()) {
           operands.push_back(convertOp.getOperand());
           continue;
         }
