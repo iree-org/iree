@@ -30,6 +30,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     cfg = "//tests:lit.cfg.py",
+    tags = ["hostonly"],
     tools = [
         "//tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
