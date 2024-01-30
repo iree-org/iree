@@ -955,14 +955,16 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   RewritePatternSet patterns(target.getContext());
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
-  SmallVector<Value> threadGrid = {
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x),
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::y),
-      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::z),
-  };
+  // This is a test op so we unsafely use thread_id x as the lane ID. In
+  // general this should linearize the thread IDs based on the workgroup size
+  // and divide by the subgroup size. i.e.
+  //
+  // lane_id = (tid_x + tid_y * dim_x + tid_z * dim_y * dim_x) / subgroup_size;
+  Value laneId =
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
 
   populateGPUDistributionPatterns(patterns);
-  populateGPUDistributionLayoutAttrPatterns(threadGrid, patterns);
+  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }

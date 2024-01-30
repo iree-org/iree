@@ -136,9 +136,11 @@ builtin.module attributes { transform.with_named_sequence } {
 #layout_row_major = #iree_vector_ext.layout<<[BATCHX, LANEY], [2, 8]>, <[BATCHY, LANEX, VECTORX], [2, 1, 8]>>
 #layout_col_major = #iree_vector_ext.layout<<[BATCHX, LANEY, VECTORX], [1, 4, 4]>, <[BATCHY, LANEX], [2, 8]>>
 
-// CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 * 8)>
-// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 + 8)>
-// CHECK-DAG: #[[$MAP2:.+]] = affine_map<()[s0] -> (s0 * 8 + 8)>
+// TODO: Use affine min tricks based on the grid size to elide the mod.
+// Note that this IR is invalid if subgroup size != 8.
+
+// CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 mod 8)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 mod 8 + 8)>
 
 // CHECK-LABEL: @distribute_transfer_write_row_major
 func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc: memref<64x64xf16>) {
@@ -148,23 +150,23 @@ func.func @distribute_transfer_write_row_major(%root: vector<16x16xf16>, %alloc:
            "__vector_layout_test_anchor_operand_0" = #layout_row_major}
                   : vector<16x16xf16>, memref<64x64xf16>
 
-  // CHECK-DAG: %[[TIDX:.+]] = gpu.thread_id  x
-  // CHECK-DAG: %[[TIDY:.+]] = gpu.thread_id  y
-  // CHECK: %[[VECX_IDX:.+]] = affine.apply #[[$MAP0]]()[%[[TIDX]]]
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C8:.+]] = arith.constant 8 : index
+  // CHECK-DAG: %[[LANEID:.+]] = gpu.thread_id  x
+  // CHECK: %[[VEC_LANE_Y:.+]] = affine.apply #[[$MAP0]]()[%[[LANEID]]]
   // CHECK: %[[DIST_SRC_VEC:.+]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<2x2x8xf16>
   // CHECK: %[[BATCH_0_0:.+]] = vector.extract %[[DIST_SRC_VEC]][0, 0] : vector<8xf16> from vector<2x2x8xf16>
-  // CHECK: vector.store %[[BATCH_0_0]], %{{.*}}[%[[TIDY]], %[[VECX_IDX]]] : memref<64x64xf16>, vector<8xf16>
+  // CHECK: vector.store %[[BATCH_0_0]], %{{.*}}[%[[VEC_LANE_Y]], %[[C0]]] : memref<64x64xf16>, vector<8xf16>
 
-  // CHECK: %[[NEXT_IDY:.+]] = affine.apply #[[$MAP1]]()[%[[TIDY]]]
+  // CHECK: %[[NEXT_VEC_LANE_Y:.+]] = affine.apply #[[$MAP1]]()[%[[LANEID]]]
   // CHECK: %[[BATCH_1_0:.+]] = vector.extract %[[DIST_SRC_VEC]][1, 0] : vector<8xf16> from vector<2x2x8xf16>
-  // CHECK: vector.store %[[BATCH_1_0]], %{{.*}}[%[[NEXT_IDY]], %[[VECX_IDX]]] : memref<64x64xf16>, vector<8xf16>
+  // CHECK: vector.store %[[BATCH_1_0]], %{{.*}}[%[[NEXT_VEC_LANE_Y]], %[[C0]]] : memref<64x64xf16>, vector<8xf16>
 
-  // CHECK: %[[NEXT_VECX_IDX:.+]] = affine.apply #[[$MAP2]]()[%[[TIDX]]]
   // CHECK: %[[BATCH_0_1:.+]] = vector.extract %[[DIST_SRC_VEC]][0, 1] : vector<8xf16> from vector<2x2x8xf16>
-  // CHECK: vector.store %[[BATCH_0_1]], %{{.*}}[%[[TIDY]], %[[NEXT_VECX_IDX]]] : memref<64x64xf16>, vector<8xf16>
+  // CHECK: vector.store %[[BATCH_0_1]], %{{.*}}[%[[VEC_LANE_Y]], %[[C8]]] : memref<64x64xf16>, vector<8xf16>
 
   // CHECK: %[[BATCH_1_1:.+]] = vector.extract %[[DIST_SRC_VEC]][1, 1] : vector<8xf16> from vector<2x2x8xf16>
-  // CHECK: vector.store %[[BATCH_1_1]], %{{.*}}[%[[NEXT_IDY]], %[[NEXT_VECX_IDX]]] : memref<64x64xf16>, vector<8xf16>
+  // CHECK: vector.store %[[BATCH_1_1]], %{{.*}}[%[[NEXT_VEC_LANE_Y]], %[[C8]]] : memref<64x64xf16>, vector<8xf16>
   func.return
 }
 
