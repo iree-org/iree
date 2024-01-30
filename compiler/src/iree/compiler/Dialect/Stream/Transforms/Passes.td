@@ -494,7 +494,7 @@ def VerifyLoweringToTensorsPass :
 
 def VerifyLoweringToAsyncResourcesPass :
     Pass<"iree-stream-verify-lowering-to-async-resources", "mlir::ModuleOp"> {
-  let summary = "Verifies that all stream.tensor.* ops and types are fully lowered to streama.async.* resource ops.";
+  let summary = "Verifies that all stream.tensor.* ops and types are fully lowered to stream.async.* resource ops.";
 }
 
 def VerifyLoweringToAsyncPass :
