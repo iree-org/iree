@@ -45,7 +45,7 @@ endfunction()
 #   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
 #       if no compiled support for that configuration.
 function(iree_check_test)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_INTEGRATION_TESTS)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
@@ -242,7 +242,7 @@ endfunction()
 #   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
 #       if no compiled support for that configuration.
 function(iree_check_single_backend_test_suite)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_INTEGRATION_TESTS)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
@@ -372,7 +372,7 @@ endfunction()
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
 function(iree_check_test_suite)
-  if(NOT IREE_BUILD_TESTS OR NOT IREE_BUILD_INTEGRATION_TESTS)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 

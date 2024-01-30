@@ -69,7 +69,6 @@ option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topolog
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_INTEGRATION_TESTS "Builds IREE integration tests." OFF)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings." OFF)
