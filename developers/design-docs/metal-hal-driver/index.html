@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/developers/performance/profiling-cpu-events/">
+        <link rel="canonical" href="https://iree.dev/developers/design-docs/metal-hal-driver/">
       
       
-        <link rel="prev" href="../profiling/">
+        <link rel="prev" href="../cuda-hal-driver/">
       
       
-        <link rel="next" href="../profiling-gpu-vulkan/">
+        <link rel="next" href="../../usage-best-practices/">
       
       
       <link rel="icon" href="../../../assets/images/ghost.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Profiling CPUs - IREE</title>
+        <title>Metal HAL driver - IREE</title>
       
     
     
@@ -81,7 +81,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#profiling-cpus" class="md-skip">
+        <a href="#metal-hal-driver" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Profiling CPUs
+              Metal HAL driver
             
           </span>
         </div>
@@ -2294,8 +2294,6 @@
                 
   
   
-    
-  
   
     
     
@@ -2316,13 +2314,15 @@
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
         
           <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
             
@@ -2335,7 +2335,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_5">
             <span class="md-nav__icon md-icon"></span>
             Performance
@@ -2348,7 +2348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../benchmarking/" class="md-nav__link">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2370,7 +2370,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../benchmark-suites/" class="md-nav__link">
+      <a href="../../performance/benchmark-suites/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2392,7 +2392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling/" class="md-nav__link">
+      <a href="../../performance/profiling/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2412,31 +2412,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
-  
-  <span class="md-ellipsis">
-    Profiling CPUs
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2447,147 +2425,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#perf-and-simpleperf-on-linux-and-android" class="md-nav__link">
-    Perf and Simpleperf, on Linux and Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Perf and Simpleperf, on Linux and Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    Overview
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#preserving-artifacts" class="md-nav__link">
-    Preserving artifacts
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#desktop-linux" class="md-nav__link">
-    Desktop linux
-  </a>
-  
-    <nav class="md-nav" aria-label="Desktop linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#warning" class="md-nav__link">
-    Warning
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-support-for-annotate-by-cpu-event" class="md-nav__link">
-    No support for annotate by CPU event
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpreting-cpu-event-counts" class="md-nav__link">
-    Interpreting CPU event counts
-  </a>
-  
-    <nav class="md-nav" aria-label="Interpreting CPU event counts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#problems" class="md-nav__link">
-    Problems
-  </a>
-  
-    <nav class="md-nav" aria-label="Problems">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-in-themselves-normal" class="md-nav__link">
-    These events are in themselves normal
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-hardware-dependent-and-under-documented" class="md-nav__link">
-    These events are hardware-dependent and under-documented
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" class="md-nav__link">
-    These events are imprecise and noisy, particularly on ARM CPUs
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#recommendations" class="md-nav__link">
-    Recommendations
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2599,7 +2436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2621,7 +2458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling-with-tracy/" class="md-nav__link">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2649,6 +2486,8 @@
                 
   
   
+    
+  
   
     
     
@@ -2667,15 +2506,13 @@
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" checked>
         
           <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
@@ -2688,7 +2525,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_6">
             <span class="md-nav__icon md-icon"></span>
             Design docs
@@ -2701,7 +2538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/function-abi/" class="md-nav__link">
+      <a href="../function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2741,7 +2578,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2761,7 +2598,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/cuda-hal-driver/" class="md-nav__link">
+      <a href="../cuda-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2779,9 +2616,29 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../design-docs/metal-hal-driver/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Metal HAL driver
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -2790,6 +2647,224 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall Design Choices
+  </a>
+  
+    <nav class="md-nav" aria-label="Overall Design Choices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#metal-versions" class="md-nav__link">
+    Metal Versions
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#programming-languages-and-libraries" class="md-nav__link">
+    Programming Languages and Libraries
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#object-lifetime-management" class="md-nav__link">
+    Object Lifetime Management
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU Objects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#driver" class="md-nav__link">
+    Driver
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device" class="md-nav__link">
+    Device
+  </a>
+  
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-submission" class="md-nav__link">
+    Command buffer submission
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queue-ordered-allocation" class="md-nav__link">
+    Queue-ordered allocation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collectives" class="md-nav__link">
+    Collectives
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profiling" class="md-nav__link">
+    Profiling
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
+  </a>
+  
+    <nav class="md-nav" aria-label="Command buffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fillcopyupdate-buffer" class="md-nav__link">
+    Fill/copy/update buffer
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allocator" class="md-nav__link">
+    Allocator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer" class="md-nav__link">
+    Buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable" class="md-nav__link">
+    Executable
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable-cache" class="md-nav__link">
+    Executable cache
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptor-set-pipeline-layout" class="md-nav__link">
+    Descriptor set / pipeline layout
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compute-pipeline" class="md-nav__link">
+    Compute Pipeline
+  </a>
+  
+    <nav class="md-nav" aria-label="Compute Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shaderkernel-compilation" class="md-nav__link">
+    Shader/kernel compilation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupthreadgroup-size" class="md-nav__link">
+    Workgroup/threadgroup size
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-descriptors" class="md-nav__link">
+    Resource descriptors
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-dispatch" class="md-nav__link">
+    Command buffer dispatch
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -3268,64 +3343,31 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#perf-and-simpleperf-on-linux-and-android" class="md-nav__link">
-    Perf and Simpleperf, on Linux and Android
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall Design Choices
   </a>
   
-    <nav class="md-nav" aria-label="Perf and Simpleperf, on Linux and Android">
+    <nav class="md-nav" aria-label="Overall Design Choices">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    Overview
+  <a href="#metal-versions" class="md-nav__link">
+    Metal Versions
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#preserving-artifacts" class="md-nav__link">
-    Preserving artifacts
+  <a href="#programming-languages-and-libraries" class="md-nav__link">
+    Programming Languages and Libraries
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#desktop-linux" class="md-nav__link">
-    Desktop linux
+  <a href="#object-lifetime-management" class="md-nav__link">
+    Object Lifetime Management
   </a>
-  
-    <nav class="md-nav" aria-label="Desktop linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#warning" class="md-nav__link">
-    Warning
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-support-for-annotate-by-cpu-event" class="md-nav__link">
-    No support for annotate by CPU event
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3335,38 +3377,52 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interpreting-cpu-event-counts" class="md-nav__link">
-    Interpreting CPU event counts
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
   </a>
   
-    <nav class="md-nav" aria-label="Interpreting CPU event counts">
+    <nav class="md-nav" aria-label="GPU Objects">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#problems" class="md-nav__link">
-    Problems
-  </a>
-  
-    <nav class="md-nav" aria-label="Problems">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-in-themselves-normal" class="md-nav__link">
-    These events are in themselves normal
+  <a href="#driver" class="md-nav__link">
+    Driver
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#these-events-are-hardware-dependent-and-under-documented" class="md-nav__link">
-    These events are hardware-dependent and under-documented
+  <a href="#device" class="md-nav__link">
+    Device
+  </a>
+  
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-submission" class="md-nav__link">
+    Command buffer submission
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" class="md-nav__link">
-    These events are imprecise and noisy, particularly on ARM CPUs
+  <a href="#queue-ordered-allocation" class="md-nav__link">
+    Queue-ordered allocation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#collectives" class="md-nav__link">
+    Collectives
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profiling" class="md-nav__link">
+    Profiling
   </a>
   
 </li>
@@ -3377,8 +3433,104 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#recommendations" class="md-nav__link">
-    Recommendations
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
+  </a>
+  
+    <nav class="md-nav" aria-label="Command buffer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fillcopyupdate-buffer" class="md-nav__link">
+    Fill/copy/update buffer
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allocator" class="md-nav__link">
+    Allocator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer" class="md-nav__link">
+    Buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable" class="md-nav__link">
+    Executable
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable-cache" class="md-nav__link">
+    Executable cache
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#descriptor-set-pipeline-layout" class="md-nav__link">
+    Descriptor set / pipeline layout
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compute-pipeline" class="md-nav__link">
+    Compute Pipeline
+  </a>
+  
+    <nav class="md-nav" aria-label="Compute Pipeline">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#shaderkernel-compilation" class="md-nav__link">
+    Shader/kernel compilation
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workgroupthreadgroup-size" class="md-nav__link">
+    Workgroup/threadgroup size
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resource-descriptors" class="md-nav__link">
+    Resource descriptors
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer-dispatch" class="md-nav__link">
+    Command buffer dispatch
   </a>
   
 </li>
@@ -3409,14 +3561,20 @@
     
     
     
-      <a href="../../../community/tags/#cpu" class="md-tag">CPU</a>
+      <a href="../../../community/tags/#gpu" class="md-tag">GPU</a>
+    
+  
+    
+    
+    
+      <a href="../../../community/tags/#metal" class="md-tag">Metal</a>
     
   
 </nav>
 
 
   
-    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/performance/profiling-cpu-events.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/design-docs/metal-hal-driver.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3424,219 +3582,286 @@
   
 
 
-<h1 id="profiling-cpus">Profiling CPUs<a class="headerlink" href="#profiling-cpus" title="Permanent link">link</a></h1>
-<p>CPUs are able to
-<a href="https://en.wikipedia.org/wiki/Hardware_performance_counter">record</a> certain
-events that may be relevant when investigating the performance of a program. A
-common example of such an event is a
-<a href="https://en.wikipedia.org/wiki/CPU_cache#Cache_miss">"cache miss"</a>, when the
-program tries to access data in memory that isn't already in some CPU cache,
-causing that access to be slower than it could otherwise be.</p>
-<p>Querying and analyzing this data can be useful, but is hard in two distinct
-ways:</p>
+<h1 id="metal-hal-driver">Metal HAL driver<a class="headerlink" href="#metal-hal-driver" title="Permanent link">link</a></h1>
+<p>This document lists technical details regarding the Metal implemenation of
+IREE's Hardware Abstraction Layer, called a Metal HAL driver.</p>
+<p>IREE provides a <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
+interface to different compute accelerators. IREE HAL's design draws inspiration
+from modern GPU architecture and APIs; so implementing a HAL driver using modern
+GPU APIs is generally straightforward. This applies to the Metal HAL driver.</p>
+<h2 id="overall-design-choices">Overall Design Choices<a class="headerlink" href="#overall-design-choices" title="Permanent link">link</a></h2>
+<h3 id="metal-versions">Metal Versions<a class="headerlink" href="#metal-versions" title="Permanent link">link</a></h3>
+<p>Currently the Metal HAL driver expects Metal 3 capabilities. Metal 3 was
+released late 2022 and are supported since macOS Ventura and iOS 16.
+It <a href="https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf">covers</a> recent Apple silicon GPUs including A13+ and M1+
+chips and others.</p>
+<p>In the future, we expect to increase the support to cover Metal 2 capabilities.
+Metal 2 introduces useful features like argument buffer and others that are
+necessary for performance and make IREE HAL implementation simpler. Metal 2 was
+released late 2017 and are supported since macOS High Sierra and iOS 11. It is
+already dominant (<a href="https://gs.statcounter.com/macos-version-market-share/desktop/worldwide">macOS</a>, <a href="https://developer.apple.com/support/app-store/">iOS</a>).</p>
+<h3 id="programming-languages-and-libraries">Programming Languages and Libraries<a class="headerlink" href="#programming-languages-and-libraries" title="Permanent link">link</a></h3>
+<p>The Metal framework only exposes Objective-C or Swift programming language APIs.
+Metal HAL driver needs to inherit from common HAL abstraction definitions, which
+are in C. To minimize dependency and binary size and increase performance, we
+use Metal's Objective-C API for implementing the Metal HAL driver.
+Header (<code>.h</code>) and implementation (<code>.m</code>) files are put adjacent to each other.</p>
+<h3 id="object-lifetime-management">Object Lifetime Management<a class="headerlink" href="#object-lifetime-management" title="Permanent link">link</a></h3>
+<p>Objective-C uses refcount for tracking object lifetime and managing memory. This
+is traditionally done manually by sending <code>retain</code> and <code>release</code> messages to
+Objective-C objects. Modern Objective-C allows developers to opt in to use
+<a href="https://en.wikipedia.org/wiki/Automatic_Reference_Counting">Automatic Reference Counting</a> to let the compiler to automatically
+deduce and insert <code>retain</code>/<code>release</code> where possible to simplify the burdern of
+manual management.</p>
+<p>We don't use ARC in the Metal HAL driver given that IREE has its own object
+refcount and lifetime management mechanism. Metal HAL GPU objects are tracked
+with that to be consistent with others. Each Metal HAL GPU object <code>retain</code>s
+the underlying Metal <code>id&lt;MTL*&gt;</code> object on construction and <code>release</code>s on
+destruction.</p>
+<h2 id="gpu-objects">GPU Objects<a class="headerlink" href="#gpu-objects" title="Permanent link">link</a></h2>
+<p>Metal is one of the main modern GPU APIs that provide more explicit control over
+the hardware. The mapping between IREE HAL classes and Metal protocols are
+relatively straightforward:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">IREE HAL Class</th>
+<th style="text-align: center;">Metal Protocol</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/driver.h"><code>iree_hal_driver_t</code></a></td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a></td>
+<td style="text-align: center;"><a href="https://developer.apple.com/documentation/metal/mtldevice?language=objc"><code>MTLDevice</code></a></td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h"><code>iree_hal_command_buffer_t</code></a></td>
+<td style="text-align: center;"><a href="https://developer.apple.com/documentation/metal/mtlcommandbuffer?language=objc"><code>MTLCommandBuffer</code></a></td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/semaphore.h"><code>iree_hal_semaphore_t</code></a></td>
+<td style="text-align: center;"><a href="https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc"><code>MTLSharedEvent</code></a></td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/allocator.h"><code>iree_hal_allocator_t</code></a></td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/buffer.h"><code>iree_hal_buffer_t</code></a></td>
+<td style="text-align: center;"><a href="https://developer.apple.com/documentation/metal/mtlbuffer?language=objc"><code>MTLBuffer</code></a></td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h"><code>iree_hal_executable_t</code></a></td>
+<td style="text-align: center;"><a href="https://developer.apple.com/documentation/metal/mtllibrary?language=objc"><code>MTLLibrary</code></a></td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable_cache.h"><code>iree_hal_executable_cache_t</code></a></td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_descriptor_set_layout_t</code></a></td>
+<td style="text-align: center;">N/A</td>
+</tr>
+<tr>
+<td style="text-align: center;"><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_pipeline_layout_t</code></a></td>
+<td style="text-align: center;">N/A</td>
+</tr>
+</tbody>
+</table>
+<p>In the following subsections, we go over each pair to provide more details.</p>
+<h3 id="driver">Driver<a class="headerlink" href="#driver" title="Permanent link">link</a></h3>
+<p>There is no native driver abstraction in Metal. IREE's Metal HAL driver still
+provides a <a href="https://github.com/openxla/iree/tree/main/experimental/metal/metal_driver.h"><code>iree_hal_metal_driver_t</code></a> struct to implement the
+common <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/driver.h"><code>iree_hal_driver_t</code></a> struct. <code>iree_hal_metal_driver_t</code> just
+<code>retain</code>s all available Metal devices in the system during its lifetime, to
+guarantee that we have the same <code>id&lt;MTLDevice&gt;</code> for device querying and
+creation.</p>
+<h3 id="device">Device<a class="headerlink" href="#device" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/tree/main/experimental/metal/metal_device.h"><code>iree_hal_metal_device_t</code></a> implements <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a>
+to provide the interface to Metal GPU device by wrapping a <code>id&lt;MTLDevice&gt;</code>. Upon
+construction, <code>iree_hal_metal_device_t</code> creates and retains one queue for both
+dispatch and transfer during its lifetime. In the future we expect to spport
+multiple queues for better concurrency.</p>
+<h4 id="command-buffer-submission">Command buffer submission<a class="headerlink" href="#command-buffer-submission" title="Permanent link">link</a></h4>
+<p>In IREE HAL, command buffers are directly created from the <code>iree_hal_device_t</code>.
+It's also directly submitted there via <code>iree_hal_device_queue_execute()</code>.
+Each execution takes a batch of command buffers, together with a list of waiting
+<code>iree_hal_semaphore_t</code>s and a list signaling <code>iree_hal_semaphore_t</code>s.
+There is no direct mapping of such structure in Metal; so we performs the submission
+in three steps:</p>
+<ol>
+<li>Create a new <code>MTLCommandBuffer</code> to <code>encodeWaitForEvent:value</code> for all
+   waiting <code>iree_hal_semaphore_t</code>s and commit this command buffer.</li>
+<li>Commit all command buffers in the submmision batch.</li>
+<li>Create a new <code>MTLCommandBuffer</code> to <code>encodeSignalEvent:value</code> for all
+   signaling <code>iree_hal_semaphore_t</code>s and commit this command buffer.</li>
+</ol>
+<p>Such submission enables asynchronous execution of the workload on the GPU.</p>
+<h4 id="queue-ordered-allocation">Queue-ordered allocation<a class="headerlink" href="#queue-ordered-allocation" title="Permanent link">link</a></h4>
+<p>Queue-ordered asynchronous allocations via <code>iree_hal_device_queue_alloc</code> is not fully
+supported yet; it just translates to blocking wait and allocation.</p>
+<h4 id="collectives">Collectives<a class="headerlink" href="#collectives" title="Permanent link">link</a></h4>
+<p>Collectives suppport is not yet implemented.</p>
+<h4 id="profiling">Profiling<a class="headerlink" href="#profiling" title="Permanent link">link</a></h4>
+<p>The Metal HAL driver supports profiling via <code>MTLCaptureManager</code>. We can either
+capture to a trace file or XCode.</p>
+<p>To perform profiling in the command line, attach <code>--device_profiling_mode=queue
+--device_profiling_file=/path/to/metal.gputrace</code> to IREE binaries.</p>
+<h3 id="command-buffer">Command buffer<a class="headerlink" href="#command-buffer" title="Permanent link">link</a></h3>
+<p>Command buffers are where IREE HAL and Metal API have a major difference.</p>
+<p>IREE HAL command buffers follow the flat Vulkan recording model, where all memory
+or dispatch commands are recorded into a command buffer directly.
+Unlike Vulkan, Metal adopts a multi-level command recording model--memory/dispatch
+commands are not directly recorded into a command buffer; rather, they must go
+through the additional level of blit/compute encoders.
+Implementing IREE's HAL using Metal would require switching encoders for
+interleaved memory and dispatch commands.
+Additionally, certain IREE HAL API features do not have direct mapping in Metal
+APIs, e.g., various forms of IREE HAL execution/memory barriers. Translating
+them would require looking at both previous and next commands to decide the
+proper mapping.</p>
+<p>Due to these reasons, it's beneficial to have a complete view of the full
+command buffer and extra flexibility during recording, in order to fixup past
+commands, or inspect future commands.</p>
+<p>Therefore, to implement IREE HAL command buffers using Metal, we perform two
+steps using a linked list of command segments:
+First we create segments to keep track of all IREE HAL commands and the
+associated data. And then, when finalizing the command buffer, we iterate
+through all the segments and record their contents into a proper
+<code>MTLCommandBuffer</code>. A linked list gives us the flexibility to organize
+command sequence in low overhead; and a deferred recording gives us the
+complete picture of the command buffer when really started recording.</p>
+<p>The Metal HAL driver right now only support one-shot command buffers, by mapping
+to <code>MTLCommandBuffer</code>s.</p>
+<h4 id="fillcopyupdate-buffer">Fill/copy/update buffer<a class="headerlink" href="#fillcopyupdate-buffer" title="Permanent link">link</a></h4>
+<p>Metal APIs for fill and copy buffers have alignment restrictions on the offset
+and length. <code>iree_hal_command_buffer_{fill|copy|update}_buffer()</code> is more
+flexible regarding that. So for cases aren't directly supported by Metal APIs,
+we use <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/drivers/metal/builtin/">polyfill compute kernels</a> to perform the memory
+operation using GPU threads.</p>
+<h3 id="semaphore">Semaphore<a class="headerlink" href="#semaphore" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/semaphore.h"><code>iree_hal_semaphore_t</code></a> allows host-&gt;device, device-&gt;host, host-&gt;host,
+and device-&gt;device synchronization. It maps to Vulkan timeline semaphore. In
+Metal world, the counterpart would be <a href="https://developer.apple.com/documentation/metal/mtlsharedevent?language=objc"><code>MTLSharedEvent</code></a>. Most
+of the <code>iree_hal_semaphore_t</code> APIs are simple to implement in
+<a href="https://github.com/openxla/iree/tree/main/experimental/metal/shared_event.h"><code>MetalSharedEvent</code></a>, with <code>iree_hal_semaphore_wait()</code> as an
+exception. A listener is registered on the <code>MTLSharedEvent</code> with
+<code>notifyListener:atValue:block:</code> to singal a semaphore to wake the current
+thread, which is put into sleep by waiting on the semaphore.</p>
+<h3 id="allocator">Allocator<a class="headerlink" href="#allocator" title="Permanent link">link</a></h3>
+<p>At the moment the Metal HAL driver just has a very simple
+<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/allocator.h"><code>iree_hal_allocator_t</code></a> implementation. It just wraps a <code>MTLDevice</code>
+and redirects all allocation requests to the <code>MTLDevice</code>. No page/pool/slab or
+whatever. This is meant to be used together with common allocator layers like the
+caching allocator.</p>
+<h3 id="buffer">Buffer<a class="headerlink" href="#buffer" title="Permanent link">link</a></h3>
+<p>IREE <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/buffer.h"><code>iree_hal_buffer_t</code></a> maps Metal <code>MTLBuffer</code>. See
+<a href="#memory-management">Memory Management</a> for more details.</p>
+<h3 id="executable">Executable<a class="headerlink" href="#executable" title="Permanent link">link</a></h3>
+<p>IREE <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h"><code>iree_hal_executable_t</code></a> represents a GPU program archive with
+a driver-defined format. It maps naturally to Metal <a href="https://developer.apple.com/documentation/metal/mtllibrary?language=objc"><code>MTLLibrary</code></a>.
+An entry point in a <code>MTLLibrary</code> is a <a href="https://developer.apple.com/documentation/metal/mtlfunction?language=objc"><code>MTLFunction</code></a>. We define
+<a href="https://github.com/openxla/iree/tree/main/experimental/metal/kernel_library.h"><code>iree_hal_metal_kernel_params_t</code></a> to wrap around a
+<code>MTLLibrary</code>, its <code>MTLFunction</code>s, and also <code>MTLComputePipelineState</code> objects
+constructed from <code>MTLFunction</code>s.</p>
+<h3 id="executable-cache">Executable cache<a class="headerlink" href="#executable-cache" title="Permanent link">link</a></h3>
+<p>IREE <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable_cache.h"><code>iree_hal_executable_cache_t</code></a> is modeling a cache of
+preprared GPU executables for a particular device. At the moment the Metal
+HAL driver does not peforming any caching on GPU programs; it simply reads the
+program from the FlatBuffer and hands it over to Metal driver.</p>
+<h3 id="descriptor-set-pipeline-layout">Descriptor set / pipeline layout<a class="headerlink" href="#descriptor-set-pipeline-layout" title="Permanent link">link</a></h3>
+<p>See <a href="#resource-descriptors">Resource descriptors</a> for more details.</p>
+<h2 id="compute-pipeline">Compute Pipeline<a class="headerlink" href="#compute-pipeline" title="Permanent link">link</a></h2>
+<h3 id="shaderkernel-compilation">Shader/kernel compilation<a class="headerlink" href="#shaderkernel-compilation" title="Permanent link">link</a></h3>
+<p>Metal has <a href="https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf">Metal Shading Language (MSL)</a> for authoring graphics
+shaders and compute kernels. MSL source code can be directly consumed by the
+Metal framework at run-time; it can also be compiled first into an opaque
+library using <a href="https://developer.apple.com/documentation/metal/libraries/building_a_library_with_metal_s_command-line_tools?language=objc">command-line tools</a> at build-time.</p>
+<p>IREE uses compilers to compile ML models expressed with high-level op semantics
+down to GPU native source format. This is also the case for the Metal HAL
+driver. Metal does not provide an open intermediate language; we reuse the
+SPIR-V code generation pipeline and then cross compile the generated SPIR-V into
+MSL source with <a href="https://github.com/KhronosGroup/SPIRV-Cross">SPIRV-Cross</a>. This is actually a fair common
+practice for targeting multiple GPU APIs in graphics programming world. For
+example, the Vulkan implmenation in macOS/iOS, <a href="https://github.com/KhronosGroup/MoltenVK">MoltenVK</a>, is also
+doing the same for shaders/kernels. The path is quite robust, as demonstrated
+by various games on top of MoltenVK.</p>
+<p>Therefore, in IREE, we have a <a href="https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV"><code>MetalSPIRVTargetBackend</code></a>,
+which pulls in the common SPIR-V passes to form the compilation pipeline.
+The difference would be to provide a suitable SPIR-V target environment to drive
+the compilation, which one can derive from the Metal GPU families to target.
+The serialization step differs from
+<a href="https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV"><code>VulkanSPIRVTargetBackend</code></a> too: following the normal
+SPIR-V serialization step, we additionally need to invoke SPRIV-Cross to
+cross compile the generated SPIR-V into MSL, and then compile and/or serialize
+the MSL source/library.</p>
+<p>IREE uses <a href="https://google.github.io/flatbuffers/">FlatBuffer</a> to encode the whole workload module,
+including both GPU shader/kernel (called executable in IREE terminology) and
+CPU scheduling logic. The GPU executables are embedded as part of the module's
+FlatBuffer, which are <a href="https://en.wikipedia.org/wiki/Mmap"><code>mmap</code></a>ped when IREE runs.</p>
+<p>For the Metal HAL driver, it means we need to embed the MSL kernels inside the
+module FlatBuffer. Right now we can either encode the MSL source strings and
+compile them at Metal run-time, or directly encoding the library instead.</p>
+<h3 id="workgroupthreadgroup-size">Workgroup/threadgroup size<a class="headerlink" href="#workgroupthreadgroup-size" title="Permanent link">link</a></h3>
+<p>When dispatching a compute kernel in Metal, we need to specify the number of
+thread groups in grid and the number of threads in thread group. Both are
+3-D vectors. IREE HAL, which follows Vulkan, calls them workgroup count and
+workgroup size, respectively.</p>
+<p>In Vulkan programming model, workgroup count and workgroup size are specified at
+different places: the former is given when invoking
+<a href="https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDispatch.html"><code>vkCmdDispatch()</code></a>, while the later is encoded in the
+dispatched SPIR-V code. This split does not match the Metal model, where we
+specify both in the API with <code>dispatchThreads:threadsPerThreadgroup:</code>.</p>
+<p>As said in <a href="#shader-kernel-compilation">shader/kernel compilation</a>, MSL kernels
+are cross compiled from SPIR-V code and then embeded in the module FlatBuffer.
+The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
+information extracted from the SPIR-V code. We encode an additional 3-D vector
+for each entry point and use it as the threadgroup size when later dispatching
+the <code>MTLFunction</code> corresponding to the entry point.</p>
+<h3 id="resource-descriptors">Resource descriptors<a class="headerlink" href="#resource-descriptors" title="Permanent link">link</a></h3>
+<p>A descriptor is an opaque handle pointing to a resource that is accessed in
+the compute kernel. IREE's HAL models several concepts related to GPU resource
+management explicitly:</p>
 <ul>
-<li>Depending on the CPU and on the OS, both hardware and software limitations can
-  get in the way of obtaining accurate data.</li>
-<li>This data tends to be inherently difficult to interpret, even when it is
-  perfectly accurate. In practice it is often noisy and inaccurate, which makes
-  interpretation even more complicated.</li>
+<li><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_descriptor_set_layout_t</code></a>: a schema for
+  describing an array of descriptor bindings. Each descriptor binding specifies
+  the resource type, access mode and other information.</li>
+<li><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h"><code>iree_hal_pipeline_layout_t</code></a>: a schema for describing all
+  the resources accessed by a compute pipeline. It includes zero or more
+  <code>DescriptorSetLayout</code>s and (optional) push constants.</li>
 </ul>
-<p>There are two parts to this page: platform-specific information about <a href="#perf-and-simpleperf-on-linux-and-android">how to
-query</a> this data, and, at the end, a
-platform-independent explanation of <a href="#interpreting-cpu-event-counts">how to
-interpret</a> it.</p>
-<h2 id="perf-and-simpleperf-on-linux-and-android">Perf and Simpleperf, on Linux and Android<a class="headerlink" href="#perf-and-simpleperf-on-linux-and-android" title="Permanent link">link</a></h2>
-<h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h3>
-<p>The Linux kernel exposes system event counters to user-space programs by means
-of the
-<a href="https://man7.org/linux/man-pages/man2/perf_event_open.2.html"><code>perf_event_open</code></a>
-system call. This includes both hardware event counters (such as CPU cache
-events) and software events from the kernel (such as page faults and context
-switches). Anyone may use this system call to implement a profiler, but Linux
-readily offers one, <a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a>.</p>
-<h3 id="preserving-artifacts">Preserving artifacts<a class="headerlink" href="#preserving-artifacts" title="Permanent link">link</a></h3>
-<p>By default IREE cleans up any temporary files it creates while running. Tools
-like perf, however, require those files exist even after the process has exited.
-The environment variable <code>IREE_PRESERVE_DYLIB_TEMP_FILES</code> can be set to preserve
-the files. This is only needed for the CPU path when using the system loader.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">IREE_PRESERVE_DYLIB_TEMP_FILES</span><span class="o">=</span><span class="m">1</span>
-</code></pre></div>
-<h3 id="desktop-linux">Desktop linux<a class="headerlink" href="#desktop-linux" title="Permanent link">link</a></h3>
-<p>On desktop Linux we can use
-<a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a>. It is provided on
-most Linux distributions, for instance on Debian-based distributions do:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>linux-perf
-</code></pre></div>
-<p>Run the program to be profiled, prepending its command line with <code>perf record</code>.
-By default this will write the profile data to the current directory,
-<code>./perf.data</code>. Sometimes this isn't ideal, such as then the current directory is
-under version control. Explicit paths can be specified by <code>-o</code> flag to direct
-the output of <code>perf record</code>, and then by <code>-i</code> flags to select the input of
-subsequent commands analyzing the profile. Example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p>By default, this samples time spent. One may specify instead an event to sample
-by, with the <code>-e</code> flag. For instance, to sample by L1 cache misses, one may do:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span>-e<span class="w"> </span>L1-dcache-load-misses<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p><code>perf list</code> dumps the list of event types.</p>
-<p>Once you have recorded a profile, there are two main ways to analyze it: <code>perf
-report</code> and <code>perf annotate</code>.</p>
-<p><code>perf report</code> breaks down the event counts by symbol. In the default case where
-what was sampled was time, this is just an ordinary profile by symbol name, no
-different than what could be viewed in other profilers such as
-<a href="../profiling-with-tracy/">Tracy</a>. Where it gets really interesting is when the
-profile was recording a specific event type, as in the above <code>-e
-L1-dcache-load-misses</code> example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>report<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-Overhead<span class="w">  </span>Command<span class="w">          </span>Shared<span class="w"> </span>Object<span class="w">              </span>Symbol
-<span class="w">  </span><span class="m">61</span>.53%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_31
-<span class="w">  </span><span class="m">13</span>.30%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_11
-<span class="w">   </span><span class="m">2</span>.11%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_13
-<span class="w">   </span><span class="m">1</span>.90%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_19
-<span class="w">   </span><span class="m">1</span>.54%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_25
-<span class="w">   </span><span class="m">1</span>.49%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_5
-</code></pre></div>
-<p><code>perf annotate</code> breaks down the event counts by instruction. Again, in the
-default case where what was sampled was time, this is no different than what
-could be viewed in Tracy, and the real motivation to use <code>perf</code> is when
-profiling by specific event types as in the above <code>-e L1-dcache-load-misses</code>
-example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>annotate<span class="w"> </span>-i<span class="w"> </span>perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span><span class="m">4000</span><span class="w"> </span>Hz,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-serving_default_ex_dispatch_31<span class="w">  </span>/tmp/dylib_executablenzpx2Q.so<span class="w"> </span><span class="o">[</span>Percent:<span class="w"> </span><span class="nb">local</span><span class="w"> </span>period<span class="o">]</span>
-<span class="w">  </span><span class="m">1</span>.66<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x1000<span class="o">(</span>%rdi<span class="o">)</span>,%xmm10
-<span class="w">  </span><span class="m">0</span>.48<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x800<span class="o">(</span>%rdi<span class="o">)</span>,%xmm9
-<span class="w">  </span><span class="m">0</span>.82<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span><span class="o">(</span>%rdi<span class="o">)</span>,%xmm8
-<span class="w">  </span><span class="m">0</span>.49<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.12<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.14<span class="w"> </span>│<span class="w">        </span>mulps<span class="w">  </span>%xmm5,%xmm4
-<span class="w">  </span><span class="m">0</span>.28<span class="w"> </span>│<span class="w">        </span>addps<span class="w">  </span>%xmm6,%xmm4
-<span class="w">  </span><span class="m">0</span>.60<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm3,%xmm6
-<span class="w">  </span><span class="m">0</span>.34<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm3,%xmm6
-</code></pre></div>
-<h4 id="warning">Warning<a class="headerlink" href="#warning" title="Permanent link">link</a></h4>
-<p><code>perf annotate</code> is even noisier than <code>perf report</code> as it can be overly
-optimistic, depending on the CPU, to pin an event to a specific instruction.
-Typically, this works fairly well on x86 CPUs and less well on ARM CPUs and more
-generally on anything mobile. Even on a desktop x86 CPU, this is noisy, as the
-above example (recorded on a Skylake workstation) shows: it blamed a <code>mulps
-%xmm5,%xmm4</code> instruction for a cache miss, which doesn't make sense as that
-instruction only touches registers.</p>
-<h3 id="android">Android<a class="headerlink" href="#android" title="Permanent link">link</a></h3>
-<p>On Android we can use
-<a href="https://developer.android.com/ndk/guides/simpleperf"><code>simpleperf</code></a>. It's
-preinstalled on current Android <code>userdebug</code> images, and part of the Android NDK.</p>
-<p>In theory, as Android is Linux, it should be possible to use <code>perf</code>.
-Unfortunately, <code>perf</code> is difficult to build for Android. Fortunately,
-<code>simpleperf</code> is readily available: it is preinstalled in Android <code>userdebug</code>
-images, and it is part of the Android NDK.</p>
-<p>First, we record on the device:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>simpleperf<span class="w"> </span>record<span class="w"> </span>-e<span class="w"> </span>raw-l1d-cache-refill<span class="w"> </span>-o<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>/data/local/tmp/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p>Then pull the recorded data from the device, and analyze on the desktop. We
-assume that <code>${ANDROID_NDK}</code> points to the local copy of the Android NDK.</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>pull<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span>/tmp/perf.data
-<span class="si">${</span><span class="nv">ANDROID_NDK</span><span class="si">}</span>/simpleperf/report.py<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-</code></pre></div>
-<p>This prints a breakdown of <code>raw-l1d-cache-refill</code> events by symbol.</p>
-<p>Like with <code>perf</code>, a list of event types can be queried by the <code>list</code> subcommand:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>simpleperf<span class="w"> </span>list
-</code></pre></div>
-<h4 id="no-support-for-annotate-by-cpu-event">No support for <code>annotate</code> by CPU event<a class="headerlink" href="#no-support-for-annotate-by-cpu-event" title="Permanent link">link</a></h4>
-<p>There is no <code>simpleperf annotate</code>. The <code>simpleperf</code> documentation lists a couple
-of
-<a href="https://android.googlesource.com/platform/system/extras/+/main/simpleperf/doc/README.md#show-annotated-source-code-and-disassembly">ways</a>
-of achieving the same thing.</p>
-<p>However:</p>
-<ul>
-<li>The common case of annotating by time, as opposed to annotating by CPU event,
-  is supported by <a href="../profiling-with-tracy/">Tracy</a>.</li>
-<li>Annotating by CPU event is inherently not working due to hardware limitations
-  of the ARM CPUs found in Android devices. That is, the hardware is too
-  imprecise at pinning an event to a particular instruction.</li>
-</ul>
-<h2 id="interpreting-cpu-event-counts">Interpreting CPU event counts<a class="headerlink" href="#interpreting-cpu-event-counts" title="Permanent link">link</a></h2>
-<h3 id="problems">Problems<a class="headerlink" href="#problems" title="Permanent link">link</a></h3>
-<p>There are multiple layers of complexity in interpreting CPU event counts.</p>
-<h4 id="these-events-are-in-themselves-normal">These events are in themselves normal<a class="headerlink" href="#these-events-are-in-themselves-normal" title="Permanent link">link</a></h4>
-<p>The first difficulty is in the fact that most of these events are <em>normal</em>. So
-just knowing that they happened is not in itself actionable.</p>
-<p>For example, if we learn that some code causes cache misses, that isn't big
-news: so does all code. Maybe this code has <em>too many</em> cache misses, but how
-many is too many? Maybe this code alone accounts for a large fraction of the
-overall total of the whole program, but maybe even that is normal, for instance
-if the code being studied is the 'hot' part of the program where a large
-fraction of overall time is spent?</p>
-<h4 id="these-events-are-hardware-dependent-and-under-documented">These events are hardware-dependent and under-documented<a class="headerlink" href="#these-events-are-hardware-dependent-and-under-documented" title="Permanent link">link</a></h4>
-<p>Many of these events have a meaning that varies between CPUs and that is
-difficult to characterize on any CPU, let alone in a way that applies to all
-CPUs.</p>
-<p>For example, take the "L2 data cache refill". On ARM, with <code>simpleperf</code>, that
-would be <code>raw-l2d-cache-refill</code>. Questions:</p>
-<ul>
-<li>Is “L2” <a href="https://en.wikipedia.org/wiki/Cache_inclusion_policy">inclusive</a> of
-  “L1”?</li>
-<li>How many bytes are transferred per “refill”?</li>
-<li>Are accesses induced by speculative execution or by automatic pre-fetching
-  counted in the same way as accesses induced by actual code execution?</li>
-</ul>
-<p>The answers to all of the above questions are CPU-dependent. They may even vary
-between the CPU cores of the same Android device.</p>
-<h4 id="these-events-are-imprecise-and-noisy-particularly-on-arm-cpus">These events are imprecise and noisy, particularly on ARM CPUs<a class="headerlink" href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" title="Permanent link">link</a></h4>
-<p>Expect noise levels above 10% in many CPU event counts on ARM CPUs. Moreover, on
-ARM, as discussed above, there is inaccuracy in which instruction is blamed for
-which event, which will increase inaccuracy of per-symbol breakdowns for very
-cheap symbols (and makes <code>perf annotate</code> impossible as noted above). Finally, be
-aware that some ARM CPUs may perform event count interpolation, so we may not
-have any access to true hardware counts.</p>
-<h3 id="recommendations">Recommendations<a class="headerlink" href="#recommendations" title="Permanent link">link</a></h3>
-<p>Here is a workflow pattern that allows to make significant use of CPU event
-counts, despite all the problems noted above:</p>
-<ul>
-<li>Hypothesize that some code diff might help performance, and might help
-  reducing the number of CPU events of a certain type, and that the two might be
-  related.</li>
-<li>Benchmark with and without the code diff, on the same device, everything else
-  being equal.<ul>
-<li>Let your benchmark perform a fixed number of iterations, or, if using a
-benchmark termination condition of the form "run until at least N seconds
-have elapsed", carefully divide event counts by the actual number of
-iterations that were run.</li>
-</ul>
-</li>
-<li>If the observed CPU event count difference is significant, go ahead and claim
-  that your code diff probably helps with that aspect of CPU behavior.</li>
-</ul>
-<p>Some things NOT to be done:</p>
-<ul>
-<li>Don’t try to compare different metrics, not even when it seems obvious that
-  they should satisfy a simple relationship, not even on the same CPU (e.g. “L1
-  accesses should be greater than L2 accesses”).</li>
-<li>Don’t divide by some “total” metric to get some kinds of ratios. For example,
-  don’t try to compute a “cache miss ratio” as quotient of “cache refill” over
-  “all cache accesses” metrics. The first problem with that (even before we get
-  to CPU-specific issues) is that that’s rewarding increases to the “all cache
-  accesses” metrics, so if something bad happens in your codegen and your kernel
-  ends up spilling a lot of register to the stack, that’s going to be a lot more
-  accesses which will all be L1 hits so that’ll help this ratio look better!  So
-  more generally, just try to minimize some CPU metrics (that count “costly”
-  events), not some more complex math expression formed from arithmetic on CPU
-  metrics.</li>
-</ul>
+<p>However, this isn't totally matching Metal's paradigm.
+In the Metal framework, the closest concept to descriptor sets would be <a href="https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc">argument
+buffer</a>. There is no direct correspondence to
+descriptor set layout and pipeline layout. Rather, the layout is implicitly
+encoded in Metal shaders as MSL structs. The APIs for creating argument buffers
+do not encourage early creation without pipelines: one typically creates them
+for each <code>MTLFunction</code>.</p>
+<p>All of this means it's better to defer the creation of the argument buffer
+until the point of compute pipeline creation and dispatch. Therefore, the Metal
+HAL driver's <code>iree_hal_metal_descriptor_set_layout_t</code> and
+<code>iree_hal_metal_pipeline_layout_t</code> are just containers holding the information
+up for recording <a href="#command-buffer-dispatch">command buffer dispatch</a>.</p>
+<h3 id="command-buffer-dispatch">Command buffer dispatch<a class="headerlink" href="#command-buffer-dispatch" title="Permanent link">link</a></h3>
+<p>Metal HAL driver command buffer dispatch recording performs the following steps
+with the current active <code>MTLComputeCommandEncoder</code>:</p>
+<ol>
+<li>Bind the <code>MTLComputePipelineState</code> for the current entry function.</li>
+<li>Encode the push constants using <code>setBytes:length:atIndex</code>.</li>
+<li>For each bound descriptor set at set #<code>S</code>:</li>
+<li>Create a <a href="https://developer.apple.com/documentation/metal/mtlargumentencoder?language=objc"><code>MTLArgumentEncoder</code></a> for encoding an
+      associated argument <code>MTLBuffer</code>.</li>
+<li>For each bound resource buffer at binding #<code>B</code> in this descriptor set,
+      encode it to the argument buffer index #<code>B</code> with
+      <code>setBuffer::offset::atIndex:</code> and inform the <code>MTLComputeCommandEncoder</code>
+      that the dispatch will use this resource with <code>useResource:usage:</code>.</li>
+<li>Set the argument <code>MTLBuffer</code> to buffer index #<code>S</code>.</li>
+<li>Dispatch with <code>dispatchThreadgroups:threadsPerThreadgroup:</code>.</li>
+</ol>
 
 
 

@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/developers/performance/profiling-cpu-events/">
+        <link rel="canonical" href="https://iree.dev/developers/design-docs/cuda-hal-driver/">
       
       
-        <link rel="prev" href="../profiling/">
+        <link rel="prev" href="../invocation-execution-model/">
       
       
-        <link rel="next" href="../profiling-gpu-vulkan/">
+        <link rel="next" href="../metal-hal-driver/">
       
       
       <link rel="icon" href="../../../assets/images/ghost.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Profiling CPUs - IREE</title>
+        <title>CUDA HAL driver - IREE</title>
       
     
     
@@ -81,7 +81,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#profiling-cpus" class="md-skip">
+        <a href="#cuda-hal-driver" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Profiling CPUs
+              CUDA HAL driver
             
           </span>
         </div>
@@ -2294,8 +2294,6 @@
                 
   
   
-    
-  
   
     
     
@@ -2316,13 +2314,15 @@
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_5" >
         
           <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
             
@@ -2335,7 +2335,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_5">
             <span class="md-nav__icon md-icon"></span>
             Performance
@@ -2348,7 +2348,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../benchmarking/" class="md-nav__link">
+      <a href="../../performance/benchmarking/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2370,7 +2370,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../benchmark-suites/" class="md-nav__link">
+      <a href="../../performance/benchmark-suites/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m11.628 16.186-2.047-2.14 6.791-5.953 1.21 1.302zm8.837 6.047c2.14-2.14 3.535-5.117 3.535-8.466 0-6.604-5.395-12-12-12s-12 5.396-12 12c0 3.35 1.302 6.326 3.535 8.466l1.674-1.675c-1.767-1.767-2.79-4.093-2.79-6.79A9.568 9.568 0 0 1 12 4.185a9.568 9.568 0 0 1 9.581 9.581c0 2.605-1.116 5.024-2.79 6.791Z"/></svg>
@@ -2392,7 +2392,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling/" class="md-nav__link">
+      <a href="../../performance/profiling/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2412,31 +2412,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
-  
-  <span class="md-ellipsis">
-    Profiling CPUs
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../performance/profiling-cpu-events/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2447,147 +2425,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#perf-and-simpleperf-on-linux-and-android" class="md-nav__link">
-    Perf and Simpleperf, on Linux and Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Perf and Simpleperf, on Linux and Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    Overview
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#preserving-artifacts" class="md-nav__link">
-    Preserving artifacts
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#desktop-linux" class="md-nav__link">
-    Desktop linux
-  </a>
-  
-    <nav class="md-nav" aria-label="Desktop linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#warning" class="md-nav__link">
-    Warning
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-support-for-annotate-by-cpu-event" class="md-nav__link">
-    No support for annotate by CPU event
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interpreting-cpu-event-counts" class="md-nav__link">
-    Interpreting CPU event counts
-  </a>
-  
-    <nav class="md-nav" aria-label="Interpreting CPU event counts">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#problems" class="md-nav__link">
-    Problems
-  </a>
-  
-    <nav class="md-nav" aria-label="Problems">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-in-themselves-normal" class="md-nav__link">
-    These events are in themselves normal
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-hardware-dependent-and-under-documented" class="md-nav__link">
-    These events are hardware-dependent and under-documented
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" class="md-nav__link">
-    These events are imprecise and noisy, particularly on ARM CPUs
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#recommendations" class="md-nav__link">
-    Recommendations
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2599,7 +2436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling-gpu-vulkan/" class="md-nav__link">
+      <a href="../../performance/profiling-gpu-vulkan/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2621,7 +2458,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../profiling-with-tracy/" class="md-nav__link">
+      <a href="../../performance/profiling-with-tracy/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m16 11.78 4.24-7.33 1.73 1-5.23 9.05-6.51-3.75L5.46 19H22v2H2V3h2v14.54L9.5 8l6.5 3.78Z"/></svg>
@@ -2649,6 +2486,8 @@
                 
   
   
+    
+  
   
     
     
@@ -2667,15 +2506,13 @@
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" checked>
         
           <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
@@ -2688,7 +2525,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_6">
             <span class="md-nav__icon md-icon"></span>
             Design docs
@@ -2701,7 +2538,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2558,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/function-abi/" class="md-nav__link">
+      <a href="../function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2741,7 +2578,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2759,9 +2596,29 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../design-docs/cuda-hal-driver/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    CUDA HAL driver
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -2770,6 +2627,168 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall design choices
+  </a>
+  
+    <nav class="md-nav" aria-label="Overall design choices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuda-driver-vs-runtime-api" class="md-nav__link">
+    CUDA driver vs runtime API
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU Objects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#driver" class="md-nav__link">
+    Driver
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device" class="md-nav__link">
+    Device
+  </a>
+  
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#async-allocation" class="md-nav__link">
+    Async allocation
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allocator" class="md-nav__link">
+    Allocator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer" class="md-nav__link">
+    Buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable" class="md-nav__link">
+    Executable
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synchronization" class="md-nav__link">
+    Synchronization
+  </a>
+  
+    <nav class="md-nav" aria-label="Synchronization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    Event
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+    <nav class="md-nav" aria-label="Semaphore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuevent-capabilities" class="md-nav__link">
+    CUevent capabilities
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-to-wait-analysis" class="md-nav__link">
+    Signal to wait analysis
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-structures" class="md-nav__link">
+    Data structures
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2781,7 +2800,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/metal-hal-driver/" class="md-nav__link">
+      <a href="../metal-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3268,64 +3287,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#perf-and-simpleperf-on-linux-and-android" class="md-nav__link">
-    Perf and Simpleperf, on Linux and Android
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall design choices
   </a>
   
-    <nav class="md-nav" aria-label="Perf and Simpleperf, on Linux and Android">
+    <nav class="md-nav" aria-label="Overall design choices">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
-    Overview
+  <a href="#cuda-driver-vs-runtime-api" class="md-nav__link">
+    CUDA driver vs runtime API
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#preserving-artifacts" class="md-nav__link">
-    Preserving artifacts
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#desktop-linux" class="md-nav__link">
-    Desktop linux
-  </a>
-  
-    <nav class="md-nav" aria-label="Desktop linux">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#warning" class="md-nav__link">
-    Warning
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#android" class="md-nav__link">
-    Android
-  </a>
-  
-    <nav class="md-nav" aria-label="Android">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#no-support-for-annotate-by-cpu-event" class="md-nav__link">
-    No support for annotate by CPU event
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3335,38 +3307,31 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#interpreting-cpu-event-counts" class="md-nav__link">
-    Interpreting CPU event counts
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
   </a>
   
-    <nav class="md-nav" aria-label="Interpreting CPU event counts">
+    <nav class="md-nav" aria-label="GPU Objects">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#problems" class="md-nav__link">
-    Problems
-  </a>
-  
-    <nav class="md-nav" aria-label="Problems">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#these-events-are-in-themselves-normal" class="md-nav__link">
-    These events are in themselves normal
+  <a href="#driver" class="md-nav__link">
+    Driver
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#these-events-are-hardware-dependent-and-under-documented" class="md-nav__link">
-    These events are hardware-dependent and under-documented
+  <a href="#device" class="md-nav__link">
+    Device
   </a>
   
-</li>
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" class="md-nav__link">
-    These events are imprecise and noisy, particularly on ARM CPUs
+  <a href="#async-allocation" class="md-nav__link">
+    Async allocation
   </a>
   
 </li>
@@ -3377,9 +3342,84 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#recommendations" class="md-nav__link">
-    Recommendations
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
   </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allocator" class="md-nav__link">
+    Allocator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer" class="md-nav__link">
+    Buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable" class="md-nav__link">
+    Executable
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synchronization" class="md-nav__link">
+    Synchronization
+  </a>
+  
+    <nav class="md-nav" aria-label="Synchronization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    Event
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+    <nav class="md-nav" aria-label="Semaphore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cuevent-capabilities" class="md-nav__link">
+    CUevent capabilities
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-to-wait-analysis" class="md-nav__link">
+    Signal to wait analysis
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-structures" class="md-nav__link">
+    Data structures
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
         
@@ -3409,14 +3449,20 @@
     
     
     
-      <a href="../../../community/tags/#cpu" class="md-tag">CPU</a>
+      <a href="../../../community/tags/#gpu" class="md-tag">GPU</a>
+    
+  
+    
+    
+    
+      <a href="../../../community/tags/#cuda" class="md-tag">CUDA</a>
     
   
 </nav>
 
 
   
-    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/performance/profiling-cpu-events.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/design-docs/cuda-hal-driver.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3424,218 +3470,224 @@
   
 
 
-<h1 id="profiling-cpus">Profiling CPUs<a class="headerlink" href="#profiling-cpus" title="Permanent link">link</a></h1>
-<p>CPUs are able to
-<a href="https://en.wikipedia.org/wiki/Hardware_performance_counter">record</a> certain
-events that may be relevant when investigating the performance of a program. A
-common example of such an event is a
-<a href="https://en.wikipedia.org/wiki/CPU_cache#Cache_miss">"cache miss"</a>, when the
-program tries to access data in memory that isn't already in some CPU cache,
-causing that access to be slower than it could otherwise be.</p>
-<p>Querying and analyzing this data can be useful, but is hard in two distinct
-ways:</p>
+<h1 id="cuda-hal-driver">CUDA HAL driver<a class="headerlink" href="#cuda-hal-driver" title="Permanent link">link</a></h1>
+<p>This document lists technical details regarding the CUDA implemenation of
+IREE's Hardware Abstraction Layer, called a CUDA HAL driver.</p>
+<p>IREE provides a <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
+interface to different compute accelerators. IREE HAL's design draws inspiration
+from modern GPU architecture and APIs; so implementing a HAL driver using CUDA
+is mostly straightforward; though there are places we need emulation given no
+direct mapping concepts or mechanisms.</p>
+<h2 id="overall-design-choices">Overall design choices<a class="headerlink" href="#overall-design-choices" title="Permanent link">link</a></h2>
+<h3 id="cuda-driver-vs-runtime-api">CUDA driver vs runtime API<a class="headerlink" href="#cuda-driver-vs-runtime-api" title="Permanent link">link</a></h3>
+<p>IREE HAL's design draws inspiration from modern GPU APIs--it provides explicit
+control of low-level GPU objects. The compiler is expected to plan the object
+lifetime and schedule workload and synchronization in an optimized way; IREE
+HAL implementation and the underlying GPU driver stack is expected to be a thin
+layer without much smarts and magic.</p>
+<p>Therefore when implementing the IREE HAL using CUDA, we use the
+<a href="https://docs.nvidia.com/cuda/cuda-driver-api/index.html">driver API</a> instead of the <a href="https://docs.nvidia.com/cuda/cuda-runtime-api/index.html">runtime API</a>.
+At runtime the HAL CUDA driver will load the <code>libcuda.so</code>/<code>nvcuda.dll</code> library
+dynamically and query a subset of the CUDA driver API used in HAL via
+<a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DRIVER__ENTRY__POINT.html#group__CUDA__DRIVER__ENTRY__POINT_1gcae5adad00590572ab35b2508c2d6e0d">the <code>cuGetProcAddress()</code> API</a>.</p>
+<h2 id="gpu-objects">GPU Objects<a class="headerlink" href="#gpu-objects" title="Permanent link">link</a></h2>
+<h3 id="driver">Driver<a class="headerlink" href="#driver" title="Permanent link">link</a></h3>
+<p>There is no direct CUDA construct that map to the IREE HAL <code>iree_hal_driver_t</code>
+abstraction. We use it to hold the dynamic symbols loaded for all devices,
+and device enumeration and creation.</p>
+<h3 id="device">Device<a class="headerlink" href="#device" title="Permanent link">link</a></h3>
+<p><code>iree_hal_cuda_device_t</code> implements <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a> to provide
+the interface to CUDA GPU device by wrapping a <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html"><code>CUdevice</code></a>.
+For each device, right now we create two <code>CUstream</code>s--one for issuing commands
+for memory allocation and kernel lauches as instructed by the program; the other
+for issue host callback functions after dispatched command buffers completes.
+See <a href="#synchronization">synchronization</a> section regarding the details.</p>
+<h4 id="async-allocation">Async allocation<a class="headerlink" href="#async-allocation" title="Permanent link">link</a></h4>
+<p>The CUDA HAL drivers supports async allocation
+(<code>iree_hal_device_queue_alloca()</code> and <code>iree_hal_device_queue_dealloca()</code>)
+via <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MALLOC__ASYNC.html#group__CUDA__MALLOC__ASYNC">CUDA stream ordered memory allocation</a>.</p>
+<p>The <code>async_allocations</code> in the <code>iree_hal_cuda_device_params_t</code> struct allows
+to enable this feature.</p>
+<h3 id="command-buffer">Command buffer<a class="headerlink" href="#command-buffer" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h"><code>iree_hal_command_buffer_t</code></a> is a recording of commands to
+issue to the GPU; when the command buffer is submitted to the device it's then
+actually executed on the GPU asynchronously.</p>
+<p>Two implementations of <code>iree_hal_command_buffer_t</code> exist in the CUDA HAL
+driver--<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/graph_command_buffer.c">one</a> backed by <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__GRAPH.html#group__CUDA__GRAPH"><code>CUgraph</code></a> and
+<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/stream_command_buffer.c">the other</a> backed by <code>CUstream</code>.</p>
+<p><code>CUgraph</code> conceptually matches <code>iree_hal_command_buffer_t</code> better given it's
+a recording of commands to issue to the GPU. Also using the <code>CUgraph</code> API allows
+to easily encode fine grain dependencies between dispatch without having to
+create multiple streams. Therefore, the <code>CUgraph</code>-backed implementation is a
+more natural one.
+Though note that <code>CUgraph</code> API is meant to be used for recording once and
+replying multiple times and there may be a performance penalty to using
+<code>CUgraph</code> API for one-shot command buffer.</p>
+<p>The <code>CUstream</code>-backed implementation just issues commands directly to a
+<code>CUstream</code> when recording. Commands issued to <code>CUstream</code> can be immediately
+sent to the GPU for execution; there is no recording and replaying separation.
+In order to match the recording semantics of <code>iree_hal_command_buffer_t</code>, to
+use the <code>CUstream</code>-backed command buffer, we need to first record the command
+buffer into an in-memory
+<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h"><code>iree_hal_deferred_command_buffer_t</code></a>, and then
+when applying the command buffer, we create a new <code>CUstream</code>-backed
+implementation.</p>
+<p>The <code>command_buffer_mode</code> in the <code>iree_hal_cuda_device_params_t</code> struct allows
+to select which implementation to use.</p>
+<h3 id="allocator">Allocator<a class="headerlink" href="#allocator" title="Permanent link">link</a></h3>
+<p>The allocator will forward allocation requests to <code>cuMemHostAlloc()</code> for host
+local memory, <code>cuMemAlloc()</code> for device local and host invisible memory, and
+<code>cuMemAllocManaged()</code> for device local and host visible memory.</p>
+<h3 id="buffer">Buffer<a class="headerlink" href="#buffer" title="Permanent link">link</a></h3>
+<p>CUDA buffers are represented either as a host pointer or a device pointer of
+type <code>CUdeviceptr</code>.</p>
+<h3 id="executable">Executable<a class="headerlink" href="#executable" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h"><code>iree_hal_executable_t</code></a> maps naturally to <code>CUmodule</code>.</p>
+<p>The compiler generates a FlatBuffer containing a PTX image as well as a
+list of entry point functions and their associated metadata (names,
+workgroup size, dynamic shared memory size, etc.). At runtime, the CUDA HAL
+driver loads the PTX image and creates <code>CUfunction</code>s out of it for various
+entry points.</p>
+<h2 id="synchronization">Synchronization<a class="headerlink" href="#synchronization" title="Permanent link">link</a></h2>
+<h3 id="event">Event<a class="headerlink" href="#event" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h"><code>iree_hal_event_t</code></a> right now is not used in the compiler so it's
+not yet implemented in the CUDA HAL driver.</p>
+<h3 id="semaphore">Semaphore<a class="headerlink" href="#semaphore" title="Permanent link">link</a></h3>
+<p>The IREE HAL uses semaphores to synchronize work between host CPU threads and
+device GPU streams. It's a unified primitive that covers all directions--host
+to host, host to device, device to host, and device to device, and allows
+flexible signal and wait ordering--signal before wait, or wait before signal.
+There is no limit on the number of waits of the same value too.</p>
+<p>The core state of a HAL semaphore consists of a monotonically increasing 64-bit
+integer value, which forms a timeline--signaling the semaphore to a larger
+value advances the timeline and unblocks work waiting on some earlier values.
+The semantics closely mirrors
+<a href="https://www.khronos.org/blog/vulkan-timeline-semaphores">Vulkan timeline semaphore</a>.</p>
+<p>In CUDA, there is no direct equivalent primitives providing all the capabilities
+needed by the HAL semaphore abstraction:</p>
 <ul>
-<li>Depending on the CPU and on the OS, both hardware and software limitations can
-  get in the way of obtaining accurate data.</li>
-<li>This data tends to be inherently difficult to interpret, even when it is
-  perfectly accurate. In practice it is often noisy and inaccurate, which makes
-  interpretation even more complicated.</li>
+<li><a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEMOP.html">Stream memory operations</a> provides <code>cuStreamWriteValue64()</code> and
+  <code>cuStreamWaitValue64()</code>, which can implment HAL semaphore 64-bit integer value
+  signal and wait. Though these operations require device pointers and cannot
+  accepts pointers to managed memory buffers, meaning no support for the host.
+  Additionally, per the spec, "synchronization ordering established through
+  these APIs is not visible to CUDA. CUDA tasks that are (even indirectly)
+  ordered by these APIs should also have that order expressed with
+  CUDA-visible dependencies such as events." So it's not suitable for
+  integration with other CUDA components.</li>
+<li>For <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXTRES__INTEROP.html">external resource interoperability</a>, we have APIs
+  like <code>cuSignalExternalSemaphoresAsync()</code> and <code>cuWaitExternalSemaphoresAsync()</code>,
+  which can directly map to Vulkan timeline semaphores. Though these APIs are
+  meant to handle exernal resources--there is no way to create
+  <code>CUexternalSemaphore</code> objects directly other than <code>cuImportExternalSemaphore()</code>.</li>
 </ul>
-<p>There are two parts to this page: platform-specific information about <a href="#perf-and-simpleperf-on-linux-and-android">how to
-query</a> this data, and, at the end, a
-platform-independent explanation of <a href="#interpreting-cpu-event-counts">how to
-interpret</a> it.</p>
-<h2 id="perf-and-simpleperf-on-linux-and-android">Perf and Simpleperf, on Linux and Android<a class="headerlink" href="#perf-and-simpleperf-on-linux-and-android" title="Permanent link">link</a></h2>
-<h3 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h3>
-<p>The Linux kernel exposes system event counters to user-space programs by means
-of the
-<a href="https://man7.org/linux/man-pages/man2/perf_event_open.2.html"><code>perf_event_open</code></a>
-system call. This includes both hardware event counters (such as CPU cache
-events) and software events from the kernel (such as page faults and context
-switches). Anyone may use this system call to implement a profiler, but Linux
-readily offers one, <a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a>.</p>
-<h3 id="preserving-artifacts">Preserving artifacts<a class="headerlink" href="#preserving-artifacts" title="Permanent link">link</a></h3>
-<p>By default IREE cleans up any temporary files it creates while running. Tools
-like perf, however, require those files exist even after the process has exited.
-The environment variable <code>IREE_PRESERVE_DYLIB_TEMP_FILES</code> can be set to preserve
-the files. This is only needed for the CPU path when using the system loader.</p>
-<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">IREE_PRESERVE_DYLIB_TEMP_FILES</span><span class="o">=</span><span class="m">1</span>
-</code></pre></div>
-<h3 id="desktop-linux">Desktop linux<a class="headerlink" href="#desktop-linux" title="Permanent link">link</a></h3>
-<p>On desktop Linux we can use
-<a href="https://perf.wiki.kernel.org/index.php/Main_Page"><code>perf</code></a>. It is provided on
-most Linux distributions, for instance on Debian-based distributions do:</p>
-<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>linux-perf
-</code></pre></div>
-<p>Run the program to be profiled, prepending its command line with <code>perf record</code>.
-By default this will write the profile data to the current directory,
-<code>./perf.data</code>. Sometimes this isn't ideal, such as then the current directory is
-under version control. Explicit paths can be specified by <code>-o</code> flag to direct
-the output of <code>perf record</code>, and then by <code>-i</code> flags to select the input of
-subsequent commands analyzing the profile. Example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p>By default, this samples time spent. One may specify instead an event to sample
-by, with the <code>-e</code> flag. For instance, to sample by L1 cache misses, one may do:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>record<span class="w"> </span>-o<span class="w"> </span>/tmp/perf.data<span class="w"> </span>-e<span class="w"> </span>L1-dcache-load-misses<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>./tools/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p><code>perf list</code> dumps the list of event types.</p>
-<p>Once you have recorded a profile, there are two main ways to analyze it: <code>perf
-report</code> and <code>perf annotate</code>.</p>
-<p><code>perf report</code> breaks down the event counts by symbol. In the default case where
-what was sampled was time, this is just an ordinary profile by symbol name, no
-different than what could be viewed in other profilers such as
-<a href="../profiling-with-tracy/">Tracy</a>. Where it gets really interesting is when the
-profile was recording a specific event type, as in the above <code>-e
-L1-dcache-load-misses</code> example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>report<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-Overhead<span class="w">  </span>Command<span class="w">          </span>Shared<span class="w"> </span>Object<span class="w">              </span>Symbol
-<span class="w">  </span><span class="m">61</span>.53%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_31
-<span class="w">  </span><span class="m">13</span>.30%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_11
-<span class="w">   </span><span class="m">2</span>.11%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_13
-<span class="w">   </span><span class="m">1</span>.90%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_19
-<span class="w">   </span><span class="m">1</span>.54%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_25
-<span class="w">   </span><span class="m">1</span>.49%<span class="w">  </span>cpu0<span class="w">             </span>dylib_executablenzpx2Q.so<span class="w">  </span><span class="o">[</span>.<span class="o">]</span><span class="w"> </span>serving_default_ex_dispatch_5
-</code></pre></div>
-<p><code>perf annotate</code> breaks down the event counts by instruction. Again, in the
-default case where what was sampled was time, this is no different than what
-could be viewed in Tracy, and the real motivation to use <code>perf</code> is when
-profiling by specific event types as in the above <code>-e L1-dcache-load-misses</code>
-example:</p>
-<div class="highlight"><pre><span></span><code>perf<span class="w"> </span>annotate<span class="w"> </span>-i<span class="w"> </span>perf.data
-
-Samples:<span class="w"> </span>6K<span class="w"> </span>of<span class="w"> </span>event<span class="w"> </span><span class="s1">&#39;L1-dcache-load-misses&#39;</span>,<span class="w"> </span><span class="m">4000</span><span class="w"> </span>Hz,<span class="w"> </span>Event<span class="w"> </span>count<span class="w"> </span><span class="o">(</span>approx.<span class="o">)</span>:<span class="w"> </span><span class="m">362571861</span>
-serving_default_ex_dispatch_31<span class="w">  </span>/tmp/dylib_executablenzpx2Q.so<span class="w"> </span><span class="o">[</span>Percent:<span class="w"> </span><span class="nb">local</span><span class="w"> </span>period<span class="o">]</span>
-<span class="w">  </span><span class="m">1</span>.66<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x1000<span class="o">(</span>%rdi<span class="o">)</span>,%xmm10
-<span class="w">  </span><span class="m">0</span>.48<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span>-0x800<span class="o">(</span>%rdi<span class="o">)</span>,%xmm9
-<span class="w">  </span><span class="m">0</span>.82<span class="w"> </span>│<span class="w">        </span>movups<span class="w"> </span><span class="o">(</span>%rdi<span class="o">)</span>,%xmm8
-<span class="w">  </span><span class="m">0</span>.49<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.12<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm1,%xmm4
-<span class="w">  </span><span class="m">0</span>.14<span class="w"> </span>│<span class="w">        </span>mulps<span class="w">  </span>%xmm5,%xmm4
-<span class="w">  </span><span class="m">0</span>.28<span class="w"> </span>│<span class="w">        </span>addps<span class="w">  </span>%xmm6,%xmm4
-<span class="w">  </span><span class="m">0</span>.60<span class="w"> </span>│<span class="w">        </span>movaps<span class="w"> </span>%xmm3,%xmm6
-<span class="w">  </span><span class="m">0</span>.34<span class="w"> </span>│<span class="w">        </span>shufps<span class="w"> </span><span class="nv">$0</span>x0,%xmm3,%xmm6
-</code></pre></div>
-<h4 id="warning">Warning<a class="headerlink" href="#warning" title="Permanent link">link</a></h4>
-<p><code>perf annotate</code> is even noisier than <code>perf report</code> as it can be overly
-optimistic, depending on the CPU, to pin an event to a specific instruction.
-Typically, this works fairly well on x86 CPUs and less well on ARM CPUs and more
-generally on anything mobile. Even on a desktop x86 CPU, this is noisy, as the
-above example (recorded on a Skylake workstation) shows: it blamed a <code>mulps
-%xmm5,%xmm4</code> instruction for a cache miss, which doesn't make sense as that
-instruction only touches registers.</p>
-<h3 id="android">Android<a class="headerlink" href="#android" title="Permanent link">link</a></h3>
-<p>On Android we can use
-<a href="https://developer.android.com/ndk/guides/simpleperf"><code>simpleperf</code></a>. It's
-preinstalled on current Android <code>userdebug</code> images, and part of the Android NDK.</p>
-<p>In theory, as Android is Linux, it should be possible to use <code>perf</code>.
-Unfortunately, <code>perf</code> is difficult to build for Android. Fortunately,
-<code>simpleperf</code> is readily available: it is preinstalled in Android <code>userdebug</code>
-images, and it is part of the Android NDK.</p>
-<p>First, we record on the device:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>simpleperf<span class="w"> </span>record<span class="w"> </span>-e<span class="w"> </span>raw-l1d-cache-refill<span class="w"> </span>-o<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>/data/local/tmp/iree-benchmark-module<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>--device<span class="o">=</span>local-task<span class="w"> </span><span class="se">\</span>
-<span class="w">      </span>...<span class="w"> </span>command-line<span class="w"> </span>arguments<span class="w"> </span>of<span class="w"> </span>iree-benchmark-module<span class="w"> </span>as<span class="w"> </span>usual<span class="w"> </span>...
-</code></pre></div>
-<p>Then pull the recorded data from the device, and analyze on the desktop. We
-assume that <code>${ANDROID_NDK}</code> points to the local copy of the Android NDK.</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>pull<span class="w"> </span>/data/local/tmp/perf.data<span class="w"> </span>/tmp/perf.data
-<span class="si">${</span><span class="nv">ANDROID_NDK</span><span class="si">}</span>/simpleperf/report.py<span class="w"> </span>-i<span class="w"> </span>/tmp/perf.data
-</code></pre></div>
-<p>This prints a breakdown of <code>raw-l1d-cache-refill</code> events by symbol.</p>
-<p>Like with <code>perf</code>, a list of event types can be queried by the <code>list</code> subcommand:</p>
-<div class="highlight"><pre><span></span><code>adb<span class="w"> </span>shell<span class="w"> </span>simpleperf<span class="w"> </span>list
-</code></pre></div>
-<h4 id="no-support-for-annotate-by-cpu-event">No support for <code>annotate</code> by CPU event<a class="headerlink" href="#no-support-for-annotate-by-cpu-event" title="Permanent link">link</a></h4>
-<p>There is no <code>simpleperf annotate</code>. The <code>simpleperf</code> documentation lists a couple
-of
-<a href="https://android.googlesource.com/platform/system/extras/+/main/simpleperf/doc/README.md#show-annotated-source-code-and-disassembly">ways</a>
-of achieving the same thing.</p>
-<p>However:</p>
+<p>Therefore, to implement the support, we need to leverage multiple native CPU or
+CUDA primitives under the hood.</p>
+<h4 id="cuevent-capabilities"><code>CUevent</code> capabilities<a class="headerlink" href="#cuevent-capabilities" title="Permanent link">link</a></h4>
+<p>The main synchronization mechanism is <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EVENT.html">CUDA event--<code>CUevent</code></a>.
+As a functionality and integration baseline, we use <code>CUevent</code> to implement the
+IREE HAL semaphore abstraction.</p>
+<p><code>CUevent</code> natively supports the following capabilities:</p>
 <ul>
-<li>The common case of annotating by time, as opposed to annotating by CPU event,
-  is supported by <a href="../profiling-with-tracy/">Tracy</a>.</li>
-<li>Annotating by CPU event is inherently not working due to hardware limitations
-  of the ARM CPUs found in Android devices. That is, the hardware is too
-  imprecise at pinning an event to a particular instruction.</li>
+<li>State: binary; either unsignaled or signaled. There can exist multiple
+  waits (e.g., via <code>cuEventSynchronize()</code> or <code>cuGraphAddEventWaitNode()</code>) for
+  the same <code>CUevent</code> signal (e.g., via <code>cuEventRecord()</code> or
+  <code>cuGraphAddEventRecordNode()</code>).</li>
+<li>Ordering: must be signal before wait. Waiting before signal would mean
+  waiting an empty set of work, or previously recorded work.</li>
+<li>Direction: device to device, device to host.</li>
 </ul>
-<h2 id="interpreting-cpu-event-counts">Interpreting CPU event counts<a class="headerlink" href="#interpreting-cpu-event-counts" title="Permanent link">link</a></h2>
-<h3 id="problems">Problems<a class="headerlink" href="#problems" title="Permanent link">link</a></h3>
-<p>There are multiple layers of complexity in interpreting CPU event counts.</p>
-<h4 id="these-events-are-in-themselves-normal">These events are in themselves normal<a class="headerlink" href="#these-events-are-in-themselves-normal" title="Permanent link">link</a></h4>
-<p>The first difficulty is in the fact that most of these events are <em>normal</em>. So
-just knowing that they happened is not in itself actionable.</p>
-<p>For example, if we learn that some code causes cache misses, that isn't big
-news: so does all code. Maybe this code has <em>too many</em> cache misses, but how
-many is too many? Maybe this code alone accounts for a large fraction of the
-overall total of the whole program, but maybe even that is normal, for instance
-if the code being studied is the 'hot' part of the program where a large
-fraction of overall time is spent?</p>
-<h4 id="these-events-are-hardware-dependent-and-under-documented">These events are hardware-dependent and under-documented<a class="headerlink" href="#these-events-are-hardware-dependent-and-under-documented" title="Permanent link">link</a></h4>
-<p>Many of these events have a meaning that varies between CPUs and that is
-difficult to characterize on any CPU, let alone in a way that applies to all
-CPUs.</p>
-<p>For example, take the "L2 data cache refill". On ARM, with <code>simpleperf</code>, that
-would be <code>raw-l2d-cache-refill</code>. Questions:</p>
+<p>We need to fill the remaining capability gaps. Before going into details,
+the overall approach would be to:</p>
 <ul>
-<li>Is “L2” <a href="https://en.wikipedia.org/wiki/Cache_inclusion_policy">inclusive</a> of
-  “L1”?</li>
-<li>How many bytes are transferred per “refill”?</li>
-<li>Are accesses induced by speculative execution or by automatic pre-fetching
-  counted in the same way as accesses induced by actual code execution?</li>
+<li>State: we need a 64-bit integer value timeline. Given the binary state of
+  a <code>CUevent</code>, each <code>CUevent</code> would just be a "timepoint" on the timeline.</li>
+<li>Ordering: we need to defer releasing the workload to the GPU until the
+  semaphore waits are reached on the host, or we can have some device
+  <code>CUevent</code> to wait on.</li>
+<li>Direction: host to host and host to device is missing; we can support that
+  with host synchronization mechanisms.</li>
 </ul>
-<p>The answers to all of the above questions are CPU-dependent. They may even vary
-between the CPU cores of the same Android device.</p>
-<h4 id="these-events-are-imprecise-and-noisy-particularly-on-arm-cpus">These events are imprecise and noisy, particularly on ARM CPUs<a class="headerlink" href="#these-events-are-imprecise-and-noisy-particularly-on-arm-cpus" title="Permanent link">link</a></h4>
-<p>Expect noise levels above 10% in many CPU event counts on ARM CPUs. Moreover, on
-ARM, as discussed above, there is inaccuracy in which instruction is blamed for
-which event, which will increase inaccuracy of per-symbol breakdowns for very
-cheap symbols (and makes <code>perf annotate</code> impossible as noted above). Finally, be
-aware that some ARM CPUs may perform event count interpolation, so we may not
-have any access to true hardware counts.</p>
-<h3 id="recommendations">Recommendations<a class="headerlink" href="#recommendations" title="Permanent link">link</a></h3>
-<p>Here is a workflow pattern that allows to make significant use of CPU event
-counts, despite all the problems noted above:</p>
+<h4 id="signal-to-wait-analysis">Signal to wait analysis<a class="headerlink" href="#signal-to-wait-analysis" title="Permanent link">link</a></h4>
+<p>Concretely, for a given HAL semaphore, looking at the four directions:</p>
+<h5 id="cpu-signal">CPU signal<a class="headerlink" href="#cpu-signal" title="Permanent link">link</a></h5>
+<p>A CPU thread signals the semaphore timeline to a new value.</p>
+<p>If there are CPU waits, it is purely on the CPU side. We just need to use common
+CPU notification mechanisms. In IREE we have <code>iree_event_t</code> wrapping various
+low-level OS primitives for it. So we can just use that to represent a wait
+timepoint. We need to keep track of all CPU wait timepoints in the timeline.
+After a new signaled value, go through the timeline and notify all those waiting
+on earlier values.</p>
+<p>If there are GPU waits, given that there are no way we can signal a <code>CUevent</code> on
+CPU, one way to handle this is to cache and defer the submission batches by
+ourselves until CPU signals past the desired value. To support this, we would
+need to implement a deferred/pending actions queue.</p>
+<h5 id="gpu-signal">GPU signal<a class="headerlink" href="#gpu-signal" title="Permanent link">link</a></h5>
+<p>GPU signals can only be through a <code>CUevent</code> object, which has a binary state.
+We need to advance the timeline too. One way is to use <code>cuLaunchHostFunc()</code>
+to advance from the CPU side with <code>iree_hal_semaphore_list_signal()</code>.
+This additionally would mean we can reuse the logic form CPU signaling to
+unblock CPU waits.</p>
+<p>After advancing the timeline from the CPU side with <code>cuLaunchHostFunc()</code>,
+we can release more workload from the deferred/pending actions queue to the GPU.
+Though, per the <a href="https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXEC.html#group__CUDA__EXEC_1gab95a78143bae7f21eebb978f91e7f3f">documentation</a> of <code>cuLaunchHostFunc()</code>,
+"the host function must not make any CUDA API calls." So we cannot do that
+directly inside <code>cuLaunchHostFunc()</code>; we need to notify another separate
+thread to call CUDA APIs to push more work to the GPU. So the deferred/pending
+action queue should have an associcated thread.</p>
+<p>For GPU waits, we can also leverage the same logic--using CPU signaling to
+unblock deferred GPU queue actions. Though this is performant, given that
+the CPU is involved for GPU internal synchronization. We want to use <code>CUevent</code>
+instead:</p>
 <ul>
-<li>Hypothesize that some code diff might help performance, and might help
-  reducing the number of CPU events of a certain type, and that the two might be
-  related.</li>
-<li>Benchmark with and without the code diff, on the same device, everything else
-  being equal.<ul>
-<li>Let your benchmark perform a fixed number of iterations, or, if using a
-benchmark termination condition of the form "run until at least N seconds
-have elapsed", carefully divide event counts by the actual number of
-iterations that were run.</li>
+<li>We keep track of all GPU signals in the timeline. Once we see a GPU wait
+  request, try to scan the timeline to find a GPU signal that advances the
+  timeline past the desired value, and use that for waiting instead. (This
+  actually applies to CPU waits too, and it's an optimization over pure
+  CPU side <code>iree_event_t</code> polling.)</li>
+<li>We may not see GPU signal before seeing GPU wait requests, then we can also
+  keep track of all GPU waits in the timeline. Later once see either a CPU
+  signal or GPU signal advancing past the waited value, we can handle them
+  accordingly--submitting immediately or associating the <code>CUevent</code>.
+  This would also guarantee the requirement of <code>CUevent</code>--recording should
+  happen before waiting.</li>
+<li>We can use the same <code>CUevent</code> to unblock multiple GPU waits. That's allowed,
+  though it would mean we need to be careful regarding <code>CUevent</code> lifetime
+  management. Here we can use reference counting to see how many timepoints
+  are using it and automatically return to a pool once done.</li>
 </ul>
-</li>
-<li>If the observed CPU event count difference is significant, go ahead and claim
-  that your code diff probably helps with that aspect of CPU behavior.</li>
-</ul>
-<p>Some things NOT to be done:</p>
+<p>Another problem is that per the <code>cuLaunchHostFunc()</code> doc, "the function will
+be called after currently enqueued work and will block work added after it."
+We don't want the blocking behavior involving host. So we can use a dedicated
+<code>CUstream</code> for launching the host function, waiting on the <code>CUevent</code> from the
+original stream too. We can also handle resource deallocation together there.</p>
+<h4 id="data-structures">Data structures<a class="headerlink" href="#data-structures" title="Permanent link">link</a></h4>
+<p>To summarize, we need the following data structures to implement HAL semaphore:</p>
 <ul>
-<li>Don’t try to compare different metrics, not even when it seems obvious that
-  they should satisfy a simple relationship, not even on the same CPU (e.g. “L1
-  accesses should be greater than L2 accesses”).</li>
-<li>Don’t divide by some “total” metric to get some kinds of ratios. For example,
-  don’t try to compute a “cache miss ratio” as quotient of “cache refill” over
-  “all cache accesses” metrics. The first problem with that (even before we get
-  to CPU-specific issues) is that that’s rewarding increases to the “all cache
-  accesses” metrics, so if something bad happens in your codegen and your kernel
-  ends up spilling a lot of register to the stack, that’s going to be a lot more
-  accesses which will all be L1 hits so that’ll help this ratio look better!  So
-  more generally, just try to minimize some CPU metrics (that count “costly”
-  events), not some more complex math expression formed from arithmetic on CPU
-  metrics.</li>
+<li><code>iree_event_t</code>: CPU notification mechanism wrapping low-level OS primitives.
+  Used by host wait timepoints.</li>
+<li><code>iree_event_pool_t</code>: a pool for CPU <code>iree_event_t</code> objects to recycle.</li>
+<li><code>iree_hal_cuda_event_t</code>: GPU notification mechanism wrapping a <code>CUevent</code> and
+  a reference count. Used by device signal and wait timepoints. Associates with
+  a <code>iree_hal_cuda_event_pool_t</code> pool--returns to the pool directly on once
+  reference count goes to 0.</li>
+<li><code>iree_hal_cuda_event_pool_t</code>: a pool for GPU <code>iree_hal_cuda_event_t</code> objects
+  to recycle.</li>
+<li><code>iree_hal_cuda_timepoint_t</code>: an object that wraps a CPU <code>iree_event_t</code> or
+  GPU <code>iree_hal_cuda_event_t</code> to represent wait/signal of a timepoint on a
+  timeline.</li>
+<li><code>iree_hal_cuda_timepoint_pool_t</code>: a pool for <code>iree_hal_cuda_timepoint_t</code>
+  objects to recycle. This pool builds upon the CPU and GPU event pool--it
+  acquires CPU/GPU event objects there.</li>
+<li><code>iree_hal_cuda_timeline_semaphore_t</code>: contains a list of CPU wait and GPU
+  wait/signal timepoints.</li>
+<li><code>iree_hal_cuda_queue_action_t</code>: a pending queue action (kernel launch or
+  stream-ordered allocation).</li>
+<li><code>iree_hal_cuda_pending_queue_actions_t</code>: a data structure to manage pending
+  queue actions. It provides APIs to enqueue actions, and advance the queue on
+  demand--queue actions are released to the GPU when all their wait semaphores
+  are signaled past the desired value, or we can have a <code>CUevent</code> object already
+  recorded to some <code>CUstream</code> to wait on.</li>
 </ul>
 
 

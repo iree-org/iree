@@ -126,6 +126,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/developers/design-docs/cuda-hal-driver/</loc>
+         <lastmod>2024-01-30</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/design-docs/design-roadmap/</loc>
          <lastmod>2024-01-30</lastmod>
          <changefreq>daily</changefreq>
@@ -137,6 +142,11 @@
     </url>
     <url>
          <loc>https://iree.dev/developers/design-docs/invocation-execution-model/</loc>
+         <lastmod>2024-01-30</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://iree.dev/developers/design-docs/metal-hal-driver/</loc>
          <lastmod>2024-01-30</lastmod>
          <changefreq>daily</changefreq>
     </url>
