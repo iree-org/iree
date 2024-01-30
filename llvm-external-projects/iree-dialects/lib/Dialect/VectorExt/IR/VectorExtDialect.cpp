@@ -153,3 +153,21 @@ std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
   }
   return std::nullopt;
 }
+
+std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
+  int64_t laneX = 1;
+  int64_t laneY = 1;
+  int64_t laneZ = 1;
+  for (PerDimLayoutAttr dimLayout : getLayouts()) {
+    auto maybeXShape = dimLayout.getShape(LayoutDimension::LANEX);
+    if (maybeXShape)
+      laneX = *maybeXShape;
+    auto maybeYShape = dimLayout.getShape(LayoutDimension::LANEY);
+    if (maybeYShape)
+      laneY = *maybeYShape;
+    auto maybeZShape = dimLayout.getShape(LayoutDimension::LANEZ);
+    if (maybeZShape)
+      laneZ = *maybeZShape;
+  }
+  return std::make_tuple(laneX, laneY, laneZ);
+}
