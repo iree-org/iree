@@ -128,6 +128,10 @@ private:
 struct ModuleAnalysis {
   ModuleAnalysis(IREE::VM::ModuleOp module) {
     typeTable = buildTypeTable(module);
+    for (auto [index, typeDef] : llvm::enumerate(typeTable)) {
+      mapType(typeDef.type, index);
+    }
+
     for (auto func : module.getOps<IREE::VM::FuncOp>()) {
       functions[func.getOperation()] = FuncAnalysis(func);
     }
