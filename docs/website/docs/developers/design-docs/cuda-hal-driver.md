@@ -273,21 +273,14 @@ To summarize, we need the following data structures to implement HAL semaphore:
   are signaled past the desired value, or we can have a `CUevent` object already
   recorded to some `CUstream` to wait on.
 
-
 [cuda-driver-api]: https://docs.nvidia.com/cuda/cuda-driver-api/index.html
 [cuda-runtime-api]: https://docs.nvidia.com/cuda/cuda-runtime-api/index.html
 [vulkan-timeline-semaphore]: https://www.khronos.org/blog/vulkan-timeline-semaphores
 [iree-hal]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal
-[hal-allocator]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/allocator.h
-[hal-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/buffer.h
 [hal-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h
-[hal-descriptor-set-layout]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
-[hal-pipeline-layout]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/pipeline_layout.h
 [hal-device]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h
-[hal-driver]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/driver.h
 [hal-executable]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h
 [hal-executable-cache]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable_cache.h
-[hal-semaphore]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/semaphore.h
 [hal-event]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h
 [hal-deferred-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
 [cu-device]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
