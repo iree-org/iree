@@ -1,12 +1,9 @@
-func.func @main() {
-  %input_0 = util.unfoldable_constant dense<[[1.0,-2.0,-3.0,4.0,-5.0]]> : tensor<1x5xf32>
-  %input_1 = util.unfoldable_constant dense<[[[[15.],[14.],[13.]],
-                                              [[12.],[11.],[10.]],
-                                              [[9.],[8.],[7.]],
-                                              [[6.],[5.],[4.]],
-                                              [[3.],[2.],[1.]]]]> : tensor<1x5x3x1xf32>
+// RUN: iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=vmvx %s --input=1x5xf32=1,-2,-3,4,-5 --input=1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1 | FileCheck %s
+// RUN: iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=llvm-cpu %s --input=1x5xf32=1,-2,-3,4,-5 --input=1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1 | FileCheck %s
 
-  %0 = stablehlo.transpose %input_0, dims = [1, 0] {name = "transpose.41"} : (tensor<1x5xf32>) -> tensor<5x1xf32>
+// CHECK-LABEL: EXEC @main
+func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32> {
+  %0 = stablehlo.transpose %arg0, dims = [1, 0] {name = "transpose.41"} : (tensor<1x5xf32>) -> tensor<5x1xf32>
   %1 = stablehlo.reshape %0 {name = "reshape.42"} : (tensor<5x1xf32>) -> tensor<5x1x1xf32>
   %2 = stablehlo.reshape %0 {name = "reshape.55"} : (tensor<5x1xf32>) -> tensor<5x1xf32>
   %3 = stablehlo.broadcast_in_dim %2, dims = [0, 1] {name = "broadcast.56"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
@@ -44,8 +41,7 @@ func.func @main() {
   %24 = stablehlo.constant dense<0.000000e+00> : tensor<5x1x5xf32>
   %cst_10 = arith.constant {name = "constant.66"} dense<0.000000e+00> : tensor<f32>
   %25 = stablehlo.constant dense<0.000000e+00> : tensor<5x5xf32>
-
-  %26 = stablehlo.reshape %input_1 {name = "reshape.38"} : (tensor<1x5x3x1xf32>) -> tensor<1x5x3xf32>
+  %26 = stablehlo.reshape %arg1 {name = "reshape.38"} : (tensor<1x5x3x1xf32>) -> tensor<1x5x3xf32>
   %27 = stablehlo.transpose %26, dims = [1, 0, 2] {name = "transpose.39"} : (tensor<1x5x3xf32>) -> tensor<5x1x3xf32>
   %28 = stablehlo.reshape %27 {name = "reshape.40"} : (tensor<5x1x3xf32>) -> tensor<5x3xf32>
   %cst_11 = arith.constant {name = "constant.61"} dense<[[0.706495285, -0.567672312, 0.483717591, 0.522725761, 0.7563259], [-0.0899272263, -0.283501834, -0.350822538, -0.351515919, -0.337136656], [-0.451804549, 0.372324884, -0.620518147, 0.235451385, 0.851095855]]> : tensor<3x5xf32>
@@ -73,13 +69,19 @@ func.func @main() {
   %45 = stablehlo.add %43, %44 {name = "add.89"} : tensor<5x5xf32>
   %46 = stablehlo.maximum %9, %45 {name = "maximum.92"} : tensor<5x5xf32>
   %47 = stablehlo.reshape %46 {name = "reshape.94"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
-  %result = stablehlo.select %7, %8, %47 {name = "select.95"} : tensor<5x1x5xi1>, tensor<5x1x5xf32>
-
-  check.expect_almost_eq_const(%result, dense<[[[0., 0., 0., 0., 0.]],
-                                               [[3.79097, 4.9929, 0.9083, 0., 0.]],
-                                               [[2.8042, 3.7808, 0.5600, 0., 0.]],
-                                               [[0., 0., 0., 0., 0.]],
-                                               [[0.8795, 1.2182, 0.1342, 0., 0.]]]> :
-      tensor<5x1x5xf32>) : tensor<5x1x5xf32>
-  return
+  %48 = stablehlo.select %7, %8, %47 {name = "select.95"} : tensor<5x1x5xi1>, tensor<5x1x5xf32>
+  return %48 : tensor<5x1x5xf32>
 }
+
+// On separate lines to avoid "[[" which FileCheck interprets as substitutions
+// CHECK: 5x1x5xf32=[
+// CHECK-SAME:   [0 0 0 0 0]
+// CHECK-SAME: ][
+// CHECK-SAME:   [3.79{{[0-9]+}} 4.99{{[0-9]+}} 0.90{{[0-9]+}} 0 0]
+// CHECK-SAME: ][
+// CHECK-SAME:   [2.80{{[0-9]+}} 3.78{{[0-9]+}} 0.56{{[0-9]+}} 0 0]
+// CHECK-SAME: ][
+// CHECK-SAME:   [0 0 0 0 0]
+// CHECK-SAME: ][
+// CHECK-SAME:   [0.87{{[0-9]+}} 1.21{{[0-9]+}} 0.13{{[0-9]+}} 0 0]
+// CHECK-SAME: ]

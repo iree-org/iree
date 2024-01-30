@@ -15,25 +15,23 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_check_test_suite(
+iree_lit_test_suite(
   NAME
-    check
+    lit
   SRCS
     "collatz.mlir"
     "edge_detection.mlir"
+    "fragment_000.mlir"
     "fullyconnected.mlir"
-  TARGET_BACKENDS
-    "vmvx"
-    "llvm-cpu"
-    "vulkan-spirv"
-    "metal-spirv"
-  DRIVERS
-    "local-task"
-    "local-task"
-    "vulkan"
-    "metal"
-  INPUT_TYPE
-    "stablehlo"
+    "mnist_fake_weights.mlir"
+    "unidirectional_lstm.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree-run-mlir
+  LABELS
+    "driver=local-task"
+    "hostonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
