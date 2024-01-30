@@ -327,14 +327,7 @@ struct DistributeTransferWriteLayoutAttr final
 
     // TODO: Return failure if we need masking.
 
-    Type elementType = writeOp.getSource().getType().getElementType();
-    auto vectorType =
-        VectorType::get(vectorLayout.getDistributedShape(), elementType);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        writeOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
-    VectorValue acc = cast<VectorValue>(zero);
-
-    accessMemory(writeOp, acc, vectorLayout, rewriter);
+    accessMemory(writeOp, writeOp.getVector(), vectorLayout, rewriter);
 
     rewriter.eraseOp(writeOp);
     return success();
