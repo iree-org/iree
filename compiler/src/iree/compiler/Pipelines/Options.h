@@ -74,6 +74,8 @@ struct GlobalOptimizationOptions {
   // Enables transposing all concatenations to the outer most dimension.
   bool outerDimConcat = false;
 
+  bool propagateGlobalLayout = false;
+
   // Enables data tiling.
   bool dataTiling = true;
 

@@ -96,6 +96,12 @@ def OptimizeNumerics :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
+def PropagateDataLayout :
+    Pass<"iree-global-opt-propagate-data-layout", "mlir::ModuleOp"> {
+  let summary = "Propagates data layouts up to globals";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createPropagateDataLayoutPass()";
+}
+
 def PropagateLinalgTranspose :
     InterfacePass<"iree-global-opt-propagate-linalg-transpose", "mlir::FunctionOpInterface"> {
   let summary = "Propagates linalg.transpose through a restricted set of ops";

@@ -114,6 +114,10 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                    llvm::cl::desc("Enables data tiling path."),
                    llvm::cl::cat(category));
   binder.opt<bool>(
+      "iree-opt-propagate-global-layout", propagateGlobalLayout,
+      llvm::cl::desc("Enables propagation of packed global data layouts."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
       "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime (on by default)."),

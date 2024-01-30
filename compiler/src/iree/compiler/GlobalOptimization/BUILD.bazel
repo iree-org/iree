@@ -46,6 +46,7 @@ iree_compiler_cc_library(
     srcs = [
         "CleanupNumericNarrowing.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",
+        "DataLayoutUtils.cpp",
         "DecomposeConcat.cpp",
         "DemoteContractionInputsToBF16.cpp",
         "DetachElementwiseFromNamedOps.cpp",
@@ -59,6 +60,7 @@ iree_compiler_cc_library(
         "MaterializeHomogeneousEncodings.cpp",
         "OptimizeNumerics.cpp",
         "Passes.cpp",
+        "PropagateDataLayout.cpp",
         "PropagateLinalgTranspose.cpp",
         "RaiseSpecialOps.cpp",
         "RemoveZeroExtentTensors.cpp",
@@ -67,6 +69,7 @@ iree_compiler_cc_library(
         "Utils.cpp",
     ],
     hdrs = [
+        "DataLayoutUtils.h",
         "Passes.h",
         "Utils.h",
     ],

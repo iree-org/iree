@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "infer_numeric_narrowing.mlir"
     "materialize_homogeneous_encodings.mlir"
     "optimize_numerics.mlir"
+    "propagate_data_layout.mlir"
     "propagate_linalg_transpose.mlir"
     "raise_special_ops.mlir"
     "remove_zero_extent_tensors.mlir"
