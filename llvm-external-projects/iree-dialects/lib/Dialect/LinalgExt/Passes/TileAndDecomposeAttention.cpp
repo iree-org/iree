@@ -290,14 +290,15 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
 
   // Compute matmul(softmax, v)
   Operation *matmulOp;
-  if (transposeV)
+  if (transposeV) {
     matmulOp = builder.create<linalg::MatmulTransposeBOp>(
         loc, scaledAcc.getType(), ValueRange{partialSoftmax, valueSlice},
         scaledAcc);
-  else
+  } else {
     matmulOp = builder.create<linalg::MatmulOp>(
         loc, scaledAcc.getType(), ValueRange{partialSoftmax, valueSlice},
         scaledAcc);
+  }
   ops.push_back(matmulOp);
   Value result = matmulOp->getResult(0);
   return std::make_tuple(result, newMax, newSum);
@@ -441,7 +442,7 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
       SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
 
   if (attnOp.getTransposeV())
-    tiledAttentionOp->setAttr("transpose_v", rewriter.getBoolAttr(true));
+    tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());
 
   Value tiledResult = tiledAttentionOp.getResult(0);
   Value newMax = tiledAttentionOp.getResult(1);

@@ -2478,14 +2478,12 @@ LogicalResult AttentionOp::verify() {
     return failure();
   ArrayRef<int64_t> queryShape = queryType.getShape();
   ArrayRef<int64_t> keyShape = keyType.getShape();
-  ArrayRef<int64_t> valueShape = valueType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
+  SmallVector<int64_t> valueShape(valueType.getShape());
   bool transposeV = getTransposeV();
   if (transposeV) {
-    SmallVector<int64_t> transposedValueShape(valueShape);
-    size_t lastIdx = transposedValueShape.size() - 1;
-    std::swap(transposedValueShape[lastIdx - 1], transposedValueShape[lastIdx]);
-    valueShape = transposedValueShape;
+    size_t lastIdx = valueShape.size() - 1;
+    std::swap(valueShape[lastIdx - 1], valueShape[lastIdx]);
   }
   if (failed(verifyCompatibleShape(keyShape, valueShape)))
     return op->emitOpError("incompatible value shape");
