@@ -121,7 +121,7 @@ func.func private @callerWithTies(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 
 // Tests that attrs we don't know about are passed through to the new ops.
 
-// CHECK: flow.func private @importPassThroughAttrs(%arg0: tensor<1xi32> {some.arg_attr}) -> tensor<1xi8> {some.result_attr} attributes {some.import_attr}
+// CHECK: flow.func private @importPassThroughAttrs(%arg0: tensor<1xi32> {some.arg_attr}) -> (tensor<1xi8> {some.result_attr}) attributes {some.import_attr}
 func.func private @importPassThroughAttrs(tensor<1xi32> {some.arg_attr}) -> (tensor<1xi8> {some.result_attr}) attributes {
   iree.abi.streamable,
   some.import_attr

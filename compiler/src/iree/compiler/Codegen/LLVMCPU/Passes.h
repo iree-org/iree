@@ -27,7 +27,7 @@ createConvertToLLVMPass(bool reassociateFpReordering = false);
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds = true);
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUEmitVectorizationRemarksPass();
 
 /// Pass to select a lowering strategy for a hal.executable.variant operation.
@@ -48,14 +48,15 @@ createLLVMCPULowerExecutableTargetPass();
 /// Can handel more operations if required in future.
 std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUMmt4dVectorLoweringPass();
 
 /// Pass to perform peeling on non-distributed loops.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUPeelPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUPeelPass();
 
 /// Pass to perform SplitReduction transformations of `LinalgOp`s.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUSplitReductionPass(bool enableReassociateFpReductions = false);
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
@@ -63,15 +64,16 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
 
 /// Pass to tile TilingInterface ops with given tilingLevel.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTilePass(int64_t tilingLevel = -1);
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUUnfuseFMAOpsPass();
 
 //------------------------------------------------------------------------------
 // Passes to lower Vector ops before conversion to LLVM.
@@ -82,25 +84,30 @@ struct LLVMCPUVectorLoweringPassOptions {
   bool lowerVectorTransposeToAVX2 = false;
 };
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUDropVectorUnitDimsPass();
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "");
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorTransferLoweringPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorTransposeLoweringPass(
     bool lowerVectorTransposeToAVX2 = false);
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorShapeCastLoweringPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass();
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUVectorLoweringPass(
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUVectorLoweringPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUVectorLoweringPass(
     const LLVMCPUVectorLoweringPassOptions &options);
 
 /// A pass that converts certain vector.contract ops to custom kernels.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createVectorContractCustomKernelsPass();
 
 // Verifies that only supported IR constructs are passed to the compiler (like

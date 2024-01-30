@@ -6,7 +6,7 @@ vm.module @bytecode_module_benchmark {
   }
 
   // Measures the cost of a call an internal function.
-  vm.func @internal_func(%arg0 : i32) -> i32 attributes {noinline} {
+  vm.func @internal_func(%arg0 : i32) -> i32 attributes {inlining_policy = #util.inline.never} {
     vm.return %arg0 : i32
   }
   vm.export @call_internal_func

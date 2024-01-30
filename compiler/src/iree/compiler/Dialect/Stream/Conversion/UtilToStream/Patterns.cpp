@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -142,7 +141,7 @@ struct GlobalOpExpansion
           globalOp.getLoc(), initialValue, resourceOp.getSymName());
       rewriter.create<IREE::Util::GlobalStoreOp>(
           globalOp.getLoc(), initialValueSize, resourceSizeOp.getSymName());
-      rewriter.create<IREE::Util::InitializerReturnOp>(globalOp.getLoc());
+      rewriter.create<IREE::Util::ReturnOp>(globalOp.getLoc());
     }
 
     expansionState->globalMap[globalOp.getSymName()] = ExpandedGlobalResource{
@@ -256,7 +255,7 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       });
 
   conversionTarget
-      .addLegalOp<IREE::Util::InitializerOp, IREE::Util::InitializerReturnOp>();
+      .addLegalOp<IREE::Util::InitializerOp, IREE::Util::ReturnOp>();
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&

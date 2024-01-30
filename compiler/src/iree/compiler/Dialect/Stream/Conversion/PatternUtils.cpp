@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::iree_compiler {
 

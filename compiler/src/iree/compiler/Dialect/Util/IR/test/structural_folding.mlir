@@ -2,5 +2,5 @@
 
 // CHECK-NOT: util.initializer
 util.initializer {
-  util.initializer.return
+  util.return
 }

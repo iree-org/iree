@@ -123,7 +123,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
                                              rewriter.getIndexAttr(1));
   tileSizesSVFirst[numLoops - 1] = rewriter.getIndexAttr(0);
   auto options = scf::SCFTilingOptions().setTileSizes(tileSizesSVFirst);
-  FailureOr<scf::SCFTilingResult> tileResFirst = scf::tileUsingSCFForOp(
+  FailureOr<scf::SCFTilingResult> tileResFirst = scf::tileUsingSCF(
       rewriter, cast<TilingInterface>(linalgOp.getOperation()), options);
   if (failed(tileResFirst)) {
     LLVM_DEBUG(llvm::dbgs() << "failed on step 1 (SCFTiling)\n");
@@ -149,7 +149,7 @@ LogicalResult splitReductionImpl(Operation *op, int64_t size,
   // tile.
   tileSizesSV[numLoops - 1] = rewriter.getIndexAttr(1);
   options = scf::SCFTilingOptions().setTileSizes(tileSizesSV);
-  FailureOr<scf::SCFTilingResult> tileRes = scf::tileUsingSCFForOp(
+  FailureOr<scf::SCFTilingResult> tileRes = scf::tileUsingSCF(
       rewriter, cast<TilingInterface>(splitRes->splitLinalgOp.getOperation()),
       options);
   if (failed(tileRes)) {
@@ -217,7 +217,7 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUSplitReductionPass(const bool enableFpReductionReordering) {
   return std::make_unique<LLVMCPUSplitReductionPass>(
       enableFpReductionReordering);

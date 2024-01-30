@@ -135,7 +135,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     {
       RewritePatternSet patterns(context);
@@ -156,7 +156,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConcretizePadResultShapePass() {
   return std::make_unique<ConcretizePadResultShapePass>();
 }

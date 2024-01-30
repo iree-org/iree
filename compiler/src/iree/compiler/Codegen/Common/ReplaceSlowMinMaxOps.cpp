@@ -84,7 +84,7 @@ void ReplaceSlowMinMaxOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 mlir::iree_compiler::createReplaceSlowMinMaxOpsPass() {
   return std::make_unique<ReplaceSlowMinMaxOpsPass>();
 }

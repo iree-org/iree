@@ -267,7 +267,7 @@ public:
       builder.create<GlobalStoreOp>(loc, clonedResult, globalSymbol);
     }
 
-    builder.create<InitializerReturnOp>(loc);
+    builder.create<IREE::Util::ReturnOp>(loc);
     return success();
   }
 

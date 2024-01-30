@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-vector-contract-custom-kernels %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-vector-contract-custom-kernels))" %s | FileCheck %s
 
 // There are two parts to this test: the "deep" part and the "wide part".
 

@@ -27,14 +27,15 @@ struct LowerUKernelOpsToCallsPass
 void LowerUKernelOpsToCallsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
-  llvm::MapVector<IREE::Codegen::UKernelOpInterface, func::CallOp> toReplace;
+  llvm::MapVector<IREE::Codegen::UKernelOpInterface, mlir::CallOpInterface>
+      toReplace;
   Operation *errorOp = nullptr;
   IRRewriter rewriter(context);
   WalkResult result = getOperation().walk(
       [&](IREE::Codegen::UKernelOpInterface microKernelOp) -> WalkResult {
         OpBuilder::InsertionGuard g(rewriter);
         rewriter.setInsertionPoint(microKernelOp);
-        FailureOr<func::CallOp> callOp =
+        FailureOr<mlir::CallOpInterface> callOp =
             microKernelOp.lowerToFunctionCall(rewriter);
         if (failed(callOp)) {
           errorOp = microKernelOp;

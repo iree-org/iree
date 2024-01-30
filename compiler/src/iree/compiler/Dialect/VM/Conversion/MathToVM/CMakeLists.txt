@@ -19,6 +19,7 @@ iree_cc_library(
     "ConvertMathToVM.cpp"
   DEPS
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRMathDialect
     MLIRPass

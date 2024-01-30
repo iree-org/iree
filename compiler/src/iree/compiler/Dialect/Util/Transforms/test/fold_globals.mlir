@@ -81,7 +81,7 @@ util.global private mutable @mutable : index
 util.initializer {
   %c6 = arith.constant 6 : index
   util.global.store %c6, @immutable1 : index
-  util.initializer.return
+  util.return
 }
 func.func @foo(%arg0: index) -> (index, index, index) {
   // CHECK-DAG: %[[C5:.+]] = arith.constant 5
@@ -125,15 +125,15 @@ util.initializer {
   %c6 = arith.constant 6 : index
   // CHECK-NOT: util.global.store %c6, @unused1 : index
   util.global.store %c6, @unused1 : index
-  util.initializer.return
+  util.return
 }
 
 // -----
 
-// CHECK: util.global private @dupeCst0 {noinline} = 5 : index
-util.global private @dupeCst0 {noinline} = 5 : index
+// CHECK: util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
+util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
-util.global private @dupeCst1 {noinline} = 5 : index
+util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
 func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[VALUE0:.+]] = util.global.load @dupeCst0
   %0 = util.global.load @dupeCst0 : index
@@ -153,7 +153,7 @@ util.global private @nondupeCst1 = 6 : index
 util.initializer {
   %c7 = arith.constant 7 : index
   util.global.store %c7, @nondupeCst1 : index
-  util.initializer.return
+  util.return
 }
 func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index

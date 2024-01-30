@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-linalg-quantized-conv-to-conv -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-quantized-conv-to-conv))" -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @conv2d_zp
 func.func @conv2d_zps(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024xi8>, %arg2: tensor<1x12x13x1024xi32>) -> tensor<1x12x13x1024xi32> {

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-distribute --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-distribute))" --mlir-print-local-scope %s | FileCheck %s
 
 func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
   %c0 = arith.constant 0 : index

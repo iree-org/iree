@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_UTIL_IR_UTIL_OPS
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
+include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
@@ -63,10 +64,10 @@ def Util_NullOp : Util_PureOp<"null"> {
 def Util_CastOp : Util_PureOp<"cast", [
   DeclareOpInterfaceMethods<CastOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-      "getTiedResult",
-      "getTiedResultOperand",
-      "getTiedResultOperandIndex",
-      "getTiedResultOperandIndices",
+    "getTiedResult",
+    "getTiedResultOperand",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
   ]>,
 ]> {
   let summary = [{casts one util type to another ala static_cast/dynamic_cast}];
@@ -294,7 +295,7 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
 } // OpGroupRangeArithmeticOps
 
 //===----------------------------------------------------------------------===//
-// Address/offset Arithmetic
+// Address/offset arithmetic
 //===----------------------------------------------------------------------===//
 
 def OpGroupAddressOffsetArithmeticOps : OpDocGroup {
@@ -306,7 +307,7 @@ let opDocGroup = OpGroupAddressOffsetArithmeticOps in {
 
 def Util_AlignOp : Util_PureOp<"align", [
   SameOperandsAndResultType
-  ]> {
+]> {
   let summary = "Aligns up to a power-of-two alignment if required";
   let description = [{
      Aligns |value| up to the given power-of-two |alignment| if required.
@@ -474,10 +475,10 @@ def Util_UnfoldableConstantOp : Util_Op<"unfoldable_constant"> {
 }
 
 def Util_UnreachableOp : Util_Op<"unreachable", [
-    NoMemoryEffect,
-    ReturnLike,
-    Terminator
-  ]> {
+  NoMemoryEffect,
+  ReturnLike,
+  Terminator
+]> {
   let summary = [{unreachable assertion op}];
   let description = [{
     Signals to the compiler that the parent block should not be reachable.
@@ -516,11 +517,11 @@ def OpGroupStructuralOps : OpDocGroup {
 let opDocGroup = OpGroupStructuralOps in {
 
 def Util_InitializerOp : Util_Op<"initializer", [
-    IsolatedFromAbove,
-    FunctionOpInterface,
-    CallableOpInterface,
-    Util_InitializerOpInterface,
-  ]> {
+  IsolatedFromAbove,
+  FunctionOpInterface,
+  CallableOpInterface,
+  Util_InitializerOpInterface,
+]> {
   let summary = [{global initialization function}];
   let description = [{
     A function that is called in definition order upon module initialization.
@@ -579,8 +580,130 @@ def Util_InitializerOp : Util_Op<"initializer", [
   let hasCanonicalizer = 1;
 }
 
-def Util_InitializerReturnOp : Util_Op<"initializer.return", [
-  HasParent<"IREE::Util::InitializerOp">,
+def Util_FuncOp : Util_Op<"func", [
+  AffineScope,
+  AutomaticAllocationScope,
+  FunctionOpInterface,
+  IsolatedFromAbove,
+  OpAsmOpInterface,
+]> {
+  let summary = [{function operation containing a CFG region}];
+  let description = [{
+    An operation declaring a callable function.
+
+    An external function declaration (used when referring to a function declared
+    in some other module) has no body.
+  }];
+
+  let arguments = (ins
+    SymbolNameAttr:$sym_name,
+    TypeAttrOf<FunctionType>:$function_type,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    OptionalAttr<StrAttr>:$sym_visibility,
+    OptionalAttr<DictArrayAttr>:$arg_attrs,
+    OptionalAttr<DictArrayAttr>:$res_attrs,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "FunctionType":$type,
+      CArg<"ArrayAttr", "{}">:$tiedOperands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$argAttrs,
+      CArg<"ArrayRef<DictionaryAttr>", "{}">:$resAttrs
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    static FuncOp create(Location location, StringRef name, FunctionType type,
+                         ArrayRef<int64_t> tiedOperands = {},
+                         ArrayRef<NamedAttribute> attrs = {},
+                         ArrayRef<DictionaryAttr> argAttrs = {},
+                         ArrayRef<DictionaryAttr> resAttrs = {});
+
+    bool isDeclaration() { return isExternal(); }
+
+    ::mlir::Region *getCallableRegion() { return &getBody(); }
+    ArrayRef<Type> getCallableResults() { return getFunctionType().getResults(); }
+    ::mlir::ArrayAttr getCallableArgAttrs() { return getArgAttrs().value_or(nullptr); }
+    ::mlir::ArrayAttr getCallableResAttrs() { return getResAttrs().value_or(nullptr); }
+
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+  }];
+
+  let hasCustomAssemblyFormat = 1;
+}
+
+def Util_CallOp : Util_Op<"call", [
+  CallOpInterface,
+  Util_TiedOpInterface,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+]> {
+  let summary = [{function call operation}];
+  let description = [{
+    Represents a direct call to a function that is within the same symbol scope
+    as the call. The operands and result types of the call must match the
+    specified function type.
+
+    Calls support tied operands which indicate that specific results alias
+    a specific operand. The operand and result types are allowed to differ if
+    a cast is performed within the callee.
+
+    Example:
+    ```mlir
+    util.func @fn(%arg0: i32, %arg1: tensor<f32>) -> (f32, %arg1 as tensor<i32>)
+    ...
+    %0 = util.call @fn(%0, %1) : (i32, tensor<f32>) -> (f32, %1 as tensor<i32>)
+    ```
+  }];
+
+  let arguments = (ins
+    FlatSymbolRefAttr:$callee,
+    Variadic<AnyType>:$operands,
+    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    $callee `(` $operands `)`
+    attr-dict `:`
+    custom<OperandTypeList>(type($operands))
+    `->`
+    custom<TiedFunctionResultList>(ref($operands),
+                                   ref(type($operands)),
+                                   type($results),
+                                   $tied_operands)
+  }];
+
+  let extraClassDeclaration = [{
+    FunctionType getCalleeType();
+
+    operand_range getArgOperands() { return {arg_operand_begin(), arg_operand_end()}; }
+    MutableOperandRange getArgOperandsMutable() { return getOperandsMutable(); }
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+
+    CallInterfaceCallable getCallableForCallee() {
+      return (*this)->getAttrOfType<SymbolRefAttr>("callee");
+    }
+    void setCalleeFromCallable(CallInterfaceCallable callee) {
+      (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
+    }
+  }];
+}
+
+def Util_ReturnOp : Util_Op<"return", [
+  ParentOneOf<[
+    "IREE::Util::InitializerOp",
+    "IREE::Util::FuncOp",
+  ]>,
   Pure,
   ReturnLike,
   Terminator,
@@ -590,9 +713,22 @@ def Util_InitializerReturnOp : Util_Op<"initializer.return", [
     Returns control from an initializer function.
   }];
 
-  let arguments = (ins);
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
 
-  let assemblyFormat = "attr-dict";
+  let builders = [
+    OpBuilder<(ins), [{
+      build($_builder, $_state, std::nullopt);
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    attr-dict
+    ($operands^ `:` type($operands))?
+  }];
+
+  let hasVerifier = 1;
 }
 
 } // OpGroupStructuralOps
@@ -624,7 +760,8 @@ def Util_GlobalOp : Util_Op<"global", [
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<TypedAttrInterface>:$initial_value
+    OptionalAttr<TypedAttrInterface>:$initial_value,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy
   );
 
   let assemblyFormat = [{
@@ -821,8 +958,9 @@ def OpGroupListOps : OpDocGroup {
 
 let opDocGroup = OpGroupListOps in {
 
-def Util_ListCreateOp : Util_PureOp<
-    "list.create", [MemoryEffects<[MemAlloc]>]> {
+def Util_ListCreateOp : Util_PureOp<"list.create", [
+  MemoryEffects<[MemAlloc]>,
+]> {
   let summary = [{creates a new empty list}];
   let description = [{
     Creates a new empty list with an optional initial capacity.
@@ -838,7 +976,9 @@ def Util_ListCreateOp : Util_PureOp<
   let assemblyFormat = "($initial_capacity^)? attr-dict `:` qualified(type($result))";
 }
 
-def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
+def Util_ListSizeOp : Util_Op<"list.size", [
+  MemoryEffects<[MemRead]>,
+]> {
   let summary = [{the size of the list in elements}];
   let description = [{
     Returns the current size of the list in elements.
@@ -854,7 +994,9 @@ def Util_ListSizeOp : Util_Op<"list.size", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
-def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
+def Util_ListResizeOp : Util_Op<"list.resize", [
+  MemoryEffects<[MemWrite]>,
+]> {
   let summary = [{resizes the list to a new count in elements}];
   let description = [{
     Resizes the list to contain `new_size` elements. This will either truncate
@@ -870,7 +1012,9 @@ def Util_ListResizeOp : Util_Op<"list.resize", [MemoryEffects<[MemWrite]>]> {
   let assemblyFormat = "operands attr-dict `:` qualified(type($list))";
 }
 
-def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
+def Util_ListGetOp : Util_Op<"list.get", [
+  MemoryEffects<[MemRead]>,
+]> {
   let summary = [{element accessor}];
   let description = [{
     Returns the value of the element at the given index. Note that the value
@@ -890,7 +1034,9 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
   let hasVerifier = 1;
 }
 
-def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
+def Util_ListSetOp : Util_Op<"list.set", [
+  MemoryEffects<[MemWrite]>,
+]> {
   let summary = [{element mutator}];
   let description = [{
     Sets the element at the given index to the new value.

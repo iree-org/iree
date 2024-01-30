@@ -11,13 +11,15 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::IREE::Stream {
 
-using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -122,6 +124,10 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeDeviceTensorsPass());
 
   addCleanupPatterns(passManager);
+
+  // Everything must now be in stream.async.* form but we don't yet have
+  // lifetime assigned.
+  passManager.addPass(IREE::Stream::createVerifyLoweringToAsyncResourcesPass());
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.
   // This will insert a lot of copies, so follow it up with a pass that elides

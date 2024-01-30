@@ -17,8 +17,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Inline {
+namespace mlir::iree_compiler::IREE::HAL::Inline {
 
 //===----------------------------------------------------------------------===//
 // hal_inline.buffer.allocate
@@ -237,8 +236,7 @@ LogicalResult DeviceQueryOp::verify() {
   return success();
 }
 
-} // namespace Inline
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Inline
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

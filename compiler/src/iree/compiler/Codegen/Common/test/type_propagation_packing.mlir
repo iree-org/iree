@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-type-propagation %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-type-propagation))" %s | FileCheck %s
 
 func.func @generic_op_i4() {
   %d = hal.interface.constant.load[0] : index

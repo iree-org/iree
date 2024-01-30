@@ -9,7 +9,6 @@
 
 #include "iree/compiler/Codegen/TransformStrategies/GPU/AbstractGemmLikeStrategy.h"
 #include "llvm/ADT/StringRef.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -85,7 +84,7 @@ Value buildDistributeVectors(ImplicitLocOpBuilder &b, Value variantH,
 
 /// Take care of the last common steps in a GPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks and threads and distribute vectors).
-/// Return the handles to the updated variant and the func::FuncOp ops under
+/// Return the handles to the updated variant and the function ops under
 /// the variant op.
 // TODO: abstract away AbstractReductionStrategy, this is supposed to be
 // retargetable.

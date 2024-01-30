@@ -1,4 +1,4 @@
-# Copyright 2022 The IREE Authors
+# Copyright 2023 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -16,7 +16,6 @@ iree_runtime_cc_library(
     name = "cuda",
     srcs = [
         "api.h",
-        "context_wrapper.h",
         "cuda_allocator.c",
         "cuda_allocator.h",
         "cuda_buffer.c",
@@ -24,8 +23,8 @@ iree_runtime_cc_library(
         "cuda_device.c",
         "cuda_device.h",
         "cuda_driver.c",
-        "cuda_event.c",
-        "cuda_event.h",
+        "event_pool.c",
+        "event_pool.h",
         "event_semaphore.c",
         "event_semaphore.h",
         "graph_command_buffer.c",
@@ -38,23 +37,30 @@ iree_runtime_cc_library(
         "nccl_channel.h",
         "nop_executable_cache.c",
         "nop_executable_cache.h",
+        "pending_queue_actions.c",
+        "pending_queue_actions.h",
         "pipeline_layout.c",
         "pipeline_layout.h",
         "stream_command_buffer.c",
         "stream_command_buffer.h",
+        "timepoint_pool.c",
+        "timepoint_pool.h",
         "tracing.c",
         "tracing.h",
     ],
     hdrs = [
         "api.h",
     ],
-    tags = ["driver=cuda"],
     deps = [
         ":dynamic_symbols",
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base:core_headers",
         "//runtime/src/iree/base/internal",
         "//runtime/src/iree/base/internal:arena",
+        "//runtime/src/iree/base/internal:atomic_slist",
+        "//runtime/src/iree/base/internal:event_pool",
         "//runtime/src/iree/base/internal:synchronization",
+        "//runtime/src/iree/base/internal:threading",
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/utils:collective_batch",
@@ -64,24 +70,28 @@ iree_runtime_cc_library(
         "//runtime/src/iree/hal/utils:resource_set",
         "//runtime/src/iree/hal/utils:semaphore_base",
         "//runtime/src/iree/schemas:cuda_executable_def_c_fbs",
-        "@nccl//:headers",
     ],
 )
 
 iree_runtime_cc_library(
     name = "dynamic_symbols",
     srcs = [
+        "cuda_dynamic_symbols.c",
         "cuda_headers.h",
-        "dynamic_symbols.c",
-        "status_util.c",
+        "cuda_status_util.c",
+        "nccl_dynamic_symbols.c",
+        "nccl_headers.h",
+        "nccl_status_util.c",
     ],
     hdrs = [
-        "dynamic_symbols.h",
-        "status_util.h",
+        "cuda_dynamic_symbols.h",
+        "cuda_status_util.h",
+        "nccl_dynamic_symbols.h",
+        "nccl_status_util.h",
     ],
-    tags = ["driver=cuda"],
     textual_hdrs = [
-        "dynamic_symbol_tables.h",
+        "cuda_dynamic_symbol_table.h",
+        "nccl_dynamic_symbol_table.h",
     ],
     deps = [
         "//runtime/src/iree/base",

@@ -31,7 +31,7 @@ void populateDropSharedMemoryDeallocOpPatterns(RewritePatternSet &patterns);
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns);
 
-void populateGPUDistributionLayoutAttrPatterns(ArrayRef<Value> threadGrid,
+void populateGPUDistributionLayoutAttrPatterns(Value laneId,
                                                RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler

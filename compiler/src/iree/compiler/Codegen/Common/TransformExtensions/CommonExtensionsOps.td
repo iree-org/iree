@@ -220,7 +220,7 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -356,7 +356,7 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -505,7 +505,7 @@ def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -542,7 +542,7 @@ def TestVectorLayoutAnalysisOp :
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::func::FuncOp funcOp,
+          ::mlir::FunctionOpInterface funcOp,
           ::mlir::transform::ApplyToEachResultList &results,
           ::mlir::transform::TransformState &state);
     }];
@@ -562,8 +562,8 @@ def TestGpuVectorDistribution :
     "__vector_layout_test_anchor_result_x", where "x" is the operand/result
     number.
 
-    The distribution is done over a 3D thread grid, using the 
-    gpu.thread x, y, z thread grid.
+    The distribution is done for a single warp using gpu.thread x as the lane
+    ID.
 
     #### Return modes
 
@@ -579,7 +579,7 @@ def TestGpuVectorDistribution :
     let extraClassDeclaration = [{
       ::mlir::DiagnosedSilenceableFailure applyToOne(
           ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::func::FuncOp funcOp,
+          ::mlir::FunctionOpInterface funcOp,
           ::mlir::transform::ApplyToEachResultList &results,
           ::mlir::transform::TransformState &state);
     }];
@@ -608,7 +608,7 @@ def GpuDistributeSharedMemoryCopyOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];

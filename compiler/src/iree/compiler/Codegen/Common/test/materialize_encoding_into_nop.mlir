@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-materialize-encoding-into-nop -split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-materialize-encoding-into-nop))" -split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>

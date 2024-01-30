@@ -64,8 +64,9 @@ void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
     dimOps.erase(op);
 }
 
-void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op) {
-  IRRewriter::Listener::notifyOperationInserted(op);
+void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
+                                                        InsertPoint previous) {
+  IRRewriter::Listener::notifyOperationInserted(op, previous);
   if (isa<tensor::DimOp>(op))
     dimOps.insert(op);
 }
@@ -840,7 +841,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 /// Create Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
-                   FunctionOpInterface funcOp,
+                   mlir::FunctionOpInterface funcOp,
                    DominanceInfo const &dominanceInfo,
                    FormDispatchRegionsOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an

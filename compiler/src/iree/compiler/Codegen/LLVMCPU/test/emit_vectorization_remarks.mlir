@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-emit-vectorization-remarks %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-emit-vectorization-remarks))" %s --verify-diagnostics -split-input-file
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {

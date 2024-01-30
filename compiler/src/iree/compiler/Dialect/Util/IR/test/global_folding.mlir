@@ -6,7 +6,7 @@ util.global private @v_initialized : tensor<4xi32>
 util.initializer {
   %0 = arith.constant dense<4> : tensor<4xi32>
   util.global.store %0, @v_initialized : tensor<4xi32>
-  util.initializer.return
+  util.return
 }
 
 // -----
@@ -21,7 +21,7 @@ func.func @unused_load() {
 
 // -----
 
-util.global private @v_const {noinline} = dense<1.0> : tensor<8xf32>
+util.global private @v_const {inlining_policy = #util.inline.never} = dense<1.0> : tensor<8xf32>
 // CHECK-LABEL: @no_fold_noinline_immutable_const
 func.func @no_fold_noinline_immutable_const() -> tensor<8xf32> {
   // CHECK-NEXT: = util.global.load @v_const : tensor<8xf32>

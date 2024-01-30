@@ -12,13 +12,12 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Loader {
+namespace mlir::iree_compiler::IREE::HAL::Loader {
 
 static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
   OpBuilder moduleBuilder(executableOp);
@@ -57,7 +56,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
         loc, status,
         "none of the executable binaries in the module are supported by the "
         "runtime");
-    failBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    failBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Exit block takes the loaded executable and stores it.
@@ -67,7 +66,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
     auto executableArg = exitBlock->addArgument(executableType, loc);
     exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableArg,
                                                   globalOp.getName());
-    exitBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    exitBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Start with the first try.
@@ -163,5 +162,4 @@ createMaterializeExecutablesPass() {
   return std::make_unique<MaterializeExecutablesPass>();
 }
 
-} // namespace Loader
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Loader

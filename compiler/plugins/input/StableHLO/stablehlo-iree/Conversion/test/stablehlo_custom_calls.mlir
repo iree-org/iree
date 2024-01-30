@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-stablehlo-legalize-custom-calls \
-// RUN:   --cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-custom-calls),cse)" \
+// RUN:   %s | FileCheck %s
 
 // CHECK-LABEL: @householder
 func.func public @householder(%arg0: tensor<4x3xf32>, %arg1: tensor<2xf32>) -> (tensor<4x3xf32>) {

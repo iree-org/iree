@@ -196,7 +196,7 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 #-------------------------------------------------------------------------------
 
 set(IREE_CUDA_AVAILABLE OFF)
-# The IREE cuda2 driver requires CUDA >= 12.
+# The IREE cuda driver requires CUDA >= 12.
 set(IREE_CUDA_MIN_VERSION_REQUIRED 12)
 find_package(CUDAToolkit ${IREE_CUDA_MIN_VERSION_REQUIRED})
 if(CUDAToolkit_FOUND)
@@ -242,10 +242,8 @@ option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL driv
 # not cross compiling. Note: a CUDA-compatible GPU with drivers is still
 # required to actually run CUDA workloads.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-set(IREE_HAL_DRIVER_CUDA1_DEFAULT OFF)
 if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
-  set(IREE_HAL_DRIVER_CUDA1_DEFAULT OFF)
 endif()
 
 # Vulkan support is enabled by default if the platform might support Vulkan.
@@ -263,7 +261,6 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
-option(IREE_HAL_DRIVER_CUDA1 "Enables the 'cuda1' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA1_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
@@ -318,9 +315,6 @@ endif()
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
-endif()
-if(IREE_HAL_DRIVER_CUDA1)
-  message(STATUS "  - cuda1")
 endif()
 if(IREE_HAL_DRIVER_LOCAL_SYNC)
   message(STATUS "  - local-sync")
@@ -999,9 +993,6 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS)
   set(IREE_E2E_TEST_ARTIFACTS_DIR "${IREE_BINARY_DIR}/e2e_test_artifacts")
 endif()
 
-# Note: Test deps are not built as part of all (use the iree-test-deps target).
-add_subdirectory(tests EXCLUDE_FROM_ALL)
-
 # tools/ can depend on compiler/ and runtime/.
 # Note: tools sub directory is added before compiler/ so that phony targets for
 # files with the same names from different rules are disambiguated towards
@@ -1009,6 +1000,9 @@ add_subdirectory(tests EXCLUDE_FROM_ALL)
 add_subdirectory(tools)
 add_subdirectory(compiler)
 add_subdirectory(runtime)
+
+# Note: Test deps are not built as part of all (use the iree-test-deps target).
+add_subdirectory(tests EXCLUDE_FROM_ALL)
 
 if(IREE_ENABLE_CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY "")

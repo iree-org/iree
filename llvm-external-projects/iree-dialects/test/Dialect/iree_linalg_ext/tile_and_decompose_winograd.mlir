@@ -1,5 +1,5 @@
-// RUN: iree-dialects-opt --iree-linalg-ext-tile-and-decompose-winograd --cse --split-input-file %s | FileCheck %s
-// RUN: iree-dialects-opt --iree-linalg-ext-tile-and-decompose-winograd=onlyTile --cse --split-input-file %s | FileCheck %s --check-prefix=TILING
+// RUN: iree-dialects-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-winograd),cse)" --split-input-file %s | FileCheck %s
+// RUN: iree-dialects-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-winograd{onlyTile}),cse)" --split-input-file %s | FileCheck %s --check-prefix=TILING
 
 #map = affine_map<(d0)[s0, s1] -> (1, -d0 + s1)>
 #map1 = affine_map<(d0)[s0, s1] -> (32, -d0 + s1)>

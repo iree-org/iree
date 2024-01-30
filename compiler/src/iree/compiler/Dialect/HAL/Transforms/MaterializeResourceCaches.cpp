@@ -46,10 +46,7 @@ struct MaterializeResourceCachesPass
         descriptorSetLayoutLookupOps;
     SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
-    for (Operation &funcLikeOp : moduleOp.getOps()) {
-      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp)
-        continue;
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
@@ -131,7 +128,7 @@ private:
         loc, layoutType, device, flags, bindingAttrs);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
                                                    globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
   }
@@ -186,7 +183,7 @@ private:
         setLayoutValues);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
                                                    globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
   }
@@ -283,7 +280,7 @@ private:
     auto executableValue = switchOp.getResult(0);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
                                                    globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Inlines a constant block as a function in |moduleBuilder| and then inserts

@@ -8,7 +8,7 @@
 // operations. This does not include removing complex values from function
 // argument or return types.
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"

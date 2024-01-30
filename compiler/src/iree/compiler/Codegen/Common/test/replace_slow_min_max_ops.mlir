@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-replace-slow-min-max-ops --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-replace-slow-min-max-ops))" --split-input-file %s | FileCheck %s
 
 // LABEL: func.func @min
 func.func @min(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> vector<4xf32> {

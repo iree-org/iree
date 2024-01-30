@@ -88,16 +88,16 @@ static void replaceConstantLoadOp(IREE::Flow::DispatchTensorLoadOp loadOp,
 class WGSLReplacePushConstantsPass
     : public WGSLReplacePushConstantsBase<WGSLReplacePushConstantsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::arith::ArithDialect, mlir::func::FuncDialect,
-                    mlir::tensor::TensorDialect, mlir::vector::VectorDialect,
-                    IREE::Flow::FlowDialect, IREE::HAL::HALDialect>();
+    registry.insert<mlir::arith::ArithDialect, mlir::tensor::TensorDialect,
+                    mlir::vector::VectorDialect, IREE::Flow::FlowDialect,
+                    IREE::HAL::HALDialect>();
   }
 
   void runOnOperation() override {
     auto funcOp = getOperation();
     auto loc = funcOp.getLoc();
-    auto constantLoadOps =
-        llvm::to_vector(funcOp.getOps<IREE::HAL::InterfaceConstantLoadOp>());
+    auto constantLoadOps = llvm::to_vector(
+        funcOp.getFunctionBody().getOps<IREE::HAL::InterfaceConstantLoadOp>());
     if (constantLoadOps.empty())
       return;
 
@@ -175,7 +175,7 @@ class WGSLReplacePushConstantsPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWGSLReplacePushConstantsPass() {
   return std::make_unique<WGSLReplacePushConstantsPass>();
 }

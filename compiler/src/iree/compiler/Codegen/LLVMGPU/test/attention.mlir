@@ -90,9 +90,6 @@ hal.executable @_attention_dispatch_0 {
 // CHECK-DAG:    %[[D6:.+]] = gpu.thread_id  y
 // CHECK-DAG:    %[[D7:.+]] = gpu.thread_id  z
 // CHECK-DAG:    %[[D8:.+]] = affine.apply #[[MAP2]]()[%[[D5]], %[[D6]], %[[D7]]]
-// CHECK:        gpu.barrier
-// CHECK:        gpu.barrier
-// CHECK:        gpu.barrier
 // CHECK:        %[[D9:.+]] = vector.transfer_read %[[ALLOC]][%[[C0]], %[[D8]], %[[C0]]], %[[CST_4]] {in_bounds = [true,
 // CHECK-SAME:     true]} : memref<1x128x64xf16, #[[GPU]].address_space<workgroup>>, vector<32x64xf16>
 // CHECK:        %[[D10:.+]] = arith.extf %[[D9]] : vector<32x64xf16> to vector<32x64xf32>
@@ -151,7 +148,6 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:          %[[D39:.+]] = vector.contract {indexing_maps = [#[[MAP4]], #[[MAP5]], #[[MAP6]]], iterator_types =
 // CHECK-SAME:       ["parallel", "parallel", "reduction"], kind = #[[VECTOR]].kind<add>} %[[D36]], %[[D37]], %[[D34]] :
 // CHECK-SAME:       vector<32x128xf32>, vector<64x128xf32> into vector<32x64xf32>
-// CHECK:          gpu.barrier
 // CHECK:          scf.yield %[[D16]], %[[D24]], %[[D39]] : vector<32xf32>, vector<32xf32>, vector<32x64xf32>
 // CHECK:        }
 // CHECK:        %[[DSCALE1:.+]] = vector.broadcast %[[D11]]#1 : vector<32xf32> to vector<64x32xf32>

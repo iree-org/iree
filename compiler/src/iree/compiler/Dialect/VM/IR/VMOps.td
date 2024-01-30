@@ -121,7 +121,7 @@ def VM_FuncOp : VM_Op<"func", [
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$noinline,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
   );
@@ -387,6 +387,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<attr_type>:$initial_value,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 
@@ -495,6 +496,7 @@ def VM_GlobalRefOp :
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 

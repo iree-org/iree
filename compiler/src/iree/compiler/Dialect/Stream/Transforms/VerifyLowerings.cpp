@@ -24,6 +24,7 @@ namespace mlir::iree_compiler::IREE::Stream {
 
 #define GEN_PASS_DEF_VERIFYINPUTPASS
 #define GEN_PASS_DEF_VERIFYLOWERINGTOTENSORSPASS
+#define GEN_PASS_DEF_VERIFYLOWERINGTOASYNCRESOURCESPASS
 #define GEN_PASS_DEF_VERIFYLOWERINGTOASYNCPASS
 #define GEN_PASS_DEF_VERIFYLOWERINGTOCMDPASS
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"
@@ -297,7 +298,28 @@ struct VerifyLoweringToTensorsPass
 };
 
 //===----------------------------------------------------------------------===//
-// --iree-stream-verify-lowering-to-tensors
+// --iree-stream-verify-lowering-to-async-resources
+//===----------------------------------------------------------------------===//
+
+struct VerifyLoweringToAsyncResourcesPass
+    : public IREE::Stream::impl::VerifyLoweringToAsyncResourcesPassBase<
+          VerifyLoweringToAsyncResourcesPass> {
+  void runOnOperation() override {
+    // We cannot have stream.cmd.* ops mixed with stream.tensor/async.* ops
+    // as they use different memory models. We need to allow them through,
+    // though, to allow for compiler re-entrancy.
+    Verifier verifier;
+    setupDefaultOpLegality(verifier);
+    markTensorInputsIllegal(verifier);
+    markStreamTensorOpsIllegal(verifier);
+    if (failed(verifier.run(getOperation()))) {
+      return signalPassFailure();
+    }
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// --iree-stream-verify-lowering-to-async
 //===----------------------------------------------------------------------===//
 
 struct VerifyLoweringToAsyncPass

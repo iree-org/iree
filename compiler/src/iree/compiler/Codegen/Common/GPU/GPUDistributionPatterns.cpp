@@ -9,8 +9,10 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -42,8 +44,7 @@ static std::optional<int64_t> findDimShape(LayoutAttr layout,
 /// that the current iterator state is iterating over. These indices are
 /// parameterized by the thread grid.
 static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
-                                           LayoutAttr layout,
-                                           ArrayRef<Value> threadGrid,
+                                           LayoutAttr layout, Value laneId,
                                            RewriterBase &rewriter) {
   MLIRContext *ctx = layout.getContext();
   AffineExpr threadX, threadY, threadZ;
@@ -75,10 +76,23 @@ static SmallVector<Value> computeSIMDIndex(const LayoutIterator::State &state,
       stride = stride * getAffineConstantExpr(shape, ctx);
     }
 
+    auto [laneDimX, laneDimY, laneDimZ] = layout.getLaneGrid();
+    SmallVector<Value> laneGrid = {
+        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimZ),
+        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimY),
+        rewriter.create<arith::ConstantIndexOp>(laneId.getLoc(), laneDimX)};
+    FailureOr<SmallVector<Value>> maybeReversedLaneGridVals =
+        affine::delinearizeIndex(rewriter, laneId.getLoc(), laneId, laneGrid);
+    assert(succeeded(maybeReversedLaneGridVals) &&
+           "Failed to delinearize lane index");
+    SmallVector<Value> laneGridVals = {(*maybeReversedLaneGridVals)[2],
+                                       (*maybeReversedLaneGridVals)[1],
+                                       (*maybeReversedLaneGridVals)[0]};
+
     // Compute the index for the dim.
     AffineMap indexMap = AffineMap::get(0, 3, offset);
     Value index = rewriter.create<affine::AffineApplyOp>(
-        rewriter.getUnknownLoc(), indexMap, threadGrid);
+        rewriter.getUnknownLoc(), indexMap, laneGridVals);
     simdIndex.push_back(index);
   }
 
@@ -91,17 +105,16 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
   LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    Value constantResult = constantOp.getResult();
-    if (!isa<VectorType>(constantResult.getType()))
+    auto constant = dyn_cast<VectorValue>(constantOp.getResult());
+    if (!constant)
       return failure();
-    auto constant = cast<VectorValue>(constantResult);
 
     // Only handle splat values for now.
     auto attr = dyn_cast<SplatElementsAttr>(constantOp.getValue());
     if (!attr)
       return failure();
 
-    VectorLayoutInterface layout = signature.results[0];
+    VectorLayoutInterface layout = signature[constant];
 
     // Replace the original op with the distributed op.
     Type elementType = constant.getType().getElementType();
@@ -124,23 +137,22 @@ struct DistributeElementwise final : OpDistributionPattern<OpTy> {
                                 PatternRewriter &rewriter) const override {
     // Get the distributed operands.
     SmallVector<Value> operands;
-    for (auto [operand, opLayout] :
-         llvm::zip(op->getOperands(), signature.operands)) {
+    for (Value operand : op->getOperands()) {
       if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
         operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      opLayout);
+                                                      signature[vectorOperand]);
       }
       operands.push_back(operand);
     }
 
     // Get the new distributed vector types for the operation.
     SmallVector<Type> resultTypes;
-    for (auto [result, resLayout] :
-         llvm::zip(op->getResults(), signature.results)) {
+    for (Value result : op->getResults()) {
       Type resultType = result.getType();
 
       // Distribute vector result types.
       if (auto vectorResult = dyn_cast<VectorValue>(result)) {
+        VectorLayoutInterface resLayout = signature[vectorResult];
         resultType = VectorType::get(resLayout.getDistributedShape(),
                                      vectorResult.getType().getElementType());
       }
@@ -199,9 +211,9 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                     std::is_same<OpTy, vector::TransferWriteOp>::value,
                 "expected vector::TransferReadOp or vector::TransferWriteOp");
 
-  DistributeXferLayoutAttr(MLIRContext *context, ArrayRef<Value> threadGrid,
+  DistributeXferLayoutAttr(MLIRContext *context, Value laneId,
                            PatternBenefit benefit = 1)
-      : OpDistributionPattern<OpTy>(context, benefit), threadGrid(threadGrid) {}
+      : OpDistributionPattern<OpTy>(context, benefit), laneId(laneId) {}
 
   VectorValue accessMemory(OpTy xferOp, VectorValue accumulator,
                            LayoutAttr vectorLayout,
@@ -236,7 +248,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
                                       SmallVector<Value> indices,
                                       RewriterBase &rewriter) const {
     SmallVector<Value> simdIndices =
-        computeSIMDIndex(state, memoryLayout, threadGrid, rewriter);
+        computeSIMDIndex(state, memoryLayout, laneId, rewriter);
     SmallVector<Value> memoryIndices(indices);
 
     // The memory layout has some projected leading dims that indices doesn't.
@@ -266,7 +278,7 @@ struct DistributeXferLayoutAttr : OpDistributionPattern<OpTy> {
     return 1;
   }
 
-  SmallVector<Value> threadGrid;
+  Value laneId;
 };
 
 struct DistributeTransferReadLayoutAttr final
@@ -276,7 +288,8 @@ struct DistributeTransferReadLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.results[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[readOp.getResult()]);
     if (!vectorLayout) {
       return failure();
     }
@@ -319,21 +332,15 @@ struct DistributeTransferWriteLayoutAttr final
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-    LayoutAttr vectorLayout = dyn_cast<LayoutAttr>(signature.operands[0]);
+    LayoutAttr vectorLayout =
+        dyn_cast<LayoutAttr>(signature[writeOp.getVector()]);
     if (!vectorLayout) {
       return failure();
     }
 
     // TODO: Return failure if we need masking.
 
-    Type elementType = writeOp.getSource().getType().getElementType();
-    auto vectorType =
-        VectorType::get(vectorLayout.getDistributedShape(), elementType);
-    Value zero = rewriter.create<arith::ConstantOp>(
-        writeOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
-    VectorValue acc = cast<VectorValue>(zero);
-
-    accessMemory(writeOp, acc, vectorLayout, rewriter);
+    accessMemory(writeOp, writeOp.getVector(), vectorLayout, rewriter);
 
     rewriter.eraseOp(writeOp);
     return success();
@@ -372,11 +379,11 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
                DistributeElementwise<arith::AddFOp>>(patterns.getContext());
 }
 
-void populateGPUDistributionLayoutAttrPatterns(ArrayRef<Value> threadGrid,
+void populateGPUDistributionLayoutAttrPatterns(Value laneId,
                                                RewritePatternSet &patterns) {
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
-          patterns.getContext(), threadGrid);
+          patterns.getContext(), laneId);
 }
 
 }; // namespace mlir::iree_compiler

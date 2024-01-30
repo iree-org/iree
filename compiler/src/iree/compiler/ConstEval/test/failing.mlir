@@ -15,6 +15,6 @@ module @eval_i64_scalar {
     %offset = util.global.load @offset : f64
     %sum = arith.addf %cst, %offset : f64
     util.global.store %sum, @hoisted : f64
-    util.initializer.return
+    util.return
   }
 }

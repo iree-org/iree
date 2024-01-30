@@ -11,7 +11,7 @@
 #include "iree/base/internal/atomics.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
+#include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_headers.h"
 
 #ifdef __cplusplus
@@ -20,12 +20,13 @@ extern "C" {
 
 // Retained CUDA memory pools for various allocation types.
 typedef struct iree_hal_cuda_memory_pools_t {
-  // CUDA context the pools are attached to.
-  iree_hal_cuda_context_wrapper_t* context;
   // Used exclusively for DEVICE_LOCAL allocations.
   CUmemoryPool device_local;
   // Used for any host-visible/host-local memory types.
   CUmemoryPool other;
+
+  const iree_hal_cuda_dynamic_symbols_t* cuda_symbols;
+  iree_allocator_t host_allocator;
 
   IREE_STATISTICS(struct {
     iree_atomic_int64_t device_bytes_allocated;
@@ -37,8 +38,9 @@ typedef struct iree_hal_cuda_memory_pools_t {
 
 // Initializes |out_pools| by configuring new CUDA memory pools.
 iree_status_t iree_hal_cuda_memory_pools_initialize(
-    iree_hal_cuda_context_wrapper_t* context,
+    const iree_hal_cuda_dynamic_symbols_t* cuda_symbols, CUdevice cu_device,
     const iree_hal_cuda_memory_pooling_params_t* pooling_params,
+    iree_allocator_t host_allocator,
     iree_hal_cuda_memory_pools_t* IREE_RESTRICT out_pools);
 
 // Deinitializes the |pools| and releases the underlying CUDA resources.

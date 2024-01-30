@@ -11,8 +11,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Loader {
+namespace mlir::iree_compiler::IREE::HAL::Loader {
 
 struct ResolveExecutableDispatchSymbolOp
     : public OpRewritePattern<IREE::HAL::Loader::ExecutableDispatchSymbolOp> {
@@ -55,5 +54,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createResolveExportOrdinalsPass() {
 
 static PassRegistration<ResolveExportOrdinalsPass> pass;
 
-} // namespace Loader
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Loader

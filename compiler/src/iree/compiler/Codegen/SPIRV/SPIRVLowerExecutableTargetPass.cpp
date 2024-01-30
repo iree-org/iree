@@ -82,16 +82,34 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   case CodeGenPipeline::SPIRVSubgroupReduce:
     addSPIRVSubgroupReducePassPipeline(pipeline);
     break;
-  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
-    addSPIRVCooperativeMatrixVectorizePassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-        translationInfo.value().getSoftwarePipelineStoreStage());
+  case CodeGenPipeline::SPIRVCooperativeMatrixVectorize: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    FailureOr<int64_t> maybeStage = getSoftwarePipelineStoreStage(
+        translationInfo.value().getConfiguration());
+    if (failed(maybeDepth) || failed(maybeStage)) {
+      variantOp.emitOpError("invalid cooperative matrix pipeline without "
+                            "software pipelining configuration.");
+      return signalPassFailure();
+    }
+    addSPIRVCooperativeMatrixVectorizePassPipeline(pipeline, *maybeDepth,
+                                                   *maybeStage);
     break;
-  case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
-    addSPIRVMatmulPromoteVectorizePassPipeline(
-        pipeline, translationInfo.value().getSoftwarePipelineDepth(),
-        translationInfo.value().getSoftwarePipelineStoreStage());
+  }
+  case CodeGenPipeline::SPIRVMatmulPromoteVectorize: {
+    FailureOr<int64_t> maybeDepth =
+        getSoftwarePipelineDepth(translationInfo.value().getConfiguration());
+    FailureOr<int64_t> maybeStage = getSoftwarePipelineStoreStage(
+        translationInfo.value().getConfiguration());
+    if (failed(maybeDepth) || failed(maybeStage)) {
+      variantOp.emitOpError(
+          "invalid matmul pipeline without software pipelining configuration.");
+      return signalPassFailure();
+    }
+    addSPIRVMatmulPromoteVectorizePassPipeline(pipeline, *maybeDepth,
+                                               *maybeStage);
     break;
+  }
   case CodeGenPipeline::SPIRVWinogradVectorize:
     addSPIRVWinogradVectorizePassPipeline(pipeline);
     break;
@@ -102,7 +120,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   case CodeGenPipeline::None:
     return;
   default:
-    variantOp.emitOpError("Unsupported pipeline on GPU target.");
+    variantOp.emitOpError("unsupported pipeline on GPU target.");
     return signalPassFailure();
   }
 

@@ -20,7 +20,7 @@ def UKernelOpInterface : OpInterface<"UKernelOpInterface"> {
       /*desc=*/[{
         Method to lower the Micro Kernel operation into a function call.
       }],
-      /*retType=*/"FailureOr<func::CallOp>",
+      /*retType=*/"FailureOr<mlir::CallOpInterface>",
       /*methodName=*/"lowerToFunctionCall",
       /*args=*/(ins "RewriterBase &":$rewriter),
       /*methodBody=*/"",

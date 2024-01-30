@@ -10,18 +10,20 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
-/// A signature describing the layout for each operand of vector type for
-/// an operation.
-struct DistributionSignature {
-  SmallVector<VectorLayoutInterface> operands;
-  SmallVector<VectorLayoutInterface> results;
-};
+/// A signature describing the layout for each value of vector type which is
+/// an operand or result of this operation.
+///
+/// Two operands may be the same value, but since each value can only have
+/// one layout, we only need to keep track of the value, not the two operands
+/// separately.
+using DistributionSignature =
+    DenseMap<TypedValue<VectorType>, VectorLayoutInterface>;
 
 struct DistributionPattern : RewritePattern {
   using RewritePattern::RewritePattern;

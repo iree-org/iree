@@ -93,7 +93,7 @@ void LLVMCPUTilePass::runOnOperation() {
     setSCFTileSizes(options, op, std::move(tileSizes),
                     std::move(tileScalableFlags));
     FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, op, options);
+        scf::tileUsingSCF(rewriter, op, options);
     if (failed(tiledResults))
       continue;
     rewriter.replaceOp(op, tiledResults->replacements);
@@ -113,7 +113,7 @@ void LLVMCPUTilePass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTilePass(int64_t tilingLevel) {
   return std::make_unique<LLVMCPUTilePass>(tilingLevel);
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-stablehlo-preprocessing-lower-complex %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-preprocessing-lower-complex))" %s | FileCheck %s
 
 // CHECK-LABEL: @add
 func.func @add(%arg0 : tensor<2xf32>, %arg1 : tensor<2xf32>, %arg2 : tensor<2xf32>, %arg3 : tensor<2xf32>) -> (tensor<2xf32>, tensor<2xf32>) {

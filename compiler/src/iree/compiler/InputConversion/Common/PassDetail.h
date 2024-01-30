@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_COMMON_PASSDETAIL_H_
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSDETAIL_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {

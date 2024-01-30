@@ -16,8 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Loader {
+namespace mlir::iree_compiler::IREE::HAL::Loader {
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -58,7 +57,6 @@ createResolveExportOrdinalsPass();
 
 void registerHALLoaderPasses();
 
-} // namespace Loader
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Loader
 
 #endif // IREE_COMPILER_MODULES_HAL_LOADER_TRANSFORMS_PASSES_H_

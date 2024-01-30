@@ -7,7 +7,7 @@
 #ifndef TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_
 #define TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::TorchInput {

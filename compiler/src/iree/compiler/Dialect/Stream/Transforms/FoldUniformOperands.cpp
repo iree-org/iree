@@ -13,13 +13,13 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-fold-uniform-operands"
@@ -44,7 +44,7 @@ namespace {
 //   stream.cmd.dispatch @foo(%0, %1 : index, index)
 // + deduped arguments in the executable
 static void
-deduplicateOperands(mlir::func::FuncOp funcOp,
+deduplicateOperands(mlir::FunctionOpInterface funcOp,
                     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
@@ -117,7 +117,7 @@ deduplicateOperands(mlir::func::FuncOp funcOp,
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "deduplicateOperands for " << funcOp.getSymName() << "\n";
+    llvm::dbgs() << "deduplicateOperands for " << funcOp.getName() << "\n";
     llvm::dbgs() << "  dead operands: ";
     llvm::interleaveComma(deadOperandsMap.set_bits(), llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -170,7 +170,7 @@ deduplicateOperands(mlir::func::FuncOp funcOp,
 //   stream.cmd.dispatch @foo(%c101 : index)
 // + inlined %c1 in the executable
 static void
-inlineUniformConstants(mlir::func::FuncOp funcOp,
+inlineUniformConstants(mlir::FunctionOpInterface funcOp,
                        SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
@@ -210,8 +210,7 @@ inlineUniformConstants(mlir::func::FuncOp funcOp,
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "inlineUniformConstants for " << funcOp.getSymName()
-                 << "\n";
+    llvm::dbgs() << "inlineUniformConstants for " << funcOp.getName() << "\n";
     for (unsigned i = 0; i < operandValues.size(); ++i) {
       if (!operandValues[i].has_value())
         continue;

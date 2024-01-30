@@ -150,7 +150,8 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
         // Assumed by accessors:
         TypeAttr:$type,
         UnitAttr:$is_mutable,
-        OptionalAttr<AnyAttr>:$initial_value
+        OptionalAttr<AnyAttr>:$initial_value,
+        OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy
       );
     ```
   }];
@@ -264,6 +265,34 @@ def Util_GlobalOpInterface : OpInterface<"GlobalOpInterface"> {
           $_op->setAttr("initial_value", (value));
         } else {
           $_op.removeInitialValueAttr();
+        }
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns an optional inlining policy for the global.
+      }],
+      /*retTy=*/"IREE::Util::InliningPolicyAttrInterface",
+      /*methodName=*/"getGlobalInliningPolicy",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op.getInliningPolicyAttr();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Sets (or clears) the inlining policy of the global.
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"setGlobalInliningPolicy",
+      /*args=*/(ins "IREE::Util::InliningPolicyAttrInterface":$value),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        if (value) {
+          $_op.setInliningPolicyAttr(value);
+        } else {
+          $_op.removeInliningPolicyAttr();
         }
       }]
     >,
@@ -1194,6 +1223,35 @@ def Util_SubrangeOperandOpInterface : OpInterface<"SubrangeOperandOpInterface"> 
         "unsigned":$operandIndex,
         "IREE::Util::SubrangeOperand":$operand
       )
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::InliningPolicyAttrInterface
+//===----------------------------------------------------------------------===//
+
+def Util_InliningPolicyAttrInterface : AttrInterface<"InliningPolicyAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface allowing attributes to control the inlining behavior of functions
+    and globals they are associated with.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if the inlinable operation (function, global, etc) is
+        allowed to be inlined into the inline site (caller, accessor, etc).
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"isLegalToInline",
+      /*args=*/(ins
+        "Operation *":$inlineSite,
+        "Operation *":$inlinable
+      ),
+      /*methodBody=*/[{}]
     >,
   ];
 }

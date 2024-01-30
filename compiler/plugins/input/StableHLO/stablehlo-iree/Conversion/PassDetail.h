@@ -7,8 +7,8 @@
 #ifndef STABLEHLO_IREE_CONVERSION_PASSDETAIL_H_
 #define STABLEHLO_IREE_CONVERSION_PASSDETAIL_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::stablehlo {

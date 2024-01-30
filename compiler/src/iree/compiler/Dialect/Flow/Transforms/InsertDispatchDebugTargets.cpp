@@ -142,8 +142,8 @@ struct InsertDebugTargetAtOrdinalPass
         getOrdinalFromDebugTarget(traceDebugTarget);
 
     for (auto it :
-         llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
-      FunctionOpInterface op = it.value();
+         llvm::enumerate(getOperation().getOps<mlir::FunctionOpInterface>())) {
+      mlir::FunctionOpInterface op = it.value();
       Operation *operation = op;
 
       // Only look for dispatches in upstream func ops.
@@ -211,8 +211,8 @@ struct InsertDebugTargetAtSymbolPass
       breakMatcher = llvm::Regex(breakDebugTarget);
 
     for (auto it :
-         llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
-      FunctionOpInterface funcOp = it.value();
+         llvm::enumerate(getOperation().getOps<mlir::FunctionOpInterface>())) {
+      mlir::FunctionOpInterface funcOp = it.value();
 
       // Find the target dispatch to break on and trace on all matching
       // dispatches.

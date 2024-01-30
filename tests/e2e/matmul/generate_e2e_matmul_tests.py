@@ -450,8 +450,9 @@ def generate_function(
         compilation_info_string = (
             f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation_info<\n"
             f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{dispatch_lowering_pass_pipeline}\n"
-            f"  pipeline_depth = {compilation_info.software_pipeline_depth}>,\n"
+            f"  translation_info = <{dispatch_lowering_pass_pipeline},\n"
+            f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
+            f"  store_stage = 1 }}>,\n"
             f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n"
         )
         compilation_info_attr = (
