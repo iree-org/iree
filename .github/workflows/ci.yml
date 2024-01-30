@@ -350,7 +350,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE=1 \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE=1 \
-              --env IREE_CTEST_LABEL_REGEX=^requires-gpu|^driver=vulkan$|^driver=cuda$ \
+              --env IREE_CTEST_LABEL_REGEX="^requires-gpu|^driver=vulkan$|^driver=cuda$" \
               --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
               --env IREE_CUDA_DISABLE=0 \
