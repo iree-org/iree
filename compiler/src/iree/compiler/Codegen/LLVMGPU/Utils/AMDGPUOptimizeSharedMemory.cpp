@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/AMDGPU/Transforms/Transforms.h"
 
 namespace mlir::iree_compiler {
@@ -12,7 +13,7 @@ namespace mlir::iree_compiler {
 void optimizeSharedMemoryReadsAndWrites(mlir::FunctionOpInterface funcOp) {
   SmallVector<memref::AllocOp> shmAllocOps;
   funcOp.walk([&](memref::AllocOp allocOp) {
-    if (!hasSharedMemoryAddressSpace(allocOp.getType()))
+    if (!amdgpu::AMDGPUDialect::hasSharedMemoryAddressSpace(allocOp.getType()))
       return;
     shmAllocOps.push_back(allocOp);
   });
