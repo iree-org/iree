@@ -140,6 +140,10 @@ typedef struct iree_hal_vulkan_device_properties_t {
   // ("coopmatrix.<input-element-type>.<output-element-type>.<m>x<n>x<k>")
   // * 0b01: coopmatrix.f16.f16.16x16x16
   uint32_t cooperative_matrix : 8;
+  // Addressing more requirement bitfield:
+  // ("address.<mode>")
+  // * 0b01: address.physical64
+  uint32_t address : 8;
 } iree_hal_vulkan_iree_hal_vulkan_device_properties_t;
 
 #endif  // IREE_HAL_DRIVERS_VULKAN_EXTENSIBILITY_UTIL_H_
