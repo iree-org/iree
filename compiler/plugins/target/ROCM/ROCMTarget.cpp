@@ -247,8 +247,8 @@ public:
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
     int32_t subgroupSize = 64;
-    std::string subTarget = options.targetChip.substr(0, 4);
-    const std::string GFX9("gfx9");
+    StringRef subTarget = options.targetChip;
+    StringRef GFX9("gfx9");
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
@@ -291,7 +291,7 @@ public:
       if (options.wavesPerEu > 0)
         llvmFunc->addFnAttr("amdgpu-waves-per-eu",
                             std::to_string(options.wavesPerEu));
-      if (subTarget == GFX9)
+      if (subTarget.starts_with(GFX9))
         addPreloadKernArgHint(llvmFunc);
     }
 
@@ -310,7 +310,7 @@ public:
       opt.NoInfsFPMath = false;
       opt.NoNaNsFPMath = true;
       std::string features;
-      if (GFX9 == subTarget) {
+      if (subTarget.starts_with(GFX9)) {
         features = "+sramecc,-xnack";
       } else {
         // GFX 10 or 11.
