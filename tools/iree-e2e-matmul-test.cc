@@ -226,6 +226,11 @@ REFERENCE_MATMUL(float, float, float, float)
 // [i32 <= i8 * i8 + i32]
 REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 
+// Reference mamtul instantiations from macro REFERENCE_MATMUL
+// for the int8_t input, int32_t accumlation, and int32_t result.
+// [i32 <= i32 * i32 + i32]
+REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
+
 // Reference mamtul for the f16 input, f16 accumlation, and f16 result.
 // [f16 <= f16 * f16 + f16]
 static void reference_matmul_f16_f16_f16_f16(
@@ -310,6 +315,13 @@ static iree_status_t reference_matmul_element(
     reference_matmul_int8_t_int8_t_int32_t_int32_t(
         m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
         (const int8_t*)lhs_data, (const int8_t*)rhs_data,
+        (const int32_t*)acc_data, (int32_t*)result_data, m, n);
+  } else if (iree_hal_element_type_is_integer(lhs_type, 32) &&
+             iree_hal_element_type_is_integer(rhs_type, 32) &&
+             iree_hal_element_type_is_integer(acc_type, 32)) {
+    reference_matmul_int32_t_int32_t_int32_t_int32_t(
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        (const int32_t*)lhs_data, (const int32_t*)rhs_data,
         (const int32_t*)acc_data, (int32_t*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
