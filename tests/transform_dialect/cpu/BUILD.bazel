@@ -33,6 +33,7 @@ iree_lit_test_suite(
         "transform_library.mlir",
     ],
     tags = [
+        "hostonly",
         "noasan",
         "nomsan",
         "notsan",
