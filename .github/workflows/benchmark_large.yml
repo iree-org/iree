@@ -9,7 +9,6 @@
 name: Benchmark Large
 
 on:
-  pull_request:
   schedule:
     # Scheduled to run at 09:00 UTC and 21:00 UTC.
     - cron: '0 09,21 * * *'
