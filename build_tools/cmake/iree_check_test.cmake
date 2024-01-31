@@ -135,8 +135,7 @@ function(iree_check_test)
     if((NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND
        (NOT IREE_EXTERNAL_${_NORMALIZED_DRIVER}_HAL_DRIVER_FOUND))
       set(_TEST_DISABLED TRUE)
-      # We could also disable the bytecode module build here if we wanted to.
-      # set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
 
@@ -144,6 +143,7 @@ function(iree_check_test)
   iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
   if(_EXCLUDED_BY_LABELS)
     set(_TEST_DISABLED TRUE)
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
   # ---------------------------------------------------------------------------
 
