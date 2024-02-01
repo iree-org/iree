@@ -1648,7 +1648,7 @@ hal.executable private @pack_many_elements  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[50, 48], [1, 1]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1250, 400], [1, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
 //      CHECK: hal.executable.export public @pack_many_elements
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

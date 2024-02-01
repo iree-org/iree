@@ -1384,21 +1384,32 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
   DistributionHeuristicConfig distConfig;
-  distConfig.allowIncompleteTile = true;
+  distConfig.allowIncompleteTile = false;
+  distConfig.maxTileSizes.resize(op.getSourceRank(), clDefaultDistTileSize);
   distConfig.vectorSizeHints.resize(op.getSourceRank(), 1);
-  for (auto dim : op.getInnerDimsPos()) {
-    distConfig.vectorSizeHints[dim] = vectorSize;
+  // We aim for larger tile sizes for pack ops so we maxTileSizes to the actual
+  // dimension sizes.
+  for (auto [idx, dimSize] : llvm::enumerate(op.getSourceType().getShape())) {
+    if (ShapedType::isDynamic(dimSize))
+      continue;
+    distConfig.maxTileSizes[idx] = dimSize;
   }
+
+  auto dimPositions = op.getInnerDimsPos();
+  for (int64_t dimPos : dimPositions) {
+    distConfig.vectorSizeHints[dimPos] = vectorSize;
+  }
+
+
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
 
-  // Fixup for making distTileSizes be multiple of inner_tile_sizes.
+  // Fixup for making distTileSizes be multiple of inner_tile_dimSizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
-  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
-  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
+  for (auto [pos, dimSize] : llvm::zip_equal(dimPositions, innerTiles)) {
+    if (distTileSizes[pos] == 0 || ShapedType::isDynamic(dimSize))
       continue;
-    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], size);
+    distTileSizes[pos] = llvm::alignTo(distTileSizes[pos], dimSize);
   }
 
   SmallVector<int64_t> vecTileSizes = getPackVectorTileSizes(entryPointFn, op);
@@ -1416,8 +1427,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    tensor::UnPackOp op) {
+
+  DistributionHeuristicConfig distConfig;
+  distConfig.allowIncompleteTile = false;
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
+      getDefaultDistributedLevelTileSizes(op, distConfig);
   SmallVector<int64_t> workload(op.getDestType().getShape());
 
   // Fixup for making distTileSizes be multiple of inner_tile_sizes.
