@@ -93,14 +93,21 @@ struct SPIRVMapMemRefStorageClassPass final
       return signalPassFailure();
     }
 
-    auto target = spirv::getMemorySpaceToStorageClassTarget(*context);
     spirv::MemorySpaceToStorageClassConverter converter(memorySpaceMap);
+    // Perform the replacement.
+    spirv::convertMemRefTypesAndAttrs(op, converter);
 
-    RewritePatternSet patterns(context);
-    spirv::populateMemorySpaceToStorageClassPatterns(converter, patterns);
-
-    if (failed(applyFullConversion(op, *target, std::move(patterns))))
-      return signalPassFailure();
+    // Check if there are any illegal ops remaining.
+    std::unique_ptr<ConversionTarget> target =
+        spirv::getMemorySpaceToStorageClassTarget(*context);
+    op->walk([&target, this](Operation *childOp) {
+      if (target->isIllegal(childOp)) {
+        childOp->emitOpError("failed to legalize memory space");
+        signalPassFailure();
+        return WalkResult::interrupt();
+      }
+      return WalkResult::advance();
+    });
   }
 };
 
