@@ -71,6 +71,7 @@ iree_cc_library(
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTosaToLinalg
+    MLIRTosaToMLProgram
     MLIRTosaToSCF
     MLIRTosaToTensor
     MLIRTransforms
