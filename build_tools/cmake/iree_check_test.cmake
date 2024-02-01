@@ -144,7 +144,7 @@ function(iree_check_test)
     set(_TEST_DISABLED TRUE)
   endif()
 
-  if(_TEST_DISABLED AND NOT IREE_BUILD_ALL_CHECK_TEST_MODULES)
+  if((_TEST_DISABLED OR NOT _TEST_DEFINED) AND NOT IREE_BUILD_ALL_CHECK_TEST_MODULES)
     set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
   # ---------------------------------------------------------------------------
