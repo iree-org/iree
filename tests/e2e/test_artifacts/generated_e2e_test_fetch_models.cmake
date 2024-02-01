@@ -1,4 +1,25 @@
 iree_fetch_artifact(
+  NAME "model-GPT2LMHEAD_FP32_JAX_512XI32_BATCH1"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/GPT2LMHEAD_FP32_JAX_512XI32_BATCH1/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_GPT2LMHEAD_FP32_JAX_512XI32_BATCH1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-GPT2LMHEAD_FP32_JAX_512XI32_BATCH64"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/GPT2LMHEAD_FP32_JAX_512XI32_BATCH64/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_GPT2LMHEAD_FP32_JAX_512XI32_BATCH64.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-GPT2LMHEAD_FP32_JAX_512XI32_BATCH128"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/GPT2LMHEAD_FP32_JAX_512XI32_BATCH128/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_GPT2LMHEAD_FP32_JAX_512XI32_BATCH128.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-PersonDetect_int8"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"
