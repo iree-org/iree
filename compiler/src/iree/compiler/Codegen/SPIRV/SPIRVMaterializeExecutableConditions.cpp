@@ -15,6 +15,9 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
+
+#include <cstdint>
 
 namespace mlir::iree_compiler {
 
@@ -54,14 +57,18 @@ struct KernelFeatures {
   // ("coopmatrix.<input-element-type>.<output-element-type>.<m>x<n>x<k>")
   // * 0b01: coopmatrix.f16.f16.16x16x16
   uint32_t coopMatrix;
+  // Physical storage buffer address bitfield
+  // ("address.<mode>")
+  // * ob01: address.physical64
+  uint32_t address;
 
   KernelFeatures()
       : computeFloat(0), computeInt(0), storage(0), subgroup(0), dotProduct(0),
-        coopMatrix(0) {}
+        coopMatrix(0), address(0) {}
 
   bool empty() const {
     return computeFloat == 0 && computeInt == 0 && storage == 0 &&
-           subgroup == 0 && dotProduct == 0 && coopMatrix == 0;
+           subgroup == 0 && dotProduct == 0 && coopMatrix == 0 && address == 0;
   }
 };
 
@@ -169,6 +176,13 @@ LogicalResult mapToDeviceQuery(IREE::HAL::ExecutableExportOp entryPoint,
     return success();
   }
 
+    //===-------------------------------------------------------------------===//
+    // Address capabilities
+  case spirv::Capability::PhysicalStorageBufferAddresses:
+    // Vulkan only supports 64-bit device buffer addresses.
+    features.address |= 0b01;
+    return success();
+
   default:
     break;
   }
@@ -219,6 +233,9 @@ void buildDeviceQueryRegion(const KernelFeatures &features, Value device,
   if (features.coopMatrix) {
     result = buildQueryOp("coopmatrix.ops", features.coopMatrix, result);
   }
+  if (features.address) {
+    result = buildQueryOp("address.mode", features.address, result);
+  }
   builder.create<IREE::HAL::ReturnOp>(loc, result);
 }
 
@@ -244,6 +261,9 @@ SmallVector<std::string> getDeviceQueries(const KernelFeatures &features) {
   }
   if (features.coopMatrix) {
     queries.push_back("coopmatrix.ops=" + std::to_string(features.coopMatrix));
+  }
+  if (features.address) {
+    queries.push_back("address.mode=" + std::to_string(features.address));
   }
   return queries;
 }

@@ -241,15 +241,15 @@ LogicalResult linkExecutablesInto(
       // op has the same content.
       auto targetConditionOps =
           linkedTargetOp.getOps<IREE::HAL::ExecutableConditionOp>();
-      if (auto sourceCoditionOp = variantOp.getConditionOp()) {
+      if (auto sourceConditionOp = variantOp.getConditionOp()) {
         if (targetConditionOps.empty()) {
-          sourceCoditionOp->moveBefore(
+          sourceConditionOp->moveBefore(
               &*linkedTargetBuilder.getInsertionPoint());
         } else {
           assert(llvm::hasSingleElement(targetConditionOps));
           IREE::HAL::ExecutableConditionOp referenceOp =
               *targetConditionOps.begin();
-          if (!isStructurallyEquivalentTo(*sourceCoditionOp.getOperation(),
+          if (!isStructurallyEquivalentTo(*sourceConditionOp.getOperation(),
                                           *referenceOp.getOperation())) {
             return variantOp.emitError("contains incompatible condition op");
           }

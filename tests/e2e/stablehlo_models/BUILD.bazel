@@ -33,11 +33,7 @@ iree_lit_test_suite(
     cfg = "//tests:lit.cfg.py",
     tags = [
         "driver=local-task",
-        "driver=metal",
-        "driver=vulkan",
         "hostonly",
-        # TODO(scotttodd): Enable again, now that we don't have SwiftShader CI?
-        "optonly",  # swiftshader is too slow in dbg
     ],
     tools = [
         "//tools:iree-run-mlir",
