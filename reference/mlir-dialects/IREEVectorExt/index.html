@@ -1642,40 +1642,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
-    Attributes
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#layoutattr" class="md-nav__link">
-    LayoutAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#layoutdimensionattr" class="md-nav__link">
-    LayoutDimensionAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#perdimlayoutattr" class="md-nav__link">
-    PerDimLayoutAttr
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3242,40 +3208,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#attributes_1" class="md-nav__link">
-    Attributes
-  </a>
-  
-    <nav class="md-nav" aria-label="Attributes">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#layoutattr" class="md-nav__link">
-    LayoutAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#layoutdimensionattr" class="md-nav__link">
-    LayoutDimensionAttr
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#perdimlayoutattr" class="md-nav__link">
-    PerDimLayoutAttr
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3311,12 +3243,6 @@ beyond what is currently available in the Vector Dialect.</p>
 <li><a href="#iree_vector_extlayout_conflict_resolution-vectorextlayoutconflictresolutionop">iree_vector_ext.layout_conflict_resolution (VectorExt::LayoutConflictResolutionOp)</a></li>
 <li><a href="#iree_vector_extto_simd-vectorexttosimdop">iree_vector_ext.to_simd (VectorExt::ToSIMDOp)</a></li>
 <li><a href="#iree_vector_extto_simt-vectorexttosimtop">iree_vector_ext.to_simt (VectorExt::ToSIMTOp)</a></li>
-</ul>
-</li>
-<li><a href="#attributes_1">Attributes</a><ul>
-<li><a href="#layoutattr">LayoutAttr</a></li>
-<li><a href="#layoutdimensionattr">LayoutDimensionAttr</a></li>
-<li><a href="#perdimlayoutattr">PerDimLayoutAttr</a></li>
 </ul>
 </li>
 </ul>
@@ -3448,101 +3374,6 @@ distributed vectors.</p>
 <tr>
 <td style="text-align: center;"><code>output</code></td>
 <td>vector of any type values</td>
-</tr>
-</tbody>
-</table>
-<h2 id="attributes_1">Attributes<a class="headerlink" href="#attributes_1" title="Permanent link">link</a></h2>
-<h3 id="layoutattr">LayoutAttr<a class="headerlink" href="#layoutattr" title="Permanent link">link</a></h3>
-<p>high-dimensional vector register layout for a given vector</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_vector_ext.layout&lt;
-  ::llvm::ArrayRef&lt;PerDimLayoutAttr&gt;   # layouts
-&gt;
-</code></pre></div>
-<p>This contains a complete specification of the layout for a given vector,
-whereas the attribute above only specifies the per dimension layout.</p>
-<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">layouts</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;PerDimLayoutAttr&gt;</code></td>
-<td>layout for each dimension of the vector</td>
-</tr>
-</tbody>
-</table>
-<h3 id="layoutdimensionattr">LayoutDimensionAttr<a class="headerlink" href="#layoutdimensionattr" title="Permanent link">link</a></h3>
-<p>Describes the dimension of the high-dimensional layout</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_vector_ext.dimension&lt;
-  ::mlir::iree_compiler::IREE::VectorExt::LayoutDimension   # value
-&gt;
-</code></pre></div>
-<p>Enum cases:
-* BATCHX (<code>BATCHX</code>)
-* BATCHY (<code>BATCHY</code>)
-* VECTORX (<code>VECTORX</code>)
-* VECTORY (<code>VECTORY</code>)
-* VECTORZ (<code>VECTORZ</code>)
-* LANEX (<code>LANEX</code>)
-* LANEY (<code>LANEY</code>)
-* LANEZ (<code>LANEZ</code>)</p>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::VectorExt::LayoutDimension</code></td>
-<td>an enum of type LayoutDimension</td>
-</tr>
-</tbody>
-</table>
-<h3 id="perdimlayoutattr">PerDimLayoutAttr<a class="headerlink" href="#perdimlayoutattr" title="Permanent link">link</a></h3>
-<p>high-dimensional vector register layout for a given vector dimension</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_vector_ext.per_dim_layout&lt;
-  ::llvm::ArrayRef&lt;LayoutDimensionAttr&gt;,   # labels
-  ::llvm::ArrayRef&lt;int64_t&gt;   # shapes
-&gt;
-</code></pre></div>
-<p>This attribute describes the per dimension register layout for a given vector
-that could be prescribed by an operator such as matrix multiplication.
-This is a way to explicitly represent the layout in the IR
-when it is in the SIMD form prior to converting to the SIMT form so that
-we can reason about layouts, propagating layouts and layout conflicts.</p>
-<h5 id="parameters_2">Parameters:<a class="headerlink" href="#parameters_2" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">labels</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;LayoutDimensionAttr&gt;</code></td>
-<td>labels for the high dimensional layout dims</td>
-</tr>
-<tr>
-<td style="text-align: center;">shapes</td>
-<td style="text-align: center;"><code>::llvm::ArrayRef&lt;int64_t&gt;</code></td>
-<td>shapes for the high dimensional layout dims</td>
 </tr>
 </tbody>
 </table>
