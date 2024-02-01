@@ -18,7 +18,6 @@
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToArmSME/VectorToArmSME.h"
-#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -536,8 +535,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDataTilingPipeline(OpPassManager &passManager,
-                              TilingConfig &tilingConfig,
-                              bool enableVectorMasking) {
+                              TilingConfig &tilingConfig) {
   addTileAndDistributePasses(passManager);
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
@@ -548,7 +546,12 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   {
     GenericVectorizationPassOptions options;
     options.vectorizePadding = true;
-    options.enableVectorMasking = enableVectorMasking;
+    // Masking must be unconditionally enabled to generate transfer read ops
+    // with in-bounds accesses. Otherwise, there are patterns down the road that
+    // won't trigger.
+    // TODO: Use an input enableVectorMasking flag when we have a good path for
+    // vectorizing tensor.pad without masking support.
+    options.enableVectorMasking = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(

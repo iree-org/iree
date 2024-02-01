@@ -199,7 +199,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addCPUDataTilingPipeline(pipeline, tilingConfig, enableVectorMasking);
+    addCPUDataTilingPipeline(pipeline, tilingConfig);
     break;
   }
   // Transform-dialect pipelines.

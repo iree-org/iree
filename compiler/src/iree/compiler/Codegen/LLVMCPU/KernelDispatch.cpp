@@ -1384,7 +1384,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
   DistributionHeuristicConfig distConfig;
-  distConfig.allowIncompleteTile = false;
+  distConfig.allowIncompleteTile = true;
   distConfig.maxTileSizes.resize(op.getSourceRank(), clDefaultDistTileSize);
   distConfig.vectorSizeHints.resize(op.getSourceRank(), 1);
   // We aim for larger tile sizes for pack ops so we maxTileSizes to the actual
