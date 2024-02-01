@@ -103,13 +103,15 @@ class Linux_x86_64_Benchmarks(object):
 
         # The X86_64 tag is required to put them into the X86_64 benchmark preset.
         no_dt_run_configs = self._generate(
-            model_groups.X86_64_BENCHMARK_CONFIG,
+            # model_groups.X86_64_BENCHMARK_CONFIG,
+            [],
             self.CASCADELAKE_NO_DT_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64],
         )
         dt_only_run_configs = self._generate(
-            model_groups.X86_64_BENCHMARK_CONFIG,
+            # model_groups.X86_64_BENCHMARK_CONFIG,
+            [],
             self.CASCADELAKE_DT_ONLY_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64_DT_ONLY],
