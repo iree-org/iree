@@ -48,6 +48,8 @@ iree_benchmark_suite_module_test(
   DRIVER "local-sync"
   EXPECTED_OUTPUT "1x2xi8=[72 -72]"
   MODULES
+    "riscv_32-Linux=iree_module_PersonDetect_int8_tflite___riscv_32-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
+    "riscv_64-Linux=iree_module_PersonDetect_int8_tflite___riscv_64-generic-linux_gnu-llvm_cpu__default-flags_/module.vmfb"
     "x86_64-Linux=iree_module_PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
   RUNNER_ARGS
     "--function=main"

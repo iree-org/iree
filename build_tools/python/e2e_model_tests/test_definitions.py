@@ -108,11 +108,6 @@ TEST_CONFIGS = [
         ),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="1x2xi8=[72 -72]",
-        unsupported_platforms=[
-            # TODO(#PLACEHOLDER)
-            CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.LINUX_RISCV64,
-            CMakePlatform.ANDROID_ARMV8_A,
-        ],
+        unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
     ),
 ]
