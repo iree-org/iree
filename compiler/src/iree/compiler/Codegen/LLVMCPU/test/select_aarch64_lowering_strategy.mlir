@@ -656,3 +656,37 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
 //       CHECK: func.func @mmt4d_384x384x512_4x1x4_dispatch_0()
 //       CHECK:   linalg.mmt4d
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+hal.executable public @pack_i4 {
+  hal.executable.variant public @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {cpu = "", cpu_features = "+neon", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", link_embedded = false, native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android34", ukernels = "none"}>) {
+    hal.executable.export public @pack_i4 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @pack_i4() {
+        %c0_i4 = arith.constant 0 : i4
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16000x32000xi4>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<200000x16000x64x1xi4>>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16000, 32000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<16000x32000xi4>> -> tensor<16000x32000xi4>
+        %3 = tensor.empty() : tensor<200000x16000x64x1xi4>
+        %pack = tensor.pack %2 padding_value(%c0_i4 : i4) outer_dims_perm = [1, 0] inner_dims_pos = [1, 0] inner_tiles = [64, 1] into %3 : tensor<16000x32000xi4> -> tensor<200000x16000x64x1xi4>
+        flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [200000, 16000, 64, 1], strides = [1, 1, 1, 1] : tensor<200000x16000x64x1xi4> -> !flow.dispatch.tensor<writeonly:tensor<200000x16000x64x1xi4>>
+        return
+      }
+    }
+  }
+}
+
+//  NOTE: Make sure tile sizes divide the op dimensions for i4 or we won't be able
+//        to compile the code.
+//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[20000, 16000], [1, 1]{{\]}}
+//      CHECK: func.func @pack_i4()
+//      CHECK:   tensor.pack
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+
