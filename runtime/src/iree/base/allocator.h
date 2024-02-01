@@ -92,6 +92,11 @@ static inline iree_const_byte_span_t iree_const_cast_byte_span(
   return iree_make_const_byte_span(span.data, span.data_length);
 }
 
+static inline iree_byte_span_t iree_cast_const_byte_span(
+    iree_const_byte_span_t span) {
+  return iree_make_byte_span((uint8_t*)span.data, span.data_length);
+}
+
 //===----------------------------------------------------------------------===//
 // Totally shady stack allocation
 //===----------------------------------------------------------------------===//
