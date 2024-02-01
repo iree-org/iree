@@ -33,7 +33,7 @@ func.func @nested_op_alloc_subview_use_static(%arg0 : index, %o0 : index, %o1 : 
   scf.for %iv = %c0 to %arg0 step %c1 {
     %0 = affine.min #map(%iv)
     %1 = memref.alloc() : memref<16x16xi32>
-    %2 = memref.subview %1[%o0, %o1][%c1, %0][1, 1] : memref<16x16xi32> to memref<?x?xi32, strided<[?, 1], offset: ?>>
+    %2 = memref.subview %1[%o0, %o1][%c1, %0][1, 1] : memref<16x16xi32> to memref<?x?xi32, strided<[16, 1], offset: ?>>
     memref.dealloc %1 : memref<16x16xi32>
     scf.yield
   }
@@ -77,7 +77,8 @@ func.func @nested_op_alloc_subview_use_dynamic(%arg0 : index, %o0 : index, %o1 :
 //       CHECK:   scf.for
 //       CHECK:     %[[SIZE:.+]] = affine.min
 //       CHECK:     %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC]][0, 0] [%[[SIZE]], %[[SIZE]]] [1, 1]
-//       CHECK:     memref.subview %[[SUBVIEW1]]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW1]]
+//       CHECK:     memref.subview %[[CAST]]
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   memref.dealloc %[[ALLOC]] : memref<16x16xi32>
 
