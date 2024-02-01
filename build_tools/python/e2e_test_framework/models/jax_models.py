@@ -103,9 +103,6 @@ T5_4CG_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
     entry_function="main",
     input_type_templates=[
         string.Template("${batch_size}x512xi32"),
-        string.Template("${batch_size}x512xi32"),
-        string.Template("${batch_size}x512xi32"),
-        string.Template("${batch_size}x512xi32"),
     ],
     batch_sizes=[1, 16, 24, 32, 48],
 )
