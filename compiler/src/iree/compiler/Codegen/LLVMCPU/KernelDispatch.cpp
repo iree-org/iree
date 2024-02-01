@@ -1400,7 +1400,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     distConfig.vectorSizeHints[dimPos] = vectorSize;
   }
 
-
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
 
