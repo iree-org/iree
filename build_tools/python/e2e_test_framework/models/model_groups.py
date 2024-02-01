@@ -19,6 +19,15 @@ from e2e_test_framework.models import (
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
+    common_definitions.CpuBenchmarkConfig(
+        model=jax_models.T5_4CG_LARGE_FP32_JAX_512XI32_BATCHES[1], threads=[30]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=jax_models.T5_4CG_LARGE_FP32_JAX_512XI32_BATCHES[16], threads=[30]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=jax_models.T5_4CG_LARGE_FP32_JAX_512XI32_BATCHES[32], threads=[30]
+    ),
     # Tiny models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]

@@ -86,3 +86,25 @@ T5_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
     ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512],
 )
+
+T5_4CG_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
+    id_template=model_utils.partial_template_substitute(
+        ID_FORMAT, model_id=unique_ids.MODEL_T5_4CG_LARGE_FP32_JAX_512XI32
+    ),
+    name_template=model_utils.partial_template_substitute(
+        NAME_FORMAT, name="T5_4CG_LARGE_FP32_JAX_512XI32"
+    ),
+    tags=T5_TAGS,
+    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
+    source_url_template=model_utils.partial_template_substitute(
+        SOURCE_URL_FORMAT, directory="T5_4CG_LARGE_FP32_JAX_512XI32"
+    ),
+    entry_function="main",
+    input_type_templates=[
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32"),
+    ],
+    batch_sizes=[1, 16, 24, 32, 48],
+)

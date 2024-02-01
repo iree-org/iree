@@ -1,4 +1,25 @@
 iree_fetch_artifact(
+  NAME "model-T5_4CG_LARGE_FP32_JAX_512XI32_BATCH1"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/T5_4CG_LARGE_FP32_JAX_512XI32_BATCH1/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_4CG_LARGE_FP32_JAX_512XI32_BATCH1.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-T5_4CG_LARGE_FP32_JAX_512XI32_BATCH16"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/T5_4CG_LARGE_FP32_JAX_512XI32_BATCH16/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_4CG_LARGE_FP32_JAX_512XI32_BATCH16.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-T5_4CG_LARGE_FP32_JAX_512XI32_BATCH32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085/T5_4CG_LARGE_FP32_JAX_512XI32_BATCH32/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_T5_4CG_LARGE_FP32_JAX_512XI32_BATCH32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-PersonDetect_int8"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"
