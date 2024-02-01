@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
 
@@ -145,7 +146,9 @@ static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
 Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
                       RewriterBase &rewriter,
                       SmallVectorImpl<ReassociationIndices> &ri,
-                      ArrayRef<Type> elemTypes, int operandIdx, bool isResult) {
+                      ArrayRef<Type> elemTypes, int operandIdx) {
+  assert(linalgOp.getNumDpsInputs() == 2);
+  assert(linalgOp.getNumDpsInits() == 1);
   auto cDims = linalg::inferContractionDims(linalgOp);
   Location loc = linalgOp->getLoc();
   Value expandedValue = value;
@@ -154,9 +157,9 @@ Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
   if ((cDims->m.empty() && operandIdx != 1) ||
       (cDims->n.empty() && operandIdx != 0)) {
     auto type = value.getType().cast<RankedTensorType>();
-    RankedTensorType newType =
-        getExpandedType(type, /*isBatched=*/!cDims->batch.empty(),
-                        /*isTransposed=*/isResult && cDims->n.empty(), ri);
+    RankedTensorType newType = getExpandedType(
+        type, /*isBatched=*/!cDims->batch.empty(),
+        /*isTransposed=*/operandIdx == 2 && cDims->n.empty(), ri);
     expandedValue =
         rewriter.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
   }
@@ -337,13 +340,13 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
     SmallVector<ReassociationIndices> ri;
     Value newLhs =
         getMmt4dOperand(operands[0], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/0, /*isResult*/ false);
+                        /*operandIdx=*/0);
     Value newRhs =
         getMmt4dOperand(operands[1], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/1, /*isResult*/ false);
+                        /*operandIdx=*/1);
     Value newResult =
         getMmt4dOperand(operands[2], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/2, /*isResult*/ true);
+                        /*operandIdx=*/2);
 
     Type newResultType = newResult.getType();
 
@@ -413,7 +416,6 @@ static FailureOr<Operation *> lowerOpWithEncoding(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
     MaterializeEncodingFn materializeEncodingFn, MaterializeEncodingValueFn) {
-  // ContractionOpInterface
   if (linalg::isaContractionOpInterface(linalgOp)) {
     SmallVector<Value> operands;
     operands.append(convertedInputOperands.begin(),
@@ -424,47 +426,47 @@ static FailureOr<Operation *> lowerOpWithEncoding(
                                           materializeEncodingFn);
   }
 
-  // linalg::FillOp
-  if (auto fillOp = dyn_cast<linalg::FillOp>(linalgOp.getOperation())) {
-    if (!fillOp.hasPureTensorSemantics())
-      return failure();
-    Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
-        fillOp.getLoc(), convertedOutputOperands[0].getType(),
-        convertedInputOperands, convertedOutputOperands);
-    return materializedFillOp;
-  }
-
-  // element-wise linalg::GenericOp
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation())) {
-    if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
-        genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
-      return rewriter.notifyMatchFailure(genericOp,
-                                         "linalg.generic op is not elementwise "
-                                         "with single input and single output");
-    }
-    if (!llvm::all_of(genericOp.getIndexingMapsArray(),
-                      [](AffineMap m) { return m.isIdentity(); })) {
-      return rewriter.notifyMatchFailure(
-          genericOp, "indexing maps are not all identity maps");
-    }
-    auto convertedResultType =
-        convertedOutputOperands[0].getType().cast<RankedTensorType>();
-    SmallVector<AffineMap> maps(
-        2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
-                                             rewriter.getContext()));
-    SmallVector<utils::IteratorType> iteratorTypes(
-        convertedResultType.getRank(), utils::IteratorType::parallel);
-    auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), convertedResultType, convertedInputOperands,
-        convertedOutputOperands, maps, iteratorTypes,
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-    rewriter.inlineRegionBefore(genericOp.getRegion(),
-                                materializedGenericOp.getRegion(),
-                                materializedGenericOp.getRegion().begin());
-    return materializedGenericOp.getOperation();
-  }
-
-  return failure();
+  return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
+      .Case<linalg::FillOp>(
+          [&](linalg::FillOp fillOp) -> FailureOr<Operation *> {
+            if (!fillOp.hasPureTensorSemantics())
+              return failure();
+            Operation *materializedFillOp = rewriter.create<linalg::FillOp>(
+                fillOp.getLoc(), convertedOutputOperands[0].getType(),
+                convertedInputOperands, convertedOutputOperands);
+            return materializedFillOp;
+          })
+      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp)
+                                   -> FailureOr<Operation *> {
+        if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
+            genericOp.getNumDpsInputs() != 1 ||
+            genericOp.getNumDpsInits() != 1) {
+          return rewriter.notifyMatchFailure(
+              genericOp, "linalg.generic op is not elementwise "
+                         "with single input and single output");
+        }
+        if (!llvm::all_of(genericOp.getIndexingMapsArray(),
+                          [](AffineMap m) { return m.isIdentity(); })) {
+          return rewriter.notifyMatchFailure(
+              genericOp, "indexing maps are not all identity maps");
+        }
+        auto convertedResultType =
+            convertedOutputOperands[0].getType().cast<RankedTensorType>();
+        SmallVector<AffineMap> maps(
+            2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
+                                                 rewriter.getContext()));
+        SmallVector<utils::IteratorType> iteratorTypes(
+            convertedResultType.getRank(), utils::IteratorType::parallel);
+        auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
+            genericOp.getLoc(), convertedResultType, convertedInputOperands,
+            convertedOutputOperands, maps, iteratorTypes,
+            /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+        rewriter.inlineRegionBefore(genericOp.getRegion(),
+                                    materializedGenericOp.getRegion(),
+                                    materializedGenericOp.getRegion().begin());
+        return materializedGenericOp.getOperation();
+      })
+      .Default([](Operation *op) { return failure(); });
 }
 
 /// For `dispatchTensorType` that bind a `RankedTensorType` with encoding,
