@@ -99,13 +99,6 @@ test_exclude_args+=(
   "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_llvm-cpu_local-task"
   "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_llvm-cpu_local-task"
   "iree/tests/e2e/regression/check_regression_llvm-cpu_strided_slice.mlir"
-  # TODO(#PLACEHOLDER)
-  "iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_reduce.mlir"
-  "iree/tests/e2e/stablehlo_ops/check_llvm-cpu-host_local-task_reduce.mlir"
-  "iree/tests/e2e/regression/check_regression_llvm-cpu_softmax.mlir"
-  "iree/tests/e2e/regression/check_regression_llvm-cpu_reduction_broadcast_elementwise.mlir"
-  "iree/tests/e2e/regression/aggressive_fusion_test_softmax.mlir"
-  "iree/tests/e2e/regression/check_regression_llvm-cpu_dynamic_reduce_min.mlir"
 )
 
 tests_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
