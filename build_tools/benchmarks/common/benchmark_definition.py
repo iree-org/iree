@@ -192,7 +192,7 @@ def get_iree_benchmark_module_arguments(
         # trace after the warmup phase.
         repetitions = 4
     else:
-        repetitions = 10
+        repetitions = 1
 
     cmd = []
     if dump_results:
