@@ -8,5 +8,8 @@
 
 set -xeuo pipefail
 
+PYTHON_SCRIPTS_DIR="$(python3 -c "import sysconfig; print(sysconfig.get_path('scripts'))"):$HOME/.local/bin"
+export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
+
 python3 -m pip install lit
 export LLVM_EXTERNAL_LIT="$(which lit)"
