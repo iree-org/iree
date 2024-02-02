@@ -227,7 +227,7 @@ REFERENCE_MATMUL(float, float, float, float)
 REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 
 // Reference mamtul instantiations from macro REFERENCE_MATMUL
-// for the int8_t input, int32_t accumlation, and int32_t result.
+// for the int32_t input, int32_t accumlation, and int32_t result.
 // [i32 <= i32 * i32 + i32]
 REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
 
