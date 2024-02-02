@@ -32,13 +32,19 @@ BUILD_DIR="${BUILD_DIR:-build-tests}"
 
 source build_tools/scripts/install_lit.sh
 
-# Respect user settings, but default to turning off all GPU drivers and tests.
+# CPU drivers and tests are enabled by default.
+export IREE_CPU_DISABLE="${IREE_CPU_DISABLE:-0}"
+# GPU drivers and tests are disabled by default.
 export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 export IREE_CUDA_DISABLE="${IREE_CUDA_DISABLE:-1}"
 
 # Set cmake options based on disabled features.
 declare -a cmake_config_options=()
+if (( IREE_CPU_DISABLE == 1 )); then
+  cmake_config_options+=("-DIREE_HAL_DRIVER_LOCAL_SYNC=OFF")
+  cmake_config_options+=("-DIREE_HAL_DRIVER_LOCAL_TASK=OFF")
+fi
 if (( IREE_VULKAN_DISABLE == 1 )); then
   cmake_config_options+=("-DIREE_HAL_DRIVER_VULKAN=OFF")
 fi

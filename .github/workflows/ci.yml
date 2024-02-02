@@ -303,6 +303,7 @@ jobs:
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
     runs-on:
@@ -327,6 +328,7 @@ jobs:
       - name: "Building tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_CPU_DISABLE \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
