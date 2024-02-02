@@ -615,9 +615,230 @@ iree_status_t iree_tooling_variant_list_fprint(
   return status;
 }
 
+static iree_status_t iree_tooling_create_buffer_view_with_hal_buffer(
+    iree_hal_buffer_t* hal_buffer, iree_allocator_t host_allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
+  iree_hal_dim_t shape[1] = {
+      (iree_hal_dim_t)iree_hal_buffer_byte_length(hal_buffer),
+  };
+  return iree_hal_buffer_view_create(
+      hal_buffer, IREE_ARRAYSIZE(shape), shape, IREE_HAL_ELEMENT_TYPE_INT_8,
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, host_allocator, out_buffer_view);
+}
+
+static void iree_hal_buffer_release_vm_buffer(
+    void* user_data, struct iree_hal_buffer_t* buffer) {
+  iree_vm_buffer_release((iree_vm_buffer_t*)user_data);
+}
+
+static iree_status_t iree_tooling_create_buffer_view_with_vm_buffer(
+    iree_vm_buffer_t* vm_buffer, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
+  // Get read-only pointer to the underlying buffer heap memory.
+  iree_const_byte_span_t span = iree_const_byte_span_empty();
+  IREE_RETURN_IF_ERROR(iree_vm_buffer_map_ro(
+      vm_buffer, 0, iree_vm_buffer_length(vm_buffer), 1, &span));
+
+  // Wrap the heap memory in a HAL buffer for read-only access.
+  iree_hal_buffer_release_callback_t release_callback = {
+      .fn = iree_hal_buffer_release_vm_buffer,
+      .user_data = vm_buffer,
+  };
+  iree_vm_buffer_retain(vm_buffer);
+  iree_hal_buffer_t* hal_buffer = NULL;
+  iree_status_t status = iree_hal_heap_buffer_wrap(
+      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      IREE_HAL_MEMORY_ACCESS_READ,
+      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING,
+      span.data_length, iree_cast_const_byte_span(span), release_callback,
+      &hal_buffer);
+  iree_vm_buffer_release(vm_buffer);
+
+  // Wrap the HAL buffer in a buffer view.
+  if (iree_status_is_ok(status)) {
+    status = iree_tooling_create_buffer_view_with_hal_buffer(
+        hal_buffer, host_allocator, out_buffer_view);
+  }
+
+  iree_hal_buffer_release(hal_buffer);
+  return status;
+}
+
+static iree_status_t iree_tooling_create_buffer_view_empty(
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
+  iree_hal_buffer_t* hal_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_wrap(
+      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      IREE_HAL_MEMORY_ACCESS_READ,
+      IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING, 0,
+      iree_byte_span_empty(), iree_hal_buffer_release_callback_null(),
+      &hal_buffer));
+  iree_status_t status = iree_tooling_create_buffer_view_with_hal_buffer(
+      hal_buffer, host_allocator, out_buffer_view);
+  iree_hal_buffer_release(hal_buffer);
+  return status;
+}
+
+static iree_status_t iree_tooling_create_buffer_view_with_value(
+    iree_vm_value_t value, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
+  iree_device_size_t byte_length = 0;
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  switch (value.type) {
+    case IREE_VM_VALUE_TYPE_NONE:
+      return iree_tooling_create_buffer_view_empty(
+          device_allocator, host_allocator, out_buffer_view);
+    case IREE_VM_VALUE_TYPE_I8:
+      byte_length = sizeof(value.i8);
+      element_type = IREE_HAL_ELEMENT_TYPE_INT_8;
+      break;
+    case IREE_VM_VALUE_TYPE_I16:
+      byte_length = sizeof(value.i16);
+      element_type = IREE_HAL_ELEMENT_TYPE_INT_16;
+      break;
+    case IREE_VM_VALUE_TYPE_I32:
+      byte_length = sizeof(value.i32);
+      element_type = IREE_HAL_ELEMENT_TYPE_INT_32;
+      break;
+    case IREE_VM_VALUE_TYPE_I64:
+      byte_length = sizeof(value.i64);
+      element_type = IREE_HAL_ELEMENT_TYPE_INT_64;
+      break;
+    case IREE_VM_VALUE_TYPE_F32:
+      byte_length = sizeof(value.f32);
+      element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_32;
+      break;
+    case IREE_VM_VALUE_TYPE_F64:
+      byte_length = sizeof(value.f64);
+      element_type = IREE_HAL_ELEMENT_TYPE_FLOAT_64;
+      break;
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unsupported value type");
+  }
+
+  iree_hal_buffer_params_t params = {
+      .usage =
+          IREE_HAL_BUFFER_USAGE_TRANSFER_SOURCE | IREE_HAL_BUFFER_USAGE_MAPPING,
+      .access = IREE_HAL_MEMORY_ACCESS_ALL,
+      .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+  };
+  iree_hal_buffer_t* hal_buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      device_allocator, params, byte_length, &hal_buffer));
+
+  iree_status_t status = iree_hal_buffer_map_write(
+      hal_buffer, 0, value.value_storage, byte_length);
+
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_view_create(hal_buffer, /*shape_rank=*/0,
+                                         /*shape=*/NULL, element_type,
+                                         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+                                         host_allocator, out_buffer_view);
+  }
+
+  iree_hal_buffer_release(hal_buffer);
+  return status;
+}
+
+static iree_status_t iree_tooling_create_buffer_view_from_variant(
+    iree_vm_variant_t variant, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_view_t** out_buffer_view) {
+  *out_buffer_view = NULL;
+  if (iree_vm_variant_is_empty(variant)) {
+    // Empty value - we need to emit a zero-length value to keep the npy file
+    // ordered when there are multiple entries.
+    return iree_tooling_create_buffer_view_empty(
+        device_allocator, host_allocator, out_buffer_view);
+  } else if (iree_vm_variant_is_ref(variant)) {
+    if (iree_hal_buffer_view_isa(variant.ref)) {
+      // Buffer view returned can provide the metadata required.
+      *out_buffer_view = iree_hal_buffer_view_deref(variant.ref);
+      iree_hal_buffer_view_retain(*out_buffer_view);
+      return iree_ok_status();
+    } else if (iree_hal_buffer_isa(variant.ref)) {
+      // i8 buffer view of the total length of the HAL buffer.
+      iree_hal_buffer_t* buffer = iree_hal_buffer_deref(variant.ref);
+      return iree_tooling_create_buffer_view_with_hal_buffer(
+          buffer, host_allocator, out_buffer_view);
+    } else if (iree_vm_buffer_isa(variant.ref)) {
+      // i8 buffer view of the total length of the VM buffer wrapped in a HAL
+      // buffer.
+      iree_vm_buffer_t* buffer = iree_vm_buffer_deref(variant.ref);
+      return iree_tooling_create_buffer_view_with_vm_buffer(
+          buffer, device_allocator, host_allocator, out_buffer_view);
+    } else {
+      // Unsupported type.
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "unsupported output source type; expected: "
+                              "!hal.buffer, !hal.buffer_view, !vm.buffer");
+    }
+  } else {
+    // Primitive value that we wrap in a scalar buffer view.
+    return iree_tooling_create_buffer_view_with_value(
+        iree_vm_variant_value(variant), device_allocator, host_allocator,
+        out_buffer_view);
+  }
+}
+
+static iree_status_t iree_tooling_output_variant_to_npy_file(
+    FILE* file, iree_vm_variant_t variant,
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator) {
+  // npy files require buffer views so if we receive anything but a buffer view
+  // we wrap it in one typed as bytes.
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(iree_tooling_create_buffer_view_from_variant(
+      variant, device_allocator, host_allocator, &buffer_view));
+
+  // Append buffer view contents to the file stream.
+  iree_numpy_npy_save_options_t options = IREE_NUMPY_NPY_SAVE_OPTION_DEFAULT;
+  iree_status_t status = iree_numpy_npy_save_ndarray(file, options, buffer_view,
+                                                     iree_allocator_system());
+
+  iree_hal_buffer_view_release(buffer_view);
+  return status;
+}
+
+static iree_status_t iree_tooling_output_variant_to_binary_file(
+    FILE* file, iree_vm_variant_t variant,
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator) {
+  // Today we reuse the buffer view code to get the variant into a byte buffer
+  // to write out even though we don't use any of the metadata. This is a
+  // command line tool writing out files using stdio and not an example of how
+  // to create a high performance I/O mechanism.
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(iree_tooling_create_buffer_view_from_variant(
+      variant, device_allocator, host_allocator, &buffer_view));
+  iree_device_size_t byte_length =
+      iree_hal_buffer_view_byte_length(buffer_view);
+
+  // Map the buffer memory into a host pointer so we can access it.
+  iree_hal_buffer_mapping_t mapping;
+  iree_status_t status = iree_hal_buffer_map_range(
+      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapping);
+
+  // Write to the file from the mapped memory.
+  if (iree_status_is_ok(status)) {
+    bool write_ok =
+        fwrite(mapping.contents.data, 1, byte_length, file) == byte_length;
+    status = write_ok ? iree_ok_status()
+                      : iree_make_status(IREE_STATUS_DATA_LOSS,
+                                         "failed to write buffer contents");
+  }
+
+  iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
+
+  iree_hal_buffer_view_release(buffer_view);
+  return status;
+}
+
 static iree_status_t iree_tooling_output_variant(
     iree_vm_variant_t variant, iree_string_view_t output_str,
     iree_host_size_t max_element_count, FILE* default_file) {
+  iree_allocator_t host_allocator = iree_allocator_system();
+
   if (iree_string_view_is_empty(output_str)) {
     // Send into the void.
     return iree_ok_status();
@@ -637,35 +858,39 @@ static iree_status_t iree_tooling_output_variant(
                             (int)output_str.size, output_str.data);
   }
 
-  // For now we just send buffer views to npy files as primitive values (like
-  // just a normal int) can't be round-tripped. We could wrap the primitives in
-  // a single-element buffer view if needed.
-  if (!iree_vm_variant_is_ref(variant) ||
-      !iree_hal_buffer_view_isa(variant.ref)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "only buffer views can be written to npy files");
-  }
-  iree_hal_buffer_view_t* buffer_view = iree_hal_buffer_view_deref(variant.ref);
+  // Output format is based on file extension with ones we don't know about
+  // going into binary mode. Some formats require metadata from buffer views
+  // but in binary mode we just dump whatever contents we have and leave it up
+  // to the user to handle the shape/type/encoding.
+  iree_string_view_t file_path = output_str;
 
   // Open file for either overwriting or appending (npy files can contain
   // multiple arrays).
-  iree_string_view_t file_path = output_str;
   char* file_path_cstring = NULL;
   IREE_RETURN_IF_ERROR(iree_allocate_and_copy_cstring_from_view(
-      iree_allocator_system(), file_path, &file_path_cstring));
+      host_allocator, file_path, &file_path_cstring));
   const char* mode = has_plus ? "ab" : "wb";
   FILE* file = fopen(file_path_cstring, mode);
-  iree_allocator_free(iree_allocator_system(), file_path_cstring);
+  iree_allocator_free(host_allocator, file_path_cstring);
   if (!file) {
     return iree_make_status(iree_status_code_from_errno(errno),
                             "failed to open file '%.*s'", (int)file_path.size,
                             file_path.data);
   }
 
-  // Append buffer view contents to the file stream.
-  iree_numpy_npy_save_options_t options = IREE_NUMPY_NPY_SAVE_OPTION_DEFAULT;
-  iree_status_t status = iree_numpy_npy_save_ndarray(file, options, buffer_view,
-                                                     iree_allocator_system());
+  iree_hal_allocator_t* device_allocator = NULL;
+  iree_status_t status = iree_hal_allocator_create_heap(
+      IREE_SV("tooling"), host_allocator, host_allocator, &device_allocator);
+  if (iree_status_is_ok(status)) {
+    if (iree_string_view_ends_with(file_path, IREE_SV(".npy"))) {
+      status = iree_tooling_output_variant_to_npy_file(
+          file, variant, device_allocator, host_allocator);
+    } else {
+      status = iree_tooling_output_variant_to_binary_file(
+          file, variant, device_allocator, host_allocator);
+    }
+  }
+  iree_hal_allocator_release(device_allocator);
 
   fclose(file);
   return status;
