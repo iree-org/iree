@@ -46,10 +46,8 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
     // These should be ideally folded if canonicalization was ever ran.
     // Canonicalization currently breaks other tests. If canonicalization
     // is ever ran, this should be updated.
-    // CHECK-DAG: %[[TMP:.*]] = iree_vector_ext.to_simd %[[ARG0]] : vector<16xi32> -> vector<16x16xi32> 
-    // CHECK-DAG: %[[ARG0S:.*]] = iree_vector_ext.to_simt %[[TMP]] : vector<16x16xi32> -> vector<16xi32>
     // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
-    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0S]], %[[B]] : vector<16xi32>
+    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] : vector<16xi32>
     %c = arith.muli %arg0, %b : vector<16x16xi32>
     // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
     // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<16xi32>
