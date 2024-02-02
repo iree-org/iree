@@ -6,8 +6,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-set -xeuo pipefail
-
 PYTHON_SCRIPTS_DIR="$(python3 -c "import sysconfig; print(sysconfig.get_path('scripts'))"):$HOME/.local/bin"
 export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
 
