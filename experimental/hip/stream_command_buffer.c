@@ -112,10 +112,6 @@ bool iree_hal_hip_stream_command_buffer_isa(
 
 static iree_status_t iree_hal_hip_stream_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_hip_stream_command_buffer_t* command_buffer =
-      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  (void)command_buffer;
-
   return iree_ok_status();
 }
 
@@ -145,18 +141,10 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
 static void iree_hal_hip_stream_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
-    const iree_hal_label_location_t* location) {
-  iree_hal_hip_stream_command_buffer_t* command_buffer =
-      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  (void)command_buffer;
-}
+    const iree_hal_label_location_t* location) {}
 
 static void iree_hal_hip_stream_command_buffer_end_debug_group(
-    iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_hip_stream_command_buffer_t* command_buffer =
-      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  (void)command_buffer;
-}
+    iree_hal_command_buffer_t* base_command_buffer) {}
 
 static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* base_command_buffer,
@@ -230,8 +218,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_fill_buffer(
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
-  hipDeviceptr_t dst =
-      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
+  hipDeviceptr_t dst = (uint8_t*)target_device_buffer + target_offset;
   size_t num_elements = length / pattern_length;
 
   switch (pattern_length) {
@@ -296,10 +283,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_update_buffer(
   // Issue the copy using the scratch memory as the source.
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
-  hipDeviceptr_t dst =
-      (hipDeviceptr_t)((uintptr_t)target_device_buffer +
+  hipDeviceptr_t dst = (uint8_t*)target_device_buffer +
                        iree_hal_buffer_byte_offset(target_buffer) +
-                       target_offset);
+                       target_offset;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->hip_symbols,
       hipMemcpyHtoDAsync(dst, (void*)src, length, command_buffer->hip_stream),
@@ -324,10 +310,8 @@ static iree_status_t iree_hal_hip_stream_command_buffer_copy_buffer(
   hipDeviceptr_t source_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
-  hipDeviceptr_t dst =
-      (hipDeviceptr_t)((uintptr_t)target_device_buffer + target_offset);
-  hipDeviceptr_t src =
-      (hipDeviceptr_t)((uintptr_t)source_device_buffer + source_offset);
+  hipDeviceptr_t dst = (uint8_t*)target_device_buffer + target_offset;
+  hipDeviceptr_t src = (uint8_t*)source_device_buffer + source_offset;
 
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->hip_symbols,
@@ -396,8 +380,7 @@ static iree_status_t iree_hal_hip_stream_command_buffer_push_descriptor_set(
       hipDeviceptr_t device_buffer = iree_hal_hip_buffer_device_pointer(
           iree_hal_buffer_allocated_buffer(binding->buffer));
       iree_device_size_t offset = iree_hal_buffer_byte_offset(binding->buffer);
-      device_ptr =
-          (hipDeviceptr_t)((uintptr_t)device_buffer + offset + binding->offset);
+      device_ptr = (uint8_t*)device_buffer + offset + binding->offset;
     }
     current_bindings[binding->binding] = device_ptr;
   }
@@ -485,14 +468,14 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       .y = workgroup_y,
       .z = workgroup_z,
   };
-  dim3 dim_blocks = {
+  dim3 block_size = {
       .x = kernel_info.block_size[0],
       .y = kernel_info.block_size[1],
       .z = kernel_info.block_size[2],
   };
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->hip_symbols,
-      hipLaunchKernel(&kernel_info.function, num_blocks, dim_blocks, params_ptr,
+      hipLaunchKernel(&kernel_info.function, num_blocks, block_size, params_ptr,
                       kernel_info.shared_memory_size,
                       command_buffer->hip_stream),
       "hipLaunchKernel");

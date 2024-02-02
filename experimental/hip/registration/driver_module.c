@@ -15,7 +15,7 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
-IREE_FLAG(bool, hip_use_streams, false,
+IREE_FLAG(bool, hip_use_streams, true,
           "Use HIP streams (instead of graphs) for executing command buffers.");
 
 IREE_FLAG(
