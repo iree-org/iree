@@ -840,9 +840,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
       shard-count: "c2-standard-60=2,default=1"
 
