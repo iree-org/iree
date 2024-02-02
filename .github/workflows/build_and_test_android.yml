@@ -25,13 +25,13 @@ on:
       is-pr:
         required: true
         type: boolean
-      build-dir:
+      install-dir:
         required: true
         type: string
-      build-dir-archive:
+      install-dir-archive:
         required: true
         type: string
-      build-dir-gcs-artifact:
+      install-dir-gcs-artifact:
         required: true
         type: string
 
@@ -52,9 +52,9 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      HOST_BUILD_DIR: ${{ inputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ inputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ inputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ inputs.install-dir-gcs-artifact }}
       IREE_WRITE_REMOTE_CCACHE: ${{ inputs.write-caches }}
     outputs:
       target-build-dir: ${{ steps.build.outputs.target-build-dir }}
@@ -65,10 +65,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Build cross-compiling target"
         id: build
         env:
@@ -80,7 +80,7 @@ jobs:
             --env "CCACHE_NAMESPACE=${DOCKER_IMAGE}" \
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             gcr.io/iree-oss/android@sha256:66bc80fc16e31de0bf64cfcdc65be37a35b7f6c5cd44e89707e35d34da961bb5 \
             build_tools/cmake/build_android.sh
           echo "target-build-dir=${TARGET_BUILD_DIR}" >> "${GITHUB_OUTPUT}"
