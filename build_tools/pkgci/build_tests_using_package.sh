@@ -26,9 +26,11 @@
 
 set -xeuo pipefail
 
+
 PACKAGE_DIR="$1"
 BUILD_DIR="${BUILD_DIR:-build-tests}"
-LLVM_EXTERNAL_LIT="${LLVM_EXTERNAL_LIT:-$(which lit)}"
+
+source build_tools/scripts/install_lit.sh
 
 # Respect user settings, but default to turning off all GPU drivers and tests.
 export IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"

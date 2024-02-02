@@ -334,9 +334,7 @@ jobs:
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
               gcr.io/iree-oss/nvidia@sha256:892fefbdf90c93b407303adadfa87f22c0f1e84b7e819e69643c78fc5927c2ba \
-              bash -euo pipefail -c \
-                "./build_tools/scripts/install_lit.sh
-                ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}"
+              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
           IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
