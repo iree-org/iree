@@ -24,7 +24,7 @@ source "${BUILD_DIR}/.env" && export PYTHONPATH
 source build_tools/cmake/setup_tf_python.sh
 
 python3 -m pip install lit
-LIT_SCRIPT=$(which lit)
+LIT_SCRIPT="$(which lit)"
 
 echo "***** Running TensorFlow integration tests *****"
 
