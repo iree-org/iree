@@ -3761,7 +3761,35 @@ above on IREE's local-task CPU device:</p>
 <span class="normal">50</span>
 <span class="normal">51</span>
 <span class="normal">52</span>
-<span class="normal">53</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Tests that execution providing no outputs is ok.</span>
+<span class="normal">53</span>
+<span class="normal">54</span>
+<span class="normal">55</span>
+<span class="normal">56</span>
+<span class="normal">57</span>
+<span class="normal">58</span>
+<span class="normal">59</span>
+<span class="normal">60</span>
+<span class="normal">61</span>
+<span class="normal">62</span>
+<span class="normal">63</span>
+<span class="normal">64</span>
+<span class="normal">65</span>
+<span class="normal">66</span>
+<span class="normal">67</span>
+<span class="normal">68</span>
+<span class="normal">69</span>
+<span class="normal">70</span>
+<span class="normal">71</span>
+<span class="normal">72</span>
+<span class="normal">73</span>
+<span class="normal">74</span>
+<span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="c1">// Tests that execution providing no outputs is ok.</span>
 
 <span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=no_output) | \</span>
@@ -3800,9 +3828,9 @@ above on IREE's local-task CPU device:</p>
 <span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \</span>
 <span class="c1">// RUN:  iree-run-module --device=local-sync --module=- --function=numpy \</span>
 <span class="c1">// RUN:                  --output= \</span>
-<span class="c1">// RUN:                  --output=@%t \</span>
-<span class="c1">// RUN:                  --output=+%t) &amp;&amp; \</span>
-<span class="c1">// RUN:  &quot;%PYTHON&quot; %S/echo_npy.py %t | \</span>
+<span class="c1">// RUN:                  --output=@%t.npy \</span>
+<span class="c1">// RUN:                  --output=+%t.npy) &amp;&amp; \</span>
+<span class="c1">// RUN:  &quot;%PYTHON&quot; %S/echo_npy.py %t.npy | \</span>
 <span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-NUMPY %s</span>
 <span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">numpy</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="c1">// Output skipped:</span>
@@ -3813,6 +3841,34 @@ above on IREE's local-task CPU device:</p>
 <span class="w">  </span><span class="c1">// OUTPUT-NUMPY-NEXT{LITERAL}:  [4 5 6 7]]</span>
 <span class="w">  </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">flow</span><span class="p">.</span><span class="n">tensor</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">]]</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
 <span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">2</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">i32</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+
+<span class="c1">// -----</span>
+
+<span class="c1">// Tests output to binary files by round-tripping the output of a function into</span>
+<span class="c1">// another invocation reading from the binary files.</span>
+
+<span class="c1">// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb &amp;&amp; \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
+<span class="c1">// RUN:                  --module=%t.vmfb \</span>
+<span class="c1">// RUN:                  --function=write_binary \</span>
+<span class="c1">// RUN:                  --output=@%t.0.bin \</span>
+<span class="c1">// RUN:                  --output=@%t.1.bin &amp;&amp; \</span>
+<span class="c1">// RUN:  iree-run-module --device=local-sync \</span>
+<span class="c1">// RUN:                  --module=%t.vmfb \</span>
+<span class="c1">// RUN:                  --function=echo_binary \</span>
+<span class="c1">// RUN:                  --input=f32=@%t.0.bin \</span>
+<span class="c1">// RUN:                  --input=2x4xi32=@%t.1.bin) | \</span>
+<span class="c1">// RUN: FileCheck --check-prefix=OUTPUT-BINARY %s</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">write_binary</span><span class="p">()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">arith</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="mf">4.0</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">flow</span><span class="p">.</span><span class="n">tensor</span><span class="p">.</span><span class="n">constant</span><span class="w"> </span><span class="n">dense</span><span class="o">&lt;</span><span class="p">[[</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">],[</span><span class="mi">4</span><span class="p">,</span><span class="mi">5</span><span class="p">,</span><span class="mi">6</span><span class="p">,</span><span class="mi">7</span><span class="p">]]</span><span class="o">&gt;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="mi">2</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
+<span class="p">}</span>
+<span class="n">func</span><span class="p">.</span><span class="n">func</span><span class="w"> </span><span class="err">@</span><span class="n">echo_binary</span><span class="p">(</span><span class="o">%</span><span class="n">arg0</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">(</span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// OUTPUT-BINARY{LITERAL}: f32=4</span>
+<span class="w">  </span><span class="c1">// OUTPUT-BINARY{LITERAL}: 2x4xi32=[0 1 2 3][4 5 6 7]</span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="o">%</span><span class="n">arg0</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="n">arg1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;</span><span class="n">f32</span><span class="o">&gt;</span><span class="p">,</span><span class="w"> </span><span class="n">tensor</span><span class="o">&lt;?</span><span class="n">x4xi32</span><span class="o">&gt;</span>
 <span class="p">}</span>
 </code></pre></div></td></tr></table></div>
 </div>
