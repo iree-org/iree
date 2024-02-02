@@ -1525,6 +1525,19 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   build(builder, result, name, isMutable, type, std::nullopt, attrs);
 }
 
+IREE::Util::GlobalLoadOpInterface GlobalOp::createLoadOp(Location loc,
+                                                         OpBuilder &builder) {
+  // TODO(benvanik): create with the immutable flag if the global is immutable.
+  // Today we avoid this and let analysis add the immutable flag when safe
+  // (not in initializers/etc).
+  return builder.create<IREE::Util::GlobalLoadOp>(loc, getType(), getSymName());
+}
+
+IREE::Util::GlobalStoreOpInterface
+GlobalOp::createStoreOp(Location loc, Value value, OpBuilder &builder) {
+  return builder.create<IREE::Util::GlobalStoreOp>(loc, value, getSymName());
+}
+
 void GlobalAddressOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), Twine("ptr_" + getGlobal()).str());
@@ -1545,26 +1558,26 @@ void GlobalLoadOp::getAsmResultNames(
 
 void GlobalLoadOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  // HACK: works around the lack of symbol side effects in mlir by only saying
-  // we have a side-effect if the variable we are loading is mutable.
-  auto globalOp =
-      SymbolTable::lookupNearestSymbolFrom<GlobalOp>(*this, getGlobalAttr());
-  assert(globalOp);
-  if (globalOp.getIsMutable()) {
+  // HACK: mlir doesn't have symbol side effects so we have to mark as a global
+  // read if not immutable and not in an initializer.
+  if (!isGlobalImmutable())
     effects.emplace_back(MemoryEffects::Read::get());
-  }
 }
 
-LogicalResult GlobalLoadIndirectOp::verify() {
-  Operation *op = getOperation();
+LogicalResult
+verifyGlobalLoadIndirectOp(IREE::Util::GlobalLoadIndirectOpInterface op) {
   auto globalType =
-      cast<IREE::Util::PtrType>(getGlobal().getType()).getTargetType();
-  auto loadType = getResult().getType();
+      cast<IREE::Util::PtrType>(op.getGlobal().getType()).getTargetType();
+  auto loadType = op.getLoadedGlobalValue().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
     return op->emitOpError() << "global type mismatch; global pointer is "
                              << globalType << " but load is " << loadType;
   }
   return success();
+}
+
+LogicalResult GlobalLoadIndirectOp::verify() {
+  return verifyGlobalLoadIndirectOp(*this);
 }
 
 void GlobalStoreOp::build(OpBuilder &builder, OperationState &state,

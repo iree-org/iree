@@ -67,12 +67,12 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     if (!isLegalConstExprRootType(info->op.getGlobalType()))
       return;
     for (auto *use : info->uses) {
-      auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);
+      auto loadOp = llvm::dyn_cast<GlobalLoadOpInterface>(use);
       if (!loadOp)
         continue;
       if (!isHoistableToRootOp(rootOp, loadOp))
         continue;
-      constantRoots[loadOp.getResult()] = loadOp;
+      constantRoots[loadOp.getLoadedGlobalValue()] = loadOp;
     }
   });
 

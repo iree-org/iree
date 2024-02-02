@@ -126,8 +126,7 @@ private:
     Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
     Value layout = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
         loc, layoutType, device, flags, bindingAttrs);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
-                                                   globalOp.getName());
+    globalOp.createStoreOp(loc, layout, blockBuilder);
     blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
@@ -170,10 +169,9 @@ private:
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     SmallVector<Value> setLayoutValues;
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
-      auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-          loc, DescriptorSetLayoutType::get(loc.getContext()),
-          setLayoutGlobalOp.getSymName());
-      setLayoutValues.push_back(setLayoutValue);
+      setLayoutValues.push_back(
+          setLayoutGlobalOp.createLoadOp(loc, blockBuilder)
+              .getLoadedGlobalValue());
     }
     // TODO(multi-device): pass in resolve info to the call and reuse.
     Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
@@ -181,8 +179,7 @@ private:
         loc, layoutType, device,
         blockBuilder.getIndexAttr(layoutAttr.getPushConstants()),
         setLayoutValues);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
-                                                   globalOp.getName());
+    globalOp.createStoreOp(loc, layout, blockBuilder);
     blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
@@ -239,9 +236,8 @@ private:
         auto pipelineLayoutGlobalOp =
             definePipelineLayoutOp(executableOp.getLoc(), exportOp.getLayout());
         pipelineLayoutValues.push_back(
-            caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-                loc, PipelineLayoutType::get(loc.getContext()),
-                pipelineLayoutGlobalOp.getSymName()));
+            pipelineLayoutGlobalOp.createLoadOp(loc, caseBuilder)
+                .getLoadedGlobalValue());
       }
 
       // Inline constant initializer from the variant.
@@ -278,8 +274,7 @@ private:
     defaultBuilder.create<scf::YieldOp>(loc, nullValue);
 
     auto executableValue = switchOp.getResult(0);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
-                                                   globalOp.getName());
+    globalOp.createStoreOp(loc, executableValue, blockBuilder);
     blockBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
@@ -323,10 +318,9 @@ private:
     OpBuilder builder(lookupOp);
     auto globalOp = defineDescriptorSetLayoutOp(
         lookupOp.getLoc(), lookupOp.getBindings(), lookupOp.getFlags());
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), DescriptorSetLayoutType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
+    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                           .getLoadedGlobalValue();
+    lookupOp.replaceAllUsesWith(loadedValue);
     lookupOp.erase();
   }
 
@@ -334,10 +328,9 @@ private:
     OpBuilder builder(lookupOp);
     auto globalOp =
         definePipelineLayoutOp(lookupOp.getLoc(), lookupOp.getLayout());
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), PipelineLayoutType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
+    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                           .getLoadedGlobalValue();
+    lookupOp.replaceAllUsesWith(loadedValue);
     lookupOp.erase();
   }
 
@@ -347,10 +340,9 @@ private:
     assert(executableIt != executableCache_.end() &&
            "executable must have been cached");
     auto globalOp = executableIt->second;
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), ExecutableType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
+    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                           .getLoadedGlobalValue();
+    lookupOp.replaceAllUsesWith(loadedValue);
     lookupOp.erase();
   }
 

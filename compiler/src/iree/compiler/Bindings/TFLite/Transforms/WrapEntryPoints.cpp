@@ -110,10 +110,8 @@ private:
       for (unsigned i = 0; i < tensorType.getRank(); ++i) {
         if (tensorType.isDynamicDim(i)) {
           auto globalOp = globalOps[dynamicDimIdx++];
-          dims.push_back(
-              builder
-                  .create<IREE::Util::GlobalLoadOp>(globalOp.getLoc(), globalOp)
-                  .getResult());
+          dims.push_back(globalOp.createLoadOp(globalOp.getLoc(), builder)
+                             .getLoadedGlobalValue());
         }
       }
       return dims;
@@ -207,8 +205,8 @@ private:
     auto entryBuilder = OpBuilder::atBlockBegin(&entryBlock);
 
     // Go back and insert a check for the dirty flag.
-    auto dirtyValue = entryBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-        loc, dirtyGlobalOp.getType(), dirtyGlobalOp.getName());
+    auto dirtyValue =
+        dirtyGlobalOp.createLoadOp(loc, entryBuilder).getLoadedGlobalValue();
     auto *recalculateBlock = calcFuncOp.addBlock();
     auto *returnBlock = calcFuncOp.addBlock();
     entryBuilder.create<mlir::cf::CondBranchOp>(loc, dirtyValue,
@@ -257,16 +255,15 @@ private:
         for (int64_t i = 0; i < outputDynamicDims.globalOps.size(); ++i) {
           auto dimValue =
               exitBuilder.createOrFold<tensor::DimOp>(exitLoc, outputValue, i);
-          exitBuilder.create<IREE::Util::GlobalStoreOp>(
-              exitLoc, dimValue, outputDynamicDims.globalOps[i].getSymName());
+          outputDynamicDims.globalOps[i].createStoreOp(exitLoc, dimValue,
+                                                       exitBuilder);
         }
       }
 
       // Clear the dirty flag now that the shapes have been updated.
       auto falseValue =
           exitBuilder.createOrFold<arith::ConstantIntOp>(exitLoc, 0, 1);
-      exitBuilder.create<IREE::Util::GlobalStoreOp>(exitLoc, falseValue,
-                                                    dirtyGlobalOp.getSymName());
+      dirtyGlobalOp.createStoreOp(exitLoc, falseValue, exitBuilder);
       exitBuilder.create<mlir::func::ReturnOp>(exitLoc);
       returnOp.erase();
     }
@@ -327,8 +324,9 @@ private:
     for (unsigned i = 0; i < shapeType.getRank(); ++i) {
       Value dimValue;
       if (shapeType.isDynamicDim(i)) {
-        dimValue = builder.create<IREE::Util::GlobalLoadOp>(
-            loc, dynamicDims.globalOps[dynamicDimIdx++]);
+        dimValue = dynamicDims.globalOps[dynamicDimIdx++]
+                       .createLoadOp(loc, builder)
+                       .getLoadedGlobalValue();
       } else {
         dimValue = builder.createOrFold<arith::ConstantIndexOp>(
             loc, shapeType.getDimSize(i));
@@ -353,8 +351,8 @@ private:
                   loc, builder.getIndexType(), listValue,
                   builder.createOrFold<arith::ConstantIndexOp>(loc, i))
               .getResult();
-      builder.create<IREE::Util::GlobalStoreOp>(
-          loc, dimValue, dynamicDims.globalOps[dynamicDimIdx++].getSymName());
+      dynamicDims.globalOps[dynamicDimIdx++].createStoreOp(loc, dimValue,
+                                                           builder);
     }
   }
 
@@ -422,8 +420,7 @@ private:
     // Set the dirty flag so that shapes get recalculated as needed.
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
     auto trueValue = exitBuilder.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
-    exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, trueValue,
-                                                  dirtyGlobalOp.getName());
+    dirtyGlobalOp.createStoreOp(loc, trueValue, exitBuilder);
     exitBuilder.create<mlir::func::ReturnOp>(loc);
   }
 
@@ -522,8 +519,8 @@ private:
          llvm::zip_equal(entryBlock->getArguments(), inputDynamicDims)) {
       SmallVector<Value> dynamicDims;
       for (auto globalOp : inputDynamicDims.globalOps) {
-        dynamicDims.push_back(entryBuilder.create<IREE::Util::GlobalLoadOp>(
-            arg.getLoc(), globalOp));
+        dynamicDims.push_back(globalOp.createLoadOp(arg.getLoc(), entryBuilder)
+                                  .getLoadedGlobalValue());
       }
       callOperands.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), inputDynamicDims.tensorType, arg,
@@ -547,16 +544,15 @@ private:
           dynamicDims, /*target_storage=*/nullptr, /*name=*/nullptr));
       for (auto [dynamicDim, globalOp] :
            llvm::zip_equal(dynamicDims, outputDynamicDims.globalOps)) {
-        entryBuilder.create<IREE::Util::GlobalStoreOp>(
-            result.getLoc(), dynamicDim, globalOp.getSymName());
+        globalOp.createStoreOp(result.getLoc(), dynamicDim, entryBuilder);
       }
     }
 
     // We recomputed the shapes of the outputs and can clear the dirty flag.
-    entryBuilder.create<IREE::Util::GlobalStoreOp>(
+    dirtyGlobalOp.createStoreOp(
         entryFuncOp.getLoc(),
         entryBuilder.create<arith::ConstantIntOp>(entryFuncOp.getLoc(), 0, 1),
-        dirtyGlobalOp.getSymName());
+        entryBuilder);
 
     entryBuilder.create<mlir::func::ReturnOp>(entryFuncOp.getLoc(),
                                               callResults);

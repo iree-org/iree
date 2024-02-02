@@ -85,8 +85,7 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());
   // util.global.store
-  initializerBuilder.create<IREE::Util::GlobalStoreOp>(
-      loc, barrierOp.getResult(0), globalOp.getName());
+  globalOp.createStoreOp(loc, barrierOp.getResult(0), initializerBuilder);
   initializerBuilder.create<IREE::Util::ReturnOp>(loc);
 
   return globalOp;
@@ -233,8 +232,9 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
   auto blockBuilder = OpBuilder::atBlockBegin(block);
   SmallVector<Value> args;
   for (int i = 0, e = entryFuncOp.getNumArguments(); i < e; ++i) {
-    args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-        loc, dummyInputVariableOps[i]));
+    args.push_back(dummyInputVariableOps[i]
+                       .createLoadOp(loc, blockBuilder)
+                       .getLoadedGlobalValue());
   }
   auto callOp = blockBuilder.create<mlir::func::CallOp>(loc, entryFuncOp, args);
 

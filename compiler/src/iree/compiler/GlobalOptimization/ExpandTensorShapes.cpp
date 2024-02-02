@@ -284,30 +284,27 @@ static void retieResults(Operation *op, Operation *newOp,
 //  %0 = util.global.load @foo : tensor<?xf32>
 //  %d = util.global.load @foo__d0 : index
 //  %1 = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
-static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
+static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                TensorDimMap &tensorDimMap) {
   if (!usesDynamicTensors(op))
     return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
-  auto indexType = builder.getIndexType();
-  auto &expandedGlobal = globalMap[op.getGlobal()];
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
   ExpandedValue expandedValue;
-  expandedValue.tensor = op.getResult();
+  expandedValue.tensor = op.getLoadedGlobalValue();
   expandedValue.dynamicDims.reserve(expandedGlobal.dynamicDimOps.size());
   for (auto dimOp : expandedGlobal.dynamicDimOps) {
     expandedValue.dynamicDims.push_back(
-        builder
-            .create<IREE::Util::GlobalLoadOp>(op.getLoc(), indexType,
-                                              dimOp.getName())
-            .getResult());
+        dimOp.createLoadOp(op.getLoc(), builder).getLoadedGlobalValue());
   }
-  tensorDimMap[op.getResult()] = expandedValue;
+  tensorDimMap[op.getLoadedGlobalValue()] = expandedValue;
   auto tieShapeOp = builder.create<IREE::Flow::TensorTieShapeOp>(
       op.getLoc(), expandedValue.tensor.getType(), expandedValue.tensor,
       expandedValue.dynamicDims);
-  op.getResult().replaceAllUsesExcept(tieShapeOp.getResult(), tieShapeOp);
+  op.getLoadedGlobalValue().replaceAllUsesExcept(tieShapeOp.getResult(),
+                                                 tieShapeOp);
 }
 
 // Moves tensor dims from global stores to loads.
@@ -319,7 +316,7 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
 //  ->
 //  util.global.store %0, @foo : tensor<?xf32>
 //  util.global.store %d, @foo__d0 : index
-static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
+static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet,
                                 TensorDimMap &tensorDimMap) {
@@ -327,15 +324,14 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
     return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
-  auto expandedValue = consumeExpandedValue(op.getLoc(), op.getValue(),
-                                            tensorDimMap, indexSet, builder);
-  auto &expandedGlobal = globalMap[op.getGlobal()];
-  builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), expandedValue.tensor,
-                                            expandedGlobal.tensorOp.getName());
+  auto expandedValue = consumeExpandedValue(
+      op.getLoc(), op.getStoredGlobalValue(), tensorDimMap, indexSet, builder);
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
+  expandedGlobal.tensorOp.createStoreOp(op.getLoc(), expandedValue.tensor,
+                                        builder);
   for (auto [valueDynamicDims, globalDynamicDimOps] : llvm::zip_equal(
            expandedValue.dynamicDims, expandedGlobal.dynamicDimOps)) {
-    builder.create<IREE::Util::GlobalStoreOp>(op.getLoc(), valueDynamicDims,
-                                              globalDynamicDimOps.getName());
+    globalDynamicDimOps.createStoreOp(op.getLoc(), valueDynamicDims, builder);
   }
   op.erase();
 }
@@ -550,9 +546,9 @@ static void expandScfConditionOp(mlir::scf::ConditionOp op, IndexSet &indexSet,
 // Recursively expands tensors into (tensor, dynamic dims...) in |op|.
 static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
                              IndexSet &indexSet, TensorDimMap &tensorDimMap) {
-  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
     expandGlobalLoadOp(loadOp, globalMap, indexSet, tensorDimMap);
-  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
+  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     expandGlobalStoreOp(storeOp, globalMap, indexSet, tensorDimMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     expandInitializerOp(initializerOp, globalMap, indexSet, tensorDimMap);

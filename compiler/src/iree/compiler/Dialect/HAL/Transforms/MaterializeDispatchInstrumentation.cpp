@@ -150,8 +150,7 @@ struct MaterializeDispatchInstrumentationPass
       Value buffer = initializerBuilder.create<IREE::Stream::ResourceAllocOp>(
           loc, globalOp.getType(), bufferSize,
           /*uninitialized=*/true, /*affinity=*/nullptr);
-      initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, buffer,
-                                                           globalOp);
+      globalOp.createStoreOp(loc, buffer, initializerBuilder);
       initializerBuilder.create<IREE::Util::ReturnOp>(loc);
     }
 
@@ -232,14 +231,15 @@ struct MaterializeDispatchInstrumentationPass
         auto parentBuilder = OpBuilder(executeOp);
 
         // Load the ringbuffer and capture it for use within the execute region.
-        auto loadOp =
-            parentBuilder.create<IREE::Util::GlobalLoadOp>(loc, globalOp);
+        auto loadedValue =
+            globalOp.createLoadOp(loc, parentBuilder).getLoadedGlobalValue();
         Value zero = parentBuilder.create<arith::ConstantIndexOp>(loc, 0);
         Value bufferSize =
             parentBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
-        executeOp.getResourceOperandsMutable().append(loadOp.getResult());
+        executeOp.getResourceOperandsMutable().append(loadedValue);
         executeOp.getResourceOperandSizesMutable().append(bufferSize);
-        auto bufferArg = executeOp.getBody().addArgument(loadOp.getType(), loc);
+        auto bufferArg =
+            executeOp.getBody().addArgument(loadedValue.getType(), loc);
 
         // Walk dispatches and pass them the ringbuffer and their unique ID.
         executeOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
@@ -342,7 +342,7 @@ struct MaterializeDispatchInstrumentationPass
 
       // Export the device buffer containing the instrument data.
       Value buffer =
-          queryBuilder.create<IREE::Util::GlobalLoadOp>(loc, globalOp);
+          globalOp.createLoadOp(loc, queryBuilder).getLoadedGlobalValue();
       Value bufferSize =
           queryBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
       auto bufferViewType = moduleBuilder.getType<IREE::HAL::BufferViewType>();
