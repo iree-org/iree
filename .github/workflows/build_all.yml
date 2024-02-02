@@ -23,17 +23,23 @@ on:
         type: string
     outputs:
       build-dir:
-        description: |
-          Local path that stores compiled artifacts.
+        description: Local build directory path.
         value: ${{ jobs.build_all.outputs.build-dir }}
       build-dir-archive:
-        description: |
-          Local path to the zipped build directory.
+        description: Name of the zipped build directory.
         value: ${{ jobs.build_all.outputs.build-dir-archive }}
       build-dir-gcs-artifact:
-        description: |
-          GCS path to the uploaded build archive.
+        description: GCS path to the uploaded build archive.
         value: ${{ jobs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir:
+        description: Local install directory path.
+        value: ${{ jobs.build_all.outputs.install-dir }}
+      install-dir-archive:
+        description: Name of the zipped install directory.
+        value: ${{ jobs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact:
+        description: GCS path to the uploaded install archive.
+        value: ${{ jobs.build_all.outputs.install-dir-gcs-artifact }}
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
@@ -53,10 +59,19 @@ jobs:
       - os-family=Linux
     env:
       BUILD_DIR: full-build-dir
+      INSTALL_DIR: full-build-dir/install
     outputs:
-      # Pass through the build directory as output so it's available to
-      # dependent jobs.
       build-dir: ${{ env.BUILD_DIR }}
+      install-dir: ${{ env.INSTALL_DIR }}
+      # Pass the install directory as output for other jobs to use.
+      # TODO(#16203): replace this with iree-dist packages
+      #   The install directory provides a similar set of files and existing
+      #   jobs are already configured to use the build directory, so this is
+      #   an intermediate step towards a fully package-based CI setup.
+      install-dir-archive: ${{ steps.install-archive.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ steps.install-upload.outputs.install-dir-gcs-artifact }}
+      # Pass the build directory as output for other jobs to use.
+      # DEPRECATED: prefer to use install-* instead.
       build-dir-archive: ${{ steps.archive.outputs.build-dir-archive }}
       build-dir-gcs-artifact: ${{ steps.upload.outputs.build-dir-gcs-artifact }}
     steps:
@@ -75,6 +90,7 @@ jobs:
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/build_all.sh \
             "${BUILD_DIR}"
+
       # Remove unused files to save disk space.
       # TODO(#16203): Switch to package-based CI
       #   This could also be an allow-list instead of a deny-list, but packages
@@ -83,6 +99,26 @@ jobs:
         run: find "${BUILD_DIR}" -type f -name "*.a" -print -delete
       - name: "Removing unused .o files"
         run: find "${BUILD_DIR}" -type f -name "*.o" -print -delete
+
+      # TODO(#16203): If this (or iree-dist) is small enough, just use GitHub
+      #   artifacts instead of `tar` commands and GCS
+      - name: "Creating install dir archive"
+        id: install-archive
+        env:
+          INSTALL_DIR_ARCHIVE: install_dir.tar.zst
+        run: |
+          tar -I 'zstd -T0' \
+            -cf ${INSTALL_DIR_ARCHIVE} ${INSTALL_DIR}
+          echo "install-dir-archive=${INSTALL_DIR_ARCHIVE}" >> "${GITHUB_OUTPUT}"
+      - name: "Uploading install dir archive"
+        id: install-upload
+        env:
+          INSTALL_DIR_ARCHIVE: ${{ steps.install-archive.outputs.install-dir-archive }}
+          INSTALL_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.install-archive.outputs.install-dir-archive }}
+        run: |
+          gcloud storage cp "${INSTALL_DIR_ARCHIVE}" "${INSTALL_DIR_GCS_ARTIFACT}"
+          echo "install-dir-gcs-artifact=${INSTALL_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
       # Things get more complicated here than when we're just building the
       # runtime. The build directory is way bigger. We're also using on our own
       # runners on GCE. So uploading to GitHub actions artifact storage hosted
