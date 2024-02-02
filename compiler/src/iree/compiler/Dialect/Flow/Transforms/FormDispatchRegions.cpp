@@ -240,22 +240,6 @@ static bool isPackLikeOp(Operation *op) {
   return isa<IREE::LinalgExt::SetEncodingOp, tensor::PackOp>(op);
 }
 
-/// Returns the source of the pack-like operation.
-// TODO(ravishankarm): This seems like a use case for an interface.
-static Value getSourceOfPackLikeOp(Operation *op) {
-  return TypeSwitch<Operation *, Value>(op)
-      .Case<tensor::PackOp>([](auto packOp) { return packOp.getSource(); })
-      .Case<IREE::LinalgExt::SetEncodingOp>(
-          [](auto setEncodingOp) { return setEncodingOp.getSource(); })
-      .Default([](Operation *) { return nullptr; });
-}
-static RankedTensorType getSourceTypeOfPackLikeOp(Operation *op) {
-  Value source = getSourceOfPackLikeOp(op);
-  if (!source)
-    return nullptr;
-  return llvm::cast<RankedTensorType>(source.getType());
-}
-
 /// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
 /// or an `extract_slice` op whose source operand matches those criteria,
 /// recursively.
