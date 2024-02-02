@@ -33,7 +33,6 @@
 #include "iree/hal/drivers/vulkan/util/ref_ptr.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"
-#include "vulkan/vulkan_core.h"
 
 using namespace iree::hal::vulkan;
 
