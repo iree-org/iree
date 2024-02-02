@@ -5,5 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(api)
+add_subdirectory(extras)
 add_subdirectory(ir)
 add_subdirectory(tools)

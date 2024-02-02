@@ -85,3 +85,33 @@ void simple_mul_inplace_workgroup(
     binding1[i] *= binding0[i];
   }
 }
+
+// `ret = -|lhs * rhs|`
+//
+// Conforms to ABI:
+// #hal.pipeline.layout<push_constants = 1, sets = [
+//   <0, bindings = [
+//       <0, storage_buffer, ReadOnly>,
+//       <1, storage_buffer, ReadOnly>,
+//       <2, storage_buffer>
+//   ]>
+// ]>
+// With a workgroup size of 64x1x1.
+void simple_mul_abs_negate_workgroup(
+    // vvvv simplification pending (buffer + offset)
+    const float* restrict binding0, const float* restrict binding0_aligned,
+    size_t binding0_offset, size_t binding0_size, size_t binding0_stride,
+    const float* restrict binding1, const float* restrict binding1_aligned,
+    size_t binding1_offset, size_t binding1_size, size_t binding1_stride,
+    float* restrict binding2, float* restrict binding2_aligned,
+    size_t binding2_offset, size_t binding2_size, size_t binding2_stride,
+    // ^^^^ simplification pending (buffer + offset)
+    size_t dim, size_t tid) {
+  size_t end = tid + 64;
+  if (end > dim) end = dim;
+  for (size_t i = tid; i < end; ++i) {
+    float prod = binding0[i] * binding1[i];
+    if (prod >= 0) prod = -prod;
+    binding2[i] = prod + 1;
+  }
+}

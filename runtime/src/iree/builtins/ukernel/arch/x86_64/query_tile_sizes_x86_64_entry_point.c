@@ -54,8 +54,7 @@ bool iree_uk_query_matmul_tile_sizes_arch(
         iree_uk_query_matmul_tile_sizes_x86_64_i8i8i32(params);
     return true;
   } else {
-    // Can't happen, validated earlier.
-    IREE_UK_ASSUME_UNREACHABLE;
+    // Shouldn't happen, validated earlier.
     return false;
   }
 }

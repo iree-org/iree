@@ -23,6 +23,7 @@
 #include "mlir/Dialect/SCF/Transforms/Passes.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/Transform/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -57,6 +58,9 @@ inline void registerMlirPasses() {
   affine::registerAffinePipelineDataTransferPass();
   registerConvertAffineToStandardPass();
 
+  // Arm SME
+  arm_sme::registerArmSMEPasses();
+
   // Linalg
   registerLinalgPasses();
 
@@ -80,8 +84,8 @@ inline void registerMlirPasses() {
   registerConvertControlFlowToSPIRVPass();
   registerConvertFuncToSPIRVPass();
 
-  // Arm SME
-  arm_sme::registerArmSMEPasses();
+  // Transform Dialect
+  transform::registerTransformPasses();
 }
 
 } // namespace mlir

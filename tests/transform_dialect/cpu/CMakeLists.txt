@@ -33,6 +33,7 @@ iree_lit_test_suite(
     matmul_codegen_default_spec.mlir
     transform_library.mlir
   LABELS
+    "hostonly"
     "noasan"
     "nomsan"
     "notsan"

@@ -562,8 +562,8 @@ def TestGpuVectorDistribution :
     "__vector_layout_test_anchor_result_x", where "x" is the operand/result
     number.
 
-    The distribution is done over a 3D thread grid, using the
-    gpu.thread x, y, z thread grid.
+    The distribution is done for a single warp using gpu.thread x as the lane
+    ID.
 
     #### Return modes
 

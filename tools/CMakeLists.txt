@@ -25,13 +25,6 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 # Write some important CMake options to a file for convenient use from scripts.
 configure_file(build_config_template.txt.in build_config.txt)
 
-# For sub-directories, we want targets fully qualified relative to the
-# root. But after, we want those in *this* directory to be unqualified
-# (i.e. 'iree-compile').
-set(IREE_PACKAGE_ROOT_PREFIX "iree/tools")
-iree_add_all_subdirs()
-set(IREE_PACKAGE_ROOT_PREFIX "")
-
 # If cross-compiling and not building the compiler, then attempt to find
 # the compiler tools.
 # This is actual broken because the situation is tri-state:
@@ -51,9 +44,18 @@ if(IREE_HOST_BIN_DIR AND NOT IREE_BUILD_COMPILER)
   iree_import_binary(NAME iree-compile OPTIONAL)
   iree_import_binary(NAME iree-opt OPTIONAL)
   iree_import_binary(NAME iree-run-mlir OPTIONAL)
+  iree_import_binary(NAME FileCheck OPTIONAL)
+  iree_import_binary(NAME not OPTIONAL)
   iree_import_binary(NAME clang OPTIONAL)
   iree_import_binary(NAME llvm-link OPTIONAL)
 endif()
+
+# For sub-directories, we want targets fully qualified relative to the
+# root. But after, we want those in *this* directory to be unqualified
+# (i.e. 'iree-compile').
+set(IREE_PACKAGE_ROOT_PREFIX "iree/tools")
+iree_add_all_subdirs()
+set(IREE_PACKAGE_ROOT_PREFIX "")
 
 # TODO(#6353): Tools has thread dependencies in gtest, benchmark, yaml, etc.
 # This should be split between runtime/compiler with optional threading support.
@@ -258,6 +260,22 @@ if(IREE_BUILD_COMPILER)
     install(
       TARGETS clang
       COMPONENT IREETools-CompilerExtra
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
+  if(IREE_FILECHECK_TARGET)
+    install(
+      TARGETS FileCheck
+      COMPONENT IREETools-CompilerDev
+      RUNTIME DESTINATION bin
+    )
+  endif()
+
+  if(IREE_NOT_TARGET)
+    install(
+      TARGETS not
+      COMPONENT IREETools-CompilerDev
       RUNTIME DESTINATION bin
     )
   endif()

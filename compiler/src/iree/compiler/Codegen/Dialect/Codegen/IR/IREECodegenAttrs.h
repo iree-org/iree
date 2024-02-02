@@ -139,8 +139,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    unsigned softwarePipelineDepth = 0,
-    unsigned softwarePipelineStoreStage = 1) {
+    DictionaryAttr pipelineConfig = DictionaryAttr()) {
   MLIRContext *context = entryPointFn.getContext();
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
@@ -148,8 +147,7 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
     return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, softwarePipelineDepth,
-      softwarePipelineStoreStage);
+      entryPointFn.getContext(), passPipeline, SymbolRefAttr(), pipelineConfig);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
@@ -161,11 +159,10 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {},
     std::optional<int64_t> subgroupSize = {},
-    unsigned softwarePipelineDepth = 0,
-    unsigned softwarePipelineStoreStage = 1) {
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, {}, passPipeline, workgroupSize,
-      subgroupSize, softwarePipelineDepth, softwarePipelineStoreStage);
+    DictionaryAttr pipelineConfig = DictionaryAttr()) {
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, tileSizes, {},
+                                               passPipeline, workgroupSize,
+                                               subgroupSize, pipelineConfig);
 }
 
 //===----------------------------------------------------------------------===//

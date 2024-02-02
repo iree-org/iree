@@ -164,6 +164,7 @@ struct SchedulingOptions {
 
 struct PreprocessingOptions {
   std::string preprocessingPassPipeline;
+  std::string preprocessingTransformSpecFilename;
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };

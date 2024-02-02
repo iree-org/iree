@@ -777,6 +777,45 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
   }};
 }
 
+static constexpr char pipeliningDepthName[] = "pipeline_depth";
+static constexpr char pipeliningStageName[] = "store_stage";
+
+DictionaryAttr
+getSoftwarePipeliningAttrDict(MLIRContext *context,
+                              unsigned softwarePipelineDepth,
+                              unsigned softwarePipelineStoreStage) {
+  SmallVector<NamedAttribute> attrs;
+  attrs.push_back(
+      {StringAttr::get(context, pipeliningDepthName),
+       IntegerAttr::get(IntegerType::get(context, 64), softwarePipelineDepth)});
+  attrs.push_back({StringAttr::get(context, pipeliningStageName),
+                   IntegerAttr::get(IntegerType::get(context, 64),
+                                    softwarePipelineStoreStage)});
+  return DictionaryAttr::get(context, attrs);
+}
+
+FailureOr<int64_t> getSoftwarePipelineDepth(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  Attribute depth = config.get(pipeliningDepthName);
+  if (!depth) {
+    return failure();
+  }
+  return llvm::cast<IntegerAttr>(depth).getInt();
+}
+
+FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  Attribute stage = config.get(pipeliningStageName);
+  if (!stage) {
+    return failure();
+  }
+  return llvm::cast<IntegerAttr>(stage).getInt();
+}
+
 //===---------------------------------------------------------------------===//
 // Misc. utility functions
 //===---------------------------------------------------------------------===//

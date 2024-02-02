@@ -110,51 +110,6 @@
 #define IREE_UK_RESTRICT restrict
 #endif  // IREE_UK_COMPILER_MSVC_VERSION_AT_LEAST(1900)
 
-// Same as LLVM_BUILTIN_UNREACHABLE. Extremely dangerous. Use only in locations
-// that are provably unreachable (+/- edge case of unreachable-past-assertions
-// discussed below).
-//
-// The potential benefit of UNREACHABLE statements is code size and/or speed
-// optimization. This is an arcane optimization. As such, each use must be
-// carefully justified.
-//
-// There is the edge case of locations that are provably unreachable when
-// optional validation code is enabled, but the validation code may also be
-// disabled, making the location technically reachable. Typically: assertions.
-// Use careful judgement for such cases.
-//
-// A typical use case in microkernels is as follows. A microkernel is
-// parametrized by type triples packed into uint32s, and needs to have a switch
-// statement on those:
-//
-// switch (params->type_triple) {
-//   case iree_uk_mykernel_f32f32f32:  // 0xf5f5f5
-//     return 123;
-//   case iree_uk_mykernel_i8i8i32:  // 0x232325
-//     return 321;
-//   default:
-//     return 0;
-// }
-//
-// As long as the microkernel has validation code (running at least as Debug
-// assertions) validating type_triple, and this code is already past that,
-// and this switch statement covers all valid cases, the `default:` case should
-// be unreachable. Adding an UNREACHABLE statement there can help with code
-// size. This would be negligible if the case constants were small enough to
-// fit in compare-with-immediate instructions, but the 24-bit type triple
-// constants here would typically not, so without UNREACHABLE, the compiler has
-// to fully implement each 24-bit literal separately.
-//
-// https://godbolt.org/z/hTv4qqbx9 shows a snipped similar as above where
-// the __builtin_unreachable shrinks the AArch64 code from 11 to 7 instructions.
-#if IREE_UK_HAVE_BUILTIN(__builtin_unreachable) || defined(IREE_UK_COMPILER_GCC)
-#define IREE_UK_ASSUME_UNREACHABLE __builtin_unreachable()
-#elif defined(IREE_UK_COMPILER_MSVC)
-#define IREE_UK_ASSUME_UNREACHABLE __assume(false)
-#else
-#define IREE_UK_ASSUME_UNREACHABLE
-#endif  // IREE_UK_HAVE_BUILTIN(__builtin_unreachable)
-
 #if IREE_UK_HAVE_ATTRIBUTE(noinline) || defined(IREE_UK_COMPILER_GCC)
 #define IREE_UK_ATTRIBUTE_NOINLINE __attribute__((noinline))
 #else
