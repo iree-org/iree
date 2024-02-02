@@ -354,10 +354,96 @@ struct DistributeTransferWriteLayoutAttr final
   }
 };
 
-}; // namespace
+struct DistributeScfYield final : OpDistributionPattern<scf::YieldOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    // Get the distributed operands.
+    SmallVector<Value> operands;
+    for (Value operand : yieldOp->getOperands()) {
+      if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
+        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
+                                                      signature[vectorOperand]);
+      }
+      operands.push_back(operand);
+    }
+
+    // Since this operation has no results, we can directly replace it.
+    auto distributedYieldOp =
+        rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
+    rewriter.replaceOp(yieldOp, distributedYieldOp);
+
+    return success();
+  }
+};
+
+struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(scf::ForOp forOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    Block *oldLoopBody = forOp.getBody();
+
+    // The new vector init_args of the loop.
+    SmallVector<Value> newInitArgs;
+    for (Value initArg : forOp.getInitArgs()) {
+      if (auto vectorInitArg = dyn_cast<VectorValue>(initArg)) {
+        initArg =
+            getDistributed(rewriter, vectorInitArg, signature[vectorInitArg]);
+      }
+      newInitArgs.push_back(initArg);
+    }
+
+    auto newForOp = rewriter.create<scf::ForOp>(
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), newInitArgs);
+    newForOp->setAttrs(forOp->getAttrs());
+    Block *loopBody = newForOp.getBody();
+
+    // Set up new iter_args. The loop body uses SIMD, so wrap the SIMD iter_args
+    // of the new loop op into ToSIMDOps.
+    rewriter.setInsertionPointToStart(loopBody);
+    SmallVector<Value> iterArgs = getBbArgsReplacements(
+        rewriter, newForOp.getRegionIterArgs(), forOp.getInitArgs());
+    iterArgs.insert(iterArgs.begin(), newForOp.getInductionVar());
+
+    // Move loop body to new loop.
+    rewriter.mergeBlocks(oldLoopBody, loopBody, iterArgs);
+
+    // Repleace loop results.
+    replaceOpWithDistributedValues(rewriter, forOp, newForOp.getResults());
+    return success();
+  }
+
+  /// Helper function for loop distribution. Given a list of bbArgs of the new
+  /// (distributed) loop op, wrap the distributed vector args (now distributed)
+  /// into ToSIMDOps, so that the block body can be moved over to the new op.
+  SmallVector<Value> getBbArgsReplacements(RewriterBase &rewriter,
+                                           Block::BlockArgListType bbArgs,
+                                           ValueRange oldInits) const {
+    SmallVector<Value> replacements;
+    for (auto [bbArg, oldInit] : llvm::zip_equal(bbArgs, oldInits)) {
+      Value val = bbArg;
+      if (auto oldVectorInit = dyn_cast<VectorValue>(oldInit)) {
+        val = rewriter.create<IREE::VectorExt::ToSIMDOp>(
+            oldVectorInit.getLoc(), oldVectorInit.getType(), val);
+      }
+      replacements.push_back(val);
+    }
+    return replacements;
+  }
+};
+
+} // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeElementwise<arith::MulIOp>,
+  patterns.add<DistributeConstants, DistributeScfYield, DistributeScfFor>(
+      patterns.getContext());
+  // Elementwise patterns.
+  patterns.add<DistributeElementwise<arith::MulIOp>,
                DistributeElementwise<arith::MulFOp>,
                DistributeElementwise<arith::AddIOp>,
                DistributeElementwise<arith::AddFOp>>(patterns.getContext());

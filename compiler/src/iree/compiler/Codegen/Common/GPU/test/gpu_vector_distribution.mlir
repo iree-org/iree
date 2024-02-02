@@ -34,6 +34,32 @@ func.func @distribute_elementwise_i32(%a: vector<16x16xi32>, %b: vector<16x16xi3
   return %d : vector<16x16xi32>
 }
 
+func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> vector<16x16xi32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c128 = arith.constant 128 : index
+  %cst_0 = arith.constant 0 : i32
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<16xi32>
+  %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0> : vector<16x16xi32>
+  // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<16xi32>)
+  %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %root) -> (vector<16x16xi32>) {
+    // These should be ideally folded if canonicalization was ever ran.
+    // Canonicalization currently breaks other tests. If canonicalization
+    // is ever ran, this should be updated.
+    // CHECK-DAG: %[[TMP:.*]] = iree_vector_ext.to_simd %[[ARG0]] : vector<16xi32> -> vector<16x16xi32> 
+    // CHECK-DAG: %[[ARG0S:.*]] = iree_vector_ext.to_simt %[[TMP]] : vector<16x16xi32> -> vector<16xi32>
+    // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
+    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0S]], %[[B]] : vector<16xi32>
+    %c = arith.muli %arg0, %b : vector<16x16xi32>
+    // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
+    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<16xi32>
+    %d = arith.addi %c, %a : vector<16x16xi32>
+    // CHECK: scf.yield %[[D]] : vector<16xi32>
+    scf.yield %d : vector<16x16xi32>
+  }
+  return %out : vector<16x16xi32>
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
