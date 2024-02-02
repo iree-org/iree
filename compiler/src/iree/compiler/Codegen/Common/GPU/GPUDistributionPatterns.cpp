@@ -360,6 +360,13 @@ struct DistributeScfYield final : OpDistributionPattern<scf::YieldOp> {
   LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    // Check if the yield is a terminator of a distributable operation.
+    // TODO: This is a hack. Ideally, we shouldn't have this and distribution
+    // should just fail if some operation is not distributable.
+    if (!isa<scf::ForOp>(yieldOp->getParentOp())) {
+      return failure();
+    }
+
     // Get the distributed operands.
     SmallVector<Value> operands;
     for (Value operand : yieldOp->getOperands()) {
