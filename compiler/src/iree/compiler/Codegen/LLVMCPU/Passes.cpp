@@ -684,7 +684,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   {
-    addCommonTargetExecutablePreprocessingPasses(passManager,
+    addCommonTargetExecutablePreprocessingPasses(
+        passManager,
         /* useDecomposeSoftmaxFusion */ false);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
     modulePassManager.addNestedPass<func::FuncOp>(
