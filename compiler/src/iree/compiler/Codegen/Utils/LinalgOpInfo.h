@@ -38,7 +38,6 @@ private:
   void computeInfo(linalg::LinalgOp);
 
   TransposeMapFilter transposeMapFilter;
-  bool transposeTrait;
   bool reductionTrait;
   bool dynamicTrait;
   SmallVector<OpOperand *> transposeOperands;

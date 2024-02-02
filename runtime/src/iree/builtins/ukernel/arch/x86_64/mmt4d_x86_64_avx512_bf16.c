@@ -7,7 +7,7 @@
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
 
-#ifdef IREE_UK_COMPILER_CLANG
+#if defined(IREE_UK_COMPILER_CLANG) && !defined(IREE_UK_COMPILER_MSVC)
 // This inline-asm function is a work-around for:
 // 1. https://github.com/llvm/llvm-project/issues/68117
 //    Summary: LLVM crash affecting Clang 16-17. Fixed in Clang 18.
@@ -38,7 +38,7 @@ static inline __m512 iree_mm512_dpbf16_ps_broadcast_rhs(
       acc, bitcast_16xf32_to_32xbf16(lhs),
       bitcast_16xf32_to_32xbf16(_mm512_set1_ps(*(const float*)rhs)));
 }
-#endif
+#endif  // IREE_UK_COMPILER_CLANG
 
 static inline void
 iree_uk_mmt4d_tile_bf16bf16fXX_1x16x2_to_16x16x2_x86_64_avx512_bf16(
