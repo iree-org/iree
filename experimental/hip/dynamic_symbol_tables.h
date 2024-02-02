@@ -51,12 +51,16 @@ IREE_HIP_PFN_DECL(hipHostMalloc, void **, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipHostRegister, void *, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipHostUnregister, void *)
 IREE_HIP_PFN_DECL(hipInit, unsigned int)
+IREE_HIP_PFN_DECL(hipLaunchKernel, const void *, dim3, dim3, void **, size_t,
+                  hipStream_t)
 IREE_HIP_PFN_DECL(hipMalloc, void **, size_t)
 IREE_HIP_PFN_DECL(hipMallocFromPoolAsync, void **, size_t, hipMemPool_t,
                   hipStream_t)
 IREE_HIP_PFN_DECL(hipMallocManaged, hipDeviceptr_t *, size_t, unsigned int)
 IREE_HIP_PFN_DECL(hipMemcpy, void *, const void *, size_t, hipMemcpyKind)
 IREE_HIP_PFN_DECL(hipMemcpyAsync, void *, const void *, size_t, hipMemcpyKind,
+                  hipStream_t)
+IREE_HIP_PFN_DECL(hipMemcpyHtoDAsync, hipDeviceptr_t, void *, size_t,
                   hipStream_t)
 IREE_HIP_PFN_DECL(hipMemPoolCreate, hipMemPool_t *, const hipMemPoolProps *)
 IREE_HIP_PFN_DECL(hipMemPoolDestroy, hipMemPool_t)

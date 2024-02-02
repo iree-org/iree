@@ -20,6 +20,14 @@ extern "C" {
 // iree_hal_hip_device_t
 //===----------------------------------------------------------------------===//
 
+// How command buffers are recorded and executed.
+typedef enum iree_hal_hip_command_buffer_mode_e {
+  // Command buffers are recorded into HIP graphs.
+  IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH = 0,
+  // Command buffers are directly issued against a HIP stream.
+  IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM = 1,
+} iree_hal_hip_command_buffer_mode_t;
+
 // Parameters defining a hipMemPool_t.
 typedef struct iree_hal_hip_memory_pool_params_t {
   // Minimum number of bytes to keep in the pool when trimming with
@@ -52,6 +60,9 @@ typedef struct iree_hal_hip_device_params_t {
   // Larger sizes will lower overhead and ensure the heap isn't hit for
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
+
+  // Specifies how command buffers are recorded and executed.
+  iree_hal_hip_command_buffer_mode_t command_buffer_mode;
 
   // Whether to use async allocations even if reported as available by the
   // device. Defaults to true when the device supports it.

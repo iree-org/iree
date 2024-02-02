@@ -23,7 +23,7 @@ iree_status_t iree_hal_hip_device_create(
     const iree_hal_hip_dynamic_symbols_t* symbols, hipDevice_t device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-// Creates a HIP stream-backed command buffer using resources from the the
+// Creates a HIP stream-backed command buffer using resources from the
 // given |base_device|.
 iree_status_t iree_hal_hip_device_create_stream_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
