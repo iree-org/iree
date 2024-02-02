@@ -94,8 +94,6 @@ jobs:
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_CUDA_DISABLE=1 \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -109,7 +107,6 @@ jobs:
         shell: bash
     env:
       BUILD_DIR: build-windows
-      IREE_VULKAN_DISABLE: 1
     steps:
       # actions/checkout is for some reason unusably slow on the large managed
       # Windows GitHub runners so we roll our own. See
@@ -294,7 +291,6 @@ jobs:
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_CUDA_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -421,7 +417,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -452,7 +447,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -466,7 +460,6 @@ jobs:
         shell: bash
     env:
       BUILD_DIR: build-runtime-windows
-      IREE_VULKAN_DISABLE: 1
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -698,7 +691,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
