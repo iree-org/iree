@@ -30,6 +30,15 @@ std::optional<int64_t> PerDimLayoutAttr::getShape(const LayoutDimension &dim) {
   return std::nullopt;
 }
 
+std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) {
+  for (PerDimLayoutAttr layout : getLayouts()) {
+    std::optional<int64_t> maybeShape = layout.getShape(dim);
+    if (maybeShape)
+      return maybeShape.value();
+  }
+  return std::nullopt;
+}
+
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
 bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
@@ -122,6 +131,28 @@ std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
   return std::nullopt;
 }
 
+std::optional<int64_t> LayoutAttr::getLaneDim(int64_t dim) {
+  assert(dim < getLayouts().size());
+  PerDimLayoutAttr layout = getDimLayout(dim);
+  for (auto [name, shape] :
+       llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
+    if (isLaneDimension(name.getValue()))
+      return shape;
+  }
+  return std::nullopt;
+}
+
+std::optional<LayoutDimension> LayoutAttr::getLane(int64_t dim) {
+  assert(dim < getLayouts().size());
+  PerDimLayoutAttr layout = getDimLayout(dim);
+  for (auto [name, shape] :
+       llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
+    if (isLaneDimension(name.getValue()))
+      return name.getValue();
+  }
+  return std::nullopt;
+}
+
 std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
   int64_t laneX = 1;
   int64_t laneY = 1;
@@ -138,6 +169,29 @@ std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
     laneZ *= maybeZShape.value_or(1);
   }
   return std::make_tuple(laneX, laneY, laneZ);
+}
+
+uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
+  uint64_t offset{0};
+  std::optional<LayoutDimension> laneDim = getLane(reductionDim);
+  if (!laneDim)
+    return offset;
+  switch (laneDim.value()) {
+  case LayoutDimension::LANEX:
+    offset = 1;
+    break;
+  case LayoutDimension::LANEY:
+    offset = getShape(LayoutDimension::LANEX).value_or(0);
+    break;
+  case LayoutDimension::LANEZ:
+    offset = getShape(LayoutDimension::LANEX).value_or(0) *
+             getShape(LayoutDimension::LANEY).value_or(0);
+    break;
+  default:
+    assert("Invalid dimension! Expected lane dimension.");
+    break;
+  }
+  return offset;
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

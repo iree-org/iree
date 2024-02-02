@@ -76,11 +76,20 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   let assemblyFormat = "`<`$layouts`>`";
   let genVerifyDecl = 0;
   let extraClassDeclaration = [{
+    // Get the shape for a given layout dimension.
+    std::optional<int64_t> getShape(const LayoutDimension &dim);
     std::optional<int64_t> getBatchDim(int64_t dim);
+    // Get the lane dimension shape for a provided simd tensor dim.
+    std::optional<int64_t> getLaneDim(int64_t dim);
+    // Get the lane dimension for a provided simd tensor dim.
+    std::optional<LayoutDimension> getLane(int64_t dim);
 
     // Returns the grid of lane ids. Assumes a valid layout.
     ::std::tuple<int64_t, int64_t, int64_t> getLaneGrid();
     PerDimLayoutAttr getDimLayout(int64_t dim) const;
+    // Given the reduction dim, computes a shuffle offset
+    // based on the shapes of the lane dimensions.
+    uint64_t getShuffleOffset(int64_t reductionDim);
   }];
 }
 
