@@ -24,7 +24,7 @@
 # Script setup                                                                #
 ###############################################################################
 
-set -euo pipefail
+set -xeuo pipefail
 
 PACKAGE_DIR="$1"
 BUILD_DIR="${BUILD_DIR:-build-tests}"
