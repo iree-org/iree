@@ -82,7 +82,7 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
     llvm::cl::init(false)};
 
 static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
-    "iree-use-decompose-softmax-fuse",
+    "iree-llvmcpu-use-decompose-softmax-fuse",
     llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
     llvm::cl::init(true));
 
