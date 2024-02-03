@@ -84,7 +84,7 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
 static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
     "iree-use-decompose-softmax-fuse",
     llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
