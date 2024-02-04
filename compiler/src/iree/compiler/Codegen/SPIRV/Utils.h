@@ -19,6 +19,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler {
 
@@ -28,8 +29,14 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
 
+/// Given an operation, returns the HAL target config attribute.
+DictionaryAttr getTargetConfigAttr(Operation *op);
+
 /// Given an operation, returns the `spirv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
+
+/// Given an operation, returns the `hal.bindings.indirect` attribute.
+UnitAttr getIndirectBindingsAttr(Operation *op);
 
 /// Given a FuncOp, returns the subgroup size to use for CodeGen, by first
 /// querying the hal.executable.export op, and then the SPIR-V target
