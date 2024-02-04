@@ -37,7 +37,6 @@ static const StringRef kLineStyleControlFlow = "dashed";
 static const StringRef kLineStyleDataFlow = "solid";
 static const StringRef kShapeNode = "box";
 static const StringRef kShapeBox = "box";
-static const StringRef kShapeTab = "tab";
 static const StringRef kShapeNone = "plain";
 static const StringRef kShapeEllipse = "ellipse";
 

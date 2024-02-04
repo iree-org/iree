@@ -35,8 +35,6 @@
 
 #define DEBUG_TYPE "iree-spirv-tile-and-promote"
 
-constexpr int kMaxVectorNumBits = 128;
-
 namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//

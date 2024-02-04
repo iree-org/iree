@@ -135,11 +135,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
 
-    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
-    "/Zc:preprocessor"
-
     # Enable C11 standards conforming mode.
     "$<$<COMPILE_LANGUAGE:C>:/std:c11>"
+
+  MSVC
+    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
+    "/Zc:preprocessor"
 )
 
 # Compiler diagnostics.

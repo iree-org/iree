@@ -695,8 +695,7 @@ static IREE::HAL::CallingConvention getCallingConvention(Operation *forOp) {
 /// pattern.
 struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
   RewriteFuncOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
-      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
-        typeConverter(typeConverter) {}
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi) {}
 
   LogicalResult matchAndRewrite(LLVM::LLVMFuncOp funcOp,
                                 PatternRewriter &rewriter) const override {
@@ -742,7 +741,6 @@ struct RewriteFuncOpABI : public OpRewritePattern<LLVM::LLVMFuncOp> {
 
 private:
   HALDispatchABI &abi;
-  LLVMTypeConverter &typeConverter;
 };
 
 /// Lower call ops with specified ABI. The ABI to use is looked up from the
@@ -754,8 +752,7 @@ private:
 /// pattern.
 struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
   RewriteCallOpABI(HALDispatchABI &abi, LLVMTypeConverter &typeConverter)
-      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
-        typeConverter(typeConverter) {}
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi) {}
 
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
@@ -790,7 +787,6 @@ struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
 
 private:
   HALDispatchABI &abi;
-  LLVMTypeConverter &typeConverter;
 };
 
 /// Rewrites calls to extern functions to dynamic library import calls.

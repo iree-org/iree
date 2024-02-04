@@ -94,8 +94,6 @@ jobs:
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_CUDA_DISABLE=1 \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -109,7 +107,6 @@ jobs:
         shell: bash
     env:
       BUILD_DIR: build-windows
-      IREE_VULKAN_DISABLE: 1
     steps:
       # actions/checkout is for some reason unusably slow on the large managed
       # Windows GitHub runners so we roll our own. See
@@ -294,7 +291,6 @@ jobs:
       - name: "Testing all"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_CUDA_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -421,7 +417,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -452,7 +447,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -466,7 +460,6 @@ jobs:
         shell: bash
     env:
       BUILD_DIR: build-runtime-windows
-      IREE_VULKAN_DISABLE: 1
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -502,8 +495,6 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -532,8 +523,6 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
       - name: "Downloading build dir archive"
         run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
       - name: "Extracting build dir archive"
@@ -698,7 +687,6 @@ jobs:
       - name: "Testing runtime"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=1 \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -829,9 +817,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
     needs: [setup, build_all]
@@ -840,9 +828,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
       shard-count: "c2-standard-60=2,default=1"
 
@@ -1007,9 +995,9 @@ jobs:
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       BUILD_SCRIPT: ${{ matrix.target.build_script }}
       TEST_SCRIPT: ${{ matrix.target.test_script }}
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
       TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
@@ -1017,10 +1005,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Build cross-compiling target"
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -1032,7 +1020,7 @@ jobs:
             --env "IREE_TARGET_ABI=${ABI}" \
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=test" \
-            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             "${DOCKER_IMAGE}" \
             "${BUILD_SCRIPT}"
       - name: "Test cross-compiling target"
@@ -1061,9 +1049,9 @@ jobs:
       runner-env: ${{ needs.setup.outputs.runner-env }}
       write-caches: ${{ needs.setup.outputs.write-caches }}
       is-pr: ${{ fromJson(needs.setup.outputs.is-pr) }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
@@ -1095,9 +1083,9 @@ jobs:
       ARCH: ${{ matrix.target.arch }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
-      HOST_BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
       TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
@@ -1106,10 +1094,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       # TODO(#11136): Only download the needed artifacts instead of everything.
       - name: "Downloading e2e test artifacts"
         run: |
@@ -1122,7 +1110,7 @@ jobs:
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "IREE_TARGET_BUILD_DIR=${TARGET_BUILD_DIR}" \
             --env "BUILD_PRESET=benchmark-suite-test" \
-            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             --env "E2E_TEST_ARTIFACTS_DIR=${E2E_TEST_ARTIFACTS_DIR}" \
             "${DOCKER_IMAGE}" \
             bash -euo pipefail -c \

@@ -42,6 +42,8 @@ iree_cc_library(
     "nop_executable_cache.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
+    "stream_command_buffer.c"
+    "stream_command_buffer.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -53,6 +55,7 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::collective_batch
+    iree::hal::utils::deferred_command_buffer
     iree::hal::utils::resource_set
     iree::schemas::rocm_executable_def_c_fbs
   COPTS
