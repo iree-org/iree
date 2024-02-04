@@ -210,4 +210,15 @@ def TestFloatRangeAnalysis : Pass<"iree-util-test-float-range-analysis", ""> {
   }];
 }
 
+def TestIndexRangeAnalysis : Pass<"iree-util-test-index-range-analysis", ""> {
+  let summary = "Tests index range analysis.";
+  let description = [{
+    Tests index range analysis by running the analysis and annotating all
+    values with their computed ranges.
+  }];
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createTestIndexRangeAnalysisPass()
+  }];
+}
+
 #endif  // IREE_DIALECT_UTIL_PASSES

@@ -36,6 +36,7 @@ iree_compiler_cc_library(
         "StripDebugOps.cpp",
         "TestConversion.cpp",
         "TestFloatRangeAnalysis.cpp",
+        "TestIndexRangeAnalysis.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -48,6 +49,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Attributes",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/Constant",
         "//compiler/src/iree/compiler/Dialect/Util/Analysis/DFX",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis/SymbolRanges",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion",
         "//compiler/src/iree/compiler/Dialect/Util/Conversion/MemRefToUtil",
         "//compiler/src/iree/compiler/Dialect/Util/IR",

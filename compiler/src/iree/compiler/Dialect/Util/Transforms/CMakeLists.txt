@@ -39,6 +39,7 @@ iree_cc_library(
     "StripDebugOps.cpp"
     "TestConversion.cpp"
     "TestFloatRangeAnalysis.cpp"
+    "TestIndexRangeAnalysis.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
@@ -62,6 +63,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::Analysis::DFX
+    iree::compiler::Dialect::Util::Analysis::SymbolRanges
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::Conversion::MemRefToUtil
     iree::compiler::Dialect::Util::IR
