@@ -25,6 +25,10 @@ iree_cc_library(
     "api.h"
   SRCS
     "api.h"
+    "event_pool.c"
+    "event_pool.h"
+    "event_semaphore.c"
+    "event_semaphore.h"
     "graph_command_buffer.c"
     "graph_command_buffer.h"
     "hip_allocator.c"
@@ -40,10 +44,14 @@ iree_cc_library(
     "native_executable.h"
     "nop_executable_cache.c"
     "nop_executable_cache.h"
+    "pending_queue_actions.c"
+    "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
+    "timepoint_pool.c"
+    "timepoint_pool.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -52,11 +60,16 @@ iree_cc_library(
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::atomic_slist
+    iree::base::internal::event_pool
+    iree::base::internal::synchronization
+    iree::base::internal::threading
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::resource_set
+    iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
   COPTS
     "-D__HIP_PLATFORM_HCC__=1"
