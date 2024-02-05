@@ -72,7 +72,7 @@ static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
 }
 
 ExecutableLibraryDI::ExecutableLibraryDI(const LLVMTypeConverter *typeConverter)
-    : typeConverter(typeConverter), builder(&typeConverter->getContext()) {
+    : builder(&typeConverter->getContext()) {
   auto *context = builder.getContext();
   fileAttr = LLVM::DIFileAttr::get(
       context, "runtime/src/iree/hal/local/executable_library.h", ".");

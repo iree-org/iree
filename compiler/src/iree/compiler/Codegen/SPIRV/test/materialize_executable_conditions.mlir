@@ -8,6 +8,14 @@
   ]>
 ]>
 
+#indirect_pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  <0, bindings = [
+    <0, storage_buffer, ReadOnly>,
+    <1, storage_buffer, ReadOnly>,
+    <2, storage_buffer>
+  ], flags = Indirect>
+]>
+
 hal.executable private @dispatch_executable {
   // CHECK-LABEL: hal.executable.variant public @test_assumed_capabilities
   //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}>)
@@ -230,6 +238,40 @@ hal.executable private @dispatch_executable {
         spirv.func @test_cooperative_matrix_capabilities() "None" { spirv.Return }
         spirv.EntryPoint "GLCompute" @test_cooperative_matrix_capabilities
         spirv.ExecutionMode @test_cooperative_matrix_capabilities "LocalSize", 64, 1, 1
+      }
+    }
+  }
+
+  // CHECK-LABEL: hal.executable.variant public @test_address_capabilities
+  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb-ptr",
+  //  CHECK-SAME:   {hal.bindings.indirect, iree.spirv.features = ["vulkan", "compute.bitwidths.int=4", "address.mode=1"]}>)
+  //       CHECK:   %{{.+}}, %[[V0:.+]] = hal.device.query<%{{.+}} : !hal.device>
+  //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.int") : i1, i32 = 0 : i32
+  //       CHECK:   %[[TARGET0:.+]] = arith.constant 4 : i32
+  //       CHECK:   %{{.+}} = arith.andi %[[V0]], %[[TARGET0]] : i32
+  //       CHECK:   %{{.+}}, %[[V1:.+]] = hal.device.query<%{{.+}} : !hal.device>
+  //  CHECK-SAME:     key("hal.dispatch" :: "address.mode") : i1, i32 = 0 : i32
+  //       CHECK:   %[[TARGET1:.+]] = arith.constant 1 : i32
+  //       CHECK:   %{{.+}} = arith.andi %[[V1]], %[[TARGET1]] : i32
+  hal.executable.variant public @test_address_capabilities target(
+      #hal.executable.target<"vulkan", "vulkan-spirv-fb-ptr", {
+        spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
+                                                        [Int64, PhysicalStorageBufferAddresses],
+                                                        [SPV_KHR_physical_storage_buffer]>,
+                                             #spirv.resource_limits<>>,
+        hal.bindings.indirect}>
+    ) {
+    hal.executable.export public @test_address_capabilities ordinal(0) layout(#indirect_pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %c1 = arith.constant 1 : index
+      hal.return %c1, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      spirv.module Physical64 GLSL450 requires
+          #spirv.vce<v1.5, [Int64, PhysicalStorageBufferAddresses], [SPV_KHR_physical_storage_buffer]> {
+        spirv.func @test_address_capabilities() "None" { spirv.Return }
+        spirv.EntryPoint "GLCompute" @test_address_capabilities
+        spirv.ExecutionMode @test_address_capabilities "LocalSize", 64, 1, 1
       }
     }
   }

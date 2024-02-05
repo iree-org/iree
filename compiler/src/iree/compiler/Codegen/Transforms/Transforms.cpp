@@ -154,8 +154,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
   {
     OpBuilder::InsertionGuard g(builder);
     builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-    auto allocationType =
-        MemRefType::get(staticShape, allocLikeType.getElementType());
+    auto allocationType = allocLikeType.clone(staticShape);
     allocation =
         builder.create<AllocLikeOpType>(loc, allocationType, alignmentAttr);
   }
@@ -163,10 +162,17 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
   Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
                                                       subviewSizes, strides);
 
+  // Cast it back to the original types to prevent consumer op's verification
+  // error. It could happen when the consumer op is a memref.subview op.
+  if (subviewOp.getType() != allocLikeType) {
+    subviewOp = builder.create<memref::CastOp>(loc, allocLikeType, subviewOp);
+  }
+
   if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
     builder.setInsertionPoint(funcOp.getFunctionBody().front().getTerminator());
     builder.create<memref::DeallocOp>(loc, allocation);
   }
+
   return subviewOp;
 }
 

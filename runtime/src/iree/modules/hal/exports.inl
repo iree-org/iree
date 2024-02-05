@@ -80,7 +80,7 @@ EXPORT_FN("executable.create", iree_hal_module_executable_create, rrrrCrD, r)
 
 EXPORT_FN("fence.await", iree_hal_module_fence_await, iCrD, i)
 EXPORT_FN("fence.create", iree_hal_module_fence_create, ri, r)
-EXPORT_FN("fence.fail", iree_hal_module_fence_signal, ri, v)
+EXPORT_FN("fence.fail", iree_hal_module_fence_fail, ri, v)
 EXPORT_FN("fence.join", iree_hal_module_fence_join, CrD, r)
 EXPORT_FN("fence.query", iree_hal_module_fence_query, r, i)
 EXPORT_FN("fence.signal", iree_hal_module_fence_signal, r, v)

@@ -137,10 +137,9 @@ struct GlobalOpExpansion
         initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
             globalOp.getLoc(), indexType, initialValue);
       }
-      rewriter.create<IREE::Util::GlobalStoreOp>(
-          globalOp.getLoc(), initialValue, resourceOp.getSymName());
-      rewriter.create<IREE::Util::GlobalStoreOp>(
-          globalOp.getLoc(), initialValueSize, resourceSizeOp.getSymName());
+      resourceOp.createStoreOp(globalOp.getLoc(), initialValue, rewriter);
+      resourceSizeOp.createStoreOp(globalOp.getLoc(), initialValueSize,
+                                   rewriter);
       rewriter.create<IREE::Util::ReturnOp>(globalOp.getLoc());
     }
 
@@ -162,7 +161,7 @@ struct GlobalLoadOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType()))
       return failure();
-    auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
+    auto &expandedGlobal = this->expansionState->globalMap[adaptor.getGlobal()];
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());

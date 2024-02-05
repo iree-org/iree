@@ -39,7 +39,7 @@ def main():
                 FAILURE_ELEMENT if "XFAIL" in file.read() else SUCCESS_ELEMENT
             )
 
-    with open(readme_file_path, "w") as tflite_model_documentation:
+    with open(readme_file_path, "w", encoding="utf-8") as tflite_model_documentation:
         tflite_model_documentation.write(
             "# TFLite integration tests status\n\n"
             "This dashboard shows the models that are currently being tested on IREE's\n"

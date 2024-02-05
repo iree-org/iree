@@ -18,9 +18,11 @@
 #include "experimental/hip/nop_executable_cache.h"
 #include "experimental/hip/pipeline_layout.h"
 #include "experimental/hip/status_util.h"
+#include "experimental/hip/stream_command_buffer.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/deferred_command_buffer.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_device_t
@@ -76,6 +78,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   memset(out_params, 0, sizeof(*out_params));
   out_params->arena_block_size = 32 * 1024;
   out_params->queue_count = 1;
+  out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
   out_params->async_allocations = true;
 }
 
@@ -324,10 +327,22 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-  return iree_hal_hip_graph_command_buffer_create(
-      base_device, device->hip_symbols, device->hip_context, mode,
-      command_categories, queue_affinity, binding_capacity, &device->block_pool,
-      device->host_allocator, out_command_buffer);
+
+  switch (device->params.command_buffer_mode) {
+    case IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH:
+      return iree_hal_hip_graph_command_buffer_create(
+          base_device, device->hip_symbols, device->hip_context, mode,
+          command_categories, queue_affinity, binding_capacity,
+          &device->block_pool, device->host_allocator, out_command_buffer);
+    case IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM:
+      return iree_hal_deferred_command_buffer_create(
+          base_device, mode, command_categories, binding_capacity,
+          &device->block_pool, iree_hal_device_host_allocator(base_device),
+          out_command_buffer);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid command buffer mode");
+  }
 }
 
 static iree_status_t iree_hal_hip_device_create_descriptor_set_layout(

@@ -304,7 +304,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda2_graph
+    check_cuda_graph
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -377,7 +377,7 @@ iree_check_single_backend_test_suite(
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS
-    "--cuda2_use_streams=false"
+    "--cuda_use_streams=false"
   LABELS
     "noasan"
     "nomsan"
@@ -388,7 +388,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda2_stream
+    check_cuda_stream
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -460,7 +460,7 @@ iree_check_single_backend_test_suite(
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS
-    "--cuda2_use_streams=true"
+    "--cuda_use_streams=true"
   LABELS
     "noasan"
     "nomsan"

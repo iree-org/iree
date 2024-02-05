@@ -145,8 +145,8 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
     auto constantOp = initializerBuilder.create<IREE::Util::BufferConstantOp>(
         globalOp.getLoc(), /*name=*/nullptr, globalOp.getInitialValueAttr(),
         alignmentAttr, /*mimeType=*/nullptr);
-    initializerBuilder.create<IREE::Util::GlobalStoreOp>(
-        globalOp.getLoc(), constantOp.getResult(), newOp.getName());
+    newOp.createStoreOp(globalOp.getLoc(), constantOp.getResult(),
+                        initializerBuilder);
     initializerBuilder.create<IREE::Util::ReturnOp>(globalOp.getLoc());
 
     return success();
