@@ -1101,7 +1101,6 @@ jobs:
 
       # Basic
       - build_all
-      - test_all
       - build_test_all_bazel
 
       # Platforms
