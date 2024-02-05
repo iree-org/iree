@@ -438,7 +438,7 @@ option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
-option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" ON)
+option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
 
 # STREQUAL feels wrong here - we don't care about the exact true-value used,
 # ON or TRUE or something else. But we haven't been able to think of a less bad
@@ -487,9 +487,7 @@ if(IREE_ENABLE_CCACHE)
   endif()
 endif()
 
-if(IREE_ENABLE_POSITION_INDEPENDENT_CODE)
-  set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
-endif()
+set (CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
 
