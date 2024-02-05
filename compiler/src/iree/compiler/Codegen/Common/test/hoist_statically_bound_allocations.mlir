@@ -32,7 +32,8 @@ func.func @nested_op_alloca_store_use(%arg0 : index) {
 //       CHECK:   scf.for
 //       CHECK:     %[[SIZE:.+]] = affine.min
 //       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOCA]][0] [%[[SIZE]]] [1]
-//       CHECK:     memref.store %{{.+}}, %[[SUBVIEW]]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
+//       CHECK:     memref.store %{{.+}}, %[[CAST]]
 
 // -----
 
@@ -54,8 +55,9 @@ func.func @nested_op_alloca_linalg_use(%arg0 : index) {
 //       CHECK:   scf.for
 //       CHECK:     %[[SIZE:.+]] = affine.min
 //       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOCA]][0] [%[[SIZE]]] [1]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
 //       CHECK:     linalg.fill
-//  CHECK-SAME:         outs(%[[SUBVIEW]] :
+//  CHECK-SAME:         outs(%[[CAST]] :
 
 // -----
 
@@ -78,7 +80,8 @@ func.func @nested_op_alloca_subview_use(%arg0 : index, %o0 : index, %o1 : index)
 //       CHECK:   scf.for
 //       CHECK:     %[[SIZE:.+]] = affine.min
 //       CHECK:     %[[SUBVIEW1:.+]] = memref.subview %[[ALLOCA]][0, 0] [%[[SIZE]], %[[SIZE]]] [1, 1]
-//       CHECK:     memref.subview %[[SUBVIEW1]]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW1]]
+//       CHECK:     memref.subview %[[CAST]]
 
 // -----
 
@@ -150,6 +153,7 @@ func.func @nested_op_alloc_linalg_use(%arg0 : index) {
 //       CHECK:   scf.for
 //       CHECK:     %[[SIZE:.+]] = affine.min
 //       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]][0] [%[[SIZE]]] [1]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
 //       CHECK:     linalg.fill
-//  CHECK-SAME:         outs(%[[SUBVIEW]] :
+//  CHECK-SAME:         outs(%[[CAST]] :
 //       CHECK:   memref.dealloc %[[ALLOC:.+]] : memref<16xi32>
