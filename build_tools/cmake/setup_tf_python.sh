@@ -14,4 +14,5 @@ export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
 
 # Install local source-only Python packages. These do not have a build step
 # but export important binaries onto the path.
+# TODO(scotttodd): use iree-tools-tf wheel on CI instead of this source code
 "${IREE_PYTHON3_EXECUTABLE}" -m pip install integrations/tensorflow/python_projects/iree_tf integrations/tensorflow/python_projects/iree_tflite

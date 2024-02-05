@@ -48,10 +48,7 @@ jobs:
           ./build_tools/pkgci/setup_venv.py $VENV_DIR \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      # TODO(scotttodd): use iree-tools-tf wheel instead of this source code
-      - name: Install TensorFlow tools
-        run: ./build_tools/cmake/setup_tf_python.sh
-      - name: Run Tests
+      - name: Run tests
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env IREE_VMVX_DISABLE=0 \
