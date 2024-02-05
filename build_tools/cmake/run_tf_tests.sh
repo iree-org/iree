@@ -11,7 +11,6 @@ set -xeuo pipefail
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
-BUILD_DIR="$1"
 IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
@@ -19,12 +18,11 @@ IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 # Disable the tests by default to reduce the test time.
 IREE_VMVX_DISABLE="${IREE_VMVX_DISABLE:-1}"
 
-# TODO(scotttodd): use build_tools/pkgci/setup_venv.py here instead of BUILD_DIR
-source "${BUILD_DIR}/.env" && export PYTHONPATH
-source build_tools/cmake/setup_tf_python.sh
-
+python3 -m pip install -r integrations/tensorflow/test/requirements.txt
 python3 -m pip install lit
 LIT_SCRIPT="$(which lit)"
+
+source build_tools/cmake/setup_tf_python.sh
 
 echo "***** Running TensorFlow integration tests *****"
 
