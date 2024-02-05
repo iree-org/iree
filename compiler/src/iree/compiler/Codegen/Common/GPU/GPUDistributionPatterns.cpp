@@ -374,7 +374,8 @@ struct DistributeReductions final
     : OpDistributionPattern<vector::MultiDimReductionOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  static constexpr int64_t maxBitsPerShuffle = 32;
+  DistributeReductions(MLIRContext *context, int64_t maxBitsPerShuffle)
+      : OpDistributionPattern(context), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
   Value doThreadGlobalReduction(Value result, uint64_t shuffleOffset,
                                 int64_t laneSize,
@@ -512,13 +513,20 @@ struct DistributeReductions final
 
     return success();
   }
+
+private:
+  int64_t maxBitsPerShuffle;
 };
 
 }; // namespace
 
+void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
+                                              int64_t maxBitsPerShuffle) {
+  patterns.add<DistributeReductions>(patterns.getContext(), maxBitsPerShuffle);
+}
+
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeReductions,
-               DistributeElementwise<arith::MulIOp>,
+  patterns.add<DistributeConstants, DistributeElementwise<arith::MulIOp>,
                DistributeElementwise<arith::MulFOp>,
                DistributeElementwise<arith::AddIOp>,
                DistributeElementwise<arith::AddFOp>>(patterns.getContext());

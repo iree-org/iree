@@ -34,6 +34,9 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns);
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,
                                                RewritePatternSet &patterns);
 
+void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
+                                              int64_t maxBitsPerShuffle = 32);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_
