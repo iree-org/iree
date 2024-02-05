@@ -591,17 +591,16 @@ void GlobalOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Turns util.global.address -> util.global.load.indirect into a direct load.
-class PropagateGlobalLoadAddress
-    : public OpRewritePattern<GlobalLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-public:
-  LogicalResult matchAndRewrite(GlobalLoadIndirectOp op,
+template <typename IndirectOpT, typename DirectOpT>
+struct PropagateGlobalLoadAddress : public OpRewritePattern<IndirectOpT> {
+  using OpRewritePattern<IndirectOpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IndirectOpT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
             op.getGlobal().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<GlobalLoadOp>(op, op.getResult().getType(),
-                                                addressOp.getGlobalAttr());
+      rewriter.replaceOpWithNewOp<DirectOpT>(
+          op, op.getResult().getType(), addressOp.getGlobalAttr(),
+          addressOp.isGlobalImmutable() ? rewriter.getUnitAttr() : UnitAttr{});
       return success();
     }
     return failure();
@@ -612,7 +611,8 @@ public:
 
 void GlobalLoadIndirectOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
-  results.insert<PropagateGlobalLoadAddress>(context);
+  results.insert<PropagateGlobalLoadAddress<IREE::Util::GlobalLoadIndirectOp,
+                                            IREE::Util::GlobalLoadOp>>(context);
 }
 
 namespace {

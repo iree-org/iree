@@ -72,8 +72,8 @@ static void hoistConstantsIntoGlobals(mlir::ModuleOp moduleOp,
     arith::ConstantOp originalConstant = it.first;
     Util::GlobalOp globalOp = it.second;
     rewriter.setInsertionPointAfterValue(originalConstant);
-    Value load =
-        rewriter.create<Util::GlobalLoadOp>(globalOp->getLoc(), globalOp);
+    Value load = globalOp.createLoadOp(globalOp.getLoc(), rewriter)
+                     .getLoadedGlobalValue();
     rewriter.replaceOp(originalConstant, load);
   }
 }

@@ -104,7 +104,7 @@ public:
 
   ArgumentBinding(ElementsAttr attr)
       : type(Type::ElementsAttr), elementsAttr(attr) {}
-  ArgumentBinding(IREE::Util::GlobalOp globalOp)
+  ArgumentBinding(IREE::Util::GlobalOpInterface globalOp)
       : type(Type::GlobalOp), globalOp(globalOp) {}
 
   Type getType() { return type; }
@@ -114,7 +114,7 @@ public:
     return elementsAttr;
   }
 
-  IREE::Util::GlobalOp getGlobalOp() {
+  IREE::Util::GlobalOpInterface getGlobalOp() {
     assert(type == Type::GlobalOp);
     return globalOp;
   }
@@ -122,7 +122,7 @@ public:
 private:
   Type type;
   ElementsAttr elementsAttr;
-  IREE::Util::GlobalOp globalOp;
+  IREE::Util::GlobalOpInterface globalOp;
 };
 
 // How to bind results to the original program.
@@ -133,12 +133,12 @@ public:
     GlobalOp,
   };
 
-  ResultBinding(IREE::Util::GlobalOp globalOp)
+  ResultBinding(IREE::Util::GlobalOpInterface globalOp)
       : type(Type::GlobalOp), globalOp(globalOp) {}
 
   Type getType() { return type; }
 
-  IREE::Util::GlobalOp getGlobalOp() {
+  IREE::Util::GlobalOpInterface getGlobalOp() {
     assert(type == Type::GlobalOp);
     return globalOp;
   }
@@ -146,7 +146,7 @@ public:
 private:
   Type type;
   ElementsAttr elementsAttr;
-  IREE::Util::GlobalOp globalOp;
+  IREE::Util::GlobalOpInterface globalOp;
 };
 
 // Description of a JIT function that we have created for doing some
@@ -222,15 +222,15 @@ private:
     Block *entryBlock = &funcOp.getBody().front();
 
     // Find immutable loads.
-    for (auto loadOp : funcOp.getOps<IREE::Util::GlobalLoadOp>()) {
-      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOp>(
+    for (auto loadOp : funcOp.getOps<IREE::Util::GlobalLoadOpInterface>()) {
+      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(loadOp.getGlobalAttr().getAttr()));
-      if (!globalOp || globalOp.getIsMutable()) {
+      if (!globalOp || globalOp.isGlobalMutable()) {
         emitWarning(loadOp.getLoc()) << "skipping consteval initializer: load "
                                         "from mutable globals not supported";
         return failure();
       }
-      Type t = loadOp.getResult().getType();
+      Type t = loadOp.getLoadedGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
         emitWarning(funcOp.getLoc())
             << "skipping consteval initializer: unsupported type for current "
@@ -240,7 +240,7 @@ private:
       }
       argumentTypes.push_back(t);
       BlockArgument entryArg = entryBlock->addArgument(t, loadOp.getLoc());
-      loadOp.getResult().replaceAllUsesWith(entryArg);
+      loadOp.getLoadedGlobalValue().replaceAllUsesWith(entryArg);
       eraseOps.push_back(loadOp);
       desc.argumentBindings.emplace_back(globalOp);
     }
@@ -268,15 +268,15 @@ private:
 
     // Find immutable stores, early exiting if not supported.
     // The consumers must come after rewrites of the producers above.
-    for (auto storeOp : funcOp.getOps<IREE::Util::GlobalStoreOp>()) {
-      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOp>(
+    for (auto storeOp : funcOp.getOps<IREE::Util::GlobalStoreOpInterface>()) {
+      auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(storeOp.getGlobalAttr().getAttr()));
-      if (!globalOp || globalOp.getIsMutable()) {
+      if (!globalOp || globalOp.isGlobalMutable()) {
         emitWarning(storeOp.getLoc()) << "skipping consteval initializer: stor "
                                          "to mutable globals not supported";
         return failure();
       }
-      Type t = storeOp.getValue().getType();
+      Type t = storeOp.getStoredGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
         emitWarning(funcOp.getLoc())
             << "skipping consteval initializer: unsupported type for current "
@@ -285,7 +285,7 @@ private:
         return failure();
       }
 
-      returns.push_back(storeOp.getValue());
+      returns.push_back(storeOp.getStoredGlobalValue());
       returnTypes.push_back(t);
       eraseOps.push_back(storeOp);
       desc.resultBindings.emplace_back(globalOp);
@@ -417,15 +417,14 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
           break;
 
         case ArgumentBinding::Type::GlobalOp: {
-          auto globalValue = arg.getGlobalOp().getInitialValue();
+          auto globalValue = arg.getGlobalOp().getGlobalInitialValue();
           if (!globalValue) {
             return emitError(jitFunction.loc)
                    << "internal error: jit global source initialization order. "
                       "global "
-                   << arg.getGlobalOp().getSymName() << " has no value";
+                   << arg.getGlobalOp().getGlobalName() << " has no value";
           }
-          if (failed(
-                  call.addArgument(arg.getGlobalOp().getLoc(), *globalValue)))
+          if (failed(call.addArgument(arg.getGlobalOp().getLoc(), globalValue)))
             return failure();
         } break;
         }
@@ -443,9 +442,9 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
           TypedAttr attr;
           if (failed(call.getResultAsAttr(
                   resultBinding.getGlobalOp().getLoc(), it.index(),
-                  resultBinding.getGlobalOp().getType(), attr)))
+                  resultBinding.getGlobalOp().getGlobalType(), attr)))
             return failure();
-          resultBinding.getGlobalOp().setInitialValueAttr(attr);
+          resultBinding.getGlobalOp().setGlobalInitialValue(attr);
           break;
         }
         }

@@ -17,7 +17,6 @@ namespace {
 struct InitializerOpConversion
     : public OpConversionPattern<IREE::Util::InitializerOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(IREE::Util::InitializerOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -40,7 +39,6 @@ struct InitializerOpConversion
 
 struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -49,11 +47,10 @@ struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
   }
 };
 
-class GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
-public:
+struct GlobalOpConversion : public OpConversionPattern<IREE::Util::GlobalOp> {
+  TypeConverter &typeConverter;
   GlobalOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -114,72 +111,61 @@ public:
 
     return success();
   }
-
-private:
-  TypeConverter &typeConverter;
 };
 
-class GlobalAddressOpConversion
+struct GlobalAddressOpConversion
     : public OpConversionPattern<IREE::Util::GlobalAddressOp> {
-public:
+  TypeConverter &typeConverter;
   GlobalAddressOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalAddressOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalAddressOp>(
-        op, typeConverter.convertType(op.getType()), op.getGlobal());
+        op, typeConverter.convertType(op.getType()), op.getGlobalAttr(),
+        op.getIsImmutableAttr());
     return success();
   }
-
-private:
-  TypeConverter &typeConverter;
 };
 
-class GlobalLoadOpConversion
+struct GlobalLoadOpConversion
     : public OpConversionPattern<IREE::Util::GlobalLoadOp> {
-public:
+  TypeConverter &typeConverter;
   GlobalLoadOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalLoadOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto operandType = op.getType();
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(op, convertedType,
-                                                             op.getGlobal());
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(
+          op, convertedType, op.getGlobalAttr(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isInteger(32)) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI32Op>(op, convertedType,
-                                                             op.getGlobal());
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI32Op>(
+          op, convertedType, op.getGlobalAttr(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isInteger(64)) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI64Op>(op, convertedType,
-                                                             op.getGlobal());
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI64Op>(
+          op, convertedType, op.getGlobalAttr(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isF32()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF32Op>(op, convertedType,
-                                                             op.getGlobal());
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF32Op>(
+          op, convertedType, op.getGlobalAttr(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isF64()) {
-      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF64Op>(op, convertedType,
-                                                             op.getGlobal());
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadF64Op>(
+          op, convertedType, op.getGlobalAttr(), adaptor.getIsImmutableAttr());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
     return success();
   }
-
-private:
-  TypeConverter &typeConverter;
 };
 
-class GlobalLoadIndirectOpConversion
+struct GlobalLoadIndirectOpConversion
     : public OpConversionPattern<IREE::Util::GlobalLoadIndirectOp> {
-public:
+  TypeConverter &typeConverter;
   GlobalLoadIndirectOpConversion(MLIRContext *context,
                                  TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalLoadIndirectOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -187,35 +173,30 @@ public:
     auto convertedType = typeConverter.convertType(operandType);
     if (IREE::VM::RefType::isCompatible(operandType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
-          op, convertedType, adaptor.getGlobal());
+          op, convertedType, adaptor.getGlobal(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI32Op>(
-          op, convertedType, adaptor.getGlobal());
+          op, convertedType, adaptor.getGlobal(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI64Op>(
-          op, convertedType, adaptor.getGlobal());
+          op, convertedType, adaptor.getGlobal(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isF32()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF32Op>(
-          op, convertedType, adaptor.getGlobal());
+          op, convertedType, adaptor.getGlobal(), adaptor.getIsImmutableAttr());
     } else if (convertedType.isF64()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectF64Op>(
-          op, convertedType, adaptor.getGlobal());
+          op, convertedType, adaptor.getGlobal(), adaptor.getIsImmutableAttr());
     } else {
       return rewriter.notifyMatchFailure(op, "unhandled global type");
     }
     return success();
   }
-
-private:
-  TypeConverter &typeConverter;
 };
 
-class GlobalStoreOpConversion
+struct GlobalStoreOpConversion
     : public OpConversionPattern<IREE::Util::GlobalStoreOp> {
-public:
   GlobalStoreOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalStoreOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -242,13 +223,11 @@ public:
   }
 };
 
-class GlobalStoreIndirectOpConversion
+struct GlobalStoreIndirectOpConversion
     : public OpConversionPattern<IREE::Util::GlobalStoreIndirectOp> {
-public:
   GlobalStoreIndirectOpConversion(MLIRContext *context,
                                   TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
-
   LogicalResult
   matchAndRewrite(IREE::Util::GlobalStoreIndirectOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {

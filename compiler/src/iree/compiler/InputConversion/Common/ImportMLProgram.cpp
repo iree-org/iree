@@ -174,9 +174,8 @@ public:
       auto funcOp = b.create<func::FuncOp>(getterName, funcType);
       funcOp.setPublic();
       b.setInsertionPointToStart(funcOp.addEntryBlock());
-      auto val = b.create<IREE::Util::GlobalLoadOp>(
-          newType, SymbolRefAttr::get(globalOp.getSymNameAttr()));
-      b.create<func::ReturnOp>(val.getResult());
+      auto val = globalOp.createLoadOp(globalOp.getLoc(), b);
+      b.create<func::ReturnOp>(val.getLoadedGlobalValue());
     }
 
     if (!setterName.empty() && isMutable) {
@@ -187,8 +186,7 @@ public:
       auto funcOp = b.create<func::FuncOp>(setterName, funcType);
       funcOp.setPublic();
       b.setInsertionPointToStart(funcOp.addEntryBlock());
-      b.create<IREE::Util::GlobalStoreOp>(funcOp.getArgument(0),
-                                          globalOp.getSymNameAttr());
+      globalOp.createStoreOp(globalOp.getLoc(), funcOp.getArgument(0), b);
       b.create<func::ReturnOp>();
     }
 

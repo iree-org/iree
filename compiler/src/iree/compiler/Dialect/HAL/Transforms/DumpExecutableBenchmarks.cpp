@@ -193,8 +193,7 @@ appendGlobalBuffer(Location loc, StringRef baseName,
       loc, globalOp.getType(), allocator, queueAffinity, memoryTypes,
       bufferUsage, indexSet.get(totalLength));
 
-  initBuilder.create<IREE::Util::GlobalStoreOp>(loc, allocateOp.getResult(),
-                                                globalOp.getNameAttr());
+  globalOp.createStoreOp(loc, allocateOp.getResult(), initBuilder);
   initBuilder.create<IREE::Util::ReturnOp>(loc);
 
   return globalOp;
@@ -289,9 +288,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   }
 
   // Push descriptor sets.
-  auto buffer =
-      funcBuilder.create<IREE::Util::GlobalLoadOp>(loc, bufferGlobalOp)
-          .getResult();
+  Value buffer =
+      bufferGlobalOp.createLoadOp(loc, funcBuilder).getLoadedGlobalValue();
   int64_t currentSet = -1;
   SmallVector<IREE::HAL::DescriptorSetBindingValue> bindingValues;
   auto flushSet = [&]() {

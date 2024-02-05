@@ -379,7 +379,10 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
       Symbol,
-      Util_GlobalOpInterface,
+      DeclareOpInterfaceMethods<Util_GlobalOpInterface, [
+        "createLoadOp",
+        "createStoreOp",
+      ]>
     ])> {
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
@@ -545,13 +548,15 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address", [
   }];
 
   let arguments = (ins
-    VM_GlobalRefAttr:$global
+    VM_GlobalRefAttr:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     AnyTypeOf<[VM_Ptr, Util_AnyPtrType]>:$result
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($result)
   }];
 
@@ -571,13 +576,15 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     ])> {
   let arguments = (ins
-    VM_GlobalRefAttr:$global
+    VM_GlobalRefAttr:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     type:$value
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($value)
   }];
 
@@ -645,13 +652,15 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
       Util_GlobalLoadIndirectOpInterface,
     ])> {
   let arguments = (ins
-    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
+    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     type:$value
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($global) `->` type($value)
   }];
 }

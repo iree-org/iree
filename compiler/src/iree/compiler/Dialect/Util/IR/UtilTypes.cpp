@@ -287,6 +287,10 @@ detail::verifyGlobalAddressOp(GlobalAddressOpInterface addressOp,
   }
   // TODO(benvanik): allow type conversion here? probably better on the indirect
   // access ops instead as it's then easier to fold the conversion.
+  if (addressOp.isGlobalImmutable() && globalOp.isGlobalMutable()) {
+    return addressOp->emitOpError()
+           << "is marked as immutable but the global is mutable";
+  }
   return success();
 }
 
@@ -302,6 +306,10 @@ LogicalResult detail::verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
     return loadOp->emitOpError()
            << "global type mismatch; global " << globalOp.getGlobalName()
            << " is " << globalOp.getGlobalType() << " but load is " << loadType;
+  }
+  if (loadOp.isGlobalImmutable() && globalOp.isGlobalMutable()) {
+    return loadOp->emitOpError()
+           << "is marked as immutable but the global is mutable";
   }
   return success();
 }

@@ -35,8 +35,9 @@ std::optional<int64_t> PerDimLayoutAttr::getShape(const LayoutDimension &dim) {
 bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
   for (auto perDimLayout : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = perDimLayout.value().getShapes();
-    int64_t computedShape = std::reduce(layoutShape.begin(), layoutShape.end(),
-                                        1, std::multiplies<int64_t>());
+    int64_t computedShape =
+        std::reduce(layoutShape.begin(), layoutShape.end(),
+                    static_cast<int64_t>(1), std::multiplies<int64_t>());
     int64_t expectedShape = shape[perDimLayout.index()];
     if (computedShape != expectedShape) {
       return false;

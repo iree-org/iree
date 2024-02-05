@@ -39,7 +39,7 @@ util.global private mutable @chained0 : index
 // CHECK-NOT: util.global private mutable @chained1 : index
 util.global private mutable @chained1 : index
 func.func @foo() -> index {
-  // CHECK: %[[VALUE:.+]] = util.global.load @chained0 : index
+  // CHECK: %[[VALUE:.+]] = util.global.load immutable @chained0 : index
   %0 = util.global.load @chained0 : index
   // CHECK-NOT: util.global.store
   util.global.store %0, @chained1 : index
@@ -135,9 +135,9 @@ util.global private @dupeCst0 {inlining_policy = #util.inline.never} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
 util.global private @dupeCst1 {inlining_policy = #util.inline.never} = 5 : index
 func.func @foo() -> (index, index) {
-  // CHECK-DAG: %[[VALUE0:.+]] = util.global.load @dupeCst0
+  // CHECK-DAG: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
   %0 = util.global.load @dupeCst0 : index
-  // CHECK-DAG: %[[VALUE1:.+]] = util.global.load @dupeCst0
+  // CHECK-DAG: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
   %1 = util.global.load @dupeCst1 : index
   // CHECK: return %[[VALUE0]], %[[VALUE1]]
   return %0, %1 : index, index

@@ -126,6 +126,35 @@ struct GlobalOpInterfaceExternalModel
       op->removeAttr("noinline");
     }
   }
+
+  IREE::Util::GlobalLoadOpInterface createLoadOp(Operation *op, Location loc,
+                                                 OpBuilder &builder) const {
+    auto globalOp = cast<ml_program::GlobalOp>(op);
+    if (globalOp.getIsMutable()) {
+      return cast<IREE::Util::GlobalLoadOpInterface>(
+          builder
+              .create<ml_program::GlobalLoadOp>(
+                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+              .getOperation());
+    } else {
+      return cast<IREE::Util::GlobalLoadOpInterface>(
+          builder
+              .create<ml_program::GlobalLoadConstOp>(
+                  loc, globalOp.getType(), FlatSymbolRefAttr::get(globalOp))
+              .getOperation());
+    }
+  }
+
+  IREE::Util::GlobalStoreOpInterface createStoreOp(Operation *op, Location loc,
+                                                   Value value,
+                                                   OpBuilder &builder) const {
+    auto globalOp = cast<ml_program::GlobalOp>(op);
+    return cast<IREE::Util::GlobalStoreOpInterface>(
+        builder
+            .create<ml_program::GlobalStoreOp>(
+                loc, FlatSymbolRefAttr::get(globalOp), value)
+            .getOperation());
+  }
 };
 
 } // namespace

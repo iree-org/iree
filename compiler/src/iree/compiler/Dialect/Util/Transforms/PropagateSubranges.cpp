@@ -321,37 +321,31 @@ static void updateSubrangeOp(IREE::Util::SubrangeOpInterface op,
 //  %l = util.global.load @foo_length : index
 //  %1 = stream.resource.subview %0[%o] :
 //       !stream.resource<*>{%s} -> !stream.resource<*>{%l}
-static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
+static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                                SubrangeMap &subrangeMap) {
   if (!usesResources(op))
     return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
-  auto indexType = builder.getIndexType();
-  auto &expandedGlobal = globalMap[op.getGlobal()];
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
   Subrange subrange;
-  subrange.resource = op.getResult();
+  subrange.resource = op.getLoadedGlobalValue();
   subrange.resourceSize =
-      builder
-          .create<IREE::Util::GlobalLoadOp>(
-              op.getLoc(), indexType, expandedGlobal.resourceSizeOp.getName())
-          .getResult();
+      expandedGlobal.resourceSizeOp.createLoadOp(op.getLoc(), builder)
+          .getLoadedGlobalValue();
   subrange.subrangeOffset =
-      builder
-          .create<IREE::Util::GlobalLoadOp>(
-              op.getLoc(), indexType, expandedGlobal.subrangeOffsetOp.getName())
-          .getResult();
+      expandedGlobal.subrangeOffsetOp.createLoadOp(op.getLoc(), builder)
+          .getLoadedGlobalValue();
   subrange.subrangeLength =
-      builder
-          .create<IREE::Util::GlobalLoadOp>(
-              op.getLoc(), indexType, expandedGlobal.subrangeLengthOp.getName())
-          .getResult();
-  subrangeMap[op.getResult()] = subrange;
+      expandedGlobal.subrangeLengthOp.createLoadOp(op.getLoc(), builder)
+          .getLoadedGlobalValue();
+  subrangeMap[op.getLoadedGlobalValue()] = subrange;
   auto newSubrange = subrange.getResourceType().createSubrangeOp(
       op.getLoc(), subrange.resource, subrange.resourceSize,
       subrange.subrangeOffset, subrange.subrangeLength, builder);
-  op.getResult().replaceAllUsesExcept(newSubrange, newSubrange.getDefiningOp());
+  op.getLoadedGlobalValue().replaceAllUsesExcept(newSubrange,
+                                                 newSubrange.getDefiningOp());
 }
 
 // Moves resource subranges from global stores to loads.
@@ -366,16 +360,16 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
 //  util.global.store %s, @foo_size : index
 //  util.global.store %o, @foo_offset : index
 //  util.global.store %l, @foo_length : index
-static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
+static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet, SubrangeMap &subrangeMap) {
   if (!usesResources(op))
     return;
   OpBuilder builder(op);
   builder.setInsertionPointAfter(op);
-  auto subrange = consumeSubrange(op.getLoc(), op.getValue(), subrangeMap,
-                                  indexSet, builder);
-  auto &expandedGlobal = globalMap[op.getGlobal()];
+  auto subrange = consumeSubrange(op.getLoc(), op.getStoredGlobalValue(),
+                                  subrangeMap, indexSet, builder);
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
   builder.create<IREE::Util::GlobalStoreOp>(
       op.getLoc(), subrange.resource, expandedGlobal.resourceOp.getName());
   builder.create<IREE::Util::GlobalStoreOp>(
@@ -585,9 +579,9 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
     return updateSubrangeOp(subrangeOp, indexSet, subrangeMap);
   }
 
-  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
     return expandGlobalLoadOp(loadOp, globalMap, indexSet, subrangeMap);
-  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
+  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     return expandGlobalStoreOp(storeOp, globalMap, indexSet, subrangeMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     return expandInitializerOp(initializerOp, globalMap, indexSet, subrangeMap);

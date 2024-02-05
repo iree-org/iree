@@ -250,10 +250,19 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     if (!global.storeOps.empty())
       return GlobalAction::PRESERVE;
-    if (!global.op.isGlobalMutable())
-      return GlobalAction::PRESERVE;
+    bool didChangeAny = global.op.isGlobalMutable() != false;
     global.op.setGlobalMutable(false);
-    return GlobalAction::UPDATE;
+    for (auto loadOp : global.loadOps) {
+      // NOTE: we don't set immutable on loads in initializers today.
+      // We should be able to, though, with a bit better analysis.
+      if (!loadOp->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+        if (!loadOp.isGlobalImmutable()) {
+          loadOp.setGlobalImmutable(true);
+          didChangeAny = true;
+        }
+      }
+    }
+    return didChangeAny ? GlobalAction::UPDATE : GlobalAction::PRESERVE;
   });
 }
 

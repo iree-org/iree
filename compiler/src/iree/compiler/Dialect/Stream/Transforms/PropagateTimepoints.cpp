@@ -298,43 +298,39 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
 //  %t = util.global.load @foo : !stream.timepoint
 //  %0 = util.global.load @foo : !stream.resource
 //  %1 = stream.timepoint.await %t, %0
-static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
+static void expandGlobalLoadOp(IREE::Util::GlobalLoadOpInterface op,
                                ExpandedGlobalMap &globalMap,
                                IRMapping &resourceTimepointMap) {
   if (!usesResources(op))
     return;
   OpBuilder builder(op);
-  auto &expandedGlobal = globalMap[op.getGlobal()];
-  auto timepoint =
-      builder
-          .create<IREE::Util::GlobalLoadOp>(
-              op.getLoc(), IREE::Stream::TimepointType::get(op.getContext()),
-              expandedGlobal.timepointOp.getName())
-          .getResult();
-  resourceTimepointMap.map(op.getResult(), timepoint);
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
+  auto timepoint = expandedGlobal.timepointOp.createLoadOp(op.getLoc(), builder)
+                       .getLoadedGlobalValue();
+  resourceTimepointMap.map(op.getLoadedGlobalValue(), timepoint);
 
   // HACK: queryValueSize may insert other ops that we don't want to replace.
   // TODO(benvanik): carry the size so we don't need to guess here.
   SmallPtrSet<Operation *, 2> replacementExceptions;
   builder.setInsertionPointAfter(op);
   auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
-      op.getLoc(), op.getResult(), builder);
+      op.getLoc(), op.getLoadedGlobalValue(), builder);
   if (resultSize) {
     replacementExceptions.insert(resultSize.getDefiningOp());
   } else {
-    auto sizeOp = builder.create<IREE::Stream::ResourceSizeOp>(op.getLoc(),
-                                                               op.getResult());
+    auto sizeOp = builder.create<IREE::Stream::ResourceSizeOp>(
+        op.getLoc(), op.getLoadedGlobalValue());
     replacementExceptions.insert(sizeOp);
     resultSize = sizeOp.getResult();
   }
   assert(resultSize && "need to be able to get a size");
 
   auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
-      op.getLoc(), op.getResult(), resultSize, timepoint);
+      op.getLoc(), op.getLoadedGlobalValue(), resultSize, timepoint);
   replacementExceptions.insert(awaitOp);
 
-  op.getResult().replaceAllUsesExcept(awaitOp.getResults().front(),
-                                      replacementExceptions);
+  op.getLoadedGlobalValue().replaceAllUsesExcept(awaitOp.getResults().front(),
+                                                 replacementExceptions);
 }
 
 // Moves awaits from global stores to loads.
@@ -346,19 +342,18 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
 //  ->
 //  util.global.store %t, @foo_timepoint : !stream.timepoint
 //  util.global.store %0, @foo : !stream.resource
-static void expandGlobalStoreOp(IREE::Util::GlobalStoreOp op,
+static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
                                 ExpandedGlobalMap &globalMap,
                                 IRMapping &resourceTimepointMap) {
   if (!usesResources(op))
     return;
   OpBuilder builder(op);
-  auto timepointOperand = consumeTimepoint(op.getLoc(), op.getValue(),
-                                           resourceTimepointMap, builder);
-  auto &expandedGlobal = globalMap[op.getGlobal()];
-  builder.create<IREE::Util::GlobalStoreOp>(
-      op.getLoc(), timepointOperand.first,
-      expandedGlobal.timepointOp.getName());
-  op.getValueMutable().assign(timepointOperand.second);
+  auto timepointOperand = consumeTimepoint(
+      op.getLoc(), op.getStoredGlobalValue(), resourceTimepointMap, builder);
+  auto &expandedGlobal = globalMap[op.getGlobalName()];
+  expandedGlobal.timepointOp.createStoreOp(op.getLoc(), timepointOperand.first,
+                                           builder);
+  op.setStoredGlobalValue(timepointOperand.second);
 }
 
 static void expandInitializerOp(IREE::Util::InitializerOp op,
@@ -605,9 +600,9 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
 // awaits.
 static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
                              IRMapping &resourceTimepointMap) {
-  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
+  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
     expandGlobalLoadOp(loadOp, globalMap, resourceTimepointMap);
-  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
+  } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     expandGlobalStoreOp(storeOp, globalMap, resourceTimepointMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     expandInitializerOp(initializerOp, globalMap, resourceTimepointMap);

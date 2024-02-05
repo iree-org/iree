@@ -88,9 +88,9 @@ public:
       valueGlobalOp.setPrivate();
       valueGlobalOps.push_back(valueGlobalOp);
       for (auto loadOp : loadOps) {
-        auto newOp = OpBuilder(loadOp).create<IREE::Util::GlobalLoadOp>(
-            loadOp.getLoc(), valueGlobalOp);
-        loadOp.replaceAllUsesWith(newOp.getResult());
+        OpBuilder builder(loadOp);
+        auto newOp = valueGlobalOp.createLoadOp(loadOp.getLoc(), builder);
+        loadOp.replaceAllUsesWith(newOp.getLoadedGlobalValue());
         loadOp.erase();
       }
     }
@@ -111,8 +111,9 @@ public:
         buffer.getLoc(), sizeof(uint32_t), 32);
     for (auto [ordinalGlobalOp, valueGlobalOp] :
          llvm::zip_equal(ordinalGlobalOps, valueGlobalOps)) {
-      Value loadedOrdinal = setterBuilder.create<IREE::Util::GlobalLoadOp>(
-          ordinalGlobalOp.getLoc(), ordinalGlobalOp);
+      Value loadedOrdinal =
+          ordinalGlobalOp.createLoadOp(ordinalGlobalOp.getLoc(), setterBuilder)
+              .getLoadedGlobalValue();
       Value bufferOffset = setterBuilder.create<arith::MulIOp>(
           loadedOrdinal.getLoc(), loadedOrdinal, elementSizeI32);
       Value loadedValue = setterBuilder.create<IREE::Util::BufferLoadOp>(
@@ -121,8 +122,8 @@ public:
                                                    setterBuilder.getIndexType(),
                                                    bufferOffset),
           elementSizeIndex);
-      setterBuilder.create<IREE::Util::GlobalStoreOp>(
-          valueGlobalOp.getLoc(), loadedValue, valueGlobalOp);
+      valueGlobalOp.createStoreOp(valueGlobalOp.getLoc(), loadedValue,
+                                  setterBuilder);
     }
     setterBuilder.create<func::ReturnOp>(setterOp.getLoc());
   }

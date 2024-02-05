@@ -101,14 +101,12 @@ public:
       auto globalOp = pair.second;
       OpBuilder builder(moduleOp.getContext());
       builder.setInsertionPoint(originalOp);
-      auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-          originalOp->getLoc(), globalOp.getType(),
-          SymbolRefAttr::get(globalOp));
+      auto loadOp = globalOp.createLoadOp(originalOp->getLoc(), builder);
 
       Value replacement;
       if (auto constantOp = dyn_cast<arith::ConstantOp>(originalOp)) {
         // Directly replace constant with global constant value.
-        replacement = loadOp.getResult();
+        replacement = loadOp.getLoadedGlobalValue();
       } else {
         assert(false && "unhandled constant op type");
       }

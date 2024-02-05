@@ -19,7 +19,9 @@
 
 namespace mlir::iree_compiler::IREE::HAL::Loader {
 
-static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
+static void replaceExecutableWithGlobal(
+    IREE::HAL::ExecutableOp executableOp,
+    DenseMap<Attribute, IREE::Util::GlobalOpInterface> &executableGlobalOps) {
   OpBuilder moduleBuilder(executableOp);
 
   auto loc = executableOp.getLoc();
@@ -64,8 +66,7 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
   {
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
     auto executableArg = exitBlock->addArgument(executableType, loc);
-    exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableArg,
-                                                  globalOp.getName());
+    globalOp.createStoreOp(loc, executableArg, exitBuilder);
     exitBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
@@ -120,6 +121,10 @@ static void replaceExecutableWithGlobal(IREE::HAL::ExecutableOp executableOp) {
                                      ValueRange{executable});
   }
 
+  // Stash for faster lookup when replacing using.
+  executableGlobalOps[FlatSymbolRefAttr::get(globalOp.getNameAttr())] =
+      globalOp;
+
   // Op goes away to get replaced with a global.
   executableOp.erase();
 }
@@ -138,18 +143,20 @@ public:
     mlir::ModuleOp moduleOp = getOperation();
 
     // Walk executables and convert each one to a global.
+    DenseMap<Attribute, IREE::Util::GlobalOpInterface> executableGlobalOps;
     for (auto executableOp : llvm::make_early_inc_range(
              moduleOp.getOps<IREE::HAL::ExecutableOp>())) {
-      replaceExecutableWithGlobal(executableOp);
+      replaceExecutableWithGlobal(executableOp, executableGlobalOps);
     }
 
     // Find lookup ops referencing an executable and swap it to a global load.
     for (auto funcOp : llvm::make_early_inc_range(
              moduleOp.getOps<mlir::FunctionOpInterface>())) {
       funcOp.walk([&](IREE::HAL::Loader::ExecutableLookupOp lookupOp) {
-        Value executable = OpBuilder(lookupOp).create<IREE::Util::GlobalLoadOp>(
-            lookupOp.getLoc(), lookupOp.getResult().getType(),
-            lookupOp.getExecutableAttr());
+        OpBuilder builder(lookupOp);
+        auto globalOp = executableGlobalOps[lookupOp.getExecutableAttr()];
+        Value executable = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                               .getLoadedGlobalValue();
         lookupOp.replaceAllUsesWith(executable);
         lookupOp.erase();
       });
