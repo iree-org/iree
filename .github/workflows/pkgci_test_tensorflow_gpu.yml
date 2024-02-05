@@ -31,13 +31,12 @@ jobs:
       options: --gpus all
       env:
         NVIDIA_DRIVER_CAPABILITIES: all
-    env:
-      PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
-      IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      VENV_DIR: ${{ github.workspace }}/venv
-      IREE_VULKAN_DISABLE: 0
-      IREE_LLVM_CPU_DISABLE: 1
-      IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+        PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
+        IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+        VENV_DIR: ${{ github.workspace }}/.venv
+        IREE_VULKAN_DISABLE: 0
+        IREE_LLVM_CPU_DISABLE: 1
+        IREE_NVIDIA_GPU_TESTS_DISABLE: 0
     steps:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -55,12 +54,12 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup base venv
         run: |
-          ./build_tools/pkgci/setup_venv.py $VENV_DIR \
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Run tests
         run: |
-          source $VENV_DIR/bin/activate
+          source ${VENV_DIR}/bin/activate
           build_tools/scripts/check_cuda.sh
           build_tools/scripts/check_vulkan.sh
-          build_tools/cmake/run_tf_tests.sh "${BUILD_DIR}"
+          build_tools/cmake/run_tf_tests.sh

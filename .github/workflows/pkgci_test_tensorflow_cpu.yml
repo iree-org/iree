@@ -29,7 +29,7 @@ jobs:
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      VENV_DIR: ${{ github.workspace }}/venv
+      VENV_DIR: ${{ github.workspace }}/.venv
       IREE_VMVX_DISABLE: 0
     steps:
       - name: Checking out repository
@@ -46,10 +46,10 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup base venv
         run: |
-          ./build_tools/pkgci/setup_venv.py $VENV_DIR \
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Run tests
         run: |
-          source $VENV_DIR/bin/activate
-          build_tools/cmake/run_tf_tests.sh "${BUILD_DIR}"
+          source ${VENV_DIR}/bin/activate
+          build_tools/cmake/run_tf_tests.sh

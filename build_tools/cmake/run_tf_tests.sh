@@ -11,7 +11,6 @@ set -xeuo pipefail
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
-BUILD_DIR="$1"
 IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
