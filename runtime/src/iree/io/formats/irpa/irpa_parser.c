@@ -40,8 +40,8 @@ static iree_status_t iree_io_resolve_irpa_v0_string(
   }
   iree_io_physical_offset_t view_offset =
       base_offset + header->metadata_segment.offset + range.offset;
-  *out_view =
-      iree_make_string_view(file_contents.data + view_offset, range.length);
+  *out_view = iree_make_string_view(
+      (const char*)file_contents.data + view_offset, range.length);
   return iree_ok_status();
 }
 

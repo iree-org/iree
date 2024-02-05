@@ -81,6 +81,11 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
                    "instrumentation is enabled."),
     llvm::cl::init(false)};
 
+static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
+    "iree-llvmcpu-use-decompose-softmax-fuse",
+    llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
+    llvm::cl::init(true));
+
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -684,7 +689,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   {
-    addCommonTargetExecutablePreprocessingPasses(passManager);
+    addCommonTargetExecutablePreprocessingPasses(passManager,
+                                                 clUseSoftmaxInterFusion);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
     modulePassManager.addNestedPass<func::FuncOp>(
         createRematerializeParallelOpsPass());

@@ -29,15 +29,6 @@ static SymbolRefAttr nestSymbolRef(SymbolRefAttr baseRefAttr,
                                    SymbolOpInterface leafOp) {
   return nestSymbolRef(baseRefAttr, FlatSymbolRefAttr::get(leafOp));
 }
-static SymbolRefAttr nestSymbolRef(SymbolOpInterface baseOp,
-                                   FlatSymbolRefAttr leafRefAttr) {
-  return nestSymbolRef(SymbolRefAttr::get(baseOp), leafRefAttr);
-}
-static SymbolRefAttr nestSymbolRef(SymbolOpInterface baseOp,
-                                   SymbolOpInterface leafOp) {
-  return nestSymbolRef(SymbolRefAttr::get(baseOp),
-                       FlatSymbolRefAttr::get(leafOp));
-}
 
 // Recursively gathers symbol->symbol replacements from the old object table
 // regions to the new object table regions into |symbolReplacements|.

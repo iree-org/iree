@@ -24,22 +24,6 @@ using VectorValue = TypedValue<VectorType>;
 
 namespace {
 
-/// Given a LayoutAttr, find the shape of the given layout dimension. It is
-/// expected that the layout has at most one instance of the requested
-/// dimension. Example:
-///   LayoutAttr: <<BATCHX: 4>, <BATCHY: 4, LANEX: 4>>
-///   dim: BATCHX
-///   output: 4
-static std::optional<int64_t> findDimShape(LayoutAttr layout,
-                                           LayoutDimension dim) {
-  for (PerDimLayoutAttr dimLayout : layout.getLayouts()) {
-    if (std::optional<int64_t> shape = dimLayout.getShape(dim)) {
-      return shape;
-    }
-  }
-  return std::nullopt;
-}
-
 /// Given the state of the iterator, compute the indices of the original vector
 /// that the current iterator state is iterating over. These indices are
 /// parameterized by the thread grid.

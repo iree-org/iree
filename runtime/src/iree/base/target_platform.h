@@ -34,6 +34,7 @@
 // IREE_COMPILER_GCC
 // IREE_COMPILER_GCC_COMPAT
 // IREE_COMPILER_MSVC
+// IREE_COMPILER_MSVC_COMPAT
 //
 // IREE_SANITIZER_ADDRESS
 // IREE_SANITIZER_MEMORY
@@ -197,12 +198,18 @@ enum iree_arch_enum_e {
 
 #if defined(__clang__)
 #define IREE_COMPILER_CLANG 1
+#if defined(_MSC_VER)
+// clang-cl is msvc-like (but also still clang).
+#define IREE_COMPILER_MSVC_COMPAT 1
+#else
 #define IREE_COMPILER_GCC_COMPAT 1
+#endif  // _MSC_VER
 #elif defined(__GNUC__)
 #define IREE_COMPILER_GCC 1
 #define IREE_COMPILER_GCC_COMPAT 1
 #elif defined(_MSC_VER)
 #define IREE_COMPILER_MSVC 1
+#define IREE_COMPILER_MSVC_COMPAT 1
 #else
 #error Unrecognized compiler.
 #endif  // compiler versions

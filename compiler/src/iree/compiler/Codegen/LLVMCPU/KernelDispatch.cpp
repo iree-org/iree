@@ -182,14 +182,6 @@ static void getRangeBounds(TilingInterface op, SmallVectorImpl<int64_t> &lb,
                            [&](Range r) { return getStaticValue(r.size); });
 }
 
-/// Returns true if all the input and output tensor operands of 'op' are fully
-/// dynamic.
-static bool isFullyDynamicOp(linalg::LinalgOp op) {
-  SmallVector<int64_t> loopRanges = op.getStaticLoopRanges();
-  return llvm::all_of(loopRanges,
-                      [](int64_t size) { return ShapedType::isDynamic(size); });
-}
-
 /// Returns the vectorization pre-processing strategy (peeling, masking) for the
 /// given LinalgOp. It is based on either (in the priority order):
 ///   * user-specified value, or
@@ -982,11 +974,6 @@ static FailureOr<Type> nonWideningLinalgElementType(linalg::LinalgOp op) {
     return failure();
   return inputAndOutputElementTypes[0];
 }
-
-static void getFullRegisterHeuristicsMatmulVectorSizes(
-    mlir::FunctionOpInterface entryPointFn, linalg::LinalgOp op,
-    int64_t vectorSize, SmallVectorImpl<int64_t> &sizes,
-    SmallVectorImpl<bool> &scalableSizeFlags) {}
 
 /// Compute or adjust existing vector sizes using a generic heuristic that will
 /// aim to fill at least one full vector register for all the element types of
