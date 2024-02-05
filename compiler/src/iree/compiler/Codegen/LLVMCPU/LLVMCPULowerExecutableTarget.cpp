@@ -183,6 +183,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
+    enableVectorMasking = true;
     addCPUDataTilingPipeline(pipeline, tilingConfig, enableVectorMasking);
     break;
   }
