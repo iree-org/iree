@@ -26,10 +26,12 @@ jobs:
       - environment=prod
       - cpu
       - os-family=Linux
+    container: docker://ghcr.io/nod-ai/cpubuilder_ubuntu_jammy_ghr_x86_64:main
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       VENV_DIR: ${{ github.workspace }}/venv
+      IREE_VMVX_DISABLE: 0
     steps:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -49,9 +51,4 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Run tests
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VMVX_DISABLE=0 \
-            gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4 \
-            build_tools/cmake/run_tf_tests.sh \
-            "${BUILD_DIR}"
+        run: build_tools/cmake/run_tf_tests.sh "${BUILD_DIR}"
