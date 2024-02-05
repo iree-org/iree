@@ -96,7 +96,11 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      # TODO(scotttodd): run iree-dialects tests
+      - name: "Testing iree-dialects"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       # Remove unused files to save disk space.
       # TODO(#16203): Switch to package-based CI
