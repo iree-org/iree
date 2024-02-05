@@ -3824,7 +3824,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_41" class="md-nav__link">
+  <a href="#attributes_46" class="md-nav__link">
     Attributes
   </a>
   
@@ -7855,7 +7855,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_41" class="md-nav__link">
+  <a href="#attributes_46" class="md-nav__link">
     Attributes
   </a>
   
@@ -8280,7 +8280,7 @@ type, with the interpretation of the type encoded on the op.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_41">Attributes</a><ul>
+<li><a href="#attributes_46">Attributes</a><ul>
 <li><a href="#ordinalcountsattr">OrdinalCountsAttr</a></li>
 </ul>
 </li>
@@ -16977,7 +16977,8 @@ trace verbosity setting.</p>
 <h4 id="vmglobaladdress-vmglobaladdressop"><code>vm.global.address</code> (VM::GlobalAddressOp)<a class="headerlink" href="#vmglobaladdress-vmglobaladdressop" title="Permanent link">link</a></h4>
 <p><em>Returns an address reference to a global</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.address` $global attr-dict `:` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.address` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns an indirect address reference to the given global. During export the
 address will be converted to the natural format of the global table (for
@@ -16989,6 +16990,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_186">Results:<a class="headerlink" href="#results_186" title="Permanent link">link</a></h5>
@@ -17018,7 +17020,7 @@ example, ordinals for refs and byte offsets for primitive types).</p>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF32</code></p>
-<p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_21">Attributes:<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -17043,7 +17045,7 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code>, <code>VM_ExtF64</code></p>
-<p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_22">Attributes:<a class="headerlink" href="#attributes_22" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -17068,7 +17070,7 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_23">Attributes:<a class="headerlink" href="#attributes_23" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -17093,7 +17095,7 @@ Initialized to zero unless an initial value is specified.</p>
 <p>Defines a global value that is treated as a scalar literal at runtime.
 Initialized to zero unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
-<p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code>, <code>VM_OpInterface</code></p>
+<p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
 <h5 id="attributes_24">Attributes:<a class="headerlink" href="#attributes_24" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -17109,7 +17111,8 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadf32-vmgloballoadf32op"><code>vm.global.load.f32</code> (VM::GlobalLoadF32Op)<a class="headerlink" href="#vmgloballoadf32-vmgloballoadf32op" title="Permanent link">link</a></h4>
 <p><em>Global 32-bit floating-point load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.f32` $global attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.f32` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Traits: <code>VM_ExtF32</code></p>
@@ -17118,6 +17121,7 @@ Initialized to zero unless an initial value is specified.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_187">Results:<a class="headerlink" href="#results_187" title="Permanent link">link</a></h5>
@@ -17138,7 +17142,8 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadf64-vmgloballoadf64op"><code>vm.global.load.f64</code> (VM::GlobalLoadF64Op)<a class="headerlink" href="#vmgloballoadf64-vmgloballoadf64op" title="Permanent link">link</a></h4>
 <p><em>Global 64-bit floating-point load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.f64` $global attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.f64` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
@@ -17147,6 +17152,7 @@ Initialized to zero unless an initial value is specified.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_188">Results:<a class="headerlink" href="#results_188" title="Permanent link">link</a></h5>
@@ -17167,7 +17173,8 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadi32-vmgloballoadi32op"><code>vm.global.load.i32</code> (VM::GlobalLoadI32Op)<a class="headerlink" href="#vmgloballoadi32-vmgloballoadi32op" title="Permanent link">link</a></h4>
 <p><em>Global 32-bit integer load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.i32` $global attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.i32` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
@@ -17175,6 +17182,7 @@ Initialized to zero unless an initial value is specified.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_189">Results:<a class="headerlink" href="#results_189" title="Permanent link">link</a></h5>
@@ -17195,7 +17203,8 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadi64-vmgloballoadi64op"><code>vm.global.load.i64</code> (VM::GlobalLoadI64Op)<a class="headerlink" href="#vmgloballoadi64-vmgloballoadi64op" title="Permanent link">link</a></h4>
 <p><em>Global 64-bit integer load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.i64` $global attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.i64` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing an primitive value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
@@ -17203,6 +17212,7 @@ Initialized to zero unless an initial value is specified.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_190">Results:<a class="headerlink" href="#results_190" title="Permanent link">link</a></h5>
@@ -17223,11 +17233,18 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadindirectf32-vmgloballoadindirectf32op"><code>vm.global.load.indirect.f32</code> (VM::GlobalLoadIndirectF32Op)<a class="headerlink" href="#vmgloballoadindirectf32-vmgloballoadindirectf32op" title="Permanent link">link</a></h4>
 <p><em>Global 32-bit floating-point load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.f32` $global attr-dict `:` type($global) `-&gt;` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.f32` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($global) `-&gt;` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_201">Operands:<a class="headerlink" href="#operands_201" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -17261,11 +17278,18 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadindirectf64-vmgloballoadindirectf64op"><code>vm.global.load.indirect.f64</code> (VM::GlobalLoadIndirectF64Op)<a class="headerlink" href="#vmgloballoadindirectf64-vmgloballoadindirectf64op" title="Permanent link">link</a></h4>
 <p><em>Global 64-bit floating-point load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.f64` $global attr-dict `:` type($global) `-&gt;` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.f64` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($global) `-&gt;` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_202">Operands:<a class="headerlink" href="#operands_202" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -17299,10 +17323,17 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadindirecti32-vmgloballoadindirecti32op"><code>vm.global.load.indirect.i32</code> (VM::GlobalLoadIndirectI32Op)<a class="headerlink" href="#vmgloballoadindirecti32-vmgloballoadindirecti32op" title="Permanent link">link</a></h4>
 <p><em>Global 32-bit integer load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.i32` $global attr-dict `:` type($global) `-&gt;` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.i32` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($global) `-&gt;` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_203">Operands:<a class="headerlink" href="#operands_203" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -17336,10 +17367,17 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadindirecti64-vmgloballoadindirecti64op"><code>vm.global.load.indirect.i64</code> (VM::GlobalLoadIndirectI64Op)<a class="headerlink" href="#vmgloballoadindirecti64-vmgloballoadindirecti64op" title="Permanent link">link</a></h4>
 <p><em>Global 64-bit integer load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.i64` $global attr-dict `:` type($global) `-&gt;` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.i64` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($global) `-&gt;` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a primitive value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_204">Operands:<a class="headerlink" href="#operands_204" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -17373,10 +17411,17 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadindirectref-vmgloballoadindirectrefop"><code>vm.global.load.indirect.ref</code> (VM::GlobalLoadIndirectRefOp)<a class="headerlink" href="#vmgloballoadindirectref-vmgloballoadindirectrefop" title="Permanent link">link</a></h4>
 <p><em>Global ref<T> load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.ref` $global attr-dict `:` type($global) `-&gt;` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.indirect.ref` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($global) `-&gt;` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a ref of the given type.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
+<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_205">Operands:<a class="headerlink" href="#operands_205" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -17410,14 +17455,16 @@ Initialized to zero unless an initial value is specified.</p>
 <h4 id="vmgloballoadref-vmgloballoadrefop"><code>vm.global.load.ref</code> (VM::GlobalLoadRefOp)<a class="headerlink" href="#vmgloballoadref-vmgloballoadrefop" title="Permanent link">link</a></h4>
 <p><em>Global ref<T> load operation</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.ref` $global attr-dict `:` type($value)
+<div class="highlight"><pre><span></span><code>operation ::= `vm.global.load.ref` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($value)
 </code></pre></div>
 <p>Loads the value of a global containing a ref of the given type.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_29">Attributes:<a class="headerlink" href="#attributes_29" title="Permanent link">link</a></h5>
+<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_196">Results:<a class="headerlink" href="#results_196" title="Permanent link">link</a></h5>
@@ -17450,7 +17497,7 @@ replaced with a store or reset.
 Initialized to null unless an initial value is specified.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>GlobalOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_30">Attributes:<a class="headerlink" href="#attributes_30" title="Permanent link">link</a></h5>
+<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -17469,7 +17516,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value value to a global.</p>
 <p>Traits: <code>VM_ExtF32</code></p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_31">Attributes:<a class="headerlink" href="#attributes_31" title="Permanent link">link</a></h5>
+<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -17498,7 +17545,7 @@ Initialized to null unless an initial value is specified.</p>
 <p>Stores a primitive value value to a global.</p>
 <p>Traits: <code>VM_ExtF64</code></p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_32">Attributes:<a class="headerlink" href="#attributes_32" title="Permanent link">link</a></h5>
+<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -17526,7 +17573,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value value to a global.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_33">Attributes:<a class="headerlink" href="#attributes_33" title="Permanent link">link</a></h5>
+<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -17554,7 +17601,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a primitive value value to a global.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_34">Attributes:<a class="headerlink" href="#attributes_34" title="Permanent link">link</a></h5>
+<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -17714,7 +17761,7 @@ Initialized to null unless an initial value is specified.</p>
 </code></pre></div>
 <p>Stores a ref<T> to a global, retaining it until the global is reset.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code>, <code>VMSerializableOp</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_35">Attributes:<a class="headerlink" href="#attributes_35" title="Permanent link">link</a></h5>
+<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>FlatSymbolRefAttr</td><td>symbol reference attribute</td></tr>
@@ -19856,7 +19903,7 @@ with the default list value of 0 if storing primitives and null if refs.</p>
 <p>Specifies an exported function with an externally-visible alias. Multiple
 exports can reference the same internal functions.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_36">Attributes:<a class="headerlink" href="#attributes_36" title="Permanent link">link</a></h5>
+<h5 id="attributes_41">Attributes:<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_ref</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -19870,7 +19917,7 @@ exports can reference the same internal functions.</p>
 All flow control is performed by VM ops.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_37">Attributes:<a class="headerlink" href="#attributes_37" title="Permanent link">link</a></h5>
+<h5 id="attributes_42">Attributes:<a class="headerlink" href="#attributes_42" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -19890,7 +19937,7 @@ imports from the module will become the required minimum version at runtime.</p>
 <p>Optional imports not present at runtime will be invalid to call and whether
 they were resolved can be queried with <code>vm.import.resolved</code>.</p>
 <p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_38">Attributes:<a class="headerlink" href="#attributes_38" title="Permanent link">link</a></h5>
+<h5 id="attributes_43">Attributes:<a class="headerlink" href="#attributes_43" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -19910,7 +19957,7 @@ Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_39">Attributes:<a class="headerlink" href="#attributes_39" title="Permanent link">link</a></h5>
+<h5 id="attributes_44">Attributes:<a class="headerlink" href="#attributes_44" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -19929,7 +19976,7 @@ module.</p>
 <p>Top-level container for VM functions.</p>
 <p>Traits: <code>IsolatedFromAbove</code>, <code>SingleBlockImplicitTerminator&lt;IREE::VM::ModuleTerminatorOp&gt;</code>, <code>SingleBlock</code>, <code>SymbolTable</code></p>
 <p>Interfaces: <code>Symbol</code>, <code>VM_OpInterface</code></p>
-<h5 id="attributes_40">Attributes:<a class="headerlink" href="#attributes_40" title="Permanent link">link</a></h5>
+<h5 id="attributes_45">Attributes:<a class="headerlink" href="#attributes_45" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -19945,7 +19992,7 @@ module.</p>
 </code></pre></div>
 <p>Traits: <code>HasParent&lt;IREE::VM::ModuleOp&gt;</code>, <code>Terminator</code></p>
 <p>Interfaces: <code>VM_OpInterface</code></p>
-<h2 id="attributes_41">Attributes<a class="headerlink" href="#attributes_41" title="Permanent link">link</a></h2>
+<h2 id="attributes_46">Attributes<a class="headerlink" href="#attributes_46" title="Permanent link">link</a></h2>
 <h3 id="ordinalcountsattr">OrdinalCountsAttr<a class="headerlink" href="#ordinalcountsattr" title="Permanent link">link</a></h3>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#vm.ordinal_counts&lt;

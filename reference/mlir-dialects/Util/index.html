@@ -1907,7 +1907,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_15" class="md-nav__link">
+  <a href="#attributes_16" class="md-nav__link">
     Attributes
   </a>
   
@@ -4144,7 +4144,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_15" class="md-nav__link">
+  <a href="#attributes_16" class="md-nav__link">
     Attributes
   </a>
   
@@ -4353,7 +4353,7 @@
 </li>
 </ul>
 </li>
-<li><a href="#attributes_15">Attributes</a><ul>
+<li><a href="#attributes_16">Attributes</a><ul>
 <li><a href="#bytepatternattr">BytePatternAttr</a></li>
 <li><a href="#byterangeattr">ByteRangeAttr</a></li>
 <li><a href="#compositeattr">CompositeAttr</a></li>
@@ -5255,7 +5255,8 @@ types) are tracked if known.</p>
 <h4 id="utilglobaladdress-utilglobaladdressop"><code>util.global.address</code> (Util::GlobalAddressOp)<a class="headerlink" href="#utilglobaladdress-utilglobaladdressop" title="Permanent link">link</a></h4>
 <p><em>Returns an address reference to a global</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.global.address` $global attr-dict `:` qualified(type($result))
+<div class="highlight"><pre><span></span><code>operation ::= `util.global.address` (`immutable` $is_immutable^)?
+              $global attr-dict `:` qualified(type($result))
 </code></pre></div>
 <p>Returns the address of a global as a typed reference. Can be used with the
 global load and store indirect ops.</p>
@@ -5266,6 +5267,7 @@ global load and store indirect ops.</p>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_14">Results:<a class="headerlink" href="#results_14" title="Permanent link">link</a></h5>
@@ -5286,10 +5288,17 @@ global load and store indirect ops.</p>
 <h4 id="utilgloballoadindirect-utilgloballoadindirectop"><code>util.global.load.indirect</code> (Util::GlobalLoadIndirectOp)<a class="headerlink" href="#utilgloballoadindirect-utilgloballoadindirectop" title="Permanent link">link</a></h4>
 <p><em>Loads a value from a global variable</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.global.load.indirect` $global attr-dict `:` qualified(type($global)) `-&gt;` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `util.global.load.indirect` (`immutable` $is_immutable^)?
+              $global attr-dict `:` qualified(type($global)) `-&gt;` type($result)
 </code></pre></div>
 <p>Returns a copy of the global variable value.</p>
 <p>Interfaces: <code>Util_GlobalLoadIndirectOpInterface</code></p>
+<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
+</table>
+
 <h5 id="operands_15">Operands:<a class="headerlink" href="#operands_15" title="Permanent link">link</a></h5>
 <table>
 <thead>
@@ -5323,14 +5332,16 @@ global load and store indirect ops.</p>
 <h4 id="utilglobalload-utilgloballoadop"><code>util.global.load</code> (Util::GlobalLoadOp)<a class="headerlink" href="#utilglobalload-utilgloballoadop" title="Permanent link">link</a></h4>
 <p><em>Loads a value from a global variable</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `util.global.load` $global attr-dict `:` type($result)
+<div class="highlight"><pre><span></span><code>operation ::= `util.global.load` (`immutable` $is_immutable^)?
+              $global attr-dict `:` type($result)
 </code></pre></div>
 <p>Returns a global variable value.</p>
 <p>Interfaces: <code>MemoryEffectOpInterface</code>, <code>OpAsmOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_GlobalLoadOpInterface</code></p>
-<h5 id="attributes_8">Attributes:<a class="headerlink" href="#attributes_8" title="Permanent link">link</a></h5>
+<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
+<tr><td><code>is_immutable</code></td><td>::mlir::UnitAttr</td><td>unit attribute</td></tr>
 </table>
 
 <h5 id="results_16">Results:<a class="headerlink" href="#results_16" title="Permanent link">link</a></h5>
@@ -5361,7 +5372,7 @@ global load and store indirect ops.</p>
 The value is tied to the execution context of the module and different
 contexts will have different variable storage.</p>
 <p>Interfaces: <code>Symbol</code>, <code>Util_GlobalOpInterface</code></p>
-<h5 id="attributes_9">Attributes:<a class="headerlink" href="#attributes_9" title="Permanent link">link</a></h5>
+<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_visibility</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -5405,7 +5416,7 @@ contexts will have different variable storage.</p>
 </code></pre></div>
 <p>Stores a copy of the value into a global variable.</p>
 <p>Interfaces: <code>SymbolUserOpInterface</code>, <code>Util_GlobalStoreOpInterface</code></p>
-<h5 id="attributes_10">Attributes:<a class="headerlink" href="#attributes_10" title="Permanent link">link</a></h5>
+<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>global</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -5755,7 +5766,7 @@ or synchronous invocation results.</p>
 have a latency between when they are emitted and when the application can
 observe the failure. It's also possible that other work that is in-flight
 or pending when the failure occurs will complete.</p>
-<h5 id="attributes_11">Attributes:<a class="headerlink" href="#attributes_11" title="Permanent link">link</a></h5>
+<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>message</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -5801,7 +5812,7 @@ a cast is performed within the callee.</p>
 %0 = util.call @fn(%0, %1) : (i32, tensor&lt;f32&gt;) -&gt; (f32, %1 as tensor&lt;i32&gt;)
 </code></pre></div></p>
 <p>Interfaces: <code>CallOpInterface</code>, <code>SymbolUserOpInterface</code>, <code>Util_TiedOpInterface</code></p>
-<h5 id="attributes_12">Attributes:<a class="headerlink" href="#attributes_12" title="Permanent link">link</a></h5>
+<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>callee</code></td><td>::mlir::FlatSymbolRefAttr</td><td>flat symbol reference attribute</td></tr>
@@ -5845,7 +5856,7 @@ a cast is performed within the callee.</p>
 in some other module) has no body.</p>
 <p>Traits: <code>AffineScope</code>, <code>AutomaticAllocationScope</code>, <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>OpAsmOpInterface</code>, <code>Symbol</code></p>
-<h5 id="attributes_13">Attributes:<a class="headerlink" href="#attributes_13" title="Permanent link">link</a></h5>
+<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>sym_name</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -5864,7 +5875,7 @@ Must not load any globals that are defined or initialized after it in the
 module.</p>
 <p>Traits: <code>IsolatedFromAbove</code></p>
 <p>Interfaces: <code>CallableOpInterface</code>, <code>FunctionOpInterface</code>, <code>Symbol</code>, <code>Util_InitializerOpInterface</code></p>
-<h5 id="attributes_14">Attributes:<a class="headerlink" href="#attributes_14" title="Permanent link">link</a></h5>
+<h5 id="attributes_15">Attributes:<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>function_type</code></td><td>::mlir::TypeAttr</td><td>type attribute of function type</td></tr>
@@ -6064,7 +6075,7 @@ the index is out of bounds.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_15">Attributes<a class="headerlink" href="#attributes_15" title="Permanent link">link</a></h2>
+<h2 id="attributes_16">Attributes<a class="headerlink" href="#attributes_16" title="Permanent link">link</a></h2>
 <h3 id="bytepatternattr">BytePatternAttr<a class="headerlink" href="#bytepatternattr" title="Permanent link">link</a></h3>
 <p>an attribute containing a filled byte pattern</p>
 <p>Syntax:</p>
