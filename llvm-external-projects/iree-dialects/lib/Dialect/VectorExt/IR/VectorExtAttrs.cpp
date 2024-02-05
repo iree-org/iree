@@ -172,7 +172,7 @@ std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
 }
 
 uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
-  uint64_t offset{0};
+  uint64_t offset = 0;
   std::optional<LayoutDimension> laneDim = getLane(reductionDim);
   if (!laneDim)
     return offset;

@@ -377,6 +377,7 @@ struct DistributeReductions final
   DistributeReductions(MLIRContext *context, int64_t maxBitsPerShuffle)
       : OpDistributionPattern(context), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
+  // Do parallel reduction using butterfly shuffles.
   Value doThreadGlobalReduction(Value result, uint64_t shuffleOffset,
                                 int64_t laneSize,
                                 vector::CombiningKind combiningKind,
@@ -384,6 +385,7 @@ struct DistributeReductions final
                                 OpBuilder &rewriter, Location loc) const {
     uint32_t size = maxBitsPerShuffle;
     Value mask;
+    assert(llvm::isPowerOf2_64(laneSize));
     for (uint64_t i = shuffleOffset; i < shuffleOffset * laneSize; i <<= 1) {
       Value packed = packVectorToSupportedWidth(loc, rewriter, result);
       auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
@@ -458,10 +460,12 @@ struct DistributeReductions final
 
     int reductionDim = reductionDims[0].getInt();
     int parallelDim = reductionDim ^ 1;
-    uint64_t shuffleOffset = sourceLayout.getShuffleOffset(reductionDim);
     if (!sourceLayout.getLane(reductionDim))
       return failure();
+    uint64_t shuffleOffset = sourceLayout.getShuffleOffset(reductionDim);
     int64_t laneSize = sourceLayout.getLaneDim(reductionDim).value();
+    if (!llvm::isPowerOf2_64(laneSize))
+      return failure();
     vector::CombiningKind combiningKind = reductionOp.getKind();
 
     auto reduceFn = [&](const LayoutIterator::State &state) {
