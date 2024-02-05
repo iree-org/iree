@@ -50,4 +50,6 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
       - name: Run tests
-        run: build_tools/cmake/run_tf_tests.sh "${BUILD_DIR}"
+        run: |
+          source $VENV_DIR/bin/activate
+          build_tools/cmake/run_tf_tests.sh "${BUILD_DIR}"
