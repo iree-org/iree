@@ -133,7 +133,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   auto target = variantOp.getTarget();
   bool lowerToAVX2 = hasAVX2Feature(target);
   bool enableVectorMasking = isX86(target) || isRISCV(target) ||
-                             (isAArch64(target) && hasAnySVEFeature(target));
+                             (isAArch64(target) && (hasAnySVEFeature(target) ||
+                                                    hasV9aFeature(target)));
 
   bool enableMicrokernels = hasUkernel(target);
   bool enableAArch64SSVE =
