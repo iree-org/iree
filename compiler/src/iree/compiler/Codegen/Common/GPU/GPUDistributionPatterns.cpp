@@ -354,38 +354,6 @@ struct DistributeTransferWriteLayoutAttr final
   }
 };
 
-struct DistributeScfYield final : OpDistributionPattern<scf::YieldOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-
-  LogicalResult matchAndRewrite(scf::YieldOp yieldOp,
-                                DistributionSignature &signature,
-                                PatternRewriter &rewriter) const override {
-    // Check if the yield is a terminator of a distributable operation.
-    // TODO: This is a hack. Ideally, we shouldn't have this and distribution
-    // should just fail if some operation is not distributable.
-    if (!isa<scf::ForOp>(yieldOp->getParentOp())) {
-      return failure();
-    }
-
-    // Get the distributed operands.
-    SmallVector<Value> operands;
-    for (Value operand : yieldOp->getOperands()) {
-      if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
-        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
-                                                      signature[vectorOperand]);
-      }
-      operands.push_back(operand);
-    }
-
-    // Since this operation has no results, we can directly replace it.
-    auto distributedYieldOp =
-        rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
-    rewriter.replaceOp(yieldOp, distributedYieldOp);
-
-    return success();
-  }
-};
-
 struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
@@ -420,8 +388,41 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
     // Move loop body to new loop.
     rewriter.mergeBlocks(oldLoopBody, loopBody, iterArgs);
 
+    if (failed(distributeYield(rewriter, newForOp))) {
+      return failure();
+    }
+
     // Repleace loop results.
     replaceOpWithDistributedValues(rewriter, forOp, newForOp.getResults());
+    return success();
+  }
+
+  LogicalResult distributeYield(PatternRewriter &rewriter,
+                                scf::ForOp forOp) const {
+    scf::YieldOp yieldOp =
+        llvm::cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+    std::optional<DistributionSignature> maybeSignature =
+        getOpSignature(yieldOp);
+    if (!maybeSignature) {
+      return failure();
+    }
+    DistributionSignature signature = *maybeSignature;
+
+    // Get the distributed operands.
+    SmallVector<Value> operands;
+    for (Value operand : yieldOp->getOperands()) {
+      if (auto vectorOperand = dyn_cast<VectorValue>(operand)) {
+        operand = DistributionPattern::getDistributed(rewriter, vectorOperand,
+                                                      signature[vectorOperand]);
+      }
+      operands.push_back(operand);
+    }
+
+    // Since this operation has no results, we can directly replace it using
+    // the standard API.
+    auto distributedYieldOp =
+        rewriter.create<scf::YieldOp>(yieldOp.getLoc(), operands);
+    rewriter.replaceOp(yieldOp, distributedYieldOp);
     return success();
   }
 
@@ -447,8 +448,7 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
 } // namespace
 
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
-  patterns.add<DistributeConstants, DistributeScfYield, DistributeScfFor>(
-      patterns.getContext());
+  patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise<arith::MulIOp>,
                DistributeElementwise<arith::MulFOp>,
