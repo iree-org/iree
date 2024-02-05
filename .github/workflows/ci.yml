@@ -150,8 +150,7 @@ jobs:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
           IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
           CCACHE_NAMESPACE: github-windows-2022-64core
-        run: |
-          ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
@@ -265,35 +264,6 @@ jobs:
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
             gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 \
             ./build_tools/bazel/build_test_all.sh
-
-  test_all:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_all')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Testing all"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
 
   test_gpu:
     needs: [setup, build_all]
