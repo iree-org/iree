@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-legalize-control-flow %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-legalize-control-flow))" %s | FileCheck %s
 
 // CHECK-LABEL: func @while(
 // CHECK-SAME: %[[VAL_0:.*]]: tensor<1xi64>) -> tensor<1xi64> {

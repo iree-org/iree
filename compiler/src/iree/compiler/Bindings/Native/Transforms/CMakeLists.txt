@@ -23,6 +23,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineUtils
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
     MLIRShapeDialect

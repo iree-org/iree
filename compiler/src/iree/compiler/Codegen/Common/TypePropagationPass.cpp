@@ -31,6 +31,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -558,7 +559,7 @@ struct LegalizeBasicBlocks : public TypePropagationPattern<OpTy> {
       return rewriter.notifyMatchFailure(funcOp,
                                          "failed to convert region types");
     }
-    rewriter.updateRootInPlace(funcOp, []() {});
+    rewriter.modifyOpInPlace(funcOp, []() {});
     return success();
   }
 };
@@ -623,7 +624,8 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTypePropagationPass() {
   return std::make_unique<TypePropagationPass>();
 }
 

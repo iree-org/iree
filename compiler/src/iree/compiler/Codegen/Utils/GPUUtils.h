@@ -36,7 +36,7 @@ getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
                         unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups);
 
 /// Returns the workgroup size associated to the funcOp entry point.
-std::array<int64_t, 3> getWorkgroupSize(func::FuncOp funcOp);
+std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//
 // GPU vectorization
@@ -72,10 +72,10 @@ LogicalResult copyToWorkgroupMemory(OpBuilder &builder, Value src, Value dst);
 
 /// Propagates shared memory copy to producer linalg.fill or consumer
 /// linalg.generic when possible.
-void propagateSharedMemoryCopy(func::FuncOp funcOp);
+void propagateSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 
 /// Inserts barriers before and after shared memory copy.
-void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp);
+void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 
 /// Emit reduction across a group for a given input. Emits `gpu.shuffle`
 /// based reduction only when `expandSubgroupReduce` is set.

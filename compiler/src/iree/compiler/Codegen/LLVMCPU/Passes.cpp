@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -20,6 +21,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -78,6 +80,11 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
     llvm::cl::desc("Instruments memory accesses in dispatches when dispatch "
                    "instrumentation is enabled."),
     llvm::cl::init(false)};
+
+static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
+    "iree-llvmcpu-use-decompose-softmax-fuse",
+    llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
+    llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
@@ -281,6 +288,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &passManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   passManager.addNestedPass<func::FuncOp>(
+      createLLVMCPUDropVectorUnitDimsPass());
+  passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
@@ -473,10 +482,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
   addCPUBufferizePasses(nestedModulePM);
 
-  // Perform memref-based transfer_read/write optimizations.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/false));
-
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -528,10 +533,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUMmt4dVectorLoweringPass());
 
-  // Fold unit dims before vector lowering.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/false));
-
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = lowerToAVX2;
@@ -564,9 +565,6 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   addCPUBufferizePasses(nestedModulePM);
 
   {
-    // Fold unit dims before vector lowering.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createOptimizeVectorTransferPass(/*flatten=*/false));
     LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     buildLLVMCPUVectorLoweringPipeline(nestedModulePM, options);
@@ -674,6 +672,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
   }
+  if (enableAArch64SME) {
+    passManager.addPass(createConvertArmSMEToLLVMPass());
+  }
   passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
@@ -688,7 +689,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   {
-    addCommonTargetExecutablePreprocessingPasses(passManager);
+    addCommonTargetExecutablePreprocessingPasses(passManager,
+                                                 clUseSoftmaxInterFusion);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
     modulePassManager.addNestedPass<func::FuncOp>(
         createRematerializeParallelOpsPass());

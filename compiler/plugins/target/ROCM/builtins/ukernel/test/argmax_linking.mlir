@@ -1,4 +1,4 @@
-// RUN: [[ $IREE_ROCM_DISABLE == 1 ]] || iree-compile --split-input-file --iree-hal-target-backends=rocm --iree-rocm-enable-ukernels=all --iree-rocm-target-chip=gfx1100 --compile-to=executable-targets %s | FileCheck %s
+// RUN: iree-compile --split-input-file --iree-hal-target-backends=rocm --iree-rocm-enable-ukernels=all --iree-rocm-target-chip=gfx1100 --compile-to=executable-targets %s | FileCheck %s
 
 // We want to check that uKernel is indeed generated from e2e workflow.
 

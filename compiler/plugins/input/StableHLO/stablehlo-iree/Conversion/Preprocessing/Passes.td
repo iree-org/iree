@@ -19,17 +19,17 @@ def StableHLOToStableHLOPreprocessing :
 }
 
 def StableHLOCanonicalize :
-    Pass<"iree-stablehlo-canonicalize", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-canonicalize", "mlir::FunctionOpInterface"> {
   let summary = "Canonicalizes StableHLO operations";
 }
 
 def DotGeneralToDot :
-    Pass<"iree-stablehlo-preprocessing-dot-general-to-dot", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-preprocessing-dot-general-to-dot", "mlir::FunctionOpInterface"> {
   let summary = "Lowers general dot to a non-batched dot when possible";
 }
 
 def EinsumToDotGeneral :
-    Pass<"iree-stablehlo-preprocessing-einsum-to-dot-general", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-preprocessing-einsum-to-dot-general", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes einsum ops to general dot ops";
 }
 
@@ -44,17 +44,17 @@ def FlattenTuplesInSCF :
 }
 
 def GatherToTorchIndexSelect :
-    Pass<"iree-stablehlo-preprocessing-gather-to-torch-index-select", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-preprocessing-gather-to-torch-index-select", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes gathers to a torch index select";
 }
 
 def LowerComplex :
-    Pass<"iree-stablehlo-preprocessing-lower-complex", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-preprocessing-lower-complex", "mlir::FunctionOpInterface"> {
   let summary = "Lowers complex operations into non-complex operations";
 }
 
 def UnfuseBatchNorm :
-    Pass<"iree-stablehlo-preprocessing-unfuse-batch-norm", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-preprocessing-unfuse-batch-norm", "mlir::FunctionOpInterface"> {
   let summary = "Materializes 'broadcast_dimensions' attributes";
 }
 

@@ -82,14 +82,14 @@ struct ConvertInitializerOp
   matchAndRewrite(IREE::Util::InitializerOp initializerOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
-    rewriter.startRootUpdate(initializerOp);
+    rewriter.startOpModification(initializerOp);
     if (failed(rewriter.convertRegionTypes(&initializerOp.getBody(),
                                            typeConverter))) {
-      rewriter.cancelRootUpdate(initializerOp);
+      rewriter.cancelOpModification(initializerOp);
       return rewriter.notifyMatchFailure(initializerOp,
                                          "failed to convert region types");
     }
-    rewriter.finalizeRootUpdate(initializerOp);
+    rewriter.finalizeOpModification(initializerOp);
     return success();
   }
 };

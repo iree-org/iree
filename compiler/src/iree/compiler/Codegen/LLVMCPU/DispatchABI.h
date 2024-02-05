@@ -95,7 +95,6 @@ public:
   LLVM::DIDerivedTypeAttr getWorkgroupStateV0T();
 
 private:
-  const LLVMTypeConverter *typeConverter;
   Builder builder;
   LLVM::DIFileAttr fileAttr;
   unsigned ptrBitwidth;

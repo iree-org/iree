@@ -68,7 +68,7 @@ static inline uint64_t iree_math_rotr_u64(const uint64_t n, uint32_t c) {
 //==============================================================================
 
 static inline int iree_math_count_leading_zeros_u32(const uint32_t n) {
-#if defined(IREE_COMPILER_MSVC)
+#if defined(IREE_COMPILER_MSVC_COMPAT)
   unsigned long result = 0;  // NOLINT(runtime/int)
   if (_BitScanReverse(&result, n)) {
     return (int)(31 - result);
@@ -97,7 +97,7 @@ static inline int iree_math_count_leading_zeros_u32(const uint32_t n) {
 }
 
 static inline int iree_math_count_leading_zeros_u64(uint64_t n) {
-#if defined(IREE_COMPILER_MSVC) && \
+#if defined(IREE_COMPILER_MSVC_COMPAT) && \
     (defined(IREE_ARCH_ARM_64) || defined(IREE_ARCH_X86_64))
   // MSVC does not have __buitin_clzll. Use _BitScanReverse64.
   unsigned long result = 0;  // NOLINT(runtime/int)
@@ -105,7 +105,7 @@ static inline int iree_math_count_leading_zeros_u64(uint64_t n) {
     return (int)(63 - result);
   }
   return 64;
-#elif defined(IREE_COMPILER_MSVC)
+#elif defined(IREE_COMPILER_MSVC_COMPAT)
   // MSVC does not have __buitin_clzll. Compose two calls to _BitScanReverse
   unsigned long result = 0;  // NOLINT(runtime/int)
   if ((n >> 32) && _BitScanReverse(&result, n >> 32)) {
@@ -141,7 +141,7 @@ static inline int iree_math_count_leading_zeros_u64(uint64_t n) {
 }
 
 static inline int iree_math_count_trailing_zeros_u32(uint32_t n) {
-#if defined(IREE_COMPILER_MSVC)
+#if defined(IREE_COMPILER_MSVC_COMPAT)
   unsigned long result = 0;  // NOLINT(runtime/int)
   _BitScanForward(&result, n);
   return (int)result;
@@ -160,11 +160,11 @@ static inline int iree_math_count_trailing_zeros_u32(uint32_t n) {
 }
 
 static inline int iree_math_count_trailing_zeros_u64(uint64_t n) {
-#if defined(IREE_COMPILER_MSVC) && defined(IREE_PTR_SIZE_64)
+#if defined(IREE_COMPILER_MSVC_COMPAT) && defined(IREE_PTR_SIZE_64)
   unsigned long result = 0;  // NOLINT(runtime/int)
   _BitScanForward64(&result, n);
   return (int)result;
-#elif defined(IREE_COMPILER_MSVC) && defined(IREE_PTR_SIZE_32)
+#elif defined(IREE_COMPILER_MSVC_COMPAT) && defined(IREE_PTR_SIZE_32)
   unsigned long result = 0;  // NOLINT(runtime/int)
   if ((uint32_t)(n) == 0) {
     _BitScanForward(&result, n >> 32);

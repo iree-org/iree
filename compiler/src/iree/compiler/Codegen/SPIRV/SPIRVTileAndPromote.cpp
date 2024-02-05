@@ -35,8 +35,6 @@
 
 #define DEBUG_TYPE "iree-spirv-tile-and-promote"
 
-constexpr int kMaxVectorNumBits = 128;
-
 namespace mlir::iree_compiler {
 
 //====---------------------------------------------------------------------===//
@@ -44,7 +42,7 @@ namespace mlir::iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static LogicalResult
-tileReductionLoops(func::FuncOp funcOp,
+tileReductionLoops(mlir::FunctionOpInterface funcOp,
                    IREE::LinalgExt::LinalgTransformationFilter filter,
                    const scf::SCFTileSizeComputationFunction &computeFn) {
   auto options =
@@ -57,7 +55,7 @@ tileReductionLoops(func::FuncOp funcOp,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult
-tileToInvocation(func::FuncOp funcOp,
+tileToInvocation(mlir::FunctionOpInterface funcOp,
                  IREE::LinalgExt::LinalgTransformationFilter filter,
                  const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
@@ -136,7 +134,7 @@ public:
 private:
   /// Promotes C matrix to shared memory when necessary and returns success if
   /// no error happens.
-  LogicalResult doPromoteCMatrix(func::FuncOp funcOp) const;
+  LogicalResult doPromoteCMatrix(mlir::FunctionOpInterface funcOp) const;
 
   // Whether to promote C matrix to use shared memory.
   bool promoteCMatrix = false;
@@ -148,7 +146,7 @@ private:
 
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  func::FuncOp funcOp = getOperation();
+  auto funcOp = getOperation();
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
   if (failed(exportOp))
     return;
@@ -287,8 +285,8 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   }
 }
 
-LogicalResult
-SPIRVTileAndPromotePass::doPromoteCMatrix(func::FuncOp funcOp) const {
+LogicalResult SPIRVTileAndPromotePass::doPromoteCMatrix(
+    mlir::FunctionOpInterface funcOp) const {
   MLIRContext *context = funcOp.getContext();
   if (!promoteCMatrix)
     return success();
@@ -354,7 +352,7 @@ SPIRVTileAndPromotePass::doPromoteCMatrix(func::FuncOp funcOp) const {
   return success();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVTileAndPromotePass(bool promoteCMatrix, bool skipThreadLevel) {
   return std::make_unique<SPIRVTileAndPromotePass>(promoteCMatrix,
                                                    skipThreadLevel);

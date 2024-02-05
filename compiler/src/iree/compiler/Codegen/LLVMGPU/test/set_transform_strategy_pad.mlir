@@ -52,7 +52,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
 //       CHECK:   transform.iree.apply_licm
-//       CHECK:   transform.iree.apply_cse
+//       CHECK:   transform.apply_cse to
 //       CHECK:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
 //       CHECK:   transform.iree.populate_workgroup_count_region_using_num_threads_slice {{.*}} : (!transform.any_op) -> ()
@@ -61,7 +61,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
 //       CHECK:   transform.iree.apply_licm
-//       CHECK:   transform.iree.apply_cse
+//       CHECK:   transform.apply_cse to
 //       CHECK:   {{.*}} = transform.structured.match ops{["scf.if"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.scf.take_assumed_branch {{.*}} take_else_branch : (!transform.any_op) -> ()
 //       CHECK:   transform.structured.vectorize {{.*}} vector_sizes [4, 4] : !transform.any_op
@@ -77,14 +77,14 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //       CHECK:     transform.apply_patterns.canonicalization
 //       CHECK    }
 //       CHECK:   transform.iree.apply_licm
-//       CHECK:   transform.iree.apply_cse
+//       CHECK:   transform.apply_cse to
 //       CHECK:   transform.iree.eliminate_empty_tensors {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   {{.*}} = transform.iree.bufferize {target_gpu} {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.memref.erase_dead_alloc_and_stores {{.*}} : (!transform.any_op) -> ()
 //       CHECK:   {{.*}} = transform.structured.match ops{["func.func"]} in {{.*}} : (!transform.any_op) -> !transform.any_op
 //       CHECK:   transform.iree.forall_to_workgroup {{.*}} : (!transform.any_op) -> ()
-//       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 : (!transform.any_op) -> ()
+//       CHECK:   transform.iree.map_nested_forall_to_gpu_threads {{.*}} workgroup_dims = [16, 16, 1] subgroup_size = 32 sync_after_distribution = true : (!transform.any_op) -> ()
 //       CHECK:     transform.apply_patterns.vector.lower_masks
 //       CHECK:     transform.apply_patterns.vector.materialize_masks
 //       CHECK:   apply_patterns to %{{.*}} {
@@ -93,7 +93,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //   CHECK-DAG:     transform.apply_patterns.canonicalization
 //       CHECK:   } : !transform.any_op
 //       CHECK:   transform.iree.apply_licm
-//       CHECK:   transform.iree.apply_cse
+//       CHECK:   transform.apply_cse to
 
 // WITH_OPTIONS-LABEL: func @pad
 //       WITH_OPTIONS:   transform.structured.tile_using_forall {{.*}}   tile_sizes [32, 16](mapping = [#gpu.block<y>, #gpu.block<x>])

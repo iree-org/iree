@@ -42,7 +42,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %variant_op : !transform.any_op
-    transform.iree.apply_cse %variant_op : !transform.any_op
+    transform.apply_cse to %variant_op : !transform.any_op
 
     // Bufferization
     // ==========================================
@@ -61,7 +61,7 @@ module attributes { transform.with_named_sequence } {
     transform.apply_patterns to %func_8 {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %func_8 : !transform.any_op
+    transform.apply_cse to %func_8 : !transform.any_op
     transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
     transform.yield
   } // codegen

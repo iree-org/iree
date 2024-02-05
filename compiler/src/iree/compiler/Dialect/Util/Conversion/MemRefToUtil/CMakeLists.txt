@@ -22,6 +22,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRMemRefDialect
     MLIRPass

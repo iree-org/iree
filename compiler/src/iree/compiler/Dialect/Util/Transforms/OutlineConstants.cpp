@@ -11,7 +11,6 @@
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -64,7 +63,6 @@ public:
   OutlineConstantsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
@@ -93,7 +91,8 @@ public:
       // By the time we've outlined things here we are sure we want them
       // outlined even if the user runs an arbitrary number of passes between
       // now and when we may use that information (HAL constant pooling, etc).
-      globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+      globalOp.setInliningPolicyAttr(
+          moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
     }
 
     // Replace all of the constants with lookups for the new variables.

@@ -39,12 +39,12 @@ struct DetachElementwisePattern
         !isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
       return failure();
     }
-    if (!linalgOp.hasTensorSemantics())
+    if (!linalgOp.hasPureTensorSemantics())
       return failure();
 
     // Nothing to do if the output tensor operand is already a fill op.
     SmallVector<OpOperand *> outputOperands;
-    if (!linalgOp.hasBufferSemantics()) {
+    if (!linalgOp.hasPureBufferSemantics()) {
       outputOperands = llvm::to_vector(
           llvm::map_range(linalgOp.getDpsInitsMutable(),
                           [](OpOperand &opOperand) { return &opOperand; }));
@@ -79,8 +79,8 @@ struct DetachElementwisePattern
         rewriter.create<linalg::FillOp>(loc, zero, initOp.getResult()).result();
 
     // Update the contraction op to use the new zero tensor as output operand.
-    rewriter.updateRootInPlace(linalgOp,
-                               [&]() { linalgOp.setDpsInitOperand(0, fill); });
+    rewriter.modifyOpInPlace(linalgOp,
+                             [&]() { linalgOp.setDpsInitOperand(0, fill); });
 
     auto outputMap = mlir::compressUnusedDims(
         linalgOp.getMatchingIndexingMap(outputOperands.front()));
@@ -175,7 +175,7 @@ struct DetachSplatConstantOutsOperands
                          .create<linalg::FillOp>(
                              loc, resultType, scalarConstantOp, emptyTensorOp)
                          .getResult(0);
-      rewriter.updateRootInPlace(dpsInterfaceOp, [&]() {
+      rewriter.modifyOpInPlace(dpsInterfaceOp, [&]() {
         dpsInterfaceOp.setDpsInitOperand(outOperand.index(), fillOp);
       });
       madeChanges = true;

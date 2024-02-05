@@ -31,10 +31,7 @@ iree_lit_test_suite(
     iree-run-mlir
   LABELS
     "driver=local-task"
-    "driver=metal"
-    "driver=vulkan"
     "hostonly"
-    "optonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

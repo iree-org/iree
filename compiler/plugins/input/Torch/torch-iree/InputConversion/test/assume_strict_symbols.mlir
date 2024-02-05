@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --torch-iree-set-strict-symbolic-shapes %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(torch-iree-set-strict-symbolic-shapes))" %s | FileCheck %s
 
 module {
   // CHECK: func @forward() {{.*}} attributes {torch.assume_strict_symbolic_shapes}

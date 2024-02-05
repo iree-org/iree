@@ -8,7 +8,9 @@
 #include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -17,10 +19,6 @@ namespace {
 struct MakeSingleDispatchForFunctionPass
     : public MakeSingleDispatchForFunctionBase<
           MakeSingleDispatchForFunctionPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
-  }
-
   void runOnOperation() override;
 };
 } // namespace
@@ -30,8 +28,8 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
 
   // Abort if there are any operations that prevent moving all operations
   // into a single dispatch.
-  auto walkResult = funcOp.walk([](Operation *op) -> WalkResult {
-    return success(!isa<func::CallOp>(op));
+  auto walkResult = funcOp.walk([](mlir::CallOpInterface op) -> WalkResult {
+    return WalkResult::interrupt();
   });
   if (walkResult.wasInterrupted()) {
     funcOp->emitOpError("unhandled operation in function body prevents moving "
@@ -41,7 +39,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // Currently this can only be done for static shapes cause
   // there is no way of getting the tied dynamic shapes for
   // a function.
-  auto resultTypes = funcOp.getFunctionType().getResults();
+  auto resultTypes = funcOp.getResultTypes();
   if (llvm::any_of(resultTypes, [&](Type t) {
         auto shapedType = t.dyn_cast<ShapedType>();
         return shapedType && !shapedType.hasStaticShape();
@@ -51,7 +49,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
 
   IRRewriter rewriter(&getContext());
   Location loc = funcOp.getLoc();
-  Region &funcBody = funcOp.getBody();
+  Region &funcBody = funcOp.getFunctionBody();
 
   // Split the function entry block to create a new entry block into which the
   // new operations will be added.
@@ -85,7 +83,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   rewriter.create<func::ReturnOp>(loc, dispatchRegionOp.getResults());
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMakeSingleDispatchForFunctionPass() {
   return std::make_unique<MakeSingleDispatchForFunctionPass>();
 }

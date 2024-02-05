@@ -97,6 +97,11 @@ def VK_CapabilitiesAttr : VK_Attr<"Capabilities", "caps"> {
     OptionalParameter<"::mlir::UnitAttr">:$storagePushConstant8,
     OptionalParameter<"::mlir::UnitAttr">:$uniformAndStorageBuffer8BitAccess,
 
+    // VK_KHR_device_buffer_address features.
+    // This corresponds to the only capability implied by the extensions:
+    // https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_buffer_device_address.html#_new_spir_v_capabilities
+    OptionalParameter<"::mlir::UnitAttr">:$physicalDeviceBufferAddresses,
+
     // VK_KHR_shader_float16_int8 features.
     //
     // This corresponds to the `VkPhysicalDeviceShaderFloat16Int8Features`

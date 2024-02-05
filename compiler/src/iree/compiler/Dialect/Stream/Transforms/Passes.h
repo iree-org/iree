@@ -14,6 +14,10 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
 
+namespace mlir::func {
+class FuncDialect;
+} // namespace mlir::func
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//

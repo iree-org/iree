@@ -2,14 +2,12 @@
 
 // RUN: iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=vmvx %s --input=1x28x28x1xf32 | FileCheck %s
 // RUN: iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=llvm-cpu %s --input=1x28x28x1xf32 | FileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=vulkan-spirv %s --input=1x28x28x1xf32 | FileCheck %s)
-// RUN: [[ $IREE_METAL_DISABLE == 1 ]] || (iree-run-mlir --Xcompiler,iree-input-type=stablehlo --Xcompiler,iree-hal-target-backends=metal-spirv %s --input=1x28x28x1xf32 | FileCheck %s)
 
 module {
-  util.global private @"__iree_flow___sm_node17__model.layer-1.kernel" {noinline} = #util.byte_pattern<1> : tensor<784x128xf32>
-  util.global private @"__iree_flow___sm_node18__model.layer-1.bias" {noinline} = #util.byte_pattern<2> : tensor<128xf32>
-  util.global private @"__iree_flow___sm_node24__model.layer-2.kernel" {noinline} = #util.byte_pattern<3> : tensor<128x10xf32>
-  util.global private @"__iree_flow___sm_node25__model.layer-2.bias" {noinline} = #util.byte_pattern<4> : tensor<10xf32>
+  util.global private @"__iree_flow___sm_node17__model.layer-1.kernel" {inlining_policy = #util.inline.never} = #util.byte_pattern<1> : tensor<784x128xf32>
+  util.global private @"__iree_flow___sm_node18__model.layer-1.bias" {inlining_policy = #util.inline.never} = #util.byte_pattern<2> : tensor<128xf32>
+  util.global private @"__iree_flow___sm_node24__model.layer-2.kernel" {inlining_policy = #util.inline.never} = #util.byte_pattern<3> : tensor<128x10xf32>
+  util.global private @"__iree_flow___sm_node25__model.layer-2.bias" {inlining_policy = #util.inline.never} = #util.byte_pattern<4> : tensor<10xf32>
   func.func @predict(%arg0: tensor<1x28x28x1xf32>) -> tensor<1x10xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}} {
     %ptr___iree_flow___sm_node17__model.layer-1.kernel = util.global.address @"__iree_flow___sm_node17__model.layer-1.kernel" : !util.ptr<tensor<784x128xf32>>
     %ptr___iree_flow___sm_node18__model.layer-1.bias = util.global.address @"__iree_flow___sm_node18__model.layer-1.bias" : !util.ptr<tensor<128xf32>>

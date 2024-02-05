@@ -257,6 +257,49 @@ When at all possible the dispatch function call or dispatch function
 substitution approaches should be used instead and in many cases that is
 sufficient for most workloads not involving other libraries.
 
+### Compile Time Inlining Custom Function Calls
+
+**Overview**: user defines functions with MLIR dialects IREE is able to ingest
+paired with a matcher and replacement pattern. The matcher runs as preprocessing
+and calls into the replacement pattern for all successful matches. The
+replacement pattern imports a function from the externally 
+ABI, wires them up and links them in their runtime binary, declares the
+externally available functions in IR, and emits calls to the functions in IR
+interleaved with other IR.
+
+**Workflows**:
+
+Statically matched and imported external functions
+```
+                                            +--------------+
+                                            | example.mlir |
++--------------+       +--------------+     +--------------+
+| (one of the  |       | functions +  |            v
+| above static | ----> | matchers +   | ----> iree-compile
+| workflows)   |       | replace.mlir |            v
++--------------+       +--------------+     +--------------+
+                                            | example.vmfb |
+                                            +--------------+
+```
+
+**Samples**:
+
+* CPU: [custom_dispatch/cpu/embedded/](./cpu/embedded/) (.c -> .o)
+  * [custom_dispatch/cpu/embedded/](./cpu/embedded/example_transform_spec.mlir) (.mlir)
+* Vulkan/SPIR-V: [custom_dispatch/vulkan/shaders/](./vulkan/shaders/) (.glsl -> .spv)
+  * [custom_dispatch/vulkan/shaders/](./vulkan/shaders/example_transform_spec.mlir) (.mlir)
+
+The above two samples build on top of a couple of the static workflows shown
+above, but should work with any of the other approaches. The idea is to separate
+the custom kernel from the target module to be compiled, allowing integration of
+custom dispatches with default IREE codegen without the need to build a custom
+set of compiler tools around IREE to generate the necessary IR.
+
+There are a number of possible points at which the match and replace can happen;
+the above shows it after import + input conversion. Other plugin points are
+possible (e.g. before input conversion or after global optimization), but
+currently are missing some ergonomics on the available matchers.
+
 ### Others
 
 Most other situations are covered by [custom modules](/samples/custom_module/).

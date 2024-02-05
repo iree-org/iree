@@ -76,6 +76,21 @@ func.func @propagate_through_rank_reduced_extract_slice(%arg0 : tensor<1x256x1x1
 
 // -----
 
+func.func @rank_reduced_extract_transposed_unit_dim(%arg0: tensor<256x1x32x128xf32>, %arg1: tensor<1x32x256x128xf32>) -> tensor<32x64x128xf32> {
+  %transposed = linalg.transpose ins(%arg0 : tensor<256x1x32x128xf32>) outs(%arg1 : tensor<1x32x256x128xf32>) permutation = [1, 2, 0, 3] 
+  %extracted_slice = tensor.extract_slice %transposed[0, 0, 0, 0] [1, 32, 64, 128] [1, 1, 1, 1] : tensor<1x32x256x128xf32> to tensor<32x64x128xf32>
+  return %extracted_slice : tensor<32x64x128xf32>
+}
+// SINK-LABEL: func @rank_reduced_extract_transposed_unit_dim
+//       SINK:   %[[EXT:.+]] = tensor.extract_slice
+//  SINK-SAME:                   tensor<256x1x32x128xf32> to tensor<64x32x128xf32>
+//       SINK:   %[[RES:.+]] = linalg.transpose ins(%[[EXT]] : tensor<64x32x128xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<32x64x128xf32>)
+//  SINK-SAME:                    permutation = [1, 0, 2]
+//       SINK:   return %[[RES]] : tensor<32x64x128xf32>
+
+// -----
+
 func.func @propagate_to_matmul_ops(%lhs: tensor<16x16xf32>,
                                    %transposed_a: tensor<16x16xf32>,
                                    %transposed_b: tensor<16x16xf32>) -> tensor<16x16xf32> {

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-cpu-materialize-encoding --canonicalize --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-materialize-encoding),canonicalize,cse)" --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -19,7 +19,7 @@ func.func @set_encoding_7x7x7_matmul_LHS() attributes {
   %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<7x7xf32>>
   %9 = flow.dispatch.workload.ordinal %6, 2 : index
   %10 = flow.dispatch.workload.ordinal %7, 3 : index
-  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
+  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
   %12 = flow.dispatch.workload.ordinal %4, 0 : index
   %13 = flow.dispatch.workload.ordinal %5, 1 : index
   %14 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [7, 7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<7x7xf32>> -> tensor<7x7xf32>
@@ -29,8 +29,8 @@ func.func @set_encoding_7x7x7_matmul_LHS() attributes {
   ^bb0(%arg0: index, %arg1: index):
     tensor.yield %cst : f32
   } : tensor<7x7xf32> to tensor<?x?xf32>
-  %17 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  flow.dispatch.tensor.store %17, %11, offsets = [0, 0], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
+  %17 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  flow.dispatch.tensor.store %17, %11, offsets = [0, 0], sizes = [%9, %10], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<7x7xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
   return
 }
 // CHECK:    func @set_encoding_7x7x7_matmul_LHS(
@@ -63,7 +63,7 @@ func.func @set_encoding_128x80x32_batch_matmul_LHS() attributes {
   %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>>
   %9 = flow.dispatch.workload.ordinal %6, 2 : index
   %10 = flow.dispatch.workload.ordinal %7, 3 : index
-  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
+  %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
   %12 = flow.dispatch.workload.ordinal %4, 0 : index
   %13 = flow.dispatch.workload.ordinal %5, 1 : index
   %14 = flow.dispatch.tensor.load %8, offsets = [0, 0, 0], sizes = [128, 80, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>> -> tensor<128x80x32xf32>
@@ -73,10 +73,10 @@ func.func @set_encoding_128x80x32_batch_matmul_LHS() attributes {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):
     tensor.yield %cst : f32
   } : tensor<128x80x32xf32> to tensor<128x?x?xf32>
-  %17 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %17 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %17, %11, offsets = [0, 0, 0], sizes = [128, %9, %10], strides = [1, 1, 1]
-    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
+    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<128x80x32xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%9, %10}
   return
 }
 // CHECK:    func @set_encoding_128x80x32_batch_matmul_LHS(
@@ -110,7 +110,7 @@ func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
   %10 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>>
   %11 = flow.dispatch.workload.ordinal %8, 2 : index
   %12 = flow.dispatch.workload.ordinal %9, 3 : index
-  %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%11, %12}
+  %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%11, %12}
   %14 = flow.dispatch.workload.ordinal %6, 0 : index
   %15 = flow.dispatch.workload.ordinal %7, 1 : index
   %16 = flow.dispatch.tensor.load %10, offsets = [0, 0, 0], sizes = [128, 32, 320], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<128x32x320xf32>> -> tensor<128x32x320xf32>
@@ -120,10 +120,10 @@ func.func @set_encoding_128x32x320_batch_matmul_RHS() attributes {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):
     tensor.yield %cst : f32
   } : tensor<128x32x320xf32> to tensor<128x?x?xf32>
-  %19 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %19 = iree_linalg_ext.set_encoding %padded : tensor<128x?x?xf32> -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %19, %13, offsets = [0, 0, 0], sizes = [128, %11, %12], strides = [1, 1, 1]
-    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%11, %12}
+    : tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+    -> !flow.dispatch.tensor<writeonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<128x32x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%11, %12}
   return
 }
 // CHECK:    func @set_encoding_128x32x320_batch_matmul_RHS(
@@ -152,11 +152,11 @@ func.func @unset_encoding_128x80x320_batch_matmul_RESULT() attributes {
   %6 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
   %7 = flow.dispatch.workload.ordinal %4, 0 : index
   %8 = flow.dispatch.workload.ordinal %5, 1 : index
-  %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%7, %8}
+  %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%7, %8}
   %10 = flow.dispatch.tensor.load %9, offsets = [0, 0, 0], sizes = [128, %7, %8], strides = [1, 1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%7, %8}
-      -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = iree_linalg_ext.unset_encoding %10 : tensor<128x?x?xf32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<128x?x?xf32>
+      : !flow.dispatch.tensor<readonly:tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>>{%7, %8}
+      -> tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = iree_linalg_ext.unset_encoding %10 : tensor<128x?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<128x80x320xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<128x?x?xf32>
   %extracted_slice = tensor.extract_slice %11[0, 0, 0] [128, 80, 320] [1, 1, 1] : tensor<128x?x?xf32> to tensor<128x80x320xf32>
   flow.dispatch.tensor.store %extracted_slice, %6, offsets = [0, 0, 0], sizes = [128, 80, 320], strides = [1, 1, 1] : tensor<128x80x320xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x80x320xf32>>
   return
@@ -189,14 +189,14 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
   %cst = arith.constant 0.0 : f32
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
-  %0 = iree_linalg_ext.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %1 = iree_linalg_ext.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%3 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = iree_linalg_ext.unset_encoding %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
+  %0 = iree_linalg_ext.set_encoding %arg0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %1 = iree_linalg_ext.set_encoding %arg1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %2 = tensor.empty(%d0, %d1) : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %3 = linalg.fill ins(%cst : f32) outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %4 = linalg.matmul ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%3 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = iree_linalg_ext.unset_encoding %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   return %5 : tensor<?x?xf32>
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -234,28 +234,28 @@ func.func @matmul_lowering_f32f32f32_aarch64() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -294,28 +294,28 @@ func.func @matvec_lowering_f32f32f32_aarch64() attributes {
 } {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<16x16xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      : !flow.dispatch.tensor<readonly:tensor<16x16xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      : !flow.dispatch.tensor<readonly:tensor<16x1xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      : !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [16, 16], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<16x16xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
-      -> tensor<16x16xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<16x16xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      -> tensor<16x16xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [16, 1], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
-      -> tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<16x1xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      -> tensor<16x1xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [16, 1], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
-      -> tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      -> tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<16x16xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<16x16xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<16x1xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [16, 1], strides = [1, 1]
-      : tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
+      : tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<16x1xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 1 : index, user_indexing_maps = [#map, #map1, #map2]>>>
   return
 }
 //      CHECK: func @matvec_lowering_f32f32f32_aarch64()
@@ -351,28 +351,28 @@ func.func @matmul_lowering_f16f16f16_aarch64() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -414,28 +414,28 @@ func.func @matmul_lowering_f32f32f32_x86_64() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -478,28 +478,28 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx2() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -541,28 +541,28 @@ func.func @matmul_lowering_f32f32f32_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -604,28 +604,28 @@ func.func @matmul_lowering_f16f16f32_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -667,28 +667,28 @@ func.func @matmul_lowering_f16f16f16_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f16, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -730,28 +730,28 @@ func.func @matmul_lowering_bf16bf16f32_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -793,28 +793,28 @@ func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -856,28 +856,28 @@ func.func @matmul_lowering_bf16bf16f32_x86_64_avx512bf16() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, f32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -921,28 +921,28 @@ func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512bf16() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = LHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RHS, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xbf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [bf16, bf16, bf16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -986,37 +986,37 @@ func.func @matmul_lowering_f32f16f16_aarch64() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %lhs_f32 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %rhs = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %dest = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
 
-  %empty = tensor.empty(%M, %K) : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+  %empty = tensor.empty(%M, %K) : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %lhs_f16 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
-     ins(%lhs_f32 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-     outs(%empty : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>) {
+     ins(%lhs_f32 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+     outs(%empty : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: f32, %out: f16):
     %17 = arith.truncf %in : f32 to f16
     linalg.yield %17 : f16
-  } -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%lhs_f16, %rhs : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%dest : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%lhs_f16, %rhs : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%dest : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 // CHECK-DAG: #[[MAP_CEILDIV_8:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1051,37 +1051,37 @@ func.func @matmul_lowering_f32f16f16_x86_64_avx512f() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %lhs_f32 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %rhs = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %dest = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
 
-  %empty = tensor.empty(%M, %K) : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+  %empty = tensor.empty(%M, %K) : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %lhs_f16 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
-     ins(%lhs_f32 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-     outs(%empty : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>) {
+     ins(%lhs_f32 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+     outs(%empty : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: f32, %out: f16):
     %17 = arith.truncf %in : f32 to f16
     linalg.yield %17 : f16
-  } -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%lhs_f16, %rhs : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%dest : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%lhs_f16, %rhs : tensor<?x?xf16, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf16, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%dest : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xf16, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f16, f16], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 
@@ -1117,28 +1117,28 @@ func.func @matmul_lowering_i8i8i32_aarch64() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1180,28 +1180,28 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1245,28 +1245,28 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1304,15 +1304,15 @@ func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
 func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs : tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {cpu_features = "+sve", target_triple="aarch64-xyz-xyz"}>
 } {
-  %0 = iree_linalg_ext.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %1 = iree_linalg_ext.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %2 = iree_linalg_ext.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %0 = iree_linalg_ext.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %1 = iree_linalg_ext.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %2 = iree_linalg_ext.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %3 = linalg.matmul
-      ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %4 = iree_linalg_ext.unset_encoding %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
+      ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %4 = iree_linalg_ext.unset_encoding %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   return %4 : tensor<?x?xf32>
 }
 
@@ -1329,15 +1329,15 @@ func.func @matmul_lowering_f32f32f32_aarch64_sve(%lhs : tensor<?x?xf32>, %rhs: t
 func.func @matmul_lowering_f32f32f32_riscv(%lhs : tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: tensor<?x?xf32>) -> tensor<?x?xf32> attributes {
   hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="riscv32-xyz-xyz"}>
 } {
-  %0 = iree_linalg_ext.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %1 = iree_linalg_ext.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %2 = iree_linalg_ext.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %0 = iree_linalg_ext.set_encoding %lhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %1 = iree_linalg_ext.set_encoding %rhs : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %2 = iree_linalg_ext.set_encoding %acc : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
   %3 = linalg.matmul
-      ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
-  %4 = iree_linalg_ext.unset_encoding %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
+      ins(%0, %1 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%2 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>>
+  %4 = iree_linalg_ext.unset_encoding %3 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   return %4 : tensor<?x?xf32>
 }
 // RISC-V targets does not implement data-tiling yet.
@@ -1358,28 +1358,28 @@ func.func @matmul_lowering_i8i8i32_riscv32_ukernel() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1423,28 +1423,28 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx2() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1488,28 +1488,28 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512bw() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -1553,28 +1553,28 @@ func.func @matmul_lowering_i8i8i32_x86_64_avx512vnni() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
@@ -1624,28 +1624,28 @@ func.func @extend_batch_vecmat_explicit_unit_dim(%arg0: tensor<32x1x128xi8>, %ar
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x1x128xi8> to tensor<?x?x?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c32, %c1, %c128) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c32, %c1, %c128) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128x11008xi8> to tensor<?x?x?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c32, %c128, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c32, %c128, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c32, %c1, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.batch_matmul ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xi32>
+  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c32, %c1, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.batch_matmul ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x1x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0, 0] [32, 1, 11008] [1, 1, 1] : tensor<?x?x?xi32> to tensor<32x1x11008xi32>
   return %extracted_slice : tensor<32x1x11008xi32>
 }
@@ -1687,28 +1687,28 @@ func.func @matmul_lowering_i16i16i32_x86_64_avx2() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %6 = linalg.matmul
-      ins(%3, %4 : tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%3, %4 : tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi16, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, i16, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
@@ -1752,35 +1752,35 @@ func.func @matmul_lowering_i16ui4i32_x86_64_avx512vnni() attributes {
   %N = hal.interface.constant.load[1] : index
   %K = hal.interface.constant.load[2] : index
   %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
   %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
   %out_binding = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0)
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   %lhs = flow.dispatch.tensor.load %lhs_binding, offsets = [0, 0], sizes = [%M, %K], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
-      -> tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %K}
+      -> tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %rhs_i4 = flow.dispatch.tensor.load %rhs_binding, offsets = [0, 0], sizes = [%K, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
-      -> tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
-  %empty = tensor.empty(%K, %N) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readonly:tensor<?x?xi4, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%K, %N}
+      -> tensor<?x?xi4, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+  %empty = tensor.empty(%K, %N) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %rhs_i32 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
-     ins(%rhs_i4 : tensor<?x?xi4, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>) outs(%empty : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>) {
+     ins(%rhs_i4 : tensor<?x?xi4, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>) outs(%empty : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i4, %out: i32):
     %17 = arith.extui %in : i4 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %out = flow.dispatch.tensor.load %out_binding, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      : !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
   %result = linalg.matmul
-      ins(%lhs, %rhs_i32 : tensor<?x?xi16, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>,
-                   tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      outs(%out : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>)
-      -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      ins(%lhs, %rhs_i32 : tensor<?x?xi16, #iree_linalg_ext.encoding<role = LHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>,
+                   tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      outs(%out : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>)
+      -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
   flow.dispatch.tensor.store %result, %out_binding, offsets = [0, 0], sizes = [%M, %N], strides = [1, 1]
-      : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
-      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
+      : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>
+      -> !flow.dispatch.tensor<readwrite:tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i16, ui4, i32], user_indexing_maps = [#map, #map1, #map2]>>>{%M, %N}
   return
 }
 
@@ -1822,28 +1822,28 @@ func.func @vecmat(%arg0: tensor<128xi8>, %arg1: tensor<128x11008xi8>) -> tensor<
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4 : tensor<?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128x11008xi8> to tensor<?x?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c128, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c128, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c11008) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.vecmat ins(%6, %9 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c11008) : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.vecmat ins(%6, %9 : tensor<?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [11008] [1] : tensor<?xi32> to tensor<11008xi32>
   return %extracted_slice : tensor<11008xi32>
 }
@@ -1894,28 +1894,28 @@ func.func @matvec(%arg0: tensor<11008x128xi8>, %arg1: tensor<128xi8>) -> tensor<
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<11008x128xi8> to tensor<?x?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c11008, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c11008, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0] high[%c0] {
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%7 : tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%7 : tensor<?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c11008) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
+  } -> tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c11008) : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [11008] [1] : tensor<?xi32> to tensor<11008xi32>
   return %extracted_slice : tensor<11008xi32>
 }
@@ -1966,28 +1966,28 @@ func.func @matvec_with_narrow_M(%arg0: tensor<15x128xi8>, %arg1: tensor<128xi8>)
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<15x128xi8> to tensor<?x?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c15, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c15, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0] high[%c0] {
   ^bb0(%arg2: index):
     tensor.yield %c0_i8 : i8
   } : tensor<128xi8> to tensor<?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%7 : tensor<?xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?xi8> -> tensor<?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c128) : tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%7 : tensor<?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c15) : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
+  } -> tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c15) : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.matvec ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 15 : index, matmul_narrow_N = 1 : index, original_type = tensor<15xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?xi32>
   %extracted_slice = tensor.extract_slice %13[0] [15] [1] : tensor<?xi32> to tensor<15xi32>
   return %extracted_slice : tensor<15xi32>
 }
@@ -2040,28 +2040,28 @@ func.func @batch_vecmat(%arg0: tensor<32x128xi8>, %arg1: tensor<32x128x11008xi8>
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128xi8> to tensor<?x?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c32, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c32, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0, 0, 0] high[%c0, %c0, %c0] {
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128x11008xi8> to tensor<?x?x?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c32, %c128, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c32, %c128, %c11008) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%7 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.batch_vecmat ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
+  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.batch_vecmat ins(%6, %9 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x128x11008xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_M = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0] [32, 11008] [1, 1] : tensor<?x?xi32> to tensor<32x11008xi32>
   return %extracted_slice : tensor<32x11008xi32>
 }
@@ -2113,28 +2113,28 @@ func.func @batch_matvec(%arg0: tensor<32x11008x128xi8>, %arg1: tensor<32x128xi8>
   ^bb0(%arg2: index, %arg3: index, %arg4: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x11008x128xi8> to tensor<?x?x?xi8>
-  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %5 = tensor.empty(%c32, %c11008, %c128) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %4 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xi8> -> tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %5 = tensor.empty(%c32, %c11008, %c128) : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %6 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%4 : tensor<?x?x?xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%5 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  } -> tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
   %padded_0 = tensor.pad %arg1 low[0, 0] high[%c0, %c0] {
   ^bb0(%arg2: index, %arg3: index):
     tensor.yield %c0_i8 : i8
   } : tensor<32x128xi8> to tensor<?x?xi8>
-  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8 = tensor.empty(%c32, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<?x?xi8, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
+  %7 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xi8> -> tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8 = tensor.empty(%c32, %c128) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%7 : tensor<?x?xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%8 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) {
   ^bb0(%in: i8, %out: i32):
     %17 = arith.extsi %in : i8 to i32
     linalg.yield %17 : i32
-  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
-  %10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %12 = linalg.batch_matvec ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<user = BATCH_MATMUL, role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
+  } -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>
+  %10 = tensor.empty(%c32, %c11008) : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11 = linalg.fill ins(%c0_i32 : i32) outs(%10 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %12 = linalg.batch_matvec ins(%6, %9 : tensor<?x?x?xi32, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xi32, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x128xi8>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%11 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13 = iree_linalg_ext.unset_encoding %12 : tensor<?x?xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], matmul_narrow_N = 1 : index, original_type = tensor<32x11008xi32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xi32>
   %extracted_slice = tensor.extract_slice %13[0, 0] [32, 11008] [1, 1] : tensor<?x?xi32> to tensor<32x11008xi32>
   return %extracted_slice : tensor<32x11008xi32>
 }
@@ -2180,32 +2180,32 @@ func.func @matmul_transpose_a_f32f32f32(%arg0: tensor<256x128xf32>, %arg1: tenso
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x128xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x128xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %4 = affine.apply #map3()[%3#0, %c256]
   %5 = affine.apply #map3()[%3#1, %c128]
   %padded = tensor.pad %arg0 low[0, 0] high[%4, %5] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<256x128xf32> to tensor<?x?xf32>
-  %6 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %6 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<256x512xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %8 = affine.apply #map3()[%7#0, %c256]
   %9 = affine.apply #map3()[%7#1, %c512]
   %padded_0 = tensor.pad %arg1 low[0, 0] high[%8, %9] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<256x512xf32> to tensor<?x?xf32>
-  %10 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %10 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %12 = affine.apply #map3()[%11#0, %c128]
   %13 = affine.apply #map3()[%11#1, %c512]
   %padded_1 = tensor.pad %arg2 low[0, 0] high[%12, %13] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x512xf32> to tensor<?x?xf32>
-  %14 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %15 = linalg.matmul_transpose_a ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
+  %14 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %15 = linalg.matmul_transpose_a ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   %extracted_slice = tensor.extract_slice %16[0, 0] [128, 512] [1, 1] : tensor<?x?xf32> to tensor<128x512xf32>
   return %extracted_slice : tensor<128x512xf32>
 }
@@ -2237,32 +2237,32 @@ func.func @matmul_transpose_b_f32f32f32(%arg0: tensor<128x256xf32>, %arg1: tenso
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x256xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %3:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x256xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %4 = affine.apply #map3()[%3#0, %c128]
   %5 = affine.apply #map3()[%3#1, %c256]
   %padded = tensor.pad %arg0 low[0, 0] high[%4, %5] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x256xf32> to tensor<?x?xf32>
-  %6 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<512x256xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %6 = iree_linalg_ext.set_encoding %padded : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %7:2 = iree_linalg_ext.upper_bound_tile_size tensor<512x256xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %8 = affine.apply #map3()[%7#0, %c512]
   %9 = affine.apply #map3()[%7#1, %c256]
   %padded_0 = tensor.pad %arg1 low[0, 0] high[%8, %9] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<512x256xf32> to tensor<?x?xf32>
-  %10 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
+  %10 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %11:2 = iree_linalg_ext.upper_bound_tile_size tensor<128x512xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
   %12 = affine.apply #map3()[%11#0, %c128]
   %13 = affine.apply #map3()[%11#1, %c512]
   %padded_1 = tensor.pad %arg2 low[0, 0] high[%12, %13] {
   ^bb0(%arg3: index, %arg4: index):
     tensor.yield %cst : f32
   } : tensor<128x512xf32> to tensor<?x?xf32>
-  %14 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %15 = linalg.matmul_transpose_b ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<user =  MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
+  %14 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %15 = linalg.matmul_transpose_b ins(%6, %10 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%14 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %16 = iree_linalg_ext.unset_encoding %15 : tensor<?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?xf32>
   %extracted_slice = tensor.extract_slice %16[0, 0] [128, 512] [1, 1] : tensor<?x?xf32> to tensor<128x512xf32>
   return %extracted_slice : tensor<128x512xf32>
 }
@@ -2294,7 +2294,7 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   %c128 = arith.constant 128 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x256x128xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x256x128xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %4 = affine.apply #map3()[%3#0, %c2]
   %5 = affine.apply #map3()[%3#1, %c256]
   %6 = affine.apply #map3()[%3#2, %c128]
@@ -2302,8 +2302,8 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x256x128xf32> to tensor<?x?x?xf32>
-  %7 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x256x512xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %7 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x256x512xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %9 = affine.apply #map3()[%8#0, %c2]
   %10 = affine.apply #map3()[%8#1, %c256]
   %11 = affine.apply #map3()[%8#2, %c512]
@@ -2311,8 +2311,8 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x256x512xf32> to tensor<?x?x?xf32>
-  %12 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x512xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %12 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x512xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %14 = affine.apply #map3()[%13#0, %c2]
   %15 = affine.apply #map3()[%13#1, %c128]
   %16 = affine.apply #map3()[%13#2, %c512]
@@ -2320,9 +2320,9 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0: tensor<2x256x128xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x512xf32> to tensor<?x?x?xf32>
-  %17 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %18 = linalg.batch_matmul_transpose_a ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
+  %17 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %18 = linalg.batch_matmul_transpose_a ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x256x128xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x256x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
   %extracted_slice = tensor.extract_slice %19[0, 0, 0] [2, 128, 512] [1, 1, 1] : tensor<?x?x?xf32> to tensor<2x128x512xf32>
   return %extracted_slice : tensor<2x128x512xf32>
 }
@@ -2354,7 +2354,7 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   %c256 = arith.constant 256 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c512 = arith.constant 512 : index
-  %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x256xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %3:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x256xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %4 = affine.apply #map3()[%3#0, %c2]
   %5 = affine.apply #map3()[%3#1, %c128]
   %6 = affine.apply #map3()[%3#2, %c256]
@@ -2362,8 +2362,8 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x256xf32> to tensor<?x?x?xf32>
-  %7 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %8:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x512x256xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %7 = iree_linalg_ext.set_encoding %padded : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %8:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x512x256xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %9 = affine.apply #map3()[%8#0, %c2]
   %10 = affine.apply #map3()[%8#1, %c512]
   %11 = affine.apply #map3()[%8#2, %c256]
@@ -2371,8 +2371,8 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x512x256xf32> to tensor<?x?x?xf32>
-  %12 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %13:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x512xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
+  %12 = iree_linalg_ext.set_encoding %padded_0 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %13:3 = iree_linalg_ext.upper_bound_tile_size tensor<2x128x512xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index, index
   %14 = affine.apply #map3()[%13#0, %c2]
   %15 = affine.apply #map3()[%13#1, %c128]
   %16 = affine.apply #map3()[%13#2, %c512]
@@ -2380,9 +2380,9 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0: tensor<2x128x256xf32>, %arg
   ^bb0(%arg3: index, %arg4: index, %arg5: index):
     tensor.yield %cst : f32
   } : tensor<2x128x512xf32> to tensor<?x?x?xf32>
-  %17 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %18 = linalg.batch_matmul_transpose_b ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
-  %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<user =  BATCH_MATMUL, role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
+  %17 = iree_linalg_ext.set_encoding %padded_1 : tensor<?x?x?xf32> -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %18 = linalg.batch_matmul_transpose_b ins(%7, %12 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<2x128x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>, tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RHS, element_types = [f32, f32, f32], original_type = tensor<2x512x256xf32>, user_indexing_maps = [#map, #map1, #map2]>>) outs(%17 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>) -> tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>>
+  %19 = iree_linalg_ext.unset_encoding %18 : tensor<?x?x?xf32, #iree_linalg_ext.encoding<role =  RESULT, element_types = [f32, f32, f32], original_type = tensor<2x128x512xf32>, user_indexing_maps = [#map, #map1, #map2]>> -> tensor<?x?x?xf32>
   %extracted_slice = tensor.extract_slice %19[0, 0, 0] [2, 128, 512] [1, 1, 1] : tensor<?x?x?xf32> to tensor<2x128x512xf32>
   return %extracted_slice : tensor<2x128x512xf32>
 }

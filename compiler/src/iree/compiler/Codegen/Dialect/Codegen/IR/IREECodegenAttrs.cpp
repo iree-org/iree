@@ -9,7 +9,6 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -60,12 +59,10 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
-    SymbolRefAttr codegenSpec) {
+    SymbolRefAttr codegenSpec, DictionaryAttr configuration) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, softwarePipelineDepth,
-             softwarePipelineStoreStage, codegenSpec);
+  return get(context, pipelineAttr, codegenSpec, configuration);
 }
 
 DispatchLoweringPassPipeline
@@ -76,8 +73,7 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    unsigned softwarePipelineDepth, unsigned softwarePipelineStoreStage,
-    SymbolRefAttr codegenSpec) {
+    SymbolRefAttr codegenSpec, DictionaryAttr configuration) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -298,11 +294,10 @@ LogicalResult CompilationInfoAttr::verify(
   if (!translationInfo) {
     return emitError() << "missing translation info";
   }
-  if (failed(TranslationInfoAttr::verify(
-          emitError, translationInfo.getPassPipeline(),
-          translationInfo.getSoftwarePipelineDepth(),
-          translationInfo.getSoftwarePipelineStoreStage(),
-          translationInfo.getCodegenSpec()))) {
+  if (failed(TranslationInfoAttr::verify(emitError,
+                                         translationInfo.getPassPipeline(),
+                                         translationInfo.getCodegenSpec(),
+                                         translationInfo.getConfiguration()))) {
     return failure();
   }
   return success();
@@ -377,7 +372,7 @@ std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
   return {};
 }
 
-LogicalResult setDispatchConfig(func::FuncOp entryPoint,
+LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
                                 ArrayRef<int64_t> workgroupSize,
                                 std::optional<int64_t> subgroupSize) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
@@ -394,7 +389,7 @@ LogicalResult setDispatchConfig(func::FuncOp entryPoint,
 }
 
 LogicalResult
-setTranslationInfo(func::FuncOp entryPoint,
+setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
   if (failed(exportOp))

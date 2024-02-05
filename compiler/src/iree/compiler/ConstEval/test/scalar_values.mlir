@@ -14,7 +14,7 @@ module @eval_i8_scalar {
     %offset = util.global.load @offset : i8
     %sum = arith.addi %cst, %offset : i8
     util.global.store %sum, @hoisted : i8
-    util.initializer.return
+    util.return
   }
 }
 
@@ -33,7 +33,7 @@ module @eval_i16_scalar {
     %offset = util.global.load @offset : i16
     %sum = arith.addi %cst, %offset : i16
     util.global.store %sum, @hoisted : i16
-    util.initializer.return
+    util.return
   }
 }
 
@@ -52,7 +52,7 @@ module @eval_i32_scalar {
     %offset = util.global.load @offset : i32
     %sum = arith.addi %cst, %offset : i32
     util.global.store %sum, @hoisted : i32
-    util.initializer.return
+    util.return
   }
 }
 
@@ -71,7 +71,7 @@ module @eval_i64_scalar {
     %offset = util.global.load @offset : i64
     %sum = arith.addi %cst, %offset : i64
     util.global.store %sum, @hoisted : i64
-    util.initializer.return
+    util.return
   }
 }
 
@@ -90,6 +90,6 @@ module @eval_f32_scalar {
     %offset = util.global.load @offset : f32
     %sum = arith.addf %cst, %offset : f32
     util.global.store %sum, @hoisted : f32
-    util.initializer.return
+    util.return
   }
 }

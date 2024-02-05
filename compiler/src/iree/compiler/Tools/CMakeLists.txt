@@ -67,8 +67,10 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Loader::IR::HALLoaderDialect
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::Modules::IO::Parameters::IR::IOParametersDialect
+    iree::compiler::Modules::IO::Parameters::Transforms
     iree::compiler::Pipelines
     iree::compiler::Preprocessing::Passes
+    iree::compiler::Preprocessing::TransformExtensions::PreprocessingExtensions
   PUBLIC
 )
 
@@ -104,9 +106,21 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToSPIRV
     MLIRTensorInferTypeOpInterfaceImpl
+    MLIRTransformDialect
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::VM::Target::init_targets
+
+    MLIRAffineTransformOps
+    MLIRBufferizationTransformOps
+    MLIRFuncTransformOps
+    MLIRGPUTransformOps
+    MLIRLinalgTransformOps
+    MLIRMemRefTransformOps
+    MLIRSCFTransformOps
+    MLIRTensorTransformOps
+    MLIRVectorTransformOps
+    MLIRTransformLoopExtension
   PUBLIC
 )
 

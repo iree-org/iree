@@ -624,7 +624,7 @@ struct GlobalTimepointConversionPattern
       return failure();
     if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
       return failure();
-    rewriter.updateRootInPlace(
+    rewriter.modifyOpInPlace(
         op, [&]() { op.setInitialValueAttr(rewriter.getI64IntegerAttr(0)); });
     return success();
   }

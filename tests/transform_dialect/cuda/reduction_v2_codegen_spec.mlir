@@ -63,7 +63,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.tensor.reassociative_reshape_folding
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %func_3 : !transform.any_op
+    transform.apply_cse to %func_3 : !transform.any_op
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
     %func_5 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_5 {
@@ -101,7 +101,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_7 : !transform.any_op
-    transform.iree.apply_cse %func_7 : !transform.any_op
+    transform.apply_cse to %func_7 : !transform.any_op
 
     transform.yield
   }

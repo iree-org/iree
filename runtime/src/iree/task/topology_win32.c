@@ -165,13 +165,13 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
         "failed to query logical processor information size (%08X)",
-        GetLastError());
+        (unsigned)GetLastError());
   }
   if (cache_relationships_size > 64 * 1024) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "logical processor information size overflow (got "
                             "%u which is large for a stack alloc)",
-                            cache_relationships_size);
+                            (unsigned)cache_relationships_size);
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* cache_relationships =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
@@ -182,7 +182,8 @@ iree_status_t iree_task_topology_fixup_constructive_sharing_masks(
                                         &cache_relationships_size)) {
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
-        "failed to query logical processor information (%08X)", GetLastError());
+        "failed to query logical processor information (%08X)",
+        (unsigned)GetLastError());
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* cache_relationships_end =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)
@@ -222,14 +223,14 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
         "failed to query logical processor information size (%08X)",
-        GetLastError());
+        (unsigned)GetLastError());
   }
   if (all_relationships_size > 64 * 1024) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "logical processor information size overflow (got "
                             "%u which is large for a stack alloc)",
-                            all_relationships_size);
+                            (unsigned)all_relationships_size);
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
@@ -241,7 +242,8 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
-        "failed to query logical processor information (%08X)", GetLastError());
+        "failed to query logical processor information (%08X)",
+        (unsigned)GetLastError());
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships_end =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)all_relationships +
@@ -278,8 +280,6 @@ iree_status_t iree_task_topology_initialize_from_logical_cpu_set(
 
   // Build an on-stack table for random access into all logical processors.
   // This isn't strictly required but makes it easier to walk the CPU table.
-  PROCESSOR_RELATIONSHIP** all_processors =
-      iree_alloca(sizeof(PROCESSOR_RELATIONSHIP*) * total_processor_count);
   iree_host_size_t global_processor_count = 0;
   for (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* p = all_relationships;
        p < all_relationships_end;
@@ -361,14 +361,14 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
         "failed to query logical processor information size (%08X)",
-        GetLastError());
+        (unsigned)GetLastError());
   }
   if (all_relationships_size > 64 * 1024) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
                             "logical processor information size overflow (got "
                             "%u which is large for a stack alloc)",
-                            all_relationships_size);
+                            (unsigned)all_relationships_size);
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)iree_alloca(
@@ -380,7 +380,8 @@ iree_status_t iree_task_topology_initialize_from_physical_cores(
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
         iree_status_code_from_win32_error(GetLastError()),
-        "failed to query logical processor information (%08X)", GetLastError());
+        "failed to query logical processor information (%08X)",
+        (unsigned)GetLastError());
   }
   SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX* all_relationships_end =
       (SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX*)((uintptr_t)all_relationships +

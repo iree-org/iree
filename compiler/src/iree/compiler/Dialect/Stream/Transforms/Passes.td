@@ -492,9 +492,14 @@ def VerifyLoweringToTensorsPass :
   let summary = "Verifies that input dialects are converted to stream.tensor.* ops.";
 }
 
+def VerifyLoweringToAsyncResourcesPass :
+    Pass<"iree-stream-verify-lowering-to-async-resources", "mlir::ModuleOp"> {
+  let summary = "Verifies that all stream.tensor.* ops and types are fully lowered to stream.async.* resource ops.";
+}
+
 def VerifyLoweringToAsyncPass :
     Pass<"iree-stream-verify-lowering-to-async", "mlir::ModuleOp"> {
-  let summary = "Verifies that all stream.tensor.* ops and types are fully lowered to stream.async.* ops.";
+  let summary = "Verifies that all stream.tensor.* ops and types are fully lowered to stream.async.* ops and all resources have an assigned lifetime.";
 }
 
 def VerifyAsyncAccessRangesPass :

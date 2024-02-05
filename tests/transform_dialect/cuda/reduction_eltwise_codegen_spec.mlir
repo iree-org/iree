@@ -27,7 +27,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     // Step 2. First level of tiling + fusion parallelizes to blocks. Tile the
     // trailing elementwise the same way we want to tile the reduction.
@@ -48,7 +48,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     // Step 3. Second level of tiling + fusion parallelizes to threads.
     // ===========================================================================
@@ -72,7 +72,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op
       : (!transform.any_op) -> !transform.any_op
@@ -93,7 +93,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     // Step 4. Rank-reduce and vectorize.
     // ===========================================================================
@@ -152,7 +152,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op_3 : !transform.any_op
-    transform.iree.apply_cse %func_op_3 : !transform.any_op
+    transform.apply_cse to %func_op_3 : !transform.any_op
 
     transform.yield
   }

@@ -19,13 +19,13 @@ on:
       runner-env:
         required: true
         type: string
-      build-dir:
+      install-dir:
         required: true
         type: string
-      build-dir-archive:
+      install-dir-archive:
         required: true
         type: string
-      build-dir-gcs-artifact:
+      install-dir-gcs-artifact:
         required: true
         type: string
       benchmark-presets:
@@ -82,9 +82,9 @@ jobs:
       - cpu
       - os-family=Linux
     env:
-      HOST_BUILD_DIR: ${{ inputs.build-dir }}
-      HOST_BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
-      HOST_BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ inputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ inputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ inputs.install-dir-gcs-artifact }}
     outputs:
       e2e-test-artifacts-dir: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
       e2e-test-artifacts-gcs-artifact-dir: ${{ steps.upload.outputs.e2e-test-artifacts-gcs-artifact-dir }}
@@ -95,10 +95,10 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${HOST_BUILD_DIR_GCS_ARTIFACT}" "${HOST_BUILD_DIR_ARCHIVE}"
-      - name: "Extracting install from build dir archive"
-        run: tar -xf "${HOST_BUILD_DIR_ARCHIVE}" "${HOST_BUILD_DIR}/install"
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building e2e test artifacts"
         id: build
         env:
@@ -108,11 +108,11 @@ jobs:
           IREE_SHARD_COUNT: ${{ inputs.shard-count }}
         run: |
           build_tools/github_actions/docker_run.sh \
-            --env "IREE_HOST_BIN_DIR=${HOST_BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
             --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
             --env "IREE_SHARD_COUNT=${IREE_SHARD_COUNT}" \
-            gcr.io/iree-oss/frontends@sha256:8e40a290cfd4c982645054b157691510a7aae5a0d5b53088ac491709a4d83f60 \
+            gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"

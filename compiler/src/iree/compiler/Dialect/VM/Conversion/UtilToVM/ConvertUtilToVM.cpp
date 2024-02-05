@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -43,6 +42,10 @@ void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
                                     RewritePatternSet &patterns);
+void populateUtilStructuralToVMPatterns(MLIRContext *context,
+                                        ConversionTarget &conversionTarget,
+                                        TypeConverter &typeConverter,
+                                        RewritePatternSet &patterns);
 
 namespace {
 
@@ -122,6 +125,8 @@ void populateUtilToVMPatterns(MLIRContext *context,
                                patterns);
   populateUtilStatusToVMPatterns(context, conversionTarget, typeConverter,
                                  patterns);
+  populateUtilStructuralToVMPatterns(context, conversionTarget, typeConverter,
+                                     patterns);
 }
 
 } // namespace mlir::iree_compiler

@@ -100,7 +100,7 @@ util.initializer {
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@spirv::@dispatch_2) workgroups([%c1, %c1, %c1])
-  util.initializer.return
+  util.return
 }
 
 //  CHECK-NOT: hal.executable private @dispatch_0

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-llvmgpu-pack-shared-memory-alloc -cse %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-pack-shared-memory-alloc),cse)" %s | FileCheck %s
 
 func.func @shared_memory_disjoint() {
   %c0 = arith.constant 0 : index

@@ -11,7 +11,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -148,8 +147,7 @@ struct ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {
         alignmentAttr, /*mimeType=*/nullptr);
     initializerBuilder.create<IREE::Util::GlobalStoreOp>(
         globalOp.getLoc(), constantOp.getResult(), newOp.getName());
-    initializerBuilder.create<IREE::Util::InitializerReturnOp>(
-        globalOp.getLoc());
+    initializerBuilder.create<IREE::Util::ReturnOp>(globalOp.getLoc());
 
     return success();
   }

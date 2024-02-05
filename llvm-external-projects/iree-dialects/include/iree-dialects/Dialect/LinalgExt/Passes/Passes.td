@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 def LinalgExtToLoops :
-    Pass<"iree-linalg-ext-to-loops", "func::FuncOp"> {
+    InterfacePass<"iree-linalg-ext-to-loops", "mlir::FunctionOpInterface"> {
   let summary = "Convert LinalgExt ops to loops and Linalg ops.";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
@@ -39,7 +39,7 @@ def PadContractionToBlockSize :
 }
 
 def TopkSplitReduction:
-    Pass<"iree-linalg-ext-topk-split-reduction", "func::FuncOp"> {
+    InterfacePass<"iree-linalg-ext-topk-split-reduction", "mlir::FunctionOpInterface"> {
   let summary = "Topk split reduction pass.";
   let description = [{
     Produces a "map-reduce" style of parallelizing a Topk Op. The op is split
@@ -54,7 +54,7 @@ def TopkSplitReduction:
 }
 
 def TileAndDecomposeWinogradTransform :
-    Pass<"iree-linalg-ext-tile-and-decompose-winograd", "func::FuncOp"> {
+    InterfacePass<"iree-linalg-ext-tile-and-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
       "Tiles and decomposes winograd transform ops into linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
@@ -72,7 +72,7 @@ def ConvertConv2DToWinograd :
 }
 
 def TileAndDecomposeAttention :
-    Pass<"iree-linalg-ext-tile-and-decompose-attention", "func::FuncOp"> {
+    InterfacePass<"iree-linalg-ext-tile-and-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
       "Tiles and decomposes attention op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"

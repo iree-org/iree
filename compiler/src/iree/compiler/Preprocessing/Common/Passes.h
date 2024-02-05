@@ -9,7 +9,7 @@
 
 #include <functional>
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -20,7 +20,7 @@ namespace mlir::iree_compiler::Preprocessing {
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
 /// Moves the body of the entire function into a single dispatch.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMakeSingleDispatchForFunctionPass();
 
 /// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
@@ -29,6 +29,9 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
+
+#define GEN_PASS_DECL
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: keep
 
 void registerCommonPreprocessingPasses();
 

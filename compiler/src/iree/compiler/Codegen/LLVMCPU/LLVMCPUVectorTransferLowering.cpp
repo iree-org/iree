@@ -36,7 +36,6 @@ void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
   auto funcOp = getOperation();
 
   RewritePatternSet patterns(ctx);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
   vector::populateVectorTransferLoweringPatterns(patterns,
                                                  /*maxTransferRank=*/1);
   auto vectorTransferToSCFOptions =
@@ -46,7 +45,7 @@ void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorTransferLoweringPass() {
   return std::make_unique<LLVMCPUVectorTransferLoweringPass>();
 }

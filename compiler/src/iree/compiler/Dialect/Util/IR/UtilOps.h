@@ -109,6 +109,46 @@ ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
 void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size);
 
 //===----------------------------------------------------------------------===//
+// custom<OperandTypeList>
+//===----------------------------------------------------------------------===//
+// ()
+// (type, type)
+
+ParseResult parseOperandTypeList(OpAsmParser &parser,
+                                 SmallVectorImpl<Type> &operandTypes);
+void printOperandTypeList(OpAsmPrinter &p, Operation *op,
+                          TypeRange operandTypes);
+
+//===----------------------------------------------------------------------===//
+// custom<TiedResultList>
+//===----------------------------------------------------------------------===//
+// type, %operand4
+
+ParseResult
+parseTiedResultList(OpAsmParser &parser,
+                    ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+                    TypeRange operandTypes, SmallVectorImpl<Type> &resultTypes,
+                    ArrayAttr &tiedOperands);
+void printTiedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
+                         TypeRange operandTypes, TypeRange resultTypes,
+                         ArrayAttr tiedOperands);
+
+//===----------------------------------------------------------------------===//
+// custom<TiedFunctionResultList>
+//===----------------------------------------------------------------------===//
+// ()
+// type
+// (type, %operand0, %operand1 as type)
+
+ParseResult parseTiedFunctionResultList(
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    ArrayRef<Type> operandTypes, SmallVectorImpl<Type> &resultTypes,
+    ArrayAttr &tiedOperands);
+void printTiedFunctionResultList(OpAsmPrinter &p, Operation *op,
+                                 ValueRange operands, TypeRange operandTypes,
+                                 TypeRange resultTypes, ArrayAttr tiedOperands);
+
+//===----------------------------------------------------------------------===//
 // custom<ShapedTiedResult>
 //===----------------------------------------------------------------------===//
 // type{%dim0, %dim1}

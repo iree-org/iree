@@ -121,7 +121,7 @@ class Linux_x86_64_Benchmarks(object):
             presets=[benchmark_presets.X86_64],
         )
         large_run_configs = self._generate(
-            model_groups.X86_64_BENCHMARK_CONFIG_LONG,
+            model_groups.X86_64_BENCHMARK_CONFIG_LARGE,
             self.CASCADELAKE_DT_UK_COMPILE_CONFIG,
             cascadelake_devices,
             presets=[benchmark_presets.X86_64_LARGE],

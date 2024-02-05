@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-rematerialize-parallel-ops --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-rematerialize-parallel-ops))" --split-input-file %s | FileCheck %s
 
 func.func @merged_reduction_parallel(%0: tensor<1x40960xf32>, %1: tensor<1xf32>, %7: tensor<1xf32>)
   -> tensor<1x40960xf32> {

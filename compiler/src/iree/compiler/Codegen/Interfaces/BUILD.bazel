@@ -119,7 +119,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":UKernelOpInterfaceGen",
-        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
     ],
 )

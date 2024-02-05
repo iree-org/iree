@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
@@ -63,7 +62,8 @@ outlineDispatchExternOp(std::string name,
                         IREE::HAL::DispatchExternOp dispatchExternOp) {
   // Create the executable that will contain the outlined region.
   // NOTE: this will get uniquified if we have multiple in the same block.
-  auto parentFuncOp = dispatchExternOp->getParentOfType<FunctionOpInterface>();
+  auto parentFuncOp =
+      dispatchExternOp->getParentOfType<mlir::FunctionOpInterface>();
   auto parentModuleOp = parentFuncOp->getParentOfType<mlir::ModuleOp>();
   OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
   auto executableOp = parentModuleBuilder.create<IREE::HAL::ExecutableOp>(
@@ -139,7 +139,7 @@ public:
   }
 
   void runOnOperation() override {
-    for (auto funcOp : getOperation().getOps<FunctionOpInterface>()) {
+    for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Outline all of the dispatch externs ops in this function.
       SmallVector<Operation *> deadOps;
       auto outlineOps = [&](Operation *op) {

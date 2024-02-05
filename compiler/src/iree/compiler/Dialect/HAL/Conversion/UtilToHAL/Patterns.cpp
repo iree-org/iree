@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -27,7 +26,7 @@ struct GlobalConversionPattern
     auto newType = getTypeConverter()->convertType(op.getType());
     if (newType == op.getType())
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       // NOTE: the initial value may be invalid here! We rely on
       // dialect-specific conversions to handle it.
       op.setTypeAttr(TypeAttr::get(newType));

@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,7 +9,8 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/hal/drivers/cuda/context_wrapper.h"
+#include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
+#include "iree/hal/drivers/cuda/cuda_headers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,7 +20,9 @@ extern "C" {
 // This is useful to isolate pipeline caching behavior and verify compilation
 // behavior.
 iree_status_t iree_hal_cuda_nop_executable_cache_create(
-    iree_hal_cuda_context_wrapper_t* context, iree_string_view_t identifier,
+    iree_string_view_t identifier,
+    const iree_hal_cuda_dynamic_symbols_t* symbols, CUdevice device,
+    iree_allocator_t host_allocator,
     iree_hal_executable_cache_t** out_executable_cache);
 
 #ifdef __cplusplus

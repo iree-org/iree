@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -15,7 +16,8 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
@@ -168,6 +170,25 @@ void buildGlobalOptimizationPassPipeline(
 
   if (transformOptions.buildConstEvalPassPipeline) {
     transformOptions.buildConstEvalPassPipeline(pipeline);
+  }
+
+  // Export after const-eval. If the user wants to keep the input constants
+  // as is in the final parameter archive, they will probably want to disable
+  // const-eval, or could run this pass as preprocessing. There might be a
+  // configuration in the future where users want to limit const-eval to smaller
+  // constants that aren't exported and skip it for larger parameters, but this
+  // is a sensible place for the common case of wanting const-eval in the final
+  // artifact + archive.
+  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
+    exportParametersOptions.archivePath =
+        transformOptions.options.parameterArchiveExportPath;
+    exportParametersOptions.parameterScope =
+        transformOptions.options.parameterExportScope;
+    exportParametersOptions.minimumSize =
+        transformOptions.options.minimumParameterExportSize;
+    pipeline.addPass(IREE::IO::Parameters::createExportParametersPass(
+        exportParametersOptions));
   }
 
   if (transformOptions.options.numericPrecisionReduction) {

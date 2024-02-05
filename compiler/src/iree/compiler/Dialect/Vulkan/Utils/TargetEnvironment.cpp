@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanTypes.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetTriple.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVTypes.h"
@@ -76,6 +77,8 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
     case Extension::VK_KHR_cooperative_matrix:
       extensions.push_back(spirv::Extension::SPV_KHR_cooperative_matrix);
       break;
+    case Extension::VK_KHR_buffer_device_address:
+      extensions.push_back(spirv::Extension::SPV_KHR_physical_storage_buffer);
     }
   }
 }
@@ -135,7 +138,9 @@ void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
   MAP_SUBGROUP_FEATURE(Quad);
   MAP_SUBGROUP_FEATURE(PartitionedNV);
 #undef MAP_SUBGROUP_FEATURE
-
+  if (vkCapabilities.getPhysicalDeviceBufferAddresses()) {
+    capabilities.push_back(spirv::Capability::PhysicalStorageBufferAddresses);
+  }
   if (vkCapabilities.getVariablePointers()) {
     capabilities.push_back(spirv::Capability::VariablePointers);
   }

@@ -42,6 +42,8 @@ iree_cc_library(
     "UtilAttrInterfaces.h.inc"
     "UtilAttrs.cpp.inc"
     "UtilAttrs.h.inc"
+    "UtilEnums.cpp.inc"
+    "UtilEnums.h.inc"
     "UtilOpInterfaces.cpp.inc"
     "UtilOpInterfaces.h.inc"
     "UtilOps.cpp.inc"
@@ -90,6 +92,8 @@ iree_tablegen_library(
   OUTS
     --gen-attrdef-decls UtilAttrs.h.inc
     --gen-attrdef-defs UtilAttrs.cpp.inc
+    --gen-enum-decls UtilEnums.h.inc
+    --gen-enum-defs UtilEnums.cpp.inc
 )
 
 iree_tablegen_library(

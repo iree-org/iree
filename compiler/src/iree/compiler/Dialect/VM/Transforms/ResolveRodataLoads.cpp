@@ -15,6 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::VM {
@@ -127,8 +128,8 @@ public:
     auto moduleOp = getOperation();
 
     Explorer explorer(moduleOp, TraversalAction::SHALLOW);
-    explorer.setOpAction<IREE::VM::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<IREE::VM::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+        TraversalAction::RECURSE);
     explorer.initialize();
 
     // Walk all !vm.buffer globals and process them (if possible).

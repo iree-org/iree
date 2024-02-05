@@ -88,8 +88,22 @@ public:
   // Returns the traversal action to perform for the given op.
   TraversalAction getTraversalAction(Operation *op);
 
+  // Registers a traversal action for ops with the given interface.
+  // Overrides the explorer default and can be overridden by dialect and op
+  // actions.
+  void setOpInterfaceAction(TypeID interfaceId, TraversalAction action);
+  template <typename InterfaceT>
+  void setOpInterfaceAction(TraversalAction action) {
+    setOpInterfaceAction(InterfaceT::getInterfaceID(), action);
+  }
+  template <typename InterfaceT, typename InterfaceT2, typename... InterfaceTs>
+  void setOpInterfaceAction(TraversalAction action) {
+    setOpInterfaceAction<InterfaceT>(action);
+    setOpInterfaceAction<InterfaceT2, InterfaceTs...>(action);
+  }
+
   // Registers a default action for all ops in the given dialect namespace.
-  // Individual op actions can override this.
+  // Overrides interface actions and individual op actions can override this.
   void setDialectAction(StringRef dialectNamespace, TraversalAction action);
   template <typename DialectT>
   void setDialectAction(TraversalAction action) {
@@ -102,7 +116,7 @@ public:
   }
 
   // Registers a traversal action for the given op, overriding the explorer
-  // default and any dialect action specified.
+  // default and any dialect or interface action specified.
   void setOpAction(OperationName op, TraversalAction action);
   template <typename OpT>
   void setOpAction(TraversalAction action) {
@@ -332,6 +346,7 @@ private:
   bool isCallGraphIncomplete = false;
 
   TraversalAction defaultAction;
+  DenseMap<TypeID, TraversalAction> interfaceActions;
   DenseMap<StringRef, TraversalAction> dialectActions;
   DenseMap<OperationName, TraversalAction> opActions;
 

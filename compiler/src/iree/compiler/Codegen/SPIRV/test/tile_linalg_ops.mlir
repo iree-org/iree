@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-tile %s | FileCheck %s
+// RUN: iree-opt -split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-tile))" %s | FileCheck %s
 
 func.func @innermost_reduction() {
   %c1 = arith.constant 1 : index

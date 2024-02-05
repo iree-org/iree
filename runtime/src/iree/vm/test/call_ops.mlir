@@ -83,27 +83,27 @@ vm.module @call_ops {
     vm.return
   }
 
-  vm.func @_i_v(%arg : i32) attributes {noinline} {
+  vm.func @_i_v(%arg : i32) attributes {inlining_policy = #util.inline.never} {
     %c1 = vm.const.i32 1
     vm.check.eq %arg, %c1, "Expected %arg to be 1" : i32
     vm.return
   }
 
-  vm.func @_r_v(%arg : !vm.ref<?>) attributes {noinline} {
+  vm.func @_r_v(%arg : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 
-  vm.func @_r_v_reuse_reg(%arg : !vm.ref<?>, %unused : !vm.ref<?>) attributes {noinline} {
+  vm.func @_r_v_reuse_reg(%arg : !vm.ref<?>, %unused : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg, %ref_dno, "Expected %arg to be NULL" : !vm.ref<?>
     vm.return
   }
 
-  vm.func @_r_v_preserve_reg(%arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) attributes {noinline} {
+  vm.func @_r_v_preserve_reg(%arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     %ref_dno = util.optimization_barrier %ref : !vm.ref<?>
     vm.check.eq %arg1, %ref_dno, "Expected %arg1 to be NULL" : !vm.ref<?>
@@ -111,27 +111,27 @@ vm.module @call_ops {
     vm.return
   }
 
-  vm.func @_v_i() -> i32 attributes {noinline} {
+  vm.func @_v_i() -> i32 attributes {inlining_policy = #util.inline.never} {
     %c1 = vm.const.i32 1
     vm.return %c1 : i32
   }
 
-  vm.func @_v_r() -> !vm.ref<?> attributes {noinline} {
+  vm.func @_v_r() -> !vm.ref<?> attributes {inlining_policy = #util.inline.never} {
     %ref = vm.const.ref.zero : !vm.ref<?>
     vm.return %ref : !vm.ref<?>
   }
 
-  vm.func @_v_ii() -> (i32, i32) attributes {noinline} {
+  vm.func @_v_ii() -> (i32, i32) attributes {inlining_policy = #util.inline.never} {
     %c1 = vm.const.i32 1
     %c2 = vm.const.i32 2
     vm.return %c1, %c2 : i32, i32
   }
 
-  vm.func @_v_v() attributes {noinline} {
+  vm.func @_v_v() attributes {inlining_policy = #util.inline.never} {
     vm.return
   }
 
-  vm.func @_v_v_fail() attributes {noinline} {
+  vm.func @_v_v_fail() attributes {inlining_policy = #util.inline.never} {
     %c2 = vm.const.i32 2
     vm.fail %c2
   }

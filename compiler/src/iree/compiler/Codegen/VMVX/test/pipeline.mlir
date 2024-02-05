@@ -1,5 +1,8 @@
 // RUN: iree-opt  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-vmvx-select-lowering-strategy, iree-vmvx-lower-executable-target)))" --split-input-file %s | FileCheck %s
 
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 hal.executable private @mmt4d_ukernel {
   hal.executable.variant public @vmvx_bytecode_fb target(<"vmvx", "vmvx-bytecode-fb", {ukernels = "all"}>) {
     hal.executable.export public @mmt4d_i8 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
@@ -13,15 +16,15 @@ hal.executable private @mmt4d_ukernel {
         %c256 = arith.constant 256 : index
         %c512 = arith.constant 512 : index
         %c16 = arith.constant 16 : index
-        %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [i8, i8, i32]>> -> index, index
+        %0:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_linalg_ext.encoding<role = LHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
         %1 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#0]
         %2 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%0#1]
         %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi8>>{%1, %2, %0#0, %0#1}
-        %4:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_linalg_ext.encoding<user = MATMUL, role = RHS, element_types = [i8, i8, i32]>> -> index, index
+        %4:2 = iree_codegen.query_tile_sizes tensor<16x16xi8, #iree_linalg_ext.encoding<role = RHS, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
         %5 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%4#0]
         %6 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%4#1]
         %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c256) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?x?x?xi8>>{%5, %6, %4#0, %4#1}
-        %8:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<user = MATMUL, role = RESULT, element_types = [i8, i8, i32]>> -> index, index
+        %8:2 = iree_codegen.query_tile_sizes tensor<16x16xi32, #iree_linalg_ext.encoding<role = RESULT, element_types = [i8, i8, i32], user_indexing_maps = [#map, #map1, #map2]>> -> index, index
         %9 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%8#0]
         %10 = affine.apply affine_map<()[s0] -> (16 ceildiv s0)>()[%8#1]
         %11 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c512) : !flow.dispatch.tensor<readwrite:tensor<?x?x?x?xi32>>{%9, %10, %8#0, %8#1}

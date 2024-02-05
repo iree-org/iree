@@ -11,7 +11,7 @@ util.initializer {
   cf.br ^bb1(%value : memref<?xi8>)
 // CHECK: ^bb1(%[[ARG:.+]]: !util.buffer)
 ^bb1(%block_arg: memref<?xi8>):
-  util.initializer.return
+  util.return
 }
 func.func private @extern() -> memref<?xi8>
 

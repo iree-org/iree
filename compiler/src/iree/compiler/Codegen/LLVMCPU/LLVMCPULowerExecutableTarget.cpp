@@ -63,22 +63,6 @@ public:
 };
 } // namespace
 
-/// The pipeline parser doesnt like strings that have `'` or `"` in them. But it
-/// is needed for demarcating the option value. So just drop them before sending
-/// it one.
-static StringRef sanitizePipelineString(StringRef input) {
-  if (input.empty())
-    return input;
-  // If first/last character is ' or ", drop them.
-  if (input.front() == '\'' || input.front() == '"') {
-    input = input.drop_front();
-  }
-  if (input.back() == '\'' || input.back() == '"') {
-    input = input.drop_back();
-  }
-  return input;
-}
-
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
@@ -111,7 +95,7 @@ static FailureOr<LoweringConfigAttr> getRootLoweringConfig(ModuleOp moduleOp) {
     }
   }
 
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     getAllEntryPoints(moduleOp);
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     // Check for self first.
@@ -172,7 +156,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
                                      /*enablePeeling=*/false,
-                                     enableVectorMasking, lowerToAVX2);
+                                     enableVectorMasking, lowerToAVX2,
+                                     enableAArch64SSVE);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::

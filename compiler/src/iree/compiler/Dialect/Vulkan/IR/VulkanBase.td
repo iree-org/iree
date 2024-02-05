@@ -90,13 +90,15 @@ def VK_KHR_storage_buffer_storage_class : I32EnumAttrCase<"VK_KHR_storage_buffer
 def VK_KHR_variable_pointers: I32EnumAttrCase<"VK_KHR_variable_pointers", 6>;
 def VK_EXT_subgroup_size_control : I32EnumAttrCase<"VK_EXT_subgroup_size_control", 7>;
 def VK_KHR_cooperative_matrix : I32EnumAttrCase<"VK_KHR_cooperative_matrix", 8>;
+def VK_KHR_buffer_device_address : I32EnumAttrCase<"VK_KHR_buffer_device_address", 9>;
 
 def VK_ExtensionAttr :
     VK_I32EnumAttr<"Extension", "supported Vulkan extension", "extension", [
       VK_KHR_16bit_storage, VK_KHR_8bit_storage, VK_KHR_shader_float16_int8,
       VK_KHR_shader_integer_dot_product, VK_KHR_spirv_1_4,
       VK_KHR_storage_buffer_storage_class, VK_KHR_variable_pointers,
-      VK_EXT_subgroup_size_control, VK_KHR_cooperative_matrix
+      VK_EXT_subgroup_size_control, VK_KHR_cooperative_matrix,
+      VK_KHR_buffer_device_address
     ]>;
 
 //===----------------------------------------------------------------------===//

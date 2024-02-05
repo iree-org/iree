@@ -72,7 +72,7 @@ hal.executable private @dot_dispatch_1  {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 2, 4]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @dot_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [2 : index, 4 : index, 1 : index]
@@ -112,7 +112,7 @@ hal.executable private @unaligned_k  {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 2]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @unaligned_k
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [32 : index, 8 : index, 1 : index]
@@ -327,7 +327,7 @@ hal.executable private @static_3d_fft_stage3 {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[32, 128, 64]]>,
-    translation_info = <LLVMGPUMatmulSimt>,
+    translation_info = <LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>,
     workgroup_size = [16, 8, 1]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -364,7 +364,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 128, 64]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @_lowering_config_test_dispatch_1
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [16 : index, 8 : index, 1 : index]
@@ -455,7 +455,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @matmul_config_sm35
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 
@@ -669,7 +669,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync pipeline_depth = 3>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @large_matmul_f16
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [128 : index, 2 : index, 1 : index]
@@ -716,7 +716,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 16]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync pipeline_depth = 4>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync, {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 //      CHECK: hal.executable.export public @large_matmul_f32
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-SAME:     workgroup_size = [128 : index, 2 : index, 1 : index]
@@ -878,7 +878,7 @@ hal.executable public @_main_dispatch_15 {
 }
 
 //   CHECK-DAG:  #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 32, 128, 32]{{\]}}
-//   CHECK-DAG:  #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//   CHECK-DAG:  #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 //       CHECK:  hal.executable.export public @_main_dispatch_15_generic_512x4x42x42x64_f32
 //  CHECK-SAME:    translation_info = #[[TRANSLATION]]
 //       CHECK:  linalg.fill

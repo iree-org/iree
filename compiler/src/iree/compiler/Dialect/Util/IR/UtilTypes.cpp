@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -24,6 +23,10 @@
 #include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Util/IR/UtilEnums.cpp.inc" // IWYU pragma: keep
+// clang-format on
 
 namespace mlir::iree_compiler::IREE::Util {
 
@@ -173,7 +176,8 @@ bool isValueUsableForOp(Value value, Block *block,
       return true;
     }
   } else if (definingBlock->isEntryBlock() &&
-             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
+             llvm::isa<mlir::FunctionOpInterface>(
+                 definingBlock->getParentOp())) {
     // Function entry block always dominates - fast path for constants.
     return true;
   } else {

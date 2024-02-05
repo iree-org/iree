@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file  -iree-llvmgpu-tensor-pad %s --fold-memref-alias-ops -canonicalize -cse | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tensor-pad),fold-memref-alias-ops,canonicalize,cse)" %s | FileCheck %s
 
 func.func @transpose_no_align_dispatch_0_generic_48x32() {
   %c48 = arith.constant 48 : index

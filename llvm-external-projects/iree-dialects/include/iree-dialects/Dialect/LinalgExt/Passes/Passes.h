@@ -9,9 +9,9 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -84,7 +84,8 @@ private:
   bool matchByDefault;
 };
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
@@ -103,11 +104,12 @@ void populateTopkSplitReductionPattern(
     const LinalgExt::LinalgTransformationFilter &f =
         LinalgExt::LinalgTransformationFilter());
 
-std::unique_ptr<OperationPass<func::FuncOp>> createTopkSplitReductionPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTopkSplitReductionPass();
 
 /// Tile and decompose the winograd transform ops into a sequence
 /// of linalg ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTileAndDecomposeWinogradTransformPass();
 
 // Creates a pass to convert linalg convolution ops into a sequence of

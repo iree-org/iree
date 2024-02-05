@@ -13,7 +13,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_CPU_PASSES_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
@@ -22,7 +22,8 @@ namespace mlir::iree_compiler {
 ///   linalg_ext.set_encoding   -> tensor.pack
 ///   linalg_ext.unset_encoding -> tensor.unpack
 ///   linalg.matmul             -> linalg.mmt4d
-std::unique_ptr<OperationPass<func::FuncOp>> createCPUMaterializeEncodingPass(
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCPUMaterializeEncodingPass(
     IREE::HAL::ExecutableTargetAttr targetAttr = nullptr);
 
 /// Like createLLVMCPUMaterializeEncodingPass, but specifically for

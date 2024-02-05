@@ -241,7 +241,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gf
   }
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 // CHECK-LABEL: hal.executable.export public @not_vmt
 //  CHECK-SAME:   subgroup_size = 64 : index
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]

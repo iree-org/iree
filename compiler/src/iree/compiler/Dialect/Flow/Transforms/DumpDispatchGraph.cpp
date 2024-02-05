@@ -21,12 +21,12 @@
 #include "llvm/Support/Format.h"
 #include "llvm/Support/GraphWriter.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Operation.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/IndentedOstream.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
@@ -37,7 +37,6 @@ static const StringRef kLineStyleControlFlow = "dashed";
 static const StringRef kLineStyleDataFlow = "solid";
 static const StringRef kShapeNode = "box";
 static const StringRef kShapeBox = "box";
-static const StringRef kShapeTab = "tab";
 static const StringRef kShapeNone = "plain";
 static const StringRef kShapeEllipse = "ellipse";
 
@@ -139,8 +138,7 @@ public:
     if (!modOp)
       return;
 
-    auto funcOps = modOp.getOps<func::FuncOp>();
-
+    auto funcOps = modOp.getOps<mlir::FunctionOpInterface>();
     if (funcOps.empty())
       return;
 
@@ -340,7 +338,8 @@ private:
     if (isa<arith::ConstantOp>(op))
       return;
 
-    if (isa<func::ReturnOp>(op))
+    if (op->hasTrait<OpTrait::ReturnLike>() &&
+        isa<mlir::FunctionOpInterface>(op->getParentOp()))
       return;
 
     if (auto load = dyn_cast<DispatchTensorLoadOp>(op)) {
@@ -384,10 +383,9 @@ private:
     auto innerModule = executableOp.getInnerModule();
     if (!innerModule)
       return;
-    auto funcOps = innerModule.getOps<func::FuncOp>();
-    auto funcIt = llvm::find_if(funcOps, [&](func::FuncOp op) {
-      return op.getNameAttr() == calleeNameAttr;
-    });
+    auto funcOps = innerModule.getOps<mlir::FunctionOpInterface>();
+    auto funcIt = llvm::find_if(
+        funcOps, [&](auto op) { return op.getNameAttr() == calleeNameAttr; });
     if (funcIt == funcOps.end())
       return;
 
@@ -435,7 +433,7 @@ private:
   std::string getLabel(Operation *op) {
     return strFromOs([&](raw_ostream &os) {
       if (op->getNumRegions() == 0) {
-        auto funcOp = op->getParentOfType<func::FuncOp>();
+        auto funcOp = op->getParentOfType<mlir::FunctionOpInterface>();
         AsmState state(funcOp);
         printResults(os, op, state);
         os << " = " << op->getName();

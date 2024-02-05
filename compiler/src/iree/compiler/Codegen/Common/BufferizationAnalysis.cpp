@@ -238,7 +238,7 @@ getTiedOperandsForDPSOps(DestinationStyleOpInterface dpsOp,
 /// same equivalence class.
 static LogicalResult analyseDPSOps(DestinationStyleOpInterface dpsOp,
                                    BufferizationPlan &plan) {
-  if (!dpsOp.hasTensorSemantics())
+  if (!dpsOp.hasPureTensorSemantics())
     return success();
   auto results = dpsOp->getResults();
   auto tiedOperands = getTiedOperandsForDPSOps(dpsOp, plan);
@@ -506,7 +506,7 @@ void BufferizationPlan::dump() {
   }
 }
 
-LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
+LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
                                              BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)

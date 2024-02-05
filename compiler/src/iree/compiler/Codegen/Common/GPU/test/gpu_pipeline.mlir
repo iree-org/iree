@@ -1,6 +1,6 @@
 // Test un-peeled epilogue generating AsyncCopyOp using zfill
-// RUN: iree-opt --iree-codegen-gpu-pipelining=epilogue-peeling=false --split-input-file %s | FileCheck %s
-// RUN: iree-opt --iree-codegen-gpu-pipelining="pipeline-depth=3 schedule-index=2 epilogue-peeling=false" --split-input-file %s | FileCheck -check-prefix=CHECK-NV %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-pipelining{epilogue-peeling=false}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-pipelining{pipeline-depth=3 schedule-index=2 epilogue-peeling=false}))" --split-input-file %s | FileCheck -check-prefix=CHECK-NV %s
 
 
 func.func @_matmul_f16_f16_dispatch_0_fill_3456x1024() {

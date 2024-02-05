@@ -6,11 +6,11 @@
 
 // Implements logic for lowering the StableHLO general dot op to the dot op.
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
 #include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"

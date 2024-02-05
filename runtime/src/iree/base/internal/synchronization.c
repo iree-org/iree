@@ -61,7 +61,7 @@
 // Cross-platform processor yield (where supported)
 //==============================================================================
 
-#if defined(IREE_COMPILER_MSVC)
+#if defined(IREE_COMPILER_MSVC_COMPAT)
 
 // MSVC uses architecture-specific intrinsics.
 

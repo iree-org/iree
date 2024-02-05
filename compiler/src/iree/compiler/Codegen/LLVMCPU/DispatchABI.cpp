@@ -13,7 +13,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Path.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 
@@ -73,7 +72,7 @@ static unsigned getDITypeSizeInBits(LLVM::DITypeAttr typeAttr) {
 }
 
 ExecutableLibraryDI::ExecutableLibraryDI(const LLVMTypeConverter *typeConverter)
-    : typeConverter(typeConverter), builder(&typeConverter->getContext()) {
+    : builder(&typeConverter->getContext()) {
   auto *context = builder.getContext();
   fileAttr = LLVM::DIFileAttr::get(
       context, "runtime/src/iree/hal/local/executable_library.h", ".");

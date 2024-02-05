@@ -47,10 +47,10 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-void debugPrint(func::FuncOp funcOp, const char *message) {
+void debugPrint(Operation *op, const char *message) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- " << message << " ---//\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 }
@@ -70,7 +70,8 @@ constexpr char coopMatShapeAttrName[] = "iree.spirv.coopmatrix.shape";
 
 /// Sets the chosen cooperative matrix type/shape for CodeGen onto the
 /// hal.executable.export op for the given `funcOp`.
-void setSPIRVCooperativeMatrixInfo(func::FuncOp funcOp, linalg::LinalgOp rootOp,
+void setSPIRVCooperativeMatrixInfo(mlir::FunctionOpInterface funcOp,
+                                   linalg::LinalgOp rootOp,
                                    ArrayRef<int64_t> shape) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
@@ -87,7 +88,8 @@ void setSPIRVCooperativeMatrixInfo(func::FuncOp funcOp, linalg::LinalgOp rootOp,
 /// Returns the chosen cooperative matrix shape for CodeGen from the
 /// hal.executable.export op for the given `funcOp`. Returns an empty
 /// ArrayRef if cannot query.
-ArrayRef<int64_t> getSPIRVCooperativeMatrixShape(func::FuncOp funcOp) {
+ArrayRef<int64_t>
+getSPIRVCooperativeMatrixShape(mlir::FunctionOpInterface funcOp) {
   auto moduleOp = funcOp->getParentOfType<ModuleOp>();
   auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
   auto attr = exportOp->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
@@ -127,7 +129,7 @@ static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
 }
 
 /// Tiles Linalg ops with workgroup markers to subgroups.
-static LogicalResult tileToSubgroup(func::FuncOp funcOp,
+static LogicalResult tileToSubgroup(mlir::FunctionOpInterface funcOp,
                                     ArrayRef<int64_t> subgroupCounts,
                                     const unsigned subgroupSize,
                                     ArrayRef<int64_t> subgroupTileSizes) {
@@ -338,7 +340,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
     // decided earlier and attached to a linalg op as an attribute.
@@ -404,7 +406,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     // First discover the chosen cooperative matrix shape. It was decided
     // earlier and attached to the export op as an attribute.
@@ -458,12 +460,12 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVTileToCooperativeOpsPass() {
   return std::make_unique<SPIRVTileToCooperativeOpsPass>();
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVVectorizeToCooperativeOpsPass() {
   return std::make_unique<SPIRVVectorizeToCooperativeOpsPass>();
 }

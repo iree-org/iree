@@ -135,8 +135,6 @@ function(iree_check_test)
     if((NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND
        (NOT IREE_EXTERNAL_${_NORMALIZED_DRIVER}_HAL_DRIVER_FOUND))
       set(_TEST_DISABLED TRUE)
-      # We could also disable the bytecode module build here if we wanted to.
-      # set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
 
@@ -144,6 +142,10 @@ function(iree_check_test)
   iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
   if(_EXCLUDED_BY_LABELS)
     set(_TEST_DISABLED TRUE)
+  endif()
+
+  if((_TEST_DISABLED OR NOT _TEST_DEFINED) AND NOT IREE_BUILD_ALL_CHECK_TEST_MODULES)
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
   # ---------------------------------------------------------------------------
 
@@ -371,6 +373,8 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
+#   INPUT_TYPE: The value for the --iree-input-type= flag. Also disables tests
+#       if no compiled support for that configuration.
 function(iree_check_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -379,7 +383,7 @@ function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME"
+    "NAME;INPUT_TYPE"
     "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS;TIMEOUT"
     ${ARGN}
   )
@@ -444,6 +448,8 @@ function(iree_check_test_suite)
           ${_TARGET_CPU_FEATURES}
         TIMEOUT
           ${_RULE_TIMEOUT}
+        INPUT_TYPE
+          ${_RULE_INPUT_TYPE}
       )
     endforeach()
   endforeach()

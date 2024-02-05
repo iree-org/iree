@@ -36,7 +36,8 @@ def MapNestedForallToGpuThreadsOp :
     If necessary, scf.forall that do not use the whole thread range
     result in predicated computations.
 
-    Barriers are inserted after each scf.forall op for now.
+    Barriers are inserted after each scf.forall op 
+    if `sync_after_distribution` is true.
 
     Return modes:
     =============
@@ -89,13 +90,15 @@ def MapNestedForallToGpuThreadsOp :
 
   let arguments = (ins TransformHandleTypeInterface:$target,
                    DefaultValuedAttr<DenseI64ArrayAttr, "{}">:$workgroup_dims,
-                   DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size);
+                   DefaultValuedOptionalAttr<I64Attr, "32">:$subgroup_size,
+                   DefaultValuedOptionalAttr<BoolAttr, "true">:$sync_after_distribution);
   let results = (outs);
 
   let assemblyFormat = [{
     $target
     `workgroup_dims` `=` $workgroup_dims
     (`subgroup_size` `=` $subgroup_size^)?
+    (`sync_after_distribution` `=` $sync_after_distribution^)?
     attr-dict
     `:` functional-type($target, results)
   }];
@@ -104,7 +107,7 @@ def MapNestedForallToGpuThreadsOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -312,8 +315,8 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let results = (outs);
 
   let assemblyFormat = [{
-    $target 
-    attr-dict 
+    $target
+    attr-dict
     `:` functional-type($target, results)
   }];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -325,7 +328,7 @@ def VectorWarpDistributionOp : Op<Transform_Dialect, "iree.vector.warp_distribut
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -437,9 +440,9 @@ def PipelineSharedMemoryCopiesOp : Op<
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let assemblyFormat = [{ 
-    $for_op 
-    attr-dict 
+  let assemblyFormat = [{
+    $for_op
+    attr-dict
     `:` functional-type(operands, results)}];
 
   let extraClassDeclaration = [{
@@ -472,9 +475,9 @@ def SynchronizeLoopOp : Op<
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
-  let assemblyFormat = [{ 
-    $for_op 
-    attr-dict 
+  let assemblyFormat = [{
+    $for_op
+    attr-dict
     `:` functional-type(operands, results)}];
 
   let extraClassDeclaration = [{
@@ -509,16 +512,16 @@ def CreateAsyncGroupsOp :
                    UnitAttr:$use_mma_sync);
   let results = (outs);
 
-  let assemblyFormat = [{ 
-    $target 
-    attr-dict 
+  let assemblyFormat = [{
+    $target
+    attr-dict
     `:` functional-type(operands, results)}];
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -558,7 +561,7 @@ def LayoutAnalysisAndDistributionOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -604,7 +607,7 @@ def ReorderTransposeOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -642,7 +645,7 @@ def EliminateGpuBarriersOp :
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -676,10 +679,66 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::func::FuncOp funcOp,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
+}
+
+def TestAMDGPUContractionDistribution :
+  Op<Transform_Dialect, "iree.test_amdgpu_contraction_distribution",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Run AMDGPU Vector Contraction distribution on the target as the root.
+
+    The anchor points are set by using the attribute
+    "__vector_layout_test_anchor_operand_x" and
+    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
+    number.
+
+    This op produces amdgpu MFMA ops.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
+    }];
+
+    let arguments = (ins TransformHandleTypeInterface:$target);
+    let results = (outs);
+
+    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+    let extraClassDeclaration = [{
+      ::mlir::DiagnosedSilenceableFailure applyToOne(
+          ::mlir::transform::TransformRewriter &rewriter,
+          ::mlir::FunctionOpInterface funcOp,
+          ::mlir::transform::ApplyToEachResultList &results,
+          ::mlir::transform::TransformState &state);
+    }];
+}
+
+
+def CreateMatmulMfmaTileSizesOp :
+  Op<Transform_Dialect, "iree.create_matmul_mfma_tile_sizes",
+    [MemoryEffectsOpInterface,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ParamProducerTransformOpTrait]> {
+  let description = [{
+    Create param of tile sizes based on the matmul sizes.
+    This operation won't succeed if the matmul shape size is not 2.
+    Now it only covers the shape of [256*, 128*], [128, 64*], [8192, 320].
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformParamTypeInterface:$workgroup_tile_sizes,
+                      TransformParamTypeInterface:$problem_specific_sizes);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS

@@ -29,6 +29,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h"
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Preprocessing/Passes.h"
 
@@ -55,6 +56,7 @@ inline void registerAllIreePasses() {
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();
   IREE::HAL::Loader::registerHALLoaderPasses();
+  IREE::IO::Parameters::registerParametersPasses();
   IREE::LinalgExt::registerPasses();
   IREE::Stream::registerStreamPasses();
   IREE::Util::registerTransformPasses();

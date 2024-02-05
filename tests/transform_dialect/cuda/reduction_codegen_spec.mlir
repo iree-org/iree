@@ -43,7 +43,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.scf.for_loop_canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     %fill_2d = transform.structured.match ops{["linalg.fill"]} filter_result_type = tensor<1x2xf32> in %variant_op
       : (!transform.any_op) -> !transform.any_op
@@ -113,7 +113,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.scf.for_loop_canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op_3 : !transform.any_op
-    transform.iree.apply_cse %func_op_3 : !transform.any_op
+    transform.apply_cse to %func_op_3 : !transform.any_op
 
     transform.yield
   }

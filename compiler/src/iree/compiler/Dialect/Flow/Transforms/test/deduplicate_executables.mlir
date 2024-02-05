@@ -72,7 +72,7 @@ util.initializer {
   // CHECK: {{.*}} = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0(%[[CST]]) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @duplicate_executables_ex_1::@duplicate_executables_entry_1(%cst) : (tensor<4xf32>) -> tensor<4xf32>
   util.optimization_barrier %0 : tensor<4xf32>
-  util.initializer.return
+  util.return
 }
 
 // -----

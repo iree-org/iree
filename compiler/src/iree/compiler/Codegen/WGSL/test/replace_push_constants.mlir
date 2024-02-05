@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-wgsl-replace-push-constants %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-wgsl-replace-push-constants))" %s | FileCheck %s
 
 // CHECK-LABEL: @emptyFunctionNoOp
 func.func @emptyFunctionNoOp() {
