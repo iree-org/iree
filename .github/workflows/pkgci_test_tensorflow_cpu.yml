@@ -26,7 +26,7 @@ jobs:
       - environment=prod
       - cpu
       - os-family=Linux
-    container: docker://ghcr.io/nod-ai/cpubuilder_ubuntu_jammy_ghr_x86_64:main
+    container: docker://gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
