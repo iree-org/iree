@@ -26,7 +26,6 @@ jobs:
       - environment=prod
       - cpu
       - os-family=Linux
-    container: docker://gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
@@ -37,8 +36,6 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           submodules: false
-      - name: "Marking git safe.directory"
-        run: git config --global --add safe.directory '*'
       - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
