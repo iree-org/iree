@@ -36,8 +36,16 @@ static void iree_uk_mmt4d_tile_s8s4s32_generic(
           iree_uk_int32_t lhs_0 = lhs_panel[i0 * K0 + 2 * k0h];
           iree_uk_int32_t lhs_1 = lhs_panel[i0 * K0 + 2 * k0h + 1];
           iree_uk_int8_t rhs_byte = rhs_panel[j0 * K0half + k0h];
-          iree_uk_int32_t rhs_0 = rhs_byte & 0xf;
-          iree_uk_int32_t rhs_1 = rhs_byte >> 4;
+
+          iree_uk_int8_t rhs_0 = rhs_byte & 0x0F;
+          if (rhs_0 & 0x08) {
+            rhs_0 |= 0xF0;
+          }
+          iree_uk_int8_t rhs_1 = (rhs_byte >> 4) & 0x0F;
+          if (rhs_1 & 0x08) {
+            rhs_1 |= 0xF0;
+          }
+
           acc[i0 * N0 + j0] += lhs_0 * rhs_0 + lhs_1 * rhs_1;
         }
       }

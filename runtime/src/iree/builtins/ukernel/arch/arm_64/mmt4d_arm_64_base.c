@@ -4,8 +4,45 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+//#define IREE_DEVICE_STANDALONE
+#ifndef IREE_DEVICE_STANDALONE
+#include <stdio.h>
+
+#define BYTE_TO_BINARY_PATTERN "%c%c%c%c %c%c%c%c"
+#define BYTE_TO_BINARY(byte)  \
+  ((byte) & 0x80 ? '1' : '0'), \
+  ((byte) & 0x40 ? '1' : '0'), \
+  ((byte) & 0x20 ? '1' : '0'), \
+  ((byte) & 0x10 ? '1' : '0'), \
+  ((byte) & 0x08 ? '1' : '0'), \
+  ((byte) & 0x04 ? '1' : '0'), \
+  ((byte) & 0x02 ? '1' : '0'), \
+  ((byte) & 0x01 ? '1' : '0')
+
+#define WORD_TO_BINARY_PATTERN "%c%c%c%c %c%c%c%c %c%c%c%c %c%c%c%c"
+#define WORD_TO_BINARY(word)  \
+  ((word) & 0x8000 ? '1' : '0'), \
+  ((word) & 0x4000 ? '1' : '0'), \
+  ((word) & 0x2000 ? '1' : '0'), \
+  ((word) & 0x1000 ? '1' : '0'), \
+  ((word) & 0x0800 ? '1' : '0'), \
+  ((word) & 0x0400 ? '1' : '0'), \
+  ((word) & 0x0200 ? '1' : '0'), \
+  ((word) & 0x0100 ? '1' : '0'), \
+  ((word) & 0x0080 ? '1' : '0'), \
+  ((word) & 0x0040 ? '1' : '0'), \
+  ((word) & 0x0020 ? '1' : '0'), \
+  ((word) & 0x0010 ? '1' : '0'), \
+  ((word) & 0x0008 ? '1' : '0'), \
+  ((word) & 0x0004 ? '1' : '0'), \
+  ((word) & 0x0002 ? '1' : '0'), \
+  ((word) & 0x0001 ? '1' : '0')
+
+#endif
+
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
+
 
 static inline void iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_arm_64(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
@@ -265,6 +302,7 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
     iree_uk_mmt4d_tile_s8s8s32_4x8x1_arm_64,
     iree_uk_mmt4d_tile_s8s8s32_8x8x1_arm_64)
 
+
 static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
@@ -274,18 +312,28 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
 
+#ifndef IREE_DEVICE_STANDALONE
+  printf("----- Start optimized M: %lld, N: %lld, K: %lld, M0: %d, N0: %d, K0: %d ------\n", params->M, params->N, params->K, M0, params->N0, params->K0);
+#endif
+
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   int32x4_t acc[16];
-  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < 4 * M0; ++i) {
-      acc[i] = vld1q_s32(out_ptr + 4 * i);
-    }
-  } else {
-    for (int i = 0; i < 4 * M0; ++i) {
-      acc[i] = vdupq_n_s32(0);
+  // We start with zero accumulators and add the value of *out_ptr later.
+  for (int i = 0; i < 4 * M0; ++i) {
+    acc[i] = vdupq_n_s32(0);
+  }
+
+#ifndef IREE_DEVICE_STANDALONE
+  for (int i = 0; i < 4 * M0; ++i) {
+    for (int j = 0; j < 4; j++) {
+      int32_t val = acc[i][j];
+      printf("init acc[%d][%d]: %d\n", i, j, val);
     }
   }
-  const int8x8_t vmask0f = vmov_n_s8(INT8_C(0x0F));
+#endif
+
+  const int8x8_t vmask = vmov_n_s8(INT8_C(0xF0));
+
   for (int k = 0; k < params->K; ++k) {
     // Handle 1x16x2.
     int16x8_t lhs = vmovl_s8(vld1_s8(lhs_ptr));
@@ -296,17 +344,82 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
     int8x8_t rhs_1 = vld1_s8(rhs_ptr);
     rhs_ptr += 8;
 
-    int16x8_t rhs_a = vmovl_s8(vand_s8(rhs_0, vmask0f));
-    int16x8_t rhs_b = vmovl_s8(vshr_n_s8(rhs_0, 4));
-    int16x8_t rhs_c = vmovl_s8(vand_s8(rhs_1, vmask0f));
-    int16x8_t rhs_d = vmovl_s8(vshr_n_s8(rhs_1, 4));
+    int8x8_t rhs_0_low = vshl_n_s8(rhs_0, 4);
+    int8x8_t rhs_0_high = vand_s8(rhs_0, vmask);
+
+    int8x8_t rhs_1_low = vshl_n_s8(rhs_1, 4);
+    int8x8_t rhs_1_high = vand_s8(rhs_1, vmask);
+
+    int16x8_t rhs_a = vmovl_s8(rhs_0_low);
+    int16x8_t rhs_b = vmovl_s8(rhs_0_high);
+    int16x8_t rhs_c = vmovl_s8(rhs_1_low);
+    int16x8_t rhs_d = vmovl_s8(rhs_1_high);
+
+#ifndef IREE_DEVICE_STANDALONE
+    printf("lhs_0: %d\n", lhs[0]);
+    printf("lhs_1: %d\n", lhs[1]);
+
+    for (int m = 0; m < 8; m++) {
+      int8_t rhs_byte = rhs_0[m];
+      printf("rhs_0[%d]: rhs_byte "BYTE_TO_BINARY_PATTERN"\n", m, BYTE_TO_BINARY(rhs_byte));
+    }
+//    for (int m = 0; m < 8; m++) {
+//      int16_t val = rhs_0_low[m];
+//      printf("rhs_0_low[%d]: "BYTE_TO_BINARY_PATTERN"\n", m, BYTE_TO_BINARY(val));
+//    }
+//    for (int m = 0; m < 8; m++) {
+//      int16_t val = rhs_0_high[m];
+//      printf("rhs_0_high[%d]: "BYTE_TO_BINARY_PATTERN"\n", m, BYTE_TO_BINARY(val));
+//    }
+    for (int m = 0; m < 8; m++) {
+      int16_t val = rhs_a[m];
+      printf("rhs_a[%d]: "WORD_TO_BINARY_PATTERN"\n", m, WORD_TO_BINARY(val));
+      printf("rhs_a[%d]: %d\n", m, val);
+    }
+    for (int m = 0; m < 8; m++) {
+      int16_t val = rhs_b[m];
+      printf("rhs_b[%d]: "WORD_TO_BINARY_PATTERN"\n", m, WORD_TO_BINARY(val));
+      printf("rhs_b[%d]: %d\n", m, val);
+    }
+
+    for (int m = 0; m < 8; m++) {
+      int8_t rhs_byte = rhs_1[m];
+      printf("rhs_1[%d]: rhs_byte %hhx\n", m, rhs_byte);
+    }
+    for (int m = 0; m < 8; m++) {
+      int16_t val = rhs_c[m];
+      printf("rhs_c[%d]: %d\n", m, val);
+    }
+    for (int m = 0; m < 8; m++) {
+      int16_t val = rhs_d[m];
+      printf("rhs_d[%d]: %d\n", m, val);
+    }
+#endif
 
     acc[0] = vmlal_lane_s16(acc[0], vget_low_s16(rhs_a), vget_low_s16(lhs), 0);
+#ifndef IREE_DEVICE_STANDALONE
+    int16_t lhs_0_test = lhs[0];
+    for (int i = 0; i < 4; i++) {
+      int16_t rhs_0_test = rhs_a[i];
+      int32_t val = acc[0][i];
+      printf("first acc[0][%d]: %d. lhs: %d, rhs: %d\n", i, val, lhs_0_test, rhs_0_test);
+    }
+#endif
+
     acc[1] = vmlal_lane_s16(acc[1], vget_high_s16(rhs_a), vget_low_s16(lhs), 0);
     acc[2] = vmlal_lane_s16(acc[2], vget_low_s16(rhs_c), vget_low_s16(lhs), 0);
     acc[3] = vmlal_lane_s16(acc[3], vget_high_s16(rhs_c), vget_low_s16(lhs), 0);
 
     acc[0] = vmlal_lane_s16(acc[0], vget_low_s16(rhs_b), vget_low_s16(lhs), 1);
+#ifndef IREE_DEVICE_STANDALONE
+    int16_t lhs_1_test = lhs[1];
+    for (int i = 0; i < 4; i++) {
+      int16_t rhs_1_test = rhs_b[i];
+      int32_t val = acc[0][i];
+      printf("second acc[0][%d]: %d. lhs: %d, rhs: %d\n", i, val, lhs_1_test, rhs_1_test);
+    }
+#endif
+
     acc[1] = vmlal_lane_s16(acc[1], vget_high_s16(rhs_b), vget_low_s16(lhs), 1);
     acc[2] = vmlal_lane_s16(acc[2], vget_low_s16(rhs_d), vget_low_s16(lhs), 1);
     acc[3] = vmlal_lane_s16(acc[3], vget_high_s16(rhs_d), vget_low_s16(lhs), 1);
@@ -371,7 +484,38 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
       }
     }
   }
+
+  // Divide by 16.
+//  for (int i = 0; i < 4 * M0; ++i) {
+//#ifndef IREE_DEVICE_STANDALONE
+////    for (int j = 0; j < 4; j++) {
+////      int32_t val = acc[i][j];
+////      printf("before acc[%d][%d]: %d\n", i, j, val);
+////    }
+//#endif
+//    acc[i] = vshrq_n_s32(acc[i], 4);
+//#ifndef IREE_DEVICE_STANDALONE
+//    for (int j = 0; j < 4; j++) {
+//      int32_t val = acc[i][j];
+//      printf("after acc[%d][%d]: %d\n", i, j, val);
+//    }
+//#endif
+//  }
+
   for (int i = 0; i < 4 * M0; ++i) {
+    acc[i] = vshrq_n_s32(acc[i], 4);
+
+    if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+      int32x4_t existing_acc = vld1q_s32(out_ptr + 4 * i);
+      acc[i] = vaddq_s32(acc[i], existing_acc);
+    }
+
+#ifndef IREE_DEVICE_STANDALONE
+    for (int j = 0; j < 4; j++) {
+      int32_t val = acc[i][j];
+      printf("after acc[%d][%d]: %d\n", i, j, val);
+    }
+#endif
     vst1q_s32(out_ptr + 4 * i, acc[i]);
   }
 }
