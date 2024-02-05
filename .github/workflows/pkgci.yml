@@ -58,9 +58,3 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_cpu')
     uses: ./.github/workflows/pkgci_test_tensorflow_cpu.yml
-
-  test_tensorflow_gpu:
-    name: Test TensorFlow GPU
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_gpu')
-    uses: ./.github/workflows/pkgci_test_tensorflow_gpu.yml
