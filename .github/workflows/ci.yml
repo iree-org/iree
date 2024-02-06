@@ -980,7 +980,7 @@ jobs:
       is-pr: ${{ fromJson(needs.setup.outputs.is-pr) }}
       install-dir: ${{ needs.build_all.outputs.install-dir }}
       install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
 
   test_benchmark_suites:
     needs: [setup, build_all, build_e2e_test_artifacts]
@@ -1122,7 +1122,7 @@ jobs:
         if: always()
         env:
           # If the job of an artifact is skipped or failed, we show "NOT_PRESENT".
-          BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact || 'NOT_PRESENT' }}
+          INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact || 'NOT_PRESENT' }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir || 'NOT_PRESENT' }}
           BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir || 'NOT_PRESENT' }}
           EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir || 'NOT_PRESENT' }}
