@@ -749,7 +749,7 @@ struct MergeExecutableConstantBlocks
                targetRegion.getOps<IREE::HAL::ReturnOp>())) {
         llvm::append_range(resultValues, returnOp.getOperands());
         OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), nextBlock);
-        returnOp.erase();
+        rewriter.eraseOp(returnOp);
       }
     }
 

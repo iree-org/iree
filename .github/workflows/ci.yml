@@ -476,71 +476,6 @@ jobs:
       - name: "Testing runtime"
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
-  ################################# Tensorflow #################################
-  # Jobs that test the IREE-Tensorflow integrations
-  ##############################################################################
-  test_tf_integrations:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tf_integrations')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Running TF integrations tests"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VMVX_DISABLE=0 \
-            gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4 \
-            build_tools/cmake/run_tf_tests.sh \
-            "${BUILD_DIR}"
-
-  test_tf_integrations_gpu:
-    needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tf_integrations_gpu')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - gpu
-      - os-family=Linux
-    env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Running TF integrations tests"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env IREE_VULKAN_DISABLE=0 \
-            --env IREE_LLVM_CPU_DISABLE=1 \
-            --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
-            --gpus all \
-            --env NVIDIA_DRIVER_CAPABILITIES=all \
-            gcr.io/iree-oss/frontends-nvidia@sha256:685575bf34a2667cc1dc89dd248b959cb1c6f24f395c9451c5ebb8f5fe0f6714 \
-            bash -euo pipefail -c \
-              "./build_tools/scripts/check_cuda.sh
-              ./build_tools/scripts/check_vulkan.sh
-              build_tools/cmake/run_tf_tests.sh ${BUILD_DIR}"
-
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
@@ -1148,10 +1083,6 @@ jobs:
       - build_test_runtime
       - build_test_runtime_arm64
       - build_test_runtime_windows
-
-      # Tensorflow
-      - test_tf_integrations
-      - test_tf_integrations_gpu
 
       # Configurations
       - python_release_packages

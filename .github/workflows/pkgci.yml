@@ -52,3 +52,9 @@ jobs:
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
+
+  test_tensorflow_cpu:
+    name: Test TensorFlow CPU
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_cpu')
+    uses: ./.github/workflows/pkgci_test_tensorflow_cpu.yml

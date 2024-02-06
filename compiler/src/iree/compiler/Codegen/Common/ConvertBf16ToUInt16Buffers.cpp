@@ -265,7 +265,7 @@ struct ConvertBf16ToUInt16BuffersPass final
                                                      Operation *op) {
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
       });
-      target.addLegalOp<arith::TruncFOp, arith::ExtFOp>();
+      target.addLegalOp<arith::TruncFOp, arith::ExtFOp, ModuleOp>();
       target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
                                         IREE::HAL::HALDialect,
                                         memref::MemRefDialect, scf::SCFDialect>(
