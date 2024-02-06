@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-stablehlo-verify-compiler-input-legality \
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect \
+// RUN:   --iree-stablehlo-verify-compiler-input-legality \
 // RUN:   --verify-diagnostics %s
 
 // expected-error@+1 {{one or more illegal operations were found in the compiler input}}
@@ -28,5 +29,28 @@ func.func @illegal_shape(%arg0: tensor<*xf32>) -> index {
   %arg_shape = shape.shape_of %arg0 : tensor<*xf32> -> tensor<?xindex>
   %rank = shape.rank %arg_shape : tensor<?xindex> -> index
   return %rank : index
+}
+}
+
+// -----
+// expected-error@+1 {{one or more illegal operations were found in the compiler input}}
+module {
+func.func @illegal_tf_ops() -> () {
+  // expected-note@+1 {{tf.test_unconverted_op_1}}
+  "tf.test_unconverted_op_1" () : () -> ()
+  // expected-note@+1 {{tf.test_unconverted_op_2}}
+  "tf.test_unconverted_op_2" () : () -> ()
+}
+}
+
+// -----
+// expected-error@+1 {{one or more illegal operations were found in the compiler input}}
+module {
+func.func @illegal_tf_and_stablehlo(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+  // expected-note@+1 {{failed to legalize operation 'stablehlo.add' that was explicitly marked illegal}}
+  %0 = stablehlo.add %arg0, %arg1 : tensor<4xf32>
+  // expected-note@+1 {{tf.test_unconverted_op}}
+  "tf.test_unconverted_op" () : () -> ()
+  return %0 : tensor<4xf32>
 }
 }

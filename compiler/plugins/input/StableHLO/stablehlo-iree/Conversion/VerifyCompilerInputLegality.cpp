@@ -37,17 +37,33 @@ struct VerifyCompilerStableHloInputLegality final
     // NOTE: It is not fully illegal to tunnel input dialect ops through to
     // backends that expect them. When such situations arise, the container
     // op should be marked recursively legal here.
-    SmallVector<Diagnostic> failures;
+    SmallVector<Diagnostic> failuresDiagnostics;
     {
-      ScopedDiagnosticHandler diag(context,
-                                   [&](Diagnostic &d) -> LogicalResult {
-                                     failures.push_back(std::move(d));
-                                     return success();
-                                   });
+      ScopedDiagnosticHandler diag(
+          context, [&](Diagnostic &d) -> LogicalResult {
+            failuresDiagnostics.push_back(std::move(d));
+            return success();
+          });
       if (succeeded(applyPartialConversion(getOperation(), conversionTarget,
                                            std::move(conversionPatterns)))) {
-        return;
+        // Continue checking for other possible errors.
       }
+    }
+
+    // Also check for dialects that should have been converted to stablehlo
+    // prior to being presented to IREE in the first place.
+    // We don't want to use source dependencies for these dialects, so we just
+    // use string matching.
+    llvm::DenseSet<StringRef> invalidDialects{"tf", "mhlo"};
+    llvm::DenseSet<Operation *> invalidOps;
+    getOperation().walk([&](Operation *op) {
+      if (invalidDialects.contains(op->getName().getDialectNamespace())) {
+        invalidOps.insert(op);
+      }
+    });
+
+    if (failuresDiagnostics.empty() && invalidOps.empty()) {
+      return;
     }
 
     // Error fall-through. Attach all reported issues as notes.
@@ -56,11 +72,15 @@ struct VerifyCompilerStableHloInputLegality final
         << "one or more illegal operations were found in the compiler input "
            "(are you missing an --iree-input-type= flag, or did you mean to "
            "pre-process through an IREE importer frontend?)";
-    for (Diagnostic &failureDiag : failures) {
+    for (Diagnostic &failureDiag : failuresDiagnostics) {
       Diagnostic &note = errorDiag.attachNote(failureDiag.getLocation());
       for (auto &arg : failureDiag.getArguments()) {
         note.append(arg);
       }
+    }
+    for (auto &invalidOp : invalidOps) {
+      Diagnostic &note = errorDiag.attachNote(invalidOp->getLoc());
+      note.append(invalidOp->getName());
     }
 
     signalPassFailure();
