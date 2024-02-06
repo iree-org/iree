@@ -62,15 +62,15 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
         vector::VectorTransposeLowering::Shuffle16x16);
   }
 
-  constexpr unsigned specializedBenefit = 10;
-  constexpr unsigned narrowTypeEmulationBenefit = 20;
+  constexpr unsigned kSpecializedBenefit = 10;
+  constexpr unsigned kNarrowTypeEmulationBenefit = 20;
 
   RewritePatternSet patterns(ctx);
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
   vector::populateVectorTransposeLoweringPatterns(patterns,
                                                   vectorTransformOptions);
   vector::populateVectorTransposeNarrowTypeRewritePatterns(
-      patterns, narrowTypeEmulationBenefit);
+      patterns, kNarrowTypeEmulationBenefit);
 
   if (lowerVectorTransposeToAVX2) {
     auto avx2LoweringOptions =
@@ -79,7 +79,7 @@ void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
                 .lower4x8xf32()
                 .lower8x8xf32());
     x86vector::avx2::populateSpecializedTransposeLoweringPatterns(
-        patterns, avx2LoweringOptions, specializedBenefit);
+        patterns, avx2LoweringOptions, kSpecializedBenefit);
   }
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
