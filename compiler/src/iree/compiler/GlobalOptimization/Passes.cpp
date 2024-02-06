@@ -139,7 +139,6 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
