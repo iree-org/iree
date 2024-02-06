@@ -1267,10 +1267,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
         {"iree_allocator_t", "allocator"},
         {"iree_vm_ref_type_t", "types", countOrEmpty(numTypes)}};
 
-    auto structOp = emitc_builders::struct_def(builder, loc, moduleStructName,
-                                               moduleStructFields);
-    if (failed(structOp))
-      return failure();
+    emitc_builders::structDefinition(builder, loc, moduleStructName,
+                                     moduleStructFields);
 
     auto ordinalCounts = moduleOp.getOrdinalCountsAttr();
 
@@ -1285,10 +1283,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
          countOrEmpty(ordinalCounts.getImportFuncs())},
     };
 
-    auto structStateOp = emitc_builders::struct_def(
-        builder, loc, moduleStructStateName, moduleStructStateFields);
-    if (failed(structStateOp))
-      return failure();
+    emitc_builders::structDefinition(builder, loc, moduleStructStateName,
+                                     moduleStructStateFields);
 
     // Emit declarations for private functions.
     for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
@@ -1885,7 +1881,8 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
           /*operand=*/newFuncOp.getArgument(SHIM_ARGUMENT_ARGS_STORAGE));
 
       // cast
-      std::string argumentsType = argumentStruct.name.value();
+      std::string argumentsType =
+          std::string("struct ") + argumentStruct.name.value();
       auto arguments = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
           /*type=*/
@@ -1907,7 +1904,8 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
           /*operand=*/newFuncOp.getArgument(SHIM_ARGUMENT_RETS_STORAGE));
 
       // cast
-      std::string resultType = resultStruct.name.value();
+      std::string resultType =
+          std::string("struct ") + resultStruct.name.value();
       auto results = rewriter.create<emitc::CastOp>(
           /*location=*/loc,
           /*type=*/

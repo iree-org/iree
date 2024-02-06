@@ -690,12 +690,13 @@ vm.module @my_module {
 
 vm.module @my_module {
 
-  // Typedef structs for arguments and results
-  // CHECK: emitc.call_opaque "EMITC_TYPEDEF_STRUCT"() {args = [#emitc.opaque<"my_module_fn_args_t">, #emitc.opaque<"int32_t arg0;">]} : () -> ()
-  // CHECK: emitc.call_opaque "EMITC_TYPEDEF_STRUCT"() {args = [#emitc.opaque<"my_module_fn_result_t">, #emitc.opaque<"int32_t res0;">]} : () -> ()
-
+  // Define structs for arguments and results
+  //      CHECK: emitc.verbatim "struct my_module_fn_args_t {int32_t arg0;};"
+  // CHECK-NEXT: emitc.verbatim "struct my_module_fn_result_t {int32_t res0;};"
+  // CHECK-NEXT: static
+  
   // Create a new function to export with the adapted signature.
-  //      CHECK: func.func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
+  // CHECK-NEXT: func.func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
   // CHECK-SAME:                                %arg4: !emitc.ptr<!emitc.opaque<"void">>, %arg5: !emitc.ptr<!emitc.opaque<"void">>)
   // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
 
@@ -706,18 +707,18 @@ vm.module @my_module {
   // Cast argument and result structs.
   // CHECK-NEXT: %[[ARGDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"data">]}
   // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
-  // CHECK-NEXT: %[[ARGS:.+]] = emitc.cast %[[ARGDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"my_module_fn_args_t">>
+  // CHECK-NEXT: %[[ARGS:.+]] = emitc.cast %[[ARGDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>
   // CHECK-NEXT: %[[RESULTDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg3) {args = [0 : index, #emitc.opaque<"data">]}
   // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
-  // CHECK-NEXT: %[[RESULTS:.+]] = emitc.cast %[[RESULTDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"my_module_fn_result_t">>
+  // CHECK-NEXT: %[[RESULTS:.+]] = emitc.cast %[[RESULTDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>
 
   // Unpack the argument from the struct.
   // CHECK-NEXT: %[[MARG:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"arg0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_fn_args_t">>) -> i32
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>) -> i32
 
   // Unpack the result pointer from the struct.
   // CHECK-NEXT: %[[MRES:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ADDRESS"(%[[RESULTS]]) {args = [0 : index, #emitc.opaque<"res0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_fn_result_t">>) -> !emitc.ptr<i32>
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>) -> !emitc.ptr<i32>
 
   // Call the internal function.
   // CHECK-NEXT: %{{.+}} = call @my_module_fn(%arg0, %[[MODULECASTED]], %[[MODSTATECASTED]], %[[MARG]], %[[MRES]])

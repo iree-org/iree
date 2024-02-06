@@ -303,20 +303,17 @@ void arrayElementAssign(OpBuilder builder, Location location, Value array,
 
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields) {
-  std::string structBody;
-
-  for (auto &field : fields) {
-    structBody += field.type + " " + field.name + ";";
-  }
-
   auto ctx = builder.getContext();
+  std::string decl = std::string("struct ") + structName.str() + " {";
+  for (auto &field : fields) {
+    decl += field.type + " " + field.name;
+    if (field.isArray())
+      decl += "[" + std::to_string(field.arraySize.value()) + "]";
+    decl += ";";
+  }
+  decl += "};";
 
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location, /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_TYPEDEF_STRUCT"), /*args=*/
-      ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, structName),
-                           emitc::OpaqueAttr::get(ctx, structBody)}),
-      /*templateArgs=*/ArrayAttr{}, /*operands=*/ArrayRef<Value>{});
+  builder.create<emitc::VerbatimOp>(location, StringAttr::get(ctx, decl));
 }
 
 Value structMember(OpBuilder builder, Location location, Type type,
@@ -495,23 +492,6 @@ func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
   decl += ");";
 
   return {builder.create<emitc::VerbatimOp>(location, decl)};
-}
-
-FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
-                                        StringRef name,
-                                        ArrayRef<StructField> fields) {
-  auto ctx = builder.getContext();
-  std::string decl = std::string("struct ") + name.str() + " {";
-  for (auto &field : fields) {
-    decl += field.type + " " + field.name;
-    if (field.isArray())
-      decl += "[" + std::to_string(field.arraySize.value()) + "]";
-    decl += ";";
-  }
-  decl += "};";
-
-  return {
-      builder.create<emitc::VerbatimOp>(location, StringAttr::get(ctx, decl))};
 }
 
 void makeFuncStatic(OpBuilder builder, Location location,

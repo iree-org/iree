@@ -153,10 +153,6 @@ FailureOr<emitc::VerbatimOp>
 func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
           IREE::VM::EmitCTypeConverter &typeConverter);
 
-FailureOr<emitc::VerbatimOp> struct_def(OpBuilder builder, Location location,
-                                        StringRef name,
-                                        ArrayRef<StructField> fields);
-
 void makeFuncStatic(OpBuilder builder, Location location,
                     mlir::func::FuncOp func);
 
