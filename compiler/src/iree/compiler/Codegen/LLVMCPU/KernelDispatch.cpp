@@ -147,6 +147,7 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
+template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
   for (T element : vector) {
