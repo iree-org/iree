@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --iree-convert-mesh-to-flow --cse %s | FileCheck %s
 
-mesh.cluster @mesh_2d(shape = 3x4)
+mesh.mesh @mesh_2d(shape = 3x4)
 
 // CHECK-LABEL: func @all_gather_non_default_channel
 func.func @all_gather_non_default_channel(
@@ -25,7 +25,7 @@ func.func @all_gather_non_default_channel(
 
 // -----
 
-mesh.cluster @mesh_1d(shape = 2)
+mesh.mesh @mesh_1d(shape = 2)
 
 // CHECK-LABEL: func @all_reduce_sum_default_channel
 func.func @all_reduce_sum_default_channel(
@@ -43,7 +43,7 @@ func.func @all_reduce_sum_default_channel(
 
 // -----
 
-mesh.cluster @mesh_2d(shape = 2x2)
+mesh.mesh @mesh_2d(shape = 2x2)
 
 // CHECK-LABEL: func @all_reduce_min_non_default_channel
 func.func @all_reduce_min_non_default_channel(
@@ -61,7 +61,7 @@ func.func @all_reduce_min_non_default_channel(
 
 // -----
 
-mesh.cluster @mesh_1d(shape = 2)
+mesh.mesh @mesh_1d(shape = 2)
 
 // CHECK-LABEL: func @all_reduce_f32
 func.func @all_reduce_f32(
@@ -79,7 +79,7 @@ func.func @all_reduce_f32(
 
 // -----
 
-mesh.cluster @mesh_1d(shape = 2)
+mesh.mesh @mesh_1d(shape = 2)
 
 // CHECK-LABEL: func @process_linear_index
 func.func @process_linear_index() -> index {
@@ -92,7 +92,7 @@ func.func @process_linear_index() -> index {
 
 // -----
 
-mesh.cluster @mesh_3d(shape = 2x3x4)
+mesh.mesh @mesh_3d(shape = 2x3x4)
 
 // CHECK-LABEL: func @all_to_all_non_default_channel
 func.func @all_to_all_non_default_channel(
@@ -119,7 +119,7 @@ func.func @all_to_all_non_default_channel(
 
 // -----
 
-mesh.cluster @mesh_2d(shape = 2x2)
+mesh.mesh @mesh_2d(shape = 2x2)
 
 // CHECK-LABEL: func @reduce_scatter_non_default_channel
 func.func @reduce_scatter_non_default_channel(

@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Mesh/IR/MeshDialect.h"
 #include "mlir/Dialect/Mesh/IR/MeshOps.h"
 #include "mlir/Dialect/Mesh/Transforms/Simplifications.h"
 #include "mlir/Dialect/Mesh/Transforms/Transforms.h"
@@ -68,29 +69,16 @@ namespace mlir::iree_compiler::IREE::Flow {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Dialect/Flow/Conversion/MeshToFlow/Passes.h.inc" // IWYU pragma: keep
 
-// TODO: Use from MLIR when exposed.
-static mesh::ClusterOp getMesh(Operation *op, FlatSymbolRefAttr meshSymbol,
-                               SymbolTableCollection &symbolTableCollection) {
-  return symbolTableCollection.lookupNearestSymbolFrom<mesh::ClusterOp>(
-      op, meshSymbol);
-}
-
-template <typename MeshCollectiveOp>
-static mesh::ClusterOp getMesh(MeshCollectiveOp op,
-                               SymbolTableCollection &symbolTableCollection) {
-  return getMesh(op.getOperation(), op.getMeshAttr(), symbolTableCollection);
-}
-
 static bool hasMoreThanOneMesh(Operation *op) {
   int meshCount = 0;
-  op->walk([&meshCount](mesh::ClusterOp mesh) {
+  op->walk([&meshCount](mesh::MeshOp mesh) {
     ++meshCount;
     return meshCount > 1 ? WalkResult::interrupt() : WalkResult::advance();
   });
   return meshCount > 1;
 }
 
-static bool isDefaultChannel(mesh::ClusterOp mesh,
+static bool isDefaultChannel(mesh::MeshOp mesh,
                              ArrayRef<mesh::MeshAxis> meshAxes) {
   if (mesh.getRank() != static_cast<int64_t>(meshAxes.size())) {
     return false;
@@ -98,8 +86,7 @@ static bool isDefaultChannel(mesh::ClusterOp mesh,
   return isIdentityPermutation(meshAxes);
 }
 
-static Value getDefaultChannel(mesh::ClusterOp mesh,
-                               bool useNamedDefaultChannels,
+static Value getDefaultChannel(mesh::MeshOp mesh, bool useNamedDefaultChannels,
                                ImplicitLocOpBuilder &builder) {
   if (useNamedDefaultChannels)
     return builder.create<IREE::Flow::ChannelDefaultOp>(mesh.getSymName());
@@ -139,7 +126,7 @@ convertReductionKind(mesh::PartialAttr reduction) {
       reduction.getContext(), convertReductionKind(reduction.getValue()));
 }
 
-static Value buildChannelCreation(mesh::ClusterOp mesh,
+static Value buildChannelCreation(mesh::MeshOp mesh,
                                   ArrayRef<mesh::MeshAxis> meshAxes,
                                   bool useNamedDefaultChannels,
                                   ImplicitLocOpBuilder &builder) {
@@ -148,7 +135,7 @@ static Value buildChannelCreation(mesh::ClusterOp mesh,
   SmallVector<Value> meshProcessMultiIndex =
       builder.create<mesh::ProcessMultiIndexOp>(mesh).getResults();
   SmallVector<Value> meshShape =
-      builder.create<mesh::ClusterShapeOp>(mesh).getResults();
+      builder.create<mesh::MeshShapeOp>(mesh).getResults();
   SmallVector<Value> reorderedMeshIndex =
       permute(ArrayRef<Value>(meshProcessMultiIndex), meshAxes);
   SmallVector<Value> reorderedMeshShape =
@@ -168,7 +155,7 @@ static Value buildChannelCreation(mesh::ClusterOp mesh,
                                       reorderedProcessLinearIndex));
 }
 
-static SmallString<64> getChannelName(mesh::ClusterOp mesh,
+static SmallString<64> getChannelName(mesh::MeshOp mesh,
                                       ArrayRef<mesh::MeshAxis> axes) {
   SmallString<64> res;
   llvm::raw_svector_ostream stream(res);
@@ -185,7 +172,7 @@ static SmallString<64> getChannelName(mesh::ClusterOp mesh,
   return res;
 }
 
-static void buildChannelInitializer(mesh::ClusterOp mesh,
+static void buildChannelInitializer(mesh::MeshOp mesh,
                                     ArrayRef<mesh::MeshAxis> meshAxes,
                                     bool useNamedDefaultChannels,
                                     ImplicitLocOpBuilder &builder) {
@@ -201,7 +188,7 @@ static void buildChannelInitializer(mesh::ClusterOp mesh,
 
 // Construct a Flow channel inside `module` using
 // util.global and util.initializer.
-static void buildGlobalChannelCreation(mesh::ClusterOp mesh,
+static void buildGlobalChannelCreation(mesh::MeshOp mesh,
                                        ArrayRef<mesh::MeshAxis> meshAxes,
                                        bool useNamedDefaultChannels,
                                        ModuleOp module, OpBuilder &opBuilder) {
@@ -221,7 +208,7 @@ static void buildGlobalChannelCreation(mesh::ClusterOp mesh,
   buildChannelInitializer(mesh, meshAxes, useNamedDefaultChannels, builder);
 }
 
-static Value buildCachedChannelLoading(mesh::ClusterOp mesh,
+static Value buildCachedChannelLoading(mesh::MeshOp mesh,
                                        ArrayRef<mesh::MeshAxis> meshAxes,
                                        bool useNamedDefaultChannels,
                                        ImplicitLocOpBuilder &builder) {
@@ -240,12 +227,12 @@ static Value buildCachedChannelLoading(
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointAfter(op);
 
-  mesh::ClusterOp mesh = getMesh(op, symbolTableCollection);
+  mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
   return buildCachedChannelLoading(mesh, op.getMeshAxes(),
                                    useNamedDefaultChannels, builder);
 }
 
-SmallVector<mesh::MeshAxis> getAllMeshAxes(mesh::ClusterOp mesh) {
+SmallVector<mesh::MeshAxis> getAllMeshAxes(mesh::MeshOp mesh) {
   SmallVector<mesh::MeshAxis> res(mesh.getRank());
   std::iota(res.begin(), res.end(), 0);
   return res;
@@ -257,7 +244,7 @@ static Value buildCachedChannelLoading(
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointAfter(op);
 
-  mesh::ClusterOp mesh = getMesh(op, symbolTableCollection);
+  mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
   return buildCachedChannelLoading(mesh, getAllMeshAxes(mesh),
                                    useNamedDefaultChannels, builder);
 }
@@ -386,22 +373,6 @@ splitMoveCollapse(TypedValue<RankedTensorType> tensor, int64_t splitAxis,
   return collapseAxesN(v, collapseAxis, 2, builder);
 }
 
-// TODO: Use this function from MLIR when it is exposed in Mesh utils.
-static int64_t collectiveDeviceGroupSize(ArrayRef<mesh::MeshAxis> meshAxes,
-                                         ArrayRef<int64_t> meshShape) {
-  int64_t res = 1;
-
-  for (mesh::MeshAxis axis : meshAxes) {
-    if (ShapedType::isDynamic(meshShape[axis])) {
-      return ShapedType::kDynamic;
-    }
-    assert(size_t(axis) < meshShape.size());
-    res *= meshShape[axis];
-  }
-
-  return res;
-}
-
 namespace {
 
 template <typename Op>
@@ -504,10 +475,10 @@ struct MeshAllToAllToFlow
                                          "Dynamic tensor case is unsupported.");
     }
 
-    mesh::ClusterOp mesh = getMesh(op, symbolTableCollection);
+    mesh::MeshOp mesh = mesh::getMesh(op, symbolTableCollection);
     assert(!ShapedType::isDynamicShape(mesh.getShape()));
     int64_t splitCount =
-        collectiveDeviceGroupSize(op.getMeshAxes(), mesh.getShape());
+        mesh::collectiveProcessGroupSize(op.getMeshAxes(), mesh.getShape());
     // TODO: handle dynamic case.
     if (ShapedType::isDynamic(splitCount)) {
       // TODO: add dynamic support.
@@ -611,7 +582,7 @@ struct MeshReduceScatterToFlow
 };
 
 using MeshAndAxesSet =
-    DenseSet<std::tuple<mesh::ClusterOp, SmallVector<mesh::MeshAxis>>>;
+    DenseSet<std::tuple<mesh::MeshOp, SmallVector<mesh::MeshAxis>>>;
 
 template <typename Op>
 struct CollectiveOpVisitor {
@@ -621,7 +592,7 @@ struct CollectiveOpVisitor {
         symbolTableCollection(symbolTableCollection) {}
   void operator()(Op op) {
     meshAndAxesSet.insert(std::make_tuple(
-        symbolTableCollection.lookupNearestSymbolFrom<mesh::ClusterOp>(
+        symbolTableCollection.lookupNearestSymbolFrom<mesh::MeshOp>(
             op, op.getMeshAttr()),
         llvm::to_vector(op.getMeshAxes())));
   }
@@ -639,8 +610,8 @@ struct CollectiveOpWithoutMeshAxesVisitor {
       : meshAndAxesSet(meshAndAxesSet),
         symbolTableCollection(symbolTableCollection) {}
   void operator()(Op op) {
-    mesh::ClusterOp mesh =
-        symbolTableCollection.lookupNearestSymbolFrom<mesh::ClusterOp>(
+    mesh::MeshOp mesh =
+        symbolTableCollection.lookupNearestSymbolFrom<mesh::MeshOp>(
             op, op.getMeshAttr());
     meshAndAxesSet.insert(std::make_tuple(mesh, getAllMeshAxes(mesh)));
   }
@@ -701,12 +672,11 @@ convertCollectives(ModuleOp moduleOp,
   return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
 }
 
-static void removeMeshClusterOps(MeshAndAxesSet &meshAndAxesSet) {
+static void removeMeshOps(MeshAndAxesSet &meshAndAxesSet) {
   auto meshRange =
       llvm::map_range(meshAndAxesSet, [](auto &v) { return std::get<0>(v); });
-  DenseSet<mesh::ClusterOp> clusterOpsSet(std::begin(meshRange),
-                                          std::end(meshRange));
-  for (mesh::ClusterOp op : clusterOpsSet) {
+  DenseSet<mesh::MeshOp> meshOpsSet(std::begin(meshRange), std::end(meshRange));
+  for (mesh::MeshOp op : meshOpsSet) {
     if (op)
       op.erase();
   }
@@ -735,8 +705,8 @@ struct ConvertMeshToFlowPass
       return signalPassFailure();
     }
 
-    // Cleanup cluster definition ops that are no longer referenced.
-    removeMeshClusterOps(meshAndAxesSet);
+    // Cleanup mesh definition ops that are no longer referenced.
+    removeMeshOps(meshAndAxesSet);
   }
 };
 

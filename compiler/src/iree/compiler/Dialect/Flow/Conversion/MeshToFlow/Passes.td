@@ -15,7 +15,7 @@ def ConvertMeshToFlow :
   let description = [{
     Each mesh corresponds to a default Flow channel with the same group name.
     ```
-    mesh.cluster @mesh_1(shape = 2x3)
+    mesh.mesh @mesh_1(shape = 2x3)
     ```
     ```
     %channel = flow.channel.default "mesh_1" : !flow.channel
@@ -30,7 +30,7 @@ def ConvertMeshToFlow :
     operation.
     For example
     ```
-    mesh.cluster @mesh(shape = 2x3x4x5)
+    mesh.mesh @mesh(shape = 2x3x4x5)
     ...
     %1 = mesh.all_reduce on @mesh mesh_axes = [2, 0] : tensor<10x20xf32>
     ```

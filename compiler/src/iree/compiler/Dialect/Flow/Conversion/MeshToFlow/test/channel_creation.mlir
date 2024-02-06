@@ -5,7 +5,7 @@ module @static_1d_mesh_grouping_along_axis_0 {
 
   // No channel initialization default channel is expected.
   // CHECK-NOT: util.global private @_mesh_mesh_1d_axes_0 {inlining_policy = #util.inline.never} : !flow.channel
-  mesh.cluster @mesh_1d(shape = 2)
+  mesh.mesh @mesh_1d(shape = 2)
 
   func.func @f(
       %arg0 : tensor<1xi8>) -> tensor<1xi8> {
@@ -31,7 +31,7 @@ module @static_2d_mesh_grouping_along_axis_1 {
     // CHECK: %[[CHANNEL:.*]] = flow.channel.split
     // CHECK-SAME: %[[DEFAULT_CHANNEL]], %[[COLOR_AND_KEY]]#0, %[[COLOR_AND_KEY]]#1 : !flow.channel -> !flow.channel
     // CHECK: util.global.store %[[CHANNEL]], @_mesh_mesh_2d_axes_1 : !flow.channel
-  mesh.cluster @mesh_2d(shape = 3x4)
+  mesh.mesh @mesh_2d(shape = 3x4)
 
   func.func @f(%input : tensor<1xi8>) -> tensor<1xi8> {
     %out = mesh.all_reduce %input on @mesh_2d mesh_axes = [1] : tensor<1xi8> -> tensor<1xi8>
@@ -63,7 +63,7 @@ module @static_4d_mesh_grouping_along_axes_2_1 {
     // CHECK: %[[CHANNEL:.*]] = flow.channel.split
     // CHECK-SAME: %[[DEFAULT_CHANNEL]], %[[GROUP_IDX]], %[[IN_GROUP_IDX]] : !flow.channel -> !flow.channel
     // CHECK: util.global.store %[[CHANNEL]], @_mesh_mesh_4d_axes_2_1 : !flow.channel
-  mesh.cluster @mesh_4d(shape = 3x4x5x6)
+  mesh.mesh @mesh_4d(shape = 3x4x5x6)
 
   func.func @f(%input : tensor<1xi8>) -> tensor<1xi8> {
     %out = mesh.all_reduce %input on @mesh_4d mesh_axes = [2, 1] : tensor<1xi8> -> tensor<1xi8>
@@ -78,7 +78,7 @@ module @multiple_different_channels {
 
   // CHECK-DAG: util.global private @_mesh_mesh_2d_axes_0 {inlining_policy = #util.inline.never} : !flow.channel
   // CHECK-DAG: util.global private @_mesh_mesh_2d_axes_1 {inlining_policy = #util.inline.never} : !flow.channel
-  mesh.cluster @mesh_2d(shape = 3x4)
+  mesh.mesh @mesh_2d(shape = 3x4)
 
   func.func @f(%input : tensor<1xi8>) -> (tensor<1xi8>, tensor<1xi8>) {
     %out0 = mesh.all_reduce %input on @mesh_2d mesh_axes = [0] : tensor<1xi8> -> tensor<1xi8>
@@ -93,7 +93,7 @@ module @multiple_different_channels {
 module @same_channel_used_multiple_times {
 
   // CHECK: util.global private @_mesh_mesh_2d_axes_0 {inlining_policy = #util.inline.never} : !flow.channel
-  mesh.cluster @mesh_2d(shape = 3x4)
+  mesh.mesh @mesh_2d(shape = 3x4)
 
   func.func @f(%input0 : tensor<1xi8>, %input1 : tensor<1xi8>) -> (tensor<1xi8>, tensor<1xi8>) {
     %out0 = mesh.all_reduce %input0 on @mesh_2d mesh_axes = [0] : tensor<1xi8> -> tensor<1xi8>
@@ -113,14 +113,14 @@ module @multiple_meshes {
     // CHECK: %[[CHANNEL:.*]] = flow.channel.split
     // CHECK-SAME: %[[DEFAULT_CHANNEL]], %{{.*}}, %{{.*}} : !flow.channel -> !flow.channel
     // CHECK: util.global.store %[[CHANNEL]], @_mesh_mesh1_axes_0 : !flow.channel
-  mesh.cluster @mesh1(shape = 1x2)
+  mesh.mesh @mesh1(shape = 1x2)
   // CHECK: util.global private @_mesh_mesh2_axes_1 {inlining_policy = #util.inline.never} : !flow.channel
   // CHECK: util.initializer {
     // CHECK: %[[DEFAULT_CHANNEL:.*]] = flow.channel.default "mesh2" : !flow.channel
     // CHECK: %[[CHANNEL:.*]] = flow.channel.split
     // CHECK-SAME: %[[DEFAULT_CHANNEL]], %{{.*}}, %{{.*}} : !flow.channel -> !flow.channel
     // CHECK: util.global.store %[[CHANNEL]], @_mesh_mesh2_axes_1 : !flow.channel
-  mesh.cluster @mesh2(shape = 3x4)
+  mesh.mesh @mesh2(shape = 3x4)
 
   func.func @f(%input0 : tensor<1xi8>, %input1 : tensor<1xi8>) -> (tensor<1xi8>, tensor<1xi8>) {
     %out0 = mesh.all_reduce %input0 on @mesh1 mesh_axes = [0] : tensor<1xi8> -> tensor<1xi8>

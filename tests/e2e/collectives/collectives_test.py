@@ -155,7 +155,7 @@ class SingleRank(unittest.TestCase):
         all_reduce([1, 2, 3, 4]) == [1, 2, 3, 4].
         """
         mlir = """
-            mesh.cluster @mesh(shape = 1)
+            mesh.mesh @mesh(shape = 1)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
@@ -177,7 +177,7 @@ class SingleRank(unittest.TestCase):
         [[1, 2], [3, 4]]
         """
         mlir = """
-            mesh.cluster @mesh(shape = 1)
+            mesh.mesh @mesh(shape = 1)
 
             func.func @main(%input : tensor<2x2xf32>) -> tensor<2x2xf32> {
             %out = mesh.all_to_all %input on @mesh mesh_axes = [0]
@@ -232,7 +232,7 @@ class TwoRanks(unittest.TestCase):
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
         """
         mlir = """
-            mesh.cluster @mesh(shape = 2)
+            mesh.mesh @mesh(shape = 2)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
@@ -255,7 +255,7 @@ class TwoRanks(unittest.TestCase):
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
         """
         mlir = """
-            mesh.cluster @mesh(shape = 1x2x1)
+            mesh.mesh @mesh(shape = 1x2x1)
 
             func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<4xf32> -> tensor<4xf32>
@@ -293,7 +293,7 @@ class FourRanks(unittest.TestCase):
         [12, 14] [12, 14]
         """
         mlir = """
-            mesh.cluster @mesh(shape = 2x2)
+            mesh.mesh @mesh(shape = 2x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
@@ -336,7 +336,7 @@ class FourRanks(unittest.TestCase):
         [6, 8] [10, 12]
         """
         mlir = """
-            mesh.cluster @mesh(shape = 2x2)
+            mesh.mesh @mesh(shape = 2x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<2xf32> -> tensor<2xf32>
@@ -379,7 +379,7 @@ class FourRanks(unittest.TestCase):
         [6, 8] [10, 12]
         """
         mlir = """
-            mesh.cluster @mesh(shape = 1x2x1x2)
+            mesh.mesh @mesh(shape = 1x2x1x2)
 
             func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
             %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
@@ -422,7 +422,7 @@ class FourRanks(unittest.TestCase):
         [[2, 6]]  [[4, 8]]
         """
         mlir = """
-            mesh.cluster @mesh(shape = 1x2x1x2)
+            mesh.mesh @mesh(shape = 1x2x1x2)
 
             func.func @main(%input : tensor<2x1xf32>) -> tensor<1x2xf32> {
             %out = mesh.all_to_all %input on @mesh mesh_axes = [1]
