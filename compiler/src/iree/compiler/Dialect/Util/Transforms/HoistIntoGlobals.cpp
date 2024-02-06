@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
@@ -28,6 +29,50 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
         "Prints a dot graph representing the const-expr analysis. The red "
         "nodes represent roots and the green nodes represent hoisted values."),
     llvm::cl::value_desc("filename"));
+
+template <typename AccessorTy>
+static inline bool isAccessorParameterized(SymbolTable moduleSymbols,
+                                           AccessorTy op) {
+  auto global =
+      moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
+  if (!global)
+    return true;
+  if (!global.getGlobalInitialValue())
+    return false;
+  return !isa<Util::SerializableAttrInterface>(global.getGlobalInitialValue());
+}
+
+// Today the only way to interact with a global is with loads, stores, and
+// addresses, and globals are the only way to reference parameters given where
+// const-eval is run today. This is a workaround until we have proper dialect
+// interfaces for detecting whether something is evaluatable at compile time.
+static bool isParameterized(SymbolTable moduleSymbols, Operation *initializer) {
+  WalkResult res = initializer->walk([&](Operation *op) {
+    bool parameterized =
+        llvm::TypeSwitch<Operation *, bool>(op)
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](CallOpInterface accessor) {
+              // Pessimistic case for calls that could transitively load a
+              // parameter. Today const-expr hoisting does not model calls
+              // properly so we don't hit this path.
+              return true;
+            })
+            .Default([=](auto) { return false; });
+    if (parameterized) {
+      return WalkResult::interrupt();
+    }
+    return WalkResult::advance();
+  });
+  return res.wasInterrupted();
+}
 
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
@@ -149,9 +194,6 @@ public:
       Location loc = originalValue.getLoc();
       OpBuilder builder = getModuleEndBuilder();
       auto initializerOp = builder.create<InitializerOp>(loc);
-      // Signals that this initializer is eligible for constant evaluation
-      // at compile time.
-      initializerOp->setAttr("iree.compiler.consteval", builder.getUnitAttr());
       Block *entryBlock = initializerOp.addEntryBlock();
       OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
       IRMapping valueMapping;
@@ -162,6 +204,13 @@ public:
       }
 
       existingGlobal = hoistedMap.lookup(originalValue);
+
+      // Signals that this initializer is eligible for constant evaluation
+      // at compile time.
+      if (!isParameterized(moduleSymbols, initializerOp)) {
+        initializerOp->setAttr("iree.compiler.consteval",
+                               builder.getUnitAttr());
+      }
     }
     assert(existingGlobal &&
            "hoisting const-expr should have mapped a global for the requested "

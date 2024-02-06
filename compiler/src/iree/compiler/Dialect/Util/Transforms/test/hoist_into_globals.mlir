@@ -343,3 +343,19 @@ module @nested_program_const_expr {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: @parameterized_const_expr
+module @parameterized_const_expr {
+// Verify that the initializer does not get labelled as evaluatable by
+// const-eval.
+//      CHECK: util.initializer {
+// CHECK-NEXT:   util.global.load @parameter_constant
+  util.global private @parameter_constant = #stream.parameter.named<"compile"::"constant_hoisted_0"> : i32
+  func.func @main() -> (i32) {
+    %load = util.global.load @parameter_constant : i32
+    %1 = "iree_unregistered.const_expr"(%load) : (i32) -> i32
+    return %1 : i32
+  }
+}
