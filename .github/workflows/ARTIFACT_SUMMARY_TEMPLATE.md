@@ -2,7 +2,7 @@
 
 ```sh
 # Compiler and host tools archive:
-export BUILD_DIR_URL="${BUILD_DIR_GCS_ARTIFACT}"
+export INSTALL_DIR_URL="${INSTALL_DIR_GCS_ARTIFACT}"
 # Directory of e2e test artifacts:
 export E2E_TEST_ARTIFACTS_DIR_URL="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 # Directory of benchmark tool binaries:
