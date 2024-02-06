@@ -18,6 +18,7 @@
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
 #include "iree/compiler/ConstEval/Passes.h"
+#include "iree/compiler/Dialect/Flow/Conversion/MeshToFlow/MeshToFlow.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -53,6 +54,7 @@ inline void registerAllIreePasses() {
   GlobalOptimization::registerGlobalOptimizationPipeline();
   Preprocessing::registerPreprocessingPasses();
   IREE::Flow::registerFlowPasses();
+  IREE::Flow::registerMeshToFlowPasses();
   IREE::HAL::registerHALPasses();
   IREE::HAL::Inline::registerHALInlinePasses();
   IREE::HAL::Loader::registerHALLoaderPasses();

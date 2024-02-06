@@ -1732,6 +1732,11 @@ def FLOW_ChannelDefaultOp : FLOW_PureOp<"channel.default", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+
+  let builders = [
+    OpBuilder<(ins "StringRef":$group)>,
+    OpBuilder<(ins)>
+  ];
 }
 
 def FLOW_ChannelSplitOp : FLOW_Op<"channel.split", [

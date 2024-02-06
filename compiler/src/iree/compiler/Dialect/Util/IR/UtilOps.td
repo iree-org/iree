@@ -772,7 +772,6 @@ def Util_GlobalOp : Util_Op<"global", [
     custom<TypeOrAttr>($type, $initial_value)
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "StringRef":$name,

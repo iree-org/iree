@@ -66,6 +66,7 @@ iree_compiler_cc_library(
         "//runtime/src/iree/schemas/instruments:dispatch_def_c_fbs",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineToStandard",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ControlFlowDialect",

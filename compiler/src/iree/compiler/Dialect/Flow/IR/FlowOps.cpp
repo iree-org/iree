@@ -21,6 +21,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
@@ -1945,6 +1946,16 @@ void ChannelCountOp::getAsmResultNames(
 void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "default_channel");
+}
+
+void ChannelDefaultOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                             StringRef group) {
+  ChannelDefaultOp::build(odsBuilder, odsState,
+                          odsBuilder.getStringAttr(group));
+}
+
+void ChannelDefaultOp::build(OpBuilder &odsBuilder, OperationState &odsState) {
+  ChannelDefaultOp::build(odsBuilder, odsState, StringAttr());
 }
 
 //===----------------------------------------------------------------------===//

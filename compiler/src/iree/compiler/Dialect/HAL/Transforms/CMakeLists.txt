@@ -42,6 +42,7 @@ iree_cc_library(
     ::PassesIncGen
     LLVMSupport
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRArithDialect
     MLIRBufferizationDialect
     MLIRControlFlowDialect

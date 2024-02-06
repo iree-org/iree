@@ -7,7 +7,11 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_CONVERSION_CONVERSIONPATTERNS_H_
 #define IREE_COMPILER_DIALECT_UTIL_CONVERSION_CONVERSIONPATTERNS_H_
 
+#include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -18,7 +22,7 @@ struct GenericConvertTypesPattern : public OpConversionPattern<T> {
   LogicalResult
   matchAndRewrite(T op, typename T::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type> resultTypes;
+    SmallVector<Type> newResultTypes;
     for (auto oldType : op.getOperation()->getResultTypes()) {
       SmallVector<Type> newTypes;
       if (failed(this->getTypeConverter()->convertType(oldType, newTypes))) {
@@ -26,11 +30,43 @@ struct GenericConvertTypesPattern : public OpConversionPattern<T> {
       }
       // TODO(benvanik): figure out this silly expansion stuff. Seems broken.
       // resultTypes.append(newTypes);
-      resultTypes.push_back(newTypes.front());
+      newResultTypes.push_back(newTypes.front());
     }
-    auto newOp = rewriter.create<T>(op.getLoc(), resultTypes,
-                                    adaptor.getOperands(), op->getAttrs());
+
+    SmallVector<NamedAttribute> newAttrs;
+    if (failed(convertTypeAttributes(op->getAttrs(), newAttrs))) {
+      return rewriter.notifyMatchFailure(op,
+                                         "failed converting type attributes");
+    }
+
+    if (newResultTypes == op->getResultTypes() &&
+        op->getOperands() == adaptor.getOperands() &&
+        newAttrs == op->getAttrs()) {
+      return rewriter.notifyMatchFailure(op, "op does not need transformation");
+    }
+
+    auto newOp = rewriter.create<T>(op.getLoc(), newResultTypes,
+                                    adaptor.getOperands(), newAttrs);
     rewriter.replaceOp(op, newOp->getResults());
+    return success();
+  }
+
+protected:
+  LogicalResult convertTypeAttributes(ArrayRef<NamedAttribute> attrs,
+                                      SmallVector<NamedAttribute> &res) const {
+    for (NamedAttribute attr : attrs) {
+      TypeAttr oldType = attr.getValue().dyn_cast<TypeAttr>();
+      if (!oldType) {
+        res.push_back(attr);
+        continue;
+      }
+
+      Type newType = this->getTypeConverter()->convertType(oldType.getValue());
+      if (!newType) {
+        return failure();
+      }
+      res.push_back(NamedAttribute(attr.getName(), TypeAttr::get(newType)));
+    }
     return success();
   }
 };

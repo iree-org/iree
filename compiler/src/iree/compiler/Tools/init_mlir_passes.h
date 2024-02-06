@@ -54,8 +54,6 @@ inline void registerMlirPasses() {
 
   // Affine
   affine::registerAffinePasses();
-  affine::registerAffineLoopFusionPass();
-  affine::registerAffinePipelineDataTransferPass();
   registerConvertAffineToStandardPass();
 
   // Arm SME

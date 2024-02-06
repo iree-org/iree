@@ -59,6 +59,7 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
+        "//compiler/src/iree/compiler/Dialect/Flow/Conversion/MeshToFlow",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
