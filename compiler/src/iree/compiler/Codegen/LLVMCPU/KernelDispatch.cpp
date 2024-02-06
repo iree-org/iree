@@ -83,6 +83,12 @@ static llvm::cl::opt<bool> clDisableVectorPeeling(
                    "heuristics to select the strategy)."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableScalableVectorization(
+    "iree-llvmcpu-enable-scalable-vectorization",
+    llvm::cl::desc("Enable scalable vectorization if it is supported by the "
+                   "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
+    llvm::cl::init(false));
+
 // Non-static options are used in other places.
 llvm::cl::opt<bool> clEnableTransformDialectJit(
     "iree-llvmcpu-enable-transform-dialect-jit",
@@ -225,7 +231,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (hasAnySVEFeature(targetAttr)) {
+    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -937,8 +943,8 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
   if (isAArch64(targetAttr)) {
     sizes.append({8, 16, 1});
 
-    // Specialisation for SVE.
-    if (hasAnySVEFeature(targetAttr)) {
+    // Specialisation for scalable vectorization.
+    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
@@ -1063,9 +1069,9 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
   // TODO: Compute vector tile sizes using heuristics.
 
   if (isAArch64(targetAttr)) {
-    if (hasSMEFeature(targetAttr)) {
-      // Note: This may not pick any sizes (which will fallback to the SVE
-      // heuristics below).
+    if (clEnableScalableVectorization && hasSMEFeature(targetAttr)) {
+      // Note: This may not pick any sizes (which will fallback to the scalable
+      // vectorization heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
     }
 

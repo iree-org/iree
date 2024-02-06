@@ -7,8 +7,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
