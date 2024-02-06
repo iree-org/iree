@@ -1,0 +1,148 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+exports_files(["IndexingBase.td"])
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "IndexingBase.td",
+            "IndexingInterfaces.td",
+            "IndexingOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:CallInterfacesTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:FunctionInterfacesTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "ExternalModels",
+    srcs = [
+        "IndexingExternalModels.cpp",
+    ],
+    hdrs = [
+        "IndexingExternalModels.h",
+    ],
+    deps = [
+        ":IR",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
+        "@llvm-project//mlir:MLProgramDialect",
+        "@llvm-project//mlir:TensorDialect",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IR",
+    srcs = [
+        "IndexingDialect.cpp",
+        "IndexingInterfaces.cpp",
+        "IndexingOps.cpp",
+    ],
+    hdrs = [
+        "IndexingDialect.h",
+        "IndexingInterfaces.h",
+        "IndexingOps.h",
+    ],
+    textual_hdrs = [
+        "IndexingOpInterfaces.cpp.inc",
+        "IndexingOpInterfaces.h.inc",
+        "IndexingOps.cpp.inc",
+        "IndexingOps.h.inc",
+    ],
+    deps = [
+        ":IndexingInterfacesGen",
+        ":IndexingOpsGen",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:CastInterfaces",
+        "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferTypeOpInterface",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "IndexingInterfacesGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "IndexingOpInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "IndexingOpInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IndexingInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IndexingOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "IndexingOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "IndexingOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IndexingOps.td",
+    deps = [":td_files"],
+)
+
+iree_tablegen_doc(
+    name = "IndexingDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=util",
+            ],
+            "IndexingDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IndexingOps.td",
+    deps = [":td_files"],
+)

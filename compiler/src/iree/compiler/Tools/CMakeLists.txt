@@ -49,6 +49,9 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::Indexing::IR
+    iree::compiler::Dialect::Indexing::IR::ExternalModels
+    iree::compiler::Dialect::Indexing::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::IR

@@ -22,6 +22,8 @@
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/Indexing/IR/IndexingDialect.h"
+#include "iree/compiler/Dialect/Indexing/IR/IndexingExternalModels.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
@@ -47,6 +49,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::HAL::Inline::HALInlineDialect,
                   IREE::HAL::Loader::HALLoaderDialect,
                   IREE::IO::Parameters::IOParametersDialect,
+                  IREE::Indexing::IndexingDialect,
                   IREE::Input::IREEInputDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
                   IREE::Stream::StreamDialect,
@@ -58,6 +61,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   // External models.
+  IREE::Indexing::registerIndexingExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
   registerGlobalOptimizationInterfaces(registry);
