@@ -1,6 +1,5 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' \
-// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --iree-llvmcpu-vector-pproc-strategy=peel \
-// RUN:   --split-input-file %s | FileCheck %s
+// RUN:   --iree-llvmcpu-enable-scalable-vectorization=true --split-input-file %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -48,8 +47,8 @@ hal.executable private @matmul_tensors_sve  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: hal.executable.export public @matmul_tensors
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -88,8 +87,8 @@ hal.executable private @matmul_static_tensors_sve  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 7, 0], [5, 7, 0], [0, 0, 0], [8, [16], 0], [0, 0, 1], [0, 0, 0]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[5, 7, 0], [5, [8], 0], [0, 0, 1], [0, 0, 0]]>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       CHECK: hal.executable.export public @static_tensors_non_pow_two_sizes
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
@@ -130,10 +129,3 @@ hal.executable private @static_tensors_1x1  {
   }
 }
 
-// TODO: FIXME - scalable "16" ([16]) for just 1 element
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, [16], 0], [0, 0, 1], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
-//      CHECK: hal.executable.export public @static_tensors_1x1
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]

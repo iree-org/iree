@@ -7,8 +7,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -133,8 +131,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   auto target = variantOp.getTarget();
   bool lowerToAVX2 = hasAVX2Feature(target);
   bool enableVectorMasking = isX86(target) || isRISCV(target) ||
-                             (isAArch64(target) && (hasAnySVEFeature(target) ||
-                                                    hasV9aFeature(target)));
+                             (isAArch64(target) && hasAnySVEFeature(target));
 
   bool enableMicrokernels = hasUkernel(target);
   bool enableAArch64SSVE =
