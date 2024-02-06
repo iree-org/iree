@@ -299,9 +299,13 @@ jobs:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_gpu')
     env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: build-tests
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
+      IREE_CUDA_DISABLE: 0
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -311,29 +315,37 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Querying GPU information
         run: |
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Testing all"
-        env:
-          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
-          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
+      - name: "Building tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_CPU_DISABLE \
+              --env IREE_VULKAN_DISABLE \
+              --env IREE_CUDA_DISABLE \
+              gcr.io/iree-oss/nvidia@sha256:892fefbdf90c93b407303adadfa87f22c0f1e84b7e819e69643c78fc5927c2ba \
+              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+      - name: "Running GPU tests"
+        env:
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=cuda$
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+              --env IREE_VULKAN_DISABLE \
+              --env IREE_CUDA_DISABLE \
+              --env IREE_CTEST_LABEL_REGEX \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
-              --env IREE_CTEST_LABEL_REGEX \
-              --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
-              --env IREE_CUDA_DISABLE=0 \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
               --env CTEST_PARALLEL_LEVEL=2 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
@@ -348,9 +360,13 @@ jobs:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_a100')
     env:
-      BUILD_DIR: ${{ needs.build_all.outputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ needs.build_all.outputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      BUILD_DIR: build-tests
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
+      IREE_CUDA_DISABLE: 0
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -360,29 +376,37 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Querying GPU information
         run: |
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting build dir archive"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}"
-      - name: "Testing all"
-        env:
-          IREE_NVIDIA_SM80_TESTS_DISABLE: 0
-          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80|^requires-gpu|^driver=vulkan$|^driver=cuda$
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
+      - name: "Building tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_CPU_DISABLE \
+              --env IREE_VULKAN_DISABLE \
+              --env IREE_CUDA_DISABLE \
+              gcr.io/iree-oss/nvidia@sha256:892fefbdf90c93b407303adadfa87f22c0f1e84b7e819e69643c78fc5927c2ba \
+              ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+      - name: "Running GPU tests"
+        env:
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu-sm80|^requires-gpu|^driver=vulkan$|^driver=cuda$
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 0
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 1
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+              --env IREE_VULKAN_DISABLE \
+              --env IREE_CUDA_DISABLE \
+              --env IREE_CTEST_LABEL_REGEX \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
-              --env IREE_CTEST_LABEL_REGEX \
-              --env IREE_VULKAN_DISABLE=0 \
               --env IREE_VULKAN_F16_DISABLE=0 \
-              --env IREE_CUDA_DISABLE=0 \
               --env IREE_NVIDIA_GPU_TESTS_DISABLE=0 \
               --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
