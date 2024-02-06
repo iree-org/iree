@@ -30,23 +30,23 @@ class LinalgOp;
 
 namespace mlir::iree_compiler {
 
-// Returns an MmaAttr from the array of mmaTypes compatible with the given
+// Returns an MmaAttr from the array of mmaKinds compatible with the given
 // structured operation description. The conditions for compatibility are
 //
 // 1. The iteration bounds are aligned on the shape of the mma operation.
 // 2. The element types of |inputTypes| match with `[aType, bType, cType]`
 //
 // Returns the first successful match.
-FailureOr<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaTypes, ArrayRef<AffineMap> indexingMaps,
+std::optional<IREE::GPU::MmaAttr>
+getCompatibleMmaAttr(ArrayAttr mmaKinds, ArrayRef<AffineMap> indexingMaps,
                      ArrayRef<int64_t> iterationBounds, TypeRange inputTypes);
 // Helper for contractions.
-FailureOr<IREE::GPU::MmaAttr> getCompatibleMmaAttr(ArrayAttr mmaTypes,
-                                                   vector::ContractionOp);
+std::optional<IREE::GPU::MmaAttr> getCompatibleMmaAttr(ArrayAttr mmaKinds,
+                                                       vector::ContractionOp);
 // Helper for linalg ops. Fails if the linalg op is not inferrable as a
 // contraction op.
-FailureOr<IREE::GPU::MmaAttr> getCompatibleMmaAttr(ArrayAttr mmaTypes,
-                                                   linalg::LinalgOp);
+std::optional<IREE::GPU::MmaAttr> getCompatibleMmaAttr(ArrayAttr mmaKinds,
+                                                       linalg::LinalgOp);
 
 } // namespace mlir::iree_compiler
 

@@ -936,16 +936,16 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
-static constexpr char mmaTypeListName[] = "mma_types";
+static constexpr char mmaTypeListName[] = "mma_intrinsics";
 static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
   if (!config) {
     return failure();
   }
-  Attribute types = config.get(mmaTypeListName);
+  ArrayAttr types = dyn_cast_or_null<ArrayAttr>(config.get(mmaTypeListName));
   if (!types) {
     return failure();
   }
-  return llvm::cast<ArrayAttr>(types);
+  return types;
 }
 
 FailureOr<ArrayAttr>

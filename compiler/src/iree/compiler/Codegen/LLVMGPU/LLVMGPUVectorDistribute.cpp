@@ -71,7 +71,7 @@ getPerDimLayout(MLIRContext *context, SmallVector<LayoutDimensionAttr> dimTypes,
 }
 
 // Vector layout option setter aimed at contractions. Currently this only sets
-// anchors for two types of operation; vector.contract and vector.transfer_read
+// anchors for two types of operations; vector.contract and vector.transfer_read
 // from non-shared memory. The assumption in this case is that all IR input to
 // this pass has a leaf rooted on a transfer_read or includes a contraction in
 // the program slice, meaning all operations should receive layouts. Layout
@@ -108,14 +108,14 @@ private:
   void setContractionAnchor(MLIRContext *context,
                             VectorLayoutAnalysis &analysis,
                             vector::ContractionOp contract) {
-    FailureOr<IREE::GPU::MmaAttr> maybeMmaType =
+    std::optional<IREE::GPU::MmaAttr> maybeMmaType =
         getCompatibleMmaAttr(mmaTypes, contract);
     // TODO: Add SIMT fallback.
-    assert(succeeded(maybeMmaType) && "incompatible contraction op");
+    assert(maybeMmaType && "incompatible contraction op");
 
     auto mmaType = *maybeMmaType;
     auto maybeLayouts = mmaType.getContractionLayout(contract);
-    assert(succeeded(maybeMmaType) && "mma layout type must not be opaque");
+    assert(maybeMmaType && "mma layout type must not be opaque");
 
     auto [aLayout, bLayout, cLayout] = *maybeLayouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
@@ -138,6 +138,19 @@ private:
   // transfers into the layout attributes that currently don't support more
   // than a few dimensions. This pattern needs to be reworked with the layout
   // attributes.
+  //
+  // The layout this generates is approximately the following:
+  //
+  // #row_layout = #iree_vector_ext.per_dim_layout<
+  //   [BATCHX, LANEX,         VECTORX],
+  //   [-1,     subgroup_size, 128 / element_type_bitwidth]>
+  // #col_layout = #iree_vector_ext.per_dim_layout<
+  //   [VECTORY, LANEY],
+  //   [-1,      leftover threads from subgroup_size / LANEX]>
+  // #layout = #iree_vector_ext.layout<#row_layout, #col_layout>
+  //
+  // Where -1 indicates assign all remaining elements along that dimension
+  // to that dim type.
   void setTransferReadAnchor(MLIRContext *context,
                              VectorLayoutAnalysis &analysis,
                              vector::TransferReadOp transfer) {
@@ -166,10 +179,9 @@ private:
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
-    // TODO: Need delinearization of thread indices to support higher
-    // dimensionalities.
+    // TODO: Support > 2-d transfers.
     int64_t transferRank = transfer.getVectorType().getRank();
-    if (transferRank > 4) {
+    if (transferRank > 2) {
       return;
     }
 
@@ -199,14 +211,12 @@ private:
     int64_t residualThreads = flatNumThreads / xThreads;
     SmallVector<int64_t> xDimSizes = {-1, xThreads, numElementsPerThread};
 
-    // Here, VECTORY, VECTORZ, and BATCHY are treated like batch dimensions.
+    // Here, we only distribute the second dimension, if present, along the
+    // LANEY and VECTORY dimensions.
     SmallVector<SmallVector<LayoutDimensionAttr>> dimTypes = {
         {LayoutDimensionAttr::get(context, LayoutDimension::VECTORY),
-         LayoutDimensionAttr::get(context, LayoutDimension::LANEY)},
-        {LayoutDimensionAttr::get(context, LayoutDimension::VECTORZ)},
-        {LayoutDimensionAttr::get(context, LayoutDimension::BATCHY)}};
-    SmallVector<SmallVector<int64_t>> dimSizes = {
-        {-1, residualThreads}, {-1}, {-1}};
+         LayoutDimensionAttr::get(context, LayoutDimension::LANEY)}};
+    SmallVector<SmallVector<int64_t>> dimSizes = {{-1, residualThreads}};
 
     SmallVector<PerDimLayoutAttr> perDimAttrs;
     int64_t idx = 0;
@@ -259,12 +269,17 @@ public:
 
     FailureOr<ArrayAttr> maybeSupportedTypes =
         getSupportedMmaTypes(llvm::cast<func::FuncOp>(func));
-    // TODO: Support SIMT distribution fallback. Contractions always benefit
-    // from an anchoring layout because they do implicit shuffles, or broadcast
-    // when loading data.
+    // TODO: Support FMA fallback. Contractions always benefit from an anchoring
+    // layout because they do implicit shuffles, or broadcast when loading data.
     if (failed(maybeSupportedTypes)) {
       func->emitError() << "Failed to collect the set of supported mma types "
                            "for vector distribution";
+      return signalPassFailure();
+    }
+
+    auto maybeSubgroupSize = getSubgroupSize(func);
+    if (!maybeSubgroupSize) {
+      func.emitError() << "subgroup size required for vector distribution";
       return signalPassFailure();
     }
 
@@ -281,11 +296,6 @@ public:
     // Construct the expression for linearizing the thread indices.
     AffineExpr linearId =
         x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-    auto maybeSubgroupSize = getSubgroupSize(func);
-    if (!maybeSubgroupSize) {
-      func.emitError() << "subgroup size required for vector distribution";
-      return signalPassFailure();
-    }
     AffineExpr laneId = linearId % *maybeSubgroupSize;
 
     // This all needs some kind of simplification; the arithmetic it produces

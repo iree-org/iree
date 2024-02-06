@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,7 +10,7 @@
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
-// IREE Codegen dialect
+// IREE GPU Dialect
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_Dialect : Dialect {

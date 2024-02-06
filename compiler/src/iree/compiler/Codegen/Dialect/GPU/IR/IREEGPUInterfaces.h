@@ -4,9 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- IREEGPUInterfaces.h - Codegen GPU dialect interfaces ---------------===//
-//===----------------------------------------------------------------------===//
-
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES_H_
 

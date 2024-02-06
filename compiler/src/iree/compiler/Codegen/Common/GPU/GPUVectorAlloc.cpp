@@ -25,7 +25,7 @@ namespace mlir::iree_compiler {
 // For optimal performance we always want to copy 128 bits.
 static constexpr int copyVectorNumBits = 128;
 
-/// Filter to decide which [contract] ops need allocations.
+/// Filter to decide which contraction ops need allocations.
 static bool contractOpFilter(Operation *op) {
   auto contractOp = dyn_cast<vector::ContractionOp>(op);
   if (!contractOp) {
@@ -107,41 +107,39 @@ public:
   void runOnOperation() override {
     auto funcOp = getOperation();
 
-    SmallVector<Operation *> opsToPromote;
-    funcOp.walk([&](Operation *op) {
-      // Today we only do promotion for contractions.
+    SmallVector<vector::ContractionOp> opsToPromote;
+    funcOp.walk([&](vector::ContractionOp op) {
+      // Today we only do promotion for certain contractions.
       if (contractOpFilter(op))
         opsToPromote.push_back(op);
     });
-    for (Operation *op : opsToPromote) {
-      OpBuilder builder(op);
-      if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
-        // Promote both of the input operands, excluding the accumulator.
-        OpOperand &lhs = contractOp.getLhsMutable();
-        FailureOr<Value> lhsRet =
-            allocateTensorForVector(builder, op->getLoc(), lhs.get());
-        if (failed(lhsRet)) {
-          return signalPassFailure();
-        }
-
-        OpOperand &rhs = contractOp.getRhsMutable();
-        FailureOr<Value> rhsRet =
-            allocateTensorForVector(builder, op->getLoc(), rhs.get());
-        if (failed(rhsRet)) {
-          return signalPassFailure();
-        }
-
-        // HACK: Until proper barrier placement is handled later we have to
-        // synchronize here.
-        builder.create<gpu::BarrierOp>(op->getLoc());
-
-        Value lhsVec =
-            readVectorFromTensor(builder, contractOp.getLhsType(), *lhsRet);
-        Value rhsVec =
-            readVectorFromTensor(builder, contractOp.getRhsType(), *rhsRet);
-        lhs.set(lhsVec);
-        rhs.set(rhsVec);
+    for (vector::ContractionOp contractOp : opsToPromote) {
+      OpBuilder builder(contractOp);
+      // Promote both of the input operands, excluding the accumulator.
+      OpOperand &lhs = contractOp.getLhsMutable();
+      FailureOr<Value> lhsRet =
+          allocateTensorForVector(builder, contractOp->getLoc(), lhs.get());
+      if (failed(lhsRet)) {
+        return signalPassFailure();
       }
+
+      OpOperand &rhs = contractOp.getRhsMutable();
+      FailureOr<Value> rhsRet =
+          allocateTensorForVector(builder, contractOp->getLoc(), rhs.get());
+      if (failed(rhsRet)) {
+        return signalPassFailure();
+      }
+
+      // HACK: Until proper barrier placement is handled later we have to
+      // synchronize here.
+      builder.create<gpu::BarrierOp>(contractOp->getLoc());
+
+      Value lhsVec =
+          readVectorFromTensor(builder, contractOp.getLhsType(), *lhsRet);
+      Value rhsVec =
+          readVectorFromTensor(builder, contractOp.getRhsType(), *rhsRet);
+      lhs.set(lhsVec);
+      rhs.set(rhsVec);
     }
   }
 };

@@ -298,12 +298,18 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // Currently only applies when there is a supported mma operation we can map
   // to.
   // TODO: Reuse this pipeline for SIMT based flows.
-  FailureOr<IREE::GPU::MmaAttr> maybeMmaAttr =
+  std::optional<IREE::GPU::MmaAttr> maybeMmaAttr =
       getCompatibleMmaAttr(*maybeMmaTypes, op);
-  if (failed(maybeMmaAttr)) {
+  if (!maybeMmaAttr) {
     return failure();
   }
   IREE::GPU::MmaAttr mmaAttr = *maybeMmaAttr;
+
+  // This pipeline needs to know the subgroup size to know how to distribute to
+  // virtual lane ids.
+  if (targetInfo.supportedSubgroupSizes.empty()) {
+    return failure();
+  }
 
   int64_t numLoops = op.getNumLoops();
 
@@ -362,11 +368,6 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   tileSizes.push_back(workgroupTileSizes);
   SmallVector<int64_t, 3> workgroupSize(3, 1); // (X, Y, Z)
 
-  // This pipeline needs to know the subgroup size to know how to distribute to
-  // virtual lane ids.
-  if (targetInfo.supportedSubgroupSizes.empty()) {
-    return failure();
-  }
   int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
   workgroupSize[0] = subgroupSize;
 

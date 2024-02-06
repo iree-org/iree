@@ -105,7 +105,7 @@ def GPUTileReduction :
 
 def GPUVectorAlloc :
     InterfacePass<"iree-codegen-gpu-vector-alloc", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to create allocations for some vector values to copy"
+  let summary = "Pass to create allocations for contraction inputs to copy "
                 "to GPU shared memory";
   let constructor = "mlir::iree_compiler::createGPUVectorAlloc()";
 }

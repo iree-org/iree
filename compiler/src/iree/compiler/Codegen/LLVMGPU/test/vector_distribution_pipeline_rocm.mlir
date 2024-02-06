@@ -10,8 +10,8 @@
 hal.executable @matmul_256x256x256 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_types = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                   #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):

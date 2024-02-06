@@ -816,7 +816,7 @@ FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
   return llvm::cast<IntegerAttr>(stage).getInt();
 }
 
-static constexpr char mmaTypeListName[] = "mma_types";
+static constexpr char mmaTypeListName[] = "mma_intrinsics";
 
 FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
   if (!config) {

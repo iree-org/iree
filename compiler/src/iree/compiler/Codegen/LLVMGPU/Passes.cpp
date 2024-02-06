@@ -477,10 +477,6 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkgroupSpecializationPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

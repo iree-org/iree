@@ -10,9 +10,3 @@
 #include "mlir/IR/DialectImplementation.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.cpp.inc"
-
-namespace mlir::iree_compiler::IREE::GPU {
-
-} // namespace mlir::iree_compiler::IREE::GPU
-
-namespace mlir::iree_compiler {} // namespace mlir::iree_compiler

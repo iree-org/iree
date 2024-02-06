@@ -14,8 +14,8 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 // Returns the list of supported mma types (mfma/wmma).
-FailureOr<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
-                                              StringRef targetArch);
+std::optional<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
+                                                  StringRef targetArch);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

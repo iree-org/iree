@@ -15,6 +15,4 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h.inc" // IWYU pragma: keep
 // clang-format on
 
-namespace mlir::iree_compiler {} // namespace mlir::iree_compiler
-
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUDIALECT_H_

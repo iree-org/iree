@@ -182,14 +182,14 @@ getContractionLayout(vector::ContractionOp contract, ConcreteMmaLayout layout) {
 //===----------------------------------------------------------------------===//
 
 static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
-                                           MFMAType type) {
+                                           MFMAIntrinsic type) {
   Type f16 = Float16Type::get(context);
   Type f32 = Float32Type::get(context);
   switch (type) {
-  case MFMAType::F16_16x16x16_F32: {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
     return OpaqueMmaLayout{16, 16, 16, f16, f16, f32};
   }
-  case MFMAType::F16_32x32x8_F32: {
+  case MFMAIntrinsic::F16_32x32x8_F32: {
     return OpaqueMmaLayout{32, 32, 8, f16, f16, f32};
   }
   }
@@ -198,7 +198,7 @@ static OpaqueMmaLayout getOpaqueMFMALayout(MLIRContext *context,
 }
 
 static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
-                                               MFMAType type) {
+                                               MFMAIntrinsic type) {
   auto opaqueLayout = getOpaqueMFMALayout(context, type);
 
   LayoutDimensionAttr laneX =
@@ -215,7 +215,7 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
       LayoutDimensionAttr::get(context, LayoutDimension::VECTORZ);
   (void)laneZ, (void)vectorZ;
   switch (type) {
-  case MFMAType::F16_16x16x16_F32: {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
     // #row_layout = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
     // #col_layout = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
     // #row_layout2 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
@@ -236,7 +236,7 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
-  case MFMAType::F16_32x32x8_F32: {
+  case MFMAIntrinsic::F16_32x32x8_F32: {
     // #row_layout = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
     // #col_layout = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
     // #row_layout1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
@@ -273,8 +273,9 @@ Attribute MFMAAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess()))
     return {};
 
-  FailureOr<MFMATypeAttr> mfmaType = FieldParser<MFMATypeAttr>::parse(p);
-  if (failed(mfmaType)) {
+  FailureOr<MFMAIntrinsicAttr> mfmaIntrinsic =
+      FieldParser<MFMAIntrinsicAttr>::parse(p);
+  if (failed(mfmaIntrinsic)) {
     p.emitError(p.getCurrentLocation(), "failed to parse mfma type identifier");
     return {};
   }
@@ -282,19 +283,19 @@ Attribute MFMAAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseGreater()))
     return {};
 
-  return get(p.getContext(), mfmaType->getValue());
+  return get(p.getContext(), mfmaIntrinsic->getValue());
 }
 
 void MFMAAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
-  os << stringifyMFMAType(getType().getValue());
+  os << stringifyMFMAIntrinsic(getIntrinsic().getValue());
   os << ">";
 }
 
-MFMAAttr MFMAAttr::get(MLIRContext *context, MFMAType type) {
+MFMAAttr MFMAAttr::get(MLIRContext *context, MFMAIntrinsic type) {
   auto layout = getOpaqueMFMALayout(context, type);
-  return Base::get(context, MFMATypeAttr::get(context, type), layout.mSize,
+  return Base::get(context, MFMAIntrinsicAttr::get(context, type), layout.mSize,
                    layout.nSize, layout.kSize, layout.aType, layout.bType,
                    layout.cType);
 }
@@ -303,7 +304,7 @@ FailureOr<std::tuple<VectorLayoutInterface, VectorLayoutInterface,
                      VectorLayoutInterface>>
 MFMAAttr::getContractionLayout(vector::ContractionOp contract) const {
   ConcreteMmaLayout layout =
-      getConcreteMFMALayout(contract->getContext(), getType().getValue());
+      getConcreteMFMALayout(contract->getContext(), getIntrinsic().getValue());
   return IREE::GPU::getContractionLayout(contract, layout);
 }
 
@@ -322,35 +323,35 @@ void IREEGPUDialect::registerAttributes() {
 
 namespace mlir::iree_compiler {
 
-FailureOr<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaTypes, vector::ContractionOp contract) {
+std::optional<IREE::GPU::MmaAttr>
+getCompatibleMmaAttr(ArrayAttr mmaKinds, vector::ContractionOp contract) {
   SmallVector<int64_t> iterationBounds;
   contract.getIterationBounds(iterationBounds);
-  return getCompatibleMmaAttr(mmaTypes, contract.getIndexingMapsArray(),
+  return getCompatibleMmaAttr(mmaKinds, contract.getIndexingMapsArray(),
                               iterationBounds, contract->getOperandTypes());
 }
 
-FailureOr<IREE::GPU::MmaAttr> getCompatibleMmaAttr(ArrayAttr mmaTypes,
-                                                   linalg::LinalgOp linalgOp) {
-  return getCompatibleMmaAttr(mmaTypes, linalgOp.getIndexingMapsArray(),
+std::optional<IREE::GPU::MmaAttr>
+getCompatibleMmaAttr(ArrayAttr mmaKinds, linalg::LinalgOp linalgOp) {
+  return getCompatibleMmaAttr(mmaKinds, linalgOp.getIndexingMapsArray(),
                               linalgOp.getStaticLoopRanges(),
                               linalgOp->getOperandTypes());
 }
 
-FailureOr<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaTypes, ArrayRef<AffineMap> indexingMaps,
+std::optional<IREE::GPU::MmaAttr>
+getCompatibleMmaAttr(ArrayAttr mmaKinds, ArrayRef<AffineMap> indexingMaps,
                      ArrayRef<int64_t> iterationBounds, TypeRange inputTypes) {
   FailureOr<linalg::ContractionDimensions> maybeContractionDims =
       linalg::inferContractionDims(indexingMaps);
   if (failed(maybeContractionDims)) {
-    return failure();
+    return std::nullopt;
   }
   auto contractionDims = *maybeContractionDims;
 
   // TODO: Relax this condition once distribution supports it.
   if (contractionDims.k.size() != 1 || contractionDims.m.size() != 1 ||
       contractionDims.n.size() != 1) {
-    return failure();
+    return std::nullopt;
   }
 
   unsigned mDim = contractionDims.m[0];
@@ -366,36 +367,36 @@ getCompatibleMmaAttr(ArrayAttr mmaTypes, ArrayRef<AffineMap> indexingMaps,
   if (ShapedType::isDynamic(problemMSize) ||
       ShapedType::isDynamic(problemNSize) ||
       ShapedType::isDynamic(problemKSize)) {
-    return failure();
+    return std::nullopt;
   }
 
   if (inputTypes.size() != 3) {
-    return failure();
+    return std::nullopt;
   }
 
   Type lhsType = getElementTypeOrSelf(inputTypes[0]);
   Type rhsType = getElementTypeOrSelf(inputTypes[1]);
   Type accType = getElementTypeOrSelf(inputTypes[2]);
 
-  for (Attribute a : mmaTypes.getValue()) {
-    auto mmaType = dyn_cast<IREE::GPU::MmaAttr>(a);
-    if (!mmaType) {
-      return failure();
+  for (Attribute a : mmaKinds.getValue()) {
+    auto mmaKind = dyn_cast<IREE::GPU::MmaAttr>(a);
+    if (!mmaKind) {
+      return std::nullopt;
     }
 
-    auto [typeA, typeB, typeC] = mmaType.getABCElementTypes();
+    auto [typeA, typeB, typeC] = mmaKind.getABCElementTypes();
     if (typeA != lhsType || typeB != rhsType || typeC != accType) {
       continue;
     }
 
-    auto [sizeM, sizeN, sizeK] = mmaType.getMNKShape();
+    auto [sizeM, sizeN, sizeK] = mmaKind.getMNKShape();
     if (problemMSize % sizeM != 0 || problemNSize % sizeN != 0 ||
         problemKSize % sizeK != 0) {
       continue;
     }
-    return mmaType;
+    return mmaKind;
   }
-  return failure();
+  return std::nullopt;
 }
 
 } // namespace mlir::iree_compiler

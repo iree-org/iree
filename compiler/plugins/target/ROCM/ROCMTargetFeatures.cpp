@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -12,7 +12,7 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
-                                  ArrayRef<IREE::GPU::MFMAType> types) {
+                                  ArrayRef<IREE::GPU::MFMAIntrinsic> types) {
   SmallVector<Attribute> attrs(types.size(), IREE::GPU::MFMAAttr());
   for (auto [idx, type] : llvm::enumerate(types)) {
     attrs[idx] = IREE::GPU::MFMAAttr::get(context, type);
@@ -20,13 +20,14 @@ static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
   return ArrayAttr::get(context, attrs);
 }
 
-FailureOr<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
-                                              StringRef targetArch) {
+std::optional<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
+                                                  StringRef targetArch) {
   if (targetArch == "gfx940") {
-    return getMfmaArrayAttr(context, {IREE::GPU::MFMAType::F16_16x16x16_F32,
-                                      IREE::GPU::MFMAType::F16_32x32x8_F32});
+    return getMfmaArrayAttr(context,
+                            {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
+                             IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});
   }
-  return failure();
+  return std::nullopt;
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

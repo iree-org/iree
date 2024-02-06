@@ -4,8 +4,8 @@ hal.executable private @matmul_dispatch_0 {
   // This pass queries the target device for the list of supported mma ops.
   hal.executable.variant public @rocm_hsaco_fb target(
       <"rocm", "rocm-hsaco-fb", {
-      mma_types = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                   #iree_gpu.mfma_layout<F16_32x32x8_F32>],
+      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                        #iree_gpu.mfma_layout<F16_32x32x8_F32>],
       target_arch = "gfx940",
       ukernels = "none"}>) {
     hal.executable.export public @matmul_256x256x256 ordinal(0)

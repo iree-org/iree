@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --allow-unregistered-dialect --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-vector-alloc))" | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-vector-alloc))" | FileCheck %s
 
 func.func @matmul_256x256x256(%lhs: tensor<16x256xf16>,
                               %rhs: tensor<256x16xf16>,
