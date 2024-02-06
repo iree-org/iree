@@ -40,6 +40,7 @@ iree_lit_test_suite(
             "pipeline_pad_tests.mlir",
             "pipeline_peel_and_vectorize_tests.mlir",
             "pipeline_split_reduction_tests.mlir",
+            "pipeline_ssve_tests.mlir",
             "pipeline_tests.mlir",
             "pipeline_transpose_avx2_tests.mlir",
             "pipeline_vector_masking_tests.mlir",
