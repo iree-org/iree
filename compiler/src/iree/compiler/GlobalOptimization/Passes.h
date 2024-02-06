@@ -110,10 +110,6 @@ std::unique_ptr<Pass> createSetEncodingPass();
 /// Simplifies tensor pack/unpack ops to reshape ops.
 std::unique_ptr<Pass> createSimplifyPackUnpackPass();
 
-/// Converts linalg.generic ops to linalg.batch_matmul, possibly with transposes
-/// on operands/result.
-std::unique_ptr<Pass> createLiftGenericToTransposeBatchMatmulPass();
-
 void registerGlobalOptimizationPipeline();
 
 } // namespace mlir::iree_compiler::GlobalOptimization
