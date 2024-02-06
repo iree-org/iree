@@ -407,6 +407,73 @@ func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16
   func.return %c : vector<32x16xf16>
 }
 
+#row_broadcast_layout = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX], [2, 16]>
+#col_broadcast_layout = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [2, 4, 4]>
+#layout_broadcast_1d = #iree_vector_ext.layout<#row_broadcast_layout>
+#layout_broadcast_2d = #iree_vector_ext.layout<#row_broadcast_layout, #col_broadcast_layout>
+#layout_broadcast_1d_t = #iree_vector_ext.layout<#col_broadcast_layout>
+#layout_broadcast_2d_t = #iree_vector_ext.layout<#col_broadcast_layout, #row_broadcast_layout>
+
+func.func @distribute_broadcast_row_col(%source: vector<32xf32>) -> vector<32x32xf32> {
+  %result = vector.broadcast %source {
+          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d_t,
+          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d} 
+          : vector<32xf32> to vector<32x32xf32>
+  // CHECK-DAG: %[[S00:.*]] = vector.extract %[[SOURCE:.*]][0, 0]
+  // CHECK-DAG: vector.insert %[[S00]], %{{.*}} [0, 0, 0]
+  // CHECK-DAG: vector.insert %[[S00]], %{{.*}} [1, 0, 0]
+  // CHECK-DAG: %[[S01:.*]] = vector.extract %[[ACC:.*]][0, 1]
+  // CHECK-DAG: vector.insert %[[S01]], %{{.*}} [0, 0, 1]
+  // CHECK-DAG: vector.insert %[[S01]], %{{.*}} [1, 0, 1]
+  // CHECK-DAG: %[[S02:.*]] = vector.extract %[[ACC:.*]][0, 2]
+  // CHECK-DAG: vector.insert %[[S02]], %{{.*}} [0, 0, 2]
+  // CHECK-DAG: vector.insert %[[S02]], %{{.*}} [1, 0, 2]
+  // CHECK-DAG: %[[S03:.*]] = vector.extract %[[ACC:.*]][0, 3]
+  // CHECK-DAG: vector.insert %[[S03]], %{{.*}} [0, 0, 3]
+  // CHECK-DAG: vector.insert %[[S03]], %{{.*}} [1, 0, 3]
+
+  // CHECK-DAG: %[[S10:.*]] = vector.extract %[[SOURCE]][1, 0]
+  // CHECK-DAG: vector.insert %[[S10]], %{{.*}} [0, 1, 0]
+  // CHECK-DAG: vector.insert %[[S10]], %{{.*}} [1, 1, 0]
+  // CHECK-DAG: %[[S11:.*]] = vector.extract %[[ACC:.*]][1, 1]
+  // CHECK-DAG: vector.insert %[[S11]], %{{.*}} [0, 1, 1]
+  // CHECK-DAG: vector.insert %[[S11]], %{{.*}} [1, 1, 1]
+  // CHECK-DAG: %[[S12:.*]] = vector.extract %[[ACC:.*]][1, 2]
+  // CHECK-DAG: vector.insert %[[S12]], %{{.*}} [0, 1, 2]
+  // CHECK-DAG: vector.insert %[[S12]], %{{.*}} [1, 1, 2]
+  // CHECK-DAG: %[[S13:.*]] = vector.extract %[[ACC:.*]][1, 3]
+  // CHECK-DAG: vector.insert %[[S13]], %{{.*}} [0, 1, 3]
+  // CHECK-DAG: vector.insert %[[S13]], %{{.*}} [1, 1, 3]
+  func.return %result : vector<32x32xf32>
+}
+
+func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32xf32> {
+  %result = vector.broadcast %source {
+          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d,
+          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d_t} 
+          : vector<32xf32> to vector<32x32xf32>
+  // CHECK-DAG: %[[S0:.*]] = vector.extract %[[SOURCE:.*]][0]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 0]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 1]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 2]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 3]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 1, 0]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 1, 1]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 1, 2]
+  // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 1, 3]
+
+  // CHECK-DAG: %[[S1:.*]] = vector.extract %[[SOURCE:.*]][1]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 0, 0]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 0, 1]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 0, 2]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 0, 3]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 0]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 1]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 2]
+  // CHECK-DAG: vector.insert %[[S1]], %{{.*}} [1, 1, 3]
+  func.return %result : vector<32x32xf32>
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op

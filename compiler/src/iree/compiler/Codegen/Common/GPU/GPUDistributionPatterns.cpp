@@ -356,6 +356,7 @@ struct DistributeTransferWriteLayoutAttr final
     return accumulator;
   }
 };
+
 struct DistributeReductions final
     : OpDistributionPattern<vector::MultiDimReductionOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -643,6 +644,71 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
   }
 };
 
+struct DistributeBroadcastLayoutAttr final
+    : OpDistributionPattern<vector::BroadcastOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    VectorValue source = dyn_cast<VectorValue>(broadcastOp.getSource());
+    if (!source) {
+      // TODO: Add support for scalar broadcasting.
+      llvm::errs() << "scalar??\n";
+      return failure();
+    }
+
+    VectorValue vector = broadcastOp.getVector();
+    LayoutAttr layout = dyn_cast<LayoutAttr>(signature[vector]);
+    if (!layout) {
+      llvm::errs() << "layout is not layoutattr\n";
+      return failure();
+    }
+
+    VectorLayoutInterface sourceLayout = signature[source];
+
+    // We currently only support 1-D to 2-D broadcasting.
+    if (source.getType().getRank() != 1 || vector.getType().getRank() != 2) {
+      llvm::errs() << "rank mismatch\n";
+      return failure();
+    }
+
+    int broadcastedDim = 0;
+    int parallelDim = 1;
+
+    Type elementType =
+        llvm::cast<ShapedType>(vector.getType()).getElementType();
+    auto vectorType =
+        VectorType::get(layout.getDistributedShape(), elementType);
+    Location loc = broadcastOp.getLoc();
+    Value accumulator = rewriter.create<arith::ConstantOp>(
+        loc, vectorType, rewriter.getZeroAttr(vectorType));
+
+    // Iterate over the parallel dimension.;
+    LayoutIterator parallelIterator(layout, parallelDim);
+    parallelIterator.apply([&](const LayoutIterator::State &parallelState) {
+      // Extract the value from source.
+      SmallVector<int64_t> sourceIndices = parallelState.computeSIMTIndex();
+      Value value = rewriter.create<vector::ExtractOp>(
+          loc, getDistributed(rewriter, source, sourceLayout), sourceIndices);
+
+      // Broadcast value over the broadcasted dimension.
+      LayoutIterator broadcastIterator(layout, broadcastedDim);
+      broadcastIterator.maybeFreezeAndConcatenate(parallelState);
+      broadcastIterator.apply([&](const LayoutIterator::State &broadcastState) {
+        SmallVector<int64_t> resultIndices = broadcastState.computeSIMTIndex();
+
+        accumulator = rewriter.create<vector::InsertOp>(loc, value, accumulator,
+                                                        resultIndices);
+      });
+    });
+
+    replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -664,7 +730,8 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
           patterns.getContext(), laneId);
-  patterns.add<DistributeTranspose>(patterns.getContext());
+  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose>(
+      patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
