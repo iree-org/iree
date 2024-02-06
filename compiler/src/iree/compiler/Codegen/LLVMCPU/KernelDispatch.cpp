@@ -86,7 +86,7 @@ static llvm::cl::opt<bool> clDisableVectorPeeling(
 static llvm::cl::opt<bool> clEnableScalableVectorization(
     "iree-llvmcpu-enable-scalable-vectorization",
     llvm::cl::desc("Enable scalable vectorization if it is supported by the "
-                   "target (i.e., '+sve' feature flag)"),
+                   "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
     llvm::cl::init(false));
 
 // Non-static options are used in other places.
@@ -147,12 +147,6 @@ static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   return os;
 }
 
-static bool
-enableScalableVectorization(IREE::HAL::ExecutableTargetAttr target) {
-  return clEnableScalableVectorization && hasAnySVEFeature(target);
-}
-
-template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                      const llvm::SmallVectorImpl<T> &vector) {
   for (T element : vector) {
@@ -236,7 +230,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 
   // Default AArch64 specific strategies.
   if (isAArch64(targetAttr)) {
-    if (enableScalableVectorization(targetAttr)) {
+    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
       return VectorPreProcStrategy::Masking;
     }
 
@@ -949,7 +943,7 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
     sizes.append({8, 16, 1});
 
     // Specialisation for scalable vectorization.
-    if (enableScalableVectorization(targetAttr)) {
+    if (clEnableScalableVectorization && hasAnySVEFeature(targetAttr)) {
       // Mark middle dimensions as scalable, so sizes are (8, [16], 1).
       scalableSizeFlags.append({false, true, false});
     }
@@ -1074,7 +1068,7 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
   // TODO: Compute vector tile sizes using heuristics.
 
   if (isAArch64(targetAttr)) {
-    if (hasSMEFeature(targetAttr)) {
+    if (clEnableScalableVectorization && hasSMEFeature(targetAttr)) {
       // Note: This may not pick any sizes (which will fallback to the scalable
       // vectorization heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
