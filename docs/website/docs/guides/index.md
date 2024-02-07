@@ -33,3 +33,8 @@ Guides for specific configurations:
   for AMD-specific solutions
 * [:simple-apple: GPU - Metal](./deployment-configurations/gpu-metal.md)
   for running on Apple hardware
+
+## General topics
+
+* [:octicons-file-symlink-file-16: Parameters](./parameters.md) for managing large chunks of
+  program data
