@@ -103,6 +103,13 @@ def GPUTileReduction :
   let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
 }
 
+def GPUVectorAlloc :
+    InterfacePass<"iree-codegen-gpu-vector-alloc", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to create allocations for contraction inputs to copy "
+                "to GPU shared memory";
+  let constructor = "mlir::iree_compiler::createGPUVectorAlloc()";
+}
+
 def VectorReductionToGPU :
     InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Convert vector reduction to GPU ops.";

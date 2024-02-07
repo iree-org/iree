@@ -323,7 +323,9 @@ struct DistributeTransferWriteLayoutAttr final
       return failure();
     }
 
-    // TODO: Return failure if we need masking.
+    if (writeOp.getMask()) {
+      return failure();
+    }
 
     accessMemory(writeOp, writeOp.getVector(), vectorLayout, rewriter);
 
