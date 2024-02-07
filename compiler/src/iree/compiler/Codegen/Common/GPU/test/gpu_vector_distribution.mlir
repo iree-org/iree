@@ -6,15 +6,15 @@
 func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
-  // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<16xf16>
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<1x1x16xf16>
   %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0.0> : vector<16x16xf16>
-  // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
-  // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] : vector<16xf16>
+  // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<1x1x16xf16>
+  // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] : vector<1x1x16xf16>
   %c = arith.mulf %root, %b : vector<16x16xf16>
-  // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
-  // CHECK-DAG: %[[D:.*]] = arith.addf %[[C]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
+  // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<1x1x16xf16>
+  // CHECK-DAG: %[[D:.*]] = arith.addf %[[C]], %[[A]] fastmath<reassoc,nnan> : vector<1x1x16xf16>
   %d = arith.addf %c, %a fastmath<reassoc,nnan> : vector<16x16xf16>
-  // CHECK: iree_vector_ext.to_simd %[[D]] : vector<16xf16> -> vector<16x16xf16>
+  // CHECK: iree_vector_ext.to_simd %[[D]] : vector<1x1x16xf16> -> vector<16x16xf16>
   return %d : vector<16x16xf16>
 }
 
@@ -22,15 +22,15 @@ func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf1
 func.func @distribute_elementwise_i32(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> vector<16x16xi32> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0 : i32
-  // CHECK: %[[ROOT:.*]] = arith.constant dense<2> : vector<16xi32>
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<2> : vector<1x1x16xi32>
   %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<2> : vector<16x16xi32>
-  // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
-  // CHECK-DAG: %[[C:.*]] = arith.muli %[[B]], %[[ROOT]] : vector<16xi32>
+  // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<1x1x16xi32>
+  // CHECK-DAG: %[[C:.*]] = arith.muli %[[B]], %[[ROOT]] : vector<1x1x16xi32>
   %c = arith.muli %root, %b : vector<16x16xi32>
-  // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
-  // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<16xi32>
+  // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<1x1x16xi32>
+  // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<1x1x16xi32>
   %d = arith.addi %c, %a : vector<16x16xi32>
-  // CHECK: iree_vector_ext.to_simd %[[D]] : vector<16xi32> -> vector<16x16xi32>
+  // CHECK: iree_vector_ext.to_simd %[[D]] : vector<1x1x16xi32> -> vector<16x16xi32>
   return %d : vector<16x16xi32>
 }
 
@@ -39,20 +39,20 @@ func.func @distribute_scf_for(%a: vector<16x16xi32>, %b: vector<16x16xi32>) -> v
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
   %cst_0 = arith.constant 0 : i32
-  // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<16xi32>
+  // CHECK: %[[ROOT:.*]] = arith.constant dense<0> : vector<1x1x16xi32>
   %root = arith.constant {"__vector_layout_test_anchor_result_0" = #layout} dense<0> : vector<16x16xi32>
-  // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<16xi32>)
+  // CHECK: iter_args(%[[ARG0:.*]] = %[[ROOT]]) -> (vector<1x1x16xi32>)
   %out = scf.for %i = %c0 to %c128 step %c1 iter_args(%arg0 = %root) -> (vector<16x16xi32>) {
     // These should be ideally folded if canonicalization was ever ran.
     // Canonicalization currently breaks other tests. If canonicalization
     // is ever ran, this should be updated.
-    // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
-    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] : vector<16xi32>
+    // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<1x1x16xi32>
+    // CHECK-DAG: %[[C:.*]] = arith.muli %[[ARG0]], %[[B]] : vector<1x1x16xi32>
     %c = arith.muli %arg0, %b : vector<16x16xi32>
-    // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<16xi32>
-    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<16xi32>
+    // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xi32> -> vector<1x1x16xi32>
+    // CHECK-DAG: %[[D:.*]] = arith.addi %[[C]], %[[A]] : vector<1x1x16xi32>
     %d = arith.addi %c, %a : vector<16x16xi32>
-    // CHECK: scf.yield %[[D]] : vector<16xi32>
+    // CHECK: scf.yield %[[D]] : vector<1x1x16xi32>
     scf.yield %d : vector<16x16xi32>
   }
   return %out : vector<16x16xi32>
