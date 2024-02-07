@@ -597,6 +597,50 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
   }
 };
 
+struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp transposeOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue value = transposeOp.getVector();
+    LayoutAttr layout = dyn_cast<LayoutAttr>(signature[value]);
+    if (!layout) {
+      return failure();
+    }
+
+    /// Transpose only changes the notion of where the data carried by each
+    /// thread comes from in the SIMD vector. The data carried by each thread is
+    /// still the same, just iterated in a new permuted order. This iteration
+    /// information is carried by the layout. So, we can simply distribute
+    /// transpose to a no-op. Example:
+    ///
+    /// input: vector<2x4xf16>
+    ///
+    /// 0 0 1 1
+    /// 2 2 3 3
+    ///
+    /// after transpose,
+    ///
+    /// transp: vector<4x2xf16>
+    ///
+    /// 0 2
+    /// 0 2
+    /// 1 3
+    /// 1 3
+    ///
+    /// As it can be seen, each thread is still carrying the same data and
+    /// distributes to vector<2xf16>.
+    ///
+    /// The only difference is where this vector<2xf16> comes from and that
+    /// before transpose, this vector<2xf16> was representing the fastest
+    /// changing dimension, but after distribution it's not.
+    replaceOpWithDistributedValues(rewriter, transposeOp,
+                                   getDistributed(rewriter, value, layout));
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -618,6 +662,7 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
           patterns.getContext(), laneId);
+  patterns.add<DistributeTranspose>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
