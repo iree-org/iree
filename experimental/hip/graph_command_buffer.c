@@ -382,16 +382,23 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
 
-  HIP_MEMCPY3D params = {
-      .srcMemoryType = hipMemoryTypeHost,
-      .srcHost = storage,
-      .dstMemoryType = hipMemoryTypeDevice,
-      .dstDevice = target_device_buffer,
-      .dstXInBytes = iree_hal_buffer_byte_offset(target_buffer) + target_offset,
-      .WidthInBytes = length,
-      .Height = 1,
-      .Depth = 1,
-  };
+  hipArray_t source_array = NULL, dst_array = NULL;
+
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyToArray(source_array, 0, 0, storage, length,
+                       hipMemcpyHostToHost),
+      "hipMemcpyToArray");
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyToArray(dst_array, 0, 0, NULL, length, hipMemcpyHostToDevice),
+      "hipMemcpyToArray");
+
+  hipMemcpy3DParms params = {.srcArray = source_array,
+                             .dstArray = dst_array,
+                             .dstPos = make_hipPos(0, 0, 0),
+                             .extent = make_hipExtent(length, 1, 1),
+                             .kind = hipMemcpyHostToDevice};
 
   if (command_buffer->graph_node_count >=
       IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
@@ -402,11 +409,19 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      hipDrvGraphAddMemcpyNode(
+      hipGraphAddMemcpyNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
           command_buffer->hip_graph, &command_buffer->hip_barrier_node,
-          dependency_count, &params, command_buffer->hip_context),
-      "hipDrvGraphAddMemcpyNode");
+          dependency_count, &params),
+      "hipGraphAddMemcpyNode");
+
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyFromArray(
+          target_device_buffer, dst_array,
+          iree_hal_buffer_byte_offset(target_buffer) + target_offset, 0, length,
+          hipMemcpyDeviceToDevice),
+      "hipMemcpyFromArray");
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -433,17 +448,25 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
 
-  HIP_MEMCPY3D params = {
-      .srcMemoryType = hipMemoryTypeDevice,
-      .srcDevice = source_device_buffer,
-      .srcXInBytes = source_offset,
-      .dstMemoryType = hipMemoryTypeDevice,
-      .dstDevice = target_device_buffer,
-      .dstXInBytes = target_offset,
-      .WidthInBytes = length,
-      .Height = 1,
-      .Depth = 1,
-  };
+  hipArray_t source_array = NULL, dst_array = NULL;
+
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyToArray(source_array, 0, 0,
+                       (uint8_t*)source_device_buffer + source_offset, length,
+                       hipMemcpyDeviceToDevice),
+      "hipMemcpyToArray");
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyToArray(dst_array, 0, 0, NULL, length, hipMemcpyHostToDevice),
+      "hipMemcpyToArray");
+
+  hipMemcpy3DParms params = {.srcArray = source_array,
+                             .srcPos = make_hipPos(0, 0, 0),
+                             .dstArray = dst_array,
+                             .dstPos = make_hipPos(0, 0, 0),
+                             .extent = make_hipExtent(length, 1, 1),
+                             .kind = hipMemcpyDeviceToDevice};
 
   if (command_buffer->graph_node_count >=
       IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT) {
@@ -454,11 +477,17 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
       z0, command_buffer->symbols,
-      hipDrvGraphAddMemcpyNode(
+      hipGraphAddMemcpyNode(
           &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++],
           command_buffer->hip_graph, &command_buffer->hip_barrier_node,
-          dependency_count, &params, command_buffer->hip_context),
-      "hipDrvGraphAddMemcpyNode");
+          dependency_count, &params),
+      "hipGraphAddMemcpyNode");
+
+  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, command_buffer->symbols,
+      hipMemcpyFromArray((uint8_t*)target_device_buffer + target_offset,
+                         dst_array, 0, 0, length, hipMemcpyDeviceToDevice),
+      "hipMemcpyFromArray");
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
