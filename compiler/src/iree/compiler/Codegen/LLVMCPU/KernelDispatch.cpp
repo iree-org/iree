@@ -1271,6 +1271,48 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
+static SmallVector<int64_t>
+getMmt4dDistributionSizes(uint64_t pressumedM1, uint64_t pressumedN1,
+                          ArrayRef<int64_t> innerTileSizes, unsigned numLoops,
+                          unsigned mmt4dDimBase) {
+  // Compute the number of distribution level tiles per thread based on the
+  // inner level tiles. We merge multiple cache level tiles into a single
+  // distribution level tile to match the target distribution tiles per thread
+  // and minimize distribution sharding overhead.
+  SmallVector<int64_t> distTileSizes(numLoops, 0);
+  constexpr int64_t targetDistTilesPerThread = 8;
+  int64_t numCacheSizeTiles =
+      llvm::divideCeil(pressumedM1, innerTileSizes[mmt4dDimBase + 0]) *
+      llvm::divideCeil(pressumedN1, innerTileSizes[mmt4dDimBase + 1]);
+  int64_t numDistTilesPerThread = llvm::divideCeil(
+      numCacheSizeTiles, targetDistTilesPerThread * clNumberOfRuntimeThreads);
+
+  // Assign the tiles per thread along pressumedM1 and pressumedN1. We try to do
+  // it kind of proportional to their sizes: the larger the size, the more we
+  // tile it.
+  int64_t ratio = llvm::divideCeil(std::max(pressumedM1, pressumedN1),
+                                   std::min(pressumedM1, pressumedN1));
+  int64_t numM1Tiles, numN1Tiles;
+  if (pressumedN1 >= pressumedM1) {
+    numN1Tiles = llvm::divideCeil(numDistTilesPerThread, ratio);
+    numM1Tiles = numDistTilesPerThread / numN1Tiles;
+  } else {
+    numM1Tiles = llvm::divideCeil(numDistTilesPerThread, ratio);
+    numN1Tiles = numDistTilesPerThread / numM1Tiles;
+  }
+
+  distTileSizes[mmt4dDimBase + 0] =
+      numM1Tiles * innerTileSizes[mmt4dDimBase + 0];
+  distTileSizes[mmt4dDimBase + 1] =
+      numN1Tiles * innerTileSizes[mmt4dDimBase + 1];
+
+  LLVM_DEBUG(KD_DBGS() << "Number of distribution tiles: (M=" << numM1Tiles
+                       << " x N=" << numN1Tiles
+                       << ") = " << numM1Tiles * numN1Tiles << "\n");
+
+  return distTileSizes;
+}
+
 static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   DistributionHeuristicConfig distConfig;
   distConfig.allowIncompleteTile = true;
@@ -1323,28 +1365,38 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
               : getMatmulTileSize(tileBytes, rhsType.getElementTypeBitWidth(),
                                   reductionSize, N0);
 
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, distConfig);
-  // Cache-level sizes are set to the distribution tile sizes for now. This will
-  // allow us to change distribution tile sizes while still preserving the
-  // existing cache behavior to some extent.
   unsigned numLoops = op.getNumLoops();
-  SmallVector<int64_t> cacheParallelTileSizes(distTileSizes.begin(),
-                                              distTileSizes.end());
+  SmallVector<int64_t> cacheParallelTileSizes(numLoops, 0)
+      // = getDefaultDistributedLevelTileSizes(op, distConfig);
   SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
 
-  SmallVector<int64_t> parallelTileSizes(numLoops, 1);
-  assert(parallelTileSizes.size() == mmt4dDimBase + 6);
-  parallelTileSizes[mmt4dDimBase + 3] = M0;
-  parallelTileSizes[mmt4dDimBase + 4] = N0;
-  parallelTileSizes[mmt4dDimBase + 5] = K0;
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
+  // Compute distribution tile sizes for mmt4d. If shapes are dynamic, we assume
+  // some values just to generate some distribution tile sizes.
+  uint64_t pressumedM1 = ShapedType::isDynamic(M1) ? 1024 : M1;
+  uint64_t pressumedN1 = ShapedType::isDynamic(N1) ? 1024 : N1;
+  SmallVector<int64_t> distTileSizes = getMmt4dDistributionSizes(
+      pressumedM1, pressumedN1, cacheParallelTileSizes, numLoops, mmt4dDimBase);
+
+  SmallVector<int64_t> vectorParallelTileSizes(numLoops, 1);
+  assert(vectorParallelTileSizes.size() == mmt4dDimBase + 6);
+  vectorParallelTileSizes[mmt4dDimBase + 3] = M0;
+  vectorParallelTileSizes[mmt4dDimBase + 4] = N0;
+  vectorParallelTileSizes[mmt4dDimBase + 5] = K0;
+  SmallVector<int64_t> vectorReductionTileSizes;
+  splitParallelAndReductionTiles(op, vectorParallelTileSizes,
+                                 vectorReductionTileSizes);
 
   SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
-  return {distTileSizes,           cacheParallelTileSizes,
-          cacheReductionTileSizes, parallelTileSizes,
-          reductionTileSizes,      vectorInnerParallelTileSizes};
+  TileSizesListType tileSizes = {distTileSizes,
+                                 cacheParallelTileSizes,
+                                 cacheReductionTileSizes,
+                                 vectorParallelTileSizes,
+                                 vectorReductionTileSizes,
+                                 vectorInnerParallelTileSizes};
+
+  LLVM_DEBUG(KD_DBGS() << "Final tile sizes for mmt4d: " << tileSizes << "\n");
+
+  return tileSizes;
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
