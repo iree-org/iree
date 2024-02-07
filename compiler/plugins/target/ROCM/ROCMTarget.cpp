@@ -470,10 +470,9 @@ private:
 
     addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
 
-    std::optional<ArrayAttr> maybeMmaAttrs =
-        getROCMSupportedMmaAttrs(context, options.targetChip);
-    if (maybeMmaAttrs) {
-      addConfig("mma_intrinsics", *maybeMmaAttrs);
+    ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
+    if (mmaAttrs) {
+      addConfig("mma_intrinsics", mmaAttrs);
     }
 
     auto configAttr = b.getDictionaryAttr(configItems);

@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -14,8 +14,7 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 // Returns the list of supported mma types (mfma/wmma).
-std::optional<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
-                                                  StringRef targetArch);
+ArrayAttr getROCMSupportedMmaAttrs(MLIRContext *context, StringRef targetArch);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

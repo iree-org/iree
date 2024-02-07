@@ -312,12 +312,9 @@ public:
     threadGrid[2] = affine::makeComposedFoldedAffineMax(
         builder, func.getLoc(), idMap, {threadGrid[2], c0});
 
-    OpFoldResult dimX = builder.createOrFold<arith::ConstantIndexOp>(
-        func.getLoc(), workgroupSize[0] - 1);
-    OpFoldResult dimY = builder.createOrFold<arith::ConstantIndexOp>(
-        func.getLoc(), workgroupSize[1] - 1);
-    OpFoldResult dimZ = builder.createOrFold<arith::ConstantIndexOp>(
-        func.getLoc(), workgroupSize[2] - 1);
+    OpFoldResult dimX = builder.getIndexAttr(workgroupSize[0] - 1);
+    OpFoldResult dimY = builder.getIndexAttr(workgroupSize[1] - 1);
+    OpFoldResult dimZ = builder.getIndexAttr(workgroupSize[2] - 1);
     threadGrid[0] = affine::makeComposedFoldedAffineMin(
         builder, func.getLoc(), idMap, {threadGrid[0], dimX});
     threadGrid[1] = affine::makeComposedFoldedAffineMin(

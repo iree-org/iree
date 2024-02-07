@@ -20,14 +20,13 @@ static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
   return ArrayAttr::get(context, attrs);
 }
 
-std::optional<ArrayAttr> getROCMSupportedMmaAttrs(MLIRContext *context,
-                                                  StringRef targetArch) {
+ArrayAttr getROCMSupportedMmaAttrs(MLIRContext *context, StringRef targetArch) {
   if (targetArch == "gfx940") {
     return getMfmaArrayAttr(context,
                             {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
                              IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});
   }
-  return std::nullopt;
+  return ArrayAttr();
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

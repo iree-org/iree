@@ -1,4 +1,4 @@
-// RUN: iree-opt %s | iree-opt | FileCheck %s
+// RUN: iree-opt %s | FileCheck %s
 
 module {
   func.func @test_f16_16x16x16_f32() attributes {
