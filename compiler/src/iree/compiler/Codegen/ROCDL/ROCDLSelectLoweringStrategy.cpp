@@ -24,26 +24,24 @@ public:
     registry.insert<IREE::Codegen::IREECodegenDialect>();
   }
 
-  void runOnOperation() override;
+  void runOnOperation() override {
+    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+    ModuleOp moduleOp = variantOp.getInnerModule();
+
+    if (failed(initROCDLLaunchConfig(moduleOp))) {
+      return signalPassFailure();
+    }
+
+    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
+        getIdenticalTranslationInfo(variantOp);
+    if (!translationInfo) {
+      moduleOp.emitError(
+          "unsupported entry point functions with different translation info");
+      return signalPassFailure();
+    }
+  }
 };
 } // namespace
-
-void ROCDLSelectLoweringStrategyPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-
-  if (failed(initROCDLLaunchConfig(moduleOp))) {
-    return signalPassFailure();
-  }
-
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-      getIdenticalTranslationInfo(variantOp);
-  if (!translationInfo) {
-    moduleOp.emitError(
-        "unsupported entry point functions with different translation info");
-    return signalPassFailure();
-  }
-}
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createROCDLSelectLoweringStrategyPass() {
