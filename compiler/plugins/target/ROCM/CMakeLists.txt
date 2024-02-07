@@ -28,6 +28,7 @@ iree_cc_library(
     "ROCMTargetFeatures.cpp"
     "ROCMTargetUtils.cpp"
   DEPS
+    IREEVectorExtDialect
     LLVMAMDGPUCodeGen
     LLVMAnalysis
     LLVMBitWriter

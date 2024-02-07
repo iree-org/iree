@@ -58,6 +58,7 @@ iree_compiler_cc_library(
         ":IREEGPUAttrs",
         ":IREEGPUDialectGen",
         ":IREEGPUInterfaces",
+        "//compiler/src/iree/compiler/Codegen/Common",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:DialectUtils",

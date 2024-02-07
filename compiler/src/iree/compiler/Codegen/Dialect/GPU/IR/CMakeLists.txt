@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRParser
     MLIRSupport
+    iree::compiler::Codegen::Common
   PUBLIC
 )
 
