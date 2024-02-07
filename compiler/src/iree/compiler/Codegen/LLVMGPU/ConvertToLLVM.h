@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
-#define IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
+#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_CONVERTTOLLVM_H_
+#define IREE_COMPILER_CODEGEN_LLVMGPU_CONVERTTOLLVM_H_
 
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
 
@@ -36,4 +36,4 @@ void populateGpuMemorySpaceAttributeConversions(
 
 } // namespace mlir::iree_compiler
 
-#endif // IREE_COMPILER_CODEGEN_LLVMGPU_COMMON_H_
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_CONVERTTOLLVM_H_
