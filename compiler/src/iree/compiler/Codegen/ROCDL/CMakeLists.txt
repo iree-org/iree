@@ -46,6 +46,8 @@ iree_cc_library(
     "ROCDLSelectLoweringStrategy.cpp"
   DEPS
     ::PassHeaders
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAMDGPUDialect
     MLIRAMDGPUToROCDL
