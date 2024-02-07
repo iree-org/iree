@@ -111,6 +111,17 @@ enum class VectorPreProcStrategy {
   None
 };
 
+// NOTE: This flag is meant for testing + experimentation and should not be
+// used in deployment.
+static llvm::cl::opt<bool> clExperimentalArmForceSSVE(
+    "iree-experimental-llvmcpu-arm-force-ssve",
+    llvm::cl::desc(
+        "Controls whether to disable SME tiling when SME+SSVE are enabled "
+        "with +sme. As a result, IREE will effectively target SSVE "
+        "instead of SME. This flag is experimental and should only be "
+        "used for testing."),
+    llvm::cl::init(false));
+
 // Use this flag to override IREE's heuristics for selecting the pre-processing
 // strategy.
 static llvm::cl::opt<VectorPreProcStrategy> clPProcStrategy(
@@ -1069,7 +1080,8 @@ getMatmulVectorSizes(mlir::FunctionOpInterface entryPointFn,
   // TODO: Compute vector tile sizes using heuristics.
 
   if (isAArch64(targetAttr)) {
-    if (clEnableScalableVectorization && hasSMEFeature(targetAttr)) {
+    if (clEnableScalableVectorization && !clExperimentalArmForceSSVE &&
+        hasSMEFeature(targetAttr)) {
       // Note: This may not pick any sizes (which will fallback to the scalable
       // vectorization heuristics below).
       getMatmulAArch64SMEVectorSizes(op, matmulTileSizes, matmulScalableFlags);
