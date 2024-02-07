@@ -18,11 +18,10 @@ IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 # Disable the tests by default to reduce the test time.
 IREE_VMVX_DISABLE="${IREE_VMVX_DISABLE:-1}"
 
-python3 -m pip install -r integrations/tensorflow/test/requirements.txt
 python3 -m pip install lit
 LIT_SCRIPT="$(which lit)"
 
-source build_tools/cmake/setup_tf_python.sh
+source build_tools/scripts/setup_tf_python.sh
 
 echo "***** Running TensorFlow integration tests *****"
 
