@@ -9,7 +9,7 @@
 # Build e2e test artifacts using a host tools directory.
 #
 # The required IREE_HOST_BIN_DIR environment variable indicates the location
-# of the precompiled IREE binaries. The IREE_BENCHMARK_PRESETS environment 
+# of the precompiled IREE binaries. The IREE_BENCHMARK_PRESETS environment
 # variable can be set to build required artifacts for the comma-separated
 # benchmark presets. By default `iree-benchmark-suites` is built for sanity
 # check and e2e model testing. It can be disabled with the environment variable
@@ -31,7 +31,7 @@ BUILD_DEFAULT_BENCHMARK_SUITES="${IREE_BUILD_DEFAULT_BENCHMARK_SUITES:-1}"
 SHARD_COUNT="${IREE_SHARD_COUNT:-default=1}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_tf_python.sh
+source build_tools/scripts/setup_tf_python.sh
 
 declare -a BUILD_TARGETS
 

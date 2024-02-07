@@ -112,7 +112,7 @@ jobs:
             --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
             --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
             --env "IREE_SHARD_COUNT=${IREE_SHARD_COUNT}" \
-            gcr.io/iree-oss/frontends@sha256:5817b2780534b32347b8214fd8205f4fbf9d15d35555ce024be07da59f4f9df4 \
+            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
           echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
