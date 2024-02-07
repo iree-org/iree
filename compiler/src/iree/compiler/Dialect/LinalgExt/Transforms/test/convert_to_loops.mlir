@@ -769,7 +769,7 @@ func.func @NC_to_NCnc(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
   return
 }
 // CHECK:       #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
-// CHECK-LABEL: func.func @NC_to_NCnc(
+// CHECK:       func.func @NC_to_NCnc(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[ubN:.*]] = arith.constant 4 : index
 // CHECK-DAG:     %[[step:.*]] = arith.constant 1 : index
@@ -796,7 +796,7 @@ func.func @NC_to_NCnc_pad_static(%arg0: memref<13x15xf32>, %arg1: memref<2x8x8x2
 }
 // CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
 // CHECK-DAG:   #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
-// CHECK-LABEL: func.func @NC_to_NCnc_pad_static(
+// CHECK:       func.func @NC_to_NCnc_pad_static(
 // CHECK-DAG:     %[[C0:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[C2:.*]] = arith.constant 2 : index
@@ -827,7 +827,7 @@ func.func @KC_to_KCck(%arg0: memref<128x256xf32>, %arg1: memref<4x8x32x32xf32>) 
   return
 }
 // CHECK:       #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
-// CHECK-LABEL: func.func @KC_to_KCck(
+// CHECK:       func.func @KC_to_KCck(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[ubK:.*]] = arith.constant 4 : index
 // CHECK-DAG:     %[[step:.*]] = arith.constant 1 : index
@@ -854,7 +854,7 @@ func.func @KC_to_KCc(%arg0: memref<128x256xf32>, %arg1: memref<128x8x32xf32>) {
   return
 }
 // CHECK:       #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
-// CHECK-LABEL: func.func @KC_to_KCc(
+// CHECK:       func.func @KC_to_KCc(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[step:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[ubK:.*]] = arith.constant 128 : index
@@ -878,7 +878,7 @@ func.func @KC_to_KCk(%arg0: memref<128x256xf32>, %arg1: memref<4x256x32xf32>) {
 }
 
 // CHECK:       #[[MAP:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
-// CHECK-LABEL: func.func @KC_to_KCk(
+// CHECK:       func.func @KC_to_KCk(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[step:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[ubC:.*]] = arith.constant 256 : index
@@ -903,7 +903,7 @@ func.func @KCRS_to_KCRSck(%arg0: memref<128x64x1x1xf32>, %arg1: memref<4x8x1x1x8
 
 // CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
 // CHECK-DAG:   #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
-// CHECK-LABEL: func.func @KCRS_to_KCRSck(
+// CHECK:       func.func @KCRS_to_KCRSck(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[one:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[ubK:.*]] = arith.constant 4 : index
@@ -935,7 +935,7 @@ func.func @KCRS_to_KCRSsr(%arg0: memref<1x1x128x64xf32>, %arg1: memref<1x1x4x8x8
 
 // CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
 // CHECK-DAG:   #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 8 + d1)>
-// CHECK-LABEL: func.func @KCRS_to_KCRSsr(
+// CHECK:       func.func @KCRS_to_KCRSsr(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[one:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[ubR:.*]] = arith.constant 4 : index
@@ -970,7 +970,7 @@ func.func @shuffled_dim_pos_and_tiles(%arg0: memref<128x256x2x1000xf32>, %arg1: 
 
 // CHECK-DAG:   #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0 * 32 + d1)>
 // CHECK-DAG:   #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0 * 2 + d1)>
-// CHECK-LABEL: func.func @shuffled_dim_pos_and_tiles(
+// CHECK:       func.func @shuffled_dim_pos_and_tiles(
 // CHECK-DAG:     %[[lb:.*]] = arith.constant 0 : index
 // CHECK-DAG:     %[[step:.*]] = arith.constant 1 : index
 // CHECK-DAG:     %[[ubDimZero:.*]] = arith.constant 4 : index

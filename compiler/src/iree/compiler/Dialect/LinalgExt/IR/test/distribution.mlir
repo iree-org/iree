@@ -1,4 +1,4 @@
-// RUN: iree-opt --transform-dialect-interpreter --split-input-file -canonicalize -cse %s | FileCheck  %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file -canonicalize -cse %s | FileCheck  %s
 
 func.func @scatter_tiling_distribution(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
@@ -14,10 +14,12 @@ func.func @scatter_tiling_distribution(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] { mapping = [#gpu.thread<y>, #gpu.thread<x>] } : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] { mapping = [#gpu.thread<y>, #gpu.thread<x>] } : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 10)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 30)>
@@ -73,11 +75,14 @@ func.func @sort_3d_multi_result_distribute(
       } -> tensor<?x?x?xi32>, tensor<?x?x?xf32>
   return %0, %1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
+
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 10)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 30)>
 // CHECK-DAG:   #[[MAP2:.+]] = affine_map<(d0) -> (d0 * 10)>
@@ -128,10 +133,13 @@ func.func @sort_3d_multi_result_distribute_memref(
       }
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %forall, %tiled_op = transform.structured.tile_using_forall %0 tile_sizes [10, 30, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 10)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 30)>

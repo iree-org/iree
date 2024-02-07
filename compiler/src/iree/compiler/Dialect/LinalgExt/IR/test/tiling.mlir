@@ -1,4 +1,4 @@
-// RUN: iree-opt --transform-dialect-interpreter --split-input-file --verify-diagnostics -canonicalize -cse %s | FileCheck  %s
+// RUN: iree-opt --iree-transform-dialect-interpreter --split-input-file --verify-diagnostics -canonicalize -cse %s | FileCheck  %s
 
 func.func @scatter_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
@@ -14,10 +14,12 @@ func.func @scatter_tiling(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
@@ -71,10 +73,12 @@ func.func @scatter_tiling_memref(
     }
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
@@ -120,10 +124,12 @@ func.func @scatter_no_tiling(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
 }
 //       CHECK: func.func @scatter_no_tiling
 //  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
@@ -151,10 +157,12 @@ func.func @scatter_repeated_indices_tiling(
     } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
 //       CHECK: func.func @scatter_repeated_indices_tiling
@@ -198,10 +206,12 @@ func.func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
        } -> tensor<?xi32>
   return %0 : tensor<?xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
 }
 //      CHECK: func.func @sort_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<?xi32>
@@ -221,10 +231,12 @@ func.func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
        } -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
 //       CHECK: func.func @sort_2d(
@@ -258,10 +270,12 @@ func.func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
        } -> tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
 //       CHECK: func.func @sort_2d_inner_parallel(
@@ -297,10 +311,12 @@ func.func @sort_2d_multi_result(
        } -> tensor<?x?xi32>, tensor<?x?xf32>
   return %0#0, %0#1 : tensor<?x?xi32>, tensor<?x?xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
 //       CHECK: func.func @sort_2d_multi_result(
@@ -340,10 +356,12 @@ func.func @sort_2d_multi_result_memref(
      }
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
   %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
   %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
 //       CHECK: func.func @sort_2d_multi_result_memref(
@@ -374,10 +392,12 @@ func.func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
   : tensor<1024xf32>, tensor<1024xf32>
   return %0#0, %0#1 : tensor<1024xf32>, tensor<1024xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @fft_1d_stage_5(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
@@ -412,10 +432,12 @@ func.func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
   : tensor<3x1024xf32>, tensor<3x1024xf32>
   return %0#0, %0#1 : tensor<3x1024xf32>, tensor<3x1024xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @fft_2d_stage_5(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
@@ -447,10 +469,12 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
     outs(%arg0, %arg1: memref<1024xf32>, memref<1024xf32>)
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @fft_1d_stage_5_memref(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
@@ -477,10 +501,12 @@ func.func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
     outs(%arg1: memref<?xi32>)
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)
 // CHECK-DAG:  #[[MAP2:.+]] = affine_map<()[s0, s1, s2] -> (s0 - s1 - s2)>
@@ -514,10 +540,12 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
          outs(%init: tensor<?x?xi32>) : tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 20)>
@@ -567,10 +595,12 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   } -> tensor<128xi32>, tensor<i32>
   return %2#0 : tensor<128xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    transform.yield
+  }
 }
 //      CHECK: func.func @scan_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
@@ -595,10 +625,12 @@ func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
   } -> tensor<16x32xi32>, tensor<32xi32>
   return %2#0 : tensor<16x32xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 
 //  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0) -> (-d0 + 32, 20)>
@@ -639,10 +671,12 @@ func.func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   }
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 //      CHECK:  #[[MAP0:.+]] = affine_map<(d0) -> (-d0 + 32, 20)>
 //      CHECK:  func.func @scan_2d_memref(
@@ -676,13 +710,15 @@ func.func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tens
         } -> tensor<?x3xf32>, tensor<?x3xi32>
   return %0#0, %0#1 : tensor<?x3xf32>, tensor<?x3xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
-// CHECK-LABEL: func.func @topk_tile_tensor
+// CHECK:       func.func @topk_tile_tensor
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
@@ -721,14 +757,16 @@ func.func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memr
         }
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 
 // CHECK:       #[[MAP0:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 10)>
-// CHECK-LABEL: func.func @topk_tile_memref
+// CHECK:       func.func @topk_tile_memref
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
@@ -763,10 +801,12 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
         } -> tensor<20x3xf32>, tensor<20x3xi32>
   return %0#0, %0#1 : tensor<20x3xf32>, tensor<20x3xi32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-LABEL: func.func @topk_tile_tensor_optional
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
@@ -797,10 +837,12 @@ func.func @winograd_input_transform(%arg0: tensor<1x10x10x1280xf32>) -> tensor<8
     ins(%arg0 : tensor<1x10x10x1280xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
   return %1 : tensor<8x8x1x2x2x1280xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_input_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x10x10x1280xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
@@ -834,10 +876,12 @@ func.func @winograd_input_transform_memref(%arg0: memref<1x10x10x1280xf32>, %arg
     ins(%arg0 : memref<1x10x10x1280xf32>) outs(%arg1 : memref<8x8x1x2x2x1280xf32>)
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_input_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<1x10x10x1280xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x1280xf32>) {
@@ -866,10 +910,12 @@ func.func @winograd_output_transform(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<
         ins(%arg0 : tensor<8x8x1x2x2x32xf32>) outs(%0 : tensor<1x12x12x32xf32>) -> tensor<1x12x12x32xf32>
   return %1 : tensor<1x12x12x32xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_output_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x12x12x32xf32> {
@@ -889,10 +935,12 @@ func.func @winograd_output_transform_memref(%arg0: memref<8x8x1x2x2x32xf32>, %ar
    ins(%arg0 : memref<8x8x1x2x2x32xf32>) outs(%arg1 : memref<1x12x12x32xf32>)
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_output_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x32xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<1x12x12x32xf32>) {
@@ -912,10 +960,12 @@ func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> ten
     ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
   return %1 : tensor<8x8x1x2x2x1280xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1280x10x10xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
@@ -950,10 +1000,12 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> te
         ins(%arg0 : tensor<8x8x1x2x2x32xf32>) outs(%0 : tensor<1x32x12x12xf32>) -> tensor<1x32x12x12xf32>
   return %1 : tensor<1x32x12x12xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK:      func.func @winograd_output_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x32x12x12xf32> {
@@ -971,10 +1023,12 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
   %1 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, tensor<192x1024x64xf32>) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
   return %1 : tensor<192x1024x64xf32>
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (-d0 + 192, 10)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (-d0 + 1024, 30)>
@@ -1019,10 +1073,12 @@ func.func @attention_memref(%query: memref<192x1024x64xf32>, %key: memref<192x10
   iree_linalg_ext.attention ins(%query, %key, %value : memref<192x1024x64xf32>, memref<192x1024x64xf32>, memref<192x1024x64xf32>) outs(%output : memref<192x1024x64xf32>)
   return
 }
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    transform.yield
+  }
 }
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (-d0 + 192, 10)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (-d0 + 1024, 30)>

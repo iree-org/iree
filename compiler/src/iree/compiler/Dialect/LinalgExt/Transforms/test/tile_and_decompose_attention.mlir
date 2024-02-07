@@ -97,7 +97,7 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 
 // TILING-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // TILING-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
-// TILING-LABEL: @attention
+// TILING:      func.func @attention
 // TILING-SAME: (%[[QUERY:.+]]: tensor<1x1024x64xf32>, %[[KEY:.+]]: tensor<1x1024x64xf32>, %[[VALUE:.+]]: tensor<1x1024x64xf32>)
 // TILING:        %[[D0:.+]] = tensor.empty() : tensor<1x1024x64xf32>
 // TILING:        %[[D1:.+]] = tensor.empty() : tensor<1024x64xf32>

@@ -15,7 +15,7 @@ func.func @topk_split_reduction_1d(%input_values: tensor<30xf32>, %out_values: t
 }
 
 // SINGLE-DAG:     #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// SINGLE-LABEL:   func.func @topk_split_reduction_1d(
+// SINGLE:         func.func @topk_split_reduction_1d(
 // SINGLE-SAME:                                       %[[ARG0:.*]]: tensor<30xf32>,
 // SINGLE-SAME:                                       %[[ARG1:.*]]: tensor<3xf32>,
 // SINGLE-SAME:                                       %[[ARG2:.*]]: tensor<3xi32>) -> (tensor<3xf32>, tensor<3xi32>) {
@@ -65,7 +65,7 @@ func.func @topk_split_reduction_nd(%input_values: tensor<3x10x40x8xf32>, %out_va
 }
 
 // MULTIPLE-DAG:     #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-// MULTIPLE-LABEL:   func.func @topk_split_reduction_nd(
+// MULTIPLE:         func.func @topk_split_reduction_nd(
 // MULTIPLE-SAME:                                    %[[ARG0:.*]]: tensor<3x10x40x8xf32>,
 // MULTIPLE-SAME:                                    %[[ARG1:.*]]: tensor<3x10x4x8xf32>,
 // MULTIPLE-SAME:                                    %[[ARG2:.*]]: tensor<3x10x4x8xi32>) -> (tensor<3x10x4x8xf32>, tensor<3x10x4x8xi32>) {
@@ -115,7 +115,7 @@ func.func @topk_split_reduction_double(%input_values: tensor<400xf32>, %out_valu
 }
 
 // DOUBLE-DAG:     #[[MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// DOUBLE-LABEL:   func.func @topk_split_reduction_double(
+// DOUBLE:         func.func @topk_split_reduction_double(
 // DOUBLE-SAME:                                       %[[ARG0:.*]]: tensor<400xf32>,
 // DOUBLE-SAME:                                       %[[ARG1:.*]]: tensor<3xf32>,
 // DOUBLE-SAME:                                       %[[ARG2:.*]]: tensor<3xi32>) -> (tensor<3xf32>, tensor<3xi32>) {

@@ -13,7 +13,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
 def RewriteForallToAsyncOp :
-  Op<Transform_Dialect, "forall_to_async",
+  Op<Transform_Dialect, "iree.forall_to_async",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformEachOpTrait,
@@ -50,7 +50,7 @@ def RewriteForallToAsyncOp :
   }];
 }
 
-def TileAttentionOp : Op<Transform_Dialect, "tile_attention",
+def TileAttentionOp : Op<Transform_Dialect, "iree.tile_attention",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,
@@ -87,7 +87,7 @@ def TileAttentionOp : Op<Transform_Dialect, "tile_attention",
   }];
 }
 
-def DecomposeTiledAttentionOp : Op<Transform_Dialect, "decompose_tiled_attention",
+def DecomposeTiledAttentionOp : Op<Transform_Dialect, "iree.decompose_tiled_attention",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-transform-dialect-interpreter --split-input-file | FileCheck %s
 
 #map0 = affine_map<(d0)[s0] -> (d0 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
@@ -47,8 +47,10 @@ func.func @static_tile(%arg0: index, %arg1: memref<?xf32>, %arg2: memref<?xf32>)
   return
 }
 
-transform.sequence failures(propagate) {
-^bb1(%module_op: !transform.any_op):
-  %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1 = forall_to_async %0 : (!transform.any_op) -> !transform.any_op
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %0 = transform.structured.match ops{["scf.forall"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    %1 = transform.iree.forall_to_async %0 : (!transform.any_op) -> !transform.any_op
+    transform.yield
+  }
 }
