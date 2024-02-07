@@ -93,26 +93,46 @@ VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
 // The vector dimensions are combined into a single SIMT
 // vector dimension.
 SmallVector<int64_t> LayoutAttr::getDistributedShape() const {
-  SmallVector<LayoutDimension> labels{
-      LayoutDimension::BATCHX, LayoutDimension::BATCHY,
-      LayoutDimension::VECTORY, LayoutDimension::VECTORX};
+  SmallVector<LayoutDimension> batchLabels{
+      LayoutDimension::BATCHX,
+      LayoutDimension::BATCHY,
+  };
+
+  SmallVector<LayoutDimension> vectorLabels{LayoutDimension::VECTORY,
+                                            LayoutDimension::VECTORX};
+
   SmallVector<int64_t> simtVectorShape;
-  std::optional<int64_t> vectorShape;
-  for (LayoutDimension dim : labels) {
+
+  for (LayoutDimension dim : batchLabels) {
+    bool foundLabel = false;
+    ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
+    for (PerDimLayoutAttr layout : layouts) {
+      if (!layout.contains(dim))
+        continue;
+      foundLabel = true;
+      int64_t shape = layout.getShape(dim).value();
+      simtVectorShape.push_back(shape);
+      break;
+    }
+
+    if (!foundLabel) {
+      simtVectorShape.push_back(1);
+    }
+  }
+
+  int64_t vectorShape = 1;
+  for (LayoutDimension dim : vectorLabels) {
     ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
     for (PerDimLayoutAttr layout : layouts) {
       if (!layout.contains(dim))
         continue;
       int64_t shape = layout.getShape(dim).value();
-      if (isVectorDimension(dim)) {
-        vectorShape = shape * vectorShape.value_or(1);
-        continue;
-      }
-      simtVectorShape.push_back(shape);
+      vectorShape *= shape;
+      break;
     }
   }
-  if (vectorShape)
-    simtVectorShape.push_back(vectorShape.value());
+
+  simtVectorShape.push_back(vectorShape);
   return simtVectorShape;
 }
 

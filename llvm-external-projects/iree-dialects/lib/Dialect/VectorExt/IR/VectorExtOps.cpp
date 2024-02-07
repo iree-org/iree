@@ -153,26 +153,33 @@ void LayoutIterator::apply(
 // dimension.
 SmallVector<int64_t> LayoutIterator::State::computeSIMTIndex() const {
   SmallVector<int64_t> offset;
-  std::optional<int64_t> vecOffset;
+  int64_t vecOffset = 0;
   for (auto label : labels) {
+    bool foundLabel = false;
     for (auto [name, it] : iterators) {
       if (name != label)
         continue;
+      foundLabel = true;
       if (isBatchDimension(name)) {
         offset.push_back(it.getPosition());
-        continue;
+        break;
       }
       if (isVectorDimension(name)) {
         int64_t step{1};
         if (name == LayoutDimension::VECTORY) {
           step = ranges.lookup(LayoutDimension::VECTORX).stop;
         }
-        vecOffset = vecOffset.value_or(0) + it.getPosition() * step;
+        vecOffset += it.getPosition() * step;
+        break;
       }
     }
+
+    if (isBatchDimension(label) && !foundLabel) {
+      offset.push_back(0);
+    }
   }
-  if (vecOffset)
-    offset.push_back(vecOffset.value());
+
+  offset.push_back(vecOffset);
   return offset;
 }
 
