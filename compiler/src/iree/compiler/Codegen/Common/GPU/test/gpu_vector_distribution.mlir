@@ -370,7 +370,9 @@ func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16
   %b = vector.transfer_read %mem1[%c0, %c0], %cst : memref<32x32xf16>, vector<16x32xf16>
   // CHECK-NOT: vector.transpose
   %b_t = vector.transpose %b, [1, 0] : vector<16x32xf16> to vector<32x16xf16>
+  // CHECK: %[[ADD:.*]] = arith.addf %{{.*}}, %{{.*}} : vector<4xf16>
   %c = arith.addf %a, %b_t {"__vector_layout_test_anchor_result_0" = #transpose_test_layout} : vector<32x16xf16>
+  // CHECK: iree_vector_ext.to_simd %[[ADD]] : vector<4xf16> -> vector<32x16xf16>
   func.return %c : vector<32x16xf16>
 }
 
