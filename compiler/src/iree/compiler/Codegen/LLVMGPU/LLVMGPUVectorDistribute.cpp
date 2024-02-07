@@ -22,8 +22,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -259,9 +259,9 @@ struct LLVMGPUVectorDistributePass
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VectorExt::IREEVectorExtDialect>();
+    registry.insert<affine::AffineDialect>();
     registry.insert<amdgpu::AMDGPUDialect>();
     registry.insert<gpu::GPUDialect>();
-    registry.insert<nvgpu::NVGPUDialect>();
   }
 
   void runOnOperation() override {
@@ -277,7 +277,14 @@ public:
       return signalPassFailure();
     }
 
-    auto maybeSubgroupSize = getSubgroupSize(func);
+    std::optional<int64_t> maybeSubgroupSize = std::nullopt;
+    if (func->hasAttr("subgroup_size")) {
+      maybeSubgroupSize =
+          llvm::cast<IntegerAttr>(func->getAttr("subgroup_size")).getInt();
+    } else {
+      maybeSubgroupSize = getSubgroupSize(func);
+    }
+
     if (!maybeSubgroupSize) {
       func.emitError() << "subgroup size required for vector distribution";
       return signalPassFailure();
@@ -290,7 +297,16 @@ public:
         builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
         builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
                                               gpu::Dimension::z)};
-    auto workgroupSize = getWorkgroupSize(func);
+    std::array<int64_t, 3> workgroupSize;
+    if (func->hasAttr("subgroup_size")) {
+      auto tmpSizes =
+          llvm::cast<ArrayAttr>(func->getAttr("workgroup_size")).getValue();
+      for (auto [i, size] : llvm::enumerate(tmpSizes)) {
+        workgroupSize[i] = llvm::cast<IntegerAttr>(size).getInt();
+      }
+    } else {
+      workgroupSize = getWorkgroupSize(func);
+    }
     AffineExpr x, y, z;
     bindSymbols(func.getContext(), x, y, z);
     // Construct the expression for linearizing the thread indices.
@@ -325,7 +341,7 @@ public:
                                                     laneId, threadGrid);
 
     ContractionVectorLayoutOptions options(func, *maybeSupportedTypes,
-                                           getWorkgroupSize(func), laneVal);
+                                           workgroupSize, laneVal);
     // TODO: This should return failure when distribution fails for any op.
     distributeVectorOps(func, options.getPatterns(), options);
   }

@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -950,12 +951,11 @@ static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
 
 FailureOr<ArrayAttr>
 getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
-    return getSupportedMmaTypes(targetAttr.getConfiguration());
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
+  if (!targetAttr) {
+    return failure();
   }
-  return failure();
+  return getSupportedMmaTypes(targetAttr.getConfiguration());
 }
 
 } // namespace mlir::iree_compiler
