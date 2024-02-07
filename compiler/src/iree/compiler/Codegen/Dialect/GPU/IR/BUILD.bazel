@@ -59,6 +59,7 @@ iree_compiler_cc_library(
         ":IREEGPUDialectGen",
         ":IREEGPUInterfaces",
         "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:DialectUtils",
@@ -66,6 +67,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )
 
