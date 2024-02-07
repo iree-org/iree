@@ -358,6 +358,22 @@ func.func @distribute_reduction_f32(%source: vector<16x16xf32>, %init: vector<16
   func.return %result : vector<16xf32>
 }
 
+#transpose_test_layout = #iree_vector_ext.layout<<[LANEY], [32]>, <[LANEX, VECTORX], [4, 4]>>
+
+func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16>) -> vector<32x16xf16> {
+  // CHECK: func.func @distribute_transpose(%[[MEM:.*]]: memref<32x32xf16>, %[[MEM1:.*]]: memref<32x32xf16>
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  // CHECK-COUNT-1: vector.load %[[MEM]]
+  // CHECK-COUNT-4: vector.load %[[MEM1]]
+  %a = vector.transfer_read %mem[%c0, %c0], %cst : memref<32x32xf16>, vector<32x16xf16>
+  %b = vector.transfer_read %mem1[%c0, %c0], %cst : memref<32x32xf16>, vector<16x32xf16>
+  // CHECK-NOT: vector.transpose
+  %b_t = vector.transpose %b, [1, 0] : vector<16x32xf16> to vector<32x16xf16>
+  %c = arith.addf %a, %b_t {"__vector_layout_test_anchor_result_0" = #transpose_test_layout} : vector<32x16xf16>
+  func.return %c : vector<32x16xf16>
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
