@@ -142,9 +142,7 @@ struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
   void runOnOperation() override {
     SmallVector<Operation *> toDelete;
     getOperation()->walk<WalkOrder::PreOrder>([&](Operation *nestedOp) {
-      if (isa<iree_compiler::IREE::LinalgExt::DoNotDCEOperandsOp>(nestedOp)) {
-        toDelete.push_back(nestedOp);
-      } else if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
+      if (isa<::mlir::transform::TransformOpInterface>(nestedOp)) {
         toDelete.push_back(nestedOp);
         return WalkResult::skip();
       }

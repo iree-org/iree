@@ -47,24 +47,6 @@ def OpGroupUtilityOps : OpDocGroup {
 
 let opDocGroup = OpGroupUtilityOps in {
 
-def IREELinalgExt_DoNotDCEOperandsOp :
-  Op<IREELinalgExt_Dialect, "transform.do_not_dce_operands", []> {
-  let summary = "Unfoldable op that just keeps its operands live";
-  let description = [{
-    Unfoldable op that just keeps its operands live. This is to use with the
-    transform dialect in case where transforms introduce IR that would be
-    otherwise DCE'd by canonicalizations.
-
-    This op should be added to the transform dialect in the fullness of time but
-    it can't be registered dynamically on the IREE side as that triggers errors
-    since the op does not implement any transform interface.
-  }];
-
-  let arguments = (ins Variadic<AnyType>:$operands);
-  let results = (outs);
-  let assemblyFormat = "attr-dict $operands `:` type($operands)";
-}
-
 def IREELinalgExt_YieldOp : IREELinalgExt_PureOp<"yield", [Pure, ReturnLike, Terminator]> {
   let summary = "LinalgExt yield op";
   let description = [{
