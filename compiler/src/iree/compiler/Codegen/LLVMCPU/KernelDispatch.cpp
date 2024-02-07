@@ -1625,6 +1625,9 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                              const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
+
+  LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
+
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
     return failure();
@@ -1697,6 +1700,10 @@ static LogicalResult setElementwiseGenericOpRootConfig(
     const TargetMLTransformInfo &targetMLTransInfo) {
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
+
+  LLVM_DEBUG(
+      KD_DBGS() << "Setting elementwise generic op root configuration\n");
+
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0)
     return failure();
@@ -2273,12 +2280,12 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   auto rootLoweringConfig = getLoweringConfig(rootOperation);
   TilingConfig tilingConfig(rootLoweringConfig);
   SmallVector<int64_t> distTileSizes, parallelVecTileSizes;
+  SmallVector<bool> distScalableTileSizes, parallelVecScalableTileSizes;
   if (tilingConfig.getNumTilingLevels() > 0) {
     distTileSizes = tilingConfig.getDistributionTileSizes();
   }
   if (tilingConfig.getNumTilingLevels() > 1) {
-    // TODO: Handle scalable tiles.
-    std::tie(parallelVecTileSizes, std::ignore) =
+    std::tie(parallelVecTileSizes, parallelVecScalableTileSizes) =
         tilingConfig.getVectorCommonParallelSizes();
   }
 
@@ -2360,13 +2367,17 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
 
   // Split parallel vector tile sizes into common parts and op-specific parts.
   SmallVector<int64_t> commonVecTileSizes = parallelVecTileSizes;
+  SmallVector<bool> commonVecScalableTileFlags = parallelVecScalableTileSizes;
   SmallVector<int64_t> innerVecTileSizes(maxLoopNums, 0);
+  SmallVector<bool> innerVecScalableTileFlags(maxLoopNums, false);
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
       if (iterType == utils::IteratorType::reduction) {
         innerVecTileSizes[idx] = parallelVecTileSizes[idx];
+        innerVecScalableTileFlags[idx] = parallelVecScalableTileSizes[idx];
         commonVecTileSizes[idx] = 0;
+        commonVecScalableTileFlags[idx] = false;
       }
     }
   }
@@ -2384,17 +2395,26 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       scalableTileFlagsList = rootLoweringConfig.getScalableTileFlagVals();
       if (tilingConfig.getNumTilingLevels() > 0) {
         tileSizesList[tilingConfig.getDistributionLevel()] = distTileSizes;
+        scalableTileFlagsList[tilingConfig.getDistributionLevel()] =
+            distScalableTileSizes;
       }
       if (tilingConfig.getNumTilingLevels() > 1) {
         tileSizesList[tilingConfig.getVectorCommonParallelLevel()] =
             commonVecTileSizes;
+        scalableTileFlagsList[tilingConfig.getVectorCommonParallelLevel()] =
+            commonVecScalableTileFlags;
       }
     } else {
       // Build 4-level lowering configs for other ops.
       tileSizesList = {distTileSizes, commonVecTileSizes};
       SmallVector<int64_t> zeros(numLoops, 0);
+      SmallVector<bool> falseVec(numLoops, 0);
+      // No scalable tiling for the distribution
+      scalableTileFlagsList.push_back(falseVec);
+      scalableTileFlagsList.push_back(commonVecScalableTileFlags);
       TypeSwitch<Operation *>(op)
           .Case<tensor::PackOp>([&](auto packOp) {
+            // TODO: Handle scalable flags
             tileSizesList.push_back(zeros);
             tileSizesList.push_back(innerVecTileSizes);
             // Scale and permutate the outer dim tiles for pack op.
@@ -2419,18 +2439,26 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
             } else {
               tileSizesList.push_back(zeros);
             }
+            // ATM Assume there are no scalable sizes for reduciton dims
+            scalableTileFlagsList.push_back(falseVec);
             // Only copy the inner vector tile sizes on parallel dims.
             SmallVector<int64_t> vecTileSizes(numLoops, 0);
+            SmallVector<bool> vecScalableTileFlags(numLoops, false);
             auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
             for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
-              if (iterType == utils::IteratorType::parallel)
+              if (iterType == utils::IteratorType::parallel) {
                 vecTileSizes[idx] = innerVecTileSizes[idx];
+                vecScalableTileFlags[idx] = innerVecScalableTileFlags[idx];
+              }
             }
             tileSizesList.push_back(vecTileSizes);
+            scalableTileFlagsList.push_back(vecScalableTileFlags);
           });
     }
 
     for (auto &ts : tileSizesList)
+      ts.resize(numLoops, 0);
+    for (auto &ts : scalableTileFlagsList)
       ts.resize(numLoops, 0);
     auto config = IREE::Codegen::LoweringConfigAttr::get(ctx, tileSizesList,
                                                          scalableTileFlagsList);
