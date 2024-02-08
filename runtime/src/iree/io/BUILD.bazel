@@ -112,3 +112,25 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "vec_stream",
+    srcs = ["vec_stream.c"],
+    hdrs = ["vec_stream.h"],
+    deps = [
+        ":stream",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "vec_stream_test",
+    srcs = ["vec_stream_test.cc"],
+    deps = [
+        ":vec_stream",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+    ],
+)
