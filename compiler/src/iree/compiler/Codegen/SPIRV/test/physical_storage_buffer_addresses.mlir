@@ -42,7 +42,7 @@ hal.executable private @interface_binding {
 
 // CHECK-LABEL: spirv.module PhysicalStorageBuffer64
 //       CHECK:   spirv.GlobalVariable [[GLOBAL:@.+]] bind(3, 0) :
-//  CHECK-SAME:     !spirv.ptr<!spirv.struct<(!spirv.ptr<i32, PhysicalStorageBuffer>, !spirv.ptr<i32, PhysicalStorageBuffer>, !spirv.ptr<i32, PhysicalStorageBuffer>)>, StorageBuffer>
+//  CHECK-SAME:     !spirv.ptr<!spirv.struct<(!spirv.ptr<i32, PhysicalStorageBuffer> [0], !spirv.ptr<i32, PhysicalStorageBuffer> [8], !spirv.ptr<i32, PhysicalStorageBuffer> [16])>, StorageBuffer>
 //       CHECK:   spirv.func
 //       CHECK:   %[[addr0:.+]] = spirv.mlir.addressof [[GLOBAL]]
 //  CHECK-NEXT:   %[[cst0:.+]] = spirv.Constant 0 : i32
