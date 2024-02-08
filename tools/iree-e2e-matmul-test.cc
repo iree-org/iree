@@ -19,7 +19,6 @@
 #include "iree/modules/hal/module.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
 

@@ -14,8 +14,13 @@ func.func @no_input() {
 //   * The VM does not use i1/i8 types, so i32 VM types are returned instead.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --module=- --function=scalars \
-// RUN:  --input=1 --input=5 --input=1234 --input=-3.14) | \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=- \
+// RUN:                  --function=scalars \
+// RUN:                  --input=1 \
+// RUN:                  --input=5 \
+// RUN:                  --input=1234 \
+// RUN:                  --input=-3.14) | \
 // RUN: FileCheck --check-prefix=INPUT-SCALARS %s
 // INPUT-SCALARS-LABEL: EXEC @scalars
 func.func @scalars(%arg0: i1, %arg1: i8, %arg2 : i32, %arg3 : f32) -> (i1, i8, i32, f32) {
@@ -34,8 +39,12 @@ func.func @scalars(%arg0: i1, %arg1: i8, %arg2 : i32, %arg3 : f32) -> (i1, i8, i
 //   * Brackets may also be used to separate element values.
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync --module=- --function=buffers \
-// RUN:  --input=i32=5 --input=2xi32 --input="2x3xi32=1 2 3 4 5 6") | \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=- \
+// RUN:                  --function=buffers \
+// RUN:                  --input=i32=5 \
+// RUN:                  --input=2xi32 \
+// RUN:                  --input="2x3xi32=1 2 3 4 5 6") | \
 // RUN: FileCheck --check-prefix=INPUT-BUFFERS %s
 // INPUT-BUFFERS-LABEL: EXEC @buffers
 func.func @buffers(%arg0: tensor<i32>, %arg1: tensor<2xi32>, %arg2: tensor<2x3xi32>) -> (tensor<i32>, tensor<2xi32>, tensor<2x3xi32>) {
@@ -55,20 +64,25 @@ func.func @buffers(%arg0: tensor<i32>, %arg1: tensor<2xi32>, %arg2: tensor<2x3xi
 //     provide 1+ values.
 //   * Some data types may be converted (i32 -> si32 here) - bug?
 
-// RUN: iree-compile --iree-hal-target-backends=vmvx %s -o %t.vmfb
-//
-// RUN: iree-run-module --device=local-sync --module=%t.vmfb --function=npy_round_trip \
-// RUN:   --input="2xi32=11 12" --input="3xi32=1 2 3" --output=@%t.npy --output=+%t.npy
-//
-// RUN: iree-run-module --device=local-sync --module=%t.vmfb --function=npy_round_trip \
-// RUN:   --input=@%t.npy | \
-// RUN: FileCheck --check-prefix=INPUT-NPY_FILES %s
+// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=%t.vmfb \
+// RUN:                  --function=npy_round_trip \
+// RUN:                  --input=2xi32=11,12 \
+// RUN:                  --input=3xi32=1,2,3 \
+// RUN:                  --output=@%t.npy \
+// RUN:                  --output=+%t.npy && \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=%t.vmfb \
+// RUN:                  --function=npy_round_trip \
+// RUN:                  --input=*%t.npy) | \
+// RUN: FileCheck --check-prefix=INPUT-NUMPY %s
 
-// INPUT-NPY_FILES-LABEL: EXEC @npy_round_trip
+// INPUT-NUMPY-LABEL: EXEC @npy_round_trip
 func.func @npy_round_trip(%arg0: tensor<2xi32>, %arg1: tensor<3xi32>) -> (tensor<2xi32>, tensor<3xi32>) {
-  // INPUT-NPY_FILES: result[0]: hal.buffer_view
-  // INPUT-NPY_FILES-NEXT: 2xsi32=11 12
-  // INPUT-NPY_FILES: result[1]: hal.buffer_view
-  // INPUT-NPY_FILES-NEXT: 3xsi32=1 2 3
+  // INPUT-NUMPY: result[0]: hal.buffer_view
+  // INPUT-NUMPY-NEXT: 2xsi32=11 12
+  // INPUT-NUMPY: result[1]: hal.buffer_view
+  // INPUT-NUMPY-NEXT: 3xsi32=1 2 3
   return %arg0, %arg1 : tensor<2xi32>, tensor<3xi32>
 }

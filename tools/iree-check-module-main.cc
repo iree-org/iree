@@ -20,7 +20,6 @@
 #include "iree/testing/status_matchers.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
-#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
 

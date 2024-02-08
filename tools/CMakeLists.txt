@@ -76,7 +76,7 @@ iree_cc_binary(
     iree::modules::hal::types
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util
+    iree::tooling::function_io
     iree::vm
   INSTALL_COMPONENT IREETools-Runtime
 )
@@ -95,7 +95,6 @@ iree_cc_binary(
     iree::testing::gtest
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util
     iree::vm
     iree::vm::bytecode::module
   TESTONLY
@@ -242,7 +241,6 @@ iree_cc_binary(
     iree::modules::hal
     iree::tooling::context_util
     iree::tooling::device_util
-    iree::tooling::vm_util
     iree::vm
     iree::vm::cc
 )
