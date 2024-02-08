@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/io/stream.h"
+#include "iree/io/memory_stream.h"
 
 #include <array>
 #include <string>
@@ -22,10 +22,6 @@ using iree::testing::status::StatusIs;
 using testing::ElementsAre;
 using testing::ElementsAreArray;
 using testing::Eq;
-
-//===----------------------------------------------------------------------===//
-// iree_io_memory_stream_t
-//===----------------------------------------------------------------------===//
 
 TEST(MemoryStreamTest, Wrap) {
   uint8_t data[5] = {0, 1, 2, 3, 4};

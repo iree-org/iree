@@ -104,6 +104,10 @@ IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT void iree_string_builder_reset(iree_string_builder_t* builder) {
+  builder->size = 0;
+}
+
 IREE_API_EXPORT iree_status_t iree_string_builder_append_inline(
     iree_string_builder_t* builder, iree_host_size_t count, char** out_head) {
   *out_head = NULL;

@@ -18,10 +18,37 @@ iree_cc_library(
   SRCS
     "file_handle.c"
   DEPS
+    ::memory_stream
     ::stream
     iree::base
     iree::base::internal
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    memory_stream
+  HDRS
+    "memory_stream.h"
+  SRCS
+    "memory_stream.c"
+  DEPS
+    ::stream
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    memory_stream_test
+  SRCS
+    "memory_stream_test.cc"
+  DEPS
+    ::memory_stream
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -93,18 +120,6 @@ iree_cc_library(
     iree::base
     iree::base::internal
   PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    stream_test
-  SRCS
-    "stream_test.cc"
-  DEPS
-    ::stream
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
