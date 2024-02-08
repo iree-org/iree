@@ -2439,7 +2439,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
             } else {
               tileSizesList.push_back(zeros);
             }
-            // ATM Assume there are no scalable sizes for reduciton dims
+            // ATM Assume there are no scalable sizes for reduction dims
             scalableTileFlagsList.push_back(falseVec);
             // Only copy the inner vector tile sizes on parallel dims.
             SmallVector<int64_t> vecTileSizes(numLoops, 0);
