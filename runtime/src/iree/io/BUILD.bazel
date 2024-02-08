@@ -93,6 +93,17 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "stdio_stream",
+    srcs = ["stdio_stream.c"],
+    hdrs = ["stdio_stream.h"],
+    deps = [
+        ":stream",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "stream",
     srcs = ["stream.c"],
     hdrs = ["stream.h"],

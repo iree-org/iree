@@ -111,6 +111,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    stdio_stream
+  HDRS
+    "stdio_stream.h"
+  SRCS
+    "stdio_stream.c"
+  DEPS
+    ::stream
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     stream
   HDRS
     "stream.h"
