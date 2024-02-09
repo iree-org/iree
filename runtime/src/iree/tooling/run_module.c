@@ -267,22 +267,6 @@ static iree_status_t iree_tooling_run_function(
         "processing instrument data");
   }
 
-  // Transfer outputs to the host so they can be processed. Only required when
-  // using full HAL device-based execution.
-  if (iree_status_is_ok(status) && device != NULL) {
-    iree_hal_buffer_params_t target_params = {
-        .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
-        .access = IREE_HAL_MEMORY_ACCESS_ALL,
-        .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
-        .min_alignment = 0,
-    };
-    status = iree_tooling_transfer_variant_list(
-        device, outputs, device_allocator, target_params,
-        /*wait_fence=*/NULL, /*signal_fence=*/NULL);
-  }
-
   // Handle either printing/writing the outputs or checking them against
   // expected values (basic pass/fail testing).
   if (iree_status_is_ok(status)) {
