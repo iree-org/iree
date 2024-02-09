@@ -129,7 +129,7 @@ def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
 }
 
 def GlobalLoopInvariantCodeMotion : InterfacePass<"iree-global-opt-loop-invariant-code-motion", "mlir::FunctionOpInterface"> {
-  let summary = "TODO";
+  let summary = "Hoist loop invariants out of loops with zero-trip-check";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createGlobalLoopInvariantCodeMotionPass()";
 }
 

@@ -110,7 +110,7 @@ std::unique_ptr<Pass> createSetEncodingPass();
 /// Simplifies tensor pack/unpack ops to reshape ops.
 std::unique_ptr<Pass> createSimplifyPackUnpackPass();
 
-/// TODO
+/// Hoist loop invariants out of loops with zero-trip-check.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGlobalLoopInvariantCodeMotionPass();
 
