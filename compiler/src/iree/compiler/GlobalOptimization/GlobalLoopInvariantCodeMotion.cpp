@@ -11,7 +11,6 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/LoopInvariantCodeMotionUtils.h"
 
 #include "llvm/Support/Debug.h"
 
