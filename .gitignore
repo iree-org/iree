@@ -90,3 +90,7 @@ llvm-external-projects/iree-dialects/.cache
 
 # pkgci artifacts
 artifacts/
+
+# Side effects of local patching/merging
+*.orig
+*.rej
