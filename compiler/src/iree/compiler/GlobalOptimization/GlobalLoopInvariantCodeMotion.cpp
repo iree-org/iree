@@ -20,15 +20,17 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-// Check if the op is hoistable (but we might not want to hoist it alone).
-static bool isHoistableOp(Operation *op) {
-  return isMemoryEffectFree(op) && isSpeculatable(op) &&
-         !op->hasTrait<OpTrait::IsTerminator>();
-}
-
 // Check if the op is a leaf op we always want to hoist.
 static bool isHoistableLeafOp(Operation *op) {
-  return isa<tensor::PackOp, tensor::UnPackOp>(op);
+  // Currently it's limited to a small set of ops related to constant pack op.
+  return isa<tensor::PackOp>(op);
+}
+
+// Check if the op is hoistable (but we might not want to hoist it alone).
+static bool isHoistableOp(Operation *op) {
+  // Currently it's limited to a small set of ops related to constant pack op.
+  return op->hasTrait<OpTrait::ConstantLike>() || isa<tensor::EmptyOp>(op) ||
+         isHoistableLeafOp(op);
 }
 
 // Check if the op and its producers are loop invariants and hoistable. Results
