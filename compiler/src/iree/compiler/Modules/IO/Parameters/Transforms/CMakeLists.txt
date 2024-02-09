@@ -16,9 +16,12 @@ iree_cc_library(
   HDRS
     "Passes.h"
     "Passes.h.inc"
+    "RuntimeUtils.h"
   SRCS
     "ExportParameters.cpp"
+    "GenerateSplatParameterArchive.cpp"
     "Passes.cpp"
+    "RuntimeUtils.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

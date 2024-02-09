@@ -16,11 +16,14 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "ExportParameters.cpp",
+        "GenerateSplatParameterArchive.cpp",
         "Passes.cpp",
+        "RuntimeUtils.cpp",
     ],
     hdrs = [
         "Passes.h",
         "Passes.h.inc",
+        "RuntimeUtils.h",
     ],
     deps = [
         ":PassesIncGen",

@@ -190,6 +190,16 @@ void buildGlobalOptimizationPassPipeline(
         exportParametersOptions));
   }
 
+  if (!transformOptions.options.splatParameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
+        generateSplatOptions;
+    generateSplatOptions.archivePath =
+        transformOptions.options.splatParameterArchiveExportPath;
+    pipeline.addPass(
+        IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
+            generateSplatOptions));
+  }
+
   if (transformOptions.options.numericPrecisionReduction) {
     pipeline.addPass(createInferNumericNarrowingPass());
     pipeline.addPass(createOptimizeNumericsPass());
