@@ -195,6 +195,90 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
   return offset;
 }
 
+VectorLayoutInterface
+LayoutV2Attr::project(ArrayRef<bool> projectedDims) const {
+  llvm_unreachable("Not yet implemented");
+}
+
+VectorLayoutInterface
+LayoutV2Attr::permute(ArrayRef<int64_t> permutation) const {
+  llvm_unreachable("Not yet implemented");
+}
+
+SmallVector<int64_t> LayoutV2Attr::getDistributedShape() const {
+  llvm_unreachable("Not yet implemented");
+}
+
+bool LayoutV2Attr::isValidLayout(ArrayRef<int64_t> shape) const {
+  // Multiply all shapes in the layout.
+  for (int i = 0, e = shape.size(); i < e; ++i) {
+    int64_t expectedShape =
+        getSubgroupsPerWorkgroup()[i] * getBatchesPerSubgroup()[i] *
+        getDuplicatesPerBatch()[i] * getThreadsPerDuplicate()[i] *
+        getElementsPerThread()[i];
+    if (expectedShape != shape[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// TODO: These things should ideally go into the parser when we have a custom
+// parser.
+LogicalResult LayoutV2Attr::verify(
+    llvm::function_ref<InFlightDiagnostic()> emitError,
+    ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
+    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
+    ArrayRef<int64_t> duplicatesPerBatch, ArrayRef<int64_t> duplicateOrder,
+    ArrayRef<int64_t> threadsPerDuplicate, ArrayRef<int64_t> threadOrder,
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
+  // Everything should have the same rank.
+  unsigned rank = subgroupsPerWorkgroup.size();
+  if (subgroupOrder.size() != rank || batchesPerSubgroup.size() != rank ||
+      batchOrder.size() != rank || duplicatesPerBatch.size() != rank ||
+      duplicateOrder.size() != rank || threadsPerDuplicate.size() != rank ||
+      threadOrder.size() != rank || elementsPerThread.size() != rank ||
+      elementOrder.size() != rank) {
+    emitError() << "all layout arrays must have the same rank";
+    return failure();
+  }
+
+  // Shapes must not be zero or negative.
+  if (llvm::any_of(subgroupsPerWorkgroup, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(batchesPerSubgroup, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(duplicatesPerBatch, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(threadsPerDuplicate, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(elementsPerThread, [](int64_t v) { return v <= 0; })) {
+    emitError() << "all layout array values must be positive";
+    return failure();
+  }
+
+  // Each order array must contain the values 0 to rank-1 exactly once.
+  auto checkOrder = [&](ArrayRef<int64_t> order, StringRef name) {
+    if (llvm::any_of(order, [&](int64_t v) { return v < 0 || v >= rank; })) {
+      emitError() << "all " << name << " values must be in the range [0, "
+                  << rank - 1 << "]";
+      return failure();
+    }
+    if (llvm::any_of(llvm::seq<int64_t>(0, rank),
+                     [&](int64_t v) { return llvm::count(order, v) != 1; })) {
+      emitError() << "all " << name << " values must be unique";
+      return failure();
+    }
+    return success();
+  };
+
+  if (failed(checkOrder(subgroupOrder, "subgroup order")) ||
+      failed(checkOrder(batchOrder, "batch order")) ||
+      failed(checkOrder(duplicateOrder, "duplicate order")) ||
+      failed(checkOrder(threadOrder, "thread order")) ||
+      failed(checkOrder(elementOrder, "element order"))) {
+    return failure();
+  }
+
+  return success();
+}
+
 } // namespace mlir::iree_compiler::IREE::VectorExt
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
