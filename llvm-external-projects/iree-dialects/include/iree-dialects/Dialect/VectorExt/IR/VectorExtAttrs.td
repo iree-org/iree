@@ -140,13 +140,11 @@ def LayoutV2Attr : IREEVectorExt_Attr<"LayoutV2",
 
     2. Threads per Subgroup:
 
-    Threads in a subgroup are distributed in three levels. The first two
-    levels, batches and duplicates are simply ways to represent replication,
-    but at different levels. 
+    Threads in a subgroup are distributed in three levels.
 
-    The first level of replication, batches, are a way to represent instruction
-    duplication. For example, a GPU intrinsic which can only take 4x4 shape at
-    a time, uses batches to represent thread distribution over a 16x16 shape.
+    The first level, batches, are a way to represent instruction unrolling. For
+    example, an intrinsic which can only take 4x4 shape at a time, uses batches
+    to unroll a 16x16 shape to the native intrinsice shape.
 
     Batches can be thought of as loops around the original layout:
 
@@ -158,9 +156,9 @@ def LayoutV2Attr : IREEVectorExt_Attr<"LayoutV2",
       - batches_per_subgroup: Ranges of each loop
       - batch_order: Ordering of each loop, from outermost to innermost
 
-    The second level of replication, duplicates, are a way to represent
-    thread duplication required by a particular intrinsic. For example,
-    some AMDGPU matrix multiplication variants require threads to be distributed
+    The second level, duplicates, are a way to represent thread duplication
+    required by a particular intrinsic. For example, some AMDGPU matrix
+    multiplication variants require threads to be distributed
     like:
 
     0 1 2 3 4
