@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -33,9 +34,7 @@ struct TargetInfo {
 };
 
 static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
         return attr.getValue();
@@ -321,9 +320,9 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   return failure();
 }
 
-// Propogates the configuration to the other ops.
+// Propagates the configuration to the other ops.
 static void propagateLoweringConfig(Operation *rootOp,
-                                    SmallVector<Operation *> computeOps) {
+                                    ArrayRef<Operation *> computeOps) {
   if (IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOp)) {
     for (auto op : computeOps) {
       if (op != rootOp)
