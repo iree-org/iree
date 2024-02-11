@@ -15,6 +15,75 @@ namespace mlir::iree_compiler {
 using SizesAndScalableFlags =
     std::pair<SmallVector<int64_t>, SmallVector<bool>>;
 
+using SizeAndScalableFlag = std::tuple<int64_t &, bool &>;
+
+/// A tuple that encapsulates two quantities describing tile sizes:
+///   * regular tile sizes (integers) - that's always required
+///   * scalable tile flags (bool - only used/required for scalable
+///     vectorisation.
+/// Use this wrapper to make sure that both quantities are upated when
+/// manipulating tile sizes.
+struct SizesAndScalableFlagsTuple {
+  SmallVector<int64_t> sizes;
+  SmallVector<bool> flags;
+
+  // Represents a pair of references to a size and a scalable flag at the given
+  // index. Due to various implementation details of vector of bools, it's much
+  // easier to store a reference to a whole container and an index. While this
+  // increases the size of this wrapper, it also simplifies the implementation.
+  struct ReferencePair {
+    SmallVector<int64_t> &sizesVec;
+    SmallVector<bool> &flagsVec;
+    // Index of this pair within the vectors
+    size_t index;
+
+    explicit ReferencePair(const ReferencePair &a) = default;
+    ReferencePair(SmallVector<int64_t> &sizesVecRef,
+                  SmallVector<bool> &boolVectorRef, size_t indexRef)
+        : sizesVec(sizesVecRef), flagsVec(boolVectorRef), index(indexRef) {}
+
+    // Update this pair based on the input integer + bool
+    ReferencePair &operator=(const std::pair<int64_t, bool> &values) {
+      sizesVec[index] = values.first;
+      flagsVec[index] = values.second;
+      return *this;
+    }
+
+    // Update this pair based on the input integer. Assume that the scalable
+    // size is false. This is safe to use in cases where no scalable
+    // vectorisation/tiling is used/supported.
+    ReferencePair &operator=(int64_t size) {
+      sizesVec[index] = size;
+      flagsVec[index] = false;
+      return *this;
+    }
+
+    // Update this pair based on the input ReferencePair
+    ReferencePair &operator=(const ReferencePair &pair) {
+      sizesVec[index] = pair.sizesVec[index];
+      flagsVec[index] = pair.flagsVec[index];
+      return *this;
+    }
+  };
+
+  SizesAndScalableFlagsTuple(SmallVector<int64_t> s, SmallVector<bool> f)
+      : sizes(s), flags(f) {}
+
+  // Initialise to {0, false} for all sizes
+  SizesAndScalableFlagsTuple(size_t numElements)
+      : sizes(SmallVector<int64_t>(numElements, 0)),
+        flags(SmallVector<bool>(numElements, false)) {}
+
+  SizesAndScalableFlags get() {
+    return std::pair<SmallVector<int64_t>, SmallVector<bool>>(sizes, flags);
+  }
+
+  ReferencePair operator[](size_t index) {
+    // A new pair requires a reference to sizes, scalable flags and an index.
+    return {sizes, flags, index};
+  }
+};
+
 /// Provides unified API to get access to all the tile size needed during the
 /// CPU lowering process, while abstracting the representation and verification
 /// details of such information in the IR.
@@ -127,8 +196,10 @@ public:
 
 private:
   SizesAndScalableFlags getVectorSizesForLevel(unsigned level) {
-    return std::make_pair(loweringConfig.getTileSizeVals(level),
-                          loweringConfig.getScalableTileFlagVals(level));
+    return SizesAndScalableFlagsTuple(
+               loweringConfig.getTileSizeVals(level),
+               loweringConfig.getScalableTileFlagVals(level))
+        .get();
   }
 
   SmallVector<int64_t> getTileSizesForLevel(unsigned level) {

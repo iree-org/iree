@@ -2375,18 +2375,16 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                        << "\n");
 
   // Split parallel vector tile sizes into common parts and op-specific parts.
-  SmallVector<int64_t> commonVecTileSizes = parallelVecTileSizes;
-  SmallVector<bool> commonVecScalableTileFlags = parallelVecScalableTileSizes;
-  SmallVector<int64_t> innerVecTileSizes(maxLoopNums, 0);
-  SmallVector<bool> innerVecScalableTileFlags(maxLoopNums, false);
+  SizesAndScalableFlagsTuple commanVecTileSizesAndFlags = {
+      parallelVecTileSizes, parallelVecScalableTileSizes};
+  SizesAndScalableFlagsTuple innerVecTileSizesAndFlags(maxLoopNums);
   for (auto op : computeOps) {
     auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
     for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
       if (iterType == utils::IteratorType::reduction) {
-        innerVecTileSizes[idx] = parallelVecTileSizes[idx];
-        innerVecScalableTileFlags[idx] = parallelVecScalableTileSizes[idx];
-        commonVecTileSizes[idx] = 0;
-        commonVecScalableTileFlags[idx] = false;
+        innerVecTileSizesAndFlags[idx] = {parallelVecTileSizes[idx],
+                                          parallelVecScalableTileSizes[idx]};
+        commanVecTileSizesAndFlags[idx] = {/*size=*/0, /*scalableFlag=*/false};
       }
     }
   }
@@ -2409,18 +2407,18 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       }
       if (tilingConfig.getNumTilingLevels() > 1) {
         tileSizesList[tilingConfig.getVectorCommonParallelLevel()] =
-            commonVecTileSizes;
+            commanVecTileSizesAndFlags.sizes;
         scalableTileFlagsList[tilingConfig.getVectorCommonParallelLevel()] =
-            commonVecScalableTileFlags;
+            commanVecTileSizesAndFlags.flags;
       }
     } else {
       // Build 4-level lowering configs for other ops.
-      tileSizesList = {distTileSizes, commonVecTileSizes};
+      tileSizesList = {distTileSizes, commanVecTileSizesAndFlags.sizes};
       SmallVector<int64_t> zeros(numLoops, 0);
       SmallVector<bool> falseVec(numLoops, 0);
       // No scalable tiling for the distribution
       scalableTileFlagsList.push_back(falseVec);
-      scalableTileFlagsList.push_back(commonVecScalableTileFlags);
+      scalableTileFlagsList.push_back(commanVecTileSizesAndFlags.flags);
       bool setUpOK =
           TypeSwitch<Operation *, bool>(op)
               .Case<tensor::PackOp>([&](auto packOp) {
@@ -2431,7 +2429,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                     return false;
                 }
                 tileSizesList.push_back(zeros);
-                tileSizesList.push_back(innerVecTileSizes);
+                tileSizesList.push_back(innerVecTileSizesAndFlags.sizes);
                 // Scale and permutate the outer dim tiles for pack op.
                 ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
                 ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
@@ -2460,18 +2458,16 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                   scalableTileFlagsList.push_back(falseVec);
                 }
                 // Only copy the inner vector tile sizes on parallel dims.
-                SmallVector<int64_t> vecTileSizes(numLoops, 0);
-                SmallVector<bool> vecScalableTileFlags(numLoops, false);
+                SizesAndScalableFlagsTuple vecTileSizesAndFlags(numLoops);
                 auto iterTypes =
                     cast<TilingInterface>(op).getLoopIteratorTypes();
                 for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
                   if (iterType == utils::IteratorType::parallel) {
-                    vecTileSizes[idx] = innerVecTileSizes[idx];
-                    vecScalableTileFlags[idx] = innerVecScalableTileFlags[idx];
+                    vecTileSizesAndFlags[idx] = innerVecTileSizesAndFlags[idx];
                   }
                 }
-                tileSizesList.push_back(vecTileSizes);
-                scalableTileFlagsList.push_back(vecScalableTileFlags);
+                tileSizesList.push_back(vecTileSizesAndFlags.sizes);
+                scalableTileFlagsList.push_back(vecTileSizesAndFlags.flags);
 
                 return true;
               });
