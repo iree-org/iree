@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -94,6 +95,18 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp) {
         llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
   }
   return workgroupSize;
+}
+
+std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      mlir::iree_compiler::getEntryPoint(funcOp);
+  if (failed(exportOp)) {
+    return std::nullopt;
+  }
+  if (IntegerAttr attr = exportOp->getSubgroupSizeAttr()) {
+    return attr.getValue().getSExtValue();
+  }
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -918,6 +931,31 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
   }
   // TODO: Once plumbed, add a CUDA backend and supported cuda arch check.
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+static constexpr char mmaTypeListName[] = "mma_intrinsics";
+static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  ArrayAttr types = dyn_cast_or_null<ArrayAttr>(config.get(mmaTypeListName));
+  if (!types) {
+    return failure();
+  }
+  return types;
+}
+
+FailureOr<ArrayAttr>
+getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
+  if (!targetAttr) {
+    return failure();
+  }
+  return getSupportedMmaTypes(targetAttr.getConfiguration());
 }
 
 } // namespace mlir::iree_compiler

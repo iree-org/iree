@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-hoist-into-globals %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-global-optimization-hoist-constant-expressions %s | FileCheck %s
 // Spot verification that policies for linalg ops is respected.
 
 // CHECK-LABEL: @compute_hoisted

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
@@ -43,6 +44,7 @@ public:
     registry
         .insert<IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
+                IREE::VectorExt::IREEVectorExtDialect,
                 linalg::LinalgDialect,
                 gpu::GPUDialect,
                 nvgpu::NVGPUDialect,
@@ -115,6 +117,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
     addGPUTransposePassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
+    addGPUVectorDistributePassPipeline(pipeline);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
     addGPUWarpReductionPassPipeline(pipeline);

@@ -12,6 +12,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -30,6 +31,11 @@
 #include "mlir/IR/Value.h"
 
 namespace mlir::iree_compiler {
+
+llvm::cl::opt<bool> clGPUEnableVectorDistribution(
+    "iree-codegen-llvmgpu-use-vector-distribution",
+    llvm::cl::desc("enable the usage of the vector distribution pipeline"),
+    llvm::cl::init(false));
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -275,6 +281,102 @@ getTensorCorePipeline(Type elementType) {
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
   };
   return codegenPipeline;
+}
+
+static LogicalResult
+setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
+                            linalg::LinalgOp op, const TargetInfo &targetInfo) {
+  if (!linalg::isaContractionOpInterface(op) || op.getNumParallelLoops() < 2) {
+    return failure();
+  }
+
+  FailureOr<ArrayAttr> maybeMmaTypes = getSupportedMmaTypes(entryPoint);
+  if (failed(maybeMmaTypes)) {
+    return failure();
+  }
+
+  // Currently only applies when there is a supported mma operation we can map
+  // to.
+  // TODO: Reuse this pipeline for SIMT based flows.
+  std::optional<IREE::GPU::MmaAttr> maybeMmaAttr =
+      getCompatibleMmaAttr(*maybeMmaTypes, op);
+  if (!maybeMmaAttr) {
+    return failure();
+  }
+  IREE::GPU::MmaAttr mmaAttr = *maybeMmaAttr;
+
+  // This pipeline needs to know the subgroup size to know how to distribute to
+  // virtual lane ids.
+  if (targetInfo.supportedSubgroupSizes.empty()) {
+    return failure();
+  }
+
+  int64_t numLoops = op.getNumLoops();
+
+  SmallVector<int64_t> workgroupTileSizes(numLoops, 0);
+
+  // Arbitrary starter heuristics.
+  int64_t maxMSize = 128;
+  int64_t maxNSize = 128;
+  int64_t maxKSize = 32;
+
+  SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(op);
+  assert(succeeded(contractionDims) && "Could not infer contraction dims");
+
+  int64_t mDim = contractionDims->m[0];
+  int64_t nDim = contractionDims->n[0];
+  int64_t kDim = contractionDims->k[0];
+
+  int64_t problemMSize = bounds[mDim];
+  int64_t problemNSize = bounds[nDim];
+  int64_t problemKSize = bounds[kDim];
+
+  auto getTileSize = [](int64_t problemSize, int64_t maxSize) {
+    int64_t tileSize = maxSize;
+    // The static verification that the linalg op is statically aligned to the
+    // particular mma type guarantees that this will be at least the minimum
+    // tile size.
+    // TODO: Allow unaligned and dynamic cases once masking is supported by
+    // distribution.
+    while (problemSize % tileSize != 0)
+      tileSize /= 2;
+    return tileSize;
+  };
+
+  int64_t mTile = getTileSize(problemMSize, maxMSize);
+  int64_t nTile = getTileSize(problemNSize, maxNSize);
+  int64_t kTile = getTileSize(problemKSize, maxKSize);
+
+  // Get the shape of the [warp-synchronous] mma operation.
+  auto [minMSize, minNSize, minKSize] = mmaAttr.getMNKShape();
+
+  // HACK: This is a single workgroup...
+  mTile = std::min(mTile, minMSize);
+  nTile = std::min(nTile, minNSize);
+
+  // Following the LLVMGPU convention of keeping all of the tile sizes in one
+  // list.
+  workgroupTileSizes[mDim] = mTile;
+  workgroupTileSizes[nDim] = nTile;
+  workgroupTileSizes[kDim] = kTile;
+
+  TileSizesListType tileSizes;
+  // HACK: need proper heuristics for workgroup size, but for now the pipeline
+  // is single subgroup.
+  tileSizes.push_back(workgroupTileSizes);
+  SmallVector<int64_t, 3> workgroupSize(3, 1); // (X, Y, Z)
+
+  int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+  workgroupSize[0] = subgroupSize;
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
+      workgroupSize, /*subgroupSize=*/subgroupSize);
+
+  return success();
 }
 
 static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
@@ -1323,6 +1425,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     return success();
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
+    if (clGPUEnableVectorDistribution) {
+      if (succeeded(setVectorDistributionConfig(entryPointFn, linalgOp,
+                                                targetInfo))) {
+        return success();
+      }
+    }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
     }

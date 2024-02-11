@@ -6,7 +6,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Source this to set up the local python environment with in-tree, source
-# only packages.
+# only packages as well as other tensorflow requirements.
 
 IREE_PYTHON3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE:-$(which python3)}"
 PYTHON_SCRIPTS_DIR="$(python -c "import sysconfig; print(sysconfig.get_path('scripts'))"):$HOME/.local/bin"
@@ -16,3 +16,6 @@ export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
 # but export important binaries onto the path.
 # TODO(scotttodd): use iree-tools-tf wheel on CI instead of this source code
 "${IREE_PYTHON3_EXECUTABLE}" -m pip install integrations/tensorflow/python_projects/iree_tf integrations/tensorflow/python_projects/iree_tflite
+
+# Install test requirements (notably tensorflow/tf-nightly)
+"${IREE_PYTHON3_EXECUTABLE}" -m pip install -r integrations/tensorflow/test/requirements.txt

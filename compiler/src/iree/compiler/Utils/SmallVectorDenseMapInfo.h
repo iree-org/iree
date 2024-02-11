@@ -29,11 +29,10 @@ struct DenseMapInfo<SmallVector<T, N>> {
   static unsigned getHashValue(const SmallVector<T, N> &v) {
     hash_code hash = llvm::DenseMapInfo<T>::getHashValue(
         llvm::DenseMapInfo<T>::getEmptyKey());
-    std::accumulate(v.begin(), v.end(), hash,
-                    [](hash_code hash, const T &element) {
-                      return hash_combine(hash, element);
-                    });
-    return hash;
+    return std::accumulate(v.begin(), v.end(), hash,
+                           [](hash_code hash, const T &element) {
+                             return hash_combine(hash, element);
+                           });
   }
 
   static bool isEqual(const SmallVector<T, N> &lhs,

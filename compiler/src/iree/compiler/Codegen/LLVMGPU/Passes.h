@@ -49,6 +49,9 @@ void addGPUTransposePassPipeline(OpPassManager &pm);
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
+/// Lowering based on vector distribution patterns.
+void addGPUVectorDistributePassPipeline(OpPassManager &pm);
+
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
@@ -106,6 +109,10 @@ createLLVMGPUTensorPadPass();
 /// Perform tiling and distribution to threads.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTileAndDistribute(bool distributeToWarp = false);
+
+// Pass to distribute vectorized functions.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorDistribute();
 
 /// Lower vector ops before convertion to LLVM.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
