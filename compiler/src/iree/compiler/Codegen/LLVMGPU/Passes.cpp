@@ -838,7 +838,6 @@ void registerCodegenLLVMGPUPasses() {
         buildLLVMGPUCodegenPassPipeline(passManager, true);
       });
 }
-#undef GEN_PASS_REGISTRATION
 
 //===---------------------------------------------------------------------===//
 // ROCDL Pass Registration
