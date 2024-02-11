@@ -151,4 +151,104 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_tablegen_library(
+  NAME
+    ROCDLPassesIncGen
+  TD_FILE
+    "ROCDLPasses.td"
+  OUTS
+    --gen-pass-decls ROCDLPasses.h.inc
+)
+
+iree_cc_library(
+  NAME
+    ROCDLPassHeaders
+  HDRS
+    "ROCDLPassDetail.h"
+    "ROCDLPasses.h"
+    "ROCDLPasses.h.inc"
+  DEPS
+    ::ROCDLPassesIncGen
+    MLIRPass
+    iree::compiler::Dialect::HAL::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ROCDL
+  HDRS
+    "ROCDLKernelConfig.h"
+    "ROCDLPasses.h"
+  SRCS
+    "ROCDLKernelConfig.cpp"
+    "ROCDLLowerExecutableTarget.cpp"
+    "ROCDLSelectLoweringStrategy.cpp"
+  DEPS
+    ::LLVMGPU
+    ::ROCDLPassHeaders
+    IREELinalgExtDialect
+    IREELinalgExtPasses
+    LLVMSupport
+    MLIRAMDGPUDialect
+    MLIRAMDGPUToROCDL
+    MLIRAMDGPUTransforms
+    MLIRAMDGPUUtils
+    MLIRAffineDialect
+    MLIRAffineToStandard
+    MLIRAnalysis
+    MLIRArithDialect
+    MLIRArithToAMDGPU
+    MLIRArithToLLVM
+    MLIRArithTransforms
+    MLIRBufferizationDialect
+    MLIRComplexToLLVM
+    MLIRComplexToStandard
+    MLIRControlFlowToLLVM
+    MLIRFuncDialect
+    MLIRFuncToLLVM
+    MLIRFuncTransforms
+    MLIRFunctionInterfaces
+    MLIRGPUDialect
+    MLIRGPUToROCDLTransforms
+    MLIRGPUTransforms
+    MLIRIR
+    MLIRLLVMCommonConversion
+    MLIRLinalgDialect
+    MLIRLinalgTransforms
+    MLIRMathDialect
+    MLIRMathToLLVM
+    MLIRMemRefDialect
+    MLIRMemRefToLLVM
+    MLIRMemRefTransforms
+    MLIRPass
+    MLIRROCDLDialect
+    MLIRROCDLTarget
+    MLIRROCDLToLLVMIRTranslation
+    MLIRSCFDialect
+    MLIRSCFToControlFlow
+    MLIRSCFTransforms
+    MLIRSideEffectInterfaces
+    MLIRSupport
+    MLIRTensorDialect
+    MLIRTransformDialect
+    MLIRTransforms
+    MLIRValueBoundsOpInterface
+    MLIRVectorDialect
+    MLIRVectorToGPU
+    MLIRVectorToLLVM
+    MLIRVectorToSCF
+    MLIRVectorTransforms
+    iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::UKernelOpInterface
+    iree::compiler::Codegen::Transforms
+    iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

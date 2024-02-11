@@ -26,7 +26,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMCPU
     iree::compiler::Codegen::LLVMGPU
-    iree::compiler::Codegen::ROCDL
+    iree::compiler::Codegen::LLVMGPU::ROCDL
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::VMVX
     iree::compiler::Codegen::WGSL

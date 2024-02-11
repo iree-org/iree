@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_CODEGEN_ROCDL_PASSES
-#define IREE_CODEGEN_ROCDL_PASSES
+#ifndef IREE_CODEGEN_LLVMGPU_ROCDLPASSES
+#define IREE_CODEGEN_LLVMGPU_ROCDLPASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -32,5 +32,5 @@ def ROCDLSelectLoweringStrategy : Pass<
 }
 
 
-#endif // IREE_CODEGEN_ROCDL_PASSES
+#endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES
 

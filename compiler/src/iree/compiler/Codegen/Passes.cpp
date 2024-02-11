@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Codegen/ROCDL/Passes.h"
 #include "mlir/Pass/PassManager.h"
 
 //===---------------------------------------------------------------------===//
@@ -16,6 +15,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"

@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -46,6 +47,10 @@ static llvm::cl::opt<unsigned>
     logSwizzleTile("iree-codegen-log-swizzle-tile",
                    llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
 
+//===----------------------------------------------------------------------===//
+// Bufferization Configuration
+//===----------------------------------------------------------------------===//
+
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
@@ -77,6 +82,10 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   }
   return success();
 }
+
+//===----------------------------------------------------------------------===//
+// Common Pass Recipes
+//===----------------------------------------------------------------------===//
 
 static void addBufferizePasses(OpPassManager &passManager) {
   BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
@@ -123,10 +132,6 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 }
-
-//===---------------------------------------------------------------------===//
-// Codegen pipelines.
-//===---------------------------------------------------------------------===//
 
 //===---------------------------------------------------------------------===//
 // Default Vectorization
@@ -629,21 +634,22 @@ void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
       createRemoveSingleIterationLoopPass());
 }
 
-// Sub pipeline to make the address computation more explicit and
-// optimize them.
-// The idea here is to be less dependent on what the backend is able to
-// do by heavy lifting most of the work while we still have the
-// information about loops.
-// Note: This needs to run before SCF -> CF.
-static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
+// Add passes to make the address computation more explicit and optimize them.
+//
+// The idea here is to be less dependent on what the LLVM backend is able to do,
+// by heavy lifting most of the work while we still have the information about
+// loops.
+//
+// Note that this needs to run before SCF -> CF.
+static void addLowerAndOptimizeAddressComputationPasses(OpPassManager &pm) {
   pm.addPass(createExtractAddressComputationGPUPass());
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
-  // Hoist loop invariant variables to give decompose affine pass the right loop
-  // dependencies.
+  // Hoist loop invariant variables to give affine decomposition pass the right
+  // loop dependencies.
   pm.addPass(createLoopInvariantCodeMotionPass());
-  // Decompose the `affine.apply`s.
+  // Decompose affine ops.
   pm.addPass(createDecomposeAffineOpsPass());
   // Get rid of the redundant computations.
   pm.addPass(createCSEPass());
@@ -652,9 +658,8 @@ static void addLowerAndOptimzeAddressComputation(OpPassManager &pm) {
   pm.addPass(createLowerAffinePass());
 }
 
-static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
+static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   pm.addPass(createConvertHALDescriptorTypeToGPUAddressSpacePass());
-
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -669,23 +674,22 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
-  // Pad allocations with dynamic dimension before lowering of SCF and affine
-  // but after linalg lowering.
+  // Pad allocations with dynamic dimension after linalg lowering but before
+  // lowering SCF and affine ops.
   pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // Handled tensor-type constants.
+  // Handled tensor constants.
   pm.addPass(arith::createConstantBufferizePass());
   pm.addPass(createFoldTensorExtractOpPass());
 
   pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorLoweringPass());
 
-  // THIS NEEDS TO RUN BEFORE SCF ->CF ON
-  addLowerAndOptimzeAddressComputation(pm);
-  // THIS NEEDS TO RUN BEFORE SCF ->CF OFF
+  // This pass needs to run before SCF -> CF.
+  addLowerAndOptimizeAddressComputationPasses(pm);
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
@@ -696,7 +700,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
-  // SCF -> STD
+  // SCF -> CF
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<func::FuncOp>(createCSEPass());
@@ -708,7 +712,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createConvertBf16ArithToF32Pass());
   pm.addPass(createConvertBf16ToUInt16BuffersPass());
 
-  // math dialect elementry functions -> polynomial form.
+  // Convert math dialect elementry functions to polynomial form.
   pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
@@ -718,12 +722,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
-  // debug info well.
+
+  // Strip out the debug info for the kernel.
   pm.addPass(createStripDebugInfoPass());
-  // Cast address spaces of all function arguments to generic
+  // Cast address spaces of all function arguments to generic.
   pm.addPass(createLLVMGPUCastAddressSpaceFunction());
-  if (useROCM) {
+
+  if (forROCDL) {
     // convert to ROCDL.
     pm.addPass(createConvertToROCDLPass());
   } else {
@@ -745,6 +750,10 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
   //   2. if transform.do_not_dce_operands ops are introduced.
   passManager.addPass(createDropSchedulePass());
 }
+
+//===----------------------------------------------------------------------===//
+// Common Pass Pipelines
+//===----------------------------------------------------------------------===//
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
   addCommonTargetExecutablePreprocessingPasses(pm);
@@ -772,18 +781,41 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
   });
 }
 
+//===----------------------------------------------------------------------===//
+// ROCDL Pass Pipelines
+//===----------------------------------------------------------------------===//
+
+void buildROCDLCodegenConfigurationPassPipeline(OpPassManager &pm) {
+  addCommonTargetExecutablePreprocessingPasses(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  pm.addPass(createROCDLSelectLoweringStrategyPass());
+}
+
+void buildROCDLCodegenPassPipeline(OpPassManager &pm) {
+  pm.addPass(createROCDLLowerExecutableTargetPass());
+  OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
+  addLowerToLLVMGPUPasses(nestedModulePM, /*forROCDL=*/true);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "Using ROCDL pass pipeline:\n";
+    pm.printAsTextualPipeline(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
+}
+
 //===---------------------------------------------------------------------===//
-// Register LLVMGPU Passes
+// Common Pass Registration
 //===---------------------------------------------------------------------===//
 
-namespace {
+namespace common {
 #define GEN_PASS_REGISTRATION
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h.inc"
-} // namespace
+} // namespace common
 
 void registerCodegenLLVMGPUPasses() {
   // Generated.
-  registerPasses();
+  common::registerPasses();
 
   static PassPipelineRegistration<> LLVMGPUConfigPipeline(
       "iree-codegen-llvmgpu-configuration-pipeline",
@@ -804,6 +836,35 @@ void registerCodegenLLVMGPUPasses() {
       "Runs the progressive lowering pipeline from Linalg to ROCDL",
       [](OpPassManager &passManager) {
         buildLLVMGPUCodegenPassPipeline(passManager, true);
+      });
+}
+#undef GEN_PASS_REGISTRATION
+
+//===---------------------------------------------------------------------===//
+// ROCDL Pass Registration
+//===---------------------------------------------------------------------===//
+
+namespace rocdl {
+#define GEN_PASS_REGISTRATION
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h.inc"
+} // namespace rocdl
+
+void registerCodegenROCDLPasses() {
+  // Generated.
+  rocdl::registerPasses();
+
+  static PassPipelineRegistration<> ROCDLConfigPipeline(
+      "iree-codegen-rocdl-configuration-pipeline",
+      "Runs pass pipeline to select a suitable lowering strategy for ROCDL",
+      [](OpPassManager &passManager) {
+        buildROCDLCodegenConfigurationPassPipeline(passManager);
+      });
+
+  static PassPipelineRegistration<> LinalgROCDLPipeline(
+      "iree-codegen-linalg-to-rocdl-pipeline2",
+      "Runs pass pipeline to progressively lower Linalg to ROCDL",
+      [](OpPassManager &passManager) {
+        buildROCDLCodegenPassPipeline(passManager);
       });
 }
 

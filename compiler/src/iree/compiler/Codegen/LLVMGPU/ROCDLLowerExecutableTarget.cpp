@@ -6,8 +6,8 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/ROCDL/PassDetail.h"
-#include "iree/compiler/Codegen/ROCDL/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPassDetail.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
