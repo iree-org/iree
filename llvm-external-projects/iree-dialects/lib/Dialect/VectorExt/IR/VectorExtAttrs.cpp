@@ -195,13 +195,11 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
   return offset;
 }
 
-VectorLayoutInterface
-NestedAttr::project(ArrayRef<bool> projectedDims) const {
+VectorLayoutInterface NestedAttr::project(ArrayRef<bool> projectedDims) const {
   llvm_unreachable("Not yet implemented");
 }
 
-VectorLayoutInterface
-NestedAttr::permute(ArrayRef<int64_t> permutation) const {
+VectorLayoutInterface NestedAttr::permute(ArrayRef<int64_t> permutation) const {
   llvm_unreachable("Not yet implemented");
 }
 
