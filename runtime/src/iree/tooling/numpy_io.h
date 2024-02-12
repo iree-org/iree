@@ -36,10 +36,9 @@
 #ifndef IREE_TOOLING_NUMPY_IO_H_
 #define IREE_TOOLING_NUMPY_IO_H_
 
-#include <stdio.h>
-
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/io/stream.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,7 +83,7 @@ typedef uint32_t iree_numpy_npy_save_options_t;
 // See `numpy.load`:
 // https://numpy.org/doc/stable/reference/generated/numpy.load.html
 IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
-    FILE* stream, iree_numpy_npy_load_options_t options,
+    iree_io_stream_t* stream, iree_numpy_npy_load_options_t options,
     iree_hal_buffer_params_t buffer_params, iree_hal_device_t* device,
     iree_hal_allocator_t* device_allocator,
     iree_hal_buffer_view_t** out_buffer_view);
@@ -95,7 +94,7 @@ IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
 // See `numpy.save`:
 // https://numpy.org/doc/stable/reference/generated/numpy.save.html
 IREE_API_EXPORT iree_status_t iree_numpy_npy_save_ndarray(
-    FILE* stream, iree_numpy_npy_save_options_t options,
+    iree_io_stream_t* stream, iree_numpy_npy_save_options_t options,
     iree_hal_buffer_view_t* buffer_view, iree_allocator_t host_allocator);
 
 #ifdef __cplusplus

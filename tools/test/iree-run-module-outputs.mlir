@@ -55,7 +55,8 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // -----
 
 // Tests output to binary files by round-tripping the output of a function into
-// another invocation reading from the binary files.
+// another invocation reading from the binary files. Each output is written to
+// its own file (optimal for alignment/easier to inspect).
 
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
 // RUN:  iree-run-module --device=local-sync \
@@ -69,6 +70,24 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 // RUN:                  --input=f32=@%t.0.bin \
 // RUN:                  --input=2x4xi32=@%t.1.bin) | \
 // RUN: FileCheck --check-prefix=OUTPUT-BINARY %s
+
+// Tests output to binary files by round-tripping the output of a function into
+// another invocation reading from the binary files. The values are appended to
+// a single file and read from the single file.
+
+// RUN: (iree-compile --iree-hal-target-backends=vmvx %s -o=%t.vmfb && \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=%t.vmfb \
+// RUN:                  --function=write_binary \
+// RUN:                  --output=@%t.bin \
+// RUN:                  --output=+%t.bin && \
+// RUN:  iree-run-module --device=local-sync \
+// RUN:                  --module=%t.vmfb \
+// RUN:                  --function=echo_binary \
+// RUN:                  --input=f32=@%t.bin \
+// RUN:                  --input=2x4xi32=+%t.bin) | \
+// RUN: FileCheck --check-prefix=OUTPUT-BINARY %s
+
 func.func @write_binary() -> (tensor<f32>, tensor<?x4xi32>) {
   %0 = arith.constant dense<4.0> : tensor<f32>
   %1 = flow.tensor.constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>

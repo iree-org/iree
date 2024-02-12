@@ -155,6 +155,9 @@ iree_io_file_handle_flush(iree_io_file_handle_t* handle);
 // iree_io_stream_t utilities
 //===----------------------------------------------------------------------===//
 
+// TODO(benvanik): remove/rework iree_io_stream_open so that it doesn't pull in
+// any implementations by putting callbacks on the file handle constructors.
+
 // Opens a stream from the given |file_handle| at the absolute |file_offset|.
 // The returned stream will retain the file until it is released.
 IREE_API_EXPORT iree_status_t iree_io_stream_open(

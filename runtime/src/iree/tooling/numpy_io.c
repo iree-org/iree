@@ -29,7 +29,7 @@
 // start of the file payload.
 // |out_header_buffer| must be freed by the caller with |host_allocator|.
 static iree_status_t iree_numpy_npy_read_header(
-    FILE* stream, iree_allocator_t host_allocator,
+    iree_io_stream_t* stream, iree_allocator_t host_allocator,
     iree_host_size_t* out_header_length, char** out_header_buffer) {
   IREE_ASSERT_ARGUMENT(stream);
   IREE_ASSERT_ARGUMENT(out_header_length);
@@ -45,10 +45,9 @@ static iree_status_t iree_numpy_npy_read_header(
     uint8_t version_minor;
   } header;
   static_assert(sizeof(header) == 8, "packing");
-  if (fread(&header, 1, sizeof(header), stream) != sizeof(header)) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "unable to read entire header prefix");
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_read(stream, sizeof(header), &header, NULL),
+      "unable to read entire header prefix");
 
   // Verify magic bytes to confirm this is an npy file.
   static const uint8_t kMagicBytes[6] = {0x93, 'N', 'U', 'M', 'P', 'Y'};
@@ -73,23 +72,17 @@ static iree_status_t iree_numpy_npy_read_header(
   iree_host_size_t header_length = 0;
   if (header.version_major == 1) {
     uint16_t header_length_u16 = 0;
-    if (fread(&header_length_u16, 1, sizeof(header_length_u16), stream) !=
-        sizeof(header_length_u16)) {
-      return iree_make_status(
-          IREE_STATUS_RESOURCE_EXHAUSTED,
-          "failed to read version %d.%d 2-byte header length",
-          header.version_major, header.version_minor);
-    }
+    IREE_RETURN_IF_ERROR(iree_io_stream_read(stream, sizeof(header_length_u16),
+                                             &header_length_u16, NULL),
+                         "failed to read version %d.%d 2-byte header length",
+                         header.version_major, header.version_minor);
     header_length = header_length_u16;
   } else {
     uint32_t header_length_u32 = 0;
-    if (fread(&header_length_u32, 1, sizeof(header_length_u32), stream) !=
-        sizeof(header_length_u32)) {
-      return iree_make_status(
-          IREE_STATUS_RESOURCE_EXHAUSTED,
-          "failed to read version %d.%d 4-byte header length",
-          header.version_major, header.version_minor);
-    }
+    IREE_RETURN_IF_ERROR(iree_io_stream_read(stream, sizeof(header_length_u32),
+                                             &header_length_u32, NULL),
+                         "failed to read version %d.%d 4-byte header length",
+                         header.version_major, header.version_minor);
     header_length = header_length_u32;
   }
 
@@ -101,11 +94,9 @@ static iree_status_t iree_numpy_npy_read_header(
 
   // Read entire header string, including padding/newline.
   iree_status_t status = iree_ok_status();
-  if (fread(header_buffer, 1, header_length, stream) != header_length) {
-    status = iree_make_status(
-        IREE_STATUS_RESOURCE_EXHAUSTED,
-        "failed to read header string of %" PRIhsz " bytes", header_length);
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_read(stream, header_length, header_buffer, NULL),
+      "failed to read header string of %" PRIhsz " bytes", header_length);
 
   if (iree_status_is_ok(status)) {
     // Caller must free the string buffer.
@@ -118,19 +109,17 @@ static iree_status_t iree_numpy_npy_read_header(
 }
 
 typedef struct {
-  FILE* stream;
+  iree_io_stream_t* stream;
 } iree_numpy_npy_read_params_t;
 static iree_status_t iree_numpy_npy_read_into_mapping(
     iree_hal_buffer_mapping_t* mapping, void* user_data) {
   iree_numpy_npy_read_params_t* params =
       (iree_numpy_npy_read_params_t*)user_data;
-  iree_host_size_t contents_length = mapping->contents.data_length;
-  if (fread(mapping->contents.data, 1, contents_length, params->stream) !=
-      contents_length) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "failed to read npy contents of %" PRIhsz " bytes",
-                            contents_length);
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_read(params->stream, mapping->contents.data_length,
+                          mapping->contents.data, NULL),
+      "failed to read npy contents of %" PRIhsz " bytes",
+      mapping->contents.data_length);
   return iree_ok_status();
 }
 
@@ -293,7 +282,7 @@ static iree_status_t iree_numpy_parse_shape_dims(iree_string_view_t shape,
 }
 
 IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
-    FILE* stream, iree_numpy_npy_load_options_t options,
+    iree_io_stream_t* stream, iree_numpy_npy_load_options_t options,
     iree_hal_buffer_params_t buffer_params, iree_hal_device_t* device,
     iree_hal_allocator_t* device_allocator,
     iree_hal_buffer_view_t** out_buffer_view) {
@@ -309,7 +298,7 @@ IREE_API_EXPORT iree_status_t iree_numpy_npy_load_ndarray(
   // if we failed trying to parse the header. Since npy files are often
   // concatenated callers are likely to be using this in a loop and checking for
   // this condition, even if it'd be better if they did it themselves.
-  if (feof(stream)) {
+  if (iree_io_stream_is_eos(stream)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE, "end-of-file");
   }
@@ -502,7 +491,7 @@ static iree_status_t iree_numpy_npy_build_header(
 // alignment. |header_dict| should not have any trailing padding or the newline
 // character.
 static iree_status_t iree_numpy_npy_write_header(
-    FILE* stream, iree_numpy_npy_save_options_t options,
+    iree_io_stream_t* stream, iree_numpy_npy_save_options_t options,
     iree_string_view_t header_dict) {
   // v1 -> v2 if the header requires it; we don't but good to be conformant.
   bool requires_v2 = header_dict.size > 65535;
@@ -520,10 +509,8 @@ static iree_status_t iree_numpy_npy_write_header(
       .version_minor = 0,
   };
   static_assert(sizeof(header) == 8, "padding");
-  if (fwrite(&header, 1, sizeof(header), stream) != sizeof(header)) {
-    return iree_make_status(IREE_STATUS_DATA_LOSS,
-                            "failed to write header prefix");
-  }
+  IREE_RETURN_IF_ERROR(iree_io_stream_write(stream, sizeof(header), &header),
+                       "failed to write header prefix");
 
   // Pad out what we write to 64b.
   // Note that this includes the header prefix, length, dict, and newline.
@@ -536,46 +523,37 @@ static iree_status_t iree_numpy_npy_write_header(
   iree_host_size_t header_length = header_dict.size + padding_length + /*\n*/ 1;
   if (requires_v2) {
     uint32_t header_length_u32 = (uint32_t)header_length;
-    if (fwrite(&header_length_u32, 1, sizeof(header_length_u32), stream) !=
-        sizeof(header_length_u32)) {
-      return iree_make_status(IREE_STATUS_DATA_LOSS,
-                              "failed to write header length");
-    }
+    IREE_RETURN_IF_ERROR(iree_io_stream_write(stream, sizeof(header_length_u32),
+                                              &header_length_u32),
+                         "failed to write header length");
   } else {
     uint16_t header_length_u16 = (uint16_t)header_length;
-    if (fwrite(&header_length_u16, 1, sizeof(header_length_u16), stream) !=
-        sizeof(header_length_u16)) {
-      return iree_make_status(IREE_STATUS_DATA_LOSS,
-                              "failed to write header length");
-    }
+    IREE_RETURN_IF_ERROR(iree_io_stream_write(stream, sizeof(header_length_u16),
+                                              &header_length_u16),
+                         "failed to write header length");
   }
 
   // Write header contents (without padding/trailing newline).
-  if (fwrite(header_dict.data, 1, header_dict.size, stream) !=
-      header_dict.size) {
-    return iree_make_status(IREE_STATUS_DATA_LOSS,
-                            "failed to write header contents");
-  }
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_write(stream, header_dict.size, header_dict.data),
+      "failed to write header contents");
 
   // Add space padding up to 64b alignment (minus newline).
-  for (iree_host_size_t i = 0; i < padding_length; ++i) {
-    if (fputc(' ', stream) != ' ') {
-      return iree_make_status(IREE_STATUS_DATA_LOSS, "failed to pad header");
-    }
-  }
+  const char space = ' ';
+  IREE_RETURN_IF_ERROR(
+      iree_io_stream_fill(stream, padding_length, &space, sizeof(space)),
+      "failed to pad header");
 
   // Trailing newline, which should put us right at the %64=0 alignment.
-  if (fputc('\n', stream) != '\n') {
-    return iree_make_status(IREE_STATUS_DATA_LOSS,
-                            "failed to write trailing newline");
-  }
+  IREE_RETURN_IF_ERROR(iree_io_stream_write_char(stream, '\n'),
+                       "failed to write trailing newline");
 
   return iree_ok_status();
 }
 
 // Writes |buffer_view| contents to |stream|.
 static iree_status_t iree_numpy_npy_write_bytes(
-    FILE* stream, iree_hal_buffer_view_t* buffer_view) {
+    iree_io_stream_t* stream, iree_hal_buffer_view_t* buffer_view) {
   iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view);
   iree_device_size_t write_length =
       iree_hal_buffer_view_byte_length(buffer_view);
@@ -585,17 +563,16 @@ static iree_status_t iree_numpy_npy_write_bytes(
       buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ, 0,
       write_length, &mapping));
 
-  bool write_ok =
-      fwrite(mapping.contents.data, 1, write_length, stream) == write_length;
+  iree_status_t status = iree_status_annotate(
+      iree_io_stream_write(stream, write_length, mapping.contents.data),
+      IREE_SV("failed to write buffer contents"));
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_unmap_range(&mapping));
-  return write_ok ? iree_ok_status()
-                  : iree_make_status(IREE_STATUS_DATA_LOSS,
-                                     "failed to write buffer contents");
+  IREE_IGNORE_ERROR(iree_hal_buffer_unmap_range(&mapping));
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_numpy_npy_save_ndarray(
-    FILE* stream, iree_numpy_npy_save_options_t options,
+    iree_io_stream_t* stream, iree_numpy_npy_save_options_t options,
     iree_hal_buffer_view_t* buffer_view, iree_allocator_t host_allocator) {
   IREE_ASSERT_ARGUMENT(stream);
   IREE_ASSERT_ARGUMENT(buffer_view);

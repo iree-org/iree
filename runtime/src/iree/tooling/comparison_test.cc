@@ -12,7 +12,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
-#include "iree/tooling/vm_util.h"
+#include "iree/tooling/function_io.h"
 #include "iree/vm/api.h"
 
 namespace iree {
@@ -22,6 +22,7 @@ using ::testing::HasSubstr;
 
 static void ParseToVariantList(iree_hal_device_t* device,
                                iree_hal_allocator_t* device_allocator,
+                               iree_string_view_t cconv,
                                iree::span<const std::string> input_strings,
                                iree_allocator_t host_allocator,
                                iree_vm_list_t** out_list) {
@@ -30,9 +31,11 @@ static void ParseToVariantList(iree_hal_device_t* device,
     input_string_views[i].data = input_strings[i].data();
     input_string_views[i].size = input_strings[i].size();
   }
-  IREE_CHECK_OK(iree_tooling_parse_to_variant_list(
-      device, device_allocator, input_string_views.data(),
-      input_string_views.size(), host_allocator, out_list));
+  IREE_CHECK_OK(iree_tooling_parse_variants(
+      cconv,
+      iree_string_view_list_t{input_string_views.size(),
+                              input_string_views.data()},
+      device, device_allocator, host_allocator, out_list));
 }
 
 class ComparisonTest : public ::testing::Test {
@@ -51,15 +54,15 @@ class ComparisonTest : public ::testing::Test {
   }
 
   bool ParseAndCompareVariantLists(
-      iree::span<const std::string> expected_strings,
+      iree_string_view_t cconv, iree::span<const std::string> expected_strings,
       iree::span<const std::string> actual_strings, std::string* out_string) {
     vm::ref<iree_vm_list_t> expected_list;
-    ParseToVariantList(/*device=*/NULL, device_allocator_, expected_strings,
-                       host_allocator_, &expected_list);
+    ParseToVariantList(/*device=*/NULL, device_allocator_, cconv,
+                       expected_strings, host_allocator_, &expected_list);
 
     vm::ref<iree_vm_list_t> actual_list;
-    ParseToVariantList(/*device=*/NULL, device_allocator_, actual_strings,
-                       host_allocator_, &actual_list);
+    ParseToVariantList(/*device=*/NULL, device_allocator_, cconv,
+                       actual_strings, host_allocator_, &actual_list);
 
     iree_string_builder_t builder;
     iree_string_builder_initialize(host_allocator_, &builder);
@@ -82,7 +85,8 @@ TEST_F(ComparisonTest, CompareEqualLists) {
   std::string buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
   auto buf_strings = std::vector<std::string>{buf_string1, buf_string2};
   std::string result;
-  EXPECT_TRUE(ParseAndCompareVariantLists(buf_strings, buf_strings, &result));
+  EXPECT_TRUE(ParseAndCompareVariantLists(IREE_SV("rr"), buf_strings,
+                                          buf_strings, &result));
   EXPECT_EQ(result, "");
 }
 
@@ -94,8 +98,8 @@ TEST_F(ComparisonTest, CompareListsWithIgnored) {
   auto expected_strings =
       std::vector<std::string>{buf_string1, buf_string2_ignored};
   std::string result;
-  EXPECT_TRUE(
-      ParseAndCompareVariantLists(expected_strings, actual_strings, &result));
+  EXPECT_TRUE(ParseAndCompareVariantLists(IREE_SV("rr"), expected_strings,
+                                          actual_strings, &result));
   EXPECT_EQ(result, "");
 }
 
@@ -105,8 +109,8 @@ TEST_F(ComparisonTest, CompareTruncatedLists) {
   auto actual_strings = std::vector<std::string>{buf_string1, buf_string2};
   auto expected_strings = std::vector<std::string>{buf_string1};
   std::string result;
-  EXPECT_FALSE(
-      ParseAndCompareVariantLists(expected_strings, actual_strings, &result));
+  EXPECT_FALSE(ParseAndCompareVariantLists(IREE_SV("rr"), expected_strings,
+                                           actual_strings, &result));
   EXPECT_THAT(result, HasSubstr("expected 1 list elements but 2 provided"));
 }
 
@@ -118,8 +122,8 @@ TEST_F(ComparisonTest, CompareDifferingLists) {
   auto expected_strings =
       std::vector<std::string>{buf_string1, buf_string2_good};
   std::string result;
-  EXPECT_FALSE(
-      ParseAndCompareVariantLists(expected_strings, actual_strings, &result));
+  EXPECT_FALSE(ParseAndCompareVariantLists(IREE_SV("rr"), expected_strings,
+                                           actual_strings, &result));
   EXPECT_THAT(
       result,
       HasSubstr("element at index 2 (999) does not match the expected (3)"));
@@ -127,15 +131,17 @@ TEST_F(ComparisonTest, CompareDifferingLists) {
 
 TEST_F(ComparisonTest, CompareListsWithDifferingTypes) {
   std::string buf_string1 = "2x2xi32=[42 43][44 45]";
-  std::string buf_string2 = "123";
+  std::string buf_string2 = "2xi32";
   std::string buf_string2_good = "2x3xf64=[1 2 3][4 5 6]";
   auto actual_strings = std::vector<std::string>{buf_string1, buf_string2};
   auto expected_strings =
       std::vector<std::string>{buf_string1, buf_string2_good};
   std::string result;
-  EXPECT_FALSE(
-      ParseAndCompareVariantLists(expected_strings, actual_strings, &result));
-  EXPECT_THAT(result, HasSubstr("variant types mismatch"));
+  EXPECT_FALSE(ParseAndCompareVariantLists(IREE_SV("rr"), expected_strings,
+                                           actual_strings, &result));
+  EXPECT_THAT(
+      result,
+      HasSubstr("metadata is 2xi32; expected that the view matches 2x3xf64"));
 }
 
 }  // namespace

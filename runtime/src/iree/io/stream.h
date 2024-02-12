@@ -83,12 +83,12 @@ iree_io_stream_length(iree_io_stream_t* stream);
 // When at the end of stream reads will fail and writes will append.
 IREE_API_EXPORT bool iree_io_stream_is_eos(iree_io_stream_t* stream);
 
-// Seeks within |stream| to |offset| based on the given |seek_mode|.
+// Seeks within |stream| to |seek_offset| based on the given |seek_mode|.
 // If IREE_IO_STREAM_MODE_SEEKABLE is not set then only forward relative seeks
 // are supported.
 IREE_API_EXPORT iree_status_t iree_io_stream_seek(
     iree_io_stream_t* stream, iree_io_stream_seek_mode_t seek_mode,
-    iree_io_stream_pos_t offset);
+    iree_io_stream_pos_t seek_offset);
 
 // Seeks within |stream| to the next offset with the specified |alignment|.
 // The alignment is expected to be a power-of-two value.
@@ -112,6 +112,16 @@ iree_io_stream_read(iree_io_stream_t* stream, iree_host_size_t buffer_capacity,
 IREE_API_EXPORT iree_status_t
 iree_io_stream_write(iree_io_stream_t* stream, iree_host_size_t buffer_length,
                      const void* buffer);
+
+// Writes a single character/byte to the stream.
+// Requires the stream have IREE_IO_STREAM_MODE_WRITABLE.
+IREE_API_EXPORT iree_status_t
+iree_io_stream_write_char(iree_io_stream_t* stream, char c);
+
+// Writes a string view to the stream (excluding NUL terminator).
+// Requires the stream have IREE_IO_STREAM_MODE_WRITABLE.
+IREE_API_EXPORT iree_status_t
+iree_io_stream_write_string(iree_io_stream_t* stream, iree_string_view_t value);
 
 // Writes |count| elements of |pattern_length| with the given |pattern| value.
 // Requires the stream have IREE_IO_STREAM_MODE_WRITABLE.
@@ -155,7 +165,7 @@ typedef struct iree_io_stream_vtable_t {
   iree_io_stream_pos_t(IREE_API_PTR* length)(iree_io_stream_t* stream);
   iree_status_t(IREE_API_PTR* seek)(iree_io_stream_t* stream,
                                     iree_io_stream_seek_mode_t seek_mode,
-                                    iree_io_stream_pos_t offset);
+                                    iree_io_stream_pos_t seek_offset);
   iree_status_t(IREE_API_PTR* read)(iree_io_stream_t* stream,
                                     iree_host_size_t buffer_capacity,
                                     void* buffer,
@@ -180,46 +190,6 @@ struct iree_io_stream_t {
   const iree_io_stream_vtable_t* vtable;
   iree_io_stream_mode_t mode;
 };
-
-//===----------------------------------------------------------------------===//
-// iree_io_memory_stream_t
-//===----------------------------------------------------------------------===//
-
-typedef void(IREE_API_PTR* iree_io_memory_stream_release_fn_t)(
-    void* user_data, iree_io_stream_t* stream);
-
-// A callback issued when a memory stream is released.
-typedef struct {
-  // Callback function pointer.
-  iree_io_memory_stream_release_fn_t fn;
-  // User data passed to the callback function. Unowned.
-  void* user_data;
-} iree_io_memory_stream_release_callback_t;
-
-// Returns a no-op file release callback that implies that no cleanup is
-// required.
-static inline iree_io_memory_stream_release_callback_t
-iree_io_memory_stream_release_callback_null(void) {
-  iree_io_memory_stream_release_callback_t callback = {NULL, NULL};
-  return callback;
-}
-
-// Wraps a fixed-size host memory allocation |contents| in a stream.
-// |release_callback| can be used to receive a callback when the stream is
-// destroyed and the reference to the contents is no longer required.
-IREE_API_EXPORT iree_status_t iree_io_memory_stream_wrap(
-    iree_io_stream_mode_t mode, iree_byte_span_t contents,
-    iree_io_memory_stream_release_callback_t release_callback,
-    iree_allocator_t host_allocator, iree_io_stream_t** out_stream);
-
-//===----------------------------------------------------------------------===//
-// iree_io_buffer_stream_t
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): buffer stream that grows with a specified block size. Provide
-// a iree_io_buffer_stream_enumerate_data_blocks(stream, callback) to enumerate
-// the blocks in order (ala iovecs). Take an iree_allocator_t dedicated to the
-// block storage separate from the iree_io_stream_t metadata.
 
 #ifdef __cplusplus
 }  // extern "C"

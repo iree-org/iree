@@ -7,6 +7,7 @@
 #include "iree/io/file_handle.h"
 
 #include "iree/base/internal/atomics.h"
+#include "iree/io/memory_stream.h"
 
 //===----------------------------------------------------------------------===//
 // iree_io_file_handle_t

@@ -106,6 +106,9 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT char* iree_string_builder_take_storage(
 IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
     iree_string_builder_t* builder, iree_host_size_t minimum_capacity);
 
+// Resets the string builder length to 0 without releasing storage.
+IREE_API_EXPORT void iree_string_builder_reset(iree_string_builder_t* builder);
+
 // Reserves storage for |count| characters (including NUL) and returns a mutable
 // pointer in |out_head| for the caller to write the characters.
 // The pointer is only valid so long as the string builder is initialized and
