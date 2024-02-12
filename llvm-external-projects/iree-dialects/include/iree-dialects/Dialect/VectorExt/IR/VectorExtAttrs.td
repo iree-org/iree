@@ -102,41 +102,61 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
 def NestedAttr : IREEVectorExt_Attr<"Nested",
       [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
   let mnemonic = "nested";
-  let summary = [{A layout representing how a GPU thread hierarchy is distributed over a shape}];
+  let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape}];
   let description = [{
-    This layout explicitly defines how a shape is distributed over a tile
-    heirarchy. We consider the following levels of hierarchy:
+    This layout explicitly defines how a shape is mapped to a compute
+    hierarchy. We consider the following levels of hierarchy, inspired by GPUs:
 
     1. Subgroups per Workgroup
     2. Threads per Subgroup
     3. Elements per Thread
 
-    Each level of heirarchy represents a tile over the next level of
-    heirarchy, except the last level, which represents elements. The tiling is
-    done on each dimension of the original vector shape. For example, for a
-    shape <16x16x16>, the tiles are 3-D. For a shape <32x32>, the tiles are
-    2-D.
+    Conceptually, each higher level of hierarchy can be viewed as multiple
+    tiles of the lower level of hierarchy; each lower level of hierarchy is
+    nested in the higher level of hierarchy. The last level represents the
+    final elements in memory.
 
-    We now describe each level of tiling:
+    The conceptual mapping is leveraged during compilation for tiling and
+    distributing to hardware for parallel computation. Concretely, the mapping
+    is done on each dimension of the original vector shape. For example, for
+    vector shape 16x16x16, we have 3 dimensions, so at each level of the
+    hierarchy we would have 3 tile sizes. Similarly for vector shape 32x32, we
+    would have 2-D tile sizes per compute hierarchy level.
+
+    We now describe each level of tiling. Each level of tiling represents a
+    count of tiles over the next level (rather than a list of tile sizes) and
+    an ordering over the tiles:
 
     1. Subgroups per Workgroup
 
-    This level of tiling is also known as "warp distribution". It represents
-    how subgroups are distributed over a workgroup. The total number of
-    subgroups are expected to be equal to the workgroup size of the GPU.
+    This level of tiling is also known as "subgroup/warp distribution". It
+    represents how subgroups are distributed in a workgroup. 
 
-    The subgroups are placed contigiously with their shape and ordering
+    The subgroups are placed contiguously with their shape and ordering
     determined by:
       - `subgroups_per_workgroup`: Sizes of this level of tiling
       - `subgroup_order`: Ordering of dimensions, from outermost to innermost
 
-    For example, subgroups_per_workgroup=[4, 2], subgroup_order=[0, 1] will
+    For example, subgroups_per_workgroup=[4, 2], subgroup_order=[1, 0] will
     arrange the subgroups in the order:
 
     0 4
     1 5
     2 6
     3 7
+
+    The total number of subgroups used (computed by multiplying each dim in
+    subgroups_per_workgroup) should be a multiple of number of subgroups in the
+    harware. If the total number of subgroups used exceeds the number of
+    subgroups of the hardware, then the subgroup used (say x) is 
+    x mod num_subgroups:
+
+    num_subgroups = 4
+
+    0 4               0 0
+    1 5    x mod 4    1 1
+    2 6    ------->   2 2
+    3 7               3 3
 
     2. Threads per Subgroup:
 
@@ -215,6 +235,18 @@ def NestedAttr : IREEVectorExt_Attr<"Nested",
     [1 3 1 3]
     [0 2 0 2]
     [1 3 1 3]
+
+    The total number of threads used (computed by multiplying each dim in
+    threads_per_outer) should be a multiple of subgroup size of the
+    harware. If the total number of threads used exceeds the subgroup size of
+    the hardware, then the threads used (say tid) is tid mod subgroup_size:
+
+    subgroup_size = 4
+
+    0 1                0 0
+    2 3    tid mod 4   1 1
+    4 5    -------->   2 2
+    6 7                3 3
 
     3. Elements per Thread
 
