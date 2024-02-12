@@ -76,6 +76,9 @@ Three wait cases are supported:
   * timeout: Relative nanoseconds to wait.
   * deadine: Absolute nanoseconds to wait.
   * Neither: Waits for infinite time.
+
+Returns whether the wait succeeded (True) or timed out (False). If the fence was
+asynchronously failed, an exception is raised.
 )";
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -1227,13 +1230,30 @@ void SetupHalBindings(nanobind::module_ m) {
               py::gil_scoped_release release;
               status = iree_hal_fence_wait(self.raw_ptr(), t);
             }
-            CheckApiStatus(status, "waiting for fence");
+            if (iree_status_is_deadline_exceeded(status)) {
+              // Time out.
+              return false;
+            } else if (iree_status_is_aborted(status)) {
+              // Synchronous failure.
+              iree_status_ignore(status);
+              status = iree_hal_fence_query(self.raw_ptr());
+              if (iree_status_is_ok(status)) {
+                status = iree_make_status(
+                    IREE_STATUS_FAILED_PRECONDITION,
+                    "expected synchronous status failure missing");
+              }
+              CheckApiStatus(status, "synchronous fence failure");
+            } else {
+              // General failure check.
+              CheckApiStatus(status, "waiting for fence");
+            }
 
+            // Asynchronous failure.
             status = iree_hal_fence_query(self.raw_ptr());
             if (iree_status_is_deferred(status)) {
               return false;
             }
-            CheckApiStatus(status, "asynchronous fence exception");
+            CheckApiStatus(status, "asynchronous fence failure");
             return true;
           },
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
