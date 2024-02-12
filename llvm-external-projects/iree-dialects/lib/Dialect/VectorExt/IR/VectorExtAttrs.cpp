@@ -212,7 +212,7 @@ bool NestedAttr::isValidLayout(ArrayRef<int64_t> shape) const {
   for (int i = 0, e = shape.size(); i < e; ++i) {
     int64_t expectedShape =
         getSubgroupsPerWorkgroup()[i] * getBatchesPerSubgroup()[i] *
-        getDuplicatesPerBatch()[i] * getThreadsPerDuplicate()[i] *
+        getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
         getElementsPerThread()[i];
     if (expectedShape != shape[i]) {
       return false;
@@ -227,14 +227,14 @@ LogicalResult NestedAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
     ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
-    ArrayRef<int64_t> duplicatesPerBatch, ArrayRef<int64_t> duplicateOrder,
-    ArrayRef<int64_t> threadsPerDuplicate, ArrayRef<int64_t> threadOrder,
+    ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
+    ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
     ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
   // Everything should have the same rank.
   unsigned rank = subgroupsPerWorkgroup.size();
   if (subgroupOrder.size() != rank || batchesPerSubgroup.size() != rank ||
-      batchOrder.size() != rank || duplicatesPerBatch.size() != rank ||
-      duplicateOrder.size() != rank || threadsPerDuplicate.size() != rank ||
+      batchOrder.size() != rank || outersPerBatch.size() != rank ||
+      outerOrder.size() != rank || threadsPerOuter.size() != rank ||
       threadOrder.size() != rank || elementsPerThread.size() != rank ||
       elementOrder.size() != rank) {
     emitError() << "all layout arrays must have the same rank";
@@ -244,8 +244,8 @@ LogicalResult NestedAttr::verify(
   // Shapes must not be zero or negative.
   if (llvm::any_of(subgroupsPerWorkgroup, [](int64_t v) { return v <= 0; }) ||
       llvm::any_of(batchesPerSubgroup, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(duplicatesPerBatch, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(threadsPerDuplicate, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(outersPerBatch, [](int64_t v) { return v <= 0; }) ||
+      llvm::any_of(threadsPerOuter, [](int64_t v) { return v <= 0; }) ||
       llvm::any_of(elementsPerThread, [](int64_t v) { return v <= 0; })) {
     emitError() << "all layout array values must be positive";
     return failure();
@@ -268,7 +268,7 @@ LogicalResult NestedAttr::verify(
 
   if (failed(checkOrder(subgroupOrder, "subgroup order")) ||
       failed(checkOrder(batchOrder, "batch order")) ||
-      failed(checkOrder(duplicateOrder, "duplicate order")) ||
+      failed(checkOrder(outerOrder, "outer order")) ||
       failed(checkOrder(threadOrder, "thread order")) ||
       failed(checkOrder(elementOrder, "element order"))) {
     return failure();

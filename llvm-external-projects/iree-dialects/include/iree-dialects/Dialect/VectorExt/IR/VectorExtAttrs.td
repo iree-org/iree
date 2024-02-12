@@ -156,36 +156,36 @@ def NestedAttr : IREEVectorExt_Attr<"Nested",
       - batches_per_subgroup: Ranges of each loop
       - batch_order: Ordering of each loop, from outermost to innermost
 
-    The second level, duplicates, are a way to represent thread duplication
+    The second level, outers, is a way to represent thread layout duplication
     required by a particular intrinsic. For example, some AMDGPU matrix
     multiplication variants require threads to be distributed
     like:
 
     0 1 2 3 4
     5 6 7 8 9
-    --------- --> Duplicates of shape 2x5 distributed over a batch of size 4x5.
-    0 1 2 3 4
-    5 6 7 8 9
+    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5 
+    0 1 2 3 4     outers_per_batch=[2, 1]
+    5 6 7 8 9     threads_per_outer=[2, 5]
 
-    Duplicates are represented using two attributes:
-      - duplicates_per_batch: Number of duplicates in a batch
-      - duplicate_order: Ordering of duplicates, from outermost to innermost
+    Outers is represented using two attributes:
+      - outers_per_batch: Number of outers in a batch
+      - outer_order: Ordering of outers, from outermost to innermost
 
-    Finally, threads are distributed in a single duplicate. The thread
+    Finally, threads are distributed in a single outer. The thread
     distribution is represented by:
 
-      - threads_per_duplicate: Sizes of this level of tiling
+      - threads_per_outer: Sizes of this level of tiling
       - thread_order: Ordering of dimensions, from outermost to innermost
 
     Examples of thread distribution over a 8x4 shape:
 
     {
       batches_per_subgroup = [2, 1]
-      duplicates_per_batch = [2, 2]
-      threads_per_duplicate = [2, 2]
+      outers_per_batch = [2, 2]
+      threads_per_outer = [2, 2]
 
       batch_order = [0, 1]
-      duplicate_order = [0, 1]
+      outer_order = [0, 1]
       thread_order = [1, 0]
     }
 
@@ -194,7 +194,7 @@ def NestedAttr : IREEVectorExt_Attr<"Nested",
     {
       [0 2]|[0 2]      0,1,2,3 --> thread ids
       [1 3]|[1 3]      
-      ------------     [x z]   --> a single duplicate tile
+      ------------     [x z]   --> a single outer tile
       [0 2]|[0 2]      [y w]
       [1 3]|[1 3]
     }{
@@ -234,10 +234,10 @@ def NestedAttr : IREEVectorExt_Attr<"Nested",
     ArrayRefParameter<"int64_t", "batches_per_subgroup">:$batchesPerSubgroup,
     ArrayRefParameter<"int64_t", "batch_order">:$batchOrder,
 
-    ArrayRefParameter<"int64_t", "duplicates_per_batch">:$duplicatesPerBatch,
-    ArrayRefParameter<"int64_t", "duplicate_order">:$duplicateOrder,
+    ArrayRefParameter<"int64_t", "outers_per_batch">:$outersPerBatch,
+    ArrayRefParameter<"int64_t", "outer_order">:$outerOrder,
 
-    ArrayRefParameter<"int64_t", "threads_per_duplicate">:$threadsPerDuplicate,
+    ArrayRefParameter<"int64_t", "threads_per_outer">:$threadsPerOuter,
     ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
 
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
@@ -249,13 +249,13 @@ def NestedAttr : IREEVectorExt_Attr<"Nested",
   let assemblyFormat = [{
     `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
         `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
-        `duplicates_per_batch`    `=` `[` $duplicatesPerBatch `]` `,`
-        `threads_per_duplicate`   `=` `[` $threadsPerDuplicate `]` `,`
+        `outers_per_batch`        `=` `[` $outersPerBatch `]` `,`
+        `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
         `subgroup_order`          `=` `[` $subgroupOrder `]` `,`
         `batch_order`             `=` `[` $batchOrder `]` `,`
-        `duplicate_order`         `=` `[` $duplicateOrder `]` `,`
+        `outer_order`             `=` `[` $outerOrder `]` `,`
         `thread_order`            `=` `[` $threadOrder `]` `,`
         `element_order`           `=` `[` $elementOrder `]` 
     `>`
