@@ -42,6 +42,50 @@ func.func @SinkSplatsToConsumers(
 
 // -----
 
+// CHECK-LABEL: @SinkSplatsToCommonAncestorOfConsumersInRegions
+func.func @SinkSplatsToCommonAncestorOfConsumersInRegions(%arg0: i1) -> (!stream.resource<*>, !stream.resource<*>) {
+  // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+  %c0 = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  %c2 = arith.constant 2 : index
+  // CHECK-DAG: %[[C3:.+]] = arith.constant 3 : index
+  %c3 = arith.constant 3 : index
+  // CHECK-DAG: %[[C100:.+]] = arith.constant 100 : index
+  %c100 = arith.constant 100 : index
+  // CHECK-DAG: %[[C123:.+]] = arith.constant 123 : i32
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-DAG: %[[C456:.+]] = arith.constant 456 : i32
+  %c456_i32 = arith.constant 456 : i32
+  // CHECK-DAG: %[[C789:.+]] = arith.constant 789 : i32
+  %c789_i32 = arith.constant 789 : i32
+  // CHECK-NOT: stream.async.splat %[[C123]]
+  // CHECK-NOT: stream.async.splat %[[C456]]
+  %0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%c100}
+  %1 = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%c100}
+  // CHECK: %[[SPLAT3:.+]] = stream.async.splat %[[C789]]
+  %2 = stream.async.splat %c789_i32 : i32 -> !stream.resource<*>{%c100}
+  // CHECK: stream.async.dispatch @executable::@dispatch2[%[[C1]], %[[C2]], %[[C3]]](%[[SPLAT3]][%[[C0]] to %[[C100]] for %[[C100]]])
+  %3 = stream.async.dispatch @executable::@dispatch2[%c1, %c2, %c3](%2[%c0 to %c100 for %c100]) : (!stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+  // CHECK-DAG: %[[SPLAT1:.+]] = stream.async.splat %[[C123]]
+  // CHECK-DAG: %[[SPLAT2:.+]] = stream.async.splat %[[C456]]
+  // CHECK-NEXT: scf.if
+  %4 = scf.if %arg0 -> (!stream.resource<*>) {
+    // CHECK: stream.async.dispatch @executable::@dispatch0[%[[C1]], %[[C2]], %[[C3]]](%[[SPLAT1]][%[[C0]] to %[[C100]] for %[[C100]]], %[[SPLAT2]][%[[C0]] to %[[C100]] for %[[C100]]])
+    %5 = stream.async.dispatch @executable::@dispatch0[%c1, %c2, %c3](%0[%c0 to %c100 for %c100], %1[%c0 to %c100 for %c100]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+    scf.yield %5 : !stream.resource<*>
+  // CHECK: else
+  } else {
+    // CHECK: stream.async.dispatch @executable::@dispatch1[%[[C1]], %[[C2]], %[[C3]]](%[[SPLAT1]][%[[C0]] to %[[C100]] for %[[C100]]], %[[SPLAT2]][%[[C0]] to %[[C100]] for %[[C100]]])
+    %6 = stream.async.dispatch @executable::@dispatch1[%c1, %c2, %c3](%0[%c0 to %c100 for %c100], %1[%c0 to %c100 for %c100]) : (!stream.resource<*>{%c100}, !stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+    scf.yield %6 : !stream.resource<*>
+  }
+  return %4, %3 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @SplatAlreadyAtSinkLocation
 func.func @SplatAlreadyAtSinkLocation(
   %arg0: i1, %arg1: i1,

@@ -234,7 +234,12 @@ static bool canStablySinkTo(Operation *toBeSunkOp, Operation *targetOp) {
   // that if `targetOp` is not a terminator, then we can prune the set of
   // sinkable ops that might fight with `toBeSunkOp` more aggressively by using
   // use-def chains.
-  bool allowUseDefPruning = !targetOp->hasTrait<mlir::OpTrait::IsTerminator>();
+  // The use-def chains check below doesn't detect implicit captures (which can
+  // be heavy to check) so we also ignore `targetOp` with regions. This can be
+  // relexed if needed.
+  bool allowUseDefPruning =
+      !targetOp->hasTrait<mlir::OpTrait::IsTerminator>() &&
+      targetOp->getNumRegions() == 0;
 
   // If the sinking operation would be a no-op, then we need to prevent
   // the sinking operation, to avoid infinite pattern applications.
@@ -1406,9 +1411,13 @@ struct SinkAllocaLikeOpToConsumers : public OpRewritePattern<Op> {
     // can sink down to it.
     Operation *firstUserInDominator = commonDominator->getTerminator();
     for (auto user : users) {
-      if (user->getBlock() == commonDominator) {
-        if (user->isBeforeInBlock(firstUserInDominator)) {
-          firstUserInDominator = user;
+      for (auto ancestor = user; ancestor != commonDominator->getParentOp();
+           ancestor = ancestor->getParentOp()) {
+        if (ancestor->getBlock() == commonDominator) {
+          if (ancestor->isBeforeInBlock(firstUserInDominator)) {
+            firstUserInDominator = ancestor;
+          }
+          break;
         }
       }
     }
