@@ -246,6 +246,13 @@ class DeviceHalTest(unittest.TestCase):
         sem.signal(1)
         self.assertTrue(fence.wait(deadline=0))
 
+    def testFenceSignal(self):
+        sem = self.device.create_semaphore(0)
+        fence = iree.runtime.HalFence.create_at(sem, 1)
+        self.assertFalse(fence.wait(deadline=0))
+        fence.signal()
+        self.assertTrue(fence.wait(deadline=0))
+
     def testSynchronousFenceFailed(self):
         sem = self.device.create_semaphore(0)
         fence = iree.runtime.HalFence.create_at(sem, 1)
