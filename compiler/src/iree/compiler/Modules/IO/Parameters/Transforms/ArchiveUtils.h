@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_COMPILER_MODULES_IO_PARAMETERS_TRANSFORMS_ARCHIVEUTILS_H_
+#define IREE_COMPILER_MODULES_IO_PARAMETERS_TRANSFORMS_ARCHIVEUTILS_H_
+
 #include "iree/base/api.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/tooling/parameter_util.h"
@@ -49,3 +52,5 @@ writeParameterIndex(Operation *op, iree_allocator_t allocator,
                     iree_io_parameter_index_t **output_built_index);
 
 } // namespace mlir::iree_compiler::IREE::IO::Parameters
+
+#endif // IREE_COMPILER_MODULES_IO_PARAMETERS_TRANSFORMS_ARCHIVEUTILS_H_

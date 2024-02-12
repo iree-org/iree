@@ -8,7 +8,7 @@
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/tooling/parameter_util.h"
 
-#include "iree/compiler/Modules/IO/Parameters/Transforms/RuntimeUtils.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/ArchiveUtils.h"
 #include "llvm/Support/FileOutputBuffer.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
