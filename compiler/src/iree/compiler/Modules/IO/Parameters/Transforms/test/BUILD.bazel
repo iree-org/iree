@@ -17,7 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "export_parameters.mlir",
-            "generate_splat_paramter_archive.mlir",
+            "generate_splat_parameter_archive.mlir",
         ],
         include = ["*.mlir"],
     ),
