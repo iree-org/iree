@@ -235,6 +235,9 @@ static bool canStablySinkTo(Operation *toBeSunkOp, Operation *targetOp) {
   // that if `targetOp` is not a terminator, then we can prune the set of
   // sinkable ops that might fight with `toBeSunkOp` more aggressively by using
   // use-def chains.
+  // The use-def chains check below doesn't detect implicit captures (which can
+  // be heavy to check) so we also ignore `targetOp` with regions. This can be
+  // relexed if needed.
   bool allowUseDefPruning =
       !targetOp->hasTrait<mlir::OpTrait::IsTerminator>() &&
       targetOp->getNumRegions() == 0;
