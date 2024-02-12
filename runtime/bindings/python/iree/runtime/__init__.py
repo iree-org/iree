@@ -51,6 +51,7 @@ from ._binding import (
     VmInstance,
     VmContext,
     VmModule,
+    VmRef,
 )
 
 from .array_interop import *
