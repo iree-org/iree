@@ -23,8 +23,8 @@ iree_lit_test_suite(
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
-        "//tools:iree-opt",
         "//tools:iree-dump-parameters",
+        "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
 )

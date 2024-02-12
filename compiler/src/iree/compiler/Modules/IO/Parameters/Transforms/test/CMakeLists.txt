@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "generate_splat_archive.mlir"
   TOOLS
     FileCheck
+    iree-dump-parameters
     iree-opt
 )
 
