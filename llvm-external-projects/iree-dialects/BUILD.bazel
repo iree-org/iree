@@ -733,6 +733,7 @@ cc_library(
         ":IREEVectorExtIncGen",
         ":IREEVectorExtInterfacesIncGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
     ],
 )
