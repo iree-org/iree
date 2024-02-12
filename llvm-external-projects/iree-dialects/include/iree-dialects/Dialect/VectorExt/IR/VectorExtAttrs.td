@@ -99,7 +99,7 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   }];
 }
 
-def NestedAttr : IREEVectorExt_Attr<"Nested",
+def NestedLayoutAttr : IREEVectorExt_Attr<"Nested",
       [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
   let mnemonic = "nested";
   let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape}];
