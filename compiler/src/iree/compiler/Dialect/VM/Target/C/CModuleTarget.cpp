@@ -105,29 +105,6 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-mlir::ModuleOp convertModule(IREE::VM::ModuleOp module) {
-  auto ctx = module.getContext();
-  Location loc = module.getLoc();
-
-  OpBuilder builder(ctx);
-
-  auto mlirModule = builder.create<mlir::ModuleOp>(loc, module.getName());
-
-  /// Move the blocks that belong to "region" before the given position in
-  /// another region.  The two regions must be different.  The caller is in
-  /// charge to update create the operation transferring the control flow to the
-  /// region and pass it the correct block arguments.
-  Region &region = module.getBodyRegion();
-  Region &parent = mlirModule.getBodyRegion();
-  Region::iterator before = parent.begin();
-  parent.getBlocks().splice(before, region.getBlocks());
-
-  auto terminator =
-      mlirModule.getBodyRegion().getBlocks().front().getTerminator();
-  terminator->erase();
-  return mlirModule;
-}
-
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
                                  CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
@@ -137,8 +114,12 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return moduleOp.emitError()
            << "failed to canonicalize vm.module to a serializable form";
   }
-
-  mlir::ModuleOp mlirModule = convertModule(moduleOp);
+  auto innerModules = moduleOp.getOps<mlir::ModuleOp>();
+  if (innerModules.empty()) {
+    return moduleOp.emitError()
+           << "vm module does not contain an inner builtin.module op";
+  }
+  mlir::ModuleOp mlirModule = *innerModules.begin();
 
   if (targetOptions.outputFormat == COutputFormat::kMlirText) {
     // Use the standard MLIR text printer.

@@ -1473,6 +1473,23 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     op->erase();
   }
 
+  // create builtin.module
+  builder.setInsertionPointToStart(&moduleOp.getBlock());
+  auto innerModule = builder.create<mlir::ModuleOp>(loc);
+
+  IRRewriter rewriter(moduleOp.getContext());
+
+  for (Operation &op : llvm::make_early_inc_range(moduleOp.getBlock())) {
+    if (&op == innerModule.getOperation()) {
+      continue;
+    }
+    if (isa<IREE::VM::ModuleTerminatorOp>(op)) {
+      continue;
+    }
+    rewriter.moveOpBefore(&op, innerModule.getBody(),
+                          innerModule.getBody()->end());
+  }
+
   return success();
 }
 
