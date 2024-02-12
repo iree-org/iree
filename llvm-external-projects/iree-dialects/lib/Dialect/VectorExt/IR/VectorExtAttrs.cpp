@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <numeric>
@@ -193,6 +194,68 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
     break;
   }
   return offset;
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
+  llvm_unreachable("Not yet implemented");
+}
+
+VectorLayoutInterface
+NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
+  llvm_unreachable("Not yet implemented");
+}
+
+SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
+  llvm_unreachable("Not yet implemented");
+}
+
+bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
+  // Multiply all shapes in the layout.
+  for (int i = 0, e = shape.size(); i < e; ++i) {
+    int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
+                            getBatchesPerSubgroup()[i] *
+                            getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
+                            getElementsPerThread()[i];
+    if (expectedShape != shape[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// TODO: These things should ideally go into the parser when we have a custom
+// parser.
+LogicalResult NestedLayoutAttr::verify(
+    llvm::function_ref<InFlightDiagnostic()> emitError,
+    ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
+    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
+    ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
+    ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
+
+  size_t rank = subgroupsPerWorkgroup.size();
+  auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
+    if (tileShape.size() != rank || order.size() != rank) {
+      emitError() << "all tiles must have the same rank as the layout";
+      return failure();
+    }
+    if (!mlir::isPermutationVector(order)) {
+      emitError() << "all orderings must be permutation vectors";
+      return failure();
+    }
+    return success();
+  };
+
+  if (failed(checkTile(subgroupsPerWorkgroup, subgroupOrder)) ||
+      failed(checkTile(batchesPerSubgroup, batchOrder)) ||
+      failed(checkTile(outersPerBatch, outerOrder)) ||
+      failed(checkTile(threadsPerOuter, threadOrder)) ||
+      failed(checkTile(elementsPerThread, elementOrder))) {
+    return failure();
+  }
+
+  return success();
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
