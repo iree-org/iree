@@ -27,8 +27,8 @@ struct IREEVectorExtDialectOpAsmInterface : public OpAsmDialectInterface {
       os << "layout";
       return AliasResult::OverridableAlias;
     }
-    if (llvm::isa<LayoutV2Attr>(attr)) {
-      os << "layoutv2";
+    if (llvm::isa<NestedAttr>(attr)) {
+      os << "nested";
       return AliasResult::OverridableAlias;
     }
     return AliasResult::NoAlias;

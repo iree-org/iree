@@ -99,9 +99,9 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   }];
 }
 
-def LayoutV2Attr : IREEVectorExt_Attr<"LayoutV2",
+def NestedAttr : IREEVectorExt_Attr<"Nested",
       [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
-  let mnemonic = "layoutv2";
+  let mnemonic = "nested";
   let summary = [{A layout representing how a GPU thread hierarchy is distributed over a shape}];
   let description = [{
     This layout explicitly defines how a shape is distributed over a tile

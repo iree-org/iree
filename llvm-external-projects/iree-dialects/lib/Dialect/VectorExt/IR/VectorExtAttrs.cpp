@@ -196,20 +196,20 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
 }
 
 VectorLayoutInterface
-LayoutV2Attr::project(ArrayRef<bool> projectedDims) const {
+NestedAttr::project(ArrayRef<bool> projectedDims) const {
   llvm_unreachable("Not yet implemented");
 }
 
 VectorLayoutInterface
-LayoutV2Attr::permute(ArrayRef<int64_t> permutation) const {
+NestedAttr::permute(ArrayRef<int64_t> permutation) const {
   llvm_unreachable("Not yet implemented");
 }
 
-SmallVector<int64_t> LayoutV2Attr::getDistributedShape() const {
+SmallVector<int64_t> NestedAttr::getDistributedShape() const {
   llvm_unreachable("Not yet implemented");
 }
 
-bool LayoutV2Attr::isValidLayout(ArrayRef<int64_t> shape) const {
+bool NestedAttr::isValidLayout(ArrayRef<int64_t> shape) const {
   // Multiply all shapes in the layout.
   for (int i = 0, e = shape.size(); i < e; ++i) {
     int64_t expectedShape =
@@ -225,7 +225,7 @@ bool LayoutV2Attr::isValidLayout(ArrayRef<int64_t> shape) const {
 
 // TODO: These things should ideally go into the parser when we have a custom
 // parser.
-LogicalResult LayoutV2Attr::verify(
+LogicalResult NestedAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
     ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
