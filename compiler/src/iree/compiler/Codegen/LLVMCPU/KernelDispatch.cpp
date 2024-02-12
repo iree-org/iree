@@ -2196,7 +2196,9 @@ static LogicalResult
 adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                             linalg::GenericOp genericOp,
                             SmallVector<int64_t> &parallelVecTileSizes,
-                            SmallVector<int64_t> &reductionTileSizes) {
+                            SmallVector<int64_t> &reductionTileSizes,
+                            SmallVector<bool> &parallelScalableFlags,
+                            SmallVector<bool> &reductionScalableFlags) {
   auto linalgOpInfo = LinalgOpInfo(genericOp);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   auto targetMLTransInfo =
@@ -2213,7 +2215,9 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
 
-  splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes);
+  splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
+                                 &parallelScalableFlags,
+                                 &reductionScalableFlags);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes,
                                  reductionTileSizes);
   for (auto [pos, tileSize] : llvm::enumerate(vecTileSizes)) {
@@ -2333,6 +2337,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   // [[X1', Z1], [X2', Y2']]
   // which is the final parallel tile sizes for all ops.
   llvm::SmallDenseMap<Operation *, SmallVector<int64_t>> reductionTileSizeMap;
+  llvm::SmallDenseMap<Operation *, SmallVector<bool>>
+      reductionScalableFlagseMap;
   distTileSizes.resize(maxLoopNums);
   parallelVecTileSizes.resize(maxLoopNums);
   bool hasSeenPackOp = false;
@@ -2353,12 +2359,14 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       hasSeenPackOp = true;
     } else if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
       SmallVector<int64_t> reductionTileSizes;
-      if (failed(adjustTileSizesForGenericOp(entryPointFn, genericOp,
-                                             parallelVecTileSizes,
-                                             reductionTileSizes))) {
+      SmallVector<bool> reductionScalableFlags;
+      if (failed(adjustTileSizesForGenericOp(
+              entryPointFn, genericOp, parallelVecTileSizes, reductionTileSizes,
+              parallelVecScalableTileSizes, reductionScalableFlags))) {
         return failure();
       }
       reductionTileSizeMap[op] = reductionTileSizes;
+      reductionScalableFlagseMap[op] = reductionScalableFlags;
     }
   }
 
@@ -2412,48 +2420,66 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       // No scalable tiling for the distribution
       scalableTileFlagsList.push_back(falseVec);
       scalableTileFlagsList.push_back(commonVecScalableTileFlags);
-      TypeSwitch<Operation *>(op)
-          .Case<tensor::PackOp>([&](auto packOp) {
-            // TODO: Handle scalable flags
-            tileSizesList.push_back(zeros);
-            tileSizesList.push_back(innerVecTileSizes);
-            // Scale and permutate the outer dim tiles for pack op.
-            ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
-            ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
-            auto outerDimsPerm = packOp.getOuterDimsPerm();
-            for (auto &tileSizes : tileSizesList) {
-              for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-                if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
-                  continue;
-                tileSizes[pos] = tileSizes[pos] / size;
-              }
-              if (!outerDimsPerm.empty()) {
-                tileSizes.resize(numLoops, 0);
-                applyPermutationToVector(tileSizes, outerDimsPerm);
-              }
-            }
-          })
-          .Default([&](auto) {
-            if (reductionTileSizeMap.contains(op)) {
-              tileSizesList.push_back(reductionTileSizeMap[op]);
-            } else {
-              tileSizesList.push_back(zeros);
-            }
-            // ATM Assume there are no scalable sizes for reduction dims
-            scalableTileFlagsList.push_back(falseVec);
-            // Only copy the inner vector tile sizes on parallel dims.
-            SmallVector<int64_t> vecTileSizes(numLoops, 0);
-            SmallVector<bool> vecScalableTileFlags(numLoops, false);
-            auto iterTypes = cast<TilingInterface>(op).getLoopIteratorTypes();
-            for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
-              if (iterType == utils::IteratorType::parallel) {
-                vecTileSizes[idx] = innerVecTileSizes[idx];
-                vecScalableTileFlags[idx] = innerVecScalableTileFlags[idx];
-              }
-            }
-            tileSizesList.push_back(vecTileSizes);
-            scalableTileFlagsList.push_back(vecScalableTileFlags);
-          });
+      bool setUpOK =
+          TypeSwitch<Operation *, bool>(op)
+              .Case<tensor::PackOp>([&](auto packOp) {
+                for (auto flags :
+                     rootLoweringConfig.getScalableTileFlagVals()) {
+                  // TODO: Handle scalable flags
+                  if (llvm::any_of(flags, [&](bool flag) { return flag; }))
+                    return false;
+                }
+                tileSizesList.push_back(zeros);
+                tileSizesList.push_back(innerVecTileSizes);
+                // Scale and permutate the outer dim tiles for pack op.
+                ArrayRef<int64_t> innerTiles = packOp.getStaticInnerTiles();
+                ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
+                auto outerDimsPerm = packOp.getOuterDimsPerm();
+                for (auto &tileSizes : tileSizesList) {
+                  for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
+                    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
+                      continue;
+                    tileSizes[pos] = tileSizes[pos] / size;
+                  }
+                  if (!outerDimsPerm.empty()) {
+                    tileSizes.resize(numLoops, 0);
+                    applyPermutationToVector(tileSizes, outerDimsPerm);
+                  }
+                }
+
+                return true;
+              })
+              .Default([&](auto) {
+                if (reductionTileSizeMap.contains(op)) {
+                  tileSizesList.push_back(reductionTileSizeMap[op]);
+                  scalableTileFlagsList.push_back(
+                      reductionScalableFlagseMap[op]);
+                } else {
+                  tileSizesList.push_back(zeros);
+                  scalableTileFlagsList.push_back(falseVec);
+                }
+                // Only copy the inner vector tile sizes on parallel dims.
+                SmallVector<int64_t> vecTileSizes(numLoops, 0);
+                SmallVector<bool> vecScalableTileFlags(numLoops, false);
+                auto iterTypes =
+                    cast<TilingInterface>(op).getLoopIteratorTypes();
+                for (auto [idx, iterType] : llvm::enumerate(iterTypes)) {
+                  if (iterType == utils::IteratorType::parallel) {
+                    vecTileSizes[idx] = innerVecTileSizes[idx];
+                    vecScalableTileFlags[idx] = innerVecScalableTileFlags[idx];
+                  }
+                }
+                tileSizesList.push_back(vecTileSizes);
+                scalableTileFlagsList.push_back(vecScalableTileFlags);
+
+                return true;
+              });
+
+      // TODO: (awarzynski) This is effectively tracking the case of
+      // tensor.pack + scalable flags, which is not support ATM (see TODO
+      // above). Remove once that's implemented.
+      if (!setUpOK)
+        return failure();
     }
 
     for (auto &ts : tileSizesList)
