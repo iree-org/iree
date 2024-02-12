@@ -12,10 +12,10 @@
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
-#include "iree/compiler/Dialect/VM/Target/C/CppEmitter.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Target/Cpp/CppEmitter.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::IREE::VM {
@@ -147,7 +147,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return success();
   }
 
-  return emitc::translateToCpp(mlirModule.getOperation(), output, true);
+  return mlir::emitc::translateToCpp(mlirModule.getOperation(), output, true);
 }
 
 LogicalResult translateModuleToC(mlir::ModuleOp outerModuleOp,
