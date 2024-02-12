@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include <numeric>
@@ -210,10 +211,10 @@ SmallVector<int64_t> NestedAttr::getDistributedShape() const {
 bool NestedAttr::isValidLayout(ArrayRef<int64_t> shape) const {
   // Multiply all shapes in the layout.
   for (int i = 0, e = shape.size(); i < e; ++i) {
-    int64_t expectedShape =
-        getSubgroupsPerWorkgroup()[i] * getBatchesPerSubgroup()[i] *
-        getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
-        getElementsPerThread()[i];
+    int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
+                            getBatchesPerSubgroup()[i] *
+                            getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
+                            getElementsPerThread()[i];
     if (expectedShape != shape[i]) {
       return false;
     }
@@ -230,47 +231,25 @@ LogicalResult NestedAttr::verify(
     ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
     ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
-  // Everything should have the same rank.
-  unsigned rank = subgroupsPerWorkgroup.size();
-  if (subgroupOrder.size() != rank || batchesPerSubgroup.size() != rank ||
-      batchOrder.size() != rank || outersPerBatch.size() != rank ||
-      outerOrder.size() != rank || threadsPerOuter.size() != rank ||
-      threadOrder.size() != rank || elementsPerThread.size() != rank ||
-      elementOrder.size() != rank) {
-    emitError() << "all layout arrays must have the same rank";
-    return failure();
-  }
 
-  // Shapes must not be zero or negative.
-  if (llvm::any_of(subgroupsPerWorkgroup, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(batchesPerSubgroup, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(outersPerBatch, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(threadsPerOuter, [](int64_t v) { return v <= 0; }) ||
-      llvm::any_of(elementsPerThread, [](int64_t v) { return v <= 0; })) {
-    emitError() << "all layout array values must be positive";
-    return failure();
-  }
-
-  // Each order array must contain the values 0 to rank-1 exactly once.
-  auto checkOrder = [&](ArrayRef<int64_t> order, StringRef name) {
-    if (llvm::any_of(order, [&](int64_t v) { return v < 0 || v >= rank; })) {
-      emitError() << "all " << name << " values must be in the range [0, "
-                  << rank - 1 << "]";
+  size_t rank = subgroupsPerWorkgroup.size();
+  auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
+    if (tileShape.size() != rank || order.size() != rank) {
+      emitError() << "all tiles must have the same rank as the layout";
       return failure();
     }
-    if (llvm::any_of(llvm::seq<int64_t>(0, rank),
-                     [&](int64_t v) { return llvm::count(order, v) != 1; })) {
-      emitError() << "all " << name << " values must be unique";
+    if (!mlir::isPermutationVector(order)) {
+      emitError() << "all orderings must be permutation vectors";
       return failure();
     }
     return success();
   };
 
-  if (failed(checkOrder(subgroupOrder, "subgroup order")) ||
-      failed(checkOrder(batchOrder, "batch order")) ||
-      failed(checkOrder(outerOrder, "outer order")) ||
-      failed(checkOrder(threadOrder, "thread order")) ||
-      failed(checkOrder(elementOrder, "element order"))) {
+  if (failed(checkTile(subgroupsPerWorkgroup, subgroupOrder)) ||
+      failed(checkTile(batchesPerSubgroup, batchOrder)) ||
+      failed(checkTile(outersPerBatch, outerOrder)) ||
+      failed(checkTile(threadsPerOuter, threadOrder)) ||
+      failed(checkTile(elementsPerThread, elementOrder))) {
     return failure();
   }
 
