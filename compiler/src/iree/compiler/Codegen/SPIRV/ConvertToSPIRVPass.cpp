@@ -203,7 +203,13 @@ getGlobalVarTypeForIndirectBinding(MLIRContext *ctx, uint32_t set,
   auto memberPtr = spirv::PointerType::get(
       placeholderResourceType, spirv::StorageClass::PhysicalStorageBuffer);
   SmallVector<Type> members(maxBinding + 1, memberPtr);
-  auto structType = spirv::StructType::get(members);
+  // We are creating a top-level Block decorated interface type here, it needs
+  // explicit layout per SPIR-V requirements.
+  SmallVector<uint32_t> offsets(maxBinding + 1);
+  for (int i = 0; i < offsets.size(); ++i) {
+    offsets[i] = 8 * i; // Each pointer takes 8 bytes.
+  }
+  auto structType = spirv::StructType::get(members, offsets);
 
   return spirv::PointerType::get(structType,
                                  spirv::StorageClass::StorageBuffer);
