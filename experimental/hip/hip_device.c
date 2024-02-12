@@ -647,7 +647,7 @@ static iree_status_t iree_hal_hip_device_queue_execute(
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_hip_device_queue_flush(
