@@ -196,6 +196,13 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
   return offset;
 }
 
+static SmallVector<int64_t> getPermutedVector(ArrayRef<int64_t> vec,
+                                              ArrayRef<int64_t> permutation) {
+  SmallVector<int64_t> permutedVec(vec);
+  applyPermutationToVector(permutedVec, permutation);
+  return permutedVec;
+}
+
 VectorLayoutInterface
 NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
   llvm_unreachable("Not yet implemented");
@@ -206,8 +213,22 @@ NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   llvm_unreachable("Not yet implemented");
 }
 
+/// We distribute to:
+/// <BATCH x OUTER x ELEMENT>
 SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
-  llvm_unreachable("Not yet implemented");
+  SmallVector<int64_t> shape;
+
+  auto appendTileToShape = [&](ArrayRef<int64_t> tile,
+                               ArrayRef<int64_t> order) {
+    SmallVector<int64_t> permutedTile = getPermutedVector(tile, order);
+    shape.append(permutedTile.begin(), permutedTile.end());
+  };
+
+  appendTileToShape(getBatchesPerSubgroup(), getBatchOrder());
+  appendTileToShape(getOutersPerBatch(), getOuterOrder());
+  appendTileToShape(getElementsPerThread(), getElementOrder());
+
+  return shape;
 }
 
 bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
