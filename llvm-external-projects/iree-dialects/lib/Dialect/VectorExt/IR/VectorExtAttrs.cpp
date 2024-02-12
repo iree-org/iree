@@ -35,7 +35,7 @@ std::optional<int64_t> PerDimLayoutAttr::getShape(const LayoutDimension &dim) {
   return std::nullopt;
 }
 
-std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) {
+std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
   for (PerDimLayoutAttr layout : getLayouts()) {
     std::optional<int64_t> maybeShape = layout.getShape(dim);
     if (maybeShape)
@@ -198,6 +198,22 @@ uint64_t LayoutAttr::getShuffleOffset(int64_t reductionDim) {
     break;
   }
   return offset;
+}
+
+bool LayoutAttr::hasLaneConflictWith(const LayoutAttr &other) {
+  SmallVector<LayoutDimension> laneDims{
+      LayoutDimension::LANEX, LayoutDimension::LANEY, LayoutDimension::LANEZ};
+  for (LayoutDimension dim : laneDims) {
+    std::optional<int64_t> shape = getShape(dim);
+    std::optional<int64_t> otherShape = other.getShape(dim);
+    if ((shape && !otherShape) || (!shape && otherShape))
+      return true;
+    if (shape && otherShape) {
+      if (shape.value() != otherShape.value())
+        return true;
+    }
+  }
+  return false;
 }
 
 VectorLayoutInterface

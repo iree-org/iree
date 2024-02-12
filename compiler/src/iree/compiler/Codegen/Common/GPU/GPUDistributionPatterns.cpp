@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
@@ -702,6 +703,90 @@ struct DistributeBroadcastLayoutAttr final
     });
 
     replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+  }
+};
+
+struct DistributeLayoutConflictResolutions final
+    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  VectorValue reshapeVector(Location loc, RewriterBase &rewriter,
+                            VectorValue src, LayoutAttr &currentLayout,
+                            LayoutAttr &targetLayout, Type elementType) const {
+
+    SmallVector<int64_t> targetShape = targetLayout.getDistributedShape();
+    SmallVector<int64_t> currentShape = currentLayout.getDistributedShape();
+
+    auto newVectorType = VectorType::get(targetShape, elementType);
+    auto constantOp = rewriter.create<arith::ConstantOp>(
+        loc, newVectorType, rewriter.getZeroAttr(newVectorType));
+    auto newVector = dyn_cast<VectorValue>(constantOp.getResult());
+
+    int64_t innermostDim = targetShape.size() - 1;
+    int64_t step =
+        std::min(targetShape[innermostDim], currentShape[innermostDim]);
+    DenseMap<LayoutDimension, int64_t> steps;
+    LayoutDimension vecDim = LayoutDimension::VECTORX;
+    steps[vecDim] = step;
+    LayoutIterator srcIterator(currentLayout, steps);
+    LayoutIterator targetIterator(targetLayout, steps);
+
+    for (; !srcIterator.iterationComplete() &&
+           !targetIterator.iterationComplete();
+         ++srcIterator, ++targetIterator) {
+      SmallVector<int64_t> srcOffset =
+          srcIterator.getState().computeSIMTIndex();
+      SmallVector<int64_t> targetOffset =
+          targetIterator.getState().computeSIMTIndex();
+      SmallVector<int64_t> sliceSize(srcOffset.size(), 1);
+      sliceSize[sliceSize.size() - 1] = step;
+      SmallVector<int64_t> sliceStride(srcOffset.size(), 1);
+      Value slice = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, src, srcOffset, sliceSize, sliceStride);
+      newVector = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, slice, newVector, targetOffset, sliceStride);
+    }
+    return newVector;
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
+                  DistributionSignature &signature,
+                  PatternRewriter &rewriter) const override {
+    VectorValue vector = resolutionOp.getInput();
+    VectorValue result = resolutionOp.getOutput();
+    LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
+    if (!currentLayout)
+      return failure();
+    LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
+    if (!targetLayout)
+      return failure();
+
+    SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
+    SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
+    if (currentVecShape.size() != targetVecShape.size())
+      return failure();
+
+    auto numElements = [](ArrayRef<int64_t> vector) {
+      return std::accumulate(vector.begin(), vector.end(), 1,
+                             std::multiplies<int64_t>());
+    };
+    if (numElements(currentVecShape) != numElements(targetVecShape))
+      return failure();
+
+    // TODO: Support lane conflicts by doing a trip to shared memory or using
+    // shuffles.
+    if (currentLayout.hasLaneConflictWith(targetLayout)) {
+      return failure();
+    }
+
+    Type elementType =
+        llvm::cast<VectorType>(result.getType()).getElementType();
+    Value newVector =
+        reshapeVector(resolutionOp.getLoc(), rewriter,
+                      getDistributed(rewriter, vector, targetLayout),
+                      currentLayout, targetLayout, elementType);
+    replaceOpWithDistributedValues(rewriter, resolutionOp, newVector);
     return success();
   }
 };
@@ -729,6 +814,8 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
           patterns.getContext(), laneId);
   patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose>(
       patterns.getContext());
+  patterns.add<DistributeTranspose>(patterns.getContext());
+  patterns.add<DistributeLayoutConflictResolutions>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler

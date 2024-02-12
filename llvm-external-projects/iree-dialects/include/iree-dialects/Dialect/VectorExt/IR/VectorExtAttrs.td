@@ -77,7 +77,7 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   let genVerifyDecl = 0;
   let extraClassDeclaration = [{
     // Get the shape for a given layout dimension.
-    std::optional<int64_t> getShape(const LayoutDimension &dim);
+    std::optional<int64_t> getShape(const LayoutDimension &dim) const;
     std::optional<int64_t> getBatchDim(int64_t dim);
     // Get the lane dimension shape for a provided simd tensor dim.
     std::optional<int64_t> getLaneDim(int64_t dim);
@@ -96,6 +96,12 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
     // which is that for lane k, the shuffle op returns the
     // value from lane k ^ offset.
     uint64_t getShuffleOffset(int64_t reductionDim);
+
+    // Determines whether the other layout has a lane
+    // dimension that the current layout does not have OR whether
+    // the shape of the two layouts for a common lane dimension
+    // is not the same.
+    bool hasLaneConflictWith(const LayoutAttr &other);
   }];
 }
 

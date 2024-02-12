@@ -481,3 +481,56 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#row_layout = #iree_vector_ext.per_dim_layout<[BATCHX, LANEY, VECTORX], [2, 4, 4]>
+#col_layout = #iree_vector_ext.per_dim_layout<[BATCHY, LANEX], [1, 16]>
+#layout0 = #iree_vector_ext.layout<#row_layout, #col_layout>
+#row_layout2 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEY, VECTORX], [1, 4, 8]>
+#layout1 = #iree_vector_ext.layout<#row_layout2, #col_layout>
+#row_layout3 = #iree_vector_ext.per_dim_layout<[BATCHX, LANEY, VECTORX], [4, 2, 4]>
+#layout2 = #iree_vector_ext.layout<#row_layout3, #col_layout>
+
+func.func @resolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16xf16>) {
+  // CHECK: func.func @resolved_layout_conflict(%[[MEM:.*]]: memref<32x16xf16>, %[[MEM1:.*]]: memref<32x16xf16>
+  // CHECK-DAG: %[[CST0:.*]] = arith.constant dense<0.000000e+00> : vector<2x1x4xf16>
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  // CHECK-COUNT-8: vector.load %[[MEM]]
+  %vec = vector.transfer_read  %a[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout1} : memref<32x16xf16>, vector<32x16xf16>
+  // CHECK: %[[V0:.*]] = vector.insert_strided_slice {{.*}} : vector<1xf16> into vector<1x1x8xf16>
+  // CHECK: %[[R0:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 0], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
+  // CHECK: %[[R1:.*]] = vector.insert_strided_slice %[[R0]], %[[CST0]] {offsets = [0, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
+  // CHECK: %[[R2:.*]] = vector.extract_strided_slice %[[V0]] {offsets = [0, 0, 4], sizes = [1, 1, 4], strides = [1, 1, 1]} : vector<1x1x8xf16> to vector<1x1x4xf16>
+  // CHECK: %[[R3:.*]] = vector.insert_strided_slice %[[R2]], %[[R1]] {offsets = [1, 0, 0], strides = [1, 1, 1]} : vector<1x1x4xf16> into vector<2x1x4xf16>
+  // CHECK: %[[R4:.*]] = arith.addf %[[R3]], %[[R3]] : vector<2x1x4xf16>
+  %vec2 = arith.addf %vec, %vec : vector<32x16xf16>
+  // CHECK-COUNT-8: vector.store {{.*}}, vector<1xf16>
+  vector.transfer_write %vec2, %b[%c0, %c0] {in_bounds = [true, true],
+           "__vector_layout_test_anchor_operand_0" = #layout0} : vector<32x16xf16>, memref<32x16xf16>
+  func.return
+}
+
+func.func @unresolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16xf16>) {
+  // CHECK: func.func @unresolved_layout_conflict(%[[MEM:.*]]: memref<32x16xf16>, %[[MEM1:.*]]: memref<32x16xf16>
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %vcst = arith.constant dense<0.0> : vector<32x16xf16>
+  // CHECK-COUNT-8: vector.load %[[MEM]]
+  %vec = vector.transfer_read  %a[%c0, %c0], %cst {"__vector_layout_test_anchor_result_0" = #layout1} : memref<32x16xf16>, vector<32x16xf16>
+  // CHECK: iree_vector_ext.layout_conflict_resolution {{.*}}
+  %vec2 = arith.addf %vec, %vcst : vector<32x16xf16>
+  // CHECK-COUNT-16: vector.store {{.*}}, vector<1xf16>
+  vector.transfer_write %vec2, %b[%c0, %c0] {in_bounds = [true, true],
+           "__vector_layout_test_anchor_operand_0" = #layout2} : vector<32x16xf16>, memref<32x16xf16>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
