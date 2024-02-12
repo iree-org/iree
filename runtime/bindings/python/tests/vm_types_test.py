@@ -45,7 +45,7 @@ class VmTypesTest(unittest.TestCase):
         l.push_int(10 * 1000 * 1000 * 1000)
         self.assertEqual(str(l), "<VmVariantList(1): [10000000000]>")
 
-    def test_variant_list_buffers(self):
+    def test_variant_list_buffer_view(self):
         device = rt.get_device("local-sync")
         ET = rt.HalElementType
         for dt, et in (
@@ -81,6 +81,17 @@ class VmTypesTest(unittest.TestCase):
             np.testing.assert_array_equal(ary1, ary2)
             with self.assertRaises(IndexError):
                 lst.get_as_object(1, rt.HalBufferView)
+
+    def test_variant_list_buffer(self):
+        device = rt.get_device("local-sync")
+        lst = rt.VmVariantList(5)
+        buffer = device.allocator.allocate_buffer(
+            memory_type=rt.MemoryType.DEVICE_LOCAL,
+            allowed_usage=rt.BufferUsage.DEFAULT,
+            allocation_size=1024,
+        )
+        lst.push_ref(buffer)
+        _ = (lst.get_as_object(0, rt.HalBuffer),)
 
     def test_variant_list_zero_rank_tensor_to_str(self):
         device = rt.get_device("local-sync")

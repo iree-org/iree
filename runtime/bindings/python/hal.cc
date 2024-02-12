@@ -76,6 +76,9 @@ Three wait cases are supported:
   * timeout: Relative nanoseconds to wait.
   * deadine: Absolute nanoseconds to wait.
   * Neither: Waits for infinite time.
+
+Returns whether the wait succeeded (True) or timed out (False). If the fence was
+asynchronously failed, an exception is raised.
 )";
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -912,9 +915,18 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
-      .def_static("map_to_dtype", [](iree_hal_element_type_t element_type) {
-        int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(element_type);
-        return numpy::DescrNewFromType(typenum);
+      .def_static("map_to_dtype",
+                  [](iree_hal_element_type_t element_type) {
+                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
+                        element_type);
+                    return numpy::DescrNewFromType(typenum);
+                  })
+      .def_static("is_byte_aligned",
+                  [](iree_hal_element_type_t element_type) {
+                    return iree_hal_element_is_byte_aligned(element_type);
+                  })
+      .def_static("dense_byte_count", [](iree_hal_element_type_t element_type) {
+        return iree_hal_element_dense_byte_count(element_type);
       });
 
   py::class_<HalDevice>(m, "HalDevice")
@@ -1041,7 +1053,11 @@ void SetupHalBindings(nanobind::module_ m) {
            "last resort method for making them compatible for transfer to "
            "arbitrary devices.");
 
-  py::class_<HalBuffer>(m, "HalBuffer")
+  auto hal_buffer = py::class_<HalBuffer>(m, "HalBuffer");
+  VmRef::BindRefProtocol(hal_buffer, iree_hal_buffer_type,
+                         iree_hal_buffer_retain_ref, iree_hal_buffer_deref,
+                         iree_hal_buffer_isa);
+  hal_buffer
       .def("fill_zero", &HalBuffer::FillZero, py::arg("byte_offset"),
            py::arg("byte_length"))
       .def("byte_length", &HalBuffer::byte_length)
@@ -1095,6 +1111,10 @@ void SetupHalBindings(nanobind::module_ m) {
       .def_prop_ro("element_type",
                    [](HalBufferView& self) {
                      return iree_hal_buffer_view_element_type(self.raw_ptr());
+                   })
+      .def_prop_ro("byte_length",
+                   [](HalBufferView& self) {
+                     return iree_hal_buffer_view_byte_length(self.raw_ptr());
                    })
       .def("__repr__", &HalBufferView::Repr);
 
@@ -1177,9 +1197,23 @@ void SetupHalBindings(nanobind::module_ m) {
           },
           py::arg("from_fence"))
       .def(
+          "fail",
+          [](HalFence& self, std::string& message) {
+            // TODO: Take some category enum and use that is available.
+            iree_status_t status =
+                iree_make_status(IREE_STATUS_UNKNOWN, "%s", message.c_str());
+            iree_hal_fence_fail(self.raw_ptr(), status);
+          },
+          py::arg("message"))
+      .def("signal",
+           [](HalFence& self) {
+             CheckApiStatus(iree_hal_fence_signal(self.raw_ptr()),
+                            "signalling fence");
+           })
+      .def(
           "wait",
           [](HalFence& self, std::optional<iree_duration_t> timeout,
-             std::optional<iree_time_t> deadline) {
+             std::optional<iree_time_t> deadline) -> bool {
             iree_timeout_t t;
             if (!timeout && !deadline) {
               t = iree_infinite_timeout();
@@ -1196,7 +1230,31 @@ void SetupHalBindings(nanobind::module_ m) {
               py::gil_scoped_release release;
               status = iree_hal_fence_wait(self.raw_ptr(), t);
             }
-            CheckApiStatus(status, "waiting for fence");
+            if (iree_status_is_deadline_exceeded(status)) {
+              // Time out.
+              return false;
+            } else if (iree_status_is_aborted(status)) {
+              // Synchronous failure.
+              iree_status_ignore(status);
+              status = iree_hal_fence_query(self.raw_ptr());
+              if (iree_status_is_ok(status)) {
+                status = iree_make_status(
+                    IREE_STATUS_FAILED_PRECONDITION,
+                    "expected synchronous status failure missing");
+              }
+              CheckApiStatus(status, "synchronous fence failure");
+            } else {
+              // General failure check.
+              CheckApiStatus(status, "waiting for fence");
+            }
+
+            // Asynchronous failure.
+            status = iree_hal_fence_query(self.raw_ptr());
+            if (iree_status_is_deferred(status)) {
+              return false;
+            }
+            CheckApiStatus(status, "asynchronous fence failure");
+            return true;
           },
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
           kHalFenceWait);
