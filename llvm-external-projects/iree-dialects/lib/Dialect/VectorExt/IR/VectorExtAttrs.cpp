@@ -206,8 +206,14 @@ NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
   llvm_unreachable("Not yet implemented");
 }
 
+/// We distribute to:
+/// <BATCH x OUTER x ELEMENT>
 SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
-  llvm_unreachable("Not yet implemented");
+  SmallVector<int64_t> shape;
+  shape.append(applyPermutation(getBatchesPerSubgroup(), getBatchOrder()));
+  shape.append(applyPermutation(getOutersPerBatch(), getOuterOrder()));
+  shape.append(applyPermutation(getElementsPerThread(), getElementOrder()));
+  return shape;
 }
 
 bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
