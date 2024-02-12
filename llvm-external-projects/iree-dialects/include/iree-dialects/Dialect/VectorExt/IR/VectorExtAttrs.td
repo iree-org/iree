@@ -99,9 +99,9 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   }];
 }
 
-def NestedLayoutAttr : IREEVectorExt_Attr<"Nested",
+def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
       [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
-  let mnemonic = "nested";
+  let mnemonic = "nested_layout";
   let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape}];
   let description = [{
     This layout explicitly defines how a shape is mapped to a compute
