@@ -42,8 +42,8 @@ func.func @SinkSplatsToConsumers(
 
 // -----
 
-// CHECK-LABEL: @SinkSplatsToConsumersInRegions
-func.func @SinkSplatsToConsumersInRegions(%arg0: i1) -> (!stream.resource<*>, !stream.resource<*>) {
+// CHECK-LABEL: @SinkSplatsToCommonAncestorOfConsumersInRegions
+func.func @SinkSplatsToCommonAncestorOfConsumersInRegions(%arg0: i1) -> (!stream.resource<*>, !stream.resource<*>) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
