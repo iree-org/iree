@@ -14,10 +14,13 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "ArchiveUtils.h"
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "ArchiveUtils.cpp"
     "ExportParameters.cpp"
+    "GenerateSplatParameterArchive.cpp"
     "Passes.cpp"
   DEPS
     ::PassesIncGen

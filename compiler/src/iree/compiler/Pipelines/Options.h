@@ -100,6 +100,10 @@ struct GlobalOptimizationOptions {
   // Optional scope to use for the created parameter archive.
   std::string parameterExportScope = "";
 
+  // File path to create a splat parameter archive out of all parameters in the
+  // module.
+  std::string splatParameterArchiveExportPath = "";
+
   // Minimum size of constants to export as parameters.
   int64_t minimumParameterExportSize = 256;
 

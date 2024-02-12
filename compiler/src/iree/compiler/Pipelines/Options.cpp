@@ -150,6 +150,13 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
           "Minimum size of constants to export to the archive created in "
           "`iree-opt-export-parameter-archive-export-file`."),
       llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-opt-splat-parameter-archive-export-file",
+      splatParameterArchiveExportPath,
+      llvm::cl::desc(
+          "File path to create a parameter archive of splat values out of all "
+          "parameter backed globals."),
+      llvm::cl::cat(category));
 }
 
 void SchedulingOptions::bindOptions(OptionsBinder &binder) {

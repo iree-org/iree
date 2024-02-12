@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/ArchiveUtils.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Error.h"
@@ -76,41 +77,6 @@ static void hoistConstantsIntoGlobals(mlir::ModuleOp moduleOp,
                      .getLoadedGlobalValue();
     rewriter.replaceOp(originalConstant, load);
   }
-}
-
-// Wrapper around iree_io_stream for use when serializing constants.
-class iree_io_stream_ostream : public llvm::raw_ostream {
-public:
-  explicit iree_io_stream_ostream(iree_io_stream_t *stream) : stream(stream) {
-    iree_io_stream_retain(stream);
-  }
-  ~iree_io_stream_ostream() override { iree_io_stream_release(stream); }
-
-private:
-  uint64_t current_pos() const override {
-    return iree_io_stream_offset(stream);
-  }
-  void write_impl(const char *ptr, size_t size) override {
-    IREE_CHECK_OK(iree_io_stream_write(stream, size, ptr));
-  }
-  iree_io_stream_t *stream = NULL;
-};
-
-static LogicalResult handleRuntimeError(ModuleOp moduleOp, iree_status_t status,
-                                        StringRef failureMessage) {
-  if (iree_status_is_ok(status))
-    return success();
-  std::string message;
-  message.resize(512);
-  iree_host_size_t buffer_length;
-  if (!iree_status_format(status, message.size(), &message[0],
-                          &buffer_length)) {
-    message.resize(buffer_length + 1);
-    iree_status_format(status, message.size(), &message[0], &buffer_length);
-  }
-  message.resize(buffer_length);
-  iree_status_ignore(status);
-  return moduleOp.emitError() << failureMessage << message;
 }
 
 struct ExportParametersPass
@@ -203,57 +169,22 @@ struct ExportParametersPass
           << llvm::errorToErrorCode(FileOrErr.takeError()).message();
       return signalPassFailure();
     }
-    std::unique_ptr<llvm::FileOutputBuffer> FileBuffer = std::move(*FileOrErr);
+    std::unique_ptr<llvm::FileOutputBuffer> fileBuffer = std::move(*FileOrErr);
 
-    // Wrap the output file for use with the parameter archive builder.
     iree_io_file_handle_t *target_file_handle = NULL;
-    iree_byte_span_t file_contents = iree_make_byte_span(
-        FileBuffer->getBufferStart(), FileBuffer->getBufferSize());
-    // Release callback is a no-op, the mapping is managed by the unique_ptr.
-    iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-        IREE_IO_FILE_ACCESS_WRITE, file_contents,
-        iree_io_file_handle_release_callback_null(), host_allocator,
-        &target_file_handle);
-    auto releaseFileExit = llvm::make_scope_exit(
-        [&]() { return iree_io_file_handle_release(target_file_handle); });
-    if (failed(handleRuntimeError(moduleOp, status,
-                                  "Failed to open output parameter archive"))) {
-      return signalPassFailure();
-    }
-
-    // Wrap the target file in a stream.
     iree_io_stream_t *target_stream = NULL;
-    status =
-        iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, target_file_handle,
-                            /*file_offset=*/0, host_allocator, &target_stream);
-    auto releaseStreamExit = llvm::make_scope_exit(
-        [&]() { return iree_io_stream_release(target_stream); });
-    if (failed(handleRuntimeError(
-            moduleOp, status, "Failed to create I/O stream to output file"))) {
-      return signalPassFailure();
-    }
-
-    // Allocate an index we'll populate during building to allow us to get the
-    // storage ranges of non-metadata parameters.
     iree_io_parameter_index_t *built_index = NULL;
-    status = iree_io_parameter_index_create(host_allocator, &built_index);
-    auto releaseIndexExit = llvm::make_scope_exit(
-        [&]() { return iree_io_parameter_index_release(built_index); });
-    if (failed(handleRuntimeError(moduleOp, status,
-                                  "Failed to allocate parameter index"))) {
+    if (failed(writeParameterIndex(moduleOp, host_allocator, builder,
+                                   fileBuffer, &target_file_handle,
+                                   &target_stream, &built_index))) {
       return signalPassFailure();
     }
 
-    // Commit the archive header to the file and produce an index referencing
-    // it. This will allow us to know where to copy file contents.
-    status = iree_io_parameter_archive_builder_write(
-        &builder, target_file_handle, /*file_offset=*/0, target_stream,
-        built_index);
-    if (failed(handleRuntimeError(
-            moduleOp, status,
-            "Failed to write parameter index header to output file"))) {
-      return signalPassFailure();
-    }
+    auto releaseFileExit = llvm::make_scope_exit([&]() -> void {
+      iree_io_stream_release(target_stream);
+      iree_io_parameter_index_release(built_index);
+      iree_io_file_handle_release(target_file_handle);
+    });
 
     StringAttr scopeAttr = parameterScope.empty()
                                ? StringAttr()
@@ -266,7 +197,7 @@ struct ExportParametersPass
       StringRef name = constantGlobal.getSymName();
 
       const iree_io_parameter_index_entry_t *target_entry = NULL;
-      status = iree_io_parameter_index_lookup(
+      iree_status_t status = iree_io_parameter_index_lookup(
           built_index,
           iree_string_view_t{name.data(),
                              static_cast<iree_host_size_t>(name.size())},
@@ -304,7 +235,7 @@ struct ExportParametersPass
       constantGlobal.setInitialValueAttr(param);
     }
     // Commit the written file.
-    llvm::Error maybeCommit = FileBuffer->commit();
+    llvm::Error maybeCommit = fileBuffer->commit();
     if (maybeCommit) {
       InFlightDiagnostic errorStream =
           moduleOp.emitError() << "Failed to commit archive with error: ";

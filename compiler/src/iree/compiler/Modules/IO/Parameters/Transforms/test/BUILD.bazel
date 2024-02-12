@@ -17,11 +17,13 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "export_parameters.mlir",
+            "generate_splat_parameter_archive.mlir",
         ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
     tools = [
+        "//tools:iree-dump-parameters",
         "//tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
