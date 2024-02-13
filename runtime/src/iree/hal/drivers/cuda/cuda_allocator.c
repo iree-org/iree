@@ -59,7 +59,6 @@ iree_status_t iree_hal_cuda_allocator_create(
     CUstream stream, iree_hal_cuda_memory_pools_t* pools,
     iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(cuda_symbols);
-  IREE_ASSERT_ARGUMENT(pools);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
