@@ -24,6 +24,9 @@ public:
   Type convertTypeAsNonPointer(Type type) const;
   Type convertTypeAsPointer(Type type) const;
   emitc::OpaqueType convertTypeAsCType(Type type) const;
+
+  // TODO(simon-camp): This helper is no longer needed when we switch the
+  // conversion to use emitc.func and emitc.declare_func ops.
   std::optional<std::string> convertTypeToStringLiteral(Type type) const;
 
   SetVector<Operation *> sourceMaterializations;

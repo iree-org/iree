@@ -111,7 +111,6 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
   return {};
 }
 
-// TODO: This should go upstream
 std::optional<std::string>
 EmitCTypeConverter::convertTypeToStringLiteral(Type type) const {
   if (auto oType = llvm::dyn_cast<emitc::OpaqueType>(type)) {

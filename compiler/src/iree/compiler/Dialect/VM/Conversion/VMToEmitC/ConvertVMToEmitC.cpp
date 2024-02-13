@@ -1149,15 +1149,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-/// TODO:
-///   - replace string concatenation with Twines
-///   - be more thoughtful of the location to use
-///   - move things to conversion patterns if possible
-///   - create helper functions in emitc_builders.escape_hatch
-///     - function declaration
-///     - global
-///     - structured preprocessor directive
-///     - struct definition
+/// Generate boilerplate code like includes for the iree C API, include guards,
+/// structures to hold module state, functions and global variables to create a
+/// module instance etc.
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1214,7 +1208,6 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     builder.create<emitc::IncludeOp>(loc, "iree/vm/shims_emitc.h");
 
     // rodata ops
-    // TODO: Make this a conversion
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
       auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
           rodataOp.getValue());
@@ -1292,8 +1285,8 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       }
     }
 
+    // TODO(simon-camp): Move these to a structured helper
     // global descriptors
-    // TODO: Move this to a structured helper
     //   - define structs for each entity etc.
     auto printStringView = [](StringRef s) -> std::string {
       // We can't use iree_make_string_view because function calls are not
@@ -1446,7 +1439,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     builder.create<emitc::VerbatimOp>(loc, descriptor);
 
-    // move functions marked with vm.emit_at_end to the end of the module
+    // move functions marked as emitAtEnd to the end of the module
     auto funcs =
         SmallVector<mlir::func::FuncOp>(moduleOp.getOps<mlir::func::FuncOp>());
     for (auto func : funcs) {
@@ -4708,11 +4701,6 @@ public:
       funcOp.erase();
     }
 
-    // // Generate func ops that implement the C API.
-    // if (failed(createAPIFunctions(module, typeConverter.analysis))) {
-    //   return signalPassFailure();
-    // }
-
     SmallVector<std::string> importShims;
 
     // The conversion of `call/call.variadic` ops on imported functions expects
@@ -4743,7 +4731,6 @@ public:
     target.addLegalOp<IREE::VM::ImportOp>();
 
     // This op is needed in the printer to emit an array holding the data.
-    // TODO: Mark illegal once there is a conversion
     target.addLegalOp<IREE::VM::RodataOp>();
 
     if (failed(applyFullConversion(module, target, std::move(patterns)))) {
@@ -4770,8 +4757,6 @@ public:
       }
     });
 
-    // Generate boilerplate code like inlcudes for the iree API, include guards,
-    // etc.
     if (failed(createModuleStructure(module, typeConverter))) {
       return signalPassFailure();
     }

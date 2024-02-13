@@ -19,8 +19,12 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
+/// TODO(simon-camp): This struct grew from being a wrapper around the
+/// RegisterAllocation and ValueLiveness analyses to also cache other things
+/// needed throughout the conversion. This led to hard to follow failuresin the
+/// usage of this when only part of this struct was correctly initialized. This
+/// should be split into multiple structs each with a single responsibility.
 struct FuncAnalysis {
-public:
   FuncAnalysis() = default;
   FuncAnalysis(bool emitAtEnd) : emitAtEnd(emitAtEnd) {}
   FuncAnalysis(IREE::VM::FuncOp funcOp) {
@@ -58,7 +62,10 @@ public:
     return callingConvention.value();
   }
 
-  StringRef getExportName() { return exportName.value(); }
+  StringRef getExportName() {
+    assert(exportName.has_value());
+    return exportName.value();
+  }
 
   bool isExported() { return exportName.has_value(); }
 
