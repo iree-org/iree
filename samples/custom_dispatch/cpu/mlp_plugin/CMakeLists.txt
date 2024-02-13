@@ -11,8 +11,8 @@ if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
 endif()
 
 ## Current support is only for x86.
-iree_compiler_targeting_iree_arch(MLP_PLUGIN_BUILD_X86_64 "x86_64")
-if (NOT MLP_PLUGIN_BUILD_X86_64)
+if(NOT IREE_ARCH STREQUAL "x86_64")
+  message(STATUS "IREE mlp_pluging sample ignored -- only builds for x86_64 (today)")
   return()
 endif()
 
