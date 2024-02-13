@@ -36,5 +36,5 @@ Guides for specific configurations:
 
 ## General topics
 
-* [:octicons-file-symlink-file-16: Parameters](./parameters.md) for managing large chunks of
-  program data
+* [:octicons-file-symlink-file-16: Parameters](./parameters.md) for managing
+  large chunks of program data

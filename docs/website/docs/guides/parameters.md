@@ -280,7 +280,7 @@ files.
 IREE command line tooling can load parameter files alongside module files:
 
 ```console
-$ iree-run-module --module=program.vmfb --parameters=data.irpa ...
+iree-run-module --module=program.vmfb --parameters=data.irpa ...
 ```
 
 For concrete examples, see these test files:
