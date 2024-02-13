@@ -25,9 +25,8 @@ typedef struct {
 } mlp_plugin_t;
 
 // Helper function to resolve index [i][j] into location for given strides.
-size_t get_index(size_t i, size_t j, size_t offset, size_t stride0,
-                 size_t stride1) {
-  return offset + i * stride0 + j * stride1;
+static size_t get_index(size_t i, size_t j, size_t offset, size_t stride) {
+  return offset + i * stride + j;
 }
 
 // `ret = mlp(lhs, rhs)`
@@ -56,26 +55,11 @@ static int mlp_external(void* params_ptr, void* context, void* reserved) {
   mlp_plugin_t* plugin = (mlp_plugin_t*)context;
   typedef struct {
     const float* restrict lhs;
-    const float* restrict lhs_aligned;
     size_t lhs_offset;
-    size_t lhs_size0;
-    size_t lhs_size1;
-    size_t lhs_stride0;
-    size_t lhs_stride1;
     const float* restrict rhs;
-    const float* restrict rhs_aligned;
     size_t rhs_offset;
-    size_t rhs_size0;
-    size_t rhs_size1;
-    size_t rhs_stride0;
-    size_t rhs_stride1;
     float* restrict result;
-    float* restrict result_aligned;
     size_t result_offset;
-    size_t result_size0;
-    size_t result_size1;
-    size_t result_stride0;
-    size_t result_stride1;
     int32_t M;
     int32_t N;
     int32_t K;
@@ -87,16 +71,13 @@ static int mlp_external(void* params_ptr, void* context, void* reserved) {
     for (int32_t j = 0; j < params->N; j++) {
       float curr_result = 0.0;
       for (int32_t k = 0; k < params->K; k++) {
-        size_t lhs_index = get_index(i, k, params->lhs_offset,
-                                     params->lhs_stride0, params->lhs_stride1);
-        size_t rhs_index = get_index(k, j, params->rhs_offset,
-                                     params->rhs_stride0, params->rhs_stride1);
+        size_t lhs_index = get_index(i, k, params->lhs_offset, (size_t)params->K);
+        size_t rhs_index = get_index(k, j, params->rhs_offset, (size_t)params->N);
         curr_result += params->lhs[lhs_index] * params->rhs[rhs_index];
       }
       curr_result = curr_result < 0.0 ? 0.0 : curr_result;
       size_t result_index =
-          get_index(i, j, params->result_offset, params->result_stride0,
-                    params->result_stride1);
+          get_index(i, j, params->result_offset, params->N);
       params->result[result_index] = curr_result;
     }
   }

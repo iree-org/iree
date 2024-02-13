@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "apply_pdl_patterns_torch.mlir"
+    "apply_pdl_patterns_tosa.mlir"
     "conv2d_to_img2col.mlir"
     "conv_to_channels_last.mlir"
     "make_single_dispatch_for_function.mlir"
@@ -25,6 +27,8 @@ iree_lit_test_suite(
     iree-opt
   DATA
     external_function_spec.mlir
+    torch.pdl.mlir
+    tosa.pdl.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -4,7 +4,7 @@
 // RUN:     --module=- \
 // RUN:     --function=mlp_invocation \
 // RUN:     --input="2x2xf32=[[2.0, 2.0], [-2.0, -2.0]]" \
-// RUN:     --input="2x2xf32=[[3.0 -3.0], [3.0, -3.0]]"
+// RUN:     --input="2x2xf32=[[3.0, -3.0], [3.0, -3.0]]"
 
 // The implementation of MLP is matched using a transform dialect script and is forwarded to a system plugin.
 
