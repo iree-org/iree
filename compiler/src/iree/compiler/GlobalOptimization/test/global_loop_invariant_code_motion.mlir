@@ -126,3 +126,43 @@ func.func @not_hoist_loop_variant_and_non_leaf_alone(%bound : i32, %src : tensor
 // CHECK:         } do {
 // CHECK:           scf.yield
 // CHECK:         }
+
+// -----
+
+func.func @not_hoist_from_nested_regions(%bound : i32, %flag : i1, %src : tensor<100x100xf32>) -> tensor<13x13x8x8xf32> {
+  %cst0 = arith.constant 0 : i32
+  %cst1 = arith.constant 1 : i32
+  %pad0 = arith.constant 0.0 : f32
+  %init = arith.constant dense<0.0> : tensor<13x13x8x8xf32>
+  %res:2 = scf.while (%iter = %cst0, %val = %init) : (i32, tensor<13x13x8x8xf32>) -> (i32, tensor<13x13x8x8xf32>) {
+    %ifadd = scf.if %flag -> tensor<13x13x8x8xf32> {
+      %dest = tensor.empty() : tensor<13x13x8x8xf32>
+      %pack = tensor.pack %src padding_value(%pad0 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<100x100xf32> -> tensor<13x13x8x8xf32>
+      %add = arith.addf %val, %pack : tensor<13x13x8x8xf32>
+      scf.yield %add : tensor<13x13x8x8xf32>
+    } else {
+      scf.yield %init : tensor<13x13x8x8xf32>
+    }
+    %next = arith.addi %iter, %cst1 : i32
+    %cond = arith.cmpi slt, %next, %bound : i32
+    scf.condition(%cond) %next, %ifadd : i32, tensor<13x13x8x8xf32>
+  } do {
+  ^bb0(%arg1: i32, %arg2: tensor<13x13x8x8xf32>):
+    scf.yield %arg1, %arg2 : i32, tensor<13x13x8x8xf32>
+  }
+  return %res#1 : tensor<13x13x8x8xf32>
+}
+
+// CHECK-LABEL: func.func @not_hoist_from_nested_regions
+// CHECK-NOT:     tensor.empty
+// CHECK-NOT:     tensor.pack
+// CHECK-NOT:     tensor.unpack
+// CHECK:         scf.while
+// CHECK:           scf.if
+// CHECK:             %[[PACK_DEST:.+]] = tensor.empty
+// CHECK:             tensor.pack {{.*}} into %[[PACK_DEST]]
+// CHECK:           } else {
+// CHECK:           scf.condition
+// CHECK:         } do {
+// CHECK:           scf.yield
+// CHECK:         }

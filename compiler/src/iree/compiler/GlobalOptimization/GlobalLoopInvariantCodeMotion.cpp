@@ -15,9 +15,7 @@
 #include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "global-loop-invariant-code-motion"
-#define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
-
-namespace mlir::iree_compiler::GlobalOptimization {
+#define LICM_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
 // Check if the op is a leaf op we always want to hoist.
 static bool isHoistableLeafOp(Operation *op) {
@@ -34,9 +32,9 @@ static bool isHoistableOp(Operation *op) {
 
 // Check if the op and its producers are loop invariants and hoistable. Results
 // are cached in hoistableOpMap to avoid repeated traversals.
-static bool
-checkHoistableTree(LoopLikeOpInterface loopOp, Operation *op,
-                   llvm::SmallDenseMap<Operation *, bool> &hoistableOpMap) {
+static bool checkHoistableBackwardSlice(
+    LoopLikeOpInterface loopOp, Operation *op,
+    llvm::SmallDenseMap<Operation *, bool> &hoistableOpMap) {
   // First check if the op has been analyzed.
   if (hoistableOpMap.contains(op))
     return hoistableOpMap[op];
@@ -60,7 +58,8 @@ checkHoistableTree(LoopLikeOpInterface loopOp, Operation *op,
 
       Operation *producer = value.getDefiningOp();
       // If the value is not an operation, we don't hoist it.
-      if (!producer || !checkHoistableTree(loopOp, producer, hoistableOpMap)) {
+      if (!producer ||
+          !checkHoistableBackwardSlice(loopOp, producer, hoistableOpMap)) {
         result = WalkResult::interrupt();
         break;
       }
@@ -71,16 +70,16 @@ checkHoistableTree(LoopLikeOpInterface loopOp, Operation *op,
   bool hoistable = !op->walk(walkFn).wasInterrupted();
   hoistableOpMap[op] = hoistable;
 
-  LLVM_DEBUG(KD_DBGS() << (hoistable ? "Hoistable: " : "Non-hoistable: ") << *op
-                       << "\n");
+  LLVM_DEBUG(LICM_DBGS() << (hoistable ? "Hoistable: " : "Non-hoistable: ")
+                         << *op << "\n");
   return hoistable;
 }
 
 // Call `moveOutOfLoop` to hoist op and its producer out of the loop. Ops are
 // hoisted in post-order to handle the dependencies (leaves of the producer tree
 // are hoisted first).
-static LogicalResult hoistProducerTree(Operation *op,
-                                       LoopLikeOpInterface loopOp) {
+static LogicalResult hoistBackwardSlice(Operation *op,
+                                        LoopLikeOpInterface loopOp) {
   // Check if the op has been hoisted.
   if (!loopOp->isAncestor(op))
     return success();
@@ -89,7 +88,7 @@ static LogicalResult hoistProducerTree(Operation *op,
   auto result = op->walk([&](Operation *walkOp) {
     for (OpOperand &operand : walkOp->getOpOperands()) {
       if (Operation *producer = operand.get().getDefiningOp()) {
-        if (failed(hoistProducerTree(producer, loopOp)))
+        if (failed(hoistBackwardSlice(producer, loopOp)))
           return WalkResult::interrupt();
       }
     }
@@ -109,12 +108,12 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
 
   llvm::SmallDenseMap<Operation *, bool> hoistableOpMap;
   for (Region *region : loopOp.getLoopRegions()) {
-    // Check top-level ops.
+    // Consider only the top-level ops in the region.
     for (Operation &op : region->getOps()) {
       if (!isHoistableLeafOp(&op))
         continue;
-      if (checkHoistableTree(loopOp, &op, hoistableOpMap)) {
-        LLVM_DEBUG(KD_DBGS() << "Found hoistable leaf: " << op << "\n");
+      if (checkHoistableBackwardSlice(loopOp, &op, hoistableOpMap)) {
+        LLVM_DEBUG(LICM_DBGS() << "Found hoistable leaf: " << op << "\n");
         opsToHoist.push_back(&op);
       }
     }
@@ -136,12 +135,14 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
 
   // Hoist ops in order to handle the dependencies.
   for (Operation *op : opsToHoist) {
-    if (failed(hoistProducerTree(op, wrappedLoop.value())))
+    if (failed(hoistBackwardSlice(op, wrappedLoop.value())))
       return failure();
   }
 
   return success();
 }
+
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
