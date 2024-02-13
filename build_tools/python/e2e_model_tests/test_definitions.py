@@ -10,12 +10,11 @@ from dataclasses import dataclass
 import dataclasses
 import enum
 
-from e2e_test_framework.definitions import common_definitions, iree_definitions
+from e2e_test_framework.definitions import iree_definitions
 from e2e_test_framework.models import tflite_models
 from benchmark_suites.iree import (
     riscv_benchmarks,
     x86_64_benchmarks,
-    armv8_a_benchmarks,
     module_execution_configs,
 )
 
@@ -23,7 +22,6 @@ from benchmark_suites.iree import (
 class CMakePlatform(enum.Enum):
     """Enum of CMake system platform string."""
 
-    ANDROID_ARMV8_A = "arm_64-Android"
     LINUX_RISCV32 = "riscv_32-Linux"
     LINUX_RISCV64 = "riscv_64-Linux"
     LINUX_X86_64 = "x86_64-Linux"
@@ -31,7 +29,6 @@ class CMakePlatform(enum.Enum):
 
 # Compile config used for each CMake system platform.
 PLATFORM_COMPILE_CONFIG_MAP = {
-    CMakePlatform.ANDROID_ARMV8_A: armv8_a_benchmarks.Android_ARMv8_A_Benchmarks.DT_UK_COMPILE_CONFIG,
     CMakePlatform.LINUX_RISCV32: riscv_benchmarks.Linux_RV32_Benchmarks.DEFAULT_COMPILE_CONFIG,
     CMakePlatform.LINUX_RISCV64: riscv_benchmarks.Linux_RV64_Benchmarks.DEFAULT_COMPILE_CONFIG,
     CMakePlatform.LINUX_X86_64: x86_64_benchmarks.Linux_x86_64_Benchmarks.CASCADELAKE_DT_UK_COMPILE_CONFIG,
@@ -69,7 +66,6 @@ TEST_CONFIGS = [
         expected_output="mobilenet_v1_fp32_expected_output.txt",
         unsupported_platforms=[
             CMakePlatform.LINUX_RISCV32,
-            CMakePlatform.ANDROID_ARMV8_A,
         ],
     ),
     # efficientnet_int8_correctness_test
@@ -81,7 +77,6 @@ TEST_CONFIGS = [
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="efficientnet_int8_expected_output.txt",
         unsupported_platforms=[
-            CMakePlatform.ANDROID_ARMV8_A,
             CMakePlatform.LINUX_RISCV32,
             CMakePlatform.LINUX_RISCV64,
         ],
@@ -108,6 +103,5 @@ TEST_CONFIGS = [
         ),
         execution_config=module_execution_configs.ELF_LOCAL_SYNC_CONFIG,
         expected_output="1x2xi8=[72 -72]",
-        unsupported_platforms=[CMakePlatform.ANDROID_ARMV8_A],
     ),
 ]
