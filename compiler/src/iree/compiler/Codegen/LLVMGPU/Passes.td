@@ -13,6 +13,12 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUChainedMatmul :
+    InterfacePass<"iree-amdgpu-chained-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to swap operands and transpose accumulator and result";
+  let constructor = "mlir::iree_compiler::createAMDGPUChainedMatmulPass()";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVM :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {

@@ -72,6 +72,7 @@ iree_cc_library(
     "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
+    "AMDGPUChainedMatmulPatterns.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"

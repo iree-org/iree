@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_chained_matmul.mlir"
     "amdgpu_contraction_distribution.mlir"
     "attention.mlir"
     "cast_address_space_function.mlir"

@@ -130,6 +130,10 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize);
 
+/// Swaps contract operands and transposes results and accumulator.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createAMDGPUChainedMatmulPass();
+
 //----------------------------------------------------------------------------//
 // Register LLVMGPU Passes
 //----------------------------------------------------------------------------//
