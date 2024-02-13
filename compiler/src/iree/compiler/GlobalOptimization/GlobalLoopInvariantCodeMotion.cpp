@@ -14,6 +14,8 @@
 
 #include "llvm/Support/Debug.h"
 
+using namespace mlir;
+
 #define DEBUG_TYPE "global-loop-invariant-code-motion"
 #define LICM_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
@@ -39,35 +41,28 @@ static bool checkHoistableBackwardSlice(
   if (hoistableOpMap.contains(op))
     return hoistableOpMap[op];
 
-  // Check if the nested ops and the op itself are hoistable. And check if the
-  // producers of all operands are hoistable.
-  auto walkFn = [&](Operation *walkOp) {
-    // Check if the op is hoistable.
-    if (!isHoistableOp(walkOp))
-      return WalkResult::interrupt();
-
-    WalkResult result = WalkResult::advance();
-    // Check if the producers of operands are hoistable.
-    for (OpOperand &operand : walkOp->getOpOperands()) {
+  bool hoistable = true;
+  // Currently only hoist ops with no region (so no implicit capture).
+  if (op->getNumRegions() > 0) {
+    hoistable = false;
+  } else {
+    // Check if all producers are hoistable.
+    for (OpOperand &operand : op->getOpOperands()) {
       Value value = operand.get();
-      // Ignore values defined in a nested region or outside the loop.
-      if (walkOp->isAncestor(value.getParentRegion()->getParentOp()) ||
-          loopOp.isDefinedOutsideOfLoop(value)) {
+      // Ignore values defined outside the loop.
+      if (loopOp.isDefinedOutsideOfLoop(value))
         continue;
-      }
 
       Operation *producer = value.getDefiningOp();
       // If the value is not an operation, we don't hoist it.
       if (!producer ||
           !checkHoistableBackwardSlice(loopOp, producer, hoistableOpMap)) {
-        result = WalkResult::interrupt();
+        hoistable = false;
         break;
       }
     }
-    return result;
-  };
+  }
 
-  bool hoistable = !op->walk(walkFn).wasInterrupted();
   hoistableOpMap[op] = hoistable;
 
   LLVM_DEBUG(LICM_DBGS() << (hoistable ? "Hoistable: " : "Non-hoistable: ")
