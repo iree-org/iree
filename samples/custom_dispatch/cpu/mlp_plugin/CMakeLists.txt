@@ -10,9 +10,14 @@ if(NOT IREE_TARGET_BACKEND_LLVM_CPU OR
   return()
 endif()
 
+## Current support is only for x86.
+if(NOT IREE_ARCH STREQUAL "x86_64")
+  message(STATUS "IREE mlp_pluging sample ignored -- only builds for x86_64 (today)")
+  return()
+endif()
+
 # system-library plugin mechanism using the system dynamic library loader.
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
-
   
 add_library(iree_samples_custom_dispatch_cpu_mlp_plugin SHARED
   mlp_plugin.c
