@@ -405,9 +405,8 @@ public:
                      variantOp.getName(), ".hsaco", targetHSACO);
     }
 
-    auto hsacoRef = flatbuffers_uint8_vec_create(
-        builder, reinterpret_cast<const uint8_t *>(targetHSACO.c_str()),
-        targetHSACO.size());
+    auto hsacoRef = flatbuffers_string_create(builder, targetHSACO.c_str(),
+                                              targetHSACO.size());
 
     auto entryPointNames = llvm::map_to_vector<8>(
         variantOp.getBlock()
