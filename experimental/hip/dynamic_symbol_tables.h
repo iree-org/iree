@@ -15,9 +15,6 @@ IREE_HIP_PFN_DECL(hipDeviceGetName, char *, int, hipDevice_t)
 IREE_HIP_PFN_DECL(hipDeviceGetUuid, hipUUID *, hipDevice_t)
 IREE_HIP_PFN_DECL(hipDevicePrimaryCtxRelease, hipDevice_t)
 IREE_HIP_PFN_DECL(hipDevicePrimaryCtxRetain, hipCtx_t *, hipDevice_t)
-IREE_HIP_PFN_DECL(hipDrvGraphAddMemcpyNode, hipGraphNode_t *, hipGraph_t,
-                  const hipGraphNode_t *, size_t, const HIP_MEMCPY3D *,
-                  hipCtx_t)
 IREE_HIP_PFN_DECL(hipEventCreate, hipEvent_t *)
 IREE_HIP_PFN_DECL(hipEventCreateWithFlags, hipEvent_t *, unsigned int)
 IREE_HIP_PFN_DECL(hipEventDestroy, hipEvent_t)
