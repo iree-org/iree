@@ -966,6 +966,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }

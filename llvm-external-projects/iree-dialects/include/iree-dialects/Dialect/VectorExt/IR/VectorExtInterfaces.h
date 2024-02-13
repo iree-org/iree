@@ -9,6 +9,8 @@
 
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
+#include <mlir/IR/PatternMatch.h>
+#include <mlir/IR/Value.h>
 
 /// Include the generated interface declarations.
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtAttrInterfaces.h.inc"

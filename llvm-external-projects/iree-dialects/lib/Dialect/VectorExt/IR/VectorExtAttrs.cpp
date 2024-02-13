@@ -9,6 +9,9 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include <mlir/Dialect/Affine/IR/AffineOps.h>
+#include <mlir/IR/OpDefinition.h>
+#include <mlir/IR/PatternMatch.h>
 #include <numeric>
 
 using namespace mlir;
@@ -262,6 +265,25 @@ LogicalResult NestedLayoutAttr::verify(
   }
 
   return success();
+}
+
+/// Given the state of the iterator, compute the indices of the original vector
+/// that the current iterator state is iterating over. These indices are
+/// parameterized by the thread grid.
+FailureOr<ValueRange>
+NestedLayoutAttr::computeThreadIds(Value threadId,
+                                   RewriterBase &rewriter) const {
+  SmallVector<OpFoldResult> basis;
+  for (auto warpTy : getSubgroupOrder()) {
+    basis.push_back(rewriter.getIndexAttr(getSubgroupsPerWorkgroup()[warpTy]));
+  }
+  for (auto threadTy : getThreadOrder()) {
+    basis.push_back(rewriter.getIndexAttr(getThreadsPerOuter()[threadTy]));
+  }
+
+  auto delinearized = rewriter.create<mlir::affine::AffineDelinearizeIndexOp>(
+      threadId.getLoc(), threadId, basis);
+  return delinearized->getResults();
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

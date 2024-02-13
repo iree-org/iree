@@ -40,6 +40,16 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getDistributedShape",
       /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*description=*/"Get the delinearized ids of the given thread id.",
+      /*retTy=*/"FailureOr<ValueRange>",
+      /*methodName=*/"computeThreadIds",
+      /*args=*/(ins "Value":$threadId, "RewriterBase&":$rewriter),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
     >
   ];
 }
