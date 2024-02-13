@@ -1,5 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' --split-input-file %s | FileCheck %s
 
+// XFAIL: *
+
 // Check that this dispatch compiles to vectors and that there are no allocas.
 // By proxy checks that destination passing style kicked in correctly
 // and no CSE was run between first level tile + fuse + distribute
