@@ -2341,6 +2341,7 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       reductionScalableFlagseMap;
   distTileSizes.resize(maxLoopNums);
   parallelVecTileSizes.resize(maxLoopNums);
+  parallelVecScalableTileSizes.resize(maxLoopNums);
   bool hasSeenPackOp = false;
   for (auto op : computeOps) {
     assert(!hasSeenPackOp && "Pack op must be the last op");
