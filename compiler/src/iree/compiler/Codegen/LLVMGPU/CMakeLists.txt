@@ -39,6 +39,29 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_tablegen_library(
+  NAME
+    ROCDLPassesIncGen
+  TD_FILE
+    "ROCDLPasses.td"
+  OUTS
+    --gen-pass-decls ROCDLPasses.h.inc
+)
+
+iree_cc_library(
+  NAME
+    ROCDLPassHeaders
+  HDRS
+    "ROCDLPassDetail.h"
+    "ROCDLPasses.h"
+    "ROCDLPasses.h.inc"
+  DEPS
+    ::ROCDLPassesIncGen
+    MLIRPass
+    iree::compiler::Dialect::HAL::IR
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     LLVMGPU
@@ -46,6 +69,8 @@ iree_cc_library(
     "ConvertToLLVM.h"
     "KernelConfig.h"
     "Passes.h"
+    "ROCDLKernelConfig.h"
+    "ROCDLPasses.h"
   SRCS
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
@@ -63,10 +88,15 @@ iree_cc_library(
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"
     "Passes.cpp"
+    "ROCDLKernelConfig.cpp"
+    "ROCDLLowerExecutableTarget.cpp"
+    "ROCDLSelectLoweringStrategy.cpp"
     "Verifiers.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    ::ROCDLPassHeaders
+    ::ROCDLPassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
     IREELinalgExtTransforms

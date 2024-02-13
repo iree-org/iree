@@ -12,6 +12,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+################################################################################
+# LLVMGPU common
+################################################################################
+
 iree_gentbl_cc_library(
     name = "PassesIncGen",
     tbl_outs = [
@@ -45,6 +49,41 @@ iree_compiler_cc_library(
     ],
 )
 
+################################################################################
+# ROCDL specific
+################################################################################
+
+iree_gentbl_cc_library(
+    name = "ROCDLPassesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-pass-decls"],
+            "ROCDLPasses.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ROCDLPasses.td",
+    deps = ["@llvm-project//mlir:PassBaseTdFiles"],
+)
+
+iree_compiler_cc_library(
+    name = "ROCDLPassHeaders",
+    hdrs = [
+        "ROCDLPassDetail.h",
+        "ROCDLPasses.h",
+        "ROCDLPasses.h.inc",
+    ],
+    deps = [
+        ":ROCDLPassesIncGen",
+        "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//mlir:Pass",
+    ],
+)
+
+################################################################################
+# Common library
+################################################################################
+
 iree_compiler_cc_library(
     name = "LLVMGPU",
     srcs = [
@@ -64,16 +103,23 @@ iree_compiler_cc_library(
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
         "Passes.cpp",
+        "ROCDLKernelConfig.cpp",
+        "ROCDLLowerExecutableTarget.cpp",
+        "ROCDLSelectLoweringStrategy.cpp",
         "Verifiers.cpp",
     ],
     hdrs = [
         "ConvertToLLVM.h",
         "KernelConfig.h",
         "Passes.h",
+        "ROCDLKernelConfig.h",
+        "ROCDLPasses.h",
     ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
+        ":ROCDLPassHeaders",
+        ":ROCDLPassesIncGen",
         "//compiler/src/iree/compiler/Codegen/Common",
         "//compiler/src/iree/compiler/Codegen/Common:TransformDialectInterpreterPass",
         "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
