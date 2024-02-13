@@ -92,6 +92,52 @@ func.func @hoist_pack_op_from_do_while(%bound : i32, %src : tensor<100x100xf32>)
 
 // -----
 
+func.func @hoist_pack_op_with_zero_trip_check_in_outer_loop(%bound : i32, %src : tensor<100x100xf32>) -> tensor<13x13x8x8xf32> {
+  %cst0 = arith.constant 0 : i32
+  %cst1 = arith.constant 1 : i32
+  %pad0 = arith.constant 0.0 : f32
+  %init = arith.constant dense<0.0> : tensor<13x13x8x8xf32>
+  %res_out:2 = scf.while (%iter_out = %cst0) : (i32) -> (i32, tensor<13x13x8x8xf32>) {
+    %res:2 = scf.while (%iter = %cst0, %val = %init) : (i32, tensor<13x13x8x8xf32>) -> (i32, tensor<13x13x8x8xf32>) {
+        %cond = arith.cmpi slt, %iter, %bound : i32
+        scf.condition(%cond) %iter, %val : i32, tensor<13x13x8x8xf32>
+    } do {
+    ^bb0(%arg1: i32, %arg2: tensor<13x13x8x8xf32>):
+        %dest = tensor.empty() : tensor<13x13x8x8xf32>
+        %pack = tensor.pack %src padding_value(%pad0 : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 8] into %dest : tensor<100x100xf32> -> tensor<13x13x8x8xf32>
+        %add = arith.addf %arg2, %pack : tensor<13x13x8x8xf32>
+        %next = arith.addi %arg1, %cst1 : i32
+        scf.yield %next, %add : i32, tensor<13x13x8x8xf32>
+    }
+    %cond_out = arith.cmpi slt, %iter_out, %bound : i32
+    %next_out = arith.addi %iter_out, %cst1 : i32
+    scf.condition(%cond_out) %next_out, %res#1 : i32, tensor<13x13x8x8xf32>
+  } do {
+  ^bb0(%arg1: i32, %arg2: tensor<13x13x8x8xf32>):
+    scf.yield %arg1 : i32
+  }
+  return %res_out#1 : tensor<13x13x8x8xf32>
+}
+
+// Hoist the pack op from the inner loop inside the outer loop body. Ideally we
+// can check if the whole `scf.if` is also a loop invariant and hoist it out of
+// the outer loop, which can be done with more completed analysis.
+//
+// CHECK-LABEL: func.func @hoist_pack_op_with_zero_trip_check_in_outer_loop
+// CHECK:         scf.while
+// CHECK:           scf.if
+// CHECK:             tensor.empty
+// CHECK:             tensor.pack
+// CHECK:             scf.while
+// CHECK:             } do {
+// CHECK:             }
+// CHECK:           } else {
+// CHECK:           }
+// CHECK:         } do {
+// CHECK:         }
+
+// -----
+
 func.func @not_hoist_loop_variant_and_non_leaf_alone(%bound : i32, %src : tensor<100x100xf32>) -> tensor<100x100xf32> {
   %cst0 = arith.constant 0 : i32
   %cst1 = arith.constant 1 : i32
