@@ -61,6 +61,13 @@ typedef struct iree_hal_hip_device_params_t {
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
 
+  // The host and device event pool capacity.
+  // The HIP driver implements semaphore with host and device events. This
+  // parameter controls the size of those pools. Larger values would make
+  // creating semaphore values quicker, though with increased memory
+  // consumption.
+  iree_host_size_t event_pool_capacity;
+
   // Specifies how command buffers are recorded and executed.
   iree_hal_hip_command_buffer_mode_t command_buffer_mode;
 
