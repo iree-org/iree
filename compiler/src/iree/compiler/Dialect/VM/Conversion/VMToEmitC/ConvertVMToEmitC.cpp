@@ -1182,8 +1182,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::DEFINE,
                                           includeGuard);
 
-    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
-                                          "\"iree/vm/api.h\"");
+    builder.create<emitc::IncludeOp>(loc, "iree/vm/api.h");
 
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFDEF,
                                           "__cplusplus");
@@ -1210,12 +1209,9 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                                           std::string("//  ") + includeGuard);
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IF,
                                           "defined(EMITC_IMPLEMENTATION)");
-    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
-                                          "\"iree/vm/ops.h\"");
-    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
-                                          "\"iree/vm/ops_emitc.h\"");
-    emitc_builders::preprocessorDirective(builder, loc, emitc_builders::INCLUDE,
-                                          "\"iree/vm/shims_emitc.h\"");
+    builder.create<emitc::IncludeOp>(loc, "iree/vm/ops.h");
+    builder.create<emitc::IncludeOp>(loc, "iree/vm/ops_emitc.h");
+    builder.create<emitc::IncludeOp>(loc, "iree/vm/shims_emitc.h");
 
     // rodata ops
     // TODO: Make this a conversion
@@ -1473,17 +1469,19 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     op->erase();
   }
 
-  // create builtin.module
+  // TODO(simon-camp): The emitc code emitter expects a builtin.module as the
+  // outer container of the supported operations. Instead of nesting a
+  // builtin.module inside the vm.module here we should change this conversion
+  // pass to run on the outer builtin.module and replace the vm.module
+  // completely.
   builder.setInsertionPointToStart(&moduleOp.getBlock());
   auto innerModule = builder.create<mlir::ModuleOp>(loc);
 
   IRRewriter rewriter(moduleOp.getContext());
 
   for (Operation &op : llvm::make_early_inc_range(moduleOp.getBlock())) {
-    if (&op == innerModule.getOperation()) {
-      continue;
-    }
-    if (isa<IREE::VM::ModuleTerminatorOp>(op)) {
+    if (isa<IREE::VM::ModuleTerminatorOp>(op) ||
+        &op == innerModule.getOperation()) {
       continue;
     }
     rewriter.moveOpBefore(&op, innerModule.getBody(),
