@@ -107,14 +107,11 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
 }
 
 static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                       Region &lhs, Region &rhs,
-                                       IRMapping &parentMapping);
-static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
                                        Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping);
 
-static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                       Region &lhs, Region &rhs) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs) {
   auto mapping = cache.acquireMapping();
   return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
@@ -156,9 +153,8 @@ bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
 //
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
 // TODO(#3996): add symbol ref comparison (add to IRMapping).
-static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
-                                       Region &lhs, Region &rhs,
-                                       IRMapping &mapping) {
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs, IRMapping &mapping) {
   auto &lhsRegionEntry = cache.getRegion(&lhs);
   auto &rhsRegionEntry = cache.getRegion(&rhs);
   if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
@@ -186,6 +182,7 @@ static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
     const auto &rhsBlockEntry = cache.getBlock(rhsBlock);
     if (lhsBlockEntry.count != rhsBlockEntry.count)
       return false;
+
     for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsBlock->getOperations(),
                                                rhsBlock->getOperations())) {
       if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping))

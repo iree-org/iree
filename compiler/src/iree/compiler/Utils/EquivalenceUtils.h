@@ -75,6 +75,8 @@ private:
 //
 // Uses |cache| to memoize operation information to improve repeated queries.
 // Callers must not mutate any IR that may be in the cache between queries.
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs, IRMapping &mapping);
 bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
                                 Operation &lhs, Operation &rhs);
 

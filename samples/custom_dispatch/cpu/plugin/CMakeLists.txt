@@ -30,7 +30,8 @@ set_target_properties(iree_samples_custom_dispatch_cpu_system_plugin
     OUTPUT_NAME "system_plugin"
 )
 
-add_dependencies(iree-sample-deps iree_samples_custom_dispatch_cpu_system_plugin)
+add_dependencies(iree-sample-deps
+  iree_samples_custom_dispatch_cpu_system_plugin)
 
 iree_lit_test_suite(
   NAME
