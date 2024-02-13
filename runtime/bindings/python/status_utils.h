@@ -25,6 +25,8 @@ inline nanobind::python_error RaiseValueError(const char* message) {
   return RaisePyError(PyExc_ValueError, message);
 }
 
+std::string ApiStatusToString(iree_status_t status);
+
 nanobind::python_error ApiStatusToPyExc(iree_status_t status,
                                         const char* message);
 

@@ -8,6 +8,7 @@
 #include "./hal.h"
 #include "./invoke.h"
 #include "./io.h"
+#include "./loop.h"
 #include "./numpy_interop.h"
 #include "./py_module.h"
 #include "./status_utils.h"
@@ -28,6 +29,7 @@ NB_MODULE(_runtime, m) {
   SetupHalBindings(m);
   SetupInvokeBindings(m);
   SetupIoBindings(m);
+  SetupLoopBindings(m);
   SetupPyModuleBindings(m);
   SetupVmBindings(m);
 
