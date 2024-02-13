@@ -112,9 +112,13 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
 
 UtilDialect::UtilDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context, TypeID::get<UtilDialect>()) {
+  context->loadDialect<arith::ArithDialect>();
+
   addInterfaces<UtilOpAsmInterface, UtilInlinerInterface>();
+
   registerAttributes();
   registerTypes();
+
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/Util/IR/UtilOps.cpp.inc"

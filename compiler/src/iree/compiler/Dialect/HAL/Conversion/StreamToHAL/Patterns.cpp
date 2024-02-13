@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -818,13 +817,14 @@ struct CmdFuncOpPattern
                                                 newResultTypes))) {
       return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
     }
-    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
-        funcOp, funcOp.getName(),
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::FuncOp>(
+        funcOp, funcOp.getNameAttr(),
         rewriter.getFunctionType(newArgTypes, newResultTypes),
-        funcOp.getSymVisibilityAttr(),
+        /*tied_operands=*/ArrayAttr{}, funcOp.getSymVisibilityAttr(),
         rewriter.getArrayAttr(
             ArrayRef<Attribute>(newArgAttrs.data(), newArgAttrs.size())),
-        funcOp.getAllResultAttrs());
+        funcOp.getAllResultAttrs(),
+        /*inlining_policy=*/IREE::Util::InliningPolicyAttrInterface{});
     newOp->setDialectAttrs(funcOp->getDialectAttrs());
     return success();
   }
@@ -867,8 +867,9 @@ struct CmdCallOpPattern
       llvm::append_range(resultTypes, convertedTypes);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
-                                              resultTypes, operands);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        callOp, resultTypes, callOp.getCallee(), operands,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };

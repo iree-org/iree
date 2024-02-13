@@ -13,7 +13,6 @@
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -24,7 +23,7 @@
 namespace mlir::iree_compiler::GlobalOptimization {
 
 using FunctionLikeNest =
-    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 class MaterializeHomogeneousEncodingsPass
     : public MaterializeHomogeneousEncodingsBase<

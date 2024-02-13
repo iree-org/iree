@@ -410,7 +410,6 @@ def MaterializeDispatchInstrumentationPass :
   ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "IREE::HAL::HALDialect",
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
@@ -427,7 +426,6 @@ def MaterializeResourceCachesPass :
   }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "mlir::scf::SCFDialect",
     "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",
@@ -511,7 +509,6 @@ def DumpExecutableBenchmarksPass :
   ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "mlir::scf::SCFDialect",
     "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",

@@ -13,7 +13,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -25,140 +24,6 @@
 namespace mlir::iree_compiler {
 
 namespace {
-
-struct FuncOpSignatureConversion
-    : public OpConversionPattern<mlir::func::FuncOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    auto &typeConverter = *getTypeConverter();
-
-    // Convert the input signature types.
-    // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.
-    auto originalType = funcOp.getFunctionType();
-    TypeConverter::SignatureConversion newSignature(
-        originalType.getNumInputs());
-    for (auto argType : llvm::enumerate(originalType.getInputs())) {
-      if (failed(typeConverter.convertSignatureArg(
-              argType.index(), argType.value(), newSignature))) {
-        return failure();
-      }
-    }
-    SmallVector<Type> newResultTypes;
-    if (failed(typeConverter.convertTypes(originalType.getResults(),
-                                          newResultTypes))) {
-      return failure();
-    }
-
-    // Replace function.
-    auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
-    newFuncOp.getBlocks().clear();
-    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
-                                newFuncOp.getFunctionBody(), newFuncOp.end());
-    newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
-                                               newResultTypes));
-    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
-                                           typeConverter, &newSignature))) {
-      return failure();
-    }
-
-    rewriter.eraseOp(funcOp);
-    return success();
-  }
-};
-
-static SmallVector<Value>
-expandResourceOperands(Location loc, ValueRange operands,
-                       ConversionPatternRewriter &rewriter) {
-  SmallVector<Value> expandedOperands;
-  expandedOperands.reserve(operands.size());
-  for (auto operand : operands) {
-    if (llvm::isa<TensorType>(operand.getType())) {
-      auto value = consumeTensorOperand(loc, operand, rewriter);
-      expandedOperands.push_back(value.resource);
-      expandedOperands.push_back(value.resourceSize);
-    } else if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
-      expandedOperands.push_back(operand);
-      expandedOperands.push_back(
-          rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(loc, operand));
-    } else {
-      expandedOperands.push_back(operand);
-    }
-  }
-  return expandedOperands;
-}
-
-struct CallOpConversion : public OpConversionPattern<mlir::func::CallOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::CallOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Expand any resource operands to resource + size.
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
-
-    // Expand any resource results to resource + size.
-    SmallVector<Type> expandedTypes;
-    struct Result {
-      size_t originalIndex;
-      size_t newIndex;
-      Type newType;
-    };
-    SmallVector<Result> resultMap;
-    for (auto originalType : llvm::enumerate(op.getResultTypes())) {
-      SmallVector<Type> newTypes;
-      if (failed(getTypeConverter()->convertType(originalType.value(),
-                                                 newTypes))) {
-        return rewriter.notifyMatchFailure(op,
-                                           "unable to convert result types");
-      }
-      resultMap.push_back(
-          Result{originalType.index(), expandedTypes.size(), newTypes.front()});
-      expandedTypes.append(newTypes);
-    }
-
-    // Create a new call that takes the expanded input operands and returns the
-    // expanded output results. We can't directly replace the original call as
-    // the result counts differ.
-    auto callOp = rewriter.create<mlir::func::CallOp>(
-        op.getLoc(), expandedTypes, op.getCallee(), expandedOperands);
-
-    // Tie all resource results together so we end up with 1:1 results with the
-    // original op.
-    SmallVector<Value> results;
-    for (auto result : resultMap) {
-      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
-        auto oldType = op.getResult(result.originalIndex).getType();
-        auto resource = callOp.getResult(result.newIndex + 0);
-        auto resourceSize = callOp.getResult(result.newIndex + 1);
-        results.push_back(rewriter
-                              .create<mlir::UnrealizedConversionCastOp>(
-                                  op.getLoc(), TypeRange{oldType},
-                                  ValueRange{resource, resourceSize})
-                              .getResult(0));
-      } else {
-        results.push_back(callOp.getResult(result.newIndex));
-      }
-    }
-    rewriter.replaceOp(op, results);
-
-    return success();
-  }
-};
-
-struct ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(mlir::func::ReturnOp op, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Expand any resource operands to resource + size.
-    auto expandedOperands =
-        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, expandedOperands);
-    return success();
-  }
-};
 
 struct BranchOpConversion : public OpConversionPattern<mlir::cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -495,6 +360,19 @@ struct ScfYieldOpConversion : public OpConversionPattern<mlir::scf::YieldOp> {
 
 } // namespace
 
+template <typename OpT>
+static inline void addGenericLegalOp(ConversionTarget &conversionTarget,
+                                     TypeConverter &typeConverter) {
+  conversionTarget.addDynamicallyLegalOp<OpT>([&](OpT op) {
+    return llvm::all_of(
+               op->getOperandTypes(),
+               [&typeConverter](Type t) { return typeConverter.isLegal(t); }) &&
+           llvm::all_of(op->getResultTypes(), [&typeConverter](Type t) {
+             return typeConverter.isLegal(t);
+           });
+  });
+}
+
 void populateStandardStructuralToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
     TypeConverter &typeConverter, RewritePatternSet &patterns) {
@@ -504,82 +382,25 @@ void populateStandardStructuralToStreamPatterns(
   // dynamic legality checker to force any ops using such types to run through
   // our patterns.
 
-  conversionTarget.addDynamicallyLegalOp<mlir::func::FuncOp>(
-      [&](mlir::func::FuncOp op) {
-        return typeConverter.isSignatureLegal(op.getFunctionType()) &&
-               typeConverter.isLegal(&op.getBody());
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::func::CallOp>(
-      [&](mlir::func::CallOp op) {
-        return llvm::all_of(
-                   op.getOperandTypes(),
-                   [&](Type type) { return typeConverter.isLegal(type); }) &&
-               llvm::all_of(op.getResultTypes(), [&](Type type) {
-                 return typeConverter.isLegal(type);
-               });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::func::ReturnOp>(
-      [&](mlir::func::ReturnOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-
-  conversionTarget.addDynamicallyLegalOp<mlir::cf::BranchOp>(
-      [&](mlir::cf::BranchOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::cf::CondBranchOp>(
-      [&](mlir::cf::CondBranchOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::cf::SwitchOp>(
-      [&](mlir::cf::SwitchOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::scf::IfOp>(
-      [&](mlir::scf::IfOp op) {
-        return llvm::all_of(op.getResultTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::scf::ForOp>(
-      [&](mlir::scf::ForOp op) {
-        return llvm::all_of(op.getResultTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::scf::WhileOp>(
-      [&](mlir::scf::WhileOp op) {
-        return llvm::all_of(op.getResultTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::scf::ConditionOp>(
-      [&](mlir::scf::ConditionOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-  conversionTarget.addDynamicallyLegalOp<mlir::scf::YieldOp>(
-      [&](mlir::scf::YieldOp op) {
-        return llvm::all_of(op.getOperandTypes(), [&](Type type) {
-          return typeConverter.isLegal(type);
-        });
-      });
-
+  addGenericLegalOp<mlir::cf::BranchOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::cf::CondBranchOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::cf::SwitchOp>(conversionTarget, typeConverter);
   patterns
-      .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
-              BranchOpConversion, CondBranchOpConversion, SwitchOpConversion,
-              SelectOpConversion, ScfConditionOpConversion, ScfIfOpConversion,
-              ScfForOpConversion, ScfWhileOpConversion, ScfYieldOpConversion>(
+      .insert<BranchOpConversion, CondBranchOpConversion, SwitchOpConversion>(
           typeConverter, context);
+
+  addGenericLegalOp<mlir::arith::SelectOp>(conversionTarget, typeConverter);
+  patterns.insert<SelectOpConversion>(typeConverter, context);
+
+  addGenericLegalOp<mlir::scf::IfOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::scf::ForOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::scf::WhileOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::scf::ConditionOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<mlir::scf::YieldOp>(conversionTarget, typeConverter);
+  patterns
+      .insert<ScfConditionOpConversion, ScfIfOpConversion, ScfForOpConversion,
+              ScfWhileOpConversion, ScfYieldOpConversion>(typeConverter,
+                                                          context);
 }
 
 } // namespace mlir::iree_compiler
