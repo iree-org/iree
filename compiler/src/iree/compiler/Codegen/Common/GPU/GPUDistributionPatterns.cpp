@@ -655,14 +655,12 @@ struct DistributeBroadcastLayoutAttr final
     VectorValue source = dyn_cast<VectorValue>(broadcastOp.getSource());
     if (!source) {
       // TODO: Add support for scalar broadcasting.
-      llvm::errs() << "scalar??\n";
       return failure();
     }
 
     VectorValue vector = broadcastOp.getVector();
     LayoutAttr layout = dyn_cast<LayoutAttr>(signature[vector]);
     if (!layout) {
-      llvm::errs() << "layout is not layoutattr\n";
       return failure();
     }
 
@@ -670,7 +668,6 @@ struct DistributeBroadcastLayoutAttr final
 
     // We currently only support 1-D to 2-D broadcasting.
     if (source.getType().getRank() != 1 || vector.getType().getRank() != 2) {
-      llvm::errs() << "rank mismatch\n";
       return failure();
     }
 
