@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ArithToArmSME/ArithToArmSME.h"
 #include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -636,7 +637,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   }
 
   if (enableAArch64SME) {
-    // Lower vector operations to Arm SME operations.
+    // (Arith, Vector) -> ArmSME
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::createArithToArmSMEConversionPass());
     passManager.addNestedPass<func::FuncOp>(
         mlir::createConvertVectorToArmSMEPass());
     passManager.addNestedPass<func::FuncOp>(

@@ -27,6 +27,7 @@ iree_generated_e2e_matmul_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )
@@ -48,6 +49,7 @@ iree_generated_e2e_matmul_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )
