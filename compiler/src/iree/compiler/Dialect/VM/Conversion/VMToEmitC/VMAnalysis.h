@@ -21,8 +21,8 @@ namespace mlir::iree_compiler::IREE::VM {
 
 /// TODO(simon-camp): This struct grew from being a wrapper around the
 /// RegisterAllocation and ValueLiveness analyses to also cache other things
-/// needed throughout the conversion. This led to hard to follow failuresin the
-/// usage of this when only part of this struct was correctly initialized. This
+/// needed throughout the conversion. This led to hard to locate failures
+/// when only part of this struct was correctly initialized. This
 /// should be split into multiple structs each with a single responsibility.
 struct FuncAnalysis {
   FuncAnalysis() = default;

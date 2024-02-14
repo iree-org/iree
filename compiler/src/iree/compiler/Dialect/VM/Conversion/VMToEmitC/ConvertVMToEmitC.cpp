@@ -1149,8 +1149,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
   return success();
 }
 
-/// Generate boilerplate code like includes for the iree C API, include guards,
-/// structures to hold module state, functions and global variables to create a
+/// Generate boilerplate code like includes for the IREE C API, include guards,
+/// structures to hold the module state, functions and global variables to create a
 /// module instance etc.
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
@@ -1207,7 +1207,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     builder.create<emitc::IncludeOp>(loc, "iree/vm/ops_emitc.h");
     builder.create<emitc::IncludeOp>(loc, "iree/vm/shims_emitc.h");
 
-    // rodata ops
+    // Rodata ops.
     for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
       auto value = llvm::dyn_cast<IREE::Util::SerializableAttrInterface>(
           rodataOp.getValue());
@@ -1318,7 +1318,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     deps += "};";
     builder.create<emitc::VerbatimOp>(loc, deps);
 
-    // imports
+    // Imports.
     SmallVector<IREE::VM::ImportOp> importOps(
         moduleOp.getOps<IREE::VM::ImportOp>());
     std::string importName = moduleOp.getName().str() + "_imports_";
@@ -1329,7 +1329,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       // Empty list placeholder.
       imports += "{0},";
     } else {
-      // sort import ops by ordinal
+      // Sort import ops by ordinal.
       llvm::sort(importOps, [](auto &lhs, auto &rhs) {
         return lhs.getOrdinal()->getZExtValue() <
                rhs.getOrdinal()->getZExtValue();
@@ -1349,7 +1349,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       opsToRemove.push_back(op);
     }
 
-    // exports
+    // Exports.
     SmallVector<func::FuncOp> exportedFunctions;
     for (auto func : moduleOp.getOps<func::FuncOp>()) {
       if (typeConverter.analysis.lookupFunction(func).isExported()) {
@@ -1367,7 +1367,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
       // Empty list placeholder.
       exports += "{{0}},";
     } else {
-      // sort export ops
+      // Sort export ops.
       llvm::sort(exportedFunctions, [&extractExportName](auto &lhs, auto &rhs) {
         return extractExportName(lhs).compare(extractExportName(rhs)) < 0;
       });
@@ -1385,7 +1385,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     exports += "};";
     builder.create<emitc::VerbatimOp>(loc, exports);
 
-    // functions
+    // Functions.
     std::string functionName = moduleOp.getName().str() + "_funcs_";
     std::string functions;
     functions +=
@@ -1408,7 +1408,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     functions += "};";
     builder.create<emitc::VerbatimOp>(loc, functions);
 
-    // module descriptor
+    // Module descriptor.
     // TODO(simon-camp): support module-level reflection attributes
     std::string descriptorName = moduleOp.getName().str() + "_descriptor_";
     std::string descriptor;
@@ -1439,7 +1439,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     builder.create<emitc::VerbatimOp>(loc, descriptor);
 
-    // move functions marked as emitAtEnd to the end of the module
+    // Move functions marked as `emitAtEnd` to the end of the module.
     auto funcs =
         SmallVector<mlir::func::FuncOp>(moduleOp.getOps<mlir::func::FuncOp>());
     for (auto func : funcs) {
@@ -1462,11 +1462,11 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     op->erase();
   }
 
-  // TODO(simon-camp): The emitc code emitter expects a builtin.module as the
+  // TODO(simon-camp): The Cpp Emitter expects a builtin.module as the
   // outer container of the supported operations. Instead of nesting a
-  // builtin.module inside the vm.module here we should change this conversion
-  // pass to run on the outer builtin.module and replace the vm.module
-  // completely.
+  // builtin.module inside the vm.module as in the current implementation,
+  // the conversion pass should be changed to replace the vm.module
+  // with a builtin.module.
   builder.setInsertionPointToStart(&moduleOp.getBlock());
   auto innerModule = builder.create<mlir::ModuleOp>(loc);
 
