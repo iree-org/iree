@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::iree_compiler::IREE::VM {
 
@@ -35,7 +34,7 @@ struct FuncAnalysis {
     callingConvention = makeCallingConventionString(funcOp).value();
     refs = DenseMap<int64_t, Operation *>{};
   }
-  FuncAnalysis(mlir::func::FuncOp funcOp) {
+  FuncAnalysis(mlir::emitc::FuncOp funcOp) {
     originalFunctionType = funcOp.getFunctionType();
   }
   FuncAnalysis(IREE::VM::ImportOp importOp) {
@@ -142,7 +141,7 @@ struct ModuleAnalysis {
     for (auto func : module.getOps<IREE::VM::FuncOp>()) {
       functions[func.getOperation()] = FuncAnalysis(func);
     }
-    for (auto func : module.getOps<mlir::func::FuncOp>()) {
+    for (auto func : module.getOps<mlir::emitc::FuncOp>()) {
       functions[func.getOperation()] = FuncAnalysis(func);
     }
   }
@@ -152,25 +151,25 @@ struct ModuleAnalysis {
   ModuleAnalysis(const ModuleAnalysis &) = delete;
   ModuleAnalysis &operator=(const ModuleAnalysis &) = delete;
 
-  void addDummy(mlir::func::FuncOp func, bool emitAtEnd) {
+  void addDummy(mlir::emitc::FuncOp func, bool emitAtEnd) {
     functions[func.getOperation()] = FuncAnalysis(emitAtEnd);
   }
 
-  void addFromExport(mlir::func::FuncOp func, IREE::VM::ExportOp exportOp) {
-    mlir::func::FuncOp funcOp =
+  void addFromExport(mlir::emitc::FuncOp func, IREE::VM::ExportOp exportOp) {
+    mlir::emitc::FuncOp funcOp =
         exportOp->getParentOfType<IREE::VM::ModuleOp>()
-            .lookupSymbol<mlir::func::FuncOp>(exportOp.getFunctionRefAttr());
+            .lookupSymbol<mlir::emitc::FuncOp>(exportOp.getFunctionRefAttr());
 
     auto &funcAnalysis = lookupFunction(funcOp);
     functions[func.getOperation()] =
         FuncAnalysis(funcAnalysis, exportOp.getExportName());
   }
 
-  void addFromImport(mlir::func::FuncOp func, IREE::VM::ImportOp import) {
+  void addFromImport(mlir::emitc::FuncOp func, IREE::VM::ImportOp import) {
     functions[func.getOperation()] = FuncAnalysis(import);
   }
 
-  void move(mlir::func::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {
+  void move(mlir::emitc::FuncOp newFunc, IREE::VM::FuncOp oldFunc) {
     auto &analysis = lookupFunction(oldFunc.getOperation());
 
     functions[newFunc.getOperation()] = std::move(analysis);
@@ -195,12 +194,12 @@ struct ModuleAnalysis {
   Value lookupRef(Value ref) {
     auto refValue = cast<TypedValue<IREE::VM::RefType>>(ref);
 
-    mlir::func::FuncOp funcOp;
+    mlir::emitc::FuncOp funcOp;
     if (auto definingOp = ref.getDefiningOp()) {
-      funcOp = definingOp->getParentOfType<mlir::func::FuncOp>();
+      funcOp = definingOp->getParentOfType<mlir::emitc::FuncOp>();
     } else {
       Operation *op = llvm::cast<BlockArgument>(ref).getOwner()->getParentOp();
-      funcOp = cast<mlir::func::FuncOp>(op);
+      funcOp = cast<mlir::emitc::FuncOp>(op);
     }
 
     auto &analysis = lookupFunction(funcOp);

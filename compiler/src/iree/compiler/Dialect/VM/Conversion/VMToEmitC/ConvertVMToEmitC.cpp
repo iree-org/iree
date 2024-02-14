@@ -17,7 +17,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -104,7 +103,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   auto newFuncType = mlir::FunctionType::get(
       ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-  auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
+  auto newFuncOp = builder.create<mlir::emitc::FuncOp>(loc, name, newFuncType);
   newFuncOp.setPrivate();
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
@@ -355,7 +354,7 @@ LogicalResult retainOrMoveRefs(OpBuilder &builder, Location location,
 
 /// Releases refs which are local to the function as well as ref arguments.
 void releaseRefs(OpBuilder &builder, Location location,
-                 mlir::func::FuncOp funcOp,
+                 mlir::emitc::FuncOp funcOp,
                  IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto ctx = builder.getContext();
 
@@ -388,8 +387,8 @@ void releaseRefs(OpBuilder &builder, Location location,
   }
 }
 
-/// Generate an emitc.call op with one result and split the current block into a
-/// continuation and failure block based on the truthiness of the result
+/// Generate an emitc.call_opaque op with one result and split the current block
+/// into a continuation and failure block based on the truthiness of the result
 /// value, i.e. a truthy value branches to the continuation block when
 /// `negateCondition` is false.
 emitc::CallOpaqueOp failableCall(
@@ -446,11 +445,12 @@ emitc::CallOpaqueOp returnIfError(OpBuilder &builder, Location location,
   auto blockBuilder = [&builder, &location,
                        &moduleAnalysis](emitc::CallOpaqueOp &callOp) {
     Block *block = builder.getBlock();
-    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
+    mlir::emitc::FuncOp funcOp =
+        cast<mlir::emitc::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, moduleAnalysis);
 
-    builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
+    builder.create<mlir::emitc::ReturnOp>(location, callOp.getResult(0));
   };
 
   auto ctx = builder.getContext();
@@ -468,7 +468,8 @@ failContainerNull(OpBuilder &builder, Location location, Type type,
     auto ctx = builder.getContext();
 
     Block *block = builder.getBlock();
-    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
+    mlir::emitc::FuncOp funcOp =
+        cast<mlir::emitc::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, moduleAnalysis);
 
@@ -482,23 +483,23 @@ failContainerNull(OpBuilder &builder, Location location, Type type,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    builder.create<mlir::func::ReturnOp>(location, statusOp.getResult(0));
+    builder.create<mlir::emitc::ReturnOp>(location, statusOp.getResult(0));
   };
 
   return failableCall(builder, location, type, callee, args, operands,
                       blockBuilder);
 }
 
-/// Generate a mlir.call op with one result and split the current block into a
+/// Generate a emitc.call op with one result and split the current block into a
 /// continuation and failure block based on the truthiness of the result
 /// value, i.e. a truthy value branches to the continuation block when
 /// `negateCondition` is false.
-mlir::func::CallOp failableCall(
-    OpBuilder &builder, Location location, mlir::func::FuncOp &callee,
+mlir::emitc::CallOp failableCall(
+    OpBuilder &builder, Location location, mlir::emitc::FuncOp &callee,
     ArrayRef<Value> operands,
-    const std::function<void(mlir::func::CallOp &)> &failureBlockBuilder,
+    const std::function<void(mlir::emitc::CallOp &)> &failureBlockBuilder,
     bool negateCondition = false) {
-  auto callOp = builder.create<mlir::func::CallOp>(
+  auto callOp = builder.create<mlir::emitc::CallOp>(
       /*location=*/location,
       /*callee=*/callee,
       /*operands=*/operands);
@@ -537,18 +538,19 @@ mlir::func::CallOp failableCall(
   return callOp;
 }
 
-mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
-                                 mlir::func::FuncOp &callee,
-                                 ArrayRef<Value> operands,
-                                 IREE::VM::ModuleAnalysis &moduleAnalysis) {
+mlir::emitc::CallOp returnIfError(OpBuilder &builder, Location location,
+                                  mlir::emitc::FuncOp &callee,
+                                  ArrayRef<Value> operands,
+                                  IREE::VM::ModuleAnalysis &moduleAnalysis) {
   auto blockBuilder = [&builder, &location,
-                       &moduleAnalysis](mlir::func::CallOp &callOp) {
+                       &moduleAnalysis](mlir::emitc::CallOp &callOp) {
     Block *block = builder.getBlock();
-    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
+    mlir::emitc::FuncOp funcOp =
+        cast<mlir::emitc::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, moduleAnalysis);
 
-    builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
+    builder.create<mlir::emitc::ReturnOp>(location, callOp.getResult(0));
   };
 
   return failableCall(builder, location, callee, operands, blockBuilder,
@@ -575,7 +577,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         ctx, {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))},
         {});
 
-    auto funcOp = builder.create<mlir::func::FuncOp>(
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_destroy", funcType);
     funcOp.setPrivate();
 
@@ -608,7 +610,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{allocatorOp, castedModuleOp.getResult()});
 
-    builder.create<mlir::func::ReturnOp>(loc);
+    builder.create<mlir::emitc::ReturnOp>(loc, nullptr);
   }
 
   // iree_status_t alloc_state(void*, iree_allocator_t,
@@ -627,7 +629,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              emitc::OpaqueType::get(ctx, "iree_vm_module_state_t")))},
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-    auto funcOp = builder.create<mlir::func::FuncOp>(
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_alloc_state", funcType);
     funcOp.setPrivate();
 
@@ -791,7 +793,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status);
+    builder.create<mlir::emitc::ReturnOp>(loc, status);
   }
 
   // void free_state(void*, iree_vm_module_state_t*)
@@ -807,7 +809,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              emitc::OpaqueType::get(ctx, "iree_vm_module_state_t"))},
         {});
 
-    auto funcOp = builder.create<mlir::func::FuncOp>(
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_free_state", funcType);
     funcOp.setPrivate();
 
@@ -875,7 +877,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{allocatorOp, stateOp.getResult()});
 
-    builder.create<mlir::func::ReturnOp>(loc);
+    builder.create<mlir::emitc::ReturnOp>(loc, nullptr);
   }
 
   // iree_status_t resolve_import(
@@ -906,7 +908,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         },
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-    auto funcOp = builder.create<mlir::func::FuncOp>(
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
     funcOp.setPrivate();
 
@@ -956,7 +958,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-    builder.create<mlir::func::ReturnOp>(loc, status);
+    builder.create<mlir::emitc::ReturnOp>(loc, status);
   }
 
   // iree_status_t create(
@@ -984,7 +986,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             emitc::OpaqueType::get(ctx, "iree_status_t"),
         });
 
-    auto funcOp = builder.create<mlir::func::FuncOp>(
+    auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_create", funcType);
     funcOp.setPublic();
 
@@ -1108,8 +1110,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*operands=*/
           ArrayRef<Value>{allocatorArg, module});
 
-      builder.create<mlir::func::ReturnOp>(loc,
-                                           vmInitializeStatus.getResult(0));
+      builder.create<mlir::emitc::ReturnOp>(loc,
+                                            vmInitializeStatus.getResult(0));
     }
 
     builder.setInsertionPointToEnd(condBlock);
@@ -1143,15 +1145,15 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{vmModulePtr, instanceArg, allocatorArg, moduleArg});
 
-    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::emitc::ReturnOp>(loc, status.getResult(0));
   }
 
   return success();
 }
 
 /// Generate boilerplate code like includes for the IREE C API, include guards,
-/// structures to hold the module state, functions and global variables to create a
-/// module instance etc.
+/// structures to hold the module state, functions and global variables to
+/// create a module instance etc.
 LogicalResult
 createModuleStructure(IREE::VM::ModuleOp moduleOp,
                       IREE::VM::EmitCTypeConverter &typeConverter) {
@@ -1185,7 +1187,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                                           "//  __cplusplus");
 
     // Emit declarations for public functions.
-    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::emitc::FuncOp>()) {
       if (funcOp.isPublic()) {
         auto declOp =
             emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
@@ -1276,7 +1278,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                                      moduleStructStateFields);
 
     // Emit declarations for private functions.
-    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::emitc::FuncOp>()) {
       if (funcOp.isPrivate()) {
         auto declOp =
             emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
@@ -1350,13 +1352,13 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     }
 
     // Exports.
-    SmallVector<func::FuncOp> exportedFunctions;
-    for (auto func : moduleOp.getOps<func::FuncOp>()) {
+    SmallVector<emitc::FuncOp> exportedFunctions;
+    for (auto func : moduleOp.getOps<emitc::FuncOp>()) {
       if (typeConverter.analysis.lookupFunction(func).isExported()) {
         exportedFunctions.push_back(func);
       }
     }
-    auto extractExportName = [&typeConverter](func::FuncOp funcOp) {
+    auto extractExportName = [&typeConverter](emitc::FuncOp funcOp) {
       return typeConverter.analysis.lookupFunction(funcOp).getExportName();
     };
     std::string exportName = moduleOp.getName().str() + "_exports_";
@@ -1441,7 +1443,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     // Move functions marked as `emitAtEnd` to the end of the module.
     auto funcs =
-        SmallVector<mlir::func::FuncOp>(moduleOp.getOps<mlir::func::FuncOp>());
+        SmallVector<emitc::FuncOp>(moduleOp.getOps<mlir::emitc::FuncOp>());
     for (auto func : funcs) {
       if (typeConverter.analysis.lookupFunction(func).shouldEmitAtEnd()) {
         func->moveBefore(moduleOp.getBlock().getTerminator());
@@ -1453,7 +1455,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
                                           "  // EMITC_IMPLEMENTATION");
 
     // insert a verbatim op before private functions
-    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
+    for (auto func : moduleOp.getOps<mlir::emitc::FuncOp>()) {
       emitc_builders::makeFuncStatic(builder, loc, func);
     }
   }
@@ -1528,8 +1530,8 @@ protected:
   }
 };
 
-// Convert vm operations to emitc calls. The resultiong call has the ops
-// operands as arguments followed by an argument for every attribute.
+// Convert vm operations to emitc opaque_calls. The resultiong opaque_call has
+// the ops operands as arguments followed by an argument for every attribute.
 template <typename OpTy>
 class GenericOpConversion : public EmitCConversionPattern<OpTy> {
   using Adaptor = typename OpTy::Adaptor;
@@ -1556,8 +1558,8 @@ private:
     ArrayAttr templateArgs;
 
     // If the operation has attributes, we need to explicitely build the args
-    // attribute of the emitc call op. This consists of index attributes for
-    // the operands, followed by the source op attributes themselves.
+    // attribute of the emitc opaque_call op. This consists of index attributes
+    // for the operands, followed by the source op attributes themselves.
     if (op->getAttrs().size() > 0) {
       SmallVector<Attribute> args_ =
           indexSequence(adaptor.getOperands().size(), op.getContext());
@@ -1591,12 +1593,12 @@ class DeleteOpConversion : public EmitCConversionPattern<OpTy> {
   }
 };
 
-class FuncOpConversion : public EmitCConversionPattern<mlir::func::FuncOp> {
-  using Adaptor = mlir::func::FuncOp::Adaptor;
-  using EmitCConversionPattern<mlir::func::FuncOp>::EmitCConversionPattern;
+class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
+  using Adaptor = mlir::emitc::FuncOp::Adaptor;
+  using EmitCConversionPattern<mlir::emitc::FuncOp>::EmitCConversionPattern;
 
   LogicalResult
-  matchAndRewrite(mlir::func::FuncOp funcOp, Adaptor adaptor,
+  matchAndRewrite(mlir::emitc::FuncOp funcOp, Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
         funcOp.getFunctionType().getNumInputs());
@@ -1635,7 +1637,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
-    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+    mlir::emitc::FuncOp funcOp = lookupSymbolRef<mlir::emitc::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
     std::string newFuncName = funcOp.getName().str() + "_export_shim";
@@ -1662,7 +1664,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
         ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
     auto newFuncOp =
-        rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
+        rewriter.create<mlir::emitc::FuncOp>(loc, newFuncName, newFuncType);
     newFuncOp.setPrivate();
 
     getModuleAnalysis().addFromExport(newFuncOp, exportOp);
@@ -1742,7 +1744,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
       auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status);
+      rewriter.create<mlir::emitc::ReturnOp>(loc, status);
     }
 
     rewriter.eraseOp(exportOp);
@@ -1753,7 +1755,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
   FailureOr<std::pair<Value, Value>>
   castModuleAndStateStructs(ConversionPatternRewriter &rewriter,
                             IREE::VM::ExportOp &exportOp,
-                            mlir::func::FuncOp &newFuncOp) const {
+                            mlir::emitc::FuncOp &newFuncOp) const {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
@@ -1787,10 +1789,10 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
   FailureOr<std::pair<GeneratedStruct, GeneratedStruct>>
   typedefArgumentAndResultStructs(ConversionPatternRewriter &rewriter,
                                   IREE::VM::ExportOp &exportOp,
-                                  mlir::func::FuncOp &newFuncOp) const {
+                                  mlir::emitc::FuncOp &newFuncOp) const {
     auto loc = exportOp.getLoc();
 
-    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+    mlir::emitc::FuncOp funcOp = lookupSymbolRef<mlir::emitc::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
@@ -1870,7 +1872,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
   void castArgumentAndResultStructs(ConversionPatternRewriter &rewriter,
                                     IREE::VM::ExportOp &exportOp,
-                                    mlir::func::FuncOp &newFuncOp,
+                                    mlir::emitc::FuncOp &newFuncOp,
                                     GeneratedStruct &argumentStruct,
                                     GeneratedStruct &resultStruct) const {
     auto ctx = exportOp.getContext();
@@ -1935,7 +1937,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
       return success();
     }
 
-    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+    mlir::emitc::FuncOp funcOp = lookupSymbolRef<mlir::emitc::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
@@ -1995,7 +1997,7 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
     const auto typeConverter = getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+    mlir::emitc::FuncOp funcOp = lookupSymbolRef<mlir::emitc::FuncOp>(
         exportOp.getOperation(), "function_ref");
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
@@ -2107,8 +2109,8 @@ private:
       Region *parentRegion = condBlock->getParent();
       failureBlock = builder.createBlock(parentRegion, parentRegion->end());
 
-      mlir::func::FuncOp funcOp =
-          cast<mlir::func::FuncOp>(failureBlock->getParentOp());
+      mlir::emitc::FuncOp funcOp =
+          cast<mlir::emitc::FuncOp>(failureBlock->getParentOp());
       releaseRefs(builder, location, funcOp, typeConverter.analysis);
 
       auto statusOp = builder.create<emitc::CallOpaqueOp>(
@@ -2120,7 +2122,7 @@ private:
               ctx, {emitc::OpaqueAttr::get(ctx, "IREE_STATUS_NOT_FOUND")}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
-      builder.create<mlir::func::ReturnOp>(location, statusOp.getResult(0));
+      builder.create<mlir::emitc::ReturnOp>(location, statusOp.getResult(0));
     }
 
     builder.setInsertionPointToEnd(condBlock);
@@ -2154,7 +2156,7 @@ private:
              << "Failed to build function type for wrapper";
     }
 
-    auto newFuncOp = builder.create<mlir::func::FuncOp>(
+    auto newFuncOp = builder.create<mlir::emitc::FuncOp>(
         loc, newFuncName.value(), newFuncType.value());
     newFuncOp.setPrivate();
 
@@ -2212,7 +2214,7 @@ private:
 
       auto status = emitc_builders::ireeOkStatus(builder, loc);
 
-      builder.create<mlir::func::ReturnOp>(loc, status);
+      builder.create<mlir::emitc::ReturnOp>(loc, status);
     }
 
     return success();
@@ -2366,7 +2368,7 @@ private:
   }
 
   LogicalResult packArgumentBuffer(ArrayRef<Type> inputTypes,
-                                   mlir::func::FuncOp &funcOp, Value call,
+                                   mlir::emitc::FuncOp &funcOp, Value call,
                                    OpBuilder &builder, Location loc) const {
     if (inputTypes.empty()) {
       return success();
@@ -2436,7 +2438,7 @@ private:
   }
 
   LogicalResult unpackResultBuffer(ArrayRef<Type> resultTypes,
-                                   mlir::func::FuncOp &funcOp, Value call,
+                                   mlir::emitc::FuncOp &funcOp, Value call,
                                    OpBuilder &builder, Location loc) const {
     if (resultTypes.empty()) {
       return success();
@@ -2607,8 +2609,8 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy op, Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    mlir::func::FuncOp funcOp =
-        lookupSymbolRef<mlir::func::FuncOp>(op.getOperation(), "callee");
+    mlir::emitc::FuncOp funcOp =
+        lookupSymbolRef<mlir::emitc::FuncOp>(op.getOperation(), "callee");
     IREE::VM::ImportOp importOp =
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
 
@@ -2628,13 +2630,13 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
   LogicalResult rewriteInternalCall(Operation *op, Adaptor adaptor,
                                     ConversionPatternRewriter &rewriter,
-                                    mlir::func::FuncOp funcOp) const {
+                                    mlir::emitc::FuncOp funcOp) const {
     auto loc = op->getLoc();
 
     SmallVector<Value> updatedOperands;
     SmallVector<Value> resultOperands;
 
-    auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
+    auto parentFuncOp = op->getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stackArg =
         parentFuncOp.getArgument(CCONV_ARGUMENT_STACK);
@@ -2675,7 +2677,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
-    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stackArg = funcOp.getArgument(CCONV_ARGUMENT_STACK);
     const BlockArgument stateArg =
@@ -2715,7 +2717,7 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
     if (!funcName.has_value())
       return op->emitError() << "Couldn't build name to imported function";
 
-    auto callee = moduleOp.lookupSymbol<mlir::func::FuncOp>(funcName.value());
+    auto callee = moduleOp.lookupSymbol<mlir::emitc::FuncOp>(funcName.value());
     if (callee == nullptr) {
       return op->emitError()
              << "Couldn't find function with name `" << funcName.value() << "`";
@@ -2857,7 +2859,7 @@ private:
     auto loc = cmpOp.getLoc();
 
     auto funcOp =
-        cmpOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
+        cmpOp.getOperation()->template getParentOfType<mlir::emitc::FuncOp>();
 
     const auto typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
@@ -2910,7 +2912,7 @@ class CompareRefNotZeroOpConversion
     auto ctx = cmpOp.getContext();
     auto loc = cmpOp.getLoc();
 
-    auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
@@ -3005,7 +3007,7 @@ class ConstRefRodataOpConversion
     }
 
     auto funcOp =
-        constRefRodataOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
+        constRefRodataOp.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3260,7 +3262,7 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
     // The result variables are the last N arguments of the function.
     unsigned int firstOutputArgumentIndex =
@@ -3300,7 +3302,7 @@ class ReturnOpConversion : public EmitCConversionPattern<IREE::VM::ReturnOp> {
 
     auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status);
+    rewriter.replaceOpWithNewOp<mlir::emitc::ReturnOp>(op, status);
 
     return success();
   }
@@ -3323,7 +3325,7 @@ private:
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "import");
     int importOrdinal = importOp.getOrdinal()->getZExtValue();
 
-    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3391,20 +3393,20 @@ class FailOpConversion : public EmitCConversionPattern<IREE::VM::FailOp> {
       passthroughBlock =
           rewriter.createBlock(parentRegion, parentRegion->end());
 
-      auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
+      auto funcOp = op.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
       releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
       auto status = emitc_builders::ireeOkStatus(rewriter, loc);
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status);
+      rewriter.create<mlir::emitc::ReturnOp>(loc, status);
     }
     Block *failureBlock;
     {
       OpBuilder::InsertionGuard guard(rewriter);
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
-      auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
+      auto funcOp = op.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
       releaseRefs(rewriter, loc, funcOp, getModuleAnalysis());
 
@@ -3449,7 +3451,7 @@ class FailOpConversion : public EmitCConversionPattern<IREE::VM::FailOp> {
           /*operands=*/
           ArrayRef<Value>{messageSizeIntOp.getResult(), messageDataOp});
 
-      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::emitc::ReturnOp>(loc, status.getResult(0));
     }
 
     Type boolType = rewriter.getIntegerType(1);
@@ -3490,7 +3492,7 @@ private:
     }
 
     auto funcOp =
-        loadOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
+        loadOp.getOperation()->template getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3551,7 +3553,7 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
 
     auto globalOrdinal = globalOp.getOrdinal()->getZExtValue();
 
-    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::emitc::FuncOp>();
 
     auto &funcAnalysis = this->getModuleAnalysis().lookupFunction(funcOp);
 
@@ -3577,7 +3579,7 @@ class GlobalLoadStoreRefOpConversion : public EmitCConversionPattern<OpTy> {
         /*operand=*/refs);
 
     auto moduleOp = op->getParentOfType<IREE::VM::ModuleOp>();
-    auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
+    auto parentFuncOp = op->getParentOfType<mlir::emitc::FuncOp>();
     const BlockArgument moduleArg =
         parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
     Type elementType = localValue.getType();
@@ -3651,7 +3653,7 @@ private:
     }
 
     auto funcOp =
-        storeOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
+        storeOp.getOperation()->template getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3682,9 +3684,9 @@ private:
   StringRef funcName;
 };
 
-// Convert vm operations with wrapped containers to multiple emitc calls. The
-// wrapping ref pointers are first dereferenced and the results are used as the
-// arguments of the specified function name.
+// Convert vm operations with wrapped containers to multiple emitc opaque_calls.
+// The wrapping ref pointers are first dereferenced and the results are used as
+// the arguments of the specified function name.
 template <typename OpTy>
 class ContainerOpConversion : public EmitCConversionPattern<OpTy> {
   using Adaptor = typename OpTy::Adaptor;
@@ -3865,7 +3867,7 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value containerPtr = emitc_builders::addressOf(rewriter, loc, container);
 
     auto funcOp =
-        op.getOperation()->template getParentOfType<mlir::func::FuncOp>();
+        op.getOperation()->template getParentOfType<mlir::emitc::FuncOp>();
 
     const BlockArgument stateArg =
         funcOp.getArgument(CCONV_ARGUMENT_MODULE_STATE);
@@ -3948,7 +3950,7 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
 
     auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
-        op.getOperation()->getParentOfType<mlir::func::FuncOp>();
+        op.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
     const BlockArgument moduleArg =
         parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
     auto elementTypePtr =
@@ -4164,7 +4166,7 @@ class ListGetRefOpConversion
 
     auto moduleOp = getOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
-        getOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
+        getOp.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
     const BlockArgument moduleArg =
         parentFuncOp.getArgument(CCONV_ARGUMENT_MODULE);
 
@@ -4358,7 +4360,7 @@ class ListSetRefOpConversion
         /*args=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{refValue}, getModuleAnalysis());
 
-    auto funcOp = setOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
+    auto funcOp = setOp.getOperation()->getParentOfType<mlir::emitc::FuncOp>();
 
     auto &funcAnalysis = getModuleAnalysis().lookupFunction(funcOp);
 
@@ -4639,7 +4641,7 @@ namespace IREE::VM {
 namespace {
 
 // A pass converting IREE VM operations into the EmitC dialect.
-// vm.func ops get converted to std.func with the calling convention used by
+// vm.func ops get converted to emitc.func with the calling convention used by
 // EmitC. Each function gets three additional arguments a `iree_vm_stack_t*` as
 // well as two module specific struct pointers (`{module_name}_t*` and
 // `{module_name}_state_t`). These are followed by the original function
@@ -4668,8 +4670,8 @@ public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertVMToEmitCPass)
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
-                    mlir::func::FuncDialect, IREE::Util::UtilDialect>();
+    registry.insert<mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
+                    mlir::emitc::EmitCDialect, IREE::Util::UtilDialect>();
   }
 
   StringRef getArgument() const override { return "iree-convert-vm-to-emitc"; }
@@ -4684,9 +4686,9 @@ public:
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter(module);
 
-    // Convert vm.func ops to std.func with the calling convention used by
+    // Convert vm.func ops to emitc.func with the calling convention used by
     // EmitC. We convert these upfront to make sure vm.call ops always
-    // reference std.func ops with the correct calling convention during the
+    // reference emitc.func ops with the correct calling convention during the
     // conversion.
     SmallVector<IREE::VM::FuncOp> funcsToRemove;
     SmallVector<BlockArgument> blockArgsToRemove;
@@ -4717,11 +4719,10 @@ public:
     populateVMToEmitCPatterns(target, typeConverter, patterns);
 
     target.addLegalDialect<emitc::EmitCDialect, mlir::BuiltinDialect,
-                           mlir::cf::ControlFlowDialect,
-                           mlir::func::FuncDialect>();
+                           mlir::cf::ControlFlowDialect>();
 
-    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
-        [&](mlir::func::FuncOp op) {
+    target.addDynamicallyLegalOp<mlir::emitc::FuncOp>(
+        [&](mlir::emitc::FuncOp op) {
           return typeConverter.isSignatureLegal(op.getFunctionType());
         });
 

@@ -461,7 +461,7 @@ emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
 }
 
 FailureOr<emitc::VerbatimOp>
-func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
+func_decl(OpBuilder builder, Location location, mlir::emitc::FuncOp func,
           IREE::VM::EmitCTypeConverter &typeConverter) {
   std::string decl;
   if (func.isPrivate())
@@ -495,7 +495,7 @@ func_decl(OpBuilder builder, Location location, mlir::func::FuncOp func,
 }
 
 void makeFuncStatic(OpBuilder builder, Location location,
-                    mlir::func::FuncOp func) {
+                    mlir::emitc::FuncOp func) {
   if (!func.isPrivate())
     return;
   func.setPublic();

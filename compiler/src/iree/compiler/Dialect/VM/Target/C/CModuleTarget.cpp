@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/DropExcludedExports.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/Cpp/CppEmitter.h"
 #include "mlir/Transforms/Passes.h"
@@ -108,7 +109,8 @@ canonicalizeModule(IREE::VM::ModuleOp moduleOp,
 LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
                                  CTargetOptions targetOptions,
                                  llvm::raw_ostream &output) {
-  moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
+  moduleOp.getContext()
+      ->loadDialect<IREE::Util::UtilDialect, mlir::cf::ControlFlowDialect>();
 
   if (failed(canonicalizeModule(moduleOp, targetOptions))) {
     return moduleOp.emitError()

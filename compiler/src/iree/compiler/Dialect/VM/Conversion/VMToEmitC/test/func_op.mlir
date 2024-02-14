@@ -4,7 +4,7 @@
 // some arguments are getting added. For more details see comments on the
 // `ConvertVMToEmitCPass` class in ConvertVMToEmitC.cpp.
 vm.module @my_module {
-  // CHECK: func.func @my_module_fn(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>
+  // CHECK: emitc.func @my_module_fn(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>
   // CHECK-SAME:               %arg1: !emitc.ptr<!emitc.opaque<"struct my_module_t">>,
   // CHECK-SAME:               %arg2: !emitc.ptr<!emitc.opaque<"struct my_module_state_t">>,
   // CHECK-SAME:               %arg3: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>,
