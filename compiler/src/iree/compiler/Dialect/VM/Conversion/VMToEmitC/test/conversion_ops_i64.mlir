@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
-// CHECK-LABEL: @my_module_trunc_i64
+// CHECK-LABEL: emitc.func private @my_module_trunc_i64
 vm.module @my_module {
   vm.func @trunc_i64(%arg0 : i64) -> i32 {
     // CHECK-NEXT: %0 = emitc.call_opaque "vm_trunc_i64i32"(%arg3) : (i64) -> i32
@@ -11,7 +11,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_ext_i64
+// CHECK-LABEL: emitc.func private @my_module_ext_i64
 vm.module @my_module {
   vm.func @ext_i64(%arg0 : i32) -> i64 {
     // CHECK-NEXT: %0 = emitc.call_opaque "vm_ext_i32i64s"(%arg3) : (i32) -> i64

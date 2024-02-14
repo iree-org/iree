@@ -460,47 +460,4 @@ emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
   return builder.create<emitc::VerbatimOp>(location, t);
 }
 
-FailureOr<emitc::VerbatimOp>
-func_decl(OpBuilder builder, Location location, mlir::emitc::FuncOp func,
-          IREE::VM::EmitCTypeConverter &typeConverter) {
-  std::string decl;
-  if (func.isPrivate())
-    decl += "static ";
-  if (func.getNumResults() == 0) {
-    decl += "void";
-  } else if (func.getNumResults() == 1) {
-    auto cType = typeConverter.convertTypeToStringLiteral(
-        func.getFunctionType().getResult(0));
-    decl += cType.value();
-  } else {
-    return failure();
-  }
-  decl += " ";
-  decl += func.getSymName();
-  decl += "(";
-  size_t argIndex = 0;
-  for (Type type : func.getFunctionType().getInputs()) {
-    if (argIndex++ > 0) {
-      decl += ", ";
-    }
-    auto cType = typeConverter.convertTypeToStringLiteral(type);
-    if (!cType.has_value()) {
-      return func.emitError() << "failed to convert type " << type;
-    }
-    decl += cType.value();
-  }
-  decl += ");";
-
-  return {builder.create<emitc::VerbatimOp>(location, decl)};
-}
-
-void makeFuncStatic(OpBuilder builder, Location location,
-                    mlir::emitc::FuncOp func) {
-  if (!func.isPrivate())
-    return;
-  func.setPublic();
-  builder.setInsertionPoint(func);
-  builder.create<emitc::VerbatimOp>(location, "static");
-}
-
 } // namespace mlir::iree_compiler::emitc_builders

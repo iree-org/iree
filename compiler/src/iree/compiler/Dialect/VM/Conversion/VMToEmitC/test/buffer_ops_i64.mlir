@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_fill_i64
+  // CHECK-LABEL: emitc.func private @my_module_buffer_fill_i64
   vm.func @buffer_fill_i64(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C16:.+]] = "emitc.constant"() <{value = 16 : i64}> : () -> i64
@@ -22,7 +22,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_load_i64
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i64
   vm.func @buffer_load_i64(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
 
@@ -42,7 +42,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_store_i64
+  // CHECK-LABEL: emitc.func private @my_module_buffer_store_i64
   vm.func @buffer_store_i64(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C102:.+]] = "emitc.constant"() <{value = 102 : i64}> : () -> i64

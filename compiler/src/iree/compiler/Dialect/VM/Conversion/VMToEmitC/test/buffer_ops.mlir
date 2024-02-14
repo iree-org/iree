@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
-// CHECK-LABEL: @my_module_buffer_alloc
+// CHECK-LABEL: emitc.func private @my_module_buffer_alloc
 vm.module @my_module {
   vm.func @buffer_alloc() {
     // CHECK: %[[SIZE:.+]] = "emitc.constant"() <{value = 128 : i64}> : () -> i64
@@ -23,7 +23,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_buffer_clone
+// CHECK-LABEL: emitc.func private @my_module_buffer_clone
 vm.module @my_module {
   vm.func @buffer_clone(%buf : !vm.buffer) {
     // CHECK-DAG: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
@@ -48,7 +48,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_buffer_length
+// CHECK-LABEL: emitc.func private @my_module_buffer_length
 vm.module @my_module {
   vm.func @buffer_length(%buf : !vm.buffer) {
     // CHECK: %[[BUFFER_REF:.+]] = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
@@ -63,7 +63,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_buffer_compare
+// CHECK-LABEL: emitc.func private @my_module_buffer_compare
 vm.module @my_module {
   vm.func @buffer_compare(%buf : !vm.buffer, %buf2 : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
@@ -87,7 +87,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_buffer_copy
+// CHECK-LABEL: emitc.func private @my_module_buffer_copy
 vm.module @my_module {
   vm.func @buffer_copy(%buf : !vm.buffer, %buf2 : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
@@ -110,7 +110,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_fill_i8
+  // CHECK-LABEL: emitc.func private @my_module_buffer_fill_i8
   vm.func @buffer_fill_i8(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C16:.+]] = "emitc.constant"() <{value = 16 : i64}> : () -> i64
@@ -127,7 +127,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_fill_i16
+  // CHECK-LABEL: emitc.func private @my_module_buffer_fill_i16
   vm.func @buffer_fill_i16(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_fill_i16"
     %c0 = vm.const.i64 0
@@ -137,7 +137,7 @@ vm.module @my_module {
     vm.return
   }
 
-    // CHECK-LABEL: @my_module_buffer_fill_i32
+    // CHECK-LABEL: emitc.func private @my_module_buffer_fill_i32
   vm.func @buffer_fill_i32(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_fill_i32"
     %c0 = vm.const.i64 0
@@ -151,7 +151,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_load_i8s
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i8s
   vm.func @buffer_load_i8s(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
 
@@ -167,7 +167,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_load_i8u
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i8u
   vm.func @buffer_load_i8u(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_load_i8u"
     %c0 = vm.const.i64 0
@@ -175,7 +175,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_load_i16s
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i16s
   vm.func @buffer_load_i16s(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_load_i16s"
     %c0 = vm.const.i64 0
@@ -183,7 +183,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_load_i16u
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i16u
   vm.func @buffer_load_i16u(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_load_i16u"
     %c0 = vm.const.i64 0
@@ -191,7 +191,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_load_i32
+  // CHECK-LABEL: emitc.func private @my_module_buffer_load_i32
   vm.func @buffer_load_i32(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_load_i32"
     %c0 = vm.const.i64 0
@@ -203,7 +203,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_store_i8
+  // CHECK-LABEL: emitc.func private @my_module_buffer_store_i8
   vm.func @buffer_store_i8(%buf : !vm.buffer) {
     // CHECK: %[[C0:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     // CHECK: %[[C102:.+]] = "emitc.constant"() <{value = 102 : i32}> : () -> i32
@@ -218,7 +218,7 @@ vm.module @my_module {
     vm.return
   }
 
-  // CHECK-LABEL: @my_module_buffer_store_i16
+  // CHECK-LABEL: emitc.func private @my_module_buffer_store_i16
   vm.func @buffer_store_i16(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_store_i16"
     %c0 = vm.const.i64 0
@@ -227,7 +227,7 @@ vm.module @my_module {
     vm.return
   }
 
-    // CHECK-LABEL: @my_module_buffer_store_i32
+    // CHECK-LABEL: emitc.func private @my_module_buffer_store_i32
   vm.func @buffer_store_i32(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "vm_buffer_store_i32"
     %c0 = vm.const.i64 0
@@ -240,7 +240,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_buffer_hash
+  // CHECK-LABEL: emitc.func private @my_module_buffer_hash
   vm.func @buffer_hash(%buf : !vm.buffer) {
     // CHECK: %[[STATUS:.+]] = emitc.call_opaque "iree_vm_buffer_hash"
     %c0 = vm.const.i64 0

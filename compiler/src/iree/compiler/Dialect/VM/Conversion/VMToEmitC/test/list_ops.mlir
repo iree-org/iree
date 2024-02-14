@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_alloc
+  // CHECK-LABEL: emitc.func private @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) -> !vm.list<i32> {
     // CHECK: %[[LIST:.+]] = "emitc.variable"() <{value = #emitc.opaque<"NULL">}> : () -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
     // CHECK: %[[LIST_PTR:.+]] = emitc.apply "&"(%3) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>) -> !emitc.ptr<!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>>
@@ -21,7 +21,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_reserve
+  // CHECK-LABEL: emitc.func private @my_module_list_reserve
   vm.func @list_reserve(%arg0: !vm.list<i32>, %arg1: i32) {
     // CHECK-NEXT: %0 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %1 = emitc.call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
@@ -34,7 +34,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_resize
+  // CHECK-LABEL: emitc.func private @my_module_list_resize
   vm.func @list_resize(%arg0: !vm.list<i32>, %arg1: i32) {
     // CHECK-NEXT: %0 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %1 = emitc.call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
@@ -47,7 +47,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_size
+  // CHECK-LABEL: emitc.func private @my_module_list_size
   vm.func @list_size(%arg0: !vm.list<i32>) -> i32 {
     // CHECK-NEXT: %0 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %1 = emitc.call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
@@ -60,7 +60,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_get_i32
+  // CHECK-LABEL: emitc.func private @my_module_list_get_i32
   vm.func @list_get_i32(%arg0: !vm.list<i32>, %arg1: i32) -> i32 {
     // CHECK-NEXT: %0 = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_value_t">
     // CHECK-NEXT: %1 = emitc.apply "&"(%0) : (!emitc.opaque<"iree_vm_value_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
@@ -75,7 +75,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_get_ref
+  // CHECK-LABEL: emitc.func private @my_module_list_get_ref
   vm.func @list_get_ref(%arg0: !vm.list<!vm.ref<?>>, %arg1: i32) -> !vm.buffer {
     // CHECK-NEXT: %0 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %1 = emitc.call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>
@@ -100,7 +100,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_set_i32
+  // CHECK-LABEL: emitc.func private @my_module_list_set_i32
   vm.func @list_set_i32(%arg0: !vm.list<i32>, %arg1: i32, %arg2: i32) {
     // CHECK-NEXT: %0 = emitc.call_opaque "iree_vm_value_make_i32"(%arg5) : (i32) -> !emitc.opaque<"iree_vm_value_t">
     // CHECK-NEXT: %1 = emitc.apply "&"(%0) : (!emitc.opaque<"iree_vm_value_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
@@ -115,7 +115,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_set_ref
+  // CHECK-LABEL: emitc.func private @my_module_list_set_ref
   vm.func @list_set_ref(%arg0: !vm.list<!vm.ref<?>>, %arg1: i32, %arg2: !vm.buffer) {
     // CHECK-NEXT: %0 = emitc.apply "*"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %1 = emitc.call_opaque "iree_vm_list_deref"(%0) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_list_t">>

@@ -104,6 +104,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
       ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
   auto newFuncOp = builder.create<mlir::emitc::FuncOp>(loc, name, newFuncType);
+  newFuncOp.setSpecifiersAttr(
+      builder.getArrayAttr({builder.getStringAttr("static")}));
   newFuncOp.setPrivate();
 
   // This call shold be equivalent to rewriter.inlineRegionBefore()
@@ -579,6 +581,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_destroy", funcType);
+    funcOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
     funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
@@ -631,6 +635,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_alloc_state", funcType);
+    funcOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
     funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
@@ -811,6 +817,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_free_state", funcType);
+    funcOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
     funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
@@ -910,6 +918,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcOp = builder.create<mlir::emitc::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
+    funcOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
     funcOp.setPrivate();
 
     moduleAnalysis.addDummy(funcOp, /*emitAtEnd=*/false);
@@ -1189,10 +1199,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     // Emit declarations for public functions.
     for (auto funcOp : moduleOp.getOps<mlir::emitc::FuncOp>()) {
       if (funcOp.isPublic()) {
-        auto declOp =
-            emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
-        if (failed(declOp))
-          return failure();
+        builder.create<emitc::DeclareFuncOp>(loc, funcOp.getName());
       }
     }
 
@@ -1280,10 +1287,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     // Emit declarations for private functions.
     for (auto funcOp : moduleOp.getOps<mlir::emitc::FuncOp>()) {
       if (funcOp.isPrivate()) {
-        auto declOp =
-            emitc_builders::func_decl(builder, loc, funcOp, typeConverter);
-        if (failed(declOp))
-          return failure();
+        builder.create<emitc::DeclareFuncOp>(loc, funcOp.getName());
       }
     }
 
@@ -1453,11 +1457,6 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
     builder.setInsertionPoint(moduleOp.getBlock().getTerminator());
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
                                           "  // EMITC_IMPLEMENTATION");
-
-    // insert a verbatim op before private functions
-    for (auto func : moduleOp.getOps<mlir::emitc::FuncOp>()) {
-      emitc_builders::makeFuncStatic(builder, loc, func);
-    }
   }
 
   for (auto op : opsToRemove) {
@@ -1665,6 +1664,8 @@ class ExportOpConversion : public EmitCConversionPattern<IREE::VM::ExportOp> {
 
     auto newFuncOp =
         rewriter.create<mlir::emitc::FuncOp>(loc, newFuncName, newFuncType);
+    newFuncOp.setSpecifiersAttr(
+        rewriter.getArrayAttr({rewriter.getStringAttr("static")}));
     newFuncOp.setPrivate();
 
     getModuleAnalysis().addFromExport(newFuncOp, exportOp);
@@ -2158,6 +2159,8 @@ private:
 
     auto newFuncOp = builder.create<mlir::emitc::FuncOp>(
         loc, newFuncName.value(), newFuncType.value());
+    newFuncOp.setSpecifiersAttr(
+        builder.getArrayAttr({builder.getStringAttr("static")}));
     newFuncOp.setPrivate();
 
     typeConverter.analysis.addFromImport(newFuncOp, importOp);

@@ -111,39 +111,4 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
   return {};
 }
 
-std::optional<std::string>
-EmitCTypeConverter::convertTypeToStringLiteral(Type type) const {
-  if (auto oType = llvm::dyn_cast<emitc::OpaqueType>(type)) {
-    return oType.getValue().str();
-  }
-  if (auto pType = llvm::dyn_cast<emitc::PointerType>(type)) {
-    auto valueType = convertTypeToStringLiteral(pType.getPointee());
-    if (!valueType.has_value()) {
-      return std::nullopt;
-    }
-    return valueType.value() + "*";
-  }
-  if (auto iType = llvm::dyn_cast<IntegerType>(type)) {
-    switch (iType.getWidth()) {
-    case 32:
-      return "int32_t";
-    case 64:
-      return "int64_t";
-    default:
-      return std::nullopt;
-    }
-  }
-  if (auto fType = llvm::dyn_cast<FloatType>(type)) {
-    switch (fType.getWidth()) {
-    case 32:
-      return "float";
-    case 64:
-      return "double";
-    default:
-      return std::nullopt;
-    }
-  }
-  return std::nullopt;
-}
-
 } // namespace mlir::iree_compiler::IREE::VM

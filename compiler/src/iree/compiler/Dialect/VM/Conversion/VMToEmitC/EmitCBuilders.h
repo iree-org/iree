@@ -148,17 +148,6 @@ emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
                                         PreprocessorDirective directive,
                                         StringRef value);
 
-// TODO(simon-camp): This helper is no longer needed when we switch the
-// conversion to use emitc.func and emitc.declare_func ops.
-FailureOr<emitc::VerbatimOp>
-func_decl(OpBuilder builder, Location location, mlir::emitc::FuncOp func,
-          IREE::VM::EmitCTypeConverter &typeConverter);
-
-// TODO(simon-camp): This helper is no longer needed when we switch the
-// conversion to use emitc.func ops.
-void makeFuncStatic(OpBuilder builder, Location location,
-                    mlir::emitc::FuncOp func);
-
 } // namespace mlir::iree_compiler::emitc_builders
 
 #endif // IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCBUILDERS_H_
