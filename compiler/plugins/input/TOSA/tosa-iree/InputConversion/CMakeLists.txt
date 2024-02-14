@@ -31,7 +31,6 @@ iree_cc_library(
     "Passes.h.inc"
   DEPS
     ::PassesIncGen
-    IREELinalgExtDialect
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -39,6 +38,7 @@ iree_cc_library(
     MLIRPass
     MLIRTensorDialect
     MLIRTransforms
+    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 
@@ -59,7 +59,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREELinalgExtDialect
     MLIRArithDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -75,6 +74,7 @@ iree_cc_library(
     MLIRTosaToSCF
     MLIRTosaToTensor
     MLIRTransforms
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::InputConversion::Common
   PUBLIC
 )

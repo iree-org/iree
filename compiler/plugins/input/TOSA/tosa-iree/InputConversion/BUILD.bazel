@@ -40,7 +40,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PassesIncGen",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
@@ -71,7 +71,7 @@ iree_compiler_cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//compiler/src/iree/compiler/InputConversion/Common",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",

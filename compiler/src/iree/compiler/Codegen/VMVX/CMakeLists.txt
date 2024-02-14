@@ -55,8 +55,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREELinalgExtDialect
-    IREELinalgExtPasses
     LLVMSupport
     MLIRArithDialect
     MLIRBufferizationDialect
@@ -78,6 +76,8 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VMVX::IR

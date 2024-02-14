@@ -28,8 +28,6 @@ iree_cc_library(
     "MarkerUtils.cpp"
     "Utils.cpp"
   DEPS
-    IREELinalgExtDialect
-    IREELinalgExtPasses
     LLVMSupport
     LLVMTargetParser
     MLIRAffineDialect
@@ -58,6 +56,8 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Utils
   PUBLIC
 )
