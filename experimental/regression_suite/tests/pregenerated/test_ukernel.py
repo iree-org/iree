@@ -13,15 +13,25 @@ from ireers import *
 
 COMMON_FLAGS = [
     "--iree-input-type=none",
-    "--iree-stream-resource-index-bits=64",
-    "--iree-vm-target-index-bits=64",
-    "--iree-stream-resource-max-allocation-size=3221225472",
 ]
 
 argmax_ukernel_source = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_linalg.mlir",
     group="argmax_ukernel_linalg",
 )
+
+
+@pytest.fixture
+def argmax_ukernel_host_cpu_vmfb(argmax_ukernel_source):
+    return iree_compile(
+        argmax_ukernel_source,
+        "host_cpu",
+        flags=COMMON_FLAGS
+        + [
+            "--iree-hal-target-backends=llvm-cpu",
+            "--iree-llvmcpu-target-cpu-features=host",
+        ],
+    )
 
 
 @pytest.fixture
@@ -85,6 +95,55 @@ argmax_output_f32 = fetch_source_fixture(
     "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f32.npy",
     group="argmax_ukernel_output_f32",
 )
+
+
+@pytest.mark.presubmit
+@pytest.mark.unstable_linalg
+@pytest.mark.plat_host_cpu
+def test_correctness_host_cpu(
+    argmax_ukernel_host_cpu_vmfb,
+    argmax_input_f16,
+    argmax_output_f16,
+    argmax_input_f32,
+    argmax_output_f32,
+):
+    iree_run_module(
+        argmax_ukernel_host_cpu_vmfb,
+        device="local-task",
+        function="argmax_3d_dyn_f16i32",
+        args=[
+            f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
+        ],
+    )
+    iree_run_module(
+        argmax_ukernel_host_cpu_vmfb,
+        device="local-task",
+        function="argmax_3d_dyn_f16i64",
+        args=[
+            f"--input=@{argmax_input_f16.path}",
+            f"--expected_output=@{argmax_output_f16.path}",
+        ],
+    )
+
+    iree_run_module(
+        argmax_ukernel_host_cpu_vmfb,
+        device="local-task",
+        function="argmax_3d_dyn_f32i32",
+        args=[
+            f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
+        ],
+    )
+    iree_run_module(
+        argmax_ukernel_host_cpu_vmfb,
+        device="local-task",
+        function="argmax_3d_dyn_f32i64",
+        args=[
+            f"--input=@{argmax_input_f32.path}",
+            f"--expected_output=@{argmax_output_f32.path}",
+        ],
+    )
 
 
 @pytest.mark.presubmit
