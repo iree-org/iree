@@ -293,6 +293,12 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     `>`
   }];
 
+  let extraClassDeclaration = [{
+    // Returns the subgroup/lane ids delinearized from a single linearized
+    // thread ID.
+    ValueRange computeThreadIds(Value threadId, RewriterBase &rewriter) const;
+  }];
+
   let genVerifyDecl = 1;
 }
 

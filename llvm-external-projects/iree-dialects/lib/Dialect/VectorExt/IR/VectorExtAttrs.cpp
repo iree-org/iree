@@ -4,12 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
+
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include <numeric>
 
 using namespace mlir;
 
@@ -262,6 +266,23 @@ LogicalResult NestedLayoutAttr::verify(
   }
 
   return success();
+}
+
+/// Given a single flat thread ID, compute the indices of the distributed
+/// dimensions (subgroup and thread ids).
+ValueRange NestedLayoutAttr::computeThreadIds(Value threadId,
+                                              RewriterBase &rewriter) const {
+  SmallVector<OpFoldResult> basis;
+  for (auto warpTy : getSubgroupOrder()) {
+    basis.push_back(rewriter.getIndexAttr(getSubgroupsPerWorkgroup()[warpTy]));
+  }
+  for (auto threadTy : getThreadOrder()) {
+    basis.push_back(rewriter.getIndexAttr(getThreadsPerOuter()[threadTy]));
+  }
+
+  auto delinearized = rewriter.create<mlir::affine::AffineDelinearizeIndexOp>(
+      threadId.getLoc(), threadId, basis);
+  return delinearized->getResults();
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
