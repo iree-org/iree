@@ -500,7 +500,7 @@ void makeFuncStatic(OpBuilder builder, Location location,
     return;
   func.setPublic();
   builder.setInsertionPoint(func);
-  builder.create<emitc::VerbatimOp>(location, "static ");
+  builder.create<emitc::VerbatimOp>(location, "static");
 }
 
 } // namespace mlir::iree_compiler::emitc_builders

@@ -1,5 +1,7 @@
 // RUN: iree-compile --compile-mode=vm --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
+// TODO(simon-camp): Add back check for static modifiers
+
 vm.module @global_ops {
   // check the generated state struct
   // CHECK-LABEL: struct global_ops_state_t {

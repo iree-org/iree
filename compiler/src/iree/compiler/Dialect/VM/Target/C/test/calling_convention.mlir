@@ -1,5 +1,7 @@
 // RUN: iree-compile --compile-mode=vm --output-format=vm-c %s | FileCheck %s
 
+// TODO(simon-camp): Add back check for static modifiers
+
 // CHECK: #include "iree/vm/ops.h"
 vm.module @calling_convention_test {
   // CHECK: iree_status_t calling_convention_test_no_in_no_return(iree_vm_stack_t* v1, struct calling_convention_test_t* v2, struct calling_convention_test_state_t* v3) {

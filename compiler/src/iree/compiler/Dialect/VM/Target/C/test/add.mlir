@@ -2,6 +2,7 @@
 
 // CHECK: #include "iree/vm/ops.h"
 vm.module @add_module {
+  // TODO(simon-camp): Add back check for static modifier
   // CHECK: iree_status_t add_module_add_1(iree_vm_stack_t* v1, struct add_module_t* v2, struct add_module_state_t* v3, int32_t v4, int32_t v5, int32_t* v6, int32_t* v7) {
   vm.func @add_1(%arg0 : i32, %arg1 : i32) -> (i32, i32) {
     // CHECK-NEXT: int32_t v8;
