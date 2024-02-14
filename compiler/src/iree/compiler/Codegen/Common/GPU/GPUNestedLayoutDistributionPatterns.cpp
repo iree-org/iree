@@ -30,17 +30,27 @@ using VectorValue = TypedValue<VectorType>;
 
 /// Helper to linearize the given |ids| with maximum values given as |sizes|.
 /// Gets the element ID in terms of |elementCount| and adds the element
-/// |offset|.
+/// |offset|. For example,
+///
+/// IDs = [d0, d1, d2, d3]
+/// sizes = [s0, s1, s2, s3]
+/// linear_index = d0 * (s1 * s2 * s3)
+///              + d1 * (s2 * s3)
+///              + d2 * (s3)
+///              + d3
+/// return element_index = linear_index * |elementCount| + |offset|;
 static Value linearizeIndex(OpBuilder &builder, Value offset,
                             ArrayRef<OpFoldResult> ids, ArrayRef<int64_t> sizes,
                             int64_t elementCount) {
   SmallVector<AffineExpr> exprs(ids.size() + 1);
   bindSymbolsList(builder.getContext(), MutableArrayRef{exprs});
-  AffineExpr idExpr =
-      sizes[0] > 1 ? exprs[0] : builder.getAffineConstantExpr(0);
+  AffineExpr idExpr = builder.getAffineConstantExpr(0);
 
-  for (int i = 1, e = ids.size(); i < e; ++i) {
+  for (int i = 0, e = ids.size(); i < e; ++i) {
     if (sizes[i] > 1) {
+      // Multiply by the residual threads along this dimension (which must be
+      // faster changing than all previous dimensions) and add the id for this
+      // dimension.
       idExpr = idExpr * builder.getAffineConstantExpr(sizes[i]) + exprs[i];
     }
   }
@@ -85,11 +95,7 @@ struct DistributeTransferReadNestedLayoutAttr final
 
     // The delinearized thread IDs are returned from outer most to inner most,
     // i.e. before applying the layout described dimensions ordering.
-    FailureOr<ValueRange> maybeThreadIds =
-        vectorLayout.computeThreadIds(threadId, rewriter);
-    if (failed(maybeThreadIds)) {
-      return failure();
-    }
+    ValueRange threadIds = vectorLayout.computeThreadIds(threadId, rewriter);
 
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
@@ -100,14 +106,14 @@ struct DistributeTransferReadNestedLayoutAttr final
     // layout.
     SmallVector<int64_t> loopOrder;
     int64_t base = 0;
-    for (auto b : vectorLayout.getBatchOrder()) {
+    for (int64_t b : vectorLayout.getBatchOrder()) {
       loopOrder.push_back(base + b);
       tileShape[base + b] = 1;
     }
     base += rank;
     // We must unroll along the outer dimensions as well to match the rank
     // requirements of vector transfer ops (<= memref rank up to broadcasts).
-    for (auto o : vectorLayout.getOuterOrder()) {
+    for (int64_t o : vectorLayout.getOuterOrder()) {
       loopOrder.push_back(base + o);
       tileShape[base + o] = 1;
     }
@@ -133,11 +139,10 @@ struct DistributeTransferReadNestedLayoutAttr final
     // they are used by each dimension.
     SmallVector<Value> warpIndices = llvm::to_vector(
         llvm::map_range(vectorLayout.getSubgroupOrder(),
-                        [&](int64_t i) { return maybeThreadIds.value()[i]; }));
+                        [&](int64_t i) { return threadIds[i]; }));
     SmallVector<Value> threadIndices = llvm::to_vector(
-        llvm::map_range(vectorLayout.getThreadOrder(), [&](int64_t i) {
-          return maybeThreadIds.value()[i + rank];
-        }));
+        llvm::map_range(vectorLayout.getThreadOrder(),
+                        [&](int64_t i) { return threadIds[i + rank]; }));
 
     auto isBroadcast = [](AffineExpr expr) {
       if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
