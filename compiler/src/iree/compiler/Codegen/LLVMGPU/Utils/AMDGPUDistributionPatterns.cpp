@@ -64,7 +64,9 @@ struct DistributeContractions final
   ContractType inferContractType(MLIRContext *ctx,
                                  SmallVector<AffineMap> maps) const {
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, ctx);
+    };
     AffineExpr m, n, k;
     bindDims(ctx, m, n, k);
     if ((maps == infer({{m, k}, {k, n}, {m, n}})) ||
