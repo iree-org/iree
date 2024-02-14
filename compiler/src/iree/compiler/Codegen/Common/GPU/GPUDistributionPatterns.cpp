@@ -703,9 +703,35 @@ struct DistributeBroadcastLayoutAttr final
     });
 
     replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+    return success();
   }
 };
 
+/// This pattern implements a distribution pattern for layout conflict
+/// resolutions where the resolution is a simple vector reshape.
+/// In most cases, layout conflicts will need to be resolved with a
+/// trip to shared memory or shuffle instructions and in those scenarios
+/// this pattern will not work.
+///
+/// Below we outline some scenarios where this pattern will be useful:
+/// - Unary Operators which are permutation invariant
+///   Example:
+///     Say the data for a single row is distributed among 2 threads as
+///     0 0 0 0 1 1 1 1
+///     and we have a layout conflict that requires the data to be
+///     distributed as
+///     0 0 1 1 0 0 1 1
+///     and we are interested in computing an elementwise operation like exp
+///     or trying to do a reduction along the row, then since the operations
+///     are permutation invariant, we can treat the resolution as a vector
+///     reshape.
+/// - Binary Operators which are permutation invariant
+///   Example:
+///     Using the same example as above, say we are trying to do a dot product
+///     between two vectors that have the above layout. As long as both
+///     operands are permuted the same way, we will end up with the correct
+///     sequence of multiplications and additions.
+///
 struct DistributeLayoutConflictResolutions final
     : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -774,8 +800,6 @@ struct DistributeLayoutConflictResolutions final
     if (numElements(currentVecShape) != numElements(targetVecShape))
       return failure();
 
-    // TODO: Support lane conflicts by doing a trip to shared memory or using
-    // shuffles.
     if (currentLayout.hasLaneConflictWith(targetLayout)) {
       return failure();
     }
@@ -812,10 +836,8 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
           patterns.getContext(), laneId);
-  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose>(
-      patterns.getContext());
-  patterns.add<DistributeTranspose>(patterns.getContext());
-  patterns.add<DistributeLayoutConflictResolutions>(patterns.getContext());
+  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose,
+               DistributeLayoutConflictResolutions>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
