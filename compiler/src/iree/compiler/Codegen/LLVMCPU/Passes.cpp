@@ -302,6 +302,10 @@ void buildLLVMCPUVectorLoweringPipeline(
       createLLVMCPUVectorTransposeLoweringPass(
           options.lowerVectorTransposeToAVX2));
 
+  // Potentially removes shape_cast and broadcast on unit dims before shape_cast
+  // lowering.
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+
   // 'vector.shape_cast' are very expensive operations that are even generated
   // by some of the lowerings above (e.g., transpose lowering). There are
   // chances to cancel them out if they are not lowered too early so we lower
