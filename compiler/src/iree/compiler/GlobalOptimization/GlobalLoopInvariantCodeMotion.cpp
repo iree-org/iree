@@ -19,8 +19,8 @@ using namespace mlir;
 #define DEBUG_TYPE "global-loop-invariant-code-motion"
 #define LICM_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-// Check if the op is a leaf op we always want to hoist.
-static bool isHoistableLeafOp(Operation *op) {
+// Check if the op is a root op we always want to hoist.
+static bool isHoistableRootOp(Operation *op) {
   // Currently it's limited to a small set of ops related to constant pack op.
   return isa<tensor::PackOp>(op);
 }
@@ -29,40 +29,43 @@ static bool isHoistableLeafOp(Operation *op) {
 static bool isHoistableOp(Operation *op) {
   // Currently it's limited to a small set of ops related to constant pack op.
   return op->hasTrait<OpTrait::ConstantLike>() || isa<tensor::EmptyOp>(op) ||
-         isHoistableLeafOp(op);
+         isHoistableRootOp(op);
 }
 
 // Check if the op and its producers are loop invariants and hoistable. Results
 // are cached in hoistableOpMap to avoid repeated traversals.
-static bool checkHoistableBackwardSlice(
+static bool isBackwardSliceHoistable(
     LoopLikeOpInterface loopOp, Operation *op,
     llvm::SmallDenseMap<Operation *, bool> &hoistableOpMap) {
   // First check if the op has been analyzed.
   if (hoistableOpMap.contains(op))
     return hoistableOpMap[op];
 
-  bool hoistable = true;
-  // Currently only hoist ops with no region (so no implicit capture).
+  // Currently we don't handle implicit captures, so don't hoist ops with
+  // regions.
   if (op->getNumRegions() > 0) {
-    hoistable = false;
-  } else {
-    // Check if all producers are hoistable.
-    for (OpOperand &operand : op->getOpOperands()) {
-      Value value = operand.get();
-      // Ignore values defined outside the loop.
-      if (loopOp.isDefinedOutsideOfLoop(value))
-        continue;
-
-      Operation *producer = value.getDefiningOp();
-      // If the value is not an operation, we don't hoist it.
-      if (!producer ||
-          !checkHoistableBackwardSlice(loopOp, producer, hoistableOpMap)) {
-        hoistable = false;
-        break;
-      }
-    }
+    LLVM_DEBUG(LICM_DBGS() << "Non-hoistable: " << *op << "\n");
+    hoistableOpMap[op] = false;
+    return false;
   }
 
+  bool hoistable = true;
+  // Check if all producers are hoistable.
+  for (OpOperand &operand : op->getOpOperands()) {
+    Value value = operand.get();
+    // Ignore values defined outside the loop.
+    if (loopOp.isDefinedOutsideOfLoop(value))
+      continue;
+
+    Operation *producer = value.getDefiningOp();
+    // If the producer is not an operation, don't hoist it; otherwise
+    // recursively check if the producer is hoistable.
+    if (!producer ||
+        !isBackwardSliceHoistable(loopOp, producer, hoistableOpMap)) {
+      hoistable = false;
+      break;
+    }
+  }
   hoistableOpMap[op] = hoistable;
 
   LLVM_DEBUG(LICM_DBGS() << (hoistable ? "Hoistable: " : "Non-hoistable: ")
@@ -78,42 +81,44 @@ static LogicalResult hoistBackwardSlice(Operation *op,
   // Check if the op has been hoisted.
   if (!loopOp->isAncestor(op))
     return success();
-
-  // Walk all producers and hoist them first.
-  auto result = op->walk([&](Operation *walkOp) {
-    for (OpOperand &operand : walkOp->getOpOperands()) {
-      if (Operation *producer = operand.get().getDefiningOp()) {
-        if (failed(hoistBackwardSlice(producer, loopOp)))
-          return WalkResult::interrupt();
-      }
-    }
-    return WalkResult::advance();
-  });
-  if (result.wasInterrupted())
+  // Currently only hoist ops with no region (so no implicit capture).
+  if (op->getNumRegions() > 0)
     return failure();
 
+  // Hoist the producers.
+  for (OpOperand &operand : op->getOpOperands()) {
+    if (Operation *producer = operand.get().getDefiningOp()) {
+      if (failed(hoistBackwardSlice(producer, loopOp)))
+        return failure();
+    }
+  }
   // Hoist the op itself.
   loopOp.moveOutOfLoop(op);
+
   return success();
 }
 
 static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
                                          RewriterBase &rewriter) {
-  SmallVector<Operation *> opsToHoist;
-
+  // First find the root ops can be hoisted. The root op needs to satisfy:
+  // 1. It is a root op having benefits to be hoisted (e.g. tensor.pack)
+  // 2. Its backword slice can be hoisted (e.g. they are loop invariant)
+  SmallVector<Operation *> rootOpsToHoist;
   llvm::SmallDenseMap<Operation *, bool> hoistableOpMap;
+
   for (Region *region : loopOp.getLoopRegions()) {
     // Consider only the top-level ops in the region.
-    for (Operation &op : region->getOps()) {
-      if (!isHoistableLeafOp(&op))
+    for (Operation &rootOp : region->getOps()) {
+      if (!isHoistableRootOp(&rootOp))
         continue;
-      if (checkHoistableBackwardSlice(loopOp, &op, hoistableOpMap)) {
-        LLVM_DEBUG(LICM_DBGS() << "Found hoistable leaf: " << op << "\n");
-        opsToHoist.push_back(&op);
+
+      if (isBackwardSliceHoistable(loopOp, &rootOp, hoistableOpMap)) {
+        LLVM_DEBUG(LICM_DBGS() << "Found hoistable root: " << rootOp << "\n");
+        rootOpsToHoist.push_back(&rootOp);
       }
     }
   }
-  if (opsToHoist.empty())
+  if (rootOpsToHoist.empty())
     return success();
 
   // Wrap the loop in zero-trip-check so the hoisted ops will only run when the
@@ -128,9 +133,9 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
   if (failed(wrappedLoop))
     return failure();
 
-  // Hoist ops in order to handle the dependencies.
-  for (Operation *op : opsToHoist) {
-    if (failed(hoistBackwardSlice(op, wrappedLoop.value())))
+  // Hoist root ops in regions in reverse order to handle the dependencies.
+  for (auto it = rootOpsToHoist.rbegin(); it != rootOpsToHoist.rend(); ++it) {
+    if (failed(hoistBackwardSlice(*it, wrappedLoop.value())))
       return failure();
   }
 
