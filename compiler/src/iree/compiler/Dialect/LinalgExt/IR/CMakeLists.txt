@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "LinalgExtAttrs.h.inc"
     "LinalgExtDialect.h"
+    "LinalgExtDialect.h.inc"
     "LinalgExtEnums.h.inc"
     "LinalgExtInterfaces.h"
     "LinalgExtInterfaces.h.inc"
@@ -25,6 +26,7 @@ iree_cc_library(
   SRCS
     "LinalgExtAttrs.cpp.inc"
     "LinalgExtDialect.cpp"
+    "LinalgExtDialect.cpp.inc"
     "LinalgExtEnums.cpp.inc"
     "LinalgExtInterfaces.cpp"
     "LinalgExtInterfaces.cpp.inc"

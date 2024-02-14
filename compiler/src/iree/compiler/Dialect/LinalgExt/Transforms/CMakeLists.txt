@@ -38,6 +38,7 @@ iree_cc_library(
     "TileAndDecomposeWinogradPass.cpp"
   DEPS
     ::PassesIncGen
+    IREEInputDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils

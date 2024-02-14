@@ -39,6 +39,7 @@ iree_compiler_cc_library(
     srcs = [
         "LinalgExtAttrs.cpp.inc",
         "LinalgExtDialect.cpp",
+        "LinalgExtDialect.cpp.inc",
         "LinalgExtEnums.cpp.inc",
         "LinalgExtInterfaces.cpp",
         "LinalgExtInterfaces.cpp.inc",
@@ -49,6 +50,7 @@ iree_compiler_cc_library(
     hdrs = [
         "LinalgExtAttrs.h.inc",
         "LinalgExtDialect.h",
+        "LinalgExtDialect.h.inc",
         "LinalgExtEnums.h.inc",
         "LinalgExtInterfaces.h",
         "LinalgExtInterfaces.h.inc",
