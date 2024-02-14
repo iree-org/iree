@@ -26,7 +26,9 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
   }
 }
 
-static std::string ApiStatusToString(iree_status_t status) {
+}  // namespace
+
+std::string ApiStatusToString(iree_status_t status) {
   iree_host_size_t buffer_length = 0;
   if (IREE_UNLIKELY(!iree_status_format(status, /*buffer_capacity=*/0,
                                         /*buffer=*/NULL, &buffer_length))) {
@@ -40,8 +42,6 @@ static std::string ApiStatusToString(iree_status_t status) {
              ? result
              : "";
 }
-
-}  // namespace
 
 nanobind::python_error ApiStatusToPyExc(iree_status_t status,
                                         const char* message) {
