@@ -107,12 +107,12 @@ public:
   State getState() const { return state; }
   void erase(LayoutDimension dim);
   LayoutIterator getBatchIterator() const;
+  bool iterationComplete();
 
 private:
   void initialize(const PerDimLayoutAttr &attr,
                   DenseMap<LayoutDimension, int64_t> strides,
                   std::optional<int64_t> simdIndex);
-  bool iterationComplete();
   State state;
   DenseSet<LayoutDimension> frozenDimensions;
   int64_t iterations{0};
