@@ -352,16 +352,24 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   iree_hal_task_timepoint_t* timepoints = NULL;
   iree_host_size_t total_timepoint_size =
       semaphore_list.count * sizeof(timepoints[0]);
+  bool needs_wait = true;
   status =
       iree_arena_allocate(&arena, total_timepoint_size, (void**)&timepoints);
   if (iree_status_is_ok(status)) {
     memset(timepoints, 0, total_timepoint_size);
-    for (iree_host_size_t i = 0; i < semaphore_list.count; ++i) {
+    for (iree_host_size_t i = 0; i < semaphore_list.count && needs_wait; ++i) {
       iree_hal_task_semaphore_t* semaphore =
           iree_hal_task_semaphore_cast(semaphore_list.semaphores[i]);
       iree_slim_mutex_lock(&semaphore->mutex);
       if (semaphore->current_value >= semaphore_list.payload_values[i]) {
         // Fast path: already satisfied.
+        // If in ANY wait mode, this is sufficient and we don't actually need
+        // to wait. This also skips acquiring timepoints for any remaining
+        // semaphores. We still exit normally otherwise so as to cleanup
+        // any timepoints already acquired.
+        if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
+          needs_wait = false;
+        }
       } else {
         // Slow path: get a native wait handle for the timepoint.
         iree_hal_task_timepoint_t* timepoint = &timepoints[timepoint_count++];
@@ -377,7 +385,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
   }
 
   // Perform the wait.
-  if (iree_status_is_ok(status)) {
+  if (iree_status_is_ok(status) && needs_wait) {
     if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
       status = iree_wait_any(wait_set, deadline_ns, /*out_wake_handle=*/NULL);
     } else {
