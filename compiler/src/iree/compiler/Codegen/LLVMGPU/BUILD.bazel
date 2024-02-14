@@ -87,7 +87,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "LLVMGPU",
     srcs = [
-        "AMDGPUChainedMatmulPatterns.cpp",
+        "AMDGPUChainedMatmulPass.cpp",
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",

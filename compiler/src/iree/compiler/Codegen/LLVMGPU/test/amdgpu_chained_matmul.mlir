@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-amdgpu-chained-matmul),canonicalize,cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-amdgpu-prepare-chained-matmul),canonicalize,cse)" %s | FileCheck %s
 
 #accesses0 = [
   affine_map<(m, n, k) -> (m, k)>,
@@ -59,5 +59,32 @@ builtin.module {
       : vector<32x8xf16>, vector<16x8xf16> into vector<32x16xf16>
     %exp = math.exp2 %result : vector<32x16xf16>
     func.return %exp : vector<32x16xf16>
+  }
+}
+
+// -----
+
+#accesses0 = [
+  affine_map<(m, n, k) -> (m, k)>,
+  affine_map<(m, n, k) -> (n, k)>,
+  affine_map<(m, n, k) -> (m, n)>
+]
+
+#trait0 = {
+  indexing_maps = #accesses0,
+  iterator_types = ["parallel", "parallel", "reduction"]
+}
+
+builtin.module {
+  func.func @chained_matmul_second_operand(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
+    // CHECK: func.func @chained_matmul_second_operand(%[[LHS:.*]]: vector<32x8xf16>, %[[RHS:.*]]: vector<16x8xf16>, %[[ACC:.*]]: vector<32x16xf16>
+    %lhs2 : vector<32x16xf16>, %acc2 : vector<32x32xf16>) -> vector<32x32xf16> {
+    // CHECK-NOT: vector.transpose
+    %result = vector.contract #trait0 %lhs, %rhs, %acc
+      : vector<32x8xf16>, vector<16x8xf16> into vector<32x16xf16>
+    %exp = math.exp2 %result : vector<32x16xf16>
+    %result2 = vector.contract #trait0 %lhs2, %exp, %acc2
+      : vector<32x16xf16>, vector<32x16xf16> into vector<32x32xf16>
+    func.return %result2 : vector<32x32xf16>
   }
 }

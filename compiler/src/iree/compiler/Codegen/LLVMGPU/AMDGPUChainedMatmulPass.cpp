@@ -13,26 +13,36 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct AMDGPUChainedMatmulPass
-    : public AMDGPUChainedMatmulBase<AMDGPUChainedMatmulPass> {
+struct AMDGPUPrepareForChainedMatmulPass
+    : public AMDGPUPrepareForChainedMatmulBase<
+          AMDGPUPrepareForChainedMatmulPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect>();
   }
 
+  /// A chained matmul is one where the result of the first matmul
+  /// is used as the first operand of another matmul (
+  /// first matmul lies in the backward slice of the
+  /// LHS of the second matmul).
   bool
   isChainedMatmul(SmallVector<vector::ContractionOp> &chainedMatmuls) const {
-    SetVector<Operation *> forwardSlice;
-    getForwardSlice(chainedMatmuls[0].getOperation(), &forwardSlice);
-    for (auto *sliceOp : llvm::reverse(forwardSlice)) {
+    SetVector<Operation *> backwardSlice;
+    getBackwardSlice(chainedMatmuls[1].getLhs(), &backwardSlice);
+    for (auto *sliceOp : backwardSlice) {
       auto candidateContract = dyn_cast<vector::ContractionOp>(sliceOp);
       if (!candidateContract)
         continue;
-      if (candidateContract == chainedMatmuls[1])
+      if (candidateContract == chainedMatmuls[0])
         return true;
     }
     return false;
   }
 
+  /// Given a vector contract of the form
+  /// %output = vector.contract %lhs, %rhs, %acc
+  /// this function swaps the operands (%rhs, %lhs),
+  /// transposes the accumulator and output and updates
+  /// the indexing maps for the new contract op.
   void swapOperandsAndTranspose(RewriterBase &rewriter,
                                 vector::ContractionOp contractOp) const {
     Value lhs = contractOp.getLhs();
@@ -56,6 +66,11 @@ struct AMDGPUChainedMatmulPass
     rewriter.replaceAllUsesWith(contractOp.getResult(), transposed);
   }
 
+  /// The only compatible indexing map corresponds to
+  /// the matmul_transpose_b, and is
+  /// (m, n, k) -> (m, k)
+  /// (m, n, k) -> (n, k)
+  /// (m, n, k) -> (m, n)
   bool isCompatibleIndexingMap(vector::ContractionOp contractOp,
                                MLIRContext *ctx) {
     AffineExpr m, n, k;
@@ -66,11 +81,6 @@ struct AMDGPUChainedMatmulPass
     return newIndexingMaps == contractOp.getIndexingMapsArray();
   }
 
-  // Given a contraction: D = A x B.T + C, this pattern
-  // modifies the contraction to: D.T = B x A.T + C.T
-  // where .T computes the transpose. Applying this pattern
-  // can remove layout conflicts in certain scenarios
-  // (such as flash attention on CDNA GPUs).
   void runOnOperation() override {
     auto funcOp = getOperation();
     SmallVector<vector::ContractionOp> chainedMatmuls;
@@ -94,8 +104,8 @@ struct AMDGPUChainedMatmulPass
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createAMDGPUChainedMatmulPass() {
-  return std::make_unique<AMDGPUChainedMatmulPass>();
+createAMDGPUPrepareForChainedMatmulPass() {
+  return std::make_unique<AMDGPUPrepareForChainedMatmulPass>();
 }
 
 } // namespace mlir::iree_compiler

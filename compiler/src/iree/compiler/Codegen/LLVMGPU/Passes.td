@@ -13,10 +13,10 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
-def AMDGPUChainedMatmul :
-    InterfacePass<"iree-amdgpu-chained-matmul", "mlir::FunctionOpInterface"> {
+def AMDGPUPrepareForChainedMatmul :
+    InterfacePass<"iree-amdgpu-prepare-chained-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Pass to swap operands and transpose accumulator and result";
-  let constructor = "mlir::iree_compiler::createAMDGPUChainedMatmulPass()";
+  let constructor = "mlir::iree_compiler::createAMDGPUPrepareForChainedMatmulPass()";
 }
 
 // TODO: Bring the argument in line with the names used elsewhere.
