@@ -268,12 +268,10 @@ LogicalResult NestedLayoutAttr::verify(
   return success();
 }
 
-/// Given the state of the iterator, compute the indices of the original vector
-/// that the current iterator state is iterating over. These indices are
-/// parameterized by the thread grid.
-FailureOr<ValueRange>
-NestedLayoutAttr::computeThreadIds(Value threadId,
-                                   RewriterBase &rewriter) const {
+/// Given a single flat thread ID, compute the indices of the distributed
+/// dimensions (subgroup and thread ids).
+ValueRange NestedLayoutAttr::computeThreadIds(Value threadId,
+                                              RewriterBase &rewriter) const {
   SmallVector<OpFoldResult> basis;
   for (auto warpTy : getSubgroupOrder()) {
     basis.push_back(rewriter.getIndexAttr(getSubgroupsPerWorkgroup()[warpTy]));

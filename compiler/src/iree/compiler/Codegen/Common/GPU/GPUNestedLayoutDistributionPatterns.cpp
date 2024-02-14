@@ -28,8 +28,9 @@ namespace mlir::iree_compiler {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-// Helper to linearize the given |ids| with the given maximum values as |sizes|.
-// Gets the element ID in terms of |elementCount| and adds the element |offset|.
+/// Helper to linearize the given |ids| with maximum values given as |sizes|.
+/// Gets the element ID in terms of |elementCount| and adds the element
+/// |offset|.
 static Value linearizeIndex(OpBuilder &builder, Value offset,
                             ArrayRef<OpFoldResult> ids, ArrayRef<int64_t> sizes,
                             int64_t elementCount) {
@@ -55,7 +56,7 @@ static Value linearizeIndex(OpBuilder &builder, Value offset,
 
 namespace {
 
-// Pattern to distribute `vector.transfer_read` ops with nested layouts.
+/// Pattern to distribute `vector.transfer_read` ops with nested layouts.
 struct DistributeTransferReadNestedLayoutAttr final
     : OpDistributionPattern<vector::TransferReadOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -76,6 +77,8 @@ struct DistributeTransferReadNestedLayoutAttr final
       return failure();
     }
 
+    // Guard on memrefs for distribution. In isolation this pattern is agnostic
+    // to tensors or memrefs.
     if (!isa<MemRefType>(readOp.getSource().getType())) {
       return failure();
     }

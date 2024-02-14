@@ -100,9 +100,7 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
 }
 
 def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
-      [ DeclareAttrInterfaceMethods<VectorLayoutInterface, [
-        "computeThreadIds"
-      ]> ]> {
+      [ DeclareAttrInterfaceMethods<VectorLayoutInterface> ]> {
   let mnemonic = "nested_layout";
   let summary = [{A layout representing a mapping from GPU thread hierarchy to a shape}];
   let description = [{
@@ -298,8 +296,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
   let extraClassDeclaration = [{
     // Returns the subgroup/lane ids delinearized from a single linearized
     // thread ID.
-    FailureOr<ValueRange>
-    computeThreadIds(Value threadId, RewriterBase &rewriter) const;
+    ValueRange computeThreadIds(Value threadId, RewriterBase &rewriter) const;
   }];
 
   let genVerifyDecl = 1;
