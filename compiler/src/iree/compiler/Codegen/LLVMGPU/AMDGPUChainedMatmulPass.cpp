@@ -54,7 +54,9 @@ struct AMDGPUPrepareForChainedMatmulPass
     AffineExpr m, n, k;
     bindDims(rewriter.getContext(), m, n, k);
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, contractOp.getContext());
+    };
     SmallVector<AffineMap> newIndexingMaps = infer({{n, k}, {m, k}, {n, m}});
     vector::ContractionOp swappedOp = rewriter.create<vector::ContractionOp>(
         contractOp.getLoc(), rhs, lhs, transposed,
@@ -76,7 +78,9 @@ struct AMDGPUPrepareForChainedMatmulPass
     AffineExpr m, n, k;
     bindDims(ctx, m, n, k);
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, ctx);
+    };
     SmallVector<AffineMap> newIndexingMaps = infer({{m, k}, {n, k}, {m, n}});
     return newIndexingMaps == contractOp.getIndexingMapsArray();
   }
