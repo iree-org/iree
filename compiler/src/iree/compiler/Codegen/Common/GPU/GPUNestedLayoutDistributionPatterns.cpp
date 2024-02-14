@@ -65,9 +65,9 @@ static Value linearizeIndex(OpBuilder &builder, Value offset,
       .getResult();
 }
 
-// Given a set of base transfer |indices|, |offsets| for the batch/outer
-// dimensions, and distributed warp and thread indices, computes the indices
-// of the distributed transfer operation based on the |vectorLayout|.
+/// Given a set of base transfer |indices|, |offsets| for the batch/outer
+/// dimensions, and distributed warp and thread indices, computes the indices
+/// of the distributed transfer operation based on the |vectorLayout|.
 static SmallVector<Value> getTransferIndicesFromNestedLayout(
     OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
     NestedLayoutAttr vectorLayout, AffineMap permutationMap,
@@ -244,7 +244,7 @@ struct DistributeTransferReadNestedLayoutAttr final
   Value threadId;
 };
 
-// Pattern to distribute `vector.transfer_write` ops with nested layouts.
+/// Pattern to distribute `vector.transfer_write` ops with nested layouts.
 struct DistributeTransferWriteNestedLayoutAttr final
     : OpDistributionPattern<vector::TransferWriteOp> {
   using OpDistributionPattern::OpDistributionPattern;
