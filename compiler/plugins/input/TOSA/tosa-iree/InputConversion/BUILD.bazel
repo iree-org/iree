@@ -70,8 +70,8 @@ iree_compiler_cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//compiler/src/iree/compiler/InputConversion/Common",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/InputConversion/Common",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FunctionInterfaces",
