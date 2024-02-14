@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
@@ -19,10 +19,10 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtEnums.cpp.inc" // IWYU pragma: keep
 
 #define GET_ATTRDEF_CLASSES
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc" // IWYU pragma: keep
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc" // IWYU pragma: keep
 
 // Used to control inlining behavior.
 struct IREELinalgExtInlinerInterface : public DialectInlinerInterface {
@@ -51,13 +51,13 @@ void IREELinalgExtDialect::initialize() {
 
   addAttributes<
 #define GET_ATTRDEF_LIST
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc"
       >();
 
 #define GET_OP_LIST
   addOperations<
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc"
       >();
 }
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.cpp.inc"

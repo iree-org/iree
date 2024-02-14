@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"

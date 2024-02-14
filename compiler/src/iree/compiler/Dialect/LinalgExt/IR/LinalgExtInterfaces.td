@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_LINALGEXT_INTERFACES
 #define IREE_DIALECT_LINALGEXT_INTERFACES
 
-include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtBase.td"
+include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 
 // The interface is a subset of LinalgStructuredInterface.
 def LinalgExtInterface : OpInterface<"LinalgExtOp"> {

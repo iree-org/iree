@@ -25,10 +25,10 @@ namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op);
 }
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
 /// Include the generated interface declarations.
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.h.inc" // IWYU pragma: export
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h.inc" // IWYU pragma: export
 
 } // namespace LinalgExt
 } // namespace IREE

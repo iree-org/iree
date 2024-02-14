@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMOPS_LINALGEXTTRANSFORMOPS_H
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMOPS_LINALGEXTTRANSFORMOPS_H
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
@@ -29,7 +29,7 @@ class AttentionOp;
 } // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h.inc"
+#include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h.inc"
 
 namespace mlir {
 namespace iree_compiler {
