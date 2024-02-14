@@ -65,6 +65,9 @@ on:
           GCS path to the uploaded build log.
         value: ${{ jobs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-build-log-gcs-artifact }}
 
+permissions:
+  contents: read
+
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we

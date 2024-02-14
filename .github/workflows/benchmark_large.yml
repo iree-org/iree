@@ -24,6 +24,9 @@ on:
         default: a2-highgpu-1g=1,c2-standard-60=2,default=1
         type: string
 
+permissions:
+  contents: read
+
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels
   # queued and in-progress runs for the same PR (presubmit) or commit

@@ -20,6 +20,9 @@ on:
     types:
       - labeled
 
+permissions:
+  contents: read
+
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
   HEAD_SHA: ${{ github.event.pull_request.head.sha }}

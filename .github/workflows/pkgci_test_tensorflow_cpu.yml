@@ -17,6 +17,9 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   linux_x86_64:
     name: Linux (x86_64)

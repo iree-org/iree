@@ -11,6 +11,9 @@ on:
     workflows: ["CI"]
     types: [completed]
 
+permissions:
+  contents: read
+
 env:
   PR_CI_STAGE: ${{ github.event.workflow_run.event == 'pull_request' && 'presubmit' || 'postsubmit' }}
   PR_CI_RUN_ID: ${{ github.event.workflow_run.id }}

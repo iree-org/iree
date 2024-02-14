@@ -26,10 +26,15 @@ on:
   release:
     types: [published, unpublished]
 
+permissions:
+  contents: read
+
 jobs:
   publish_website:
     # Note: a clean build of `iree-tblgen` takes ~5 minutes on standard runners.
     runs-on: ubuntu-20.04
+    permissions:
+      contents: write
     steps:
       - name: Checkout out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0

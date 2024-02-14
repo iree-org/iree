@@ -40,6 +40,9 @@ on:
           Empty if no benchmark runs.
         value: ${{ jobs.run_benchmarks.outputs.benchmark-results-gcs-artifact-dir }}
 
+permissions:
+  contents: read
+
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we

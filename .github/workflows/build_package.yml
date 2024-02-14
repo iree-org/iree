@@ -29,6 +29,9 @@ on:
         description: "Commit to check out"
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   build_packages:
     name: "${{ matrix.build-family }} :: Build ${{ matrix.build-package }} Package"

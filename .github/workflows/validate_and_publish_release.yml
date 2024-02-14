@@ -15,6 +15,9 @@ on:
         description: "Run ID for the build_package.yml workflow that triggered this workflow"
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   validate_packages:
     name: "Validate packages"

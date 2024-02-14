@@ -3,6 +3,9 @@ name: Oneshot candidate release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   tag_release:
     name: "Tag candidate release"

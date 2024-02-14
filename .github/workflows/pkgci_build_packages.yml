@@ -12,6 +12,9 @@ on:
         type: string
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
