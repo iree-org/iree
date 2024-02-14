@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import asyncio
+import timeit
 import unittest
 
 from iree.runtime import (
@@ -17,16 +18,17 @@ class HalDeviceLoopBridgeTest(unittest.TestCase):
     def testBridge(self):
         loop = asyncio.new_event_loop()
         bridge = HalDeviceLoopBridge(self.device, loop)
-        sem1 = self.device.create_semaphore(0)
-        sem2 = self.device.create_semaphore(0)
+        sem1 = None
+        sem2 = None
+        report = None
 
         async def main():
             def done_1(x):
-                print("PYTHON: sem2.signal(1)")
+                report("PYTHON: sem2.signal(1)")
                 sem2.signal(1)
 
             def done_2(x):
-                print("PYTHON: sem2.signal(2)")
+                report("PYTHON: sem2.signal(2)")
                 sem2.signal(2)
 
             f1 = bridge.on_semaphore(sem1, 1, "Semaphore 1 Signaled")
@@ -37,19 +39,33 @@ class HalDeviceLoopBridgeTest(unittest.TestCase):
 
             sem1.signal(1)
             f1_result = await f1
-            print("PYTHON: await f1 =", f1_result)
+            report("PYTHON: await f1 =", f1_result)
             f2_result = await f2
-            print("PYTHON: await f2 =", f2_result)
+            report("PYTHON: await f2 =", f2_result)
             f2_again_result = await f2_again
-            print("PYTHON: await f2_again =", f2_again_result)
+            report("PYTHON: await f2_again =", f2_again_result)
 
             self.assertEqual(f1_result, "Semaphore 1 Signaled")
             self.assertEqual(f2_result, "Semaphore 2 Signaled")
             self.assertEqual(f2_again_result, "Semaphore 2 Signaled Again")
-            print("PYTHON: ASYNC MAIN() COMPLETE")
+            report("PYTHON: ASYNC MAIN() COMPLETE")
+
+        def run_iter(with_report):
+            nonlocal sem1
+            nonlocal sem2
+            nonlocal report
+            sem1 = self.device.create_semaphore(0)
+            sem2 = self.device.create_semaphore(0)
+            if with_report:
+                report = lambda *args: print(*args)
+            else:
+                report = lambda *args: None
+            loop.run_until_complete(main())
 
         try:
-            loop.run_until_complete(main())
+            run_iter(True)
+            iter_time = timeit.timeit("run_iter(False)", globals=locals(), number=10)
+            print(f"Time/iter = {iter_time}s")
         finally:
             bridge.stop()
 

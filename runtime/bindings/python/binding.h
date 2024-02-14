@@ -20,7 +20,7 @@
 
 // Uncomment the following to enable various noisy output to stderr for
 // verifying sequencing and reference counting.
-#define IREE_PY_TRACE_ENABLED 1
+// #define IREE_PY_TRACE_ENABLED 1
 
 #if IREE_PY_TRACE_ENABLED
 #define IREE_PY_TRACEF(fmt, ...) \
