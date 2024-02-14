@@ -177,7 +177,7 @@ public:
     fam.registerPass([&] { return targetMachine.getTargetIRAnalysis(); });
 
     llvm::PipelineTuningOptions pto;
-    pto.SLPVectorization = false;
+    pto.SLPVectorization = true;
 
     llvm::PassInstrumentationCallbacks pic;
 
