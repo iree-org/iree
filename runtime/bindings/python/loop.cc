@@ -270,7 +270,7 @@ class HalDeviceLoopBridge {
   // There is really not much we can do about this, so we attempt to report.
   // TODO: Have some kind of fatal exception hook.
   void ReportUncaughtException(py::python_error &e) {
-    e.discard_as_unraisable(__func__);
+    e.discard_as_unraisable(py::str(__func__));
   }
 
   iree_slim_mutex_t mu_;
