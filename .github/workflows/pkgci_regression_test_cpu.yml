@@ -52,5 +52,5 @@ jobs:
         run: |
           source $VENV_DIR/bin/activate
           pytest \
-            -s -m "plat_host_cpu and presubmit" \
+            -rA -s -m "plat_host_cpu and presubmit" \
             experimental/regression_suite
