@@ -50,7 +50,7 @@ typedef struct iree_hal_hip_queue_action_t {
   iree_hal_hip_pending_queue_actions_t* owning_actions;
 
   // The callback to run after completing this action and before freeing
-  // all resources.
+  // all resources. Can be NULL.
   iree_hal_hip_pending_action_cleanup_callback_t cleanup_callback;
   // User data to pass into the callback.
   void* callback_user_data;
@@ -612,7 +612,9 @@ static void iree_hal_hip_pending_queue_actions_cleanup_execution(
   iree_allocator_t host_allocator = actions->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  action->cleanup_callback(action->callback_user_data);
+  if (action->cleanup_callback) {
+    action->cleanup_callback(action->callback_user_data);
+  }
 
   iree_hal_resource_set_free(action->resource_set);
   iree_hal_hip_free_semaphore_list(host_allocator,
