@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --split-input-file --verify-diagnostics %s
+// RUN: iree-opt --split-input-file --verify-diagnostics %s
 
 func.func @sort_invalid_dimension(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   // expected-error @+1 {{dimension must be within (0, 1]}}

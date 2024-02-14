@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --pass-pipeline='builtin.module(iree-linalg-pad-contraction-to-block-size{rowAlignment=16 columnAlignment=32})' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-linalg-pad-contraction-to-block-size{rowAlignment=16 columnAlignment=32})' --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @pad_matmul_static
 // Full verification is done on this case. Others use reduced checks.

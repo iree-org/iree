@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --canonicalize --split-input-file %s | FileCheck %s
+// RUN: iree-opt --canonicalize --split-input-file %s | FileCheck %s
 
 func.func @tensor_cast(%arg0: tensor<3x5xi32>) -> tensor<3x5xi32> {
   %init = tensor.empty() : tensor<3x5xi32>

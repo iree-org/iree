@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt -resolve-shaped-type-result-dims -split-input-file %s | FileCheck %s
+// RUN: iree-opt -resolve-shaped-type-result-dims -split-input-file %s | FileCheck %s
 
 func.func @pack_static(%arg0 : tensor<100x250xf32>) -> (index, index) {
   %c0 = arith.constant 0 : index

@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt --transform-dialect-interpreter --split-input-file -canonicalize -cse %s | FileCheck  %s
+// RUN: iree-opt --transform-dialect-interpreter --split-input-file -canonicalize -cse %s | FileCheck  %s
 
 func.func @scatter_tiling_distribution(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,

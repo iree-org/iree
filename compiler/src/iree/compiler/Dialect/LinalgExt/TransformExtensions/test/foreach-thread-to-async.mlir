@@ -1,4 +1,4 @@
-// RUN: iree-dialects-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
+// RUN: iree-opt %s  --transform-dialect-interpreter --split-input-file | FileCheck %s
 
 #map0 = affine_map<(d0)[s0] -> (d0 ceildiv s0)>
 #map1 = affine_map<(d0)[s0] -> (d0 * s0)>
