@@ -71,9 +71,7 @@ class HalDeviceLoopBridgeTest(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
-        # TODO: Switch to local-task (experiencing some wait deadlocking
-        # that needs triage).
-        self.device = get_device("local-sync")
+        self.device = get_device("local-task")
         self.allocator = self.device.allocator
 
 
