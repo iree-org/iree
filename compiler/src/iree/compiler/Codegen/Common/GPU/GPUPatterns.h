@@ -40,6 +40,9 @@ void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
 void populateGPUDistributeNestedLayoutAttrPatterns(Value threadId,
                                                    RewritePatternSet &patterns);
 
+void populateGPULayoutResolutionDistributionPatterns(
+    RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_GPUPATTERNS_H_

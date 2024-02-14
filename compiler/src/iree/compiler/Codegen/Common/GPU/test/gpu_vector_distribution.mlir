@@ -417,7 +417,7 @@ func.func @distribute_transpose(%mem: memref<32x32xf16>, %mem1: memref<32x32xf16
 func.func @distribute_broadcast_row_col(%source: vector<32xf32>) -> vector<32x32xf32> {
   %result = vector.broadcast %source {
           "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d_t,
-          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d} 
+          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d}
           : vector<32xf32> to vector<32x32xf32>
   // CHECK-DAG: %[[S00:.*]] = vector.extract %[[SOURCE:.*]][0, 0]
   // CHECK-DAG: vector.insert %[[S00]], %{{.*}} [0, 0, 0]
@@ -450,7 +450,7 @@ func.func @distribute_broadcast_row_col(%source: vector<32xf32>) -> vector<32x32
 func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32xf32> {
   %result = vector.broadcast %source {
           "__vector_layout_test_anchor_operand_0" = #layout_broadcast_1d,
-          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d_t} 
+          "__vector_layout_test_anchor_result_0" = #layout_broadcast_2d_t}
           : vector<32xf32> to vector<32x32xf32>
   // CHECK-DAG: %[[S0:.*]] = vector.extract %[[SOURCE:.*]][0]
   // CHECK-DAG: vector.insert %[[S0]], %{{.*}} [0, 0, 0]
@@ -530,7 +530,7 @@ func.func @unresolved_layout_conflict(%a : memref<32x16xf16>, %b : memref<32x16x
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func {experimental = true} : !transform.any_op
     transform.yield
   }
 }

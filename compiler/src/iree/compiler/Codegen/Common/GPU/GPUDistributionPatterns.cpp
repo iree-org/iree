@@ -836,8 +836,14 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
           patterns.getContext(), laneId);
-  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose,
-               DistributeLayoutConflictResolutions>(patterns.getContext());
+  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose>(
+      patterns.getContext());
+}
+
+// TODO: Need a new op/analysis to determine when this pattern is safe to use.
+void populateGPULayoutResolutionDistributionPatterns(
+    RewritePatternSet &patterns) {
+  patterns.add<DistributeLayoutConflictResolutions>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
