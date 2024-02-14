@@ -264,3 +264,144 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
     iree_uk_mmt4d_tile_s8s8s32_2x8x1_arm_64,
     iree_uk_mmt4d_tile_s8s8s32_4x8x1_arm_64,
     iree_uk_mmt4d_tile_s8s8s32_8x8x1_arm_64)
+
+// This kernel is an adaptation of the kernel
+// `qd8-f32-qc4w-gemm-1x16-minmax-neon-mlal-lane.c` in
+// https://github.com/google/XNNPACK. We borrow the int4 conversion trick
+// described within the method body.
+static inline void iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 4 && iree_uk_is_po2_u32(M0));
+  IREE_UK_ASSERT(!(params->K0 % 2));
+  const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+
+  iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
+  int32x4_t acc[16];
+  // We start with zero accumulators and add the value of *out_ptr later.
+  // This is required for the int4 trick described later.
+  for (int i = 0; i < 4 * M0; ++i) {
+    acc[i] = vdupq_n_s32(0);
+  }
+
+  const int8x16_t vmask = vmovq_n_s8(0xF0);
+
+  for (int k = 0; k < params->K; ++k) {
+    int8x16_t rhs = vld1q_s8(rhs_ptr);
+    rhs_ptr += 16;
+
+    // We unpack int4s into individual int8s. To preserve signedness, int4s are
+    // moved to the upper 4-bits of each byte. This has the effect of
+    // multiplying each int4 by 2^4 = 16. To compensate, we divide the
+    // accumulator values by 16 before storing to memory.
+    int8x16_t rhs_0 = vshlq_n_s8(rhs, 4);
+    int8x16_t rhs_1 = vandq_s8(rhs, vmask);
+
+    int16x8_t rhs_0_low = vmovl_s8(vget_low_s8(rhs_0));
+    int16x8_t rhs_0_high = vmovl_s8(vget_high_s8(rhs_0));
+    int16x8_t rhs_1_low = vmovl_s8(vget_low_s8(rhs_1));
+    int16x8_t rhs_1_high = vmovl_s8(vget_high_s8(rhs_1));
+
+    int16x4_t rhs_0_low_03 = vget_low_s16(rhs_0_low);
+    int16x4_t rhs_0_low_47 = vget_high_s16(rhs_0_low);
+    int16x4_t rhs_0_high_03 = vget_low_s16(rhs_0_high);
+    int16x4_t rhs_0_high_47 = vget_high_s16(rhs_0_high);
+
+    int16x4_t rhs_1_low_03 = vget_low_s16(rhs_1_low);
+    int16x4_t rhs_1_low_47 = vget_high_s16(rhs_1_low);
+    int16x4_t rhs_1_high_03 = vget_low_s16(rhs_1_high);
+    int16x4_t rhs_1_high_47 = vget_high_s16(rhs_1_high);
+
+    if (M0 == 4) {
+      // Handle 4x16x2.
+      int16x8_t lhs = vmovl_s8(vld1_s8(lhs_ptr));
+      lhs_ptr += 8;
+
+      int16x4_t lhs_03 = vget_low_s16(lhs);
+      int16x4_t lhs_47 = vget_high_s16(lhs);
+
+      acc[0] = vmlal_lane_s16(acc[0], rhs_0_low_03, lhs_03, 0);
+      acc[4] = vmlal_lane_s16(acc[4], rhs_0_low_03, lhs_03, 2);
+      acc[8] = vmlal_lane_s16(acc[8], rhs_0_low_03, lhs_47, 0);
+      acc[12] = vmlal_lane_s16(acc[12], rhs_0_low_03, lhs_47, 2);
+      acc[1] = vmlal_lane_s16(acc[1], rhs_0_low_47, lhs_03, 0);
+      acc[5] = vmlal_lane_s16(acc[5], rhs_0_low_47, lhs_03, 2);
+      acc[9] = vmlal_lane_s16(acc[9], rhs_0_low_47, lhs_47, 0);
+      acc[13] = vmlal_lane_s16(acc[13], rhs_0_low_47, lhs_47, 2);
+      acc[2] = vmlal_lane_s16(acc[2], rhs_0_high_03, lhs_03, 0);
+      acc[6] = vmlal_lane_s16(acc[6], rhs_0_high_03, lhs_03, 2);
+      acc[10] = vmlal_lane_s16(acc[10], rhs_0_high_03, lhs_47, 0);
+      acc[14] = vmlal_lane_s16(acc[14], rhs_0_high_03, lhs_47, 2);
+      acc[3] = vmlal_lane_s16(acc[3], rhs_0_high_47, lhs_03, 0);
+      acc[7] = vmlal_lane_s16(acc[7], rhs_0_high_47, lhs_03, 2);
+      acc[11] = vmlal_lane_s16(acc[11], rhs_0_high_47, lhs_47, 0);
+      acc[15] = vmlal_lane_s16(acc[15], rhs_0_high_47, lhs_47, 2);
+
+      acc[0] = vmlal_lane_s16(acc[0], rhs_1_low_03, lhs_03, 1);
+      acc[4] = vmlal_lane_s16(acc[4], rhs_1_low_03, lhs_03, 3);
+      acc[8] = vmlal_lane_s16(acc[8], rhs_1_low_03, lhs_47, 1);
+      acc[12] = vmlal_lane_s16(acc[12], rhs_1_low_03, lhs_47, 3);
+      acc[1] = vmlal_lane_s16(acc[1], rhs_1_low_47, lhs_03, 1);
+      acc[5] = vmlal_lane_s16(acc[5], rhs_1_low_47, lhs_03, 3);
+      acc[9] = vmlal_lane_s16(acc[9], rhs_1_low_47, lhs_47, 1);
+      acc[13] = vmlal_lane_s16(acc[13], rhs_1_low_47, lhs_47, 3);
+      acc[2] = vmlal_lane_s16(acc[2], rhs_1_high_03, lhs_03, 1);
+      acc[6] = vmlal_lane_s16(acc[6], rhs_1_high_03, lhs_03, 3);
+      acc[10] = vmlal_lane_s16(acc[10], rhs_1_high_03, lhs_47, 1);
+      acc[14] = vmlal_lane_s16(acc[14], rhs_1_high_03, lhs_47, 3);
+      acc[3] = vmlal_lane_s16(acc[3], rhs_1_high_47, lhs_03, 1);
+      acc[7] = vmlal_lane_s16(acc[7], rhs_1_high_47, lhs_03, 3);
+      acc[11] = vmlal_lane_s16(acc[11], rhs_1_high_47, lhs_47, 1);
+      acc[15] = vmlal_lane_s16(acc[15], rhs_1_high_47, lhs_47, 3);
+    } else {
+      // Handle 1x16x2.
+      int16x4_t lhs = vdup_n_s16(0);
+      lhs[0] = (int16_t)*lhs_ptr++;
+      lhs[1] = (int16_t)*lhs_ptr++;
+
+      acc[0] = vmlal_lane_s16(acc[0], rhs_0_low_03, lhs, 0);
+      acc[1] = vmlal_lane_s16(acc[1], rhs_0_low_47, lhs, 0);
+      acc[2] = vmlal_lane_s16(acc[2], rhs_0_high_03, lhs, 0);
+      acc[3] = vmlal_lane_s16(acc[3], rhs_0_high_47, lhs, 0);
+
+      acc[0] = vmlal_lane_s16(acc[0], rhs_1_low_03, lhs, 1);
+      acc[1] = vmlal_lane_s16(acc[1], rhs_1_low_47, lhs, 1);
+      acc[2] = vmlal_lane_s16(acc[2], rhs_1_high_03, lhs, 1);
+      acc[3] = vmlal_lane_s16(acc[3], rhs_1_high_47, lhs, 1);
+
+      if (M0 >= 2) {
+        // Handle 2x16x2.
+        lhs[2] = (int16_t)*lhs_ptr++;
+        lhs[3] = (int16_t)*lhs_ptr++;
+
+        acc[4] = vmlal_lane_s16(acc[4], rhs_0_low_03, lhs, 2);
+        acc[5] = vmlal_lane_s16(acc[5], rhs_0_low_47, lhs, 2);
+        acc[6] = vmlal_lane_s16(acc[6], rhs_0_high_03, lhs, 2);
+        acc[7] = vmlal_lane_s16(acc[7], rhs_0_high_47, lhs, 2);
+
+        acc[4] = vmlal_lane_s16(acc[4], rhs_1_low_03, lhs, 3);
+        acc[5] = vmlal_lane_s16(acc[5], rhs_1_low_47, lhs, 3);
+        acc[6] = vmlal_lane_s16(acc[6], rhs_1_high_03, lhs, 3);
+        acc[7] = vmlal_lane_s16(acc[7], rhs_1_high_47, lhs, 3);
+      }
+    }
+  }
+
+  for (int i = 0; i < 4 * M0; ++i) {
+    // Divide by 16 since we shifted int4s to the upper 4 bits of int8s.
+    acc[i] = vshrq_n_s32(acc[i], 4);
+    if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+      int32x4_t existing_acc = vld1q_s32(out_ptr + 4 * i);
+      acc[i] = vaddq_s32(acc[i], existing_acc);
+    }
+    vst1q_s32(out_ptr + 4 * i, acc[i]);
+  }
+}
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4(
+    iree_uk_mmt4d_tile_s8s4s32_1x16x2_to_4x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_1x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_2x16x2_arm_64,
+    iree_uk_mmt4d_tile_s8s4s32_4x16x2_arm_64)
