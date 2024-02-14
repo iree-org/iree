@@ -27,6 +27,16 @@ enum class MFMAType {
 
 namespace {
 
+static bool isOperandATransposed(ContractType contractType) {
+  return (contractType == ContractType::MTM) ||
+         (contractType == ContractType::MTMT);
+}
+
+static bool isOperandBTransposed(ContractType contractType) {
+  return (contractType == ContractType::MMT) ||
+         (contractType == ContractType::MTMT);
+}
+
 struct DistributeContractions final
     : OpDistributionPattern<vector::ContractionOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -54,8 +64,7 @@ struct DistributeContractions final
 
   int64_t getReductionDimensionShape(int64_t rowBatch, int64_t colBatch,
                                      ContractType contractType) const {
-    if ((contractType == ContractType::MTM) ||
-        (contractType == ContractType::MTMT)) {
+    if (isOperandATransposed(contractType)) {
       return rowBatch;
     }
     return colBatch;
@@ -266,10 +275,20 @@ struct DistributeContractions final
   // Output is inferred MFMAType or none (if layout is not compatible with any
   // MFMA layout).
   std::optional<MFMAType>
-  inferCompatibleMFMAType(ArrayRef<LayoutAttr> layouts) const {
+  inferCompatibleMFMAType(ArrayRef<LayoutAttr> layouts,
+                          ContractType contractType) const {
     std::optional<MFMAType> mfmaType{std::nullopt};
     SmallVector<ContractMatrixType> matrixTypes{
         ContractMatrixType::A, ContractMatrixType::B, ContractMatrixType::C};
+
+    if (isOperandATransposed(contractType)) {
+      matrixTypes[0] = ContractMatrixType::B;
+    }
+
+    if (isOperandBTransposed(contractType)) {
+      matrixTypes[1] = ContractMatrixType::A;
+    }
+
     for (auto [layout, matrixType] : llvm::zip(layouts, matrixTypes)) {
       mfmaType = inferMFMAType(layout, matrixType, mfmaType);
       if (!mfmaType)
@@ -305,10 +324,6 @@ struct DistributeContractions final
     if (!resultLayout)
       return failure();
 
-    std::optional<MFMAType> mfmaType = inferCompatibleMFMAType(layouts);
-    if (!mfmaType)
-      return failure();
-
     Type elementType =
         llvm::cast<ShapedType>(operands[ACC].getType()).getElementType();
     SmallVector<int64_t> vectorShape = resultLayout.getDistributedShape();
@@ -320,6 +335,11 @@ struct DistributeContractions final
     ContractType contractType = inferContractType(
         contractOp.getContext(), contractOp.getIndexingMapsArray());
     if (contractType == ContractType::UNSUPPORTED)
+      return failure();
+
+    std::optional<MFMAType> mfmaType =
+        inferCompatibleMFMAType(layouts, contractType);
+    if (!mfmaType)
       return failure();
 
     std::optional<int64_t> rowBatch = layouts[LHS].getBatchDim(0);
