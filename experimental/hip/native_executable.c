@@ -174,6 +174,9 @@ iree_status_t iree_hal_hip_native_executable_create(
           (char*)((char*)executable + sizeof(*executable) +
                   entry_point_count * sizeof(executable->entry_points[0])));
 
+  iree_hal_resource_initialize(&iree_hal_hip_native_executable_vtable,
+                               &executable->resource);
+
   // Load the HSACO image - this will fail if the device cannot handle the
   // contents. We could check this prior to creating
   hipModule_t module = NULL;
@@ -195,8 +198,6 @@ iree_status_t iree_hal_hip_native_executable_create(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_hip_native_executable_vtable,
-                                 &executable->resource);
     executable->host_allocator = host_allocator;
     executable->symbols = symbols;
     executable->hip_module = module;
