@@ -30,6 +30,7 @@ py_binary(
     compiler_flags = [
         "--iree-opt-data-tiling=false",
         "--iree-llvmcpu-enable-ukernels=none",
+        "--iree-llvmcpu-enable-scalable-vectorization",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -67,6 +68,7 @@ py_binary(
     name = "e2e_matmul_arm_sme_nondt_%s_%s" % (dtype, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
+        "--iree-llvmcpu-enable-scalable-vectorization",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
