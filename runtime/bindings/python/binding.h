@@ -18,6 +18,19 @@
 #include "nanobind/stl/string_view.h"
 #include "nanobind/stl/vector.h"
 
+// Uncomment the following to enable various noisy output to stderr for
+// verifying sequencing and reference counting.
+#define IREE_PY_TRACE_ENABLED 1
+
+#if IREE_PY_TRACE_ENABLED
+#define IREE_PY_TRACEF(fmt, ...) \
+  fprintf(stderr, "[[IREE_PY_TRACE]]: " fmt "\n", __VA_ARGS__)
+#define IREE_PY_TRACE(msg) fprintf(stderr, "[[IREE_PY_TRACE]]: %s", msg)
+#else
+#define IREE_PY_TRACEF(...)
+#define IREE_PY_TRACE(...)
+#endif
+
 namespace iree {
 namespace python {
 

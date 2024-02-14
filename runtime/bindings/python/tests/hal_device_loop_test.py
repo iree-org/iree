@@ -5,56 +5,60 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import asyncio
-import gc
-import threading
 import unittest
 
 from iree.runtime import (
     get_device,
-    HalDeviceLoop,
+    HalDeviceLoopBridge,
 )
 
 
-class HalDeviceLoopTest(unittest.TestCase):
-    def setUp(self):
-        super().setUp()
-        self.device = get_device("local-task")
-        self.allocator = self.device.allocator
-        self.loop = HalDeviceLoop(self.device)
-        self.loop_thread = threading.Thread(target=self.loop.run)
-        self.loop_thread.start()
-
-    def tearDown(self):
-        print("(((SIGNAL SHUTDOWN)))")
-        self.loop.signal_shutdown()
-        print("(((JOINING)))")
-        self.loop_thread.join()
-        print("(((JOINED)))")
-
-    def testFuture(self):
+class HalDeviceLoopBridgeTest(unittest.TestCase):
+    def testBridge(self):
+        loop = asyncio.new_event_loop()
+        bridge = HalDeviceLoopBridge(self.device, loop)
         sem1 = self.device.create_semaphore(0)
         sem2 = self.device.create_semaphore(0)
 
         async def main():
-            print("One fish")
-            f1 = asyncio.Future()
-            f1.add_done_callback(lambda x: print("FUTURE1: DONE"))
-            f2 = asyncio.Future()
-            f2.add_done_callback(lambda x: print("FUTURE2: DONE"))
-            await asyncio.sleep(0.5)
-            self.loop.on_semaphore(sem1, 1, f1)
-            await asyncio.sleep(0.5)
-            self.loop.on_semaphore(sem2, 1, f2)
-            await asyncio.sleep(0.5)
+            def done_1(x):
+                print("PYTHON: sem2.signal(1)")
+                sem2.signal(1)
+
+            def done_2(x):
+                print("PYTHON: sem2.signal(2)")
+                sem2.signal(2)
+
+            f1 = bridge.on_semaphore(sem1, 1, "Semaphore 1 Signaled")
+            f1.add_done_callback(done_1)
+            f2 = bridge.on_semaphore(sem2, 1, "Semaphore 2 Signaled")
+            f2.add_done_callback(done_2)
+            f2_again = bridge.on_semaphore(sem2, 2, "Semaphore 2 Signaled Again")
+
             sem1.signal(1)
-            await asyncio.sleep(0.5)
-            sem2.signal(1)
+            f1_result = await f1
+            print("PYTHON: await f1 =", f1_result)
+            f2_result = await f2
+            print("PYTHON: await f2 =", f2_result)
+            f2_again_result = await f2_again
+            print("PYTHON: await f2_again =", f2_again_result)
 
-            print("FUTURE1:", await f1)
-            print("FUTURE2:", await f2)
+            self.assertEqual(f1_result, "Semaphore 1 Signaled")
+            self.assertEqual(f2_result, "Semaphore 2 Signaled")
+            self.assertEqual(f2_again_result, "Semaphore 2 Signaled Again")
+            print("PYTHON: ASYNC MAIN() COMPLETE")
 
-        asyncio.run(main())
-        assert False
+        try:
+            loop.run_until_complete(main())
+        finally:
+            bridge.stop()
+
+    def setUp(self):
+        super().setUp()
+        # TODO: Switch to local-task (experiencing some wait deadlocking
+        # that needs triage).
+        self.device = get_device("local-sync")
+        self.allocator = self.device.allocator
 
 
 if __name__ == "__main__":

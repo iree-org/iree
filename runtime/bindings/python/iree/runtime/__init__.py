@@ -30,7 +30,7 @@ from ._binding import (
     HalBufferView,
     HalCommandBuffer,
     HalDevice,
-    HalDeviceLoop,
+    HalDeviceLoopBridge,
     HalDriver,
     HalElementType,
     HalFence,
