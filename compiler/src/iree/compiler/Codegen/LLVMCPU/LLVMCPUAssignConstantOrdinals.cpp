@@ -20,11 +20,6 @@ struct LLVMCPUAssignConstantOrdinalsPass
   void runOnOperation() override {
     auto variantOp = getOperation();
 
-    // Ignore non-LLVMCPU variants.
-    // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.
-    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu")
-      return;
-
     // Get a constant key -> ordinal mapping.
     auto keyOrdinals = variantOp.gatherConstantOrdinals();
     if (keyOrdinals.empty())
