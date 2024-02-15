@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-flow-deduplicate-executables %s | FileCheck %s
 
 // CHECK-LABEL: flow.executable public @single_executable_ex_0
-flow.executable @single_executable_ex_0 {
+flow.executable public @single_executable_ex_0 {
   flow.executable.export @single_executable_entry_0
   builtin.module {
     func.func @single_executable_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -10,18 +10,18 @@ flow.executable @single_executable_ex_0 {
     }
   }
 }
-// CHECK-LABEL: func.func @single_executable
-func.func @single_executable(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-LABEL: util.func public @single_executable
+util.func public @single_executable(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @single_executable_ex_0::@single_executable_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @single_executable_ex_0::@single_executable_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
 }
 
 // -----
 
 // CHECK-LABEL: flow.executable public @duplicate_executables_ex_0
-flow.executable @duplicate_executables_ex_0 {
+flow.executable public @duplicate_executables_ex_0 {
   flow.executable.export @duplicate_executables_entry_0
   builtin.module {
     func.func @duplicate_executables_entry_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -31,7 +31,7 @@ flow.executable @duplicate_executables_ex_0 {
   }
 }
 // CHECK-NOT: flow.executable public @duplicate_executables_ex_1
-flow.executable @duplicate_executables_ex_1 {
+flow.executable public @duplicate_executables_ex_1 {
   flow.executable.export @duplicate_executables_entry_1
   builtin.module {
     func.func @duplicate_executables_entry_1(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -41,7 +41,7 @@ flow.executable @duplicate_executables_ex_1 {
   }
 }
 // CHECK-LABEL: flow.executable public @duplicate_executables_ex_2
-flow.executable @duplicate_executables_ex_2 {
+flow.executable public @duplicate_executables_ex_2 {
   flow.executable.export @duplicate_executables_entry_2
   builtin.module {
     func.func @duplicate_executables_entry_2(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -50,8 +50,8 @@ flow.executable @duplicate_executables_ex_2 {
     }
   }
 }
-// CHECK-LABEL: func.func @duplicate_executables
-func.func @duplicate_executables(%arg0: tensor<4xf32>) {
+// CHECK-LABEL: util.func public @duplicate_executables
+util.func public @duplicate_executables(%arg0: tensor<4xf32>) {
   %c4 = arith.constant 4 : index
   // CHECK: = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @duplicate_executables_ex_0::@duplicate_executables_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
@@ -61,7 +61,7 @@ func.func @duplicate_executables(%arg0: tensor<4xf32>) {
   %2 = flow.dispatch @duplicate_executables_ex_2::@duplicate_executables_entry_2[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK: = flow.dispatch {@duplicate_executables_ex_0::@duplicate_executables_entry_0, @duplicate_executables_ex_0::@duplicate_executables_entry_0}
   %3 = flow.dispatch {@duplicate_executables_ex_0::@duplicate_executables_entry_0, @duplicate_executables_ex_1::@duplicate_executables_entry_1}[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  return
+  util.return
 }
 
 // Ensure that symbol renaming is done within initializers.
@@ -97,14 +97,14 @@ flow.executable @same_ops_diff_operands_ex_1 {
     }
   }
 }
-// CHECK-LABEL: func.func @same_ops_diff_operands
-func.func @same_ops_diff_operands(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi32> {
+// CHECK-LABEL: util.func public @same_ops_diff_operands
+util.func public @same_ops_diff_operands(%arg0: tensor<2xi32>, %arg1: tensor<2xi32>) -> tensor<2xi32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @same_ops_diff_operands_ex_0::@entry_0[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   %0 = flow.dispatch @same_ops_diff_operands_ex_0::@entry_0[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   // CHECK: %1 = flow.dispatch @same_ops_diff_operands_ex_1::@entry_1[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   %1 = flow.dispatch @same_ops_diff_operands_ex_1::@entry_1[%c4](%arg0, %arg1) : (tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
-  return %0 : tensor<2xi32>
+  util.return %0 : tensor<2xi32>
 }
 
 // -----
@@ -139,8 +139,8 @@ flow.executable @multiple_entry_points_ex_1 {
     }
   }
 }
-// CHECK-LABEL: func.func @multiple_entry_points
-func.func @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-LABEL: util.func public @multiple_entry_points
+util.func public @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[C4:.*]] = arith.constant 4
   %c4 = arith.constant 4 : index
   // CHECK:      {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
@@ -151,7 +151,7 @@ func.func @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %2 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %3 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0 : tensor<4xf32>
+  util.return %0 : tensor<4xf32>
 }
 
 // -----
@@ -176,14 +176,14 @@ flow.executable @different_types_int_ex {
     }
   }
 }
-// CHECK-LABEL: func.func @different_types
-func.func @different_types(%arg0: tensor<4xf32>) -> tensor<4xi1> {
+// CHECK-LABEL: util.func public @different_types
+util.func public @different_types(%arg0: tensor<4xf32>) -> tensor<4xi1> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @different_types_float_ex::@different_types_float_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
   %0 = flow.dispatch @different_types_float_ex::@different_types_float_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
   // CHECK: %1 = flow.dispatch @different_types_int_ex::@different_types_int_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
   %1 = flow.dispatch @different_types_int_ex::@different_types_int_entry[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xi1>
-  return %0 : tensor<4xi1>
+  util.return %0 : tensor<4xi1>
 }
 
 // -----
@@ -234,8 +234,8 @@ flow.executable @nested_ops_ex_2 {
     }
   }
 }
-// CHECK-LABEL: func.func @nested_ops
-func.func @nested_ops(%arg0: tensor<5x6xf32>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+// CHECK-LABEL: util.func public @nested_ops
+util.func public @nested_ops(%arg0: tensor<5x6xf32>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
   %c4 = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   %0 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
@@ -243,7 +243,7 @@ func.func @nested_ops(%arg0: tensor<5x6xf32>, %arg1: tensor<5x6xf32>) -> tensor<
   %1 = flow.dispatch @nested_ops_ex_0::@nested_ops_entry_0[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   // CHECK: %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
   %2 = flow.dispatch @nested_ops_ex_2::@nested_ops_entry_2[%c4](%arg0, %arg1) : (tensor<5x6xf32>, tensor<5x6xf32>) -> tensor<5x6xf32>
-  return %0 : tensor<5x6xf32>
+  util.return %0 : tensor<5x6xf32>
 }
 
 // -----
@@ -417,13 +417,13 @@ hal.executable private @ex1 {
   }
 }
 
-// CHECK-LABEL: func.func @dispatch_variants
-func.func @dispatch_variants(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+// CHECK-LABEL: util.func public @dispatch_variants
+util.func public @dispatch_variants(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[C4:.*]] = arith.constant 4
   %c4 = arith.constant 4 : index
   // CHECK:      {{.*}} = flow.dispatch @ex0::@variant::@dispatch[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @ex0::@variant::@dispatch[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-NEXT: {{.*}} = flow.dispatch @ex0::@variant::@dispatch[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = flow.dispatch @ex1::@variant::@dispatch[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  return %1 : tensor<4xf32>
+  util.return %1 : tensor<4xf32>
 }

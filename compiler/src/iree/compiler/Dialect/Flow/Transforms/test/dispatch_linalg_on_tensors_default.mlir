@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(func.func(iree-flow-form-dispatch-regions, iree-flow-clone-producers-into-dispatch-regions, iree-flow-form-dispatch-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions, iree-flow-clone-producers-into-dispatch-regions, iree-flow-form-dispatch-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
 
-func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi8>,
+util.func public @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi8>,
     %arg2 : i32, %arg3 : i32) -> tensor<?x56x56x64xi8> {
   %c0 = arith.constant 0 : index
   %c0_i32 = arith.constant 0 : i32
@@ -19,9 +19,9 @@ func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3
       %5 = arith.trunci %b0 : i32 to i8
       linalg.yield %5 : i8
     } -> tensor<?x56x56x64xi8>
-  return %4 : tensor<?x56x56x64xi8>
+  util.return %4 : tensor<?x56x56x64xi8>
 }
-//     CHECK: func.func @no_fuse_quantized
+//     CHECK: util.func public @no_fuse_quantized
 //     CHECK:   flow.dispatch.workgroups
 //     CHECK:   linalg.depthwise_conv_2d_nhwc_hwc_q
 // CHECK-NOT:   linalg.generic
@@ -32,7 +32,7 @@ func.func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3
 
 #map = affine_map<(d0, d1) -> (d1)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-func.func @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
+util.func public @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
     %arg2: tensor<384x512xf32>) -> tensor<384x512xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>> {
   %0 = tensor.empty() : tensor<384x512xf32>
   %1 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map1],
@@ -45,9 +45,9 @@ func.func @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
     linalg.yield %4 : f32
   } -> tensor<384x512xf32>
   %2 = iree_linalg_ext.set_encoding %1 : tensor<384x512xf32> -> tensor<384x512xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>
-  return %2 : tensor<384x512xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>
+  util.return %2 : tensor<384x512xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>
 }
-// CHECK-LABEL: func.func @elem_set_encoding
+// CHECK-LABEL: util.func public @elem_set_encoding
 // CHECK:         flow.dispatch.workgroups
 // CHECK:           linalg.generic
 // CHECK:           iree_linalg_ext.set_encoding
@@ -55,7 +55,7 @@ func.func @elem_set_encoding(%arg0: tensor<512xf32>, %arg1: tensor<384x512xf32>,
 
 // -----
 
-func.func @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
+util.func public @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -75,9 +75,9 @@ func.func @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf
       %addf = arith.addf %b0, %b1 : f32
       linalg.yield %addf : f32
   } -> tensor<?x?xf32>
-  return %bias_add : tensor<?x?xf32>
+  util.return %bias_add : tensor<?x?xf32>
 }
-// CHECK-LABEL: func @fix_dominance_on_fusion
+// CHECK-LABEL: util.func public @fix_dominance_on_fusion
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty
 //       CHECK:     %[[FILL:.+]] = linalg.fill
@@ -87,4 +87,4 @@ func.func @fix_dominance_on_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GEMM]],
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
-//       CHECK:   return %[[RESULT]]
+//       CHECK:   util.return %[[RESULT]]

@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-fusion-of-tensor-ops{fuse-multi-use=true}))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-flow-fusion-of-tensor-ops{fuse-multi-use=true}))" %s | FileCheck %s
 
-func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
+util.func public @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
@@ -38,9 +38,9 @@ func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
     %11 = arith.mulf %b0, %b1 : f32
     linalg.yield %11 : f32
   } -> tensor<12x128x128xf32>
-  return %10 : tensor<12x128x128xf32>
+  util.return %10 : tensor<12x128x128xf32>
 }
-// CHECK-LABEL: func.func @softmax
+// CHECK-LABEL: util.func public @softmax
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<12x128x128xf32>
 //       CHECK:   %[[INIT0:.+]] = tensor.empty()
 //       CHECK:   %[[FILL0:.+]] = linalg.fill
@@ -63,11 +63,11 @@ func.func @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
 //       CHECK:   %[[GENERIC3:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[GENERIC1]], %[[GENERIC2]] :
 //  CHECK-SAME:       outs(%[[INIT1]] :
-//       CHECK:   return %[[GENERIC3]]
+//       CHECK:   util.return %[[GENERIC3]]
 
 // -----
 
-func.func @batchnorm_training(%10 : tensor<12xf32>, %11 : tensor<12x12x12x12x12xf32>, %12 : tensor<12xf32>) -> (tensor<12xf32>, tensor<12xf32>, tensor<12xf32>)
+util.func public @batchnorm_training(%10 : tensor<12xf32>, %11 : tensor<12x12x12x12x12xf32>, %12 : tensor<12xf32>) -> (tensor<12xf32>, tensor<12xf32>, tensor<12xf32>)
 {
   %cst = arith.constant 1.42 : f32
   %cst_1 = arith.constant 1.45 : f32
@@ -111,9 +111,9 @@ func.func @batchnorm_training(%10 : tensor<12xf32>, %11 : tensor<12x12x12x12x12x
       %21 = arith.subf %arg1, %20 : f32
       linalg.yield %21 : f32
     } -> tensor<12xf32>
-  return %16, %17, %18 : tensor<12xf32>, tensor<12xf32>, tensor<12xf32>
+  util.return %16, %17, %18 : tensor<12xf32>, tensor<12xf32>, tensor<12xf32>
 }
-// CHECK-LABEL: func @batchnorm_training(
+// CHECK-LABEL: util.func public @batchnorm_training(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<12xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<12x12x12x12x12xf32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<12xf32>
@@ -126,13 +126,13 @@ func.func @batchnorm_training(%10 : tensor<12xf32>, %11 : tensor<12x12x12x12x12x
 //       CHECK:   %[[GENERIC1:.+]]:3 = linalg.generic
 //  CHECK-SAME:       ins(%[[ARG0]], %[[GENERIC0]] :
 //  CHECK-SAME:       outs(%[[INIT]], %[[INIT]], %[[INIT]] :
-//       CHECK:   return %[[GENERIC1]]#0, %[[GENERIC1]]#1, %[[GENERIC1]]#2
+//       CHECK:   util.return %[[GENERIC1]]#0, %[[GENERIC1]]#1, %[[GENERIC1]]#2
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
-  func.func @fuse_only_with_same_marker(%arg0: tensor<5x5xf32>, %arg1: tensor<5x5xf32>) -> (tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>) {
+  util.func public @fuse_only_with_same_marker(%arg0: tensor<5x5xf32>, %arg1: tensor<5x5xf32>) -> (tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>) {
     %cst = arith.constant 1.000000e+00 : f32
     %cst_0 = arith.constant 2.000000e+00 : f32
     %cst_1 = arith.constant 3.000000e+00 : f32
@@ -160,10 +160,10 @@ module {
       %8 = arith.subf %arg2, %arg3 : f32
       linalg.yield %8 : f32
     } -> tensor<5x5xf32>
-    return %4, %5, %6, %7 : tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>
+    util.return %4, %5, %6, %7 : tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>, tensor<5x5xf32>
   }
 }
-// CHECK-LABEL: func.func @fuse_only_with_same_marke
+// CHECK-LABEL: util.func public @fuse_only_with_same_marke
 // CHECK:         linalg.generic
 // CHECK-NOT:     linalg.generic
 
@@ -175,7 +175,7 @@ module {
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d3, d4, d5)>
 #map3 = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2)>
 module {
-  func.func @fuse_only_projected_perm(%arg0: tensor<16x1082x1922xi8>, %arg1: tensor<32x16x3x3xf32>, %arg2: tensor<32x1080x1920xi32>) -> tensor<32x1080x1920xi32> {
+  util.func public @fuse_only_projected_perm(%arg0: tensor<16x1082x1922xi8>, %arg1: tensor<32x16x3x3xf32>, %arg2: tensor<32x1080x1920xi32>) -> tensor<32x1080x1920xi32> {
     %0 = tensor.empty() : tensor<32x16x3x3xi8>
     %eltwise = linalg.generic {
              indexing_maps = [#map0, #map0],
@@ -200,10 +200,10 @@ module {
       linalg.yield %235 : i32
     } -> tensor<32x1080x1920xi32>
 
-    return %conv : tensor<32x1080x1920xi32>
+    util.return %conv : tensor<32x1080x1920xi32>
   }
 }
-// CHECK-LABEL: func.func @fuse_only_projected_perm
+// CHECK-LABEL: util.func public @fuse_only_projected_perm
 // CHECK:         linalg.generic
 // CHECK:         linalg.generic
 
@@ -214,7 +214,7 @@ module {
 #map2 = affine_map<(d0, d1, d2, d3) -> (d2, d3, d0)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 module {
-  func.func @nofuse_broadcast_compute(%arg0: tensor<702x702x128xf32>, %arg1: tensor<702x702x128xf32>,
+  util.func public @nofuse_broadcast_compute(%arg0: tensor<702x702x128xf32>, %arg1: tensor<702x702x128xf32>,
       %arg2: tensor<702x702x128xf32>, %arg3: tensor<702x702x128xf32>) -> tensor<128x702x702xf32> {
     %cst = arith.constant dense<1.000000e+00> : tensor<702x702x128xf32>
     %cst_0 = arith.constant 0.000000e+00 : f32
@@ -252,10 +252,10 @@ module {
       %10 = arith.addf %out, %9 : f32
       linalg.yield %10 : f32
     } -> tensor<128x702x702xf32>
-    return %8 : tensor<128x702x702xf32>
+    util.return %8 : tensor<128x702x702xf32>
   }
 }
-// CHECK-LABEL: func @nofuse_broadcast_compute(
+// CHECK-LABEL: util.func public @nofuse_broadcast_compute(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<702x702x128xf32>
@@ -273,11 +273,11 @@ module {
 //       CHECK:   %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[GENERIC1]], %[[GENERIC0]] :
 //  CHECK-SAME:       outs(%[[FILL]] :
-//       CHECK:   return %[[GENERIC2]]
+//       CHECK:   util.return %[[GENERIC2]]
 
 // -----
 
-func.func @fuse_iota_ops(%arg0: tensor<10x20xi32>) -> (tensor<10x20xi32>, tensor<10x20xi32>) {
+util.func public @fuse_iota_ops(%arg0: tensor<10x20xi32>) -> (tensor<10x20xi32>, tensor<10x20xi32>) {
   %c20 = arith.constant 20 : index
   %0 = tensor.empty() : tensor<10x20xi32>
   %1 = tensor.empty() : tensor<10x20xindex>
@@ -310,9 +310,9 @@ func.func @fuse_iota_ops(%arg0: tensor<10x20xi32>) -> (tensor<10x20xi32>, tensor
       %9 = arith.muli %8, %b0 : i32
       linalg.yield %9 : i32
     } -> tensor<10x20xi32>
-    return %7, %8 : tensor<10x20xi32>, tensor<10x20xi32>
+    util.return %7, %8 : tensor<10x20xi32>, tensor<10x20xi32>
 }
-// CHECK-LABEL: func @fuse_iota_ops(
+// CHECK-LABEL: util.func public @fuse_iota_ops(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi32>)
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<10x20xi32>
 //       CHECK:   %[[GENERIC1:.+]] = linalg.generic
@@ -329,11 +329,11 @@ func.func @fuse_iota_ops(%arg0: tensor<10x20xi32>) -> (tensor<10x20xi32>, tensor
 //       CHECK:     linalg.index
 //       CHECK:     arith.muli
 //       CHECK:     linalg.yield
-//       CHECK:   return %[[GENERIC1]], %[[GENERIC2]]
+//       CHECK:   util.return %[[GENERIC1]], %[[GENERIC2]]
 
 // -----
 
-func.func @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf32> {
+util.func public @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf32> {
   %0 = flow.dispatch.region[] -> (tensor<10x20xf32>) {
     %1 = tensor.empty() : tensor<10x20xf32>
     %2 = linalg.generic {
@@ -355,18 +355,18 @@ func.func @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<10x20xf3
     } -> tensor<10x20xf32>
     flow.return %3 : tensor<10x20xf32>
   }
-  return %0 : tensor<10x20xf32>
+  util.return %0 : tensor<10x20xf32>
 }
-// CHECK-LABEL: func @no_fuse_within_dispatch
+// CHECK-LABEL: util.func public @no_fuse_within_dispatch
 //       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
 //       CHECK:     linalg.generic
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //       CHECK:     flow.return %[[GENERIC]]
-//       CHECK:   return %[[RETURN]]
+//       CHECK:   util.return %[[RETURN]]
 
 // -----
 
-func.func @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>) -> (tensor<11008xf16>) {
+util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>) -> (tensor<11008xf16>) {
   %cst_1 = arith.constant 0.000000e+00 : f16
   %0 = tensor.empty() : tensor<11008x32x128xf16>
   %1 = arith.constant dense<0.000000e+00> : tensor<1x1x32x128xf16>
@@ -390,9 +390,9 @@ func.func @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tenso
     %13 = arith.addf %12, %out : f16
     linalg.yield %13 : f16
   } -> tensor<11008xf16>
-  return %5 : tensor<11008xf16>
+  util.return %5 : tensor<11008xf16>
 }
-//     CHECK-LABEL: func.func @nofuse_by_expand_dequant
+//     CHECK-LABEL: util.func public @nofuse_by_expand_dequant
 //   CHECK-COUNT-2:   tensor.collapse_shape
 //           CHECK:     %[[DEQUANT:.+]] = linalg.generic
 //      CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]
@@ -410,7 +410,7 @@ func.func @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tenso
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map5 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map6 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-func.func @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tensor<4096x32x128xi4>, %arg2: tensor<4096x32x1xf16>, %arg3: tensor<4096x32x1xf16>) -> tensor<1x1x4096xf16> {
+util.func public @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tensor<4096x32x128xi4>, %arg2: tensor<4096x32x1xf16>, %arg3: tensor<4096x32x1xf16>) -> tensor<1x1x4096xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %c32000 = arith.constant 32000 : index
   %c0_i64 = arith.constant 0 : i64
@@ -456,14 +456,14 @@ func.func @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tensor<4096x
     %12 = arith.addf %11, %out : f16
     linalg.yield %12 : f16
   } -> tensor<1x1x4096xf16>
-  return %10 : tensor<1x1x4096xf16>
+  util.return %10 : tensor<1x1x4096xf16>
 }
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d1, 0)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 //  CHECK-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 //  CHECK-DAG: #[[MAP4:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-//      CHECK: func.func @nofuse_by_collapse_matmul
+//      CHECK: util.func public @nofuse_by_collapse_matmul
 //      CHECK:   %[[DEQUANT:.+]] = linalg.generic {indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP1]],  #[[MAP]]],
 // CHECK-SAME:     iterator_types = ["parallel", "parallel", "parallel"]
 //  CHECK-NOT:   tensor.collapse_shape %[[DEQUANT]]
@@ -473,7 +473,7 @@ func.func @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tensor<4096x
 //  CHECK-NOT:   tensor.expand_shape %[[MATVEC]]
 // -----
 
-func.func @math_sin() {
+util.func public @math_sin() {
   %cst = arith.constant 2.000000e+00 : f32
   %cst_0 = arith.constant dense<[0.000000e+00, 6.349640e-01, -6.349640e-01, 6.349640e-01]> : tensor<4xf32>
   %cst_1 = arith.constant dense<[0.000000e+00, 1.298460e+00, 1.298460e+00, -1.298460e+00]> : tensor<4xf32>
@@ -507,9 +507,9 @@ func.func @math_sin() {
   } -> tensor<4xf32>
   check.expect_almost_eq(%4#1, %cst_1) : tensor<4xf32>
   check.expect_almost_eq(%5, %cst_0) : tensor<4xf32>
-  return
+  util.return
 }
-// CHECK-LABEL: func @math_sin()
+// CHECK-LABEL: util.func public @math_sin()
 //       CHECK:   %[[GENERIC:.+]]:2 = linalg.generic
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#0,
 //   CHECK-DAG:   check.expect_almost_eq(%[[GENERIC]]#1,
@@ -517,7 +517,7 @@ func.func @math_sin() {
 // -----
 
 // Check for fix for https://github.com/openxla/iree/issues/14953
-func.func @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<11008x32x1xf16>, %arg2: tensor<1x1x32x128xf16>) -> tensor<1x1x11008xf16> {
+util.func public @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<11008x32x1xf16>, %arg2: tensor<1x1x32x128xf16>) -> tensor<1x1x11008xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant dense<0> : tensor<11008x32x128xi4>
   %3 = util.optimization_barrier %cst_0 : tensor<11008x32x128xi4>
@@ -545,9 +545,9 @@ func.func @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<11008x32
     flow.return %10 : tensor<11008xf16>
   }
   %expanded = tensor.expand_shape %7 [[0, 1, 2]] : tensor<11008xf16> into tensor<1x1x11008xf16>
-  return %expanded : tensor<1x1x11008xf16>
+  util.return %expanded : tensor<1x1x11008xf16>
 }
-// CHECK-LABEL: func @fix_issue_14953
+// CHECK-LABEL: util.func public @fix_issue_14953
 //       CHECK:   flow.dispatch.region
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel", "parallel"]

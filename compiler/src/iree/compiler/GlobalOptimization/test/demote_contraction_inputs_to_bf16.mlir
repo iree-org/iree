@@ -1,10 +1,10 @@
 // RUN: iree-opt --split-input-file -iree-global-opt-demote-contraction-inputs-to-bf16 %s | FileCheck %s
 
-func.func @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
+util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<250x500xf32>)
       outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
-  return %0 : tensor<100x500xf32>
+  util.return %0 : tensor<100x500xf32>
 }
 
 // CHECK: @matmul_f32f32f32
@@ -23,11 +23,11 @@ func.func @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500x
 
 // -----
 
-func.func @dynamic_matmul_f32f32f32(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
+util.func public @dynamic_matmul_f32f32f32(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
     %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
+  util.return %0 : tensor<?x?xf32>
 }
 
 // CHECK: @dynamic_matmul_f32f32f32
@@ -44,11 +44,11 @@ func.func @dynamic_matmul_f32f32f32(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?x
 
 // -----
 
-func.func @batch_matmul_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<4x250x500xf32>,
+util.func public @batch_matmul_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<4x250x500xf32>,
     %arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32> {
   %0 = linalg.batch_matmul ins(%arg0, %arg1 : tensor<4x100x250xf32>, tensor<4x250x500xf32>)
       outs(%arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32>
-  return %0 : tensor<4x100x500xf32>
+  util.return %0 : tensor<4x100x500xf32>
 }
 
 // CHECK: @batch_matmul_f32f32f32
@@ -67,11 +67,11 @@ func.func @batch_matmul_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<
 
 // -----
 
-func.func @matvec_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250xf32>,
+util.func public @matvec_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250xf32>,
     %arg2 : tensor<100xf32>) -> tensor<100xf32> {
   %0 = linalg.matvec ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<250xf32>)
       outs(%arg2 : tensor<100xf32>) -> tensor<100xf32>
-  return %0 : tensor<100xf32>
+  util.return %0 : tensor<100xf32>
 }
 
 // CHECK: @matvec_f32f32f32
@@ -90,11 +90,11 @@ func.func @matvec_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250xf32>
 
 // -----
 
-func.func @batch_vecmat_f32f32f32(%arg0 : tensor<4x250xf32>, %arg1 : tensor<4x250x500xf32>,
+util.func public @batch_vecmat_f32f32f32(%arg0 : tensor<4x250xf32>, %arg1 : tensor<4x250x500xf32>,
     %arg2 : tensor<4x500xf32>) -> tensor<4x500xf32> {
   %0 = linalg.batch_vecmat ins(%arg0, %arg1 : tensor<4x250xf32>, tensor<4x250x500xf32>)
       outs(%arg2 : tensor<4x500xf32>) -> tensor<4x500xf32>
-  return %0 : tensor<4x500xf32>
+  util.return %0 : tensor<4x500xf32>
 }
 
 // CHECK: @batch_vecmat_f32f32f32
@@ -113,11 +113,11 @@ func.func @batch_vecmat_f32f32f32(%arg0 : tensor<4x250xf32>, %arg1 : tensor<4x25
 
 // -----
 
-func.func @nonmatch_matmul_f32f32f64(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
+util.func public @nonmatch_matmul_f32f32f64(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf64>) -> tensor<100x500xf64> {
   %0 = linalg.matmul ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<250x500xf32>)
       outs(%arg2 : tensor<100x500xf64>) -> tensor<100x500xf64>
-  return %0 : tensor<100x500xf64>
+  util.return %0 : tensor<100x500xf64>
 }
 
 // CHECK: @nonmatch_matmul_f32f32f64
@@ -130,11 +130,11 @@ func.func @nonmatch_matmul_f32f32f64(%arg0 : tensor<100x250xf32>, %arg1 : tensor
 
 // -----
 
-func.func @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<4x250x100xf32>, %arg1 : tensor<4x250x500xf32>,
+util.func public @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<4x250x100xf32>, %arg1 : tensor<4x250x500xf32>,
     %arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32> {
   %0 = linalg.batch_matmul_transpose_a ins(%arg0, %arg1 : tensor<4x250x100xf32>, tensor<4x250x500xf32>)
       outs(%arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32>
-  return %0 : tensor<4x100x500xf32>
+  util.return %0 : tensor<4x100x500xf32>
 }
 
 // CHECK: @batch_matmul_transpose_a_f32f32f32
@@ -153,11 +153,11 @@ func.func @batch_matmul_transpose_a_f32f32f32(%arg0 : tensor<4x250x100xf32>, %ar
 
 // -----
 
-func.func @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<4x500x250xf32>,
+util.func public @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<4x100x250xf32>, %arg1 : tensor<4x500x250xf32>,
     %arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32> {
   %0 = linalg.batch_matmul_transpose_b ins(%arg0, %arg1 : tensor<4x100x250xf32>, tensor<4x500x250xf32>)
       outs(%arg2 : tensor<4x100x500xf32>) -> tensor<4x100x500xf32>
-  return %0 : tensor<4x100x500xf32>
+  util.return %0 : tensor<4x100x500xf32>
 }
 
 // CHECK: @batch_matmul_transpose_b_f32f32f32
@@ -176,11 +176,11 @@ func.func @batch_matmul_transpose_b_f32f32f32(%arg0 : tensor<4x100x250xf32>, %ar
 
 // -----
 
-func.func @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg1 : tensor<250x500xf32>,
+util.func public @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
   %0 = linalg.matmul_transpose_a ins(%arg0, %arg1 : tensor<250x100xf32>, tensor<250x500xf32>)
       outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
-  return %0 : tensor<100x500xf32>
+  util.return %0 : tensor<100x500xf32>
 }
 
 // CHECK: @matmul_transpose_a_f32f32f32
@@ -199,11 +199,11 @@ func.func @matmul_transpose_a_f32f32f32(%arg0 : tensor<250x100xf32>, %arg1 : ten
 
 // -----
 
-func.func @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<500x250xf32>,
+util.func public @matmul_transpose_b_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<500x250xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
   %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<100x250xf32>, tensor<500x250xf32>)
       outs(%arg2 : tensor<100x500xf32>) -> tensor<100x500xf32>
-  return %0 : tensor<100x500xf32>
+  util.return %0 : tensor<100x500xf32>
 }
 
 // CHECK: @matmul_transpose_b_f32f32f32

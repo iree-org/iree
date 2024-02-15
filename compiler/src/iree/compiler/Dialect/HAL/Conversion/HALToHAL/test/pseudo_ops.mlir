@@ -22,13 +22,13 @@ hal.executable private @ex {
 // CHECK-LABEL: @calculateWorkgroups
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:  %[[WORKLOAD_0:.+]]: index, %[[WORKLOAD_1:.+]]: index, %[[WORKLOAD_2:.+]]: index)
-func.func @calculateWorkgroups(%device: !hal.device, %workload_0: index, %workload_1: index, %workload_2: index) -> (index, index, index) {
+util.func public @calculateWorkgroups(%device: !hal.device, %workload_0: index, %workload_1: index, %workload_2: index) -> (index, index, index) {
   // CHECK-DAG: %[[WORKGROUP_YZ:.+]] = arith.constant 1 : index
   // CHECK-DAG: %[[WORKGROUP_X:.+]] = affine.apply
   %workgroups:3 = hal.executable.calculate_workgroups
       device(%device : !hal.device)
       target(@ex::@variant::@dispatch)
       workload([%workload_0, %workload_1, %workload_2]) : index, index, index
-  // CHECK: return %[[WORKGROUP_X]], %[[WORKGROUP_YZ]], %[[WORKGROUP_YZ]]
-  return %workgroups#0, %workgroups#1, %workgroups#2 : index, index, index
+  // CHECK: util.return %[[WORKGROUP_X]], %[[WORKGROUP_YZ]], %[[WORKGROUP_YZ]]
+  util.return %workgroups#0, %workgroups#1, %workgroups#2 : index, index, index
 }

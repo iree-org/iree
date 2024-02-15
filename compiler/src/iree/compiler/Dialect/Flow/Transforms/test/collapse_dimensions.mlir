@@ -1,7 +1,7 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-collapse-dimensions))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-flow-collapse-dimensions))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-func.func @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {
+util.func public @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {
   %cst = arith.constant dense<0.000000e+00> : tensor<1x1x2304xf32>
   %0 = tensor.empty() : tensor<1x1x2304xf32>
   %1 = flow.dispatch.region -> (tensor<1x1x2304xf32>) {
@@ -13,9 +13,9 @@ func.func @do_not_collapse_cst_in_place(%arg0: tensor<1x1x2304xf32>) {
     } -> tensor<1x1x2304xf32>
     flow.return %3 : tensor<1x1x2304xf32>
   }
-  return
+  util.return
 }
-// CHECK-LABEL: func.func @do_not_collapse_cst_in_place
+// CHECK-LABEL: util.func public @do_not_collapse_cst_in_place
 // CHECK-SAME:    %[[ARG0:[0-9a-zA-Z]]]
 // CHECK-DAG:     %[[CST:.+]] = arith.constant
 // CHECK-DAG:     %[[COLLAPSED_ARG0:.+]] = tensor.collapse_shape %[[ARG0]]

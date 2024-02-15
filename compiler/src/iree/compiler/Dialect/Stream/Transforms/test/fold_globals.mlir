@@ -6,27 +6,27 @@
 
 // CHECK: util.global public mutable @uniformConstants = #stream.timepoint<immediate>
 util.global public mutable @uniformConstants : !stream.timepoint
-func.func @foo() {
+util.func public @foo() {
   %timepoint = stream.timepoint.immediate => !stream.timepoint
   // CHECK-NOT: util.global.store
   util.global.store %timepoint, @uniformConstants : !stream.timepoint
-  return
+  util.return
 }
-func.func @bar() {
+util.func public @bar() {
   %timepoint = stream.timepoint.immediate => !stream.timepoint
   // CHECK-NOT: util.global.store
   util.global.store %timepoint, @uniformConstants : !stream.timepoint
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-NOT: @immutable
 util.global private @immutable = #stream.timepoint<immediate> : !stream.timepoint
-func.func @foo() -> !stream.timepoint {
+util.func public @foo() -> !stream.timepoint {
   // CHECK-NOT: util.global.load @immutable
   // CHECK: %[[IMMEDIATE:.+]] = stream.timepoint.immediate => !stream.timepoint
   %0 = util.global.load @immutable : !stream.timepoint
-  // CHECK: return %[[IMMEDIATE]]
-  return %0 : !stream.timepoint
+  // CHECK: util.return %[[IMMEDIATE]]
+  util.return %0 : !stream.timepoint
 }

@@ -1,10 +1,10 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-hal-elide-redundant-commands))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-hal-elide-redundant-commands))' %s | FileCheck %s
 
 // Tests that redundant barriers are elided but barriers gaurding ops are not.
 
 // CHECK-LABEL: @elideRedundantBarriers
 // CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[LAYOUT:.+]]: !hal.pipeline_layout)
-func.func @elideRedundantBarriers(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
+util.func public @elideRedundantBarriers(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c42_i32 = arith.constant 42 : i32
@@ -16,14 +16,14 @@ func.func @elideRedundantBarriers(%cmd: !hal.command_buffer, %pipeline_layout: !
   hal.command_buffer.push_constants<%cmd : !hal.command_buffer> layout(%pipeline_layout : !hal.pipeline_layout) offset(0) values([%c42_i32]) : i32
   // CHECK: hal.command_buffer.execution_barrier
   hal.command_buffer.execution_barrier<%cmd : !hal.command_buffer> source("Dispatch|Transfer|CommandRetire") target("CommandIssue|Dispatch|Transfer") flags("None")
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @elidePushConstants
-func.func @elidePushConstants(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
+util.func public @elidePushConstants(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -43,14 +43,14 @@ func.func @elidePushConstants(%cmd: !hal.command_buffer, %pipeline_layout: !hal.
       layout(%pipeline_layout : !hal.pipeline_layout)
       offset(0)
       values([%c0, %c1]) : i32, i32
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @elidePushConstantsPrefix
-func.func @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
+util.func public @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -70,14 +70,14 @@ func.func @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %pipeline_layout:
       layout(%pipeline_layout : !hal.pipeline_layout)
       offset(1)
       values([%c1]) : i32
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @elidePushConstantsSuffix
-func.func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
+util.func public @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -94,8 +94,8 @@ func.func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %pipeline_layout:
       layout(%pipeline_layout : !hal.pipeline_layout)
       offset(1)
       values([%c0, %c2]) : i32, i32
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
@@ -104,7 +104,7 @@ func.func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %pipeline_layout:
 
 // CHECK-LABEL: @elidePushDescriptorSet
 // CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[LAYOUT:.+]]: !hal.pipeline_layout, %[[BUFFER0:.+]]: !hal.buffer, %[[BUFFER1:.+]]: !hal.buffer)
-func.func @elidePushDescriptorSet(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout, %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
+util.func public @elidePushDescriptorSet(%cmd: !hal.command_buffer, %pipeline_layout: !hal.pipeline_layout, %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100
@@ -124,6 +124,6 @@ func.func @elidePushDescriptorSet(%cmd: !hal.command_buffer, %pipeline_layout: !
     %c0 = (%buffer0 : !hal.buffer)[%c0, %size0],
     %c1 = (%buffer1 : !hal.buffer)[%c0, %size1]
   ])
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }

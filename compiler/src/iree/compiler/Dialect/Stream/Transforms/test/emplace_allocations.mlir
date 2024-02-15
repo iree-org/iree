@@ -1,9 +1,9 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-emplace-allocations))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module( util.func(iree-stream-emplace-allocations))' %s | FileCheck %s
 
 // Tests that a dispatch result is placed into the target of an update.
 
 // CHECK-LABEL: @emplaceDispatch
-func.func @emplaceDispatch(
+util.func public @emplaceDispatch(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_OFFSET:arg[0-9]+]]: index, %[[UPDATE_SIZE:arg[0-9]+]]: index,
@@ -18,8 +18,8 @@ func.func @emplaceDispatch(
   %update = stream.async.dispatch @ex::@dispatch(%input[%c0 to %input_size for %input_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
   // CHECK-NOT: stream.async.update
   %result = stream.async.update %update, %target[%update_offset to %update_end] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
-  // CHECK: return %[[RESULT]]
-  return %result : !stream.resource<*>
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
 }
 
 // -----
@@ -29,7 +29,7 @@ func.func @emplaceDispatch(
 // if the dispatch requires in-place operation that may not be safe.
 
 // CHECK-LABEL: @dontEmplaceTiedDispatch
-func.func @dontEmplaceTiedDispatch(
+util.func public @dontEmplaceTiedDispatch(
     %tied_input: !stream.resource<*>, %tied_input_size: index,
     %update_offset: index, %update_size: index,
     %target: !stream.resource<*>, %target_size: index) -> !stream.resource<*> {
@@ -39,8 +39,8 @@ func.func @dontEmplaceTiedDispatch(
   %update = stream.async.dispatch @ex::@dispatch(%tied_input[%c0 to %tied_input_size for %tied_input_size]) : (!stream.resource<*>{%tied_input_size}) -> %tied_input{%tied_input_size}
   // CHECK: %[[RESULT:.+]] = stream.async.update %[[TIED_RESULT]]
   %result = stream.async.update %update, %target[%update_offset to %update_end] : !stream.resource<*>{%tied_input_size} -> %target as !stream.resource<*>{%target_size}
-  // CHECK: return %[[RESULT]]
-  return %result : !stream.resource<*>
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : !stream.resource<*>
 }
 
 // -----
@@ -50,7 +50,7 @@ func.func @dontEmplaceTiedDispatch(
 // test that explicitly as it's 95% of what this pass is designed to optimize.
 
 // CHECK-LABEL: @emplaceDispatchSequence
-func.func @emplaceDispatchSequence(
+util.func public @emplaceDispatchSequence(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
@@ -79,8 +79,8 @@ func.func @emplaceDispatchSequence(
   %target2 = stream.async.update %update2, %target1[%c98304 to %c147456] : !stream.resource<*>{%update_size} -> %target1 as !stream.resource<*>{%target_size}
   // CHECK-NOT: stream.async.update
   %target3 = stream.async.update %update3, %target2[%c147456 to %c196608] : !stream.resource<*>{%update_size} -> %target2 as !stream.resource<*>{%target_size}
-  // CHECK: return %[[TARGET3]]
-  return %target3 : !stream.resource<*>
+  // CHECK: util.return %[[TARGET3]]
+  util.return %target3 : !stream.resource<*>
 }
 
 // -----
@@ -89,7 +89,7 @@ func.func @emplaceDispatchSequence(
 // dependencies shouldn't stop us from emplacing.
 
 // CHECK-LABEL: @emplaceMultiResultDispatchSequence
-func.func @emplaceMultiResultDispatchSequence(
+util.func public @emplaceMultiResultDispatchSequence(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
@@ -118,8 +118,8 @@ func.func @emplaceMultiResultDispatchSequence(
   %target2 = stream.async.update %update2, %target1[%c98304 to %c147456] : !stream.resource<*>{%update_size} -> %target1 as !stream.resource<*>{%target_size}
   // CHECK-NOT: stream.async.update
   %target3 = stream.async.update %update3, %target2[%c147456 to %c196608] : !stream.resource<*>{%update_size} -> %target2 as !stream.resource<*>{%target_size}
-  // CHECK: return %[[TARGET3]]
-  return %target3 : !stream.resource<*>
+  // CHECK: util.return %[[TARGET3]]
+  util.return %target3 : !stream.resource<*>
 }
 
 // -----
@@ -129,7 +129,7 @@ func.func @emplaceMultiResultDispatchSequence(
 // into the same dispatch.
 
 // CHECK-LABEL: @emplaceMultiResultDispatchInto
-func.func @emplaceMultiResultDispatchInto(
+util.func public @emplaceMultiResultDispatchInto(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
@@ -149,8 +149,8 @@ func.func @emplaceMultiResultDispatchInto(
   %target0 = stream.async.update %update#0, %target[%c0 to %c32] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
   // CHECK-NOT: stream.async.update
   %target1 = stream.async.update %update#1, %target0[%c32 to %c64] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
-  // CHECK: return %[[DISPATCH]]#1
-  return %target1 : !stream.resource<*>
+  // CHECK: util.return %[[DISPATCH]]#1
+  util.return %target1 : !stream.resource<*>
 }
 
 // -----
@@ -163,7 +163,7 @@ func.func @emplaceMultiResultDispatchInto(
 // third as the second isn't placed.
 
 // CHECK-LABEL: @dontEmplaceSparseMultiResult
-func.func @dontEmplaceSparseMultiResult(
+util.func public @dontEmplaceSparseMultiResult(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
@@ -183,8 +183,8 @@ func.func @dontEmplaceSparseMultiResult(
   %target0 = stream.async.update %update#0, %target[%c0 to %c32] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
   // CHECK: %[[TARGET1:.+]] = stream.async.update %[[DISPATCH]]#2, %[[DISPATCH]]#0[%c32 to %c64]
   %target1 = stream.async.update %update#2, %target0[%c32 to %c64] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
-  // CHECK: return %[[TARGET1]]
-  return %target1 : !stream.resource<*>
+  // CHECK: util.return %[[TARGET1]]
+  util.return %target1 : !stream.resource<*>
 }
 
 // -----
@@ -192,7 +192,7 @@ func.func @dontEmplaceSparseMultiResult(
 // Tests that sequences with data dependencies don't hoist beyond them.
 
 // CHECK-LABEL: @emplaceDependentDispatchSequence
-func.func @emplaceDependentDispatchSequence(
+util.func public @emplaceDependentDispatchSequence(
     // CHECK-SAME: %[[INPUT:arg[0-9]+]]: !stream.resource<*>, %[[INPUT_SIZE:arg[0-9]+]]: index,
     %input: !stream.resource<*>, %input_size: index,
     // CHECK-SAME: %[[UPDATE_SIZE:arg[0-9]+]]: index, %[[TARGET_SIZE:arg[0-9]+]]: index
@@ -213,6 +213,6 @@ func.func @emplaceDependentDispatchSequence(
   %target0 = stream.async.update %update0, %target[%c0 to %c49152] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
   // CHECK-NEXT: %[[TARGET1:.+]] = stream.async.update %[[UPDATE1]], %[[TARGET0]]
   %target1 = stream.async.update %update1, %target0[%c49152 to %c98304] : !stream.resource<*>{%update_size} -> %target0 as !stream.resource<*>{%target_size}
-  // CHECK-NEXT: return %[[TARGET1]]
-  return %target1 : !stream.resource<*>
+  // CHECK-NEXT: util.return %[[TARGET1]]
+  util.return %target1 : !stream.resource<*>
 }

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64, %[[ID:.+]]: !util.buffer, %[[GROUP:.+]]: !util.buffer, %[[RANK:.+]]: i32, %[[COUNT:.+]]: i32)
-func.func @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer, %rank: i32, %count: i32) {
+util.func public @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffer, %group: !util.buffer, %rank: i32, %count: i32) {
   //      CHECK: %channel = hal.channel.create
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   affinity(%[[AFFINITY]])
@@ -18,14 +18,14 @@ func.func @channel_create(%device: !hal.device, %affinity: i64, %id: !util.buffe
                                  group(%group)
                                   rank(%rank)
                                  count(%count) : !hal.channel
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @channel_split
 //  CHECK-SAME: (%[[BASE_CHANNEL:.+]]: !hal.channel, %[[COLOR:.+]]: i32, %[[KEY:.+]]: i32)
-func.func @channel_split(%base_channel: !hal.channel, %color: i32, %key: i32) {
+util.func public @channel_split(%base_channel: !hal.channel, %color: i32, %key: i32) {
   //      CHECK: %channel = hal.channel.split<%[[BASE_CHANNEL]] : !hal.channel>
   // CHECK-SAME:   color(%[[COLOR]])
   // CHECK-SAME:   key(%[[KEY]])
@@ -34,15 +34,15 @@ func.func @channel_split(%base_channel: !hal.channel, %color: i32, %key: i32) {
                               color(%color)
                                 key(%key)
                               flags(0) : !hal.channel
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @channel_rank_and_count
 // CHECK-SAME: (%[[CHANNEL:.+]]: !hal.channel)
-func.func @channel_rank_and_count(%channel: !hal.channel) -> (i32, i32) {
+util.func public @channel_rank_and_count(%channel: !hal.channel) -> (i32, i32) {
   // CHECK: = hal.channel.rank_and_count<%[[CHANNEL]] : !hal.channel> : i32, i32
   %rank, %count = hal.channel.rank_and_count<%channel : !hal.channel> : i32, i32
-  return %rank, %count : i32, i32
+  util.return %rank, %count : i32, i32
 }

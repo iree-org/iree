@@ -17,7 +17,7 @@ module attributes {hal.device.targets = [
   // CHECK:   util.global.store %[[ALLOC_BUFFER]], @__dispatch_instrumentation
 
   // Query function used by tools to get the buffers and metadata:
-  // CHECK: func.func @__query_instruments(%[[LIST:.+]]: !util.list<?>)
+  // CHECK: util.func public @__query_instruments(%[[LIST:.+]]: !util.list<?>)
   // CHECK:   %[[INTERNAL_BUFFER:.+]] = util.global.load @__dispatch_instrumentation
   // CHECK:   %[[EXPORTED_BUFFER:.+]] = stream.tensor.export %[[INTERNAL_BUFFER]]
   // CHECK:   util.list.set %[[LIST]]{{.+}}
@@ -56,7 +56,7 @@ module attributes {hal.device.targets = [
       }
     }
   }
-  func.func @main(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+  util.func public @main(%arg0: !stream.resource<external>) -> !stream.resource<external> {
     %c0 = arith.constant 0 : index
     %c128 = arith.constant 128 : index
     %ret0 = stream.resource.alloc uninitialized : !stream.resource<external>{%c128}
@@ -75,6 +75,6 @@ module attributes {hal.device.targets = [
       }
     } => !stream.timepoint
     %ret0_ready = stream.timepoint.await %timepoint => %ret0 : !stream.resource<external>{%c128}
-    return %ret0_ready : !stream.resource<external>
+    util.return %ret0_ready : !stream.resource<external>
   }
 }

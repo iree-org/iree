@@ -4,9 +4,9 @@
 //  CHECK-SAME: %[[ARG:.+]]: tensor<?x?x?xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty(%{{.*}}, %{{.*}}, %{{.*}}) : tensor<?x?x?xf32>
 //       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<?x?x?xf32>) outs(%[[E]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-//       CHECK:   return %[[S]] : tensor<?x?x?xf32>
+//       CHECK:   util.return %[[S]] : tensor<?x?x?xf32>
 
-func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
+util.func public @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
@@ -50,15 +50,17 @@ func.func @softmax(%src : tensor<?x?x?xf32>) -> (tensor<?x?x?xf32>) {
     %11 = arith.mulf %arg0, %arg1 : f32
     linalg.yield %11 : f32
   } -> tensor<?x?x?xf32>
-  return %10 : tensor<?x?x?xf32>
+  util.return %10 : tensor<?x?x?xf32>
 }
+
+// -----
 
 // CHECK-LABEL: @softmax_no_rcp
 //  CHECK-SAME: %[[ARG:.+]]: tensor<10x4096x4096xf16>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<10x4096x4096xf16>
 //       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<10x4096x4096xf16>) outs(%[[E]] : tensor<10x4096x4096xf16>) -> tensor<10x4096x4096xf16>
-//       CHECK:   return %[[S]] : tensor<10x4096x4096xf16>
-func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x4096xf16>) {
+//       CHECK:   util.return %[[S]] : tensor<10x4096x4096xf16>
+util.func public @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x4096xf16>) {
   %cst_158 = arith.constant -6.550400e+04 : f16
   %cst_121 = arith.constant 0.000000e+00 : f16
   %224 = tensor.empty() : tensor<10x4096xf16>
@@ -106,16 +108,17 @@ func.func @softmax_no_rcp(%src : tensor<10x4096x4096xf16>) -> (tensor<10x4096x40
     %5290 = arith.divf %in, %in_1572 : f16
     linalg.yield %5290 : f16
   } -> tensor<10x4096x4096xf16>
-  return %232 : tensor<10x4096x4096xf16>
+  util.return %232 : tensor<10x4096x4096xf16>
 }
 
+// -----
 
 // CHECK-LABEL: @softmax_broadcast
 //  CHECK-SAME: %[[ARG:.+]]: tensor<12x128x128xf32>
 //       CHECK:   %[[E:.+]] = tensor.empty() : tensor<12x128x128xf32>
 //       CHECK:   %[[S:.+]] = linalg.softmax dimension(2) ins(%[[ARG]] : tensor<12x128x128xf32>) outs(%[[E]] : tensor<12x128x128xf32>) -> tensor<12x128x128xf32>
-//       CHECK:   return %[[S]] : tensor<12x128x128xf32>
-func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128xf32>) {
+//       CHECK:   util.return %[[S]] : tensor<12x128x128xf32>
+util.func public @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128xf32>) {
   %cst_16 = arith.constant 0xFF800000 : f32
   %cst_18 = arith.constant -0.000000e+00 : f32
   %94 = tensor.empty() : tensor<12x128xf32>
@@ -160,10 +163,12 @@ func.func @softmax_broadcast(%93 : tensor<12x128x128xf32>) -> (tensor<12x128x128
     %2460 = arith.divf %in, %in_261 : f32
     linalg.yield %2460 : f32
   } -> tensor<12x128x128xf32>
-  return %109 : tensor<12x128x128xf32>
+  util.return %109 : tensor<12x128x128xf32>
 }
 
-func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
+// -----
+
+util.func public @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
     %arg1 : tensor<40x20xf32>) -> tensor<10x40xf32> {
   %0 = tensor.empty() : tensor<20x40xf32>
   %1 = linalg.generic {
@@ -178,16 +183,18 @@ func.func @aTransposeBMatmul(%arg0 : tensor<10x20xf32>,
   %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<10x40xf32>) -> tensor<10x40xf32>
   %5 = linalg.matmul ins(%arg0, %1 : tensor<10x20xf32>, tensor<20x40xf32>)
       outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
-  return %5 : tensor<10x40xf32>
+  util.return %5 : tensor<10x40xf32>
 }
-// CHECK-LABEL: func @aTransposeBMatmul
+// CHECK-LABEL: util.func public @aTransposeBMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<40x20xf32>
 //       CHECK:   %[[RESULT:.+]] = linalg.matmul_transpose_b
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
-//       CHECK:   return %[[RESULT]]
+//       CHECK:   util.return %[[RESULT]]
 
-func.func @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
+// -----
+
+util.func public @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
     %arg1 : tensor<5x40x20xf32>) -> tensor<5x10x40xf32> {
   %0 = tensor.empty() : tensor<5x20x40xf32>
   %1 = linalg.generic {
@@ -202,16 +209,18 @@ func.func @aTransposeBBatchMatmul(%arg0 : tensor<5x10x20xf32>,
   %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
   %5 = linalg.batch_matmul ins(%arg0, %1 : tensor<5x10x20xf32>, tensor<5x20x40xf32>)
       outs(%4 : tensor<5x10x40xf32>) -> tensor<5x10x40xf32>
-  return %5 : tensor<5x10x40xf32>
+  util.return %5 : tensor<5x10x40xf32>
 }
-// CHECK-LABEL: func @aTransposeBBatchMatmul
+// CHECK-LABEL: util.func public @aTransposeBBatchMatmul
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<5x10x20xf32>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x40x20xf32>
 //       CHECK:   %[[RESULT:.+]] = linalg.batch_matmul_transpose_b
 //  CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
-//       CHECK:   return %[[RESULT]]
+//       CHECK:   util.return %[[RESULT]]
 
-func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
+// -----
+
+util.func public @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
@@ -225,9 +234,9 @@ func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
       ^bb0(%out: f32):
         linalg.yield %cst : f32
     } -> tensor<1x1x?x?xf32>
-    return %1 : tensor<1x1x?x?xf32>
+    util.return %1 : tensor<1x1x?x?xf32>
 }
-// CHECK-LABEL: func @generic_fill
+// CHECK-LABEL: util.func public @generic_fill
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
 //       CHECK:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //       CHECK:   %[[EMPTY:.+]] = tensor.empty
@@ -235,12 +244,12 @@ func.func @generic_fill(%arg0: tensor<?x?xf32>) -> tensor<1x1x?x?xf32> {
 //       CHECK:   %[[RESULT:.+]] = linalg.fill
 //  CHECK-SAME:       ins(%[[CST]] : f32)
 //  CHECK-SAME:       outs(%[[EMPTY]] : tensor<1x1x?x?xf32>)
-//       CHECK:   return %[[RESULT]]
+//       CHECK:   util.return %[[RESULT]]
 
 // -----
 
 #map = affine_map<(d0) -> (d0)>
-func.func @test_rank_reduce(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
+util.func public @test_rank_reduce(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) -> tensor<5120xf32> {
   %c0 = arith.constant 0 : index
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel"]} outs(%B : tensor<5120xf32>) {
   ^bb0(%out: f32):
@@ -248,17 +257,17 @@ func.func @test_rank_reduce(%A : tensor<1x1x5120xf32>, %B : tensor<5120xf32>) ->
     %extracted = tensor.extract %A[%c0, %c0, %12] : tensor<1x1x5120xf32>
     linalg.yield %extracted : f32
   } -> tensor<5120xf32>
-  return %0 : tensor<5120xf32>
+  util.return %0 : tensor<5120xf32>
 }
 
-// CHECK-LABEL: func @test_rank_reduce
+// CHECK-LABEL: util.func public @test_rank_reduce
 //       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [1, 1, 5120] [1, 1, 1]
 //  CHECK-SAME:     tensor<1x1x5120xf32> to tensor<5120xf32>
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @test_slice_middle(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+util.func public @test_slice_middle(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
   %c0 = arith.constant 0 : index
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
   ^bb0(%out: f32):
@@ -267,16 +276,16 @@ func.func @test_slice_middle(%A : tensor<64x64x64xf32>, %B : tensor<64x64xf32>) 
     %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<64x64x64xf32>
     linalg.yield %extracted : f32
   } -> tensor<64x64xf32>
-  return %0 : tensor<64x64xf32>
+  util.return %0 : tensor<64x64xf32>
 }
 
-// CHECK-LABEL: func @test_slice_middle
+// CHECK-LABEL: util.func public @test_slice_middle
 //       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [64, 1, 64] [1, 1, 1]
 //  CHECK-SAME:     tensor<64x64x64xf32> to tensor<64x64xf32>
 
 // -----
 
-func.func @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320xf32> {
+util.func public @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320xf32> {
   %c0 = arith.constant 0 : index
   %c179 = arith.constant 179 : index
   %70 = tensor.empty() : tensor<320xf32>
@@ -286,10 +295,10 @@ func.func @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320
     %extracted = tensor.extract %arg0[%c0, %76, %c0] : tensor<180x320x1xf32>
     linalg.yield %extracted : f32
   } -> tensor<320xf32>
-  return %71 : tensor<320xf32>
+  util.return %71 : tensor<320xf32>
 }
 
-// CHECK-LABEL: func @test_trailing_elementwise
+// CHECK-LABEL: util.func public @test_trailing_elementwise
 //       CHECK:   tensor.extract_slice %{{.*}}[0, 0, 0] [1, 320, 1] [1, 1, 1]
 //  CHECK-SAME:     tensor<180x320x1xf32> to tensor<320xf32>
 
@@ -298,8 +307,8 @@ func.func @test_trailing_elementwise(%arg0: tensor<180x320x1xf32>) -> tensor<320
 // This currently should not be raised as the operation does not remain
 // elementwise after raising the tensor.extract to input.
 #map = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK-LABEL: func @test_non_slice
-func.func @test_non_slice(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
+// CHECK-LABEL: util.func public @test_non_slice
+util.func public @test_non_slice(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) -> tensor<64x64xf32> {
   %c0 = arith.constant 0 : index
   // CHECK: linalg.generic
   %0 = linalg.generic {indexing_maps = [#map], iterator_types = ["parallel", "parallel"]} outs(%B : tensor<64x64xf32>) {
@@ -309,13 +318,13 @@ func.func @test_non_slice(%A : tensor<128x128x128xf32>, %B : tensor<64x64xf32>) 
     %extracted = tensor.extract %A[%i1, %c0, %i2] : tensor<128x128x128xf32>
     linalg.yield %extracted : f32
   } -> tensor<64x64xf32>
-  return %0 : tensor<64x64xf32>
+  util.return %0 : tensor<64x64xf32>
 }
 
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func.func @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) -> tensor<1x32x1x128xf16> {
+util.func public @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) -> tensor<1x32x1x128xf16> {
   %1 = tensor.empty() : tensor<1x32x1x128xf16>
   %2 = tensor.empty() : tensor<32x64xf16>
   %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<1x32x1x128xf16> to tensor<32x64xf16>
@@ -327,10 +336,10 @@ func.func @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) -> tens
   } -> tensor<32x64xf16>
   %inserted_slice = tensor.insert_slice %3 into %1[0, 0, 0, 0] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<32x64xf16> into tensor<1x32x1x128xf16>
   %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, 0, 0, 64] [1, 32, 1, 64] [1, 1, 1, 1] : tensor<32x64xf16> into tensor<1x32x1x128xf16>
-  return %inserted_slice_1 : tensor<1x32x1x128xf16>
+  util.return %inserted_slice_1 : tensor<1x32x1x128xf16>
 }
 
-// CHECK-LABEL: func.func @test_slice_negate_cat_peephole
+// CHECK-LABEL: util.func public @test_slice_negate_cat_peephole
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x32x1x128xf16>
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
@@ -350,12 +359,12 @@ func.func @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) -> tens
 //       CHECK:      linalg.yield %[[SEL]] : f16
 
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[NREV]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x2x64xf16> into tensor<1x32x1x128xf16>
-//       CHECK:   return %[[COLLAPSE]]
+//       CHECK:   util.return %[[COLLAPSE]]
 
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x128xf16>) -> tensor<1x32x?x128xf16> {
+util.func public @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x128xf16>) -> tensor<1x32x?x128xf16> {
   %c2 = arith.constant 2 : index
   %d2 = tensor.dim %arg0, %c2 : tensor<1x32x?x128xf16>
   %1 = tensor.empty(%d2) : tensor<1x32x?x128xf16>
@@ -369,21 +378,21 @@ func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<1x32x?x128xf16>)
   } -> tensor<32x?x64xf16>
   %inserted_slice = tensor.insert_slice %3 into %1[0, 0, 0, 0] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<32x?x64xf16> into tensor<1x32x?x128xf16>
   %inserted_slice_1 = tensor.insert_slice %extracted_slice into %inserted_slice[0, 0, 0, 64] [1, 32, %d2, 64] [1, 1, 1, 1] : tensor<32x?x64xf16> into tensor<1x32x?x128xf16>
-  return %inserted_slice_1 : tensor<1x32x?x128xf16>
+  util.return %inserted_slice_1 : tensor<1x32x?x128xf16>
 }
 
 /// Verify that the pattern kicks in for a simple dynamic example.
-// CHECK-LABEL: func.func @test_slice_negate_cat_peephole_dynamic
+// CHECK-LABEL: util.func public @test_slice_negate_cat_peephole_dynamic
 //       CHECK:    tensor.expand_shape
 //       CHECK:    linalg.generic
 //       CHECK:      tensor.extract
 //       CHECK:    %[[COL:.+]] = tensor.collapse_shape
-//       CHECK:    return %[[COL]]
+//       CHECK:    util.return %[[COL]]
 
 // -----
 
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128xf16>) -> tensor<32x?x128xf16> {
+util.func public @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128xf16>) -> tensor<32x?x128xf16> {
   %c2 = arith.constant 2 : index
   %d2 = tensor.dim %arg0, %c2 : tensor<32x?x128xf16>
   %1 = tensor.empty(%d2) : tensor<32x?x128xf16>
@@ -396,13 +405,13 @@ func.func @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128xf16>) -
     linalg.yield %5 : f16
   } -> tensor<32x?x64xf16>
   %concat = tensor.concat dim(2) %3, %extracted_slice : (tensor<32x?x64xf16>, tensor<32x?x64xf16>) -> tensor<32x?x128xf16>
-  return %concat : tensor<32x?x128xf16>
+  util.return %concat : tensor<32x?x128xf16>
 }
 
 /// Verify that the pattern kicks in for tensor.concat as well.
-// CHECK-LABEL: func.func @test_slice_negate_cat_peephole_dynamic
+// CHECK-LABEL: util.func public @test_slice_negate_cat_peephole_dynamic
 //       CHECK:    tensor.expand_shape
 //       CHECK:    linalg.generic
 //       CHECK:      tensor.extract
 //       CHECK:    %[[COL:.+]] = tensor.collapse_shape
-//       CHECK:    return %[[COL]]
+//       CHECK:    util.return %[[COL]]

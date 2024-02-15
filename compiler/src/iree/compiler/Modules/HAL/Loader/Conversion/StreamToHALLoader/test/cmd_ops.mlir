@@ -32,7 +32,7 @@ hal.executable private @ex {
 // CHECK-LABEL: @cmdDispatch
 // CHECK-SAME: (%[[BUFFER0:.+]]: !util.buffer, %[[BUFFER0_SIZE:.+]]: index,
 // CHECK-SAME:  %[[BUFFER1:.+]]: !hal.buffer, %[[BUFFER1_SIZE:.+]]: index)
-func.func @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: index,
+util.func public @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: index,
                        %buffer1: !stream.resource<external>, %buffer1_size: index) -> !stream.timepoint {
   // (ends up by the dispatch below)
   %workload_x = arith.constant 1000 : index
@@ -87,5 +87,5 @@ func.func @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_size: ind
     }
   } => !stream.timepoint
   // CHECK: return %c0
-  return %fence : !stream.timepoint
+  util.return %fence : !stream.timepoint
 }

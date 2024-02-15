@@ -24,11 +24,11 @@ hal.executable private @ex0 {
 }
 
 // CHECK-LABEL: @get_ex0
-func.func private @get_ex0() -> !hal.executable {
+util.func private @get_ex0() -> !hal.executable {
   // CHECK: %[[EX0:.+]] = util.global.load @ex0 : !hal.executable
   %ex0 = hal_loader.executable.lookup executable(@ex0) : !hal.executable
   // CHECK: return %[[EX0]]
-  return %ex0 : !hal.executable
+  util.return %ex0 : !hal.executable
 }
 
 // CHECK: util.global private @ex1 : !hal.executable
@@ -40,9 +40,9 @@ hal.executable private @ex1 {
 }
 
 // CHECK-LABEL: @get_ex1
-func.func private @get_ex1() -> !hal.executable {
+util.func private @get_ex1() -> !hal.executable {
   // CHECK: %[[EX1:.+]] = util.global.load @ex1 : !hal.executable
   %ex1 = hal_loader.executable.lookup executable(@ex1) : !hal.executable
   // CHECK: return %[[EX1]]
-  return %ex1 : !hal.executable
+  util.return %ex1 : !hal.executable
 }

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @fold_binding_subspans_into_dispatch
-func.func @fold_binding_subspans_into_dispatch(
+util.func public @fold_binding_subspans_into_dispatch(
     // CHECK-SAME: %[[EXECUTABLE:.+]]: !hal.executable,
     %executable: !hal.executable,
     // CHECK-SAME: %[[BUFFER:.+]]: !util.buffer, %[[SUBSPAN_OFFSET:.+]]: index, %[[SUBSPAN_LENGTH:.+]]: index
@@ -26,5 +26,5 @@ func.func @fold_binding_subspans_into_dispatch(
       // CHECK: (%[[BUFFER]] : !util.buffer)[%[[ABSOLUTE_OFFSET]], %[[BINDING_LENGTH]]]
       (%subspan : !util.buffer)[%binding_offset, %binding_length]
     ])
-  return
+  util.return
 }
