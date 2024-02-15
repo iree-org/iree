@@ -162,6 +162,7 @@ struct GenericVectorizationPassOptions {
   // to specify the masked vector sizes.
   bool useConfiguredVectorSizes = true;
   bool vectorizePadding = false;
+  bool vectorizeCopy = true;
   bool vectorizeGatherAccesses = false;
   // The flag controls whether it touches the structure generated from tiling,
   // which affects later steps like bufferization and vector hoisting.

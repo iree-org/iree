@@ -130,6 +130,7 @@ public:
     this->enableVectorMasking.setValue(options.enableVectorMasking);
     this->useConfiguredVectorSizes.setValue(options.useConfiguredVectorSizes);
     this->vectorizePadding.setValue(options.vectorizePadding);
+    this->vectorizeCopy.setValue(options.vectorizeCopy);
     this->vectorizeGatherAccesses.setValue(options.vectorizeGatherAccesses);
     this->enableCleanup.setValue(options.enableCleanup);
     this->generateContract.setValue(options.generateContract);
@@ -151,9 +152,12 @@ void GenericVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op))
+    // All linalg ops are candidates for vectorization, except for linalg.copy
+    // when vectorizeCopy is false.
+    if (!vectorizeCopy && isa<linalg::CopyOp>(op)) {
+    } else if (isa<linalg::LinalgOp>(op))
       candidates.push_back(op);
-    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
+    else if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
   });
   for (Operation *op : candidates) {
