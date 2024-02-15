@@ -227,17 +227,25 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
       // We'll only use this value if all call sites are uniform.
       Attribute constantValue;
       if (matchPattern(value, m_Constant(&constantValue))) {
-        analysis.callerUniformArgValues[i] = {
-            value.getLoc(),
-            value.getType(),
-            constantValue,
-        };
+        if (!seenArgAttrs[i]) {
+          // First call site with a constant: stash so we can inline it if it's
+          // uniform.
+          seenArgAttrs[i] = constantValue;
+          analysis.callerUniformArgValues[i] = {
+              value.getLoc(),
+              value.getType(),
+              constantValue,
+          };
+        } else if (seenArgAttrs[i] != constantValue) {
+          // Value constant has changed from prior calls: mark non-uniform.
+          analysis.callerUniformArgs.reset(i);
+        }
       } else {
         // Check to see if the value is the same as previously seen.
         // This will ensure that across calling functions we set non-uniform
         // _unless_ it's a constant value.
         if (!seenArgValues[i]) {
-          // First call site: take the value directly.
+          // First call site with a value: take the value directly.
           seenArgValues[i] = value;
         } else if (seenArgValues[i] != value) {
           // Value has changed and is not constant: mark non-uniform.
@@ -245,13 +253,8 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
         }
       }
 
-      // Check to see if the constant value is the same as previously seen.
-      // NOTE: unlike callee results we only check constant values.
-      if (!seenArgAttrs[i]) {
-        // First call site: take the value directly.
-        seenArgAttrs[i] = constantValue;
-      } else if (seenArgAttrs[i] != constantValue) {
-        // Value has changed: mark non-uniform.
+      // Mark non-uniform if we've seen both constant and non-constant values.
+      if (seenArgValues[i] && seenArgAttrs[i]) {
         analysis.callerUniformArgs.reset(i);
       }
 

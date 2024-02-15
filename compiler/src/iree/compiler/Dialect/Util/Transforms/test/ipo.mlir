@@ -279,6 +279,57 @@ func.func @nonuniform_arg_caller_b(%arg0: index) -> index {
 
 // -----
 
+// Tests that non-uniform call args w/ constants don't get optimized.
+
+// CHECK-LABEL: func.func private @nonuniform_constant_arg_callee
+// CHECK-SAME: (%[[ARG0:.+]]: index) -> index
+func.func private @nonuniform_constant_arg_callee(%arg0: index) -> index {
+  // CHECK: %[[ADD:.+]] = arith.addi %[[ARG0]], %[[ARG0]]
+  %add = arith.addi %arg0, %arg0 : index
+  // CHECK: return %[[ADD]]
+  return %add : index
+}
+
+// CHECK: func.func @nonuniform_arg_caller(%[[CALLER_ARG0:.+]]: index)
+func.func @nonuniform_arg_caller(%arg0: index) -> (index, index) {
+  // CHECK-DAG: %[[C10:.+]] = arith.constant 10
+  %c10 = arith.constant 10 : index
+  // CHECK: %[[RET0:.+]] = call @nonuniform_constant_arg_callee(%[[CALLER_ARG0]]) : (index) -> index
+  %ret0 = call @nonuniform_constant_arg_callee(%arg0) : (index) -> index
+  // CHECK: %[[RET1:.+]] = call @nonuniform_constant_arg_callee(%[[C10]]) : (index) -> index
+  %ret1 = call @nonuniform_constant_arg_callee(%c10) : (index) -> index
+  // CHECK: return %[[RET0]], %[[RET1]]
+  return %ret0, %ret1 : index, index
+}
+
+// -----
+
+// Tests that non-uniform call args w/ constants don't get optimized (order
+// flipped from above).
+
+// CHECK-LABEL: func.func private @nonuniform_constant_arg_callee_flipped
+// CHECK-SAME: (%[[ARG0:.+]]: index) -> index
+func.func private @nonuniform_constant_arg_callee_flipped(%arg0: index) -> index {
+  // CHECK: %[[ADD:.+]] = arith.addi %[[ARG0]], %[[ARG0]]
+  %add = arith.addi %arg0, %arg0 : index
+  // CHECK: return %[[ADD]]
+  return %add : index
+}
+
+// CHECK: func.func @nonuniform_arg_caller_flipped(%[[CALLER_ARG0:.+]]: index)
+func.func @nonuniform_arg_caller_flipped(%arg0: index) -> (index, index) {
+  // CHECK-DAG: %[[C10:.+]] = arith.constant 10
+  %c10 = arith.constant 10 : index
+  // CHECK: %[[RET0:.+]] = call @nonuniform_constant_arg_callee_flipped(%[[C10]]) : (index) -> index
+  %ret0 = call @nonuniform_constant_arg_callee_flipped(%c10) : (index) -> index
+  // CHECK: %[[RET1:.+]] = call @nonuniform_constant_arg_callee_flipped(%[[CALLER_ARG0]]) : (index) -> index
+  %ret1 = call @nonuniform_constant_arg_callee_flipped(%arg0) : (index) -> index
+  // CHECK: return %[[RET0]], %[[RET1]]
+  return %ret0, %ret1 : index, index
+}
+
+// -----
+
 // Tests that non-uniform call results don't get optimized.
 
 // CHECK-LABEL: func.func private @nonuniform_result_callee
