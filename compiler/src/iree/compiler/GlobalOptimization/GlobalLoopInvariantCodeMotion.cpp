@@ -11,6 +11,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #include "llvm/Support/Debug.h"
 
@@ -73,28 +74,39 @@ static bool isBackwardSliceHoistable(
   return hoistable;
 }
 
-// Call `moveOutOfLoop` to hoist op and its producer out of the loop. Ops are
-// hoisted in post-order to handle the dependencies (leaves of the producer tree
-// are hoisted first).
-static LogicalResult hoistBackwardSlice(Operation *op,
-                                        LoopLikeOpInterface loopOp) {
-  // Check if the op has been hoisted.
-  if (!loopOp->isAncestor(op))
-    return success();
-  // Currently only hoist ops with no region (so no implicit capture).
-  if (op->getNumRegions() > 0)
-    return failure();
+// Hoist ops and their backward slices out of the loop.
+static LogicalResult hoistOps(LoopLikeOpInterface loopOp,
+                              SmallVectorImpl<Operation *> &opsToHoist) {
+  llvm::SmallDenseSet<Operation *> visitedOps;
+  SmallVector<Operation *> worklist(opsToHoist.begin(), opsToHoist.end());
+  // Collect ops and their backward slices.
+  while (!worklist.empty()) {
+    Operation *op = worklist.back();
+    worklist.pop_back();
 
-  // Hoist the producers.
-  for (OpOperand &operand : op->getOpOperands()) {
-    if (Operation *producer = operand.get().getDefiningOp()) {
-      if (failed(hoistBackwardSlice(producer, loopOp)))
-        return failure();
+    if (visitedOps.contains(op))
+      continue;
+    visitedOps.insert(op);
+
+    assert(op->getNumRegions() == 0 && "don't expect ops with regions yet");
+
+    for (OpOperand &operand : op->getOpOperands()) {
+      if (Operation *producer = operand.get().getDefiningOp()) {
+        // Only include producers inside the loop.
+        if (loopOp->isAncestor(producer))
+          worklist.push_back(producer);
+      }
     }
   }
-  // Hoist the op itself.
-  loopOp.moveOutOfLoop(op);
 
+  // Sort the collected ops in topological order.
+  SmallVector<Operation *> orderedOpsToHoist = llvm::to_vector(visitedOps);
+  mlir::computeTopologicalSorting(orderedOpsToHoist);
+
+  // Hoist ops in topological order.
+  for (Operation *op : orderedOpsToHoist) {
+    loopOp.moveOutOfLoop(op);
+  }
   return success();
 }
 
@@ -102,10 +114,9 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
                                          RewriterBase &rewriter) {
   // First find the root ops can be hoisted. The root op needs to satisfy:
   // 1. It is a root op having benefits to be hoisted (e.g. tensor.pack)
-  // 2. Its backword slice can be hoisted (e.g. they are loop invariant)
+  // 2. Its backward slice can be hoisted (e.g. they are loop invariant)
   SmallVector<Operation *> rootOpsToHoist;
   llvm::SmallDenseMap<Operation *, bool> hoistableOpMap;
-
   for (Region *region : loopOp.getLoopRegions()) {
     // Consider only the top-level ops in the region.
     for (Operation &rootOp : region->getOps()) {
@@ -123,7 +134,7 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
 
   // Wrap the loop in zero-trip-check so the hoisted ops will only run when the
   // loop condition is ever satisfied.
-  auto wrappedLoop =
+  FailureOr<LoopLikeOpInterface> wrappedLoop =
       TypeSwitch<Operation *, FailureOr<LoopLikeOpInterface>>(
           loopOp.getOperation())
           .Case<scf::WhileOp>([&](scf::WhileOp op) {
@@ -133,13 +144,7 @@ static LogicalResult hoistLoopInvariants(LoopLikeOpInterface loopOp,
   if (failed(wrappedLoop))
     return failure();
 
-  // Hoist root ops in regions in reverse order to handle the dependencies.
-  for (auto it = rootOpsToHoist.rbegin(); it != rootOpsToHoist.rend(); ++it) {
-    if (failed(hoistBackwardSlice(*it, wrappedLoop.value())))
-      return failure();
-  }
-
-  return success();
+  return hoistOps(*wrappedLoop, rootOpsToHoist);
 }
 
 namespace mlir::iree_compiler::GlobalOptimization {
