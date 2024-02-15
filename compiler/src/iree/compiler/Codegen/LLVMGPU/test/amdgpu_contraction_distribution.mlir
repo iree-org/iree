@@ -23,7 +23,7 @@ builtin.module attributes { transform.with_named_sequence } {
     %output = vector.contract {indexing_maps = [#map1, #map2, #map3], iterator_types = ["parallel", "parallel", "reduction"],
                                kind = #vector.kind<add>,
                                "__vector_layout_test_anchor_operand_0" = #layout_a,
-                               "__vector_layout_test_anchor_operand_1" = #layout_c,
+                               "__vector_layout_test_anchor_operand_1" = #layout_a,
                                "__vector_layout_test_anchor_operand_2" = #layout_c,
                                "__vector_layout_test_anchor_result_0" = #layout_c
                                }
