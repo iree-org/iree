@@ -2,20 +2,20 @@
 
 // CHECK-LABEL: @dispatchNoWorkload
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
-func.func @dispatchNoWorkload(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
+util.func public @dispatchNoWorkload(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
   //      CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<?x?x1024xf32>{%[[DIM1]], %[[DIM3]]}
   //      CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@entry(%[[INPUT]][%c0 to %[[INPUT_SIZE]] for %[[INPUT_SIZE]]]) :
   // CHECK-SAME:     (!stream.resource<*>{%[[INPUT_SIZE]]}) -> !stream.resource<*>{%[[RESULT_SIZE]]}
   %0 = flow.dispatch @ex::@entry(%input) : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim1, %dim3}
   // return %[[RESULT]], %[[RESULT_SIZE]] : !stream.resource<*>, index
-  return %0 : tensor<?x?x1024xf32>
+  util.return %0 : tensor<?x?x1024xf32>
 }
 
 // -----
 
 // CHECK-LABEL: @dispatch
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
-func.func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
+util.func public @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -24,14 +24,14 @@ func.func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) ->
   // CHECK-SAME:     (!stream.resource<*>{%[[INPUT_SIZE]]}) -> !stream.resource<*>{%[[RESULT_SIZE]]}
   %0 = flow.dispatch @ex::@entry[%c1, %c2, %c3](%input) : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim1, %dim3}
   // return %[[RESULT]], %[[RESULT_SIZE]] : !stream.resource<*>, index
-  return %0 : tensor<?x?x1024xf32>
+  util.return %0 : tensor<?x?x1024xf32>
 }
 
 // -----
 
 // CHECK-LABEL: @tiedDispatch
 //  CHECK-SAME: (%[[INPUT0:.+]]: !stream.resource<*>, %[[INPUT0_SIZE:.+]]: index, %[[INPUT1:.+]]: !stream.resource<*>, %[[INPUT1_SIZE:.+]]: index)
-func.func @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tensor<3x9xi32> {
+util.func public @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tensor<3x9xi32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -40,15 +40,15 @@ func.func @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tenso
   %0 = flow.dispatch @ex::@entry0[%c1, %c2, %c3](%input0) : (tensor<i32>) -> tensor<3x9xi32>
   // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@entry1[%c1, %c2, %c3](%[[INPUT1]][%c0 to %[[INPUT1_SIZE]] for %[[INPUT1_SIZE]]], %[[T]][%c0 to %[[T_SIZE]] for %[[T_SIZE]]]) : (!stream.resource<*>{%[[INPUT1_SIZE]]}, !stream.resource<*>{%[[T_SIZE]]}) -> %[[T]]{%[[T_SIZE]]}
   %1 = flow.dispatch @ex::@entry1[%c1, %c2, %c3](%input1, %0) : (tensor<2x3xi32>, tensor<3x9xi32>) -> %0
-  // CHECK: return %[[RESULT]], %[[T_SIZE]] : !stream.resource<*>, index
-  return %1 : tensor<3x9xi32>
+  // CHECK: util.return %[[RESULT]], %[[T_SIZE]] : !stream.resource<*>, index
+  util.return %1 : tensor<3x9xi32>
 }
 
 // -----
 
 // CHECK-LABEL: @dispatchAffinity
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
-func.func @dispatchAffinity(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> (tensor<?x?x1024xf32>, tensor<?x?x1024xf32>) {
+util.func public @dispatchAffinity(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> (tensor<?x?x1024xf32>, tensor<?x?x1024xf32>) {
   //      CHECK: %[[RESULT0_SIZE:.+]] = stream.tensor.sizeof on(#hal.affinity.queue<[0]>) tensor<?x?x1024xf32>{%[[DIM1]], %[[DIM3]]}
   //      CHECK: %[[RESULT0:.+]] = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@entry0(%[[INPUT]][%c0 to %[[INPUT_SIZE]] for %[[INPUT_SIZE]]])
   %0 = flow.dispatch @ex::@entry0(%input) {
@@ -60,5 +60,5 @@ func.func @dispatchAffinity(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: i
     stream.affinity = #hal.affinity.queue<[1]>
   } : (tensor<7x?x24x?xf32>{%dim1, %dim3}) -> tensor<?x?x1024xf32>{%dim3, %dim1}
   // return %[[RESULT0]], %[[RESULT0_SIZE]], %[[RESULT1]], %[[RESULT1_SIZE]]
-  return %0, %1 : tensor<?x?x1024xf32>, tensor<?x?x1024xf32>
+  util.return %0, %1 : tensor<?x?x1024xf32>, tensor<?x?x1024xf32>
 }

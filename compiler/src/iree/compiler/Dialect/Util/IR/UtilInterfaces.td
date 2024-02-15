@@ -723,6 +723,17 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
+      }],
+      /*retTy=*/"void",
+      /*methodName=*/"getAllTiedOperands",
+      /*args=*/(ins "SmallVectorImpl<int64_t> &":$indices),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        IREE::Util::detail::getAllTiedOperands($_op, indices);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the set of operands that results may be tied to as an
         (index, length) pair ala getODSOperandIndexAndLength.
 
@@ -733,8 +744,9 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         of successor operands.
       }],
       /*retTy=*/"std::pair<unsigned, unsigned>",
-      /*methodName=*/"getTiedOperandsIndexAndLength", (ins),
-      /*args=*/[{}],
+      /*methodName=*/"getTiedOperandsIndexAndLength",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return {0, $_op->getNumOperands()};
       }]
@@ -749,8 +761,9 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
         ones it will tie.
       }],
       /*retTy=*/"std::pair<unsigned, unsigned>",
-      /*methodName=*/"getTiedResultsIndexAndLength", (ins),
-      /*args=*/[{}],
+      /*methodName=*/"getTiedResultsIndexAndLength",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
         return {0, $_op->getNumResults()};
       }]

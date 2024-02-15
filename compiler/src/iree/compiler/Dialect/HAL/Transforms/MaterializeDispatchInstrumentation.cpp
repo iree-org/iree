@@ -18,7 +18,6 @@
 #include "iree/schemas/instruments/dispatch.h"
 #include "iree/schemas/instruments/dispatch_def_builder.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -310,7 +309,7 @@ struct MaterializeDispatchInstrumentationPass
     // Create query function for getting the instrumentation data.
     auto listType = moduleBuilder.getType<IREE::Util::ListType>(
         moduleBuilder.getType<IREE::Util::VariantType>());
-    auto queryOp = moduleBuilder.create<func::FuncOp>(
+    auto queryOp = moduleBuilder.create<IREE::Util::FuncOp>(
         loc, "__query_instruments",
         moduleBuilder.getFunctionType({listType}, {}));
     {
@@ -359,7 +358,7 @@ struct MaterializeDispatchInstrumentationPass
       }
 
       appendListItems(loc, listArg, iovecs, queryBuilder);
-      queryBuilder.create<func::ReturnOp>(loc);
+      queryBuilder.create<IREE::Util::ReturnOp>(loc);
     }
   }
 };

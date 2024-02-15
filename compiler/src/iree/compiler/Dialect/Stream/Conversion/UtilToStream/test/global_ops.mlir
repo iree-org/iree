@@ -4,7 +4,7 @@
 // CHECK: util.global public mutable @var_i32__size : index
 util.global public mutable @var_i32 : tensor<i32>
 // CHECK-LABEL: @mutableGlobal
-func.func @mutableGlobal() {
+util.func public @mutableGlobal() {
   // CHECK-DAG: %[[VAR:.+]] = util.global.load @var_i32 : !stream.resource<variable>
   // CHECK-DAG: %[[SIZE:.+]] = util.global.load @var_i32__size : index
   //     CHECK: %[[LOAD_T:.+]] = stream.async.transfer %[[VAR]] : !stream.resource<variable>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
@@ -13,18 +13,18 @@ func.func @mutableGlobal() {
   // CHECK-DAG: util.global.store %[[STORE_T]], @var_i32 : !stream.resource<variable>
   // CHECK-DAG: util.global.store %[[SIZE]], @var_i32__size : index
   util.global.store %0, @var_i32 : tensor<i32>
-  return
+  util.return
 }
 
 // -----
 
 // TODO(#7432): add indirect global expansion support to streams.
 // util.global public mutable @var_indirect : tensor<i32>
-// func.func @mutableGlobalIndirect() {
+// util.func public @mutableGlobalIndirect() {
 //   %0 = util.global.address @var_indirect : !util.ptr<tensor<i32>>
 //   %1 = util.global.load.indirect %0 : !util.ptr<tensor<i32>> -> tensor<i32>
 //   util.global.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
-//   return
+//   util.return
 // }
 
 // -----
@@ -38,14 +38,14 @@ func.func @mutableGlobal() {
 //  CHECK-DAG:   util.global.store %[[SIZE]], @var_with_tensor_initializer__size : index
 util.global public mutable @var_with_tensor_initializer = dense<0.000000e+00> : tensor<f32>
 // CHECK-LABEL: @initializedGlobal
-func.func @initializedGlobal() {
+util.func public @initializedGlobal() {
   // CHECK-DAG: = util.global.load @var_with_tensor_initializer : !stream.resource<variable>
   // CHECK-DAG: = util.global.load @var_with_tensor_initializer__size : index
   %0 = util.global.load @var_with_tensor_initializer : tensor<f32>
   // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_initializer : !stream.resource<variable>
   // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_initializer__size : index
   util.global.store %0, @var_with_tensor_initializer : tensor<f32>
-  return
+  util.return
 }
 
 // -----
@@ -59,14 +59,14 @@ func.func @initializedGlobal() {
 //  CHECK-DAG:   util.global.store %[[SIZE]], @var_with_tensor_uninitialized__size : index
 util.global private mutable @var_with_tensor_uninitialized = #util.uninitialized : tensor<4xf32>
 // CHECK-LABEL: @uninitializedGlobalTensor
-func.func @uninitializedGlobalTensor() {
+util.func public @uninitializedGlobalTensor() {
   // CHECK-DAG: = util.global.load @var_with_tensor_uninitialized : !stream.resource<variable>
   // CHECK-DAG: = util.global.load @var_with_tensor_uninitialized__size : index
   %0 = util.global.load @var_with_tensor_uninitialized : tensor<4xf32>
   // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_uninitialized : !stream.resource<variable>
   // CHECK-DAG: util.global.store %{{.+}}, @var_with_tensor_uninitialized__size : index
   util.global.store %0, @var_with_tensor_uninitialized : tensor<4xf32>
-  return
+  util.return
 }
 
 // -----
@@ -78,7 +78,7 @@ func.func @uninitializedGlobalTensor() {
 // CHECK-DAG: util.global public mutable @var_with_buffer_view_store__size : index
 util.global public mutable @var_with_buffer_view_store : tensor<?x4xf32>
 // CHECK-LABEL: @globalStoreFromExternal
-func.func @globalStoreFromExternal(%arg0: !hal.buffer_view) {
+util.func public @globalStoreFromExternal(%arg0: !hal.buffer_view) {
   // CHECK: %[[DIM0:.+]] = hal.buffer_view.dim
   %dim0 = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
   // CHECK: %[[SIZE:.+]] = stream.tensor.sizeof tensor<?x4xf32>{%[[DIM0]]} : index
@@ -89,7 +89,7 @@ func.func @globalStoreFromExternal(%arg0: !hal.buffer_view) {
   // CHECK: util.global.store %[[VAR]], @var_with_buffer_view_store : !stream.resource<variable>
   // CHECK: util.global.store %[[SIZE]], @var_with_buffer_view_store__size : index
   util.global.store %0, @var_with_buffer_view_store : tensor<?x4xf32>
-  return
+  util.return
 }
 
 // -----
@@ -99,9 +99,9 @@ func.func @globalStoreFromExternal(%arg0: !hal.buffer_view) {
 
 // TODO(#7432): add indirect global expansion support to streams.
 // util.global public mutable @var_indirect_with_buffer_view_store : tensor<i32>
-// func.func @globalStoreFromExternalIndirect(%arg0: !hal.buffer_view) {
+// util.func public @globalStoreFromExternalIndirect(%arg0: !hal.buffer_view) {
 //   %0 = util.global.address @var_indirect_with_buffer_view_store : !util.ptr<tensor<i32>>
 //   %1 = hal.tensor.import %arg0 : !hal.buffer_view -> tensor<i32>
 //   util.global.store.indirect %1, %0 : tensor<i32> -> !util.ptr<tensor<i32>>
-//   return
+//   util.return
 // }

@@ -173,6 +173,7 @@ static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
   constexpr const char *kRetainedAttributes[] = {
       "nosideeffects",
       "vm.fallback",
+      "vm.signature",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,
@@ -283,7 +284,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     // (Slow) lookup of the target function, which may be an import that we need
     // to perform type conversion for.
     auto calleeOp = SymbolTable::lookupSymbolIn(rootOp, calleeName);
-    if (auto funcOp = dyn_cast_or_null<func::FuncOp>(calleeOp)) {
+    if (auto funcOp = dyn_cast_or_null<FunctionOpInterface>(calleeOp)) {
       if (funcOp.isExternal()) {
         // Import that may require conversion.
         // This case handles when funcs are declared after the call.

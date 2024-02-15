@@ -18,7 +18,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -57,7 +56,8 @@ using ExpandedGlobalMap = DenseMap<StringRef, ExpandedGlobal>;
 // as duplicates will get added and we'll need to rely on global fusion to
 // get rid of them. Note that this only expands globals and does not yet update
 // use sites - we just need the ops to reference while doing so.
-static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
+static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
+                                               SymbolTable &symbolTable) {
   ExpandedGlobalMap expandedGlobals;
 
   // Gather all of the resource globals in the root.
@@ -70,7 +70,6 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
   }
 
   // Expand each global by adding the timepoint right next to it.
-  SymbolTable symbolTable(rootOp);
   auto timepointType = IREE::Stream::TimepointType::get(rootOp->getContext());
   auto immediateAttr =
       IREE::Stream::TimepointAttr::get(rootOp->getContext(), timepointType);
@@ -103,20 +102,22 @@ static bool usesResources(Operation *op) {
          llvm::any_of(op->getResultTypes(), isResourceType);
 }
 
+static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
+  newTypes.push_back(type);
+  if (isResourceType(type)) {
+    newTypes.push_back(IREE::Stream::TimepointType::get(type.getContext()));
+  }
+}
+
 // Expands resources in the given |types| list to (timepoint, resource).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
   if (types.empty())
     return {};
-  auto timepointType =
-      IREE::Stream::TimepointType::get(types.front().getContext());
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
-    if (isResourceType(type)) {
-      newTypes.push_back(timepointType);
-    }
-    newTypes.push_back(type);
+    expandType(type, newTypes);
   }
   return newTypes;
 }
@@ -150,6 +151,19 @@ static std::pair<Value, Value> consumeTimepoint(Location loc, Value value,
   }
 }
 
+static void expandOperand(Location loc, Value operand,
+                          SmallVectorImpl<Value> &newOperands,
+                          IRMapping &resourceTimepointMap, OpBuilder &builder) {
+  if (isResourceType(operand.getType())) {
+    auto [timepoint, resource] =
+        consumeTimepoint(loc, operand, resourceTimepointMap, builder);
+    newOperands.push_back(resource);
+    newOperands.push_back(timepoint);
+  } else {
+    newOperands.push_back(operand);
+  }
+}
+
 // Expands resources in |operands| into (timepoint, resource) pairs.
 static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
                                          IRMapping &resourceTimepointMap,
@@ -157,19 +171,13 @@ static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
   SmallVector<Value> result;
   result.reserve(operands.size() * 2);
   for (auto operand : operands) {
-    if (isResourceType(operand.getType())) {
-      auto timepointOperand =
-          consumeTimepoint(loc, operand, resourceTimepointMap, builder);
-      result.push_back(timepointOperand.first);
-      result.push_back(timepointOperand.second);
-    } else {
-      result.push_back(operand);
-    }
+    expandOperand(loc, operand, result, resourceTimepointMap, builder);
   }
   return result;
 }
 
-static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
+static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
+                             ExpandedGlobalMap &globalMap,
                              IRMapping &resourceTimepointMap);
 
 // Finds the size of a block argument resource or materializes a size if needed.
@@ -222,7 +230,7 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
 // Recursively expands resources into (timepoint, resource) pairs within the
 // given |region|. All branches, ops, and nested regions will be processed.
 static void expandRegion(Region &region, bool canModifyEntryBlock,
-                         ExpandedGlobalMap &globalMap,
+                         SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
                          IRMapping resourceTimepointMap) {
   if (region.empty())
     return;
@@ -242,20 +250,18 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
       if (!isResourceType(resourceArg.getType()))
         continue;
       auto timepointArg =
-          block.insertArgument(i, timepointType, resourceArg.getLoc());
+          block.insertArgument(i + 1, timepointType, resourceArg.getLoc());
       expansions.push_back(std::make_pair(timepointArg, resourceArg));
       resourceTimepointMap.map(resourceArg, timepointArg);
     }
 
     // Insert awaits that we've sunk from callers.
     auto builder = OpBuilder::atBlockBegin(&block);
-    for (auto expansion : llvm::reverse(expansions)) {
+    for (auto [timepoint, resource] : llvm::reverse(expansions)) {
       // If we can look down the chain and see the size then we can use that.
       // If it's a constant we can't use it as it may be defined anywhere in the
       // region. Dynamic dimensions usually come from outside or entry arguments
       // though and those are available.
-      auto timepoint = expansion.first;
-      auto resource = expansion.second;
       auto resourceSize =
           makeBlockArgResourceSize(region.getLoc(), resource, builder);
       auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
@@ -276,14 +282,14 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
   if (region.hasOneBlock()) {
     for (auto &op :
          llvm::make_early_inc_range(region.front().getOperations())) {
-      expandTimepoints(&op, globalMap, resourceTimepointMap);
+      expandTimepoints(&op, symbolTable, globalMap, resourceTimepointMap);
     }
   } else {
     DominanceInfo domInfo(region.getParentOp());
     for (auto *blockInfo : llvm::breadth_first(domInfo.getRootNode(&region))) {
       auto *block = blockInfo->getBlock();
       for (auto &op : llvm::make_early_inc_range(block->getOperations())) {
-        expandTimepoints(&op, globalMap, resourceTimepointMap);
+        expandTimepoints(&op, symbolTable, globalMap, resourceTimepointMap);
       }
     }
   }
@@ -357,23 +363,11 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
 }
 
 static void expandInitializerOp(IREE::Util::InitializerOp op,
+                                SymbolTable &symbolTable,
                                 ExpandedGlobalMap &globalMap,
                                 IRMapping &resourceTimepointMap) {
-  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, globalMap,
-               resourceTimepointMap);
-}
-
-// Returns true if |op| is either public and visible to external modules or
-// external and resolved later on. We can't modify their signatures.
-static bool isPublicOrExternal(CallableOpInterface callableOp) {
-  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
-    if (symbolOp.isPublic())
-      return true;
-  }
-  auto *region = callableOp.getCallableRegion();
-  if (!region || region->empty())
-    return true;
-  return false;
+  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, symbolTable,
+               globalMap, resourceTimepointMap);
 }
 
 // Inserts awaits on resource arguments.
@@ -384,24 +378,25 @@ static bool isPublicOrExternal(CallableOpInterface callableOp) {
 // don't need a wait.
 //
 // Example:
-//  func.func @foo(%0: !stream.resource)
+//  util.func @foo(%0: !stream.resource)
 //  ->
-//  func.func @foo(%t: !stream.timepoint, %0: !stream.resource) {
+//  util.func @foo(%t: !stream.timepoint, %0: !stream.resource) {
 //    %1 = stream.timepoint.await %t, %0
-static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
+static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
+                         ExpandedGlobalMap &globalMap,
                          IRMapping &resourceTimepointMap) {
   // Ignore public/external function signatures but still convert regions.
-  bool canModifyEntryBlock = !isPublicOrExternal(op);
+  bool canModifyEntryBlock = !IREE::Util::isPublicOrExternal(op);
   if (canModifyEntryBlock) {
-    auto oldType = op.getFunctionType();
-    auto inputTypes = expandTypes(oldType.getInputs());
-    auto resultTypes = expandTypes(oldType.getResults());
-    auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
-    if (newType != oldType) {
-      op.setType(newType);
-    }
+    op.expandSignature(
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        },
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        });
   }
-  expandRegion(op.getRegion(), canModifyEntryBlock, globalMap,
+  expandRegion(op.getRegion(), canModifyEntryBlock, symbolTable, globalMap,
                resourceTimepointMap);
 }
 
@@ -414,28 +409,31 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 //
 // Example:
 //  %1 = stream.timepoint.await %t, %0
-//  %r = call @foo(%1)
+//  %r = util.call @foo(%1)
 //  ->
-//  %rt, %r = call @foo(%t, %0)
+//  %rt, %r = util.call @foo(%t, %0)
 //  stream.timepoint.await %rt, %t
-static void expandCallOp(mlir::func::CallOp op,
+static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
                          IRMapping &resourceTimepointMap) {
   if (!usesResources(op))
     return;
 
   // Ignore calls to public/external functions.
-  auto calleeOp = SymbolTable::lookupNearestSymbolFrom<CallableOpInterface>(
-      op, op.getCalleeAttr());
-  if (isPublicOrExternal(calleeOp))
+  auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
+  if (IREE::Util::isPublicOrExternal(calleeOp))
     return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
-  auto operands = expandOperands(op.getLoc(), op.getOperands(),
-                                 resourceTimepointMap, builder);
-  auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
-                                                  resultTypes, operands);
+  auto newOp = op.cloneAndExpand(
+      [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
+        expandOperand(op.getLoc(), operand, newOperands, resourceTimepointMap,
+                      builder);
+      },
+      [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+        expandType(type, newTypes);
+      },
+      builder);
 
   // Insert awaits on results that we are sinking across the call edge.
   // The hope is that by moving the awaits here we can fold with uses inside
@@ -449,8 +447,8 @@ static void expandCallOp(mlir::func::CallOp op,
       oldResult.replaceAllUsesWith(newResult);
       continue;
     }
-    auto newTimepoint = newOp.getResult(newIdx++);
     auto newResult = newOp.getResult(newIdx++);
+    auto newTimepoint = newOp.getResult(newIdx++);
     resourceTimepointMap.map(newResult, newTimepoint);
     auto newResultSize =
         builder.create<IREE::Stream::ResourceSizeOp>(op.getLoc(), newResult)
@@ -469,19 +467,19 @@ static void expandCallOp(mlir::func::CallOp op,
 //
 // Example:
 //  %1 = stream.timepoint.await %t, %0
-//  return %1
+//  util.return %1
 //  ->
-//  return %t, %0
-static void expandReturnOp(mlir::func::ReturnOp op,
+//  util.return %t, %0
+static void expandReturnOp(IREE::Util::ReturnOp op,
                            IRMapping &resourceTimepointMap) {
   if (!usesResources(op))
     return;
-  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>()))
+  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
     return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(),
                                  resourceTimepointMap, builder);
-  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
+  builder.create<IREE::Util::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -491,11 +489,11 @@ static void expandReturnOp(mlir::func::ReturnOp op,
 // Example:
 //    %1 = stream.timepoint.await %t, %0
 //    br ^bb1(%1)
-//  ^bb1(%b):
+//  ^bb1(%bb_1):
 //  ->
-//    br ^bb1(%t, %0)
-//  ^bb1(%a, %b):
-//    %1 = stream.timepoint.await %a, %b
+//    br ^bb1(%0, %t)
+//  ^bb1(%bb_0, %bb_t):
+//    %1 = stream.timepoint.await %bb_t, %bb_0
 static void expandBranchOp(mlir::cf::BranchOp op,
                            IRMapping &resourceTimepointMap) {
   if (!usesResources(op))
@@ -598,19 +596,21 @@ static void expandAsyncExecuteOp(IREE::Stream::AsyncExecuteOp op,
 // Recursively expands resources into (timepoint, resource) in |op|.
 // Resource timepoint chains are established when possible by looking through
 // awaits.
-static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
+static void expandTimepoints(Operation *op, SymbolTable &symbolTable,
+                             ExpandedGlobalMap &globalMap,
                              IRMapping &resourceTimepointMap) {
   if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
     expandGlobalLoadOp(loadOp, globalMap, resourceTimepointMap);
   } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     expandGlobalStoreOp(storeOp, globalMap, resourceTimepointMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
-    expandInitializerOp(initializerOp, globalMap, resourceTimepointMap);
-  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-    expandFuncOp(funcOp, globalMap, resourceTimepointMap);
-  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
-    expandCallOp(callOp, resourceTimepointMap);
-  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
+    expandInitializerOp(initializerOp, symbolTable, globalMap,
+                        resourceTimepointMap);
+  } else if (auto funcOp = dyn_cast<IREE::Util::FuncOp>(op)) {
+    expandFuncOp(funcOp, symbolTable, globalMap, resourceTimepointMap);
+  } else if (auto callOp = dyn_cast<IREE::Util::CallOp>(op)) {
+    expandCallOp(callOp, symbolTable, resourceTimepointMap);
+  } else if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
     expandReturnOp(returnOp, resourceTimepointMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, resourceTimepointMap);
@@ -644,9 +644,10 @@ struct PropagateTimepointsPass
           PropagateTimepointsPass> {
   void runOnOperation() override {
     auto rootOp = getOperation();
+    SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding resources into (timepoint, resource).
-    auto globalMap = expandResourceGlobals(rootOp);
+    auto globalMap = expandResourceGlobals(rootOp, symbolTable);
 
     // Walk the entire IR tree and expand the globals.
     // We could do this via pattern application but that gets much trickier to
@@ -654,7 +655,8 @@ struct PropagateTimepointsPass
     // expanding multiple times.
     for (auto callableOp : rootOp.getOps<mlir::CallableOpInterface>()) {
       IRMapping resourceTimepointMap;
-      expandTimepoints(callableOp, globalMap, resourceTimepointMap);
+      expandTimepoints(callableOp, symbolTable, globalMap,
+                       resourceTimepointMap);
     }
   }
 };

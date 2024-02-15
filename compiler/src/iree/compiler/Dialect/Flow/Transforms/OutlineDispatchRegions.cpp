@@ -158,7 +158,7 @@ class OutlineDispatchRegionsPass
 public:
   OutlineDispatchRegionsPass() = default;
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<func::FuncDialect, IREE::Flow::FlowDialect>();
   }
 
   void runOnOperation() override {

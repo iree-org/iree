@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @descriptor_set_layout_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func.func @descriptor_set_layout_create(%device: !hal.device) {
+util.func public @descriptor_set_layout_create(%device: !hal.device) {
   //      CHECK: = hal.descriptor_set_layout.create
   // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:     flags("None")
@@ -16,5 +16,5 @@ func.func @descriptor_set_layout_create(%device: !hal.device) {
     #hal.descriptor_set.binding<0, storage_buffer>,
     #hal.descriptor_set.binding<1, storage_buffer>
   ]) : !hal.descriptor_set_layout
-  return
+  util.return
 }

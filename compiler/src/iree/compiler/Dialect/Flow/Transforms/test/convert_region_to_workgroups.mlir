@@ -1,8 +1,8 @@
 // RUN: iree-opt %s --iree-flow-convert-region-to-workgroups -canonicalize -cse -split-input-file | FileCheck %s
 
-// CHECK-LABEL: func @foo(
+// CHECK-LABEL: util.func public @foo(
 //       CHECK:   %[[argA:.*]]: tensor<?x?xf32>, %[[argB:.*]]: tensor<5x10xf32>, %[[argC:.*]]: tensor<10x11xf32>
-func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10x11xf32>) -> (tensor<?x?xf32>, tensor<5x11xf32>) {
+util.func public @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10x11xf32>) -> (tensor<?x?xf32>, tensor<5x11xf32>) {
   //  CHECK-DAG: %[[c0:.*]] = arith.constant 0 : index
   //  CHECK-DAG: %[[c1:.*]] = arith.constant 1 : index
   //  CHECK-DAG: %[[dim_argA_0:.*]] = tensor.dim %[[argA]], %[[c0]]
@@ -40,6 +40,6 @@ func.func @foo(%argA: tensor<?x?xf32>, %argB: tensor<5x10xf32>, %argC: tensor<10
     flow.return %2 : tensor<5x11xf32>
   }
 
-  //      CHECK: return %[[r0]], %[[r1]]
-  return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>
+  //      CHECK: util.return %[[r0]], %[[r1]]
+  util.return %r0, %r1 : tensor<?x?xf32>, tensor<5x11xf32>
 }

@@ -10,7 +10,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -18,7 +17,7 @@
 namespace mlir::iree_compiler::IREE::TFLite {
 
 using FunctionLikeNest =
-    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 void buildTransformPassPipeline(OpPassManager &passManager) {
   // Wraps the entry points in a "_tflite_xx" function and adds shape support.

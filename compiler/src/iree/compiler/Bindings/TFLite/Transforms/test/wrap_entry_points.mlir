@@ -14,7 +14,7 @@
 
 
 
-// CHECK-LABEL: func.func private @_tflite_dynamicEntry_calculate_shapes() {
+// CHECK-LABEL: util.func private @_tflite_dynamicEntry_calculate_shapes() {
 
 // Only recalculate shapes if the shapes are dirty.
 //       CHECK:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
@@ -43,16 +43,16 @@
 
 // Clear dirty bit now that the shapes have been recalculated.
 //       CHECK:   util.global.store %false, @_tflite_dynamicEntry_shapes_dirty : i1
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   util.return
 
 // Exit for when the shapes are not dirty and no work is needed.
 //  CHECK-NEXT: ^bb2:
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   util.return
 //  CHECK-NEXT: }
 
 
 
-// CHECK-LABEL: func.func @_tflite_dynamicEntry_query_input_shape
+// CHECK-LABEL: util.func public @_tflite_dynamicEntry_query_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 // Query input0 shape:
@@ -82,12 +82,12 @@
 
 // Invalid input index:
 //       CHECK: ^bb4:
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   util.return
 //  CHECK-NEXT: }
 
 
 
-// CHECK-LABEL: func.func @_tflite_dynamicEntry_resize_input_shape
+// CHECK-LABEL: util.func public @_tflite_dynamicEntry_resize_input_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 //       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
@@ -108,12 +108,12 @@
 // Set the dirty flag so that shape calculation must run again.
 //  CHECK-NEXT: ^bb4:
 //  CHECK-NEXT:   util.global.store %true, @_tflite_dynamicEntry_shapes_dirty : i1
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   util.return
 //  CHECK-NEXT: }
 
 
 
-// CHECK-LABEL: func.func @_tflite_dynamicEntry_query_output_shape
+// CHECK-LABEL: util.func public @_tflite_dynamicEntry_query_output_shape
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 // Recalculate shapes, if needed.
@@ -145,12 +145,12 @@
 //  CHECK-NEXT:   cf.br ^bb4
 
 //  CHECK-NEXT: ^bb4:
-//  CHECK-NEXT:   return
+//  CHECK-NEXT:   util.return
 //  CHECK-NEXT: }
 
 
 
-// CHECK-LABEL: func.func @_tflite_main(
+// CHECK-LABEL: util.func public @_tflite_main(
 //  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer {iree.identifier = "input0"},
 //  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer {iree.identifier = "input1"})
 //  CHECK-SAME: -> (
@@ -172,7 +172,7 @@
 // CHECK-NEXT:   %[[IN1:.+]] = hal.tensor.import %[[IN1_BUFFER]] : !hal.buffer -> tensor<?x8x8x3xf32>{%[[IN1_DIM0]]}
 
 // Call the original function with tensor arguments.
-//      CHECK:   %[[OUT:.+]]:2 = call @dynamicEntry(%[[IN0]], %[[IN1]]) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>)
+//      CHECK:   %[[OUT:.+]]:2 = util.call @dynamicEntry(%[[IN0]], %[[IN1]]) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>)
 
 // Query output0 shape and get the HAL buffer to return.
 //      CHECK:   %[[OUT0_DIM0:.+]] = tensor.dim %[[OUT]]#0, %c0 : tensor<?x8x8x3xf32>
@@ -187,13 +187,13 @@
 // Clear shape dirty bit as we've updated the shapes unconditionally.
 // CHECK-NEXT:   util.global.store %false, @_tflite_dynamicEntry_shapes_dirty : i1
 
-// CHECK-NEXT:   return %[[OUT0_BUFFER]], %[[OUT1_BUFFER]]
+// CHECK-NEXT:   util.return %[[OUT0_BUFFER]], %[[OUT1_BUFFER]]
 // CHECK-NEXT: }
 
 
 
-// CHECK-LABEL: func.func private @dynamicEntry(
-func.func @dynamicEntry(
+// CHECK-LABEL: util.func private @dynamicEntry(
+util.func public @dynamicEntry(
   %arg0: tensor<?x8x8x3xf32> {iree.identifier = "input0"},
   %arg1: tensor<?x8x8x3xf32> {iree.identifier = "input1"}
 ) -> (
@@ -204,13 +204,13 @@ func.func @dynamicEntry(
   %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
   // CHECK: = arith.addf
   %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
-  // CHECK: return
-  return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
+  // CHECK: util.return
+  util.return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @_tflite_main(
+// CHECK-LABEL: util.func public @_tflite_main(
 //  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer)
 //  CHECK-SAME: -> (
@@ -223,7 +223,7 @@ func.func @dynamicEntry(
 //  CHECK-SAME:   }
 //  CHECK-SAME: } {
 
-func.func @dynamicEntryWithoutIdentifiers(
+util.func public @dynamicEntryWithoutIdentifiers(
   %arg0: tensor<?x8x8x3xf32>,
   %arg1: tensor<?x8x8x3xf32>
 ) -> (
@@ -234,6 +234,6 @@ func.func @dynamicEntryWithoutIdentifiers(
   %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>
   // CHECK: = arith.addf
   %1 = arith.addf %0, %arg0 : tensor<?x8x8x3xf32>
-  // CHECK: return
-  return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
+  // CHECK: util.return
+  util.return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }

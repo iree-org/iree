@@ -11,8 +11,8 @@
 stream.executable private @deduplicateOperandsEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func.func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A01:.+]]: i32, %[[B0:.+]]: index, %[[C:.+]]: i1, %[[B1:.+]]: index)
-    func.func @dispatch(%binding: !stream.binding, %a0: i32, %b0: index, %c: i1, %a1: i32, %b1: index) {
+    // CHECK:  util.func public @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A01:.+]]: i32, %[[B0:.+]]: index, %[[C:.+]]: i1, %[[B1:.+]]: index)
+     util.func public @dispatch(%binding: !stream.binding, %a0: i32, %b0: index, %c: i1, %a1: i32, %b1: index) {
       // CHECK-NEXT: util.optimization_barrier %[[BINDING]] : !stream.binding
       util.optimization_barrier %binding : !stream.binding
       // CHECK-NEXT: util.optimization_barrier %[[A01]] : i32
@@ -25,12 +25,12 @@ stream.executable private @deduplicateOperandsEx {
       util.optimization_barrier %b1 : index
       // CHECK-NEXT: util.optimization_barrier %[[C]] : i1
       util.optimization_barrier %c : i1
-      return
+      util.return
     }
   }
 }
-// CHECK: func.func @deduplicateOperands(%[[A:.+]]: i32, %[[B:.+]]: index, %[[C:.+]]: i1)
-func.func @deduplicateOperands(%a: i32, %b: index, %c: i1) {
+// CHECK:  util.func public @deduplicateOperands(%[[A:.+]]: i32, %[[B:.+]]: index, %[[C:.+]]: i1)
+util.func public @deduplicateOperands(%a: i32, %b: index, %c: i1) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -45,7 +45,7 @@ func.func @deduplicateOperands(%a: i32, %b: index, %c: i1) {
       rw %capture[%c0 for %c20] : !stream.resource<transient>{%c20}
     }
   } => !stream.timepoint
-  return
+  util.return
 }
 
 // -----
@@ -60,8 +60,8 @@ func.func @deduplicateOperands(%a: i32, %b: index, %c: i1) {
 stream.executable private @inlineConstantOperandsEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func.func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[C:.+]]: i1)
-    func.func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1) {
+    // CHECK:  util.func public @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[C:.+]]: i1)
+     util.func public @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1) {
       // CHECK: %[[B:.+]] = arith.constant 20 : index
       // CHECK-NEXT: util.optimization_barrier %[[BINDING]] : !stream.binding
       util.optimization_barrier %binding : !stream.binding
@@ -71,12 +71,12 @@ stream.executable private @inlineConstantOperandsEx {
       util.optimization_barrier %b : index
       // CHECK-NEXT: util.optimization_barrier %[[C]] : i1
       util.optimization_barrier %c : i1
-      return
+      util.return
     }
   }
 }
-// CHECK: func.func @inlineConstantOperands(%[[A:.+]]: i32)
-func.func @inlineConstantOperands(%a: i32) {
+// CHECK:  util.func public @inlineConstantOperands(%[[A:.+]]: i32)
+util.func public @inlineConstantOperands(%a: i32) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -93,5 +93,5 @@ func.func @inlineConstantOperands(%a: i32) {
       rw %capture[%c0 for %c20] : !stream.resource<transient>{%c20}
     }
   } => !stream.timepoint
-  return
+  util.return
 }

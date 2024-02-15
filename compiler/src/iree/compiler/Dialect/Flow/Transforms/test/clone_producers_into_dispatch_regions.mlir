@@ -1,6 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-flow-clone-producers-into-dispatch-regions))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-flow-clone-producers-into-dispatch-regions))" %s | FileCheck %s
 
-func.func @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+util.func public @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
   %c4095 = arith.constant 4095 : i32
   %const = arith.constant dense<[
     [(0x7FC00000,0.000000e+00), (0x7FC00000,1.000000e+00)], [(0x7FC00000,2.000000e+00), (0x7FC00000,3.000000e+00)],
@@ -22,10 +22,10 @@ func.func @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomple
     } -> tensor<4x2xcomplex<f32>>
     flow.return %generic : tensor<4x2xcomplex<f32>>
   }
-  return %0 : tensor<4x2xcomplex<f32>>
+  util.return %0 : tensor<4x2xcomplex<f32>>
 }
 
-// CHECK-LABEL: func.func @complex_element_type
+// CHECK-LABEL: util.func public @complex_element_type
 //       CHECK:   flow.dispatch.region
 //       CHECK:     %[[EMPTY:.+]] = tensor.empty() : tensor<4x2xcomplex<f32>>
 //       CHECK:     %[[CST:.+]] = arith.constant dense<{{.+}}> : tensor<4x2xcomplex<f32>>
@@ -36,7 +36,7 @@ func.func @complex_element_type(%input: tensor<4xi32>, %table: tensor<8x2xcomple
 
 // -----
 
-func.func @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+util.func public @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
   %cst = complex.constant [1.000000e+00 : f32, 2.000000e+00 : f32] : complex<f32>
   %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
   %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
@@ -51,7 +51,7 @@ func.func @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x
     } -> tensor<4x2xcomplex<f32>>
     flow.return %generic : tensor<4x2xcomplex<f32>>
   }
-  return %1 : tensor<4x2xcomplex<f32>>
+  util.return %1 : tensor<4x2xcomplex<f32>>
 }
 
 // CHECK-LABEL: @complex_constant_clone
@@ -66,7 +66,7 @@ func.func @complex_constant_clone(%input: tensor<4x2xcomplex<f32>>) -> tensor<4x
 
 // -----
 
-func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
+util.func public @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>> {
   %cst = complex.create %real, %imag : complex<f32>
   %empty = tensor.empty() : tensor<4x2xcomplex<f32>>
   %0 = linalg.fill ins(%cst : complex<f32>) outs(%empty : tensor<4x2xcomplex<f32>>) -> tensor<4x2xcomplex<f32>>
@@ -81,7 +81,7 @@ func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f
     } -> tensor<4x2xcomplex<f32>>
     flow.return %generic : tensor<4x2xcomplex<f32>>
   }
-  return %0 : tensor<4x2xcomplex<f32>>
+  util.return %0 : tensor<4x2xcomplex<f32>>
 }
 
 // CHECK-LABEL: @complex_create
@@ -96,7 +96,7 @@ func.func @complex_create(%real : f32, %imag : f32, %input: tensor<4x2xcomplex<f
 
 // -----
 
-func.func @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> tensor<i32> {
+util.func public @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> tensor<i32> {
   %c1 = arith.constant 1 : index
   %c2_i32 = arith.constant 2 : i32
   %c0 = arith.constant 0 : index
@@ -112,7 +112,7 @@ func.func @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> 
   } count() -> (index, index, index) {
     flow.return %c1, %c1, %c1 : index, index, index
   }
-  return %4 : tensor<i32>
+  util.return %4 : tensor<i32>
 }
 
 
@@ -126,7 +126,7 @@ func.func @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi32>) -> 
 
 // -----
 
-func.func @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
+util.func public @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x1x4096xf32>
   %1 = tensor.empty() : tensor<4096x32x128xf32>
@@ -159,9 +159,9 @@ func.func @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1
     } -> tensor<1x1x4096xf32>
     flow.return %4 : tensor<1x1x4096xf32>
   }
-  return %9 : tensor<1x1x4096xf32>
+  util.return %9 : tensor<1x1x4096xf32>
 }
-//       CHECK: func.func @clone_dequantization
+//       CHECK: util.func public @clone_dequantization
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4096x32x128xi8>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x1x32x128xf32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<4096x32x1xf32>
@@ -181,13 +181,13 @@ func.func @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1
 //  CHECK-SAME:       ins(%[[ARG1]], %[[GEN0]] :
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   flow.return %[[GEN1]] :
-//       CHECK:   return %[[DISP]]
+//       CHECK:   util.return %[[DISP]]
 
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 module {
-  func.func @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
+  util.func public @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
     %c0_i32 = arith.constant 0 : i32
     %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
     %1 = linalg.generic {indexing_maps = [#map, #map],
@@ -211,10 +211,10 @@ module {
       %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
       flow.return %7 : tensor<32x1x344x1x32xi32>
     }
-    return %6 : tensor<32x1x344x1x32xi32>
+    util.return %6 : tensor<32x1x344x1x32xi32>
   }
 }
-//       CHECK: func.func @clone_dequantization
+//       CHECK: util.func public @clone_dequantization
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<32x1x16x1x8xi16>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<32x344x16x32x8xi4>
 //       CHECK:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<32x1x344x1x32xi32>)
@@ -236,4 +236,4 @@ module {
 //  CHECK-SAME:       ins(%[[GEN0]], %[[GEN1]] :
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   flow.return %[[MMT4D]] :
-//       CHECK:   return %[[DISP]]
+//       CHECK:   util.return %[[DISP]]

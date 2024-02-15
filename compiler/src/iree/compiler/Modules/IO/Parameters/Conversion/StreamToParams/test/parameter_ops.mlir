@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @parameterLoad
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence) -> (!hal.buffer, !hal.buffer, !hal.fence)
-func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+util.func public @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
@@ -20,14 +20,14 @@ func.func @parameterLoad(%wait: !stream.timepoint) -> (!stream.resource<constant
     "scope"::"key1"[%c51_i64] : !stream.resource<constant>{%c101}
   } => !stream.timepoint
   // CHECK: return %[[BUFFERS]]#0, %[[BUFFERS]]#1, %[[SIGNAL]]
-  return %results#0, %results#1, %result_timepoint : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
+  util.return %results#0, %results#1, %result_timepoint : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterLoadNoScope
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence) -> (!hal.buffer, !hal.fence)
-func.func @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
+util.func public @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
   // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
@@ -41,14 +41,14 @@ func.func @parameterLoadNoScope(%wait: !stream.timepoint) -> (!stream.resource<c
     "key"[%c50_i64] : !stream.resource<constant>{%c100}
   } => !stream.timepoint
   // CHECK: return %[[BUFFER]], %[[SIGNAL]]
-  return %result, %result_timepoint : !stream.resource<constant>, !stream.timepoint
+  util.return %result, %result_timepoint : !stream.resource<constant>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterRead
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[TARGET:.+]]: !hal.buffer) -> !hal.fence
-func.func @parameterRead(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
+util.func public @parameterRead(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -61,14 +61,14 @@ func.func @parameterRead(%wait: !stream.timepoint, %target: !stream.resource<tra
   // CHECK-NEXT:   "scope"::"key"[%c50_i64] -> %[[TARGET]][%c100 for %c200] : !hal.buffer
   %timepoint = stream.parameter.read await(%wait) => "scope"::"key"[%c50_i64] -> %target[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterWrite
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[SOURCE:.+]]: !hal.buffer) -> !hal.fence
-func.func @parameterWrite(%wait: !stream.timepoint, %source: !stream.resource<transient>) -> !stream.timepoint {
+util.func public @parameterWrite(%wait: !stream.timepoint, %source: !stream.resource<transient>) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -81,14 +81,14 @@ func.func @parameterWrite(%wait: !stream.timepoint, %source: !stream.resource<tr
   // CHECK-NEXT:   %[[SOURCE]][%c100 for %c200] : !hal.buffer -> "scope"::"key"[%c50_i64]
   %timepoint = stream.parameter.write await(%wait) => %source[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterGather
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[TARGET:.+]]: !hal.buffer) -> !hal.fence
-func.func @parameterGather(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
+util.func public @parameterGather(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c51_i64 = arith.constant 51 : i64
   %c52_i64 = arith.constant 52 : i64
@@ -113,14 +113,14 @@ func.func @parameterGather(%wait: !stream.timepoint, %target: !stream.resource<t
     "scope"::"key2"[%c52_i64] -> %target[%c102 for %c202] : !stream.resource<transient>{%c300}
   } => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterGatherNoScope
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[TARGET:.+]]: !hal.buffer) -> !hal.fence
-func.func @parameterGatherNoScope(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
+util.func public @parameterGatherNoScope(%wait: !stream.timepoint, %target: !stream.resource<transient>) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
@@ -140,14 +140,14 @@ func.func @parameterGatherNoScope(%wait: !stream.timepoint, %target: !stream.res
     "key1"[%c51_i64] -> %target[%c101 for %c201] : !stream.resource<transient>{%c300}
   } => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @parameterScatter
 // CHECK-SAME: (%[[WAIT:.+]]: !hal.fence, %[[SOURCE:.+]]: !hal.buffer) -> !hal.fence
-func.func @parameterScatter(%wait: !stream.timepoint, %source: !stream.resource<transient>) -> !stream.timepoint {
+util.func public @parameterScatter(%wait: !stream.timepoint, %source: !stream.resource<transient>) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c51_i64 = arith.constant 51 : i64
   %c52_i64 = arith.constant 52 : i64
@@ -173,5 +173,5 @@ func.func @parameterScatter(%wait: !stream.timepoint, %source: !stream.resource<
     %source[%c102 for %c202] : !stream.resource<transient>{%c300} -> "scope"::"key2"[%c52_i64]
   } => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }

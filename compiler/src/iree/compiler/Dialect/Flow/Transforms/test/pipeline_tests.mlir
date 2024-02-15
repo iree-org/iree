@@ -6,7 +6,7 @@
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
 #map3 = affine_map<(d0, d1) -> ()>
 module {
-  func.func @main(%arg0: tensor<833xi32>, %arg1: tensor<833x833xf32>, %arg2: tensor<f32>) -> tensor<f32> {
+  util.func public @main(%arg0: tensor<833xi32>, %arg1: tensor<833x833xf32>, %arg2: tensor<f32>) -> tensor<f32> {
     %cst = arith.constant 5.66893432E-4 : f32
     %0 = tensor.empty() : tensor<833x833xf32>
     %1 = linalg.generic {
@@ -35,7 +35,7 @@ module {
         %10 = arith.addf %b1, %b0 : f32
         linalg.yield %10 : f32
       } -> tensor<f32>
-    return %9 : tensor<f32>
+    util.return %9 : tensor<f32>
   }
 }
 // Check that the linalg op with two reduction loops get folded into a single reduction
@@ -49,11 +49,11 @@ module {
 //       CHECK:     func.func @[[FUNC1:[a-zA-Z0-9_x]+]]
 //       CHECK:       linalg.generic
 //  CHECK-SAME:         ["reduction"]
-//       CHECK:   func.func @main(
+//       CHECK:   util.func public @main(
 //       CHECK:     %[[T0:.+]] = flow.dispatch @[[EXECUTABLE0]]::@[[FUNC0]]
 //       CHECK:     %[[T1:.+]] = flow.tensor.reshape %[[T0]] : tensor<833x833xf32> -> tensor<693889xf32>
 //       CHECK:     %[[T2:.+]] = flow.dispatch @[[EXECUTABLE1]]::@[[FUNC1]](%[[T1]])
-//       CHECK:     return %[[T2]]
+//       CHECK:     util.return %[[T2]]
 
 // -----
 
@@ -63,7 +63,7 @@ module {
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 module {
-  func.func @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
+  util.func public @grouped_quantized_matmul(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = tensor.empty() : tensor<1x1x4096xf32>
     %1 = tensor.empty() : tensor<4096x32x128xf32>
@@ -82,7 +82,7 @@ module {
       %6 = arith.addf %5, %out : f32
       linalg.yield %6 : f32
     } -> tensor<1x1x4096xf32>
-    return %4 : tensor<1x1x4096xf32>
+    util.return %4 : tensor<1x1x4096xf32>
   }
 }
 // Check that the two linalg.generic ops are fused into the same dispatch
@@ -102,7 +102,7 @@ module {
 //       CHECK:   arith.mulf
 //       CHECK:   arith.addf
 //       CHECK:   flow.dispatch.tensor.store %[[GEN1]]
-//       CHECK:   func.func @grouped_quantized_matmul(
+//       CHECK:   util.func public @grouped_quantized_matmul(
 //       CHECK:     %[[T0:.+]] = flow.dispatch @[[EXECUTABLE0]]::@[[FUNC0]]
 //       CHECK:     %[[RS:.+]] = flow.tensor.reshape %[[T0]] : tensor<4096xf32> -> tensor<1x1x4096xf32>
-//       CHECK:     return %[[RS]]
+//       CHECK:     util.return %[[RS]]
