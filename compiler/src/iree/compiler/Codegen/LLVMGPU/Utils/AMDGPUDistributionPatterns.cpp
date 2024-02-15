@@ -18,15 +18,94 @@ using VectorValue = TypedValue<VectorType>;
 enum class ContractMatrixType { A, B, C, D };
 enum class ContractType { MM, MMT, MTM, MTMT, UNSUPPORTED };
 
-// The naming scheme for these operators is:
-// InputType_MxNxK_OutputType.
+/// We define AMD MFMA instruction layouts only for contract type MM, i.e. C(i,
+/// k) += A(i, j) * B(j, k). We call these canonical layouts: layoutA, layoutB,
+/// layoutC, corresponding to the A, B, C matrices.
+///
+/// For any other contract type, the layout is simply transposed for that
+/// operand. For example, for MMT, the layouts used should be layoutA,
+/// layoutB.T, layoutC. For an easier understanding of this transposition,
+/// think of the transpose simply being outside the contract:
+///
+/// vector.contract {type = MMT} %a, %b
+///
+/// is equivalent to
+///
+/// %bt = vector.transpose %b
+/// vector.contract {type = MM} %a, %bt
+///
+/// Now, you would assign layouts based on contract type MM, and would get the
+/// right layout for %b by transposing the layout for B.
+///
+/// Now that we have defined what layoutA, layoutB, layoutC are, we will define
+/// what the canonical layouts are for each MFMA instruction. These are
+/// represented as the original matrix, with elements representing which thread
+/// id in the subgroup gets which element.
+/// These layouts were referenced from
+/// https://github.com/ROCm/amd_matrix_instruction_calculator
+///
+/// The naming scheme for these operators is InputType_MxNxK_OutputType.
 enum class MFMAType {
+  /// layoutA:
+  ///  0  0  0  0 16 16 16 16 32 32 32 32 48 48 48 48
+  ///  1  1  1  1 17 17 17 17 33 33 33 33 49 49 49 49
+  ///  2  2  2  2 18 18 18 18 34 34 34 34 50 50 50 50
+  /// ...
+  /// 15 15 15 15 31 31 31 31 47 47 47 47 63 63 63 63
+  ///
+  /// layoutB:
+  /// Transpose of layoutA
+  ///
+  /// layoutC:
+  /// Same as layoutB
   F16_16x16x16_F32,
+  /// layoutA:
+  ///  0  0  0  0 32 32 32 32
+  ///  1  1  1  1 33 33 33 33
+  ///  2  2  2  2 34 34 34 34
+  ///  ⋮  ⋮  ⋮  ⋮  ⋮  ⋮  ⋮  ⋮
+  /// 31 31 31 31 63 63 63 63
+  ///
+  /// layoutB:
+  /// Transpose of layoutA
+  ///
+  /// layoutC:
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
+  ///  0  1  2 ... 31
+  ///  ⋮  ⋮  ⋮ ...  ⋮
+  /// 32 33 34 ... 63
+  ///  0  1  2 ... 31
+  ///  ⋮  ⋮  ⋮ ...  ⋮
+  /// 32 33 34 ... 63
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  ///  0  1  2 ... 31
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
+  /// 32 33 34 ... 63
   F16_32x32x8_F32,
 };
 
 namespace {
 
+static bool isOperandATransposed(ContractType contractType) {
+  return (contractType == ContractType::MTM) ||
+         (contractType == ContractType::MTMT);
+}
+
+static bool isOperandBTransposed(ContractType contractType) {
+  return (contractType == ContractType::MMT) ||
+         (contractType == ContractType::MTMT);
+}
 struct DistributeContractions final
     : OpDistributionPattern<vector::ContractionOp> {
   using OpDistributionPattern::OpDistributionPattern;
@@ -54,8 +133,7 @@ struct DistributeContractions final
 
   int64_t getReductionDimensionShape(int64_t rowBatch, int64_t colBatch,
                                      ContractType contractType) const {
-    if ((contractType == ContractType::MTM) ||
-        (contractType == ContractType::MTMT)) {
+    if (isOperandATransposed(contractType)) {
       return rowBatch;
     }
     return colBatch;
@@ -266,10 +344,20 @@ struct DistributeContractions final
   // Output is inferred MFMAType or none (if layout is not compatible with any
   // MFMA layout).
   std::optional<MFMAType>
-  inferCompatibleMFMAType(ArrayRef<LayoutAttr> layouts) const {
+  inferCompatibleMFMAType(ArrayRef<LayoutAttr> layouts,
+                          ContractType contractType) const {
     std::optional<MFMAType> mfmaType{std::nullopt};
     SmallVector<ContractMatrixType> matrixTypes{
         ContractMatrixType::A, ContractMatrixType::B, ContractMatrixType::C};
+
+    // Canonical layouts for MFMA are transposes of each other.
+    if (isOperandATransposed(contractType)) {
+      matrixTypes[0] = ContractMatrixType::B;
+    }
+    if (isOperandBTransposed(contractType)) {
+      matrixTypes[1] = ContractMatrixType::A;
+    }
+
     for (auto [layout, matrixType] : llvm::zip(layouts, matrixTypes)) {
       mfmaType = inferMFMAType(layout, matrixType, mfmaType);
       if (!mfmaType)
@@ -305,10 +393,6 @@ struct DistributeContractions final
     if (!resultLayout)
       return failure();
 
-    std::optional<MFMAType> mfmaType = inferCompatibleMFMAType(layouts);
-    if (!mfmaType)
-      return failure();
-
     Type elementType =
         llvm::cast<ShapedType>(operands[ACC].getType()).getElementType();
     SmallVector<int64_t> vectorShape = resultLayout.getDistributedShape();
@@ -320,6 +404,11 @@ struct DistributeContractions final
     ContractType contractType = inferContractType(
         contractOp.getContext(), contractOp.getIndexingMapsArray());
     if (contractType == ContractType::UNSUPPORTED)
+      return failure();
+
+    std::optional<MFMAType> mfmaType =
+        inferCompatibleMFMAType(layouts, contractType);
+    if (!mfmaType)
       return failure();
 
     std::optional<int64_t> rowBatch = layouts[LHS].getBatchDim(0);
