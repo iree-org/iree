@@ -17,6 +17,13 @@ struct BlockSizeDef {
   z:uint32;
 }
 
+// A struct for a source code location that consists of a file name and
+// a line number within that file.
+table FileLineLocDef {
+  filename:string;
+  line:int32;
+}
+
 table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
@@ -32,6 +39,11 @@ table ExecutableDef {
 
   // HSACO string of the module.
   hsaco_image:string;
+
+  // A map of entry point ordinals to source locations.
+  // This information is optional and may be used by debuggers and profilers to
+  // associate executable entry points with the source that generated them.
+  source_locations:[FileLineLocDef];
 }
 
 root_type ExecutableDef;
