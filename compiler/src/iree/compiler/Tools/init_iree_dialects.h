@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
+#include "iree/compiler/Dialect/Util/TransformOps/UtilTransformOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
@@ -65,6 +66,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
 
   // Register transform dialect extensions.
   registerTransformDialectPreprocessingExtension(registry);
+  IREE::Util::registerTransformDialectExtension(registry);
 }
 
 } // namespace mlir::iree_compiler

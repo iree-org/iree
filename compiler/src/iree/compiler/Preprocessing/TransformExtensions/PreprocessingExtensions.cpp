@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "PreprocessingExtensions.h"
+#include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
