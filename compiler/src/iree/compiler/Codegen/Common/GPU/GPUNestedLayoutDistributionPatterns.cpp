@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
@@ -64,6 +65,105 @@ static Value linearizeIndex(OpBuilder &builder, Value offset,
       .getResult();
 }
 
+/// Given a set of base transfer |indices|, |offsets| for the batch/outer
+/// dimensions, and distributed warp and thread indices, computes the indices
+/// of the distributed transfer operation based on the |vectorLayout|.
+static SmallVector<Value> getTransferIndicesFromNestedLayout(
+    OpBuilder &b, ValueRange indices, ArrayRef<int64_t> offsets,
+    NestedLayoutAttr vectorLayout, AffineMap permutationMap,
+    ArrayRef<Value> warpIndices, ArrayRef<Value> threadIndices) {
+  auto isBroadcast = [](AffineExpr expr) {
+    if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
+      return constExpr.getValue() == 0;
+    return false;
+  };
+  int64_t rank = vectorLayout.getBatchOrder().size();
+  // Permute the batch and outer vector offsets to match the order of
+  // the vector dimensions using the inverse of the batch/offset order.
+  SmallVector<int64_t> batchOffsets =
+      applyPermutation(ArrayRef<int64_t>(offsets.begin(), rank),
+                       invertPermutationVector(vectorLayout.getBatchOrder()));
+  SmallVector<int64_t> outerVectorOffsets =
+      applyPermutation(ArrayRef<int64_t>(offsets.begin() + rank, rank),
+                       invertPermutationVector(vectorLayout.getOuterOrder()));
+
+  SmallVector<Value> slicedIndices(indices.begin(), indices.end());
+  for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
+    // Broadcasted dimension offsets can be used as-is; the read index is
+    // invariant of the thread in such cases (and illegal for writes).
+    if (isBroadcast(dim)) {
+      continue;
+    }
+    unsigned pos = cast<AffineDimExpr>(dim).getPosition();
+    SmallVector<OpFoldResult> ids = {
+        warpIndices[i], b.getIndexAttr(batchOffsets[i]),
+        b.getIndexAttr(outerVectorOffsets[i]), threadIndices[i]};
+    // The order in which a vector dimension is "tiled" is
+    // subgroups -> batches -> outer vectors -> threads -> elements
+    SmallVector<int64_t> sizes = {vectorLayout.getSubgroupsPerWorkgroup()[i],
+                                  vectorLayout.getBatchesPerSubgroup()[i],
+                                  vectorLayout.getOutersPerBatch()[i],
+                                  vectorLayout.getThreadsPerOuter()[i]};
+    slicedIndices[pos] = linearizeIndex(b, indices[pos], ids, sizes,
+                                        vectorLayout.getElementsPerThread()[i]);
+  }
+  return slicedIndices;
+}
+
+static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
+  int64_t rank = vectorLayout.getBatchOrder().size();
+  // Let the unroll order first unroll the batch dimensions, then the
+  // outer vector dimensions. We unroll in the order specified by the
+  // layout.
+  SmallVector<int64_t> loopOrder;
+  int64_t base = 0;
+  for (auto b : vectorLayout.getBatchOrder()) {
+    loopOrder.push_back(base + b);
+  }
+  base += rank;
+  // We must unroll along the outer dimensions as well to match the rank
+  // requirements of vector transfer ops (<= memref rank up to broadcasts).
+  for (auto o : vectorLayout.getOuterOrder()) {
+    loopOrder.push_back(base + o);
+  }
+  base += rank;
+  for (int i = 0, e = rank; i < e; ++i) {
+    loopOrder.push_back(base + i);
+  }
+  return loopOrder;
+}
+
+static SmallVector<int64_t>
+getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
+  int64_t rank = vectorLayout.getBatchOrder().size();
+  SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
+  for (int i = 0, e = rank * 2; i < e; ++i) {
+    tileShape[i] = 1;
+  }
+  return tileShape;
+}
+
+/// Computes the warp and thread indices for the given vector layout from a
+/// single linearized thread ID.
+static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
+                                         NestedLayoutAttr vectorLayout,
+                                         SmallVector<Value> &warpIndices,
+                                         SmallVector<Value> &threadIndices) {
+  int64_t rank = vectorLayout.getBatchOrder().size();
+  // The delinearized thread IDs are returned from outer most to inner most,
+  // i.e. before applying the layout described dimensions ordering.
+  ValueRange threadIds = vectorLayout.computeThreadIds(threadId, rewriter);
+
+  // Subgroup and thread (lane) indices normalized to the order in which
+  // they are used by each dimension.
+  warpIndices =
+      llvm::to_vector(llvm::map_range(vectorLayout.getSubgroupOrder(),
+                                      [&](int64_t i) { return threadIds[i]; }));
+  threadIndices = llvm::to_vector(
+      llvm::map_range(vectorLayout.getThreadOrder(),
+                      [&](int64_t i) { return threadIds[i + rank]; }));
+}
+
 namespace {
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
@@ -93,34 +193,10 @@ struct DistributeTransferReadNestedLayoutAttr final
       return failure();
     }
 
-    // The delinearized thread IDs are returned from outer most to inner most,
-    // i.e. before applying the layout described dimensions ordering.
-    ValueRange threadIds = vectorLayout.computeThreadIds(threadId, rewriter);
-
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
-    SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
     int64_t rank = vectorLayout.getBatchOrder().size();
-
-    // Let the unroll order first unroll the batch dimensions, then the
-    // outer vector dimensions. We unroll in the order specified by the
-    // layout.
-    SmallVector<int64_t> loopOrder;
-    int64_t base = 0;
-    for (int64_t b : vectorLayout.getBatchOrder()) {
-      loopOrder.push_back(base + b);
-      tileShape[base + b] = 1;
-    }
-    base += rank;
-    // We must unroll along the outer dimensions as well to match the rank
-    // requirements of vector transfer ops (<= memref rank up to broadcasts).
-    for (int64_t o : vectorLayout.getOuterOrder()) {
-      loopOrder.push_back(base + o);
-      tileShape[base + o] = 1;
-    }
-    base += rank;
-    for (int i = 0, e = rank; i < e; ++i) {
-      loopOrder.push_back(base + i);
-    }
 
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
@@ -135,54 +211,18 @@ struct DistributeTransferReadNestedLayoutAttr final
         readOp.getLoc(), vectorType, rewriter.getZeroAttr(vectorType));
     VectorValue acc = cast<VectorValue>(zero);
 
-    // Subgroup and thread (lane) indices normalized to the order in which
-    // they are used by each dimension.
-    SmallVector<Value> warpIndices = llvm::to_vector(
-        llvm::map_range(vectorLayout.getSubgroupOrder(),
-                        [&](int64_t i) { return threadIds[i]; }));
-    SmallVector<Value> threadIndices = llvm::to_vector(
-        llvm::map_range(vectorLayout.getThreadOrder(),
-                        [&](int64_t i) { return threadIds[i + rank]; }));
-
-    auto isBroadcast = [](AffineExpr expr) {
-      if (auto constExpr = dyn_cast<AffineConstantExpr>(expr))
-        return constExpr.getValue() == 0;
-      return false;
-    };
+    SmallVector<Value> warpIndices, threadIndices;
+    populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
+                                 threadIndices);
 
     ValueRange indices = readOp.getIndices();
     SmallVector<int64_t> strides(rank, 1);
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distShape, tileShape, loopOrder)) {
-      // Permute the batch and outer vector offsets to match the order of
-      // the vector dimensions using the inverse of the batch/offset order.
-      SmallVector<int64_t> batchOffsets = applyPermutation(
-          ArrayRef<int64_t>(offsets.begin(), rank),
-          invertPermutationVector(vectorLayout.getBatchOrder()));
-      SmallVector<int64_t> outerVectorOffsets = applyPermutation(
-          ArrayRef<int64_t>(offsets.begin() + rank, rank),
-          invertPermutationVector(vectorLayout.getOuterOrder()));
+      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
+          rewriter, indices, offsets, vectorLayout, readOp.getPermutationMap(),
+          warpIndices, threadIndices);
 
-      SmallVector<Value> slicedIndices(indices.begin(), indices.end());
-      for (const auto &[i, dim] :
-           llvm::enumerate(readOp.getPermutationMap().getResults())) {
-        if (isBroadcast(dim))
-          continue;
-        unsigned pos = cast<AffineDimExpr>(dim).getPosition();
-        SmallVector<OpFoldResult> ids = {
-            warpIndices[i], rewriter.getIndexAttr(batchOffsets[i]),
-            rewriter.getIndexAttr(outerVectorOffsets[i]), threadIndices[i]};
-        // The order in which a vector dimension is "tiled" is
-        // subgroups -> batches -> outer vectors -> threads -> elements
-        SmallVector<int64_t> sizes = {
-            vectorLayout.getSubgroupsPerWorkgroup()[i],
-            vectorLayout.getBatchesPerSubgroup()[i],
-            vectorLayout.getOutersPerBatch()[i],
-            vectorLayout.getThreadsPerOuter()[i]};
-        slicedIndices[pos] =
-            linearizeIndex(rewriter, indices[pos], ids, sizes,
-                           vectorLayout.getElementsPerThread()[i]);
-      }
       Value slicedRead = rewriter.create<vector::TransferReadOp>(
           readOp.getLoc(), innerVectorType, readOp.getSource(), slicedIndices,
           readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
@@ -204,12 +244,83 @@ struct DistributeTransferReadNestedLayoutAttr final
   Value threadId;
 };
 
+/// Pattern to distribute `vector.transfer_write` ops with nested layouts.
+struct DistributeTransferWriteNestedLayoutAttr final
+    : OpDistributionPattern<vector::TransferWriteOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeTransferWriteNestedLayoutAttr(MLIRContext *context, Value threadId)
+      : OpDistributionPattern(context), threadId(threadId) {}
+
+  LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    // TODO: Support masking.
+    if (writeOp.getMask()) {
+      return failure();
+    }
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[writeOp.getVector()]);
+    if (!vectorLayout) {
+      return failure();
+    }
+
+    if (!isa<MemRefType>(writeOp.getSource().getType())) {
+      return failure();
+    }
+
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
+    int64_t rank = vectorLayout.getBatchOrder().size();
+
+    SmallVector<Value> warpIndices, threadIndices;
+    populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
+                                 threadIndices);
+
+    Value distributedVector =
+        getDistributed(rewriter, writeOp.getVector(), vectorLayout);
+
+    ValueRange indices = writeOp.getIndices();
+    for (SmallVector<int64_t> offsets :
+         StaticTileOffsetRange(distShape, tileShape, loopOrder)) {
+      SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
+          rewriter, indices, offsets, vectorLayout, writeOp.getPermutationMap(),
+          warpIndices, threadIndices);
+
+      // Extract the "element vector" from the inner most dimensions. All outer
+      // dimensions are either unrolled or distributed such that this is a
+      // contiguous slice.
+      ArrayRef<int64_t> offsetArray(offsets);
+      Value slicedVector = rewriter.create<vector::ExtractOp>(
+          writeOp.getLoc(), distributedVector,
+          offsetArray.take_front(rank * 2));
+      // Transpose to the native dimension order.
+      if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
+        slicedVector = rewriter.create<vector::TransposeOp>(
+            slicedVector.getLoc(), slicedVector,
+            invertPermutationVector(vectorLayout.getElementOrder()));
+      }
+      rewriter.create<vector::TransferWriteOp>(
+          writeOp.getLoc(), slicedVector, writeOp.getSource(), slicedIndices,
+          writeOp.getPermutationMapAttr(), writeOp.getMask(),
+          writeOp.getInBoundsAttr());
+    }
+
+    rewriter.eraseOp(writeOp);
+    return success();
+  }
+
+  Value threadId;
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
     Value threadId, RewritePatternSet &patterns) {
-  patterns.add<DistributeTransferReadNestedLayoutAttr>(patterns.getContext(),
-                                                       threadId);
+  patterns.add<DistributeTransferReadNestedLayoutAttr,
+               DistributeTransferWriteNestedLayoutAttr>(patterns.getContext(),
+                                                        threadId);
 }
 
 }; // namespace mlir::iree_compiler
