@@ -97,8 +97,7 @@ struct MaterializeUserConfigsPass
           << clCodegenTransformDialectLibraryFileName;
       return signalPassFailure();
     }
-    bool hasTransformConfig = parts.size() == 2;
-    bool hasTransformLibrary = parts.size() >= 1;
+    bool hasTransformLibrary = !parts.empty();
 
     std::string libraryFileName;
     if (hasTransformLibrary) {
@@ -110,7 +109,8 @@ struct MaterializeUserConfigsPass
     }
 
     std::string entrySequenceName;
-    if (hasTransformConfig) {
+    // Check if the user specified a custom entry point name.
+    if (parts.size() == 2) {
       if (parts[1].empty()) {
         variantOp.emitError() << "Cannot specify an empty sequence name";
         return signalPassFailure();
