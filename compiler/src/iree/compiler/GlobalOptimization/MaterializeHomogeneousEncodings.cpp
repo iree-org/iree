@@ -8,16 +8,20 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -45,8 +49,7 @@ public:
     }
   }
 
-  void runOnOperation() override {
-    auto moduleOp = getOperation();
+  void runOnModule(ModuleOp moduleOp) {
     auto executableTargets =
         IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(moduleOp);
     if (executableTargets.size() != 1) {
@@ -74,6 +77,23 @@ public:
     });
     if (failed(runPipeline(passManager, moduleOp))) {
       return signalPassFailure();
+    }
+  }
+
+  void runOnOperation() override {
+    auto rootOp = getOperation();
+    SetVector<ModuleOp> modules;
+    modules.insert(rootOp);
+    Explorer e(rootOp, TraversalAction::RECURSE);
+    e.walk([&modules](Operation *op) -> WalkResult {
+      // Explorer ignores ModuleOp, so check the parent.
+      if (auto mod = op->getParentOfType<ModuleOp>()) {
+        modules.insert(mod);
+      }
+      return WalkResult::advance();
+    });
+    for (auto module : modules) {
+      runOnModule(module);
     }
   }
 };
