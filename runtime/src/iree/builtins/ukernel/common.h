@@ -7,25 +7,6 @@
 #ifndef IREE_BUILTINS_UKERNEL_COMMON_H_
 #define IREE_BUILTINS_UKERNEL_COMMON_H_
 
-//===----------------------------------------------------------------------===//
-// Generic microkernel library
-//===----------------------------------------------------------------------===//
-//
-// Rules summary:
-// 1. Microkernels are bare-metal, excluding even the standard C library.
-//    a. Can't #include any system header.
-//    b. Can't #include any standard library header.
-//    c. Can't interface with the OS in any way.
-// 2. Microkernels code may be specialized for a target CPU architecture, but
-//    not for a target platform/OS/triple. In particular:
-//    a. It's OK to have a `#ifdef __aarch64__` but not a `#ifdef __ANDROID__`.
-// 3. Microkernels are pure/reentrant/stateless.
-//    a. Pure: the only effect of calling a ukernel is to write to destination
-//       buffers specified by pointers passed as ukernel arguments.
-//    b. Reentrant: ukernels may be called concurrently with
-//       themselves, other ukernels, or any other code, on any thread.
-//    c. Stateless: ukernels can't access any nonconstant global variable.
-
 #ifdef __cplusplus
 #error This file should only be included in ukernel/ code, which should be C, not C++.
 #endif  // __cplusplus
