@@ -54,6 +54,7 @@ iree_lit_test_suite(
     "transform_dialect_pack_shared_memory_alloc.mlir"
     "transform_dialect_promote_operands.mlir"
     "transform_dialect_vector_distribution.mlir"
+    "transform_dialect_vector_to_nvgpu_mma.mlir"
     "transform_distribute_forall.mlir"
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
