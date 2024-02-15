@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -80,14 +79,11 @@ public:
   void runOnOperation() override {
     auto rootOp = getOperation();
     SetVector<ModuleOp> modules;
-    modules.insert(rootOp);
-    Explorer e(rootOp, TraversalAction::RECURSE);
-    e.walk([&modules](Operation *op) -> WalkResult {
-      // Explorer ignores ModuleOp, so check the parent.
-      if (auto mod = op->getParentOfType<ModuleOp>()) {
+    // modules.insert(rootOp);
+    rootOp.walk([&modules](Operation *op) {
+      if (auto mod = dyn_cast<ModuleOp>(op)) {
         modules.insert(mod);
       }
-      return WalkResult::advance();
     });
     for (auto module : modules) {
       runOnModule(module);
