@@ -43,8 +43,7 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
         print("**************************************************************")
         print(f"Compiling {source} -> {vmfb_artifact} with flags:")
         print(f"  {sep.join(flags)}")
-        start_time = time.time()
-        subprocess.check_call(
+        exec_args = (
             [
                 "iree-compile",
                 "-o",
@@ -52,8 +51,11 @@ def iree_compile(source: Artifact, compiled_variant: str, flags: Sequence[str]):
                 str(source.path),
             ]
             + IREE_COMPILE_QOL_FLAGS
-            + flags,
-            cwd=str(source.group.directory),
+            + flags
+        )
+        start_time = time.time()
+        subprocess.run(
+            exec_args, check=True, capture_output=True, cwd=source.group.directory
         )
         run_time = time.time() - start_time
         print(f"Compilation succeeded in {run_time}s")
@@ -73,7 +75,7 @@ def iree_run_module(vmfb: Artifact, *, device, function, args: Sequence[str] = (
     exec_args.extend(args)
     print("**************************************************************")
     print("Exec:", " ".join(exec_args))
-    subprocess.check_call(exec_args, cwd=vmfb.group.directory)
+    subprocess.run(exec_args, check=True, capture_output=True, cwd=vmfb.group.directory)
 
 
 def iree_benchmark_module(

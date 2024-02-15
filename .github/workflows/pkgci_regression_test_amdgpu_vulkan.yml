@@ -47,5 +47,5 @@ jobs:
         run: |
           source $VENV_DIR/bin/activate
           pytest \
-            -s -m "plat_rdna3_vulkan and presubmit" \
+            -rA -s -m "plat_rdna3_vulkan and presubmit" \
             experimental/regression_suite
