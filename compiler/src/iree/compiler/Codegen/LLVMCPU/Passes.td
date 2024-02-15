@@ -145,11 +145,12 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def LLVMCPUDropVectorUnitDims :
-    InterfacePass<"iree-llvmcpu-drop-vector-unit-dims", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to drop vector unit dims.";
+def LLVMCPUOptimizeVectorShapes :
+    InterfacePass<"iree-llvmcpu-optimize-vector-shapes", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to optimize vector shapes, including dropping unit dimensions "
+                "and collapsing contiguous dimensions.";
   let constructor =
-      "mlir::iree_compiler::createLLVMCPUDropVectorUnitDimsPass()";
+      "mlir::iree_compiler::createLLVMCPUOptimizeVectorShapesPass()";
 }
 
 def LLVMCPUVirtualVectorLowering :

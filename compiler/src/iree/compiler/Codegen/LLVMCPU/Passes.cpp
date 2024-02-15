@@ -288,7 +288,7 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &passManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   passManager.addNestedPass<func::FuncOp>(
-      createLLVMCPUDropVectorUnitDimsPass());
+      createLLVMCPUOptimizeVectorShapesPass());
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
 
