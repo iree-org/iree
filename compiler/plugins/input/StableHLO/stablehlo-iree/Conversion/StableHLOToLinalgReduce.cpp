@@ -387,7 +387,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
     SmallVector<AffineMap> inferredMaps(3, AffineMap::get(ctx));
     if (rank > 0) {
       inferredMaps =
-          AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs});
+          AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs}, ctx);
     }
 
     SmallVector<AffineMap> indexingMaps;
