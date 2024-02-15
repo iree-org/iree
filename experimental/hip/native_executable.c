@@ -259,13 +259,13 @@ iree_status_t iree_hal_hip_native_executable_create(
       IREE_TRACE({
         if (iree_hal_rocm_ExecutableDef_source_locations_is_present(
                 executable_def)) {
-          iree_hal_hip_FileLineLocDef_vec_t source_locs_vec =
+          iree_hal_rocm_FileLineLocDef_vec_t source_locs_vec =
               iree_hal_rocm_ExecutableDef_source_locations_get(executable_def);
-          iree_hal_hip_FileLineLocDef_table_t source_loc =
-              iree_hal_hip_FileLineLocDef_vec_at(source_locs_vec, i);
+          iree_hal_rocm_FileLineLocDef_table_t source_loc =
+              iree_hal_rocm_FileLineLocDef_vec_at(source_locs_vec, i);
           flatbuffers_string_t filename =
-              iree_hal_hip_FileLineLocDef_filename_get(source_loc);
-          uint32_t line = iree_hal_hip_FileLineLocDef_line_get(source_loc);
+              iree_hal_rocm_FileLineLocDef_filename_get(source_loc);
+          uint32_t line = iree_hal_rocm_FileLineLocDef_line_get(source_loc);
           kernel_info->source_filename =
               iree_make_string_view(filename, flatbuffers_string_len(filename));
           kernel_info->source_line = line;
