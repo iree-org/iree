@@ -526,7 +526,7 @@ struct ConvolutionOpGeneralConversion final
 
     // Finally, create the computation
     auto inferredMaps =
-        AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs});
+        AffineMap::inferFromExprList({srcExprs, windowExprs, dstExprs}, ctx);
 
     Value emptyTensor = rewriter.create<tensor::EmptyOp>(
         loc, reshapedResultShape, resultType.getElementType());
