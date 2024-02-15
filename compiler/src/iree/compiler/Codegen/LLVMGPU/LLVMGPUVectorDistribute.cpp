@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -40,36 +41,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Computes the per-dim layout from a list of dimension types and sizes,
-// including an outer most inferred dimension. For example,
-//
-// sizes = [-1, x, y, z]
-// problemSize = s
-//
-// sizes[0] = s / (x * y * z)
-//
-// Fails if s is not divisible by the list of known sizes.
-FailureOr<PerDimLayoutAttr>
-getPerDimLayout(MLIRContext *context, SmallVector<LayoutDimensionAttr> dimTypes,
-                SmallVector<int64_t> sizes, int64_t problemSize) {
-  assert(sizes.size() == dimTypes.size() && "dim types and sizes mismatch");
-  if (sizes.front() != -1) {
-    return failure();
-  }
-  int64_t residualElements = problemSize;
-  for (int i = sizes.size() - 1, e = 1; i >= e; --i) {
-    if (sizes[i] <= 0) {
-      return failure();
-    }
-    if (residualElements % sizes[i] != 0) {
-      return failure();
-    }
-    residualElements /= sizes[i];
-  }
-  sizes[0] = residualElements;
-  return PerDimLayoutAttr::get(context, dimTypes, sizes);
-}
-
 // Vector layout option setter aimed at contractions. Currently this only sets
 // anchors for two types of operations; vector.contract and vector.transfer_read
 // from non-shared memory. The assumption in this case is that all IR input to
@@ -84,6 +55,7 @@ public:
         workgroupSize(workgroupSize), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
+    populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   }
 
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
@@ -134,23 +106,30 @@ private:
   }
 
   // Sets a layout anchor for reads from global memory.
-  // NOTE: This is mostly ad-hoc trying to fit more general distribution of
-  // transfers into the layout attributes that currently don't support more
-  // than a few dimensions. This pattern needs to be reworked with the layout
-  // attributes.
-  //
   // The layout this generates is approximately the following:
   //
-  // #row_layout = #iree_vector_ext.per_dim_layout<
-  //   [BATCHX, LANEX,         VECTORX],
-  //   [-1,     subgroup_size, 128 / element_type_bitwidth]>
-  // #col_layout = #iree_vector_ext.per_dim_layout<
-  //   [VECTORY, LANEY],
-  //   [-1,      leftover threads from subgroup_size / LANEX]>
-  // #layout = #iree_vector_ext.layout<#row_layout, #col_layout>
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, ..., 1]
+  //    batches_per_subgroup =    [<remaining undistributed elements>]
+  //    outers_per_batch =        [1, ..., 1]
+  //    threads_per_outer =       [<greedy from inner most memref dim>]
+  //    elements_per_thread =     [1, ..., 128/bitwidth, ..., 1]
+  //            inner_most_memref_dimension ^
   //
-  // Where -1 indicates assign all remaining elements along that dimension
-  // to that dim type.
+  // All orders are the same
+  //    *_order = [<broadcasted_dims>, <transfer_permutation>]>
+  //
+  // So for the following transfer_read with 64 threads
+  //  vector.transfer_read ... : memref<16x256xf16>, vector<16x32xf16>
+  //
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, 1]
+  //    batches_per_subgroup =    [1, 1]
+  //    outers_per_batch =        [1, 1]
+  //    threads_per_outer =       [16, 4]
+  //    elements_per_thread =     [1, 8]
+  //
+  //    *_order = [0, 1]>
   void setTransferReadAnchor(MLIRContext *context,
                              VectorLayoutAnalysis &analysis,
                              vector::TransferReadOp transfer) {
@@ -158,6 +137,7 @@ private:
     if (transfer.getMask()) {
       return;
     }
+    // Shared memory loads are expected to take the layout of the contraction.
     auto sourceMemRefType =
         dyn_cast<MemRefType>(transfer.getSource().getType());
     if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
@@ -179,12 +159,6 @@ private:
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
-    // TODO: Support > 2-d transfers.
-    int64_t transferRank = transfer.getVectorType().getRank();
-    if (transferRank > 2) {
-      return;
-    }
-
     AffineMap transferMap = transfer.getPermutationMap();
     if (transferMap.getNumDims() == 0) {
       return;
@@ -192,58 +166,88 @@ private:
 
     // Select the inner most dim of the memref as the contiguous dim to load
     // from.
+    int64_t transferRank = transfer.getVectorType().getRank();
     std::optional<unsigned> maybeDim = transferMap.getResultPosition(
         getAffineDimExpr(transferMap.getNumDims() - 1, context));
     int64_t distXDim = maybeDim ? *maybeDim : transferRank - 1;
 
     ArrayRef<int64_t> vectorShape = transfer.getVectorType().getShape();
 
-    // In most cases, BATCHX is expected to get a size of 1. For cases with
-    // large linear loads or small thread counts this will have to distribute
-    // residual elements to the batch dimension.
-    SmallVector<LayoutDimensionAttr> xDimTypes = {
-        LayoutDimensionAttr::get(context, LayoutDimension::BATCHX),
-        LayoutDimensionAttr::get(context, LayoutDimension::LANEX),
-        LayoutDimensionAttr::get(context, LayoutDimension::VECTORX)};
-    // NOTE: this is cheating because subgroup size == workgroup size here.
-    int64_t xThreads = vectorShape[distXDim] / numElementsPerThread;
-    xThreads = std::min(flatNumThreads, xThreads);
-    int64_t residualThreads = flatNumThreads / xThreads;
-    SmallVector<int64_t> xDimSizes = {-1, xThreads, numElementsPerThread};
+    // Limit the maximum inner vector read width to the inner most contiguous
+    // dimension. We could try to be clever and extend this to adjacent
+    // dimensions in cases where the inner most read vector dimension is small,
+    // but that requires comparing memref strides and is uncommon. For now
+    // prioritize warp contiguity over 128-bit read granularity.
+    numElementsPerThread =
+        std::min(numElementsPerThread, vectorShape[distXDim]);
 
-    // Here, we only distribute the second dimension, if present, along the
-    // LANEY and VECTORY dimensions.
-    SmallVector<SmallVector<LayoutDimensionAttr>> dimTypes = {
-        {LayoutDimensionAttr::get(context, LayoutDimension::VECTORY),
-         LayoutDimensionAttr::get(context, LayoutDimension::LANEY)}};
-    SmallVector<SmallVector<int64_t>> dimSizes = {{-1, residualThreads}};
-
-    SmallVector<PerDimLayoutAttr> perDimAttrs;
-    int64_t idx = 0;
-    // Walk the transfer op in reverse to match the preferred processing
-    // order of the dimensions types.
-    for (int i = transferRank - 1, e = 0; i >= e; --i) {
-      int64_t problemSize = vectorShape[i];
-      if (i == distXDim) {
-        auto maybeLayout =
-            getPerDimLayout(context, xDimTypes, xDimSizes, problemSize);
-        if (failed(maybeLayout)) {
-          return;
-        }
-        perDimAttrs.push_back(*maybeLayout);
-        continue;
+    llvm::SetVector<unsigned> vectorDimDistributionOrder;
+    // Get the order in which to distribute vector dimensions to threads, going
+    // from inner most to outer most memref dimension. It's important to note
+    // that this heuristic only applies to matrix multiplication cases where
+    // we are promoting the operands of a contraction to shared memory and we
+    // have no producers fused with the matmul. In general there is no universal
+    // way to set an anchoring layout for reads without doing an analysis of how
+    // the read values are used.
+    for (int i = transferMap.getNumDims() - 1, e = 0; i >= e; --i) {
+      std::optional<unsigned> maybeDim =
+          transferMap.getResultPosition(getAffineDimExpr(i, context));
+      if (maybeDim) {
+        vectorDimDistributionOrder.insert(*maybeDim);
       }
-      auto maybeLayout =
-          getPerDimLayout(context, dimTypes[idx], dimSizes[idx], problemSize);
-      idx++;
-      if (failed(maybeLayout)) {
-        return;
-      }
-      perDimAttrs.push_back(*maybeLayout);
     }
-    SmallVector<PerDimLayoutAttr, 4> reversedLayout(llvm::reverse(perDimAttrs));
+    // Add all remaining (broadcasted) dimensions
+    for (auto dim : llvm::seq(static_cast<int64_t>(0), transferRank)) {
+      if (!vectorDimDistributionOrder.contains(dim))
+        vectorDimDistributionOrder.insert(dim);
+    }
 
-    auto layout = LayoutAttr::get(context, reversedLayout);
+    int64_t residualThreads = flatNumThreads;
+    int64_t residualElements = numElementsPerThread;
+
+    SmallVector<int64_t> order(vectorDimDistributionOrder.rbegin(),
+                               vectorDimDistributionOrder.rend());
+
+    // Distribute all threads in the workgroup to the "threads" dimension,
+    // meaning subgroup counts is unit here, even though the read is being
+    // distributed to multiple subgroups. This is in an attempt to do a
+    // workgroup contiguous load.
+    SmallVector<int64_t> subgroupCounts(transferRank, 1);
+    SmallVector<int64_t> batchSizes(transferRank, 1);
+    SmallVector<int64_t> otherSizes(transferRank, 1);
+    SmallVector<int64_t> threadCounts(transferRank, 1);
+    SmallVector<int64_t> elementSizes(transferRank, 1);
+
+    for (auto dim : llvm::reverse(order)) {
+      int64_t vectorSize = vectorShape[dim];
+      // Set the element count for the inner most vector dimension.
+      if (residualElements != 1) {
+        elementSizes[dim] = residualElements;
+        vectorSize /= residualElements;
+        residualElements = 1;
+      }
+
+      assert((residualThreads % vectorSize == 0 ||
+              vectorSize % residualThreads == 0) &&
+             "dividing threads to incompatible vector");
+      if (residualThreads <= vectorSize) {
+        vectorSize /= residualThreads;
+        threadCounts[dim] = residualThreads;
+        residualThreads = 1;
+      } else {
+        residualThreads /= vectorSize;
+        threadCounts[dim] = vectorSize;
+        vectorSize = 1;
+      }
+
+      batchSizes[dim] = vectorSize;
+    }
+
+    auto layout = IREE::VectorExt::NestedLayoutAttr::get(
+        context, subgroupCounts, order, batchSizes, order, otherSizes, order,
+        threadCounts, order, elementSizes, order);
+    layout.dump();
+    transfer.dump();
     analysis.setAnchor(transfer.getResult(), layout);
   }
 
