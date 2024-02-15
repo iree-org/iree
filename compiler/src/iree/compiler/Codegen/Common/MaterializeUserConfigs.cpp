@@ -80,23 +80,14 @@ struct MaterializeUserConfigsPass
     MLIRContext *context = moduleOp.getContext();
 
     // Parse the file path and kernel config strategy from flags. There are
-    // three possible usage flows:
-    //   1. Specify only a transform dialect library, e.g.
-    //      --iree-codegen-transform-dialect-library=/path/to/library.mlir
-    //      This will load the transform library and attempt to use two default
-    //      strategies, `__kernel_config` before strategy configuration (i.e.
-    //      now), and `__transform_main` for codegen. If `__kernel_config` is
-    //      present in the library, it will run it and use the annotations set
-    //      by it. If not present, `__transform_main` will be broadcasted to all
-    //      dispatches.
+    // two possible usage flows for transform dialect libraries.
+    //   1. Use `__kernel_config` to match and annotate variants with the
+    //      strategy to use. This could either be a transform dialect strategy
+    //      or any other IREE codegen pipeline.
     //
-    //   2. Specify a library path with a strategy name instead of
-    //      `__transform_main`. This is the same as (1) except it uses a
-    //      different default strategy.
-    //
-    //   3. Specify a library path suffixed with a kernel config entry point.
-    //      This will throw an error if the specified kernel config strategy is
-    //      not found.
+    //   2. Use the configuration strategy to do codegen directly. At the end of
+    //      the strategy, the variant needs to be annotated with
+    //      "translation_info" = #iree_codegen.translation_info<None>
     SmallVector<StringRef, 2> parts;
     llvm::SplitString(llvm::StringRef(clCodegenTransformDialectLibraryFileName),
                       parts, "@");
