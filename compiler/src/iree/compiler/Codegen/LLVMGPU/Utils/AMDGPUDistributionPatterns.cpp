@@ -39,8 +39,9 @@ enum class ContractType { MM, MMT, MTM, MTMT, UNSUPPORTED };
 ///
 /// Now that we have defined what layoutA, layoutB, layoutC are, we will define
 /// what the canonical layouts are for each MFMA instruction. These are
-/// represented as what part of the matrix each thread is carrying. These
-/// layouts were referenced from
+/// represented as the original matrix, with elements representing which thread
+/// id in the subgroup gets which element.
+/// These layouts were referenced from
 /// https://github.com/ROCm/amd_matrix_instruction_calculator
 ///
 /// The naming scheme for these operators is InputType_MxNxK_OutputType.
