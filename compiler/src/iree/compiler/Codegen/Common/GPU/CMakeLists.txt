@@ -47,6 +47,7 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPUDistributeContract.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"

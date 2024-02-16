@@ -49,6 +49,7 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "CommonGPUPasses",
     srcs = [
+        "AMDGPUDistributeContract.cpp",
         "GPUCheckResourceUsage.cpp",
         "GPUDistribute.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
