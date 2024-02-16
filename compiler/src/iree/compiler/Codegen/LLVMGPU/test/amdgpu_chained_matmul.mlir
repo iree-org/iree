@@ -12,9 +12,9 @@
 }
 
 builtin.module {
-  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d1, d0)>
+  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
   func.func @chained_matmul(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
     // CHECK: func.func @chained_matmul(%[[LHS:.*]]: vector<32x8xf16>, %[[RHS:.*]]: vector<16x8xf16>, %[[ACC:.*]]: vector<32x16xf16>
     // CHECK-SAME: %[[RHS2:.*]]: vector<8x16xf16>, %[[ACC2:.*]]: vector<32x8xf16>
