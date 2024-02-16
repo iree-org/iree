@@ -967,7 +967,6 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
   populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
-  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(laneId, patterns);
   if (getExperimental())
     populateGPULayoutResolutionDistributionPatterns(patterns);
   distributeVectorOps(target, patterns, options);

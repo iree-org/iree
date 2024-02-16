@@ -88,6 +88,7 @@ iree_compiler_cc_library(
     name = "LLVMGPU",
     srcs = [
         "AMDGPUChainedMatmulPass.cpp",
+        "AMDGPUDistributeContract.cpp",
         "ConvertToLLVM.cpp",
         "ConvertToNVVM.cpp",
         "ConvertToROCDL.cpp",
@@ -115,6 +116,7 @@ iree_compiler_cc_library(
         "Passes.h",
         "ROCDLKernelConfig.h",
         "ROCDLPasses.h",
+        "ROCDLPatterns.h",
     ],
     deps = [
         ":PassHeaders",

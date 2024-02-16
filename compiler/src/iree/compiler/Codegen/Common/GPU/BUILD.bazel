@@ -49,7 +49,6 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "CommonGPUPasses",
     srcs = [
-        "AMDGPUDistributeContract.cpp",
         "GPUCheckResourceUsage.cpp",
         "GPUDistribute.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
@@ -94,7 +93,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",

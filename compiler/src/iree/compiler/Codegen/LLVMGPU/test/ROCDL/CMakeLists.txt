@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "distribute_contract.mlir"
     "pipeline_warp_reduction.mlir"
   TOOLS
     FileCheck

@@ -47,7 +47,6 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
-    "AMDGPUDistributeContract.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
@@ -76,7 +75,6 @@ iree_cc_library(
     IREELinalgExtTransforms
     IREEVectorExtDialect
     LLVMSupport
-    MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils

@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/LLVMGPU/ROCDLPatterns.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1522,6 +1523,34 @@ transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
 }
 
 void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::TestAMDGPUNestedLayoutDistribution::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  TestVectorLayoutOptions options(target);
+  RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
+  Value laneId = rewriter.create<gpu::LaneIdOp>(target.getLoc());
+
+  populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
+  populateGPUReductionDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(laneId, patterns);
+  if (getExperimental())
+    populateGPULayoutResolutionDistributionPatterns(patterns);
+  distributeVectorOps(target, patterns, options);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::TestAMDGPUNestedLayoutDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
