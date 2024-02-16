@@ -36,7 +36,7 @@ def MapNestedForallToGpuThreadsOp :
     If necessary, scf.forall that do not use the whole thread range
     result in predicated computations.
 
-    Barriers are inserted after each scf.forall op
+    Barriers are inserted after each scf.forall op 
     if `sync_after_distribution` is true.
 
     Return modes:
@@ -707,41 +707,6 @@ def TestAMDGPUContractionDistribution :
     }];
 
     let arguments = (ins TransformHandleTypeInterface:$target);
-    let results = (outs);
-
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
-    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-    let extraClassDeclaration = [{
-      ::mlir::DiagnosedSilenceableFailure applyToOne(
-          ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::FunctionOpInterface funcOp,
-          ::mlir::transform::ApplyToEachResultList &results,
-          ::mlir::transform::TransformState &state);
-    }];
-}
-
-def TestAMDGPUNestedLayoutDistribution :
-  Op<Transform_Dialect, "iree.test_amdgpu_nested_layout_distribution",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Run AMDGPU-specific nested layout vector distribution.
-
-    The anchor points are set by using the attribute
-    "__vector_layout_test_anchor_operand_x" and
-    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
-    number.
-
-    #### Return modes
-
-    This transform does not consume the target handle and always return success.
-    }];
-
-    let arguments = (ins TransformHandleTypeInterface:$target,
-                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental);
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];
