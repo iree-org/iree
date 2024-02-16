@@ -24,119 +24,98 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
 
-# We run everything twice, for each boolean value of `asan_in_bytecode_modules_ON_OFF`:
-#  - When asan_in_bytecode_modules_ON_OFF=OFF, ASAN is only enabled in the C/C++ code
-#    (compiler and runtime), not in bytecode modules. The default embedded-ELF
-#    path is used.
-#  - When asan_in_bytecode_modules_ON_OFF=ON, ASAN is also enabled in bytecode
-#    modules. The system-ELF path is used (required for ASAN-in-modules).
-for asan_in_bytecode_modules_ON_OFF in OFF ON; do
-    # It's enough to do that in either of the two loop iterations.
-    build_microbenchmarks_ON_OFF=${asan_in_bytecode_modules_ON_OFF}
+CMAKE_ARGS=(
+  "-G" "Ninja"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  "-DIREE_ENABLE_ASAN=ON"
+  "-B" "${BUILD_DIR?}"
+  "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
+  "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+  "-DIREE_BUILD_MICROBENCHMARKS=ON"
+)
 
-  CMAKE_ARGS=(
-    "-G" "Ninja"
-    "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
-    "-DIREE_ENABLE_ASAN=ON"
-    "-B" "${BUILD_DIR?}"
-    "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-    "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
-    "-DIREE_ENABLE_ASSERTIONS=${IREE_ENABLE_ASSERTIONS}"
+echo "::group::Configuring CMake"
+"${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
+echo "::endgroup::"
 
-    # The main difference between the two loop iterations: conditionally enable
-    # ASAN in bytecode modules and use the system-ELF path.
-    "-DIREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}"
-    "-DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=${asan_in_bytecode_modules_ON_OFF}"
+echo "::group::Building all"
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
+echo "::endgroup::"
 
-    # Also check if microbenchmarks are buildable. It's enough to do that in one
-    # of the two loop iterations.
-    "-DIREE_BUILD_MICROBENCHMARKS=${build_microbenchmarks_ON_OFF}"
-  )
+echo "::group::Building test deps"
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
+echo "::endgroup::"
 
-  echo "*** Configuring CMake (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-  echo "------------------"
-  "${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
+echo "::group::Building microbenchmark suites"
+"${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+echo "::endgroup::"
 
-  echo "*** Building all (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-  echo "------------------"
-  "${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
+if (( IREE_USE_CCACHE == 1 )); then
+  ccache --show-stats
+fi
 
-  echo "*** Building test deps (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-  echo "------------------"
-  "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
+# Respect the user setting, but default to as many jobs as we have cores.
+export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-  if [[ "${build_microbenchmarks_ON_OFF}" == "ON" ]]; then
-    echo "*** Building microbenchmark suites (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-    echo "------------------"
-    "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
-  fi
+# Respect the user setting, but default to turning off Vulkan.
+export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
+# Respect the user setting, but default to turning off Metal.
+export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
+# Respect the user setting, but default to turning off CUDA.
+export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
+# The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
+export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
+# Respect the user setting, but default to skipping tests that require Nvidia GPU.
+export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
 
-  if (( IREE_USE_CCACHE == 1 )); then
-    ccache --show-stats
-  fi
+# Tests to exclude by label. In addition to any custom labels (which are carried
+# over from Bazel tags), every test should be labeled with its directory.
+declare -a label_exclude_args=(
+  # Exclude specific labels.
+  # Put the whole label with anchors for exact matches.
+  ^noasan$
+  ^nodocker$
 
-  # Respect the user setting, but default to as many jobs as we have cores.
-  export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
+  # Exclude all tests in a directory.
+  # Put the whole directory with anchors for exact matches.
+  # For example:
+  #   ^bindings/python/iree/runtime$
 
-  # Respect the user setting, but default to turning off Vulkan.
-  export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
-  # Respect the user setting, but default to turning off Metal.
-  export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
-  # Respect the user setting, but default to turning off CUDA.
-  export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
-  # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
-  export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
-  # Respect the user setting, but default to skipping tests that require Nvidia GPU.
-  export IREE_NVIDIA_GPU_TESTS_DISABLE=${IREE_NVIDIA_GPU_TESTS_DISABLE:-1}
+  # Exclude all tests in some subdirectories.
+  # Put the whole parent directory with only a starting anchor.
+  # Use a trailing slash to avoid prefix collisions.
+  # For example:
+  #   ^bindings/
+)
 
-  # Tests to exclude by label. In addition to any custom labels (which are carried
-  # over from Bazel tags), every test should be labeled with its directory.
-  declare -a label_exclude_args=(
-    # Exclude specific labels.
-    # Put the whole label with anchors for exact matches.
-    ^noasan$
-    ^nodocker$
+if (( IREE_VULKAN_DISABLE == 1 )); then
+  label_exclude_args+=("^driver=vulkan$")
+fi
+if (( IREE_CUDA_DISABLE == 1 )); then
+  label_exclude_args+=("^driver=cuda$")
+fi
+if (( IREE_VULKAN_F16_DISABLE == 1 )); then
+  label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
+fi
+if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
+  label_exclude_args+=("^requires-gpu")
+fi
 
-    # Exclude all tests in a directory.
-    # Put the whole directory with anchors for exact matches.
-    # For example:
-    #   ^bindings/python/iree/runtime$
+label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
-    # Exclude all tests in some subdirectories.
-    # Put the whole parent directory with only a starting anchor.
-    # Use a trailing slash to avoid prefix collisions.
-    # For example:
-    #   ^bindings/
-  )
+pushd ${BUILD_DIR?}
 
-  if (( IREE_VULKAN_DISABLE == 1 )); then
-    label_exclude_args+=("^driver=vulkan$")
-  fi
-  if (( IREE_CUDA_DISABLE == 1 )); then
-    label_exclude_args+=("^driver=cuda$")
-  fi
-  if (( IREE_VULKAN_F16_DISABLE == 1 )); then
-    label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")
-  fi
-  if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
-    label_exclude_args+=("^requires-gpu")
-  fi
+echo "::group::Running main project ctests"
+ctest \
+  --timeout 900 \
+  --output-on-failure \
+  --no-tests=error \
+  --label-exclude "${label_exclude_regex}"
+echo "::endgroup::"
 
-  label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
+echo "::group::Running llvm-external-projects tests"
+cmake --build . --target check-iree-dialects -- -k 0
+echo "::endgroup::"
 
-  pushd ${BUILD_DIR?}
-
-  echo "*** Running main project ctests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) *******"
-  echo "------------------"
-  ctest \
-    --timeout 900 \
-    --output-on-failure \
-    --no-tests=error \
-    --label-exclude "${label_exclude_regex}"
-
-  echo "*** Running llvm-external-projects tests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
-  echo "------------------"
-  cmake --build . --target check-iree-dialects -- -k 0
-
-  popd
-done
+popd
