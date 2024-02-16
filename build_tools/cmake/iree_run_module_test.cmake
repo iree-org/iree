@@ -70,10 +70,6 @@ endfunction()
 # )
 
 function(iree_run_module_test)
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
-
   cmake_parse_arguments(
     _RULE
     ""
@@ -82,8 +78,14 @@ function(iree_run_module_test)
     ${ARGN}
   )
 
+  if(NOT IREE_BUILD_TESTS)
+    message(STATUS "${_RULE_NAME} skipped since IREE_BUILD_TESTS is OFF")
+    return()
+  endif()
+
   iree_get_platform(_PLATFORM)
   if(_PLATFORM IN_LIST _RULE_UNSUPPORTED_PLATFORMS)
+    message(STATUS "${_RULE_NAME} skipped since platform '${_PLATFORM} is IN_LIST unsupported: '${_RULE_UNSUPPORTED_PLATFORMS}'")
     return()
   endif()
 
@@ -256,10 +258,6 @@ endfunction()
 #     "mobilenet_v1_fp32_expected_output.txt"
 # )
 function(iree_benchmark_suite_module_test)
-  if(NOT IREE_BUILD_TESTS)
-    return()
-  endif()
-
   cmake_parse_arguments(
     _RULE
     ""
@@ -268,9 +266,15 @@ function(iree_benchmark_suite_module_test)
     ${ARGN}
   )
 
+  if(NOT IREE_BUILD_TESTS)
+    message(STATUS "${_RULE_NAME} skipped since IREE_BUILD_TESTS is OFF")
+    return()
+  endif()
+
   # Benchmark artifacts needs to be stored at the location of
   # `IREE_E2E_TEST_ARTIFACTS_DIR` or the test target is bypassed.
   if("${IREE_E2E_TEST_ARTIFACTS_DIR}" STREQUAL "")
+    message(STATUS "${_RULE_NAME} skipped since IREE_E2E_TEST_ARTIFACTS_DIR is empty")
     return()
   endif()
 
@@ -286,6 +290,7 @@ function(iree_benchmark_suite_module_test)
 
   # Platform is not in the supported module list, skip the test.
   if (NOT _MODULE_PATH)
+    message(STATUS "${_RULE_NAME} skipped since _MODULE_PATH is empty")
     return()
   endif()
 
