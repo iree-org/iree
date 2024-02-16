@@ -132,9 +132,10 @@ void TestMutexExclusiveAccessTryLock() {
 TEST(MutexTest, Lifetime) {
   iree_mutex_t mutex;
   iree_mutex_initialize(&mutex);
-  bool did_lock = iree_mutex_try_lock(&mutex);
-  EXPECT_TRUE(did_lock);
-  if (did_lock) iree_mutex_unlock(&mutex);
+  while (!iree_mutex_try_lock(&mutex)) {
+    // NOTE: functions with try in their name may fail spuriously.
+  }
+  iree_mutex_unlock(&mutex);
   iree_mutex_lock(&mutex);
   iree_mutex_unlock(&mutex);
   iree_mutex_deinitialize(&mutex);
@@ -153,9 +154,10 @@ TEST(MutexTest, ExclusiveAccessTryLock) {
 TEST(SlimMutexTest, Lifetime) {
   iree_slim_mutex_t mutex;
   iree_slim_mutex_initialize(&mutex);
-  bool did_lock = iree_slim_mutex_try_lock(&mutex);
-  EXPECT_TRUE(did_lock);
-  if (did_lock) iree_slim_mutex_unlock(&mutex);
+  while (!iree_slim_mutex_try_lock(&mutex)) {
+    // NOTE: functions with try in their name may fail spuriously.
+  }
+  iree_slim_mutex_unlock(&mutex);
   iree_slim_mutex_lock(&mutex);
   iree_slim_mutex_unlock(&mutex);
   iree_slim_mutex_deinitialize(&mutex);
