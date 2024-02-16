@@ -337,15 +337,6 @@ struct DistributeTransferWriteNestedLayoutAttr final
   Value threadId;
 };
 
-/*
-// TODO: Add this as a method to VectorLayoutInterface.
-int64_t getTotalDistributedDimSize(NestedLayoutAttr layout, int64_t dimIndex) {
-  return layout.getBatchesPerSubgroup()[dimIndex] *
-         layout.getOutersPerBatch()[dimIndex] *
-         layout.getElementsPerThread()[dimIndex];
-}
-*/
-
 enum class ContractKind { MK_KN_MN, UNKNOWN };
 
 ContractKind inferContractKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
@@ -357,54 +348,6 @@ ContractKind inferContractKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
     return ContractKind::MK_KN_MN;
   return ContractKind::UNKNOWN;
 }
-
-/*
-// TODO: the following implementation is not efficient..
-LogicalResult fill2DContractOperandMNIndices(
-    ArrayRef<int64_t> outputIndices, SmallVectorImpl<int64_t> &inputIndices,
-    int outputDim, int inputDim, int inputBatch, NestedLayoutAttr outputLayout,
-    NestedLayoutAttr inputLayout) {
-  int rank = outputLayout.getBatchOrder().size();
-  // We rely on the fact that for a 2-D permutation vector, its reverse is just
-  // itself in the below. That does not hold for other cases.
-  if (rank != 2 || inputLayout.getBatchOrder().size() != 2) {
-    return failure();
-  }
-
-  auto outputBatches = llvm::to_vector<2>(outputIndices.take_front(rank));
-  applyPermutationToVector(outputBatches, outputLayout.getBatchOrder());
-  int64_t batchIndex = outputIndices[outputDim];
-  SmallVector<int64_t, 2> inputBatches(rank, 0);
-  inputBatches[inputDim] = batchIndex;
-  inputBatches[1 - inputDim] = inputBatch;
-  applyPermutationToVector(inputBatches, inputLayout.getBatchOrder());
-
-  auto outputOuters =
-      llvm::to_vector<2>(outputIndices.drop_front(2).take_front(2));
-  applyPermutationToVector(outputOuters, outputLayout.getOuterOrder());
-  int64_t outerIndex = outputIndices[rank + outputDim];
-  SmallVector<int64_t, 2> inputOuters(rank, 0);
-  inputOuters[inputDim] = outerIndex;
-  inputOuters[1 - inputDim] = 0;
-  applyPermutationToVector(inputOuters, inputLayout.getOuterOrder());
-
-  auto outputElements =
-      llvm::to_vector<2>(outputIndices.drop_front(2).take_front(2));
-  applyPermutationToVector(outputElements, outputLayout.getElementOrder());
-  int64_t elementIndex = outputIndices[rank + outputDim];
-  SmallVector<int64_t, 2> inputElements(rank, 0);
-  inputElements[inputDim] = elementIndex;
-  inputElements[1 - inputDim] = 0;
-  applyPermutationToVector(inputElements, inputLayout.getElementOrder());
-
-  inputIndices.clear();
-  llvm::append_range(inputIndices, inputBatches);
-  llvm::append_range(inputIndices, inputOuters);
-  llvm::append_range(inputIndices, inputElements);
-
-  return success();
-}
-*/
 
 /// Pattern to distribute `vector.transfer_write` ops with nested layouts.
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
@@ -458,17 +401,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     }
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();
-    // SmallVector<int64_t> loopOrder = getLoopOrder(resultLayout);
     LLVM_DEBUG({
-      // llvm::dbgs() << "distShape: [";
-      // llvm::interleaveComma(distShape, llvm::dbgs());
-      // llvm::dbgs() << "]\n";
       llvm::dbgs() << "distributed shape: [";
       llvm::interleaveComma(distShape, llvm::dbgs());
       llvm::dbgs() << "]\n";
-      // llvm::dbgs() << "loopOrder: [";
-      // llvm::interleaveComma(loopOrder, llvm::dbgs());
-      // llvm::dbgs() << "]\n";
     });
 
     // Create a zero vector with the full distributed vector shape for
@@ -479,7 +415,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     VectorValue finalTile = cast<VectorValue>(zero);
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
-    // SmallVector<int64_t, 8> lhsOffsets(rank, 0), rhsOffsets(rank, 0);
     SmallVector<int64_t, 2> lhsBatchOffsets(rank, 0);
     SmallVector<int64_t, 2> rhsBatchOffsets(rank, 0);
 
@@ -491,6 +426,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       llvm::dbgs() << "]\n";
     });
 
+    // Iterate over all result batches and unroll computation to direct MFMA
+    // intrinsic ops.
     Location loc = contractOp.getLoc();
     auto resultTiles = StaticTileOffsetRange(
         resultBatches, resultBatchTileSizes, resultLayout.getBatchOrder());
@@ -516,45 +453,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                            "A/B vector k batch mismatch");
       }
 
-      /*
-      // offsets contains indices into the C/D vector. It is a n-D index for
-      // both M and N, with BATCH, OUTER, and ELEMENTS and permutation.
-      // We need to split out the BATCH, OUTER, and ELEMENTS for M, and N,
-      // revert the permutation, and then reapply the permutation for LHS and
-      // RHS sepreately. And this adjustment is specific to the contraction
-      // kind..
-      int64_t kBatch = 0;
-      if (contractKind == ContractKind::MK_KN_MN) {
-        kBatch = lhsLayout.getBatchesPerSubgroup()[1];
-        if (kBatch != rhsLayout.getBatchesPerSubgroup()[0]) {
-          return rewriter.notifyMatchFailure(contractOp,
-                                             "k batch size mismatch");
-        }
-      } else {
-        return rewriter.notifyMatchFailure(contractOp,
-                                           "unimplemented contract kind");
-      }
-      */
-
-      // Perform contraction--do separate outer product with mfma operation and
-      // accumulate to the same vector. ArrayRef resultElementOffsets =
-      // llvm::ArrayRef(offsets).drop_back(4);
+      // Perform contraction. Do separate outer product with mfma operation and
+      // accumulate to the same vector.
       for (int k = 0; k < kBatch; ++k) {
-        // if (contractKind == ContractKind::MK_KN_MN) {
-        //   if (failed(fill2DContractOperandMNIndices(
-        //           offsets, lhsOffsets, /*outputDim=*/0, /*inputDim=*/0,
-        //           /*inputBatch=*/k, resultLayout, lhsLayout)) ||
-        //       failed(fill2DContractOperandMNIndices(
-        //           offsets, rhsOffsets, /*outputDim=*/1, /*inputDim=*/1,
-        //           /*inputBatch=*/k, resultLayout, rhsLayout))) {
-        //     return failure();
-        //   }
-        // } else {
-        //   return rewriter.notifyMatchFailure(contractOp,
-        //                                      "unimplemented contract kind");
-        // }
-        // ArrayRef lhsElementOffsets = llvm::ArrayRef(lhsOffsets).drop_back(4);
-        // ArrayRef rhsElementOffsets = llvm::ArrayRef(rhsOffsets).drop_back(4);
         if (!getOperandBatchOffsets(contractKind, k, resultBatchOffsets,
                                     resultLayout, lhsBatchOffsets,
                                     rhsBatchOffsets, lhsLayout, rhsLayout)) {
