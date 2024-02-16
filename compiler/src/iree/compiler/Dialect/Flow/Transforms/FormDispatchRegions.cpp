@@ -218,6 +218,10 @@ static bool isRootOp(Operation *op) {
   if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
     return false;
   }
+  // Dequantization-like ops get cloned into dispatches later.
+  if (isDequantizationLikeOp(op)) {
+    return false;
+  }
   // Any Linalg named op or generic op with reduction iterator types is a root
   // op.
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
