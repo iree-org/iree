@@ -340,4 +340,4 @@ void iree_hal_cuda_tracing_context_free(
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context) {}
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE

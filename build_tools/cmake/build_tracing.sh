@@ -15,20 +15,28 @@ set -x
 BUILD_DIR="${1:-${IREE_TRACING_BUILD_DIR:-build-tracing}}"
 
 source build_tools/cmake/setup_build.sh
-source build_tools/cmake/setup_ccache.sh
+# Note: not using ccache since the runtime build should be fast already.
 
-# Note: https://github.com/iree-org/iree/issues/6404 prevents us from building
-# tests with these other settings. Many tests invoke the compiler tools with
-# MLIR threading enabled, which crashes with compiler tracing enabled.
+echo "::group::Building with -DIREE_TRACING_PROVIDER=tracy"
 "${CMAKE_BIN?}" -B "${BUILD_DIR}" \
   -G Ninja . \
   -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
+  -DIREE_TRACING_PROVIDER=tracy \
   -DIREE_BUILD_COMPILER=OFF
 "${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
+echo "::endgroup::"
 
-if (( IREE_USE_CCACHE == 1 )); then
-  ccache --show-stats
-fi
+echo "::group::Building with -DIREE_TRACING_PROVIDER=console"
+"${CMAKE_BIN?}" -B "${BUILD_DIR}" \
+  -G Ninja . \
+  -DPython3_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DPYTHON_EXECUTABLE="${IREE_PYTHON3_EXECUTABLE}" \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DIREE_ENABLE_RUNTIME_TRACING=ON \
+  -DIREE_TRACING_PROVIDER=console \
+  -DIREE_BUILD_COMPILER=OFF
+"${CMAKE_BIN?}" --build "${BUILD_DIR}" -- -k 0
+echo "::endgroup::"
