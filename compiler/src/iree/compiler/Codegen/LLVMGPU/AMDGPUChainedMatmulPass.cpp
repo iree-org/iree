@@ -130,7 +130,7 @@ struct AMDGPUPrepareForChainedMatmulPass
     bindDims(contractOp.getContext(), m, n, k);
     using MapList = ArrayRef<ArrayRef<AffineExpr>>;
     auto infer = [&](MapList m) {
-      return AffineMap::inferFromExprList(m, ctx);
+      return AffineMap::inferFromExprList(m, contractOp.getContext());
     };
     SmallVector<AffineMap> newIndexingMaps = infer({{m, k}, {n, k}, {m, n}});
     return newIndexingMaps == contractOp.getIndexingMapsArray();
