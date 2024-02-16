@@ -58,6 +58,7 @@ void LayoutIterator::maybeFreezeAndConcatenate(
     if (!state.contains(frozenDim)) {
       frozenDimensions.insert(frozenDim);
       state[frozenDim] = frozenIt;
+      state.ranges[frozenDim] = frozenState.ranges.lookup(frozenDim);
     }
   }
 }
