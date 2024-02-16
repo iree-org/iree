@@ -471,6 +471,166 @@ iree_check_single_backend_test_suite(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+# TODO(scotttodd): could add `CONDITION` options to
+#   iree_check_single_backend_test_suite that would allow for
+#   tests being defined but marked DISABLED, rather than wrap these with
+#   all-or-nothing CMake `if(...)` code...?
+if(IREE_ENABLE_ASAN)
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_asan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "householder.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+endif(IREE_ENABLE_ASAN)
+
+if(IREE_ENABLE_TSAN)
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_tsan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "bitcast_convert.mlir"
+    "broadcast.mlir"
+    "broadcast_add.mlir"
+    "broadcast_in_dim.mlir"
+    "clamp.mlir"
+    "compare.mlir"
+    "complex.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "convolution.mlir"
+    "cosine.mlir"
+    "divide.mlir"
+    "dot.mlir"
+    "dot_bf16.mlir"
+    "dot_general.mlir"
+    "dynamic_slice.mlir"
+    "dynamic_update_slice.mlir"
+    "exponential.mlir"
+    "exponential_fp16.mlir"
+    "exponential_minus_one.mlir"
+    "fft.mlir"
+    "finite.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "householder.mlir"
+    "iota.mlir"
+    "log.mlir"
+    "log_plus_one.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "multiply.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "philox.mlir"
+    "pow.mlir"
+    "reduce.mlir"
+    "reduce_window.mlir"
+    "remainder.mlir"
+    "reshape.mlir"
+    "reverse.mlir"
+    "rng_normal.mlir"
+    "rng_uniform.mlir"
+    "round.mlir"
+    "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
+    "select.mlir"
+    "sine.mlir"
+    "slice.mlir"
+    "sort.mlir"
+    "sqrt.mlir"
+    "subtract.mlir"
+    "tanh.mlir"
+    "three_fry.mlir"
+    "torch_index_select.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+endif(IREE_ENABLE_TSAN)
+
 iree_check_single_backend_test_suite(
   NAME
     check_webgpu
@@ -539,8 +699,9 @@ iree_check_single_backend_test_suite(
   # Only test compilation for now, the WebGPU driver is not stable/tested yet.
   # DRIVER
   #   "webgpu"
+  INPUT_TYPE
+    "stablehlo"
   COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
     "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
 
@@ -612,10 +773,9 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )
-
 
 iree_check_single_backend_test_suite(
   NAME
@@ -686,6 +846,6 @@ iree_check_single_backend_test_suite(
   # Only test compilation for now, the ROCm driver is experimental.
   # DRIVER
   #   "rocm"
-  COMPILER_FLAGS
-    "--iree-input-type=stablehlo"
+  INPUT_TYPE
+    "stablehlo"
 )

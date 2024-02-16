@@ -349,6 +349,122 @@ iree_check_single_backend_test_suite(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+if(IREE_ENABLE_ASAN)
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_asan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "equal.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
+    "matmul.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "mul_shift.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "tosa"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+endif(IREE_ENABLE_ASAN)
+
+if(IREE_ENABLE_TSAN)
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task_tsan
+  SRCS
+    "abs.mlir"
+    "add.mlir"
+    "arithmetic_right_shift.mlir"
+    "bitwise_and.mlir"
+    "bitwise_or.mlir"
+    "bitwise_xor.mlir"
+    "ceil.mlir"
+    "clamp.mlir"
+    "clz.mlir"
+    "const.mlir"
+    "equal.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "fully_connected.mlir"
+    "gather.mlir"
+    "greater.mlir"
+    "greater_equal.mlir"
+    "if.mlir"
+    "log.mlir"
+    "logical_left_shift.mlir"
+    "logical_right_shift.mlir"
+    "logical_right_shift_16.mlir"
+    "matmul.mlir"
+    "max_pool.mlir"
+    "maximum.mlir"
+    "minimum.mlir"
+    "mul.mlir"
+    "mul_shift.mlir"
+    "negate.mlir"
+    "pad.mlir"
+    "reciprocal.mlir"
+    "reduce.mlir"
+    "reshape.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sigmoid.mlir"
+    "sub.mlir"
+    "table.mlir"
+    "tanh.mlir"
+    "transpose.mlir"
+    "while.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "tosa"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+endif(IREE_ENABLE_TSAN)
+
 iree_check_single_backend_test_suite(
   NAME
     check_webgpu
@@ -398,8 +514,9 @@ iree_check_single_backend_test_suite(
   # Only test compilation for now, the WebGPU driver is not stable/tested yet.
   # DRIVER
   #   "webgpu"
+  INPUT_TYPE
+    "tosa"
   COMPILER_FLAGS
-    "--iree-input-type=tosa"
     "--iree-codegen-gpu-native-math-precision=true"  # TODO(#11321): Infer/flip default
 )
 
@@ -452,8 +569,8 @@ iree_check_single_backend_test_suite(
     "metal-spirv"
   DRIVER
     "metal"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
+  INPUT_TYPE
+    "tosa"
 )
 
 iree_check_single_backend_test_suite(
@@ -506,6 +623,6 @@ iree_check_single_backend_test_suite(
   # Only test compilation for now, the ROCm driver is experimental.
   # DRIVER
   #   "rocm"
-  COMPILER_FLAGS
-    "--iree-input-type=tosa"
+  INPUT_TYPE
+    "tosa"
 )

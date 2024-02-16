@@ -93,3 +93,39 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_ENABLE_ASAN)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-cpu_local-task
+  SRCS
+    "conv2d.mlir"
+    "f32_to_i4.mlir"
+    "i4_to_f32.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+endif(IREE_ENABLE_ASAN)
+
+if(IREE_ENABLE_TSAN)
+iree_check_single_backend_test_suite(
+  NAME
+    check_winograd_llvm-cpu_local-task
+  SRCS
+    "conv2d.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+endif(IREE_ENABLE_TSAN)

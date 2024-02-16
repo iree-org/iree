@@ -241,3 +241,204 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_ENABLE_ASAN)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_fp_reassoc_regression_llvm-cpu_asan
+  SRCS
+    "associative_reordering.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-reassociate-fp-reductions=false"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu_asan
+  SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
+    "layernorm.mlir"
+    "linalg_ops.mlir"
+    "lowering_config.mlir"
+    "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
+    "softmax.mlir"
+    "strided_slice.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_tosa_llvm-cpu_asan
+  SRCS
+    "linalg_quantized_matmul_vs_linalg_matmul.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "tosa"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    disable_demote_f64_to_f32_asan
+  SRCS
+    "disable_demote_f64_to_f32.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "-iree-opt-demote-f64-to-f32=false"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    aggressive_fusion_test_asan
+  SRCS
+    "softmax.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-flow-fuse-multi-use"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=address"
+)
+
+endif(IREE_ENABLE_ASAN)
+
+if(IREE_ENABLE_TSAN)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_fp_reassoc_regression_llvm-cpu_tsan
+  SRCS
+    "associative_reordering.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-reassociate-fp-reductions=false"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_llvm-cpu_tsan
+  SRCS
+    "dynamic_abs.mlir"
+    "dynamic_add.mlir"
+    "dynamic_dot.mlir"
+    "dynamic_reduce_min.mlir"
+    "dynamic_torch_index_select_high_rank.mlir"
+    "dynamic_torch_index_select_negative.mlir"
+    "dynamic_torch_index_select_scalar.mlir"
+    "dynamic_torch_index_select_vector.mlir"
+    "i1_inlined_constant.mlir"
+    "layernorm.mlir"
+    "linalg_ops.mlir"
+    "lowering_config.mlir"
+    "pack_pad_transpose_1x9_into_2x4x8x4_issue_12546.mlir"
+    "reduction_broadcast_elementwise.mlir"
+    "scalar_computation.mlir"
+    "softmax.mlir"
+    "strided_slice.mlir"
+    "transpose.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "stablehlo"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_regression_tosa_llvm-cpu_tsan
+  SRCS
+    "linalg_quantized_matmul_vs_linalg_matmul.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  INPUT_TYPE
+    "tosa"
+  COMPILER_FLAGS
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    disable_demote_f64_to_f32_tsan
+  SRCS
+    "disable_demote_f64_to_f32.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "-iree-opt-demote-f64-to-f32=false"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    aggressive_fusion_test_tsan
+  SRCS
+    "softmax.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-flow-fuse-multi-use"
+    "--iree-llvmcpu-link-embedded=false"
+    "--iree-llvmcpu-sanitize=thread"
+)
+
+endif(IREE_ENABLE_TSAN)
