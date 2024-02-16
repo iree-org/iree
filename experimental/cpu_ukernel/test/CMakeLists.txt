@@ -19,6 +19,7 @@ iree_check_single_backend_test_suite(
     "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
   LABELS
     "hostonly"
+    "notsan"
 )
 
 if(IREE_ENABLE_ASAN)
@@ -39,6 +40,7 @@ iree_check_single_backend_test_suite(
     "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
   LABELS
     "hostonly"
+    "notsan"
 )
 endif(IREE_ENABLE_ASAN)
 

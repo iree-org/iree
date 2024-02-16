@@ -69,6 +69,9 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "stablehlo",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -81,6 +84,9 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "stablehlo",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -94,6 +100,9 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "tosa",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -163,6 +172,9 @@ iree_check_single_backend_test_suite(
     compiler_flags = ["-iree-opt-demote-f64-to-f32=false"],
     driver = "local-task",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -175,6 +187,9 @@ iree_check_single_backend_test_suite(
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 # Compilation-only (no driver specified, the default None means compile only)

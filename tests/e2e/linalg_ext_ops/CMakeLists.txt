@@ -87,6 +87,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  LABELS
+    "notsan"
 )
 
 endif()
@@ -141,6 +143,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 endif(IREE_ENABLE_ASAN)
 

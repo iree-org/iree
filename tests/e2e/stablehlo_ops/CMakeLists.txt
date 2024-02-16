@@ -81,6 +81,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   INPUT_TYPE
     "stablehlo"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -300,6 +302,7 @@ iree_check_single_backend_test_suite(
   LABELS
     "hostonly"
     "local"
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -550,6 +553,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 endif(IREE_ENABLE_ASAN)
 

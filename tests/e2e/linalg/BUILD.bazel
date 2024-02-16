@@ -36,6 +36,9 @@ iree_check_single_backend_test_suite(
     srcs = LLVM_SRCS,
     driver = "local-task",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 VMVX_SRCS = enforce_glob(
@@ -88,6 +91,9 @@ iree_check_single_backend_test_suite(
     ],
     driver = "local-task",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(

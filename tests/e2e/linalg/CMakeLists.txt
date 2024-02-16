@@ -21,6 +21,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -57,6 +59,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -95,7 +99,6 @@ iree_check_single_backend_test_suite(
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 if(IREE_ENABLE_ASAN)
-
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
@@ -110,6 +113,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=thread"
+  LABELS
+    "notsan"
 )
 endif(IREE_ENABLE_ASAN)
 

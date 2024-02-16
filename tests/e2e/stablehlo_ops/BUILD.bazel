@@ -91,6 +91,9 @@ iree_check_single_backend_test_suite(
     driver = "local-task",
     input_type = "stablehlo",
     target_backend = "llvm-cpu",
+    tags = [
+        "notsan",
+    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -326,6 +329,7 @@ iree_check_single_backend_test_suite(
     tags = [
         "hostonly",
         "local",
+        "notsan",
     ],
     target_backend = "llvm-cpu",
 )

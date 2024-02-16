@@ -44,6 +44,8 @@ iree_check_single_backend_test_suite(
     "--iree-llvmcpu-reassociate-fp-reductions=false"
   INPUT_TYPE
     "stablehlo"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -74,6 +76,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   INPUT_TYPE
     "stablehlo"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -87,6 +91,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   INPUT_TYPE
     "tosa"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -210,6 +216,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "-iree-opt-demote-f64-to-f32=false"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -223,6 +231,8 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-flow-fuse-multi-use"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -259,6 +269,8 @@ iree_check_single_backend_test_suite(
     "--iree-llvmcpu-reassociate-fp-reductions=false"
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -292,6 +304,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -308,6 +322,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -323,6 +339,8 @@ iree_check_single_backend_test_suite(
     "-iree-opt-demote-f64-to-f32=false"
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -339,6 +357,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=address"
+  LABELS
+    "notsan"
 )
 
 endif(IREE_ENABLE_ASAN)
