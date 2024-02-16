@@ -101,7 +101,7 @@ iree_check_single_backend_test_suite(
 if(IREE_ENABLE_ASAN)
 iree_check_single_backend_test_suite(
   NAME
-    check_llvm-cpu_local-task
+    check_llvm-cpu_local-task_asan
   SRCS
     "conv2d.mlir"
     "f32_to_i4.mlir"
@@ -121,7 +121,7 @@ endif(IREE_ENABLE_ASAN)
 if(IREE_ENABLE_TSAN)
 iree_check_single_backend_test_suite(
   NAME
-    check_winograd_llvm-cpu_local-task
+    check_winograd_llvm-cpu_local-task_tsan
   SRCS
     "conv2d.mlir"
   TARGET_BACKEND

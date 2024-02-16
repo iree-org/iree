@@ -146,7 +146,7 @@ iree_check_single_backend_test_suite(
   LABELS
     "notsan"
 )
-endif(IREE_ENABLE_ASAN)
+endif()
 
 if(NOT EMSCRIPTEN AND IREE_ENABLE_TSAN)
 iree_check_single_backend_test_suite(
@@ -168,4 +168,4 @@ iree_check_single_backend_test_suite(
     "--iree-llvmcpu-link-embedded=false"
     "--iree-llvmcpu-sanitize=thread"
 )
-endif(IREE_ENABLE_TSAN)
+endif()
