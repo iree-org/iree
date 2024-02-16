@@ -6,8 +6,7 @@ module attributes { transform.with_named_sequence } {
       // Step 1. Find the fill, matmul and generic ops
       // ===========================================================================
       %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-      %matmul = transform.structured.match ops{["linalg.generic"]}
-                  attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
+      %matmul = transform.structured.match ops{["linalg.matmul_transpose_b"]}
                   in %variant_op : (!transform.any_op) -> !transform.any_op
       %generic = transform.structured.match ops{["linalg.generic"]}
                   attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>]}
