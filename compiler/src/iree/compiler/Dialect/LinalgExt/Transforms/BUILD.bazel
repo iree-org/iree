@@ -48,6 +48,7 @@ iree_compiler_cc_library(
     deps = [
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:AffineDialect",

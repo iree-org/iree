@@ -71,6 +71,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC
 )
 
