@@ -26,7 +26,7 @@ namespace {
 ///
 /// A.T = transpose(A)
 /// B.T = transpose(B)
-/// C.T = A.T @ B.T
+/// C.T = B.T @ A.T
 /// C = transpose(C.T)
 ///
 /// This is useful when the "@" instruction that the hardware lowers to
@@ -45,7 +45,7 @@ namespace {
 ///
 /// To fix this, we can apply this transformation on the first matrix:
 ///
-/// C.T (L.T) = A.T (L) @ B (L.T)
+/// C.T (L.T) = B.T (L) @ A (L.T)
 /// C   (L)   = transpose C.T (L.T)
 /// E   (L.T) = C (L)  @ D (L.T)
 ///            ^^^^^
@@ -123,6 +123,19 @@ struct AMDGPUPrepareForChainedMatmulPass
   ///
   /// matmul_transpose_b(B, A) = matmul_transpose_b_swapped(B, A).T
   ///
+  /// For the sake of completeness, we also show that this does not hold
+  /// for normal matmul:
+  ///
+  /// def matmul(A, B):
+  ///   C = A @ B
+  ///   return C
+  ///
+  /// def matmul_swapped(A, B):
+  ///  A.T = transpose(A)
+  ///  B.T = transpose(B)
+  ///  C.T = B.T @ A.T
+  ///  C   = transpose(C.T)
+  ///
   /// TODO: This check applies more generally when one of the operands in the
   /// function is transposed compared to what "@" expects.
   bool isOperandSwapInvariant(vector::ContractionOp contractOp) const {
@@ -142,6 +155,10 @@ struct AMDGPUPrepareForChainedMatmulPass
   /// A chained matmul is one where the lhs of the candidate matrix
   /// is a result of another matmul (a matmul lies in the backward slice of lhs
   /// of the first matmul).
+  ///
+  /// TODO: This definition of a chained matmul is crude. We should actually be
+  /// checking if the layout of the result of the first matmul is transposed
+  /// to that expected by the second matmul.
   FailureOr<vector::ContractionOp>
   getTransitiveMatmulParent(vector::ContractionOp contractOp) const {
     SetVector<Operation *> backwardSlice;
@@ -183,7 +200,7 @@ struct AMDGPUPrepareForChainedMatmulPass
     });
 
     IRRewriter rewriter(funcOp.getContext());
-    for (auto candidate : matmulCandidates) {
+    for (vector::ContractionOp candidate : matmulCandidates) {
       FailureOr<vector::ContractionOp> maybeChainedParent =
           getTransitiveMatmulParent(candidate);
       if (failed(maybeChainedParent)) {
