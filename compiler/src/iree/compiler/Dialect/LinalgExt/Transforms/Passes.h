@@ -14,14 +14,11 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 class ConversionTarget;
 class TypeConverter;
 
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
 // Marker used as attribute name in generated Linalg rewriting transformations.
 struct LinalgTransforms {
   static const StringLiteral kLinalgTransformMarker;
@@ -147,9 +144,6 @@ const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
 void registerPasses();
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_

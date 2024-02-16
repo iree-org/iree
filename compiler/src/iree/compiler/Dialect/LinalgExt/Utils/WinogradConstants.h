@@ -7,11 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
-namespace Winograd {
+namespace mlir::iree_compiler::IREE::LinalgExt::Winograd {
 
 // This file contains the Winograd constant matrices for different
 // output tile sizes
@@ -82,9 +78,5 @@ const float A_6x6_3x3[] = {
 
 // clang-format on
 
-} // namespace Winograd
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt::Winograd
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_

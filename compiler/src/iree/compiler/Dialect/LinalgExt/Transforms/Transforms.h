@@ -9,22 +9,13 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace scf {
-class ForOp;
-class ForallOp;
-} // namespace scf
-namespace linalg {
-class LinalgOp;
-}
-
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Pattern to rewrite a scf::ForallOp to the async dialect.
 struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
@@ -147,9 +138,6 @@ struct LinalgPromotionPattern : public LinalgBasePromotionPattern {
       : LinalgBasePromotionPattern(opName, context, options, f, benefit) {}
 };
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_

@@ -22,11 +22,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
-
+namespace mlir::iree_compiler::IREE::LinalgExt {
 namespace {
 
 static void computeLoopParams(SmallVectorImpl<Value> &lbs,
@@ -558,7 +554,4 @@ createTileAndDecomposeWinogradTransformPass() {
   return std::make_unique<TileAndDecomposeWinogradTransformPass>();
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt

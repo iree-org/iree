@@ -11,13 +11,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
-using namespace mlir;
-namespace IREE = mlir::iree_compiler::IREE;
-
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 // Marker used as attribute name in generated Linalg rewriting transformations.
 const StringLiteral LinalgTransforms::kLinalgTransformMarker =
@@ -100,11 +94,6 @@ namespace detail {
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc" // IWYU pragma: export
 } // namespace detail
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+void registerPasses() { IREE::LinalgExt::detail::registerPasses(); }
 
-void IREE::LinalgExt::registerPasses() {
-  IREE::LinalgExt::detail::registerPasses();
-}
+} // namespace mlir::iree_compiler::IREE::LinalgExt

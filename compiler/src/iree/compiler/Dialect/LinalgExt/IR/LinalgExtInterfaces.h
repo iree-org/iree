@@ -15,10 +15,7 @@
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 class LinalgExtOp;
 
 namespace detail {
@@ -30,9 +27,6 @@ LogicalResult verifyLinalgExtOpInterface(Operation *op);
 /// Include the generated interface declarations.
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h.inc" // IWYU pragma: export
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTINTERFACES_H_

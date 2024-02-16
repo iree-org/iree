@@ -12,10 +12,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = v.getType().cast<ShapedType>();
@@ -95,7 +92,4 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
   return result;
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt

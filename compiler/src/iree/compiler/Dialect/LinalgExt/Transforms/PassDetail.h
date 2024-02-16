@@ -13,18 +13,12 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 #define GEN_PASS_CLASSES
 
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc" // IWYU pragma: keep
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_TRANSFORMS_PASS_DETAIL_H_

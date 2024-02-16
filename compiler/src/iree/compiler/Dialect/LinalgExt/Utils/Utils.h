@@ -13,10 +13,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
@@ -91,8 +88,5 @@ static void permute(SmallVectorImpl<T> &vector) {
   }
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

@@ -25,10 +25,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 static inline int index(int y, int x, int dimy, int dimx) {
   return (x + dimx * y);
@@ -456,7 +453,4 @@ std::unique_ptr<Pass> createConvertConv2DToWinogradPass() {
   return std::make_unique<ConvertConv2DToWinogradPass>();
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt
