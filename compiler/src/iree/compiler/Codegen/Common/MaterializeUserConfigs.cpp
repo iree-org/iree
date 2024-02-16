@@ -25,24 +25,46 @@
 
 namespace mlir::iree_compiler {
 
-llvm::cl::opt<std::string> clCodegenTransformDialectStrategyName(
-    "iree-codegen-use-transform-dialect-strategy",
-    llvm::cl::desc(
-        "Broadcasts the given transform dialect strategy specification to all "
-        "dispatches. The specification is a symbol reference to load from a"
-        "library of transform specs (@library_call)"),
-    llvm::cl::init(""));
-
 llvm::cl::opt<std::string> clCodegenTransformDialectLibraryFileName(
     "iree-codegen-transform-dialect-library",
     llvm::cl::desc(
         "File path to a module containing a library of transform dialect"
-        "strategies"),
+        "strategies. Can be suffixed with the name of a transform sequence"
+        "within the library to run as preprocessing per executable variant."
+        "This is specified as <file-path>@<sequence-name>. If not specified,"
+        "this will default to `__kernel_config`."),
     llvm::cl::init(""));
 
 namespace {
 
 static const char kTranslationInfoAttrName[] = "translation_info";
+
+enum StrategyRunResult {
+  Success = 0,
+  NotFound = 1,
+  Failed = 2,
+};
+
+static StrategyRunResult
+runTransformConfigurationStrategy(Operation *payloadRoot,
+                                  StringRef entryPointName,
+                                  ModuleOp &transformLibrary) {
+  /// If we have a symbol, verify the existence of the symbol within the
+  /// transform library.
+  Operation *entryPoint = transform::detail::findTransformEntryPoint(
+      payloadRoot, transformLibrary, entryPointName);
+  if (!entryPoint) {
+    return StrategyRunResult::NotFound;
+  }
+
+  transform::TransformOptions options;
+  if (failed(transform::applyTransformNamedSequence(
+          payloadRoot, entryPoint, transformLibrary,
+          options.enableExpensiveChecks(true)))) {
+    return StrategyRunResult::Failed;
+  }
+  return StrategyRunResult::Success;
+}
 
 struct MaterializeUserConfigsPass
     : public MaterializeUserConfigsBase<MaterializeUserConfigsPass> {
@@ -57,42 +79,73 @@ struct MaterializeUserConfigsPass
         getAllEntryPoints(moduleOp);
     MLIRContext *context = moduleOp.getContext();
 
+    // Parse the file path and kernel config strategy from flags. There are
+    // two possible usage flows for transform dialect libraries.
+    //   1. Use `__kernel_config` to match and annotate variants with the
+    //      strategy to use. This could either be a transform dialect strategy
+    //      or any other IREE codegen pipeline.
+    //
+    //   2. Use the configuration strategy to do codegen directly. At the end of
+    //      the strategy, the variant needs to be annotated with
+    //      "translation_info" = #iree_codegen.translation_info<None>
+    SmallVector<StringRef, 2> parts;
+    llvm::SplitString(llvm::StringRef(clCodegenTransformDialectLibraryFileName),
+                      parts, "@");
+    if (parts.size() > 2) {
+      variantOp.emitError()
+          << "Invalid transform library path and sequence name "
+          << clCodegenTransformDialectLibraryFileName;
+      return signalPassFailure();
+    }
+    bool hasTransformLibrary = !parts.empty();
+
+    std::string libraryFileName;
+    if (hasTransformLibrary) {
+      if (parts[0].empty()) {
+        variantOp.emitError() << "Cannot specify an empty library path";
+        return signalPassFailure();
+      }
+      libraryFileName = parts[0];
+    }
+
+    std::string entrySequenceName;
+    // Check if the user specified a custom entry point name.
+    if (parts.size() == 2) {
+      if (parts[1].empty()) {
+        variantOp.emitError() << "Cannot specify an empty sequence name";
+        return signalPassFailure();
+      }
+      entrySequenceName = parts[1];
+    } else {
+      entrySequenceName = "__kernel_config";
+    }
+
     LDBG("MaterializeUserConfigsPass on variant: " << variantOp);
     std::optional<ModuleOp> transformLibrary = std::nullopt;
-    if (!clCodegenTransformDialectLibraryFileName.empty()) {
+    if (hasTransformLibrary) {
       auto dialect =
           context->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
-      auto maybeTransformLibrary = dialect->getOrLoadTransformLibraryModule(
-          clCodegenTransformDialectLibraryFileName);
+      auto maybeTransformLibrary =
+          dialect->getOrLoadTransformLibraryModule(libraryFileName);
       if (failed(maybeTransformLibrary)) {
-        variantOp.emitError() << "failed to load transform library module: "
-                              << clCodegenTransformDialectLibraryFileName;
+        variantOp.emitError()
+            << "failed to load transform library module: " << libraryFileName;
         return signalPassFailure();
       }
       transformLibrary = *maybeTransformLibrary;
-      LDBG("--found transform library @"
-           << clCodegenTransformDialectLibraryFileName);
-    }
+      LDBG("--found transform library @" << libraryFileName);
 
-    IREE::Codegen::DispatchLoweringPassPipeline tdPipeline =
-        IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen;
-    std::optional<IREE::Codegen::TranslationInfoAttr> clTranslationInfo;
-    // Here we always set the pipeline strategy to transform dialect if the
-    // flag is non-empty to ensure we pick the right lowering pipeline in the
-    // event a strategy symbol is defined.
-    if (!clCodegenTransformDialectLibraryFileName.empty() ||
-        !clCodegenTransformDialectStrategyName.empty()) {
-      StringRef strategyName =
-          (clCodegenTransformDialectStrategyName.empty())
-              ? StringRef(
-                    transform::TransformDialect::kTransformEntryPointSymbolName)
-              : clCodegenTransformDialectStrategyName;
-      clTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          context, tdPipeline,
-          /*codegenSpec=*/
-          SymbolRefAttr::get(context, llvm::StringRef(strategyName)),
-          /*configuration=*/DictionaryAttr());
-      LDBG("--clTranslationInfo: " << clTranslationInfo);
+      auto runResult = runTransformConfigurationStrategy(
+          variantOp, entrySequenceName, *transformLibrary);
+      if (runResult == StrategyRunResult::NotFound) {
+        variantOp.emitError() << "transform kernel config strategy `"
+                              << entrySequenceName << " not found";
+        return signalPassFailure();
+      } else if (runResult == StrategyRunResult::Failed) {
+        variantOp.emitError() << "transform kernel config strategy `"
+                              << entrySequenceName << "` failed to apply";
+        return signalPassFailure();
+      }
     }
 
     LDBG("--start iterating over: "
@@ -103,6 +156,11 @@ struct MaterializeUserConfigsPass
     for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       auto exportOp = exportOps.lookup(funcOp.getName());
       if (!exportOp) {
+        continue;
+      }
+
+      /// Nothing to do if the export already has a config.
+      if (getTranslationInfo(exportOp)) {
         continue;
       }
 
@@ -120,48 +178,14 @@ struct MaterializeUserConfigsPass
         moduleOp.emitOpError("error in setting user configuration");
         return signalPassFailure();
       }
-
-      /// Let user configs take priority over the global strategy flag.
-      if (IREE::Codegen::TranslationInfoAttr exportedTranslationInfo =
-              getTranslationInfo(exportOp)) {
-        if (translationInfo) {
-          /// Currently codegen is rooted on the variant, meaning every entry
-          /// must go through the same codegen pipeline. For multi-targeting we
-          /// will want to have multiple functions per variant, as well as
-          /// multiple exports per variant, meaning eventually the nesting of
-          /// the translation pipeline will need to change to the function, or
-          /// we'll need another level of module op nesting.
-          if (exportedTranslationInfo != translationInfo.value()) {
-            moduleOp.emitOpError(
-                "unhandled compilation of entry point functions with different "
-                "translation info");
-            return signalPassFailure();
-          }
-        } else {
-          translationInfo = exportedTranslationInfo;
-        }
-      } else {
-        if (translationInfo && translationInfo != clTranslationInfo) {
-          moduleOp.emitOpError(
-              "unhandled compilation of entry point functions with translation "
-              "info optionality");
-          return signalPassFailure();
-        }
-        if (clTranslationInfo) {
-          translationInfo = clTranslationInfo;
-          if (failed(setTranslationInfo(funcOp, translationInfo.value()))) {
-            moduleOp.emitOpError("failed to set command line translation info");
-            return signalPassFailure();
-          }
-        }
-      }
     }
 
     LDBG("--guaranteed unique translationInfo: " << translationInfo);
     /// We only need to resolve symbols for transform dialect based strategies.
     if (!translationInfo ||
         translationInfo.value().getDispatchLoweringPassPipeline() !=
-            tdPipeline) {
+            IREE::Codegen::DispatchLoweringPassPipeline::
+                TransformDialectCodegen) {
       return;
     }
 
