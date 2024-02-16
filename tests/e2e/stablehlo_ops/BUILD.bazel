@@ -90,10 +90,10 @@ iree_check_single_backend_test_suite(
     ),
     driver = "local-task",
     input_type = "stablehlo",
-    target_backend = "llvm-cpu",
     tags = [
         "notsan",
     ],
+    target_backend = "llvm-cpu",
 )
 
 iree_check_single_backend_test_suite(
