@@ -366,8 +366,8 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   auto updateIvs = ivs.drop_front(1);
 
   int64_t offset = starts.size() - updateIvs.size();
-  for (auto it : llvm::enumerate(updateIvs)) {
-    starts[it.index() + offset] = it.value();
+  for (const auto &[idx, iv] : llvm::enumerate(updateIvs)) {
+    starts[idx + offset] = iv;
   }
 
   ArrayRef<int64_t> dimMap = getDimensionMap();
@@ -435,8 +435,7 @@ LogicalResult SortOp::verify() {
   }
 
   ArrayRef<int64_t> shape = getOperandShape();
-  for (auto indexedOperand : llvm::enumerate(getOutputs())) {
-    int index = indexedOperand.index();
+  for (const auto &[index, operand] : llvm::enumerate(getOutputs())) {
     auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
       return op->emitOpError("expected operand ")
@@ -502,10 +501,10 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Value> tiledOperands(getOutputs().size());
-  for (auto en : llvm::enumerate(getOutputs())) {
-    tiledOperands[en.index()] =
-        getSlice(builder, getLoc(), en.value(), offsets, sizes, strides);
-    assert(tiledOperands[en.index()] && "failed to get slice of operand");
+  for (const auto &[idx, output] : llvm::enumerate(getOutputs())) {
+    tiledOperands[idx] =
+        getSlice(builder, getLoc(), output, offsets, sizes, strides);
+    assert(tiledOperands[idx] && "failed to get slice of operand");
   }
   SmallVector<Type, 4> resultTypes;
   if (getNumResults()) {
@@ -651,12 +650,13 @@ SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (auto en : llvm::enumerate(getOperandShape().drop_back())) {
+  for (const auto &[idx, val] :
+       llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
-    if (ShapedType::isDynamic(en.value())) {
-      size = getDimValue(builder, loc, getReal(), en.index());
+    if (ShapedType::isDynamic(val)) {
+      size = getDimValue(builder, loc, getReal(), idx);
     } else {
-      size = builder.create<arith::ConstantIndexOp>(loc, en.value());
+      size = builder.create<arith::ConstantIndexOp>(loc, val);
     }
     res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
   }
@@ -1324,11 +1324,10 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = values();
-  for (auto dim : llvm::enumerate(getInputType().getShape())) {
-    loopBounds[dim.index()].offset = zero;
-    loopBounds[dim.index()].size =
-        getDimValue(builder, loc, source, dim.index());
-    loopBounds[dim.index()].stride = one;
+  for (const auto &[idx, val] : llvm::enumerate(getInputType().getShape())) {
+    loopBounds[idx].offset = zero;
+    loopBounds[idx].size = getDimValue(builder, loc, source, idx);
+    loopBounds[idx].stride = one;
   }
   return loopBounds;
 }
@@ -1756,16 +1755,15 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
     ArrayRef<int64_t> sourceShape, ArrayRef<int64_t> innerTileSizes,
     ArrayRef<int64_t> innerDimsPos, ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
-  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    if (ShapedType::isDynamic(resultShape[tiledDim.value()])) {
+  for (const auto &[idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
+    if (ShapedType::isDynamic(resultShape[tiledDim])) {
       continue;
     }
-    if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
-      resultShape[tiledDim.value()] = ShapedType::kDynamic;
+    if (ShapedType::isDynamic(innerTileSizes[idx])) {
+      resultShape[tiledDim] = ShapedType::kDynamic;
       continue;
     }
-    resultShape[tiledDim.value()] = ceilDiv(resultShape[tiledDim.value()],
-                                            innerTileSizes[tiledDim.index()]);
+    resultShape[tiledDim] = ceilDiv(resultShape[tiledDim], innerTileSizes[idx]);
   }
 
   // Swap tile loops if outer_dims_perm is available.
@@ -1785,10 +1783,9 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   AffineExpr s0, s1;
   bindSymbols(builder.getContext(), s0, s1);
   AffineExpr ceilDivExpr = s0.ceilDiv(s1);
-  for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    resultDims[tiledDim.value()] = affine::makeComposedFoldedAffineApply(
-        builder, loc, ceilDivExpr,
-        {resultDims[tiledDim.value()], innerTileSizes[tiledDim.index()]});
+  for (const auto &[idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
+    resultDims[tiledDim] = affine::makeComposedFoldedAffineApply(
+        builder, loc, ceilDivExpr, {resultDims[tiledDim], innerTileSizes[idx]});
   }
   if (!outerDimsPerm.empty()) {
     resultDims =
@@ -2598,9 +2595,9 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   ArrayRef<int64_t> queryShape = getQueryType().getShape();
   SmallVector<OpFoldResult> queryOutputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
-  for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
-    queryOutputOffsets[info.index()] = std::get<0>(info.value());
-    queryOutputSizes[info.index()] = std::get<1>(info.value());
+  for (const auto &[idx, info] : llvm::enumerate(llvm::zip(offsets, sizes))) {
+    queryOutputOffsets[idx] = std::get<0>(info);
+    queryOutputSizes[idx] = std::get<1>(info);
   }
 
   SmallVector<OpFoldResult> keyValueOffsets(getKeyRank(), zero);
@@ -2642,9 +2639,9 @@ LogicalResult AttentionOp::getResultTilePosition(
     resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
     resultOffsets =
         SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-    for (auto info : llvm::enumerate(llvm::zip(offsets, sizes))) {
-      resultOffsets[info.index()] = std::get<0>(info.value());
-      resultSizes[info.index()] = std::get<1>(info.value());
+    for (const auto &[idx, info] : llvm::enumerate(llvm::zip(offsets, sizes))) {
+      resultOffsets[idx] = std::get<0>(info);
+      resultSizes[idx] = std::get<1>(info);
     }
     return success();
   }

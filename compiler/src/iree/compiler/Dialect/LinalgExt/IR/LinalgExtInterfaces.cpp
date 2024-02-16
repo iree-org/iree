@@ -31,11 +31,11 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
 template <typename Ty, typename DimOpTy>
 static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
                          SmallVector<OpFoldResult> &dimVals) {
-  for (auto dim : llvm::enumerate(t.getShape())) {
-    if (ShapedType::isDynamic(dim.value())) {
-      dimVals.push_back(b.create<DimOpTy>(loc, v, dim.index()).getResult());
+  for (const auto &[idx, val] : llvm::enumerate(t.getShape())) {
+    if (ShapedType::isDynamic(val)) {
+      dimVals.push_back(b.create<DimOpTy>(loc, v, idx).getResult());
     } else {
-      dimVals.push_back(b.getIndexAttr(dim.value()));
+      dimVals.push_back(b.getIndexAttr(val));
     }
   }
 }
