@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_UTILS_H_
-#define IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_UTILS_H_
+#ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
+#define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -95,4 +95,4 @@ static void permute(SmallVectorImpl<T> &vector) {
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
-#endif // IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_UTILS_H_
+#endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_

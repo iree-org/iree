@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
-#define IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
+#ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
+#define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
 
 namespace mlir {
 namespace iree_compiler {
@@ -87,4 +87,4 @@ const float A_6x6_3x3[] = {
 } // namespace IREE
 } // namespace iree_compiler
 } // namespace mlir
-#endif // IREE_DIALECTS_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
+#endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_WINOGRAD_CONSTANTS_H_
