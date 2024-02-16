@@ -6,10 +6,10 @@
 
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #define DEBUG_TYPE "vmvx-kernel-dispatch"

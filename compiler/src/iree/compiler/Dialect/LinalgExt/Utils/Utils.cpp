@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 
+#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
-#include "llvm/ADT/TypeSwitch.h"
 
 namespace mlir {
 namespace iree_compiler {
