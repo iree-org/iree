@@ -113,13 +113,14 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
   assert(
       sourceShape.size() == limitShape.size() &&
       "expected source shape rank, and limit of the shape to have same rank");
-  return llvm::all_of(
-      llvm::zip(sourceShape, limitShape), [](std::tuple<int64_t, int64_t> it) {
-        int64_t sourceExtent = std::get<0>(it);
-        int64_t limit = std::get<1>(it);
-        return ShapedType::isDynamic(sourceExtent) ||
-               ShapedType::isDynamic(limit) || sourceExtent <= limit;
-      });
+  return llvm::all_of(llvm::zip_equal(sourceShape, limitShape),
+                      [](std::tuple<int64_t, int64_t> it) {
+                        int64_t sourceExtent = std::get<0>(it);
+                        int64_t limit = std::get<1>(it);
+                        return ShapedType::isDynamic(sourceExtent) ||
+                               ShapedType::isDynamic(limit) ||
+                               sourceExtent <= limit;
+                      });
 }
 
 //===----------------------------------------------------------------------===//
@@ -185,9 +186,9 @@ LogicalResult ScatterOp::verify() {
   // original tensor.
   int64_t fullSliceDims = originalType.getRank() - indexDepth;
   for (auto it :
-       llvm::zip(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
-                 llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
-                                     updateType.getRank()))) {
+       llvm::zip_equal(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
+                       llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
+                                           updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
     if (!originalType.isDynamicDim(originalDim) &&
@@ -200,7 +201,7 @@ LogicalResult ScatterOp::verify() {
 
   // Check that the remaining update indices do not exceed the update length.
   int64_t insertDims = originalType.getRank() - updateType.getRank() + 1;
-  for (auto it : llvm::zip(
+  for (auto it : llvm::zip_equal(
            llvm::seq<unsigned>(insertDims, indexDepth),
            llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
     int64_t originalDim = std::get<0>(it);
@@ -562,7 +563,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
     OpBuilder::InsertionGuard guard(b);
     auto &block = region.front();
     b.setInsertionPointToEnd(&block);
-    for (auto it : llvm::zip(srcBlock.getArguments(), sortBlkArgs)) {
+    for (auto it : llvm::zip_equal(srcBlock.getArguments(), sortBlkArgs)) {
       bvm.map(std::get<0>(it), std::get<1>(it));
     }
     for (auto &blockOp : srcBlock.without_terminator()) {
@@ -889,7 +890,7 @@ LogicalResult ScanOp::verify() {
       expectedAccumulatorShape.push_back(inputShapes[i]);
     }
   }
-  if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
+  if (llvm::any_of(llvm::zip_equal(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
                      return !ShapedType::isDynamic(std::get<0>(s)) &&
                             !ShapedType::isDynamic(std::get<1>(s)) &&
@@ -904,7 +905,7 @@ LogicalResult ScanOp::verify() {
   if (inputShapes.size() != outputShapes.size()) {
     return op->emitOpError("expected input/output to have identical ranks");
   }
-  if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
+  if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
                      return !ShapedType::isDynamic(std::get<0>(s)) &&
                             !ShapedType::isDynamic(std::get<1>(s)) &&
@@ -997,7 +998,7 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
     OpBuilder::InsertionGuard guard(b);
     auto &block = region.front();
     b.setInsertionPointToEnd(&block);
-    for (auto it : llvm::zip(srcBlock.getArguments(), scanBlkArgs)) {
+    for (auto it : llvm::zip_equal(srcBlock.getArguments(), scanBlkArgs)) {
       bvm.map(std::get<0>(it), std::get<1>(it));
     }
     for (auto &blockOp : srcBlock.without_terminator()) {
@@ -1112,7 +1113,7 @@ LogicalResult ReverseOp::verify() {
   if (inputShapes.size() != outputShapes.size()) {
     return op->emitOpError("expexted input/output to have identical ranks");
   }
-  if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
+  if (llvm::any_of(llvm::zip_equal(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
                      return !ShapedType::isDynamic(std::get<0>(s)) &&
                             !ShapedType::isDynamic(std::get<1>(s)) &&
@@ -1289,16 +1290,17 @@ LogicalResult TopkOp::verify() {
   }
   // Input shape must match the output shape except for the dimension()
   uint64_t dim = getDimension();
-  if (!llvm::all_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
-                                              outputValuesType.getShape())),
-                    [dim](auto e) {
-                      if (e.index() == dim) {
-                        return true;
-                      }
-                      std::tuple<int64_t, int64_t> s = e.value();
-                      return succeeded(verifyCompatibleShape(std::get<0>(s),
-                                                             std::get<1>(s)));
-                    })) {
+  if (!llvm::all_of(
+          llvm::enumerate(llvm::zip_equal(inputValuesType.getShape(),
+                                          outputValuesType.getShape())),
+          [dim](auto e) {
+            if (e.index() == dim) {
+              return true;
+            }
+            std::tuple<int64_t, int64_t> s = e.value();
+            return succeeded(
+                verifyCompatibleShape(std::get<0>(s), std::get<1>(s)));
+          })) {
     return op->emitOpError("incompatible input/output shapes");
   }
   // Check region compatibility
@@ -1392,10 +1394,10 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
     b.setInsertionPointToEnd(&scfFor.getRegion().front());
     SmallVector<Value> forwardValues{loopCarryValues[0], kValue};
     SmallVector<Value> reverseValues{kValue, loopCarryValues[0]};
-    for (auto it : llvm::zip(srcBlock.getArguments(), forwardValues)) {
+    for (auto it : llvm::zip_equal(srcBlock.getArguments(), forwardValues)) {
       bvmF.map(std::get<0>(it), std::get<1>(it));
     }
-    for (auto it : llvm::zip(srcBlock.getArguments(), reverseValues)) {
+    for (auto it : llvm::zip_equal(srcBlock.getArguments(), reverseValues)) {
       bvmR.map(std::get<0>(it), std::get<1>(it));
     }
     for (auto &blockOp : srcBlock.without_terminator()) {
@@ -1659,8 +1661,8 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
            << expectedPackedType << ", got " << packedType;
   }
   if (!llvm::all_of(
-          llvm::zip(packedType.getShape().take_back(mixedTiles.size()),
-                    mixedTiles),
+          llvm::zip_equal(packedType.getShape().take_back(mixedTiles.size()),
+                          mixedTiles),
           [](std::tuple<int64_t, OpFoldResult> it) {
             std::optional<int64_t> constTileSize =
                 getConstantIntValue(std::get<1>(it));
@@ -2595,7 +2597,8 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   ArrayRef<int64_t> queryShape = getQueryType().getShape();
   SmallVector<OpFoldResult> queryOutputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
-  for (const auto &[idx, info] : llvm::enumerate(llvm::zip(offsets, sizes))) {
+  for (const auto &[idx, info] :
+       llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
     queryOutputOffsets[idx] = std::get<0>(info);
     queryOutputSizes[idx] = std::get<1>(info);
   }
@@ -2639,7 +2642,8 @@ LogicalResult AttentionOp::getResultTilePosition(
     resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
     resultOffsets =
         SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-    for (const auto &[idx, info] : llvm::enumerate(llvm::zip(offsets, sizes))) {
+    for (const auto &[idx, info] :
+         llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
       resultOffsets[idx] = std::get<0>(info);
       resultSizes[idx] = std::get<1>(info);
     }
