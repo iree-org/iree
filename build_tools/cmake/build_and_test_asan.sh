@@ -53,22 +53,26 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
     "-DIREE_BUILD_MICROBENCHMARKS=${build_microbenchmarks_ON_OFF}"
   )
 
-  echo "*** Configuring CMake (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+  echo "::group::Configuring CMake (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
   echo "------------------"
   "${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
+  echo "::endgroup::"
 
-  echo "*** Building all (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+  echo "::group::Building all (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
   echo "------------------"
   "${CMAKE_BIN?}" --build "${BUILD_DIR?}" -- -k 0
+  echo "::endgroup::"
 
-  echo "*** Building test deps (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+  echo "::group::Building test deps (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
   echo "------------------"
   "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-test-deps -- -k 0
+  echo "::endgroup::"
 
   if [[ "${build_microbenchmarks_ON_OFF}" == "ON" ]]; then
-    echo "*** Building microbenchmark suites (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+    echo "::group::Building microbenchmark suites (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
     echo "------------------"
     "${CMAKE_BIN?}" --build "${BUILD_DIR?}" --target iree-microbenchmark-suites -- -k 0
+    echo "::endgroup::"
   fi
 
   if (( IREE_USE_CCACHE == 1 )); then
@@ -126,17 +130,19 @@ for asan_in_bytecode_modules_ON_OFF in OFF ON; do
 
   pushd ${BUILD_DIR?}
 
-  echo "*** Running main project ctests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) *******"
+  echo "::group::Running main project ctests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
   echo "------------------"
   ctest \
     --timeout 900 \
     --output-on-failure \
     --no-tests=error \
     --label-exclude "${label_exclude_regex}"
+    echo "::endgroup::"
 
-  echo "*** Running llvm-external-projects tests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF}) ***"
+  echo "::group::Running llvm-external-projects tests (IREE_BYTECODE_MODULE_ENABLE_ASAN=${asan_in_bytecode_modules_ON_OFF})"
   echo "------------------"
   cmake --build . --target check-iree-dialects -- -k 0
+  echo "::endgroup::"
 
   popd
 done
