@@ -41,8 +41,9 @@ namespace IREE = mlir::iree_compiler::IREE;
 //===----------------------------------------------------------------------===//
 
 static Type getComplexElementTypeOrSelf(Type ty) {
-  if (auto complex = dyn_cast_or_null<ComplexType>(ty))
+  if (auto complex = dyn_cast_or_null<ComplexType>(ty)) {
     return complex.getElementType();
+  }
   return ty;
 }
 
@@ -91,13 +92,16 @@ static Value getSlice(OpBuilder &b, Location loc, Value source,
 /// rank). c) the number of elements in `dimsPos` is > than `rank`.
 static bool isInvalid(ArrayRef<int64_t> dimsPos, int64_t rank) {
   // early exit.
-  if (dimsPos.size() > rank)
+  if (dimsPos.size() > rank) {
     return true;
+  }
   DenseSet<int64_t> uniqued;
-  for (int64_t dim : dimsPos)
+  for (int64_t dim : dimsPos) {
     uniqued.insert(dim);
-  if (dimsPos.size() != uniqued.size())
+  }
+  if (dimsPos.size() != uniqued.size()) {
     return true;
+  }
   return llvm::any_of(
       dimsPos, [rank](int64_t dimPos) { return dimPos < 0 || dimPos >= rank; });
 }
@@ -151,8 +155,9 @@ LogicalResult ScatterOp::verify() {
   }
 
   auto originalType = getOriginalType();
-  if (isInvalid(dimMap, originalType.getRank()))
+  if (isInvalid(dimMap, originalType.getRank())) {
     return op->emitOpError("dimension map is invalid");
+  }
 
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
@@ -880,8 +885,9 @@ LogicalResult ScanOp::verify() {
   }
   SmallVector<int64_t> expectedAccumulatorShape;
   for (int i = 0; i < inputType.getRank(); i++) {
-    if (i != getDimension())
+    if (i != getDimension()) {
       expectedAccumulatorShape.push_back(inputShapes[i]);
+    }
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -952,8 +958,9 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   bool isInclusive = getInclusive();
   SmallVector<Value> accIndices;
   for (int i = 0; i < indices.size(); i++) {
-    if (i != scanDim)
+    if (i != scanDim) {
       accIndices.push_back(indices[i]);
+    }
   }
 
   auto scfIf = b.create<scf::IfOp>(
@@ -1272,12 +1279,14 @@ LogicalResult TopkOp::verify() {
   // Input indicies and values must have the same shape.
   if (auto inputIndices = indices()) {
     auto inputIndicesType = inputIndices->getType().cast<ShapedType>();
-    if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType)))
+    if (failed(verifyCompatibleShape(inputValuesType, inputIndicesType))) {
       return op->emitOpError("input indices/values shape must match");
+    }
   }
   // Output indicies and values must have the same shape.
-  if (failed(verifyCompatibleShape(outputValuesType, outputIndicesType)))
+  if (failed(verifyCompatibleShape(outputValuesType, outputIndicesType))) {
     return op->emitOpError("output indices/values shape must match");
+  }
   // Input shape must match the output shape except for the dimension()
   uint64_t dim = getDimension();
   if (!llvm::all_of(llvm::enumerate(llvm::zip(inputValuesType.getShape(),
@@ -1533,10 +1542,11 @@ static SmallVector<OpFoldResult> getMixedTiles(OpTy op) {
   unsigned dynamicValIndex = 0;
   OpBuilder b(op.getContext());
   for (int64_t tileSize : op.getStaticInnerTiles()) {
-    if (!ShapedType::isDynamic(tileSize))
+    if (!ShapedType::isDynamic(tileSize)) {
       mixedInnerTiles.push_back(b.getIndexAttr(tileSize));
-    else
+    } else {
       mixedInnerTiles.push_back(op.getInnerTiles()[dynamicValIndex++]);
+    }
   }
   return mixedInnerTiles;
 }
@@ -1566,8 +1576,9 @@ static DenseMap<int64_t, OpFoldResult> getDimAndTileMapping(OpTy op) {
   assert(tiles.size() == dimsToBlock.size() &&
          "tiles must match indices of dimension to block");
   // bind the dimension with the tile factor.
-  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size()))
+  for (auto i : llvm::seq<int64_t>(0, dimsToBlock.size())) {
     dimAndTileMapping[dimsToBlock[i]] = tiles[i];
+  }
   return dimAndTileMapping;
 }
 
@@ -1607,12 +1618,15 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   ArrayRef<int64_t> outerDimPerm = packOrUnPack.getOuterDimsPerm();
   // Verify tiles. Make sure each provided tile is non-zero.
   SmallVector<OpFoldResult> mixedTiles = packOrUnPack.getMixedTiles();
-  if (hasZeros(mixedTiles))
+  if (hasZeros(mixedTiles)) {
     return op->emitError("invalid tile factor");
-  if (isInvalid(innerDimsPos, unpackedRank))
+  }
+  if (isInvalid(innerDimsPos, unpackedRank)) {
     return op->emitError("invalid inner_dims_pos vector");
-  if (isInvalid(outerDimPerm, unpackedRank))
+  }
+  if (isInvalid(outerDimPerm, unpackedRank)) {
     return op->emitError("invalid outer_dims_perm vector");
+  }
   if (mixedTiles.size() != innerDimsPos.size()) {
     return op->emitError(
         "blocking factors must equal the number of dimensions to block");
@@ -1691,8 +1705,9 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>())
+  if (outputType.isa<RankedTensorType>()) {
     resultType.push_back(outputType);
+  }
   build(builder, state, resultType, source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -1742,8 +1757,9 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
     ArrayRef<int64_t> innerDimsPos, ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
   for (auto tiledDim : llvm::enumerate(innerDimsPos)) {
-    if (ShapedType::isDynamic(resultShape[tiledDim.value()]))
+    if (ShapedType::isDynamic(resultShape[tiledDim.value()])) {
       continue;
+    }
     if (ShapedType::isDynamic(innerTileSizes[tiledDim.index()])) {
       resultShape[tiledDim.value()] = ShapedType::kDynamic;
       continue;
@@ -1790,8 +1806,9 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   // use dispatchIndexOpFoldResults on the result, and rely on exact number of
   // dynamic dims returned by that.
   for (unsigned i = 0; i < resultDims.size(); ++i) {
-    if (!ShapedType::isDynamic(resultTypeShape[i]))
+    if (!ShapedType::isDynamic(resultTypeShape[i])) {
       continue;
+    }
     resultDims[i] =
         getValueOrCreateConstantIndexOp(builder, loc, resultDims[i]);
   }
@@ -1925,8 +1942,9 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   // non data-tile dimensions.
   SmallVector<Value> ivVec = llvm::to_vector(ivs);
   ReifiedRankedShapedTypeDims outputShape;
-  if (failed(reifyResultShapes(builder, outputShape)))
+  if (failed(reifyResultShapes(builder, outputShape))) {
     return getOperation()->emitOpError("failed to reify result shape");
+  }
   if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
     return getOperation()->emitOpError(
                "expected shape of one result value of rank")
@@ -1983,8 +2001,9 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>())
+  if (outputType.isa<RankedTensorType>()) {
     resultType.push_back(outputType);
+  }
   build(builder, state, resultType, source, output,
         outerDimsPerm.empty() ? nullptr
                               : builder.getDenseI64ArrayAttr(outerDimsPerm),
@@ -2011,8 +2030,9 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
          "number of ivs must match the rank of the output tensor");
   OpBuilder::InsertionGuard g(builder);
   ReifiedRankedShapedTypeDims outputShape;
-  if (failed(reifyResultShapes(builder, outputShape)))
+  if (failed(reifyResultShapes(builder, outputShape))) {
     return getOperation()->emitOpError("failed to reify result shape");
+  }
   if (outputShape.size() != 1 || outputShape[0].size() != getOutputRank()) {
     return getOperation()->emitOpError(
                "expected shape of one result value of rank")
@@ -2444,10 +2464,11 @@ static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
                                     ShapedType shapedType,
                                     unsigned rankToCompareWith) {
   unsigned opRank = shapedType.getRank();
-  if (opRank != rankToCompareWith)
+  if (opRank != rankToCompareWith) {
     return op->emitOpError("expected ")
            << operandName << " to have rank " << rankToCompareWith
            << " but found " << opRank;
+  }
   return success();
 }
 
@@ -2468,14 +2489,18 @@ LogicalResult AttentionOp::verify() {
   Type keyElementType = keyType.getElementType();
   Type valueElementType = valueType.getElementType();
   Type outputElementType = outputType.getElementType();
-  if (failed(checkShapeRank(op, "query", queryType, rankToCompareWith)))
+  if (failed(checkShapeRank(op, "query", queryType, rankToCompareWith))) {
     return failure();
-  if (failed(checkShapeRank(op, "key", keyType, rankToCompareWith)))
+  }
+  if (failed(checkShapeRank(op, "key", keyType, rankToCompareWith))) {
     return failure();
-  if (failed(checkShapeRank(op, "value", valueType, rankToCompareWith)))
+  }
+  if (failed(checkShapeRank(op, "value", valueType, rankToCompareWith))) {
     return failure();
-  if (failed(checkShapeRank(op, "output", outputType, rankToCompareWith)))
+  }
+  if (failed(checkShapeRank(op, "output", outputType, rankToCompareWith))) {
     return failure();
+  }
   ArrayRef<int64_t> queryShape = queryType.getShape();
   ArrayRef<int64_t> keyShape = keyType.getShape();
   ArrayRef<int64_t> outputShape = outputType.getShape();
@@ -2485,41 +2510,53 @@ LogicalResult AttentionOp::verify() {
     size_t lastIdx = valueShape.size() - 1;
     std::swap(valueShape[lastIdx - 1], valueShape[lastIdx]);
   }
-  if (failed(verifyCompatibleShape(keyShape, valueShape)))
+  if (failed(verifyCompatibleShape(keyShape, valueShape))) {
     return op->emitOpError("incompatible value shape");
-  if (failed(verifyCompatibleShape(queryShape, outputShape)))
+  }
+  if (failed(verifyCompatibleShape(queryShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
-  if (queryElementType != keyElementType || keyElementType != valueElementType)
+  }
+  if (queryElementType != keyElementType ||
+      keyElementType != valueElementType) {
     return op->emitOpError(
         "element types of (Q)uery, (K)ey and (V)value should be same");
+  }
   if (numOperands == 4) {
     // Vanilla attention.
-    if (queryElementType != outputElementType)
+    if (queryElementType != outputElementType) {
       return op->emitOpError("expected element type for Output ")
              << queryElementType << "but found " << outputElementType
              << " instead";
-    if (keyShape[2] != queryShape[2])
+    }
+    if (keyShape[2] != queryShape[2]) {
       return op->emitOpError("query and key head dimension mismatch");
+    }
   }
   if (numOperands == 6) {
     // Tiled/Flash attention.
     ShapedType maxType = *getMaxType();
     ShapedType sumType = *getSumType();
-    if (failed(checkShapeRank(op, "max", maxType, 1)))
+    if (failed(checkShapeRank(op, "max", maxType, 1))) {
       return failure();
-    if (failed(checkShapeRank(op, "sum", sumType, 1)))
+    }
+    if (failed(checkShapeRank(op, "sum", sumType, 1))) {
       return failure();
+    }
     Type maxElementType = maxType.getElementType();
     Type sumElementType = sumType.getElementType();
     ArrayRef<int64_t> maxShape = maxType.getShape();
     ArrayRef<int64_t> sumShape = sumType.getShape();
-    if (outputElementType != maxElementType || maxElementType != sumElementType)
+    if (outputElementType != maxElementType ||
+        maxElementType != sumElementType) {
       return op->emitOpError(
           "element types of tiled output, max and sum should be same");
-    if (failed(verifyCompatibleShape(maxShape, sumShape)))
+    }
+    if (failed(verifyCompatibleShape(maxShape, sumShape))) {
       return op->emitOpError("incompatible sum shape");
-    if (maxShape[0] != queryShape[0])
+    }
+    if (maxShape[0] != queryShape[0]) {
       return op->emitOpError("Query and max dimension-0 mismatch");
+    }
   }
   return success();
 }
@@ -2658,10 +2695,12 @@ LogicalResult SetEncodingOp::verify() {
         "result of set_encoding op expected to have a valid tensor encoding");
   }
   // The source and result must have the same rank.
-  if (getResultType().getRank() != getSourceType().getRank())
+  if (getResultType().getRank() != getSourceType().getRank()) {
     return emitOpError("cannot change the rank of the tensor");
-  if (failed(verifyCompatibleShape(getResultType(), getSourceType())))
+  }
+  if (failed(verifyCompatibleShape(getResultType(), getSourceType()))) {
     return emitOpError("expected to preserve the logical shape of the tensor");
+  }
   return success();
 }
 
@@ -2688,10 +2727,12 @@ LogicalResult UnsetEncodingOp::verify() {
         "source of unset_encoding op expected to have a valid tensor encoding");
   }
   // The source and result must have the same rank.
-  if (getResultType().getRank() != getSourceType().getRank())
+  if (getResultType().getRank() != getSourceType().getRank()) {
     return emitOpError("cannot change the rank of the tensor");
-  if (failed(verifyCompatibleShape(getResultType(), getSourceType())))
+  }
+  if (failed(verifyCompatibleShape(getResultType(), getSourceType()))) {
     return emitOpError("expected to preserve the logical shape of the tensor");
+  }
   return success();
 }
 

@@ -28,19 +28,22 @@ FailureOr<Operation *>
 mlir::iree_compiler::IREE::LinalgExt::ForallOpToAsyncRewriter::
     returningMatchAndRewrite(scf::ForallOp forallOp,
                              PatternRewriter &rewriter) const {
-  if (forallOp.getNumResults() > 0)
+  if (forallOp.getNumResults() > 0) {
     return forallOp->emitError("only bufferized scf.forall lowers to async");
+  }
 
-  if (forallOp.getRank() > 1)
+  if (forallOp.getRank() > 1) {
     return forallOp->emitError(
         "only single-dimension scf.forall lowers to async");
+  }
 
   // Only consider the top level ForallOp op and skip if it already
   // contains an ExecuteOp.
   if (forallOp->getParentOfType<scf::ForallOp>() ||
       llvm::any_of(forallOp.getBody()->getOperations(),
-                   [](Operation &op) { return isa<async::ExecuteOp>(&op); }))
+                   [](Operation &op) { return isa<async::ExecuteOp>(&op); })) {
     return failure();
+  }
 
   auto *ctx = forallOp.getContext();
   Location loc = forallOp.getLoc();

@@ -110,20 +110,23 @@ template <typename T>
 static bool hasValidStridesAndDilations(Operation *op) {
   auto convOp = dyn_cast<T>(op);
   // Check that strides = 1
-  if (!hasAllOneValues(convOp.getStrides()))
+  if (!hasAllOneValues(convOp.getStrides())) {
     return false;
+  }
 
   // Check that dilations = 1
-  if (!hasAllOneValues(convOp.getDilations()))
+  if (!hasAllOneValues(convOp.getDilations())) {
     return false;
+  }
   return true;
 }
 
 static bool isValidConv2d(Operation *op, bool &isNchw) {
   isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
   const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
-  if (!(isNchw || isNhwc))
+  if (!(isNchw || isNhwc)) {
     return false;
+  }
   return (isNchw ? hasValidStridesAndDilations<linalg::Conv2DNchwFchwOp>(op)
                  : hasValidStridesAndDilations<linalg::Conv2DNhwcHwcfOp>(op));
 }
@@ -139,21 +142,25 @@ public:
                                 PatternRewriter &rewriter) const override {
 
     bool isNchw;
-    if (!isValidConv2d(convOp, isNchw))
+    if (!isValidConv2d(convOp, isNchw)) {
       return failure();
+    }
 
     // Check that kernel size = 3x3
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
-    if (!kernelType)
+    if (!kernelType) {
       return failure();
+    }
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
-    if (kernelShape.size() != 4)
+    if (kernelShape.size() != 4) {
       return failure();
+    }
     const int64_t kh = isNchw ? kernelShape[2] : kernelShape[0];
     const int64_t kw = isNchw ? kernelShape[3] : kernelShape[1];
-    if ((kh != 3) || (kw != 3))
+    if ((kh != 3) || (kw != 3)) {
       return failure();
+    }
     const int64_t kernelSize = kh;
     const int64_t inputTileSize = outputTileSize + kernelSize - 1;
 
@@ -288,18 +295,21 @@ public:
                                 PatternRewriter &rewriter) const override {
 
     bool isNchw;
-    if (!isValidConv2d(convOp, isNchw))
+    if (!isValidConv2d(convOp, isNchw)) {
       return failure();
+    }
 
     // Check that kernel has been constant folded (by validating rank = 3)
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
-    if (!kernelType)
+    if (!kernelType) {
       return failure();
+    }
     Type elementType = kernelType.getElementType();
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
-    if (kernelShape.size() != 3)
+    if (kernelShape.size() != 3) {
       return failure();
+    }
 
     const int64_t kernelSize = 3;
     const int64_t inputTileSize = outputTileSize + kernelSize - 1;
@@ -310,11 +320,13 @@ public:
         loc, rewriter.getZeroAttr(elementType));
     Value input = convOp.getInputs()[0];
     auto inputType = input.getType().cast<ShapedType>();
-    if (!inputType)
+    if (!inputType) {
       return failure();
+    }
     SmallVector<int64_t> inputShape(inputType.getShape());
-    if (llvm::any_of(inputShape, ShapedType::isDynamic))
+    if (llvm::any_of(inputShape, ShapedType::isDynamic)) {
       return failure();
+    }
     assert(inputShape.size() == 4);
     if (isNchw) {
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(inputShape);

@@ -59,14 +59,16 @@ SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
   // ]
   // where key is the idx in dims_pos while value its position in dims_pos.
   DenseMap<int64_t, int64_t> dimsAndPosMapping;
-  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++)
+  for (int64_t dimsIdx = 0, end = dimsPos.size(); dimsIdx < end; dimsIdx++) {
     dimsAndPosMapping[dimsPos[dimsIdx]] = dimsIdx;
+  }
 
   // Scan the position in order and insert the value in the map
   // to compute the interchange vector.
   for (int64_t dimsIdx = 0; dimsIdx < rank; dimsIdx++) {
-    if (dimsAndPosMapping.count(dimsIdx))
+    if (dimsAndPosMapping.count(dimsIdx)) {
       interchangeVector.push_back(dimsAndPosMapping[dimsIdx]);
+    }
   }
   return interchangeVector;
 }
@@ -84,10 +86,11 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
   SmallVector<int64_t> result;
   for (auto o : ofrs) {
     // Have to do this first, as getConstantIntValue special-cases constants.
-    if (o.dyn_cast<Value>())
+    if (o.dyn_cast<Value>()) {
       result.push_back(ShapedType::kDynamic);
-    else
+    } else {
       result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));
+    }
   }
   return result;
 }

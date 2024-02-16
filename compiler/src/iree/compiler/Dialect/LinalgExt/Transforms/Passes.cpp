@@ -34,23 +34,26 @@ LinalgTransformationFilter::LinalgTransformationFilter(
     std::optional<StringAttr> replacement)
     : matchDisjunction(matchDisjunction.begin(), matchDisjunction.end()),
       replacement(replacement), matchByDefault(false) {
-  if (f)
+  if (f) {
     filters.push_back(f);
+  }
 }
 
 LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
                                                          Operation *op) const {
   if (llvm::any_of(filters,
-                   [&](const FilterFunction &f) { return failed(f(op)); }))
+                   [&](const FilterFunction &f) { return failed(f(op)); })) {
     return failure();
+  }
 
   auto attr = op->template getAttrOfType<StringAttr>(
       LinalgTransforms::kLinalgTransformMarker);
 
   if (!attr) {
     // 1. Has no filter case and matchDisjunction is empty.
-    if (matchDisjunction.empty() || matchByDefault)
+    if (matchDisjunction.empty() || matchByDefault) {
       return success();
+    }
 
     // 2. Has no filter but was expecting a filter.
     return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
@@ -60,9 +63,11 @@ LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
   }
 
   // 4. Match explicit filter.
-  for (auto filter : matchDisjunction)
-    if (attr.getValue() == filter)
+  for (auto filter : matchDisjunction) {
+    if (attr.getValue() == filter) {
       return success();
+    }
+  }
 
   // 5. Fail to match.
   return rewriter.notifyMatchFailure(op, [&](Diagnostic &diag) {
@@ -73,16 +78,18 @@ LogicalResult LinalgTransformationFilter::checkAndNotify(RewriterBase &rewriter,
 
 void LinalgTransformationFilter::replaceLinalgTransformationFilter(
     RewriterBase &rewriter, Operation *op) const {
-  if (replacement.has_value())
+  if (replacement.has_value()) {
     op->setAttr(LinalgTransforms::kLinalgTransformMarker, replacement.value());
-  else
+  } else {
     op->removeAttr(
         rewriter.getStringAttr(LinalgTransforms::kLinalgTransformMarker));
+  }
 }
 
 bool LinalgTransformationFilter::hasReplacementFilter(Operation *op) const {
-  if (!replacement)
+  if (!replacement) {
     return false;
+  }
   auto attr = op->getAttr(LinalgTransforms::kLinalgTransformMarker)
                   .dyn_cast<StringAttr>();
   return attr && attr == *replacement;

@@ -39,8 +39,9 @@ DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
   SimplePatternRewriter patternRewriter(target);
   FailureOr<Operation *> result =
       pattern.returningMatchAndRewrite(target, patternRewriter);
-  if (failed(result))
+  if (failed(result)) {
     return emitDefaultDefiniteFailure(target);
+  }
   results.push_back(*result);
   return DiagnosedSilenceableFailure::success();
 }
@@ -55,8 +56,9 @@ DiagnosedSilenceableFailure LinalgExt::TileAttentionOp::applyToOne(
     transform::TransformState &state) {
   SmallVector<Operation *> ops;
   LinalgExt::tileAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops)
+  for (auto op : ops) {
     results.push_back(op);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -66,8 +68,9 @@ DiagnosedSilenceableFailure LinalgExt::DecomposeTiledAttentionOp::applyToOne(
     transform::TransformState &state) {
   SmallVector<Operation *> ops;
   LinalgExt::decomposeTiledAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops)
+  for (auto op : ops) {
     results.push_back(op);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 

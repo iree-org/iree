@@ -68,8 +68,9 @@ static bool padTensor(Location loc, OpOperand *operand,
       needsPad = true;
     }
   }
-  if (!needsPad)
+  if (!needsPad) {
     return false;
+  }
 
   auto resultType = RankedTensorType::get(newStaticDims, type.getElementType());
   Value zeroConstant = builder.create<arith::ConstantOp>(

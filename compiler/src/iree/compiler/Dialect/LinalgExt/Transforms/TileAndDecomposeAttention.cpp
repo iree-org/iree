@@ -204,8 +204,9 @@ static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
   SmallVector<OpFoldResult> offsets(keyShape.size(), zero);
   sizes[1] = keyValueTileLength;
   sizes[2] = headDimension;
-  if (!ivs.empty())
+  if (!ivs.empty()) {
     offsets[1] = ivs[0];
+  }
   SmallVector<int64_t> tensorShape{keyShape[1], keyShape[2]};
   if (swapLastTwoDims) {
     std::swap(sizes[1], sizes[2]);
@@ -228,8 +229,9 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
       builder, loc, lbs, ubs, steps, args,
       [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
           ValueRange iterArgs) -> scf::ValueVector { return iterArgs; });
-  for (scf::ForOp loop : loopNest.loops)
+  for (scf::ForOp loop : loopNest.loops) {
     ivs.push_back(loop.getInductionVar());
+  }
   return loopNest;
 }
 
@@ -519,8 +521,9 @@ void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                std::optional<uint64_t> tileSize) {
   IREE::LinalgExt::AttentionOp tiledAttentionOp =
       tileAttention(attnOp, ops, rewriter, tileSize);
-  if (onlyTile)
+  if (onlyTile) {
     return;
+  }
   decomposeTiledAttention(tiledAttentionOp, ops, rewriter, tileSize);
 }
 
@@ -592,11 +595,13 @@ void TileAndDecomposeAttentionPass::runOnOperation() {
   MLIRContext *context = &getContext();
   IRRewriter rewriter(context);
   std::optional<uint64_t> optionalTileSize{std::nullopt};
-  if (tileSize.hasValue())
+  if (tileSize.hasValue()) {
     optionalTileSize = tileSize.getValue();
-  if (failed(
-          reifyAttentionTransform(getOperation(), onlyTile, optionalTileSize)))
+  }
+  if (failed(reifyAttentionTransform(getOperation(), onlyTile,
+                                     optionalTileSize))) {
     return signalPassFailure();
+  }
 }
 
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass() {

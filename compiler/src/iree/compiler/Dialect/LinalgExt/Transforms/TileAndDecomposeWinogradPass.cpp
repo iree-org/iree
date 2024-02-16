@@ -289,8 +289,9 @@ LogicalResult tileAndDecomposeWinogradInputTransformOp(
                                           tiledWinogradInputTransformOp))) {
     return failure();
   }
-  if (onlyTile)
+  if (onlyTile) {
     return success();
+  }
   return decomposeTiledWinogradInputTransformOp(tiledWinogradInputTransformOp,
                                                 rewriter);
 }
@@ -493,8 +494,9 @@ LogicalResult tileAndDecomposeWinogradOutputTransformOp(
                                            tiledWinogradOutputTransformOp))) {
     return failure();
   }
-  if (onlyTile)
+  if (onlyTile) {
     return success();
+  }
   return decomposeTiledWinogradOutputTransformOp(tiledWinogradOutputTransformOp,
                                                  rewriter);
 }
@@ -530,22 +532,25 @@ LogicalResult reifyWinogradTransform(mlir::FunctionOpInterface funcOp,
   LogicalResult resultOfTransformations = success();
   funcOp.walk([&](WinogradInputTransformOp inputOp) {
     if (failed(tileAndDecomposeWinogradInputTransformOp(inputOp, rewriter,
-                                                        onlyTile)))
+                                                        onlyTile))) {
       resultOfTransformations = failure();
+    }
     return WalkResult::advance();
   });
   funcOp.walk([&](WinogradOutputTransformOp outputOp) {
     if (failed(tileAndDecomposeWinogradOutputTransformOp(outputOp, rewriter,
-                                                         onlyTile)))
+                                                         onlyTile))) {
       resultOfTransformations = failure();
+    }
     return WalkResult::advance();
   });
   return resultOfTransformations;
 }
 
 void TileAndDecomposeWinogradTransformPass::runOnOperation() {
-  if (failed(reifyWinogradTransform(getOperation(), onlyTile)))
+  if (failed(reifyWinogradTransform(getOperation(), onlyTile))) {
     return signalPassFailure();
+  }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
