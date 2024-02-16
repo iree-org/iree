@@ -24,8 +24,6 @@
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 
-#define DEBUG_TYPE "iree-gpu-nested-layout-distribution"
-
 namespace mlir::iree_compiler {
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
