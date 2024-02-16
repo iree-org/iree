@@ -741,7 +741,7 @@ jobs:
 
   build_benchmark_tools:
     needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_benchmark_tools')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_benchmark_tools') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_benchmark_tools.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -752,7 +752,7 @@ jobs:
 
   build_e2e_test_artifacts:
     needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_e2e_test_artifacts')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_e2e_test_artifacts') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_e2e_test_artifacts.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -1028,11 +1028,9 @@ jobs:
       - cross_compile_and_test
       - build_and_test_android
 
-      # Artifacts for e2e testing and benchmarking
+      # Benchmark pipeline
       - build_benchmark_tools
       - build_e2e_test_artifacts
-
-      # Benchmark pipeline
       - compilation_benchmarks
       - execution_benchmarks
       - process_benchmark_results
