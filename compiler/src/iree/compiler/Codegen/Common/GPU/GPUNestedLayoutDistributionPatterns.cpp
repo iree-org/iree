@@ -153,19 +153,6 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
   return tileShape;
 }
 
-static SmallVector<int64_t>
-getThreadVectorTileShape(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
-  SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
-  // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
-  // the subvector of a thread, we need indices in all BATCH rank dimensions to
-  // have tile size 1.
-  for (int i = 0, e = rank; i < e; ++i) {
-    tileShape[i] = 1;
-  }
-  return tileShape;
-}
-
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.
 static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
