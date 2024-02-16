@@ -138,7 +138,7 @@ func.func @hoist_pack_op_with_zero_trip_check_in_outer_loop(%bound : i32, %src :
 
 // -----
 
-func.func @not_hoist_loop_variant_and_non_leaf_alone(%bound : i32, %src : tensor<100x100xf32>) -> tensor<100x100xf32> {
+func.func @not_hoist_loop_variant(%bound : i32, %src : tensor<100x100xf32>) -> tensor<100x100xf32> {
   %cst0 = arith.constant 0 : i32
   %cst1 = arith.constant 1 : i32
   %pad0 = arith.constant 0.0 : f32
@@ -159,14 +159,13 @@ func.func @not_hoist_loop_variant_and_non_leaf_alone(%bound : i32, %src : tensor
   return %res#1 : tensor<100x100xf32>
 }
 
-// CHECK-LABEL: func.func @not_hoist_loop_variant_and_non_leaf_alone
-// CHECK-NOT:     tensor.empty
+// CHECK-LABEL: func.func @not_hoist_loop_variant
+// CHECK-DAG:     %[[PACK_DEST:.+]] = tensor.empty
+// CHECK-DAG:     %[[UNPACK_DEST:.+]] = tensor.empty
 // CHECK-NOT:     tensor.pack
 // CHECK-NOT:     tensor.unpack
 // CHECK:         scf.while
-// CHECK:           %[[PACK_DEST:.+]] = tensor.empty
 // CHECK:           tensor.pack {{.*}} into %[[PACK_DEST]]
-// CHECK:           %[[UNPACK_DEST:.+]] = tensor.empty
 // CHECK:           tensor.unpack {{.*}} into %[[UNPACK_DEST]]
 // CHECK:           scf.condition
 // CHECK:         } do {
