@@ -36,9 +36,6 @@ ContractKind inferContractKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeContract(MLIRContext *context, Value threadId)
-      : OpDistributionPattern(context), threadId(threadId) {}
-
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
@@ -255,15 +252,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                                   aCast, bCast, cCast);
     return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mfmaOp);
   }
-
-  Value threadId;
 };
 
 } // namespace
 
 void populateGPUDistributeNestedLayoutContractAMDGPUPatterns(
-    Value threadId, RewritePatternSet &patterns) {
-  patterns.add<DistributeContract>(patterns.getContext(), threadId);
+    RewritePatternSet &patterns) {
+  patterns.add<DistributeContract>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler

@@ -43,7 +43,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(Value threadId,
 // Adds patterns that distributes vector.contract ops with nested layout
 // annotations to amdgpu.mfma ops.
 void populateGPUDistributeNestedLayoutContractAMDGPUPatterns(
-    Value threadId, RewritePatternSet &patterns);
+    RewritePatternSet &patterns);
 
 void populateGPULayoutResolutionDistributionPatterns(
     RewritePatternSet &patterns);
