@@ -220,11 +220,11 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
 
       if (shared_memory_sizes_vec[i] > max_shared_memory) {
-        status =
-            iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                             "requested shared memory size of %u bytes "
-                             "larger than allowed size of %u bytes",
-                             shared_memory_sizes_vec[i], max_shared_memory);
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "function '%s' requested shared memory size of %u bytes larger "
+            "than allowed size of %u bytes",
+            entry_name, shared_memory_sizes_vec[i], max_shared_memory);
       } else {
         status = IREE_HIP_RESULT_TO_STATUS(
             symbols,
