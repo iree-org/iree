@@ -60,7 +60,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "::mlir::Type":$cType
   );
 
-  let extraClassDeclaration = [{
+  string baseExtraClassDeclaration = [{
     ::std::tuple<Type, Type, Type> getABCElementTypes() {
       return ::std::make_tuple(getAType(), getBType(), getCType());
     }
@@ -117,6 +117,10 @@ def IREEGPU_MFMA : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
   let builders = [
     AttrBuilder<(ins "MFMAIntrinsic":$intrinsic)>
   ];
+
+  let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
+    int64_t getBlockSize();
+  }]);
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
