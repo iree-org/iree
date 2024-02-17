@@ -137,6 +137,9 @@ static SmallVector<int64_t>
 getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
   int64_t rank = vectorLayout.getBatchOrder().size();
   SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
+  // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
+  // the subvector only containing elements, we need indices in all BATCH and
+  // OUTER (rank * 2) dimensions to have tile size 1.
   for (int i = 0, e = rank * 2; i < e; ++i) {
     tileShape[i] = 1;
   }
