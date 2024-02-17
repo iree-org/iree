@@ -77,6 +77,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     }
     // Get the storage vector types that each thread is in charge of.
     auto [aVectorType, bVectorType, cVectorType] = mfmaAttr.getABCVectorTypes();
+    // Get parameters for the amdgpu.mfma operation.
+    MFMAParameters mfmaParams;
+    std::tie(mfmaParams.m, mfmaParams.n, mfmaParams.k) = mfmaAttr.getMNKShape();
+    mfmaParams.blocks = mfmaAttr.getBlockSize();
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
     ContractKind contractKind =
@@ -174,9 +178,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
-        accSlice = computeMMA(rewriter, loc, lhsSlice, rhsSlice, accSlice,
-                              aVectorType, bVectorType, cVectorType,
-                              mfmaAttr.getIntrinsic().getValue());
+        accSlice = computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice,
+                              accSlice, aVectorType, bVectorType, cVectorType);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
                                                     resultBatchOffsets);
@@ -230,29 +233,25 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     return true;
   }
 
+  struct MFMAParameters {
+    uint32_t m = 0;
+    uint32_t n = 0;
+    uint32_t k = 0;
+    uint32_t blocks = 0;
+  };
+
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc, Value a, Value b, Value c,
-                   VectorType aType, VectorType bType, VectorType cType,
-                   IREE::GPU::MFMAIntrinsic intrinsic) const {
+  Value computeMMA(OpBuilder &builder, Location loc,
+                   const MFMAParameters &mfmaParams, Value a, Value b, Value c,
+                   VectorType aType, VectorType bType, VectorType cType) const {
     Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
     Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
     Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
 
-    uint32_t m = 0, n = 0, k = 0, blocks = 0;
-    switch (intrinsic) {
-    case IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32:
-      m = n = k = 16;
-      blocks = 1;
-      break;
-    case IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32:
-      m = n = 32;
-      k = 8;
-      blocks = 1;
-      break;
-    }
-    Value mfmaOp = builder.create<amdgpu::MFMAOp>(loc, cType, m, n, k, blocks,
-                                                  aCast, bCast, cCast);
+    Value mfmaOp = builder.create<amdgpu::MFMAOp>(
+        loc, cType, mfmaParams.m, mfmaParams.n, mfmaParams.k, mfmaParams.blocks,
+        aCast, bCast, cCast);
     return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mfmaOp);
   }
 };
