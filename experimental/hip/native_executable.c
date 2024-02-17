@@ -184,6 +184,11 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       symbols, hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
       "hipModuleLoadDataEx");
+  if (!iree_status_is_ok(status)) {
+    status = iree_status_annotate(
+        status,
+        IREE_SV("mismatched target chip? missing/wrong bitcode directory?"));
+  }
 
   // Query max optin shared memory per block - we'll use it to compare with
   // kernel usages.
