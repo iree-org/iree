@@ -685,8 +685,8 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   }];
 }
 
-def TestAMDGPUContractionDistribution :
-  Op<Transform_Dialect, "iree.test_amdgpu_contraction_distribution",
+def AMDGPUDistributeVectorsOp :
+  Op<Transform_Dialect, "iree.amdgpu_distribute_vectors",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface,

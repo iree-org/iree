@@ -1510,7 +1510,7 @@ public:
 };
 
 DiagnosedSilenceableFailure
-transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
+transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
@@ -1521,7 +1521,7 @@ transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
+void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
