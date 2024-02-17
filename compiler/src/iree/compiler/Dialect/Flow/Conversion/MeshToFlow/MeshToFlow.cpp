@@ -106,13 +106,14 @@ static SmallVector<Value> filterOutByIndex(ArrayRef<Value> values,
   return res;
 }
 
-static CollectiveReductionOp convertReductionKind(mesh::Partial reduction) {
+static CollectiveReductionOp
+convertReductionKind(mesh::ReductionKind reduction) {
   switch (reduction) {
-  case mesh::Partial::Max:
+  case mesh::ReductionKind::Max:
     return CollectiveReductionOp::ReductionMaximum;
-  case mesh::Partial::Min:
+  case mesh::ReductionKind::Min:
     return CollectiveReductionOp::ReductionMinimum;
-  case mesh::Partial::Sum:
+  case mesh::ReductionKind::Sum:
     return CollectiveReductionOp::ReductionSum;
   default:
     assert(false);
@@ -121,7 +122,7 @@ static CollectiveReductionOp convertReductionKind(mesh::Partial reduction) {
 }
 
 static CollectiveReductionOpAttr
-convertReductionKind(mesh::PartialAttr reduction) {
+convertReductionKind(mesh::ReductionKindAttr reduction) {
   return CollectiveReductionOpAttr::get(
       reduction.getContext(), convertReductionKind(reduction.getValue()));
 }
@@ -719,7 +720,7 @@ void populateMeshToFlowCollectivesPatterns(
                MeshReduceScatterToFlow, MeshProcessLinearIndexToFlow>(
       symbolTableCollection, useNamedDefaultChannels, patterns.getContext());
   mesh::populateFoldingPatterns(patterns, symbolTableCollection);
-  mesh::processMultiIndexOpLoweringPopulatePatterns(patterns,
+  mesh::populateProcessMultiIndexOpLoweringPatterns(patterns,
                                                     symbolTableCollection);
 }
 
