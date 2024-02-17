@@ -300,6 +300,24 @@ MFMAAttr MFMAAttr::get(MLIRContext *context, MFMAIntrinsic type) {
                    layout.cType);
 }
 
+std::tuple<VectorType, VectorType, VectorType>
+MFMAAttr::getABCVectorTypes() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
+    auto aType = VectorType::get({4}, getAType());
+    auto bType = VectorType::get({4}, getBType());
+    auto cType = VectorType::get({4}, getCType());
+    return std::make_tuple(aType, bType, cType);
+  }
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    auto aType = VectorType::get({4}, getAType());
+    auto bType = VectorType::get({4}, getBType());
+    auto cType = VectorType::get({4, 4}, getCType());
+    return std::make_tuple(aType, bType, cType);
+  }
+  }
+}
+
 FailureOr<std::tuple<VectorLayoutInterface, VectorLayoutInterface,
                      VectorLayoutInterface>>
 MFMAAttr::getContractionLayout(vector::ContractionOp contract) const {

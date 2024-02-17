@@ -47,6 +47,19 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns the vector types of the operands to the mma operation.
+        ```
+          C += A * B
+        ```
+        Each thread participating in the mma operation is responsible for
+        storing such shaped vectors in the registers.
+      }],
+      /*retTy=*/"::std::tuple<::mlir::VectorType, ::mlir::VectorType, ::mlir::VectorType>",
+      /*methodName=*/"getABCVectorTypes",
+      /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the vector layout for the A matrix of the mma operation
         ```
           C += A * B

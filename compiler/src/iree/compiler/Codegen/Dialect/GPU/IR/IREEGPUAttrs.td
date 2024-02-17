@@ -18,8 +18,9 @@ def IREEGPU_MmaArrayAttr : TypedArrayAttrBase<IREEGPU_MmaAttr,
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr,[
+  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr, [
     "getABCElementTypes",
+    "getABCVectorTypes",
     "getContractionLayout",
     "getMNKShape",
   ]>
@@ -48,7 +49,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
   }];
 
-    
+
   let parameters = (ins
     mmaintrinsic:$intrinsic,
     "int64_t":$mSize,
@@ -90,7 +91,7 @@ def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
     "Descriptor for different MFMA operations", [
       F16_16x16x16_F32,
       F16_32x32x8_F32,
-    ]>; 
+    ]>;
 
 def IREEGPU_MFMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MFMAIntrinsic, "mfma_intrinsic">;

@@ -76,6 +76,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing iree.amdgpu.mfma intrinsic attribute");
     }
+    auto [aVectorType, bVectorType, cVectorType] = mfmaAttr.getABCVectorTypes();
 
     ContractKind contractKind =
         inferContractKind(getContext(), contractOp.getIndexingMapsArray());
@@ -160,6 +161,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             loc, getDistributed(rewriter, contractOp.getRhs(), rhsLayout),
             rhsBatchOffsets);
         accSlice = computeMMA(rewriter, loc, lhsSlice, rhsSlice, accSlice,
+                              aVectorType, bVectorType, cVectorType,
                               mfmaAttr.getIntrinsic().getValue());
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
@@ -231,12 +233,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   }
 
   Value computeMMA(OpBuilder &builder, Location loc, Value a, Value b, Value c,
+                   VectorType aType, VectorType bType, VectorType cType,
                    IREE::GPU::MFMAIntrinsic intrinsic) const {
-    // TODO: query these types from the intrinsic attribute outside of this
-    // function.
-    VectorType aType = getMFMAVectorType(a);
-    VectorType bType = getMFMAVectorType(b);
-    VectorType cType = getMFMAVectorType(c);
     Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
     Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
     Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
