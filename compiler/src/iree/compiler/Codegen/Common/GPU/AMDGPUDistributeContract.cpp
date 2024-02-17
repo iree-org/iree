@@ -178,9 +178,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
-        accSlice =
-            computeMMA(rewriter, loc, lhsSlice, rhsSlice, accSlice, aVectorType,
-                       bVectorType, cVectorType, mfmaParams);
+        accSlice = computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice,
+                              accSlice, aVectorType, bVectorType, cVectorType);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
                                                     resultBatchOffsets);
@@ -243,9 +242,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc, Value a, Value b, Value c,
-                   VectorType aType, VectorType bType, VectorType cType,
-                   const MFMAParameters &mfmaParams) const {
+  Value computeMMA(OpBuilder &builder, Location loc,
+                   const MFMAParameters &mfmaParams, Value a, Value b, Value c,
+                   VectorType aType, VectorType bType, VectorType cType) const {
     Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
     Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
     Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
