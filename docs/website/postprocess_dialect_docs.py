@@ -75,7 +75,7 @@ def main(args):
         "HALLoader.md": "compiler/src/iree/compiler/Modules/HAL/Loader/IR",
         "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR",
         "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input",
-        "IREELinalgExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/LinalgExt/IR",
+        "IREELinalgExt.md": "compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "IREEVectorExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/VectorExt/IR",
         "Stream.md": "compiler/src/iree/compiler/Dialect/Stream/IR",
         "Util.md": "compiler/src/iree/compiler/Dialect/Util/IR",
