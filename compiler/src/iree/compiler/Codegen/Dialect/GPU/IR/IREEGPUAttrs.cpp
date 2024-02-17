@@ -316,6 +316,7 @@ MFMAAttr::getABCVectorTypes() const {
     return std::make_tuple(aType, bType, cType);
   }
   }
+  return std::make_tuple(VectorType{}, VectorType{}, VectorType{});
 }
 
 FailureOr<std::tuple<VectorLayoutInterface, VectorLayoutInterface,
