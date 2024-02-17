@@ -10,6 +10,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 #define DEBUG_TYPE "iree-amdgpu-distribute-contract"
 
@@ -19,18 +20,74 @@ namespace {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-enum class ContractKind { MK_KN_MN, UNKNOWN };
+// A class for querying information about a contract op.
+class ContractOpDetail {
+public:
+  enum class OpKind { MK_KN_MN, MK_NK_MN, UNKNOWN };
 
-// Gets the kind of a contract op with the given indexing |maps|.
-ContractKind inferContractKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
-  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [&](MapList m) { return AffineMap::inferFromExprList(m, ctx); };
-  AffineExpr m, n, k;
-  bindDims(ctx, m, n, k);
-  if (maps == infer({{m, k}, {k, n}, {m, n}}))
-    return ContractKind::MK_KN_MN;
-  return ContractKind::UNKNOWN;
-}
+  explicit ContractOpDetail(vector::ContractionOp op) {
+    opKind = inferOpKind(op.getContext(), op.getIndexingMapsArray());
+  }
+
+  OpKind getOpKind() const { return opKind; }
+
+  // Returns the (LHS M, RHS N) dimension index pair.
+  std::optional<std::pair<int, int>> getOperandMNIndex() const {
+    switch (opKind) {
+    case OpKind::MK_KN_MN:
+      return std::make_pair(0, 1);
+    case OpKind::MK_NK_MN:
+      return std::make_pair(0, 0);
+    case OpKind::UNKNOWN:
+      break;
+    }
+    return std::nullopt;
+  }
+
+  // Returns the (LHS K, RHS K) dimension index pair.
+  std::optional<std::pair<int, int>> getOperandKIndex() const {
+    switch (opKind) {
+    case OpKind::MK_KN_MN:
+      return std::make_pair(1, 0);
+    case OpKind::MK_NK_MN:
+      return std::make_pair(1, 1);
+    case OpKind::UNKNOWN:
+      break;
+    }
+    return std::nullopt;
+  }
+
+  // Returns the result (M, N) dimension index pair.
+  std::optional<std::pair<int, int>> getResultMNIndex() const {
+    switch (opKind) {
+    case OpKind::MK_KN_MN:
+    case OpKind::MK_NK_MN:
+      return std::make_pair(0, 1);
+    default:
+      break;
+    }
+    return std::nullopt;
+  }
+
+private:
+  // Gets the kind of a contract op with the given indexing |maps|.
+  OpKind inferOpKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
+    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+    auto infer = [&](MapList m) {
+      return AffineMap::inferFromExprList(m, ctx);
+    };
+    AffineExpr m, n, k;
+    bindDims(ctx, m, n, k);
+    if (maps == infer({{m, k}, {k, n}, {m, n}}))
+      return OpKind::MK_KN_MN;
+    if (maps == infer({{m, k}, {n, k}, {m, n}}))
+      return OpKind::MK_NK_MN;
+    return OpKind::UNKNOWN;
+  }
+
+private:
+  OpKind opKind = OpKind::UNKNOWN;
+};
 
 /// Distributes `vector.contract` ops with nested layouts.
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
@@ -83,9 +140,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     mfmaParams.blocks = mfmaAttr.getBlockSize();
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
-    ContractKind contractKind =
-        inferContractKind(getContext(), contractOp.getIndexingMapsArray());
-    if (contractKind == ContractKind::UNKNOWN) {
+    ContractOpDetail opDetail(contractOp);
+    if (opDetail.getOpKind() == ContractOpDetail::OpKind::UNKNOWN) {
       return rewriter.notifyMatchFailure(contractOp, "unknown contract kind");
     }
 
@@ -146,7 +202,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
       // Get the k batch size for LHS and RHS vector.
       std::optional<int64_t> kBatch =
-          getKBatchSize(contractKind, lhsLayout, rhsLayout);
+          getKBatchSize(opDetail, lhsLayout, rhsLayout);
       LLVM_DEBUG(llvm::dbgs() << "k batch size = " << kBatch << "\n");
       if (!kBatch) {
         return rewriter.notifyMatchFailure(contractOp,
@@ -156,15 +212,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       // Perform contraction by doing separate outer product with amdgpu.mfma
       // operation and accumulate to the same vector.
       for (int k = 0; k < kBatch; ++k) {
-        // Get the batch offsets for LHS and RHS. For the K dimension it's the
+        // Fills the batch offsets for LHS and RHS. For the K dimension it's the
         // induction variable; for the M/N dimension we need to extract from the
         // result batch offsets.
-        if (!getOperandBatchOffsets(contractKind, k, originalResultBatchOffsets,
-                                    resultLayout, lhsBatchOffsets,
-                                    rhsBatchOffsets, lhsLayout, rhsLayout)) {
-          return rewriter.notifyMatchFailure(
-              contractOp, "cannot deduce lhs/rhs batch offsets");
-        }
+        fillOperandBatchOffsets(opDetail, k, originalResultBatchOffsets,
+                                resultLayout, lhsBatchOffsets, rhsBatchOffsets,
+                                lhsLayout, rhsLayout);
         LLVM_DEBUG({
           llvm::dbgs() << "current lhs batch offsets: [";
           llvm::interleaveComma(lhsBatchOffsets, llvm::dbgs());
@@ -190,47 +243,41 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   }
 
   // Gets the batch size for matmul K dimensions.
-  std::optional<int64_t> getKBatchSize(ContractKind kind,
+  std::optional<int64_t> getKBatchSize(const ContractOpDetail &opDetail,
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
-    int64_t lhsKBatch = 0, rhsKBatch = 0;
-    if (kind == ContractKind::MK_KN_MN) {
-      lhsKBatch = lhsLayout.getBatchesPerSubgroup()[1];
-      rhsKBatch = rhsLayout.getBatchesPerSubgroup()[0];
-    } else {
-      return std::nullopt;
-    }
+    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
+    int64_t lhsKBatch = lhsLayout.getBatchesPerSubgroup()[lhsK];
+    int64_t rhsKBatch = rhsLayout.getBatchesPerSubgroup()[rhsK];
 
     if (lhsKBatch != rhsKBatch)
       return std::nullopt;
     return lhsKBatch;
   }
 
-  // Given a contract op's batch |resultOffsets|, gets its batch offsets for
+  // Given a contract op's batch |resultOffsets|, fills its batch offsets for
   // both LHS and RHS.
-  bool getOperandBatchOffsets(ContractKind kind, int64_t kOffset,
-                              ArrayRef<int64_t> resultOffsets,
-                              NestedLayoutAttr resultLayout,
-                              SmallVector<int64_t, 2> &lhsOffsets,
-                              SmallVector<int64_t, 2> &rhsOffsets,
-                              NestedLayoutAttr lhsLayout,
-                              NestedLayoutAttr rhsLayout) const {
+  void fillOperandBatchOffsets(const ContractOpDetail &opDetail,
+                               int64_t kOffset, ArrayRef<int64_t> resultOffsets,
+                               NestedLayoutAttr resultLayout,
+                               SmallVector<int64_t, 2> &lhsOffsets,
+                               SmallVector<int64_t, 2> &rhsOffsets,
+                               NestedLayoutAttr lhsLayout,
+                               NestedLayoutAttr rhsLayout) const {
+    auto [lhsM, rhsN] = *opDetail.getOperandMNIndex();
+    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
+    auto [resultM, resultN] = *opDetail.getResultMNIndex();
     // resultOffsets contains batch indices into the C/D vector. It is a 2-D
     // index for both M and N. We need to split out for M and N, and add index
     // for K.
-    if (kind == ContractKind::MK_KN_MN) {
-      lhsOffsets[0] = resultOffsets[0];
-      lhsOffsets[1] = kOffset;
-      rhsOffsets[0] = kOffset;
-      rhsOffsets[1] = resultOffsets[1];
-    } else {
-      return false;
-    }
+    lhsOffsets[lhsM] = resultOffsets[resultM];
+    lhsOffsets[lhsK] = kOffset;
+    rhsOffsets[rhsN] = resultOffsets[resultN];
+    rhsOffsets[rhsK] = kOffset;
 
     // Now apply permutation on LHS/RHS according to their batch order.
     applyPermutationToVector(lhsOffsets, lhsLayout.getBatchOrder());
     applyPermutationToVector(rhsOffsets, rhsLayout.getBatchOrder());
-    return true;
   }
 
   struct MFMAParameters {
