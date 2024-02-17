@@ -112,7 +112,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=thread"
+    "--iree-llvmcpu-sanitize=address"
   LABELS
     "notsan"
 )
