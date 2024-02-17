@@ -125,11 +125,11 @@ iree_status_t iree_hal_rocm_native_executable_create(
           break;
         }
         if (shared_memory_sizes[i] > max_shared_mem) {
-          status =
-              iree_make_status(IREE_STATUS_INTERNAL,
-                               "ROCM driver error: Requested shared memory "
-                               "size of %d larger than allowed size of %d",
-                               shared_memory_sizes[i], max_shared_mem);
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                    "function '%s' requested shared memory "
+                                    "size of %d larger than allowed size of %d",
+                                    entry_name, shared_memory_sizes[i],
+                                    max_shared_mem);
         } else if (shared_memory_sizes[i] != 0) {
           status = ROCM_RESULT_TO_STATUS(
               context->syms,
