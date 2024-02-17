@@ -11,6 +11,8 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1584,6 +1586,52 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
   results.setParams(cast<OpResult>(getResult(0)), paramsArray0);
   results.setParams(cast<OpResult>(getResult(1)), paramsArray0);
   return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// SetContractionLayoutAttributes
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::SetContractionLayoutAttributes::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto payloadList = state.getPayloadOps(getTarget());
+  auto typeList = state.getParams(getMmaType());
+
+  for (auto [payload, type] : llvm::zip_equal(payloadList, typeList)) {
+    auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(type);
+    if (!mmaType) {
+      return emitDefiniteFailure()
+             << "invalid non-mma attribute for contraction annotation " << type;
+    }
+
+    auto contract = llvm::dyn_cast<vector::ContractionOp>(payload);
+    if (!contract) {
+      return emitDefiniteFailure()
+             << "invalid non-contraction annotation " << payload;
+    }
+
+    auto maybeLayouts = mmaType.getContractionLayout(contract);
+    if (failed(maybeLayouts)) {
+      return emitDefiniteFailure()
+             << "invalid opaque mma layout for annotation " << mmaType;
+    }
+
+    auto [aLayout, bLayout, cLayout] = *maybeLayouts;
+    contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
+    contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);
+    contract->setAttr("__vector_layout_test_anchor_operand_2", cLayout);
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::SetContractionLayoutAttributes::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getMmaType(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES
