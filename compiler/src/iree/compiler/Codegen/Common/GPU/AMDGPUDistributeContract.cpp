@@ -234,10 +234,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   }
 
   struct MFMAParameters {
-    uint32_t m;
-    uint32_t n;
-    uint32_t k;
-    uint32_t blocks;
+    uint32_t m = 0;
+    uint32_t n = 0;
+    uint32_t k = 0;
+    uint32_t blocks = 0;
   };
 
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
