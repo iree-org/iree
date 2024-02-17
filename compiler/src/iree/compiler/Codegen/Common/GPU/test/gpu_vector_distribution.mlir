@@ -3,7 +3,7 @@
 #layout = #iree_vector_ext.layout<<[VECTORY, LANEY], [4, 4]>, <[VECTORX, LANEX], [4, 4]>>
 
 // CHECK-LABEL: @distribute_elementwise_f16
-func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
+func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf16>, %denom: vector<16x16xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<16xf16>
@@ -11,9 +11,12 @@ func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf1
   // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
   // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] : vector<16xf16>
   %c = arith.mulf %root, %b : vector<16x16xf16>
+  // CHECK-DAG: %[[DENOM:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
+  // CHECK-DAG: %[[DIVD:.*]] = arith.divf %[[C]], %[[DENOM]] : vector<16xf16>
+  %divd = arith.divf %c, %denom : vector<16x16xf16>
   // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
-  // CHECK-DAG: %[[D:.*]] = arith.addf %[[C]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
-  %d = arith.addf %c, %a fastmath<reassoc,nnan> : vector<16x16xf16>
+  // CHECK-DAG: %[[D:.*]] = arith.addf %[[DIVD]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
+  %d = arith.addf %divd, %a fastmath<reassoc,nnan> : vector<16x16xf16>
   // CHECK: iree_vector_ext.to_simd %[[D]] : vector<16xf16> -> vector<16x16xf16>
   return %d : vector<16x16xf16>
 }
