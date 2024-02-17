@@ -67,14 +67,18 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
           contractOp, "missing nested layout for contraction rhs");
     }
 
+    // We assume there is an decision made before regarding which mfma intrinsic
+    // to use and it is attached as an attribute to this contract op.
     auto mfmaAttr =
         contractOp->getAttrOfType<IREE::GPU::MFMAAttr>("iree.amdgpu.mfma");
     if (!mfmaAttr) {
       return rewriter.notifyMatchFailure(
           contractOp, "missing iree.amdgpu.mfma intrinsic attribute");
     }
+    // Get the storage vector types that each thread is in charge of.
     auto [aVectorType, bVectorType, cVectorType] = mfmaAttr.getABCVectorTypes();
 
+    // Infer the contract kind so that we know know to correlate M/N/K dims.
     ContractKind contractKind =
         inferContractKind(getContext(), contractOp.getIndexingMapsArray());
     if (contractKind == ContractKind::UNKNOWN) {
@@ -96,9 +100,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     VectorValue finalTile = cast<VectorValue>(zero);
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
+    // Offsets into the LHS/RHS batches.
     SmallVector<int64_t, 2> lhsBatchOffsets(rank, 0);
     SmallVector<int64_t, 2> rhsBatchOffsets(rank, 0);
 
+    // Offsets into the result batches.
     ArrayRef<int64_t> resultBatches = resultLayout.getBatchesPerSubgroup();
     SmallVector<int64_t, 2> resultBatchTileSizes(rank, 1);
     LLVM_DEBUG({
@@ -106,6 +112,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       llvm::interleaveComma(resultBatches, llvm::dbgs());
       llvm::dbgs() << "]\n";
     });
+
+    Value acc = getDistributed(rewriter, cast<VectorValue>(contractOp.getAcc()),
+                               resultLayout);
+    Value lhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
+    Value rhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
 
     // Iterate over all result batches and unroll computation to direct MFMA
     // intrinsic ops.
@@ -120,12 +131,10 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       });
 
       // Get the slice of the accumulator in this batch.
-      Value acc = getDistributed(
-          rewriter, cast<VectorValue>(contractOp.getAcc()), resultLayout);
       Value accSlice =
           rewriter.create<vector::ExtractOp>(loc, acc, resultBatchOffsets);
 
-      // Get the k batch size for lhs and rhs vector.
+      // Get the k batch size for LHS and RHS vector.
       std::optional<int64_t> kBatch =
           getKBatchSize(contractKind, lhsLayout, rhsLayout);
       LLVM_DEBUG(llvm::dbgs() << "k batch size = " << kBatch << "\n");
@@ -134,9 +143,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                            "A/B vector k batch mismatch");
       }
 
-      // Perform contraction. Do separate outer product with mfma operation and
-      // accumulate to the same vector.
+      // Perform contraction by doing separate outer product with mfma operation
+      // and accumulate to the same vector.
       for (int k = 0; k < kBatch; ++k) {
+        // Get the batch offsets for LHS and RHS. For the K dimension it's the
+        // induction variable; for the M/N dimension we need to extract from the
+        // result batch offsets.
         if (!getOperandBatchOffsets(contractKind, k, resultBatchOffsets,
                                     resultLayout, lhsBatchOffsets,
                                     rhsBatchOffsets, lhsLayout, rhsLayout)) {
@@ -151,12 +163,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
           llvm::interleaveComma(rhsBatchOffsets, llvm::dbgs());
           llvm::dbgs() << "]\n";
         });
-        Value lhsSlice = rewriter.create<vector::ExtractOp>(
-            loc, getDistributed(rewriter, contractOp.getLhs(), lhsLayout),
-            lhsBatchOffsets);
-        Value rhsSlice = rewriter.create<vector::ExtractOp>(
-            loc, getDistributed(rewriter, contractOp.getRhs(), rhsLayout),
-            rhsBatchOffsets);
+
+        Value lhsSlice =
+            rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
+        Value rhsSlice =
+            rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
         accSlice = computeMMA(rewriter, loc, lhsSlice, rhsSlice, accSlice,
                               aVectorType, bVectorType, cVectorType,
                               mfmaAttr.getIntrinsic().getValue());
