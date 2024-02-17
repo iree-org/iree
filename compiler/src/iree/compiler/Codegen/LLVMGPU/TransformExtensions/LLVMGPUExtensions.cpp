@@ -1598,14 +1598,18 @@ transform_dialect::SetContractionLayoutAttributes::apply(
     transform::TransformResults &results, transform::TransformState &state) {
   auto payloadList = state.getPayloadOps(getTarget());
   auto typeList = state.getParams(getMmaType());
+  if (typeList.size() != 1) {
+    return emitDefiniteFailure()
+           << "invalid more than one attribute for contraction annotation";
+  }
+  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(typeList.front());
+  if (!mmaType) {
+    return emitDefiniteFailure()
+           << "invalid non-mma attribute for contraction annotation "
+           << typeList.front();
+  }
 
-  for (auto [payload, type] : llvm::zip_equal(payloadList, typeList)) {
-    auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(type);
-    if (!mmaType) {
-      return emitDefiniteFailure()
-             << "invalid non-mma attribute for contraction annotation " << type;
-    }
-
+  for (Operation *payload : payloadList) {
     auto contract = llvm::dyn_cast<vector::ContractionOp>(payload);
     if (!contract) {
       return emitDefiniteFailure()

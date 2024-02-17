@@ -153,11 +153,9 @@ module attributes { transform.with_named_sequence } {
 
     // Get the vector.contract ops.
     %contracts = transform.structured.match ops{["vector.contract"]} in %variant_op_3 :  (!transform.any_op) -> !transform.any_op
-    %contract1, %contract2 = transform.split_handle %contracts : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     %layout16x16x16 = transform.param.constant #layout -> !transform.any_param
-    transform.iree.set_contraction_layout_attributes %contract1, %layout16x16x16 : !transform.any_op, !transform.any_param
-    transform.iree.set_contraction_layout_attributes %contract2, %layout16x16x16 : !transform.any_op, !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contracts, %layout16x16x16 : !transform.any_op, !transform.any_param
 
     %distribute_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %distribute_func : !transform.any_op
