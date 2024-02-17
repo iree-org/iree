@@ -62,6 +62,27 @@ struct OpDistributionPattern : DistributionPattern {
   }
 };
 
+template <template <typename> class TraitType>
+class OpTraitDistributionPattern : public DistributionPattern {
+public:
+  OpTraitDistributionPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : DistributionPattern(Pattern::MatchTraitOpTypeTag(),
+                            TypeID::get<TraitType>(), benefit, context) {}
+
+  virtual LogicalResult matchAndRewrite(Operation *op,
+                                        DistributionSignature &opSignature,
+                                        PatternRewriter &rewriter) const = 0;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const final {
+    std::optional<DistributionSignature> opSignature = getOpSignature(op);
+    if (!opSignature) {
+      return failure();
+    }
+    return matchAndRewrite(op, *opSignature, rewriter);
+  }
+};
+
 /// Options to control how the layout analysis is initialised for vector
 /// distribution.
 class VectorLayoutOptions {

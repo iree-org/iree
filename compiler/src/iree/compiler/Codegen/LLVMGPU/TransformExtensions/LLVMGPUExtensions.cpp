@@ -1510,18 +1510,27 @@ public:
 };
 
 DiagnosedSilenceableFailure
-transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
+transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   TestVectorLayoutOptions options(target);
   RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
+  Value laneId =
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+
+  populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
+  populateGPUReductionDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   populateAMDGPUDistributionPatterns(patterns);
   distributeVectorOps(target, patterns, options);
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
+void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);

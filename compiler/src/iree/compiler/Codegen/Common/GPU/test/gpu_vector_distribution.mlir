@@ -3,7 +3,7 @@
 #layout = #iree_vector_ext.layout<<[VECTORY, LANEY], [4, 4]>, <[VECTORX, LANEX], [4, 4]>>
 
 // CHECK-LABEL: @distribute_elementwise_f16
-func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf16>) -> vector<16x16xf16> {
+func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf16>, %denom: vector<16x16xf16>) -> vector<16x16xf16> {
   %c0 = arith.constant 0 : index
   %cst_0 = arith.constant 0.0 : f16
   // CHECK: %[[ROOT:.*]] = arith.constant dense<0.000000e+00> : vector<16xf16>
@@ -11,9 +11,12 @@ func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf1
   // CHECK-DAG: %[[B:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
   // CHECK-DAG: %[[C:.*]] = arith.mulf %[[B]], %[[ROOT]] : vector<16xf16>
   %c = arith.mulf %root, %b : vector<16x16xf16>
+  // CHECK-DAG: %[[DENOM:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
+  // CHECK-DAG: %[[DIVD:.*]] = arith.divf %[[C]], %[[DENOM]] : vector<16xf16>
+  %divd = arith.divf %c, %denom : vector<16x16xf16>
   // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
-  // CHECK-DAG: %[[D:.*]] = arith.addf %[[C]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
-  %d = arith.addf %c, %a fastmath<reassoc,nnan> : vector<16x16xf16>
+  // CHECK-DAG: %[[D:.*]] = arith.addf %[[DIVD]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
+  %d = arith.addf %divd, %a fastmath<reassoc,nnan> : vector<16x16xf16>
   // CHECK: iree_vector_ext.to_simd %[[D]] : vector<16xf16> -> vector<16x16xf16>
   return %d : vector<16x16xf16>
 }
@@ -474,6 +477,47 @@ func.func @distribute_broadcast_col_row(%source: vector<32xf32>) -> vector<32x32
   func.return %result : vector<32x32xf32>
 }
 
+#layout_broadcast_vectory_1d = #iree_vector_ext.layout<
+  <[BATCHY, VECTORX], [1, 4]>
+>
+
+#layout_broadcast_vectory_2d = #iree_vector_ext.layout<
+  <[BATCHX, VECTORY], [1, 4]>,
+  <[BATCHY, VECTORX], [1, 4]>
+>
+
+// This test case checks if we distribute correct when we have vectorx frozen
+// and we iterate on vectory.
+// This previously caused a bug, since calculating SIMT index for broadcast
+// needs to know the range of vectorx.
+func.func @distribute_broadcast_vectory(%source: vector<4xf32>) -> vector<4x4xf32> {
+  %result = vector.broadcast %source {
+          "__vector_layout_test_anchor_operand_0" = #layout_broadcast_vectory_1d,
+          "__vector_layout_test_anchor_result_0" = #layout_broadcast_vectory_2d}
+          : vector<4xf32> to vector<4x4xf32>
+  // CHECK-DAG: %[[S00:.*]] = vector.extract %[[SOURCE:.*]][0, 0] : f32 from vector<1x4xf32>
+  // CHECK-DAG: %[[S01:.*]] = vector.extract %[[SOURCE:.*]][0, 1] : f32 from vector<1x4xf32>
+  // CHECK-DAG: %[[S02:.*]] = vector.extract %[[SOURCE:.*]][0, 2] : f32 from vector<1x4xf32>
+  // CHECK-DAG: %[[S02:.*]] = vector.extract %[[SOURCE:.*]][0, 3] : f32 from vector<1x4xf32>
+  // CHECK-DAG: vector.insert %[[S00:.*]] %{{.*}} [0, 0, 0] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S00:.*]] %{{.*}} [0, 0, 4] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S00:.*]] %{{.*}} [0, 0, 8] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S00:.*]] %{{.*}} [0, 0, 12] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S01:.*]] %{{.*}} [0, 0, 1] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S01:.*]] %{{.*}} [0, 0, 5] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S01:.*]] %{{.*}} [0, 0, 9] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S01:.*]] %{{.*}} [0, 0, 13] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S02:.*]] %{{.*}} [0, 0, 2] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S02:.*]] %{{.*}} [0, 0, 6] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S02:.*]] %{{.*}} [0, 0, 10] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S02:.*]] %{{.*}} [0, 0, 14] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 3] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 7] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 11] : f32 into vector<1x1x16xf32>
+  // CHECK-DAG: vector.insert %[[S03:.*]] %{{.*}} [0, 0, 15] : f32 into vector<1x1x16xf32>
+  func.return %result : vector<4x4xf32>
+}
+
 builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
@@ -481,7 +525,7 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-
+ 
 // -----
 
 #row_layout = #iree_vector_ext.per_dim_layout<[BATCHX, LANEY, VECTORX], [2, 4, 4]>
