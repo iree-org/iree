@@ -123,7 +123,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Location loc = contractOp.getLoc();
     auto resultTiles = StaticTileOffsetRange(
         resultBatches, resultBatchTileSizes, resultLayout.getBatchOrder());
-    for (SmallVector<int64_t, 2> resultBatchOffsets : resultTiles) {
+    SmallVector<int64_t, 2> resultBatchOffsets;
+    for (SmallVector<int64_t, 2> originalResultBatchOffsets : resultTiles) {
+      // Permute the result batch offsets first to match the distributed shape
+      // dim order for indexing.
+      resultBatchOffsets = originalResultBatchOffsets;
+      applyPermutationToVector(resultBatchOffsets,
+                               resultLayout.getBatchOrder());
       LLVM_DEBUG({
         llvm::dbgs() << "current result batch offsets: [";
         llvm::interleaveComma(resultBatchOffsets, llvm::dbgs());
@@ -143,13 +149,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                            "A/B vector k batch mismatch");
       }
 
-      // Perform contraction by doing separate outer product with mfma operation
-      // and accumulate to the same vector.
+      // Perform contraction by doing separate outer product with amdgpu.mfma
+      // operation and accumulate to the same vector.
       for (int k = 0; k < kBatch; ++k) {
         // Get the batch offsets for LHS and RHS. For the K dimension it's the
         // induction variable; for the M/N dimension we need to extract from the
         // result batch offsets.
-        if (!getOperandBatchOffsets(contractKind, k, resultBatchOffsets,
+        if (!getOperandBatchOffsets(contractKind, k, originalResultBatchOffsets,
                                     resultLayout, lhsBatchOffsets,
                                     rhsBatchOffsets, lhsLayout, rhsLayout)) {
           return rewriter.notifyMatchFailure(
@@ -199,17 +205,13 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
   // Given a contract op's batch |resultOffsets|, gets its batch offsets for
   // both LHS and RHS.
-  bool getOperandBatchOffsets(
-      ContractKind kind, int64_t kOffset,
-      // Copy intentionally given we need to mutate in the function body
-      SmallVector<int64_t, 2> resultOffsets, NestedLayoutAttr resultLayout,
-      SmallVector<int64_t, 2> &lhsOffsets, SmallVector<int64_t, 2> &rhsOffsets,
-      NestedLayoutAttr lhsLayout, NestedLayoutAttr rhsLayout) const {
-    // The result offsets are permutated and we need to revert the permutation.
-    // The following works based on the fact that for 2-D cases, a permuation
-    // vector's reverse is just itself. So this only works for 2-D cases.
-    applyPermutationToVector(resultOffsets, resultLayout.getBatchOrder());
-
+  bool getOperandBatchOffsets(ContractKind kind, int64_t kOffset,
+                              ArrayRef<int64_t> resultOffsets,
+                              NestedLayoutAttr resultLayout,
+                              SmallVector<int64_t, 2> &lhsOffsets,
+                              SmallVector<int64_t, 2> &rhsOffsets,
+                              NestedLayoutAttr lhsLayout,
+                              NestedLayoutAttr rhsLayout) const {
     // resultOffsets contains batch indices into the C/D vector. It is a 2-D
     // index for both M and N. We need to split out for M and N, and add index
     // for K.
@@ -222,24 +224,14 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return false;
     }
 
-    // Now apply permutation on lhs/rhs according to their batch order.
+    // Now apply permutation on LHS/RHS according to their batch order.
     applyPermutationToVector(lhsOffsets, lhsLayout.getBatchOrder());
     applyPermutationToVector(rhsOffsets, rhsLayout.getBatchOrder());
     return true;
   }
 
-  // Returns the vector type for the given |value| meeting mfma ops's
-  // requirements.
-  VectorType getMFMAVectorType(Value value) const {
-    auto type = cast<VectorType>(value.getType());
-    SmallVector<int64_t> shape;
-    for (int64_t dim : type.getShape()) {
-      if (dim != 1)
-        shape.push_back(dim);
-    }
-    return VectorType::get(shape, type.getElementType());
-  }
-
+  // Generates amdgpu.mfma operation on the given inputs for the given MFMA
+  // |intrinsic|.
   Value computeMMA(OpBuilder &builder, Location loc, Value a, Value b, Value c,
                    VectorType aType, VectorType bType, VectorType cType,
                    IREE::GPU::MFMAIntrinsic intrinsic) const {
@@ -247,7 +239,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
     Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
 
-    uint32_t m, n, k, blocks;
+    uint32_t m = 0, n = 0, k = 0, blocks = 0;
     switch (intrinsic) {
     case IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32:
       m = n = k = 16;
