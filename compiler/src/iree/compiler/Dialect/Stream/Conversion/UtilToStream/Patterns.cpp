@@ -20,6 +20,122 @@ namespace mlir::iree_compiler {
 namespace {
 
 //===----------------------------------------------------------------------===//
+// Structural ops
+//===----------------------------------------------------------------------===//
+
+struct FuncOpSignatureConversion
+    : public OpConversionPattern<IREE::Util::FuncOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::FuncOp funcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+
+    // Replace function and convert the signature for region conversion below.
+    TypeConverter::SignatureConversion newSignature(funcOp.getNumArguments());
+    auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
+    bool anyFailed = false;
+    newFuncOp.expandSignature(
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          if (failed(typeConverter.convertTypes(type, newTypes))) {
+            anyFailed = true;
+          }
+          if (failed(
+                  typeConverter.convertSignatureArg(i, type, newSignature))) {
+            anyFailed = true;
+          }
+        },
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          if (failed(typeConverter.convertTypes(type, newTypes))) {
+            anyFailed = true;
+          }
+        });
+    if (anyFailed) {
+      return rewriter.notifyMatchFailure(
+          funcOp, "unable to convert argument/result types");
+    }
+    newFuncOp.getBlocks().clear();
+    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
+                                newFuncOp.getFunctionBody(), newFuncOp.end());
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter, &newSignature))) {
+      return failure();
+    }
+
+    rewriter.eraseOp(funcOp);
+    return success();
+  }
+};
+
+struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::CallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Create a new call that takes the expanded input operands and returns the
+    // expanded output results. We can't directly replace the original call as
+    // the result counts differ.
+    struct Result {
+      size_t originalIndex;
+      size_t newIndex;
+      Type newType;
+    };
+    SmallVector<Result> resultMap;
+    bool anyFailed = false;
+    auto callOp = op.cloneAndExpand(
+        [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
+          auto adaptorOperand = adaptor.getOperands()[i];
+          expandResourceOperand(op.getLoc(), adaptorOperand, newOperands,
+                                rewriter);
+        },
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          size_t newIndex = newTypes.size();
+          if (failed(getTypeConverter()->convertType(type, newTypes)))
+            anyFailed = true;
+          resultMap.push_back(Result{i, newIndex, newTypes[newIndex]});
+        },
+        rewriter);
+    if (anyFailed) {
+      return rewriter.notifyMatchFailure(op, "unable to convert result types");
+    }
+
+    // Tie all resource results together so we end up with 1:1 results with the
+    // original op.
+    SmallVector<Value> results;
+    for (auto result : resultMap) {
+      if (llvm::isa<IREE::Stream::ResourceType>(result.newType)) {
+        auto oldType = op.getResult(result.originalIndex).getType();
+        auto resource = callOp.getResult(result.newIndex + 0);
+        auto resourceSize = callOp.getResult(result.newIndex + 1);
+        results.push_back(rewriter
+                              .create<mlir::UnrealizedConversionCastOp>(
+                                  op.getLoc(), TypeRange{oldType},
+                                  ValueRange{resource, resourceSize})
+                              .getResult(0));
+      } else {
+        results.push_back(callOp.getResult(result.newIndex));
+      }
+    }
+    rewriter.replaceOp(op, results);
+
+    return success();
+  }
+};
+
+struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    // Expand any resource operands to resource + size.
+    auto expandedOperands =
+        expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(op, expandedOperands);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Globals
 //===----------------------------------------------------------------------===//
 
@@ -223,6 +339,10 @@ struct GlobalStoreOpExpansion
 void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns) {
+  patterns
+      .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion>(
+          typeConverter, context);
+
   auto expansionState = std::make_shared<GlobalExpansionState>();
   // TODO(#7432): add indirect global expansion support to streams.
   patterns
@@ -259,8 +379,15 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
         return success();
       });
 
-  conversionTarget
-      .addLegalOp<IREE::Util::InitializerOp, IREE::Util::ReturnOp>();
+  conversionTarget.addLegalOp<IREE::Util::InitializerOp>();
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::FuncOp>(
+      [&](IREE::Util::FuncOp op) {
+        return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+               typeConverter.isLegal(&op.getBody());
+      });
+  addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&

@@ -1,10 +1,10 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stream-schedule-execution))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module( util.func(iree-stream-schedule-execution))" %s | FileCheck %s
 
 // Tests basic partitioning of multiple ops.
 
 // CHECK-LABEL: @partitioning
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+util.func public @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -28,8 +28,8 @@ func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resour
   // CHECK-NEXT: stream.yield %[[DISPATCH2]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: } => !stream.timepoint
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await %[[TIMEPOINT]] => %[[RESULT]] : !stream.resource<external>{%c20}
-  // CHECK-NEXT: return %[[READY]]
-  return %6 : !stream.resource<external>
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %6 : !stream.resource<external>
 }
 
 // -----
@@ -40,7 +40,7 @@ func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resour
 
 // CHECK-LABEL: @partitioningWithAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
-func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+util.func public @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -74,8 +74,8 @@ func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !str
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
   // CHECK-SAME:   on(#hal.affinity.queue<[1]>)
   // CHECK-SAME:   %[[TIMEPOINT1]] => %[[RESULT]] : !stream.resource<external>{%c20}
-  // CHECK-NEXT: return %[[READY]]
-  return %dispatch2 : !stream.resource<external>
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %dispatch2 : !stream.resource<external>
 }
 
 // -----
@@ -86,7 +86,7 @@ func.func @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !str
 
 // CHECK-LABEL: @partitioningWithConcurrentAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
-func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
+util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -128,8 +128,8 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
   // CHECK-SAME:   on(#hal.affinity.queue<[2]>)
   // CHECK-SAME:   %[[TIMEPOINT2]] => %[[RESULT]] : !stream.resource<external>{%c20}
-  // CHECK-NEXT: return %[[READY]]
-  return %dispatch2 : !stream.resource<external>
+  // CHECK-NEXT: util.return %[[READY]]
+  util.return %dispatch2 : !stream.resource<external>
 }
 
 // -----
@@ -139,7 +139,7 @@ func.func @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external
 // happen in-place on the splat and we expect the execution regions to be tied.
 
 // CHECK-LABEL: @partitionWithinBlocks
-func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
+util.func public @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c1280 = arith.constant 1280 : index
@@ -156,8 +156,8 @@ func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   // CHECK: stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[BB1_SPLAT]][{{.+}}]) : (!stream.resource<transient>{%c1280}) -> %[[BB1_SPLAT]]{%c1280}
   %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%splat[%c0 to %c1280 for %c1280]) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
   // CHECK: %[[BB1_READY:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT]] => %[[BB1_RESULT]]
-  // CHECK: return %[[BB1_READY]]
-  return %3 : !stream.resource<transient>
+  // CHECK: util.return %[[BB1_READY]]
+  util.return %3 : !stream.resource<transient>
 ^bb2:
   // CHECK: %[[BB2_RESULT:.+]], %[[BB2_TIMEPOINT:.+]] = stream.async.execute await(%[[SPLAT_TIMEPOINT]]) =>
   // CHECK-SAME: with(%[[SPLAT]] as %[[BB2_SPLAT:.+]]: !stream.resource<transient>{%c1280})
@@ -165,8 +165,8 @@ func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   // CHECK: stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[BB2_SPLAT]][{{.+}}]) : (!stream.resource<transient>{%c1280}) -> %[[BB2_SPLAT]]{%c1280}
   %4 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%splat[%c0 to %c1280 for %c1280]) : (!stream.resource<transient>{%c1280}) -> %splat{%c1280}
   // CHECK: %[[BB2_READY:.+]] = stream.timepoint.await %[[BB2_TIMEPOINT]] => %[[BB2_RESULT]]
-  // CHECK: return %[[BB2_READY]]
-  return %4 : !stream.resource<transient>
+  // CHECK: util.return %[[BB2_READY]]
+  util.return %4 : !stream.resource<transient>
 }
 
 // -----
@@ -176,7 +176,7 @@ func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
 // single block and break the assumption that one block == one partition.
 
 // CHECK-LABEL: @deviceHostDevice
-func.func @deviceHostDevice() -> !stream.resource<transient> {
+util.func public @deviceHostDevice() -> !stream.resource<transient> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c123_i8 = arith.constant 123 : i8
@@ -201,8 +201,8 @@ func.func @deviceHostDevice() -> !stream.resource<transient> {
   %5 = stream.async.transfer %4 : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
   // CHECK-NEXT: stream.yield %[[TRANSFER_H2D]]
   // CHECK: %[[READY_H2D:.+]] = stream.timepoint.await %[[TIMEPOINT_H2D]] => %[[RESULT_H2D]] : !stream.resource<transient>{%c1}
-  // CHECK: return %[[READY_H2D]]
-  return %5 : !stream.resource<transient>
+  // CHECK: util.return %[[READY_H2D]]
+  util.return %5 : !stream.resource<transient>
 }
 
 // -----
@@ -210,7 +210,7 @@ func.func @deviceHostDevice() -> !stream.resource<transient> {
 // Tests that partitioning does not hoist ops across cf.asserts.
 
 // CHECK-LABEL: @dontHoistPastAsserts
-func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+util.func public @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -242,7 +242,7 @@ func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !strea
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_2
   %6 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%3[%c0 to %c1280 for %c1280], %5[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
 
-  return %6 : !stream.resource<external>
+  util.return %6 : !stream.resource<external>
 }
 
 // -----
@@ -252,7 +252,7 @@ func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !strea
 // the cloned values will be exported to provide the value.
 
 // CHECK-LABEL: @cloneAcrossPartitions
-func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>, !stream.resource<transient>) {
+util.func public @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>, !stream.resource<transient>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c123_i8 = arith.constant 123 : i8
@@ -281,8 +281,8 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>, !str
   %result = stream.async.transfer %dispatch1 : !stream.resource<transient>{%c1} -> !stream.resource<external>{%c1}
   // CHECK: %[[PARTITION1:.+]] = stream.timepoint.await
 
-  // CHECK: return %[[PARTITION1]], %[[PARTITION0]]#1
-  return %result, %splat : !stream.resource<external>, !stream.resource<transient>
+  // CHECK: util.return %[[PARTITION1]], %[[PARTITION0]]#1
+  util.return %result, %splat : !stream.resource<external>, !stream.resource<transient>
 }
 
 // -----
@@ -293,7 +293,7 @@ func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>, !str
 // tracking both the host and device hazards correctly.
 
 // CHECK-LABEL: @deviceHostDeviceCrossing
-func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
+util.func public @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -314,8 +314,8 @@ func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch2
   %4 = stream.async.dispatch @ex::@dispatch2[%c1, %c1, %c1](%1[%c0 to %c128 for %c128], %3[%c0 to %c128 for %c128]) : (!stream.resource<transient>{%c128}, !stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
-  // CHECK: return
-  return %4 : !stream.resource<transient>
+  // CHECK: util.return
+  util.return %4 : !stream.resource<transient>
 }
 
 // -----
@@ -325,13 +325,13 @@ func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
 stream.async.func private @inplaceExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
 
 // CHECK-LABEL: @inplaceCall
-func.func @inplaceCall(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
+util.func public @inplaceCall(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
   %c0 = arith.constant 0 : index
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.call
   %0 = stream.async.call @inplaceExtern(%arg0[%c0 to %arg1 for %arg1], %arg2) : (!stream.resource<*>{%arg1}, index) -> %arg0{%arg1}
   // CHECK: stream.timepoint.await
-  return %0, %arg1 : !stream.resource<*>, index
+  util.return %0, %arg1 : !stream.resource<*>, index
 }
 
 // -----
@@ -341,7 +341,7 @@ func.func @inplaceCall(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -
 stream.async.func private @inplaceExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
 
 // CHECK-LABEL: @scfRecurse
-func.func @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
+util.func public @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) -> (!stream.resource<*>, index) {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -354,5 +354,5 @@ func.func @scfRecurse(%arg0: !stream.resource<*>, %arg1: index, %arg2: index) ->
     // CHECK: stream.timepoint.await
     scf.yield %0 : !stream.resource<*>
   }
-  return %sum, %arg1 : !stream.resource<*>, index
+  util.return %sum, %arg1 : !stream.resource<*>, index
 }

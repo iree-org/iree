@@ -169,7 +169,8 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
 
 /// Transform dialect-based common.
-void addTransformDialectPasses(OpPassManager &passManager);
+void addTransformDialectPasses(OpPassManager &passManager,
+                               StringRef entryPoint);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.

@@ -1,11 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-hal-repeat-dispatches{count=2}))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-hal-repeat-dispatches{count=2}))' %s | FileCheck %s
 
 util.global @_executable : !hal.executable
 
 // CHECK-LABEL: @duplicate_dispatches
 //  CHECK-SAME: (%[[CMD1:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[CMD2:.+]]: !hal.command_buffer)
-func.func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.command_buffer) {
+util.func public @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.command_buffer) {
   // CHECK: %[[EXE:.+]] = util.global.load @_executable
   %exe = util.global.load @_executable : !hal.executable
 
@@ -19,7 +19,7 @@ func.func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.comman
   hal.command_buffer.dispatch<%cmd2 : !hal.command_buffer> target(%exe : !hal.executable)[3] workgroups([%c2, %c2, %c2])
   hal.command_buffer.execution_barrier<%cmd2 : !hal.command_buffer> source("Dispatch|CommandRetire") target("CommandIssue|Dispatch") flags("None")
 
-  return
+  util.return
 }
 
 // CHECK: hal.command_buffer.dispatch<%[[CMD1]] : !hal.command_buffer> target(%[[EXE]] : !hal.executable)[0] workgroups([%c1, %c1, %c1])
@@ -49,7 +49,7 @@ util.global @_executable : !hal.executable
 // CHECK-LABEL: @nested_dispatch
 //  CHECK-SAME: (%[[CMD1:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[IDX:.+]]: index)
-func.func @nested_dispatch(%cmd1 : !hal.command_buffer, %idx : index) {
+util.func public @nested_dispatch(%cmd1 : !hal.command_buffer, %idx : index) {
   // CHECK: %[[EXE:.+]] = util.global.load @_executable
   %exe = util.global.load @_executable : !hal.executable
 
@@ -62,7 +62,7 @@ func.func @nested_dispatch(%cmd1 : !hal.command_buffer, %idx : index) {
   default {
   }
 
-  return
+  util.return
 }
 
 // CHECK: scf.index_switch

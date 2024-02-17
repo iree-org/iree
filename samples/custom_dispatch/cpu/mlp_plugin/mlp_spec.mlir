@@ -1,4 +1,4 @@
-// Sample spec that matches an MLP example and forwards to 
+// Sample spec that matches an MLP example and forwards to
 // an implementation implemented by a system plugin.
 // Is used along with samples/custom_dispatch/cpu/plugin/mlp.mlir
 
@@ -51,7 +51,7 @@ module attributes {transform.with_named_sequence} {
     }
   }
 
-  func.func private @call_mlp(%lhs : tensor<?x?xf32>, %rhs : tensor<?x?xf32>, %init1 : tensor<?x?xf32>, %init2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  util.func private @call_mlp(%lhs : tensor<?x?xf32>, %rhs : tensor<?x?xf32>, %init1 : tensor<?x?xf32>, %init2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %m = tensor.dim %lhs, %c0 : tensor<?x?xf32>
@@ -61,17 +61,15 @@ module attributes {transform.with_named_sequence} {
     %n_i32 = arith.index_cast %n : index to i32
     %k_i32 = arith.index_cast %k : index to i32
 
-    %mlp_result = flow.dispatch @executable::@x86_64::@mlp[](%lhs, %rhs, %m_i32, %n_i32, %k_i32) {
+    %mlp_result = flow.dispatch @executable::@x86_64::@mlp(%lhs, %rhs, %m_i32, %n_i32, %k_i32) {
       hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>,
         #hal.interface.binding<0, 2>
-      ],
-      // HACK: keep the executable live through DCE. Only required when
-      // using the automatic variant selection.
-      hal.executable.ref = [@executable]
-    } : (tensor<?x?xf32>{%m, %k}, tensor<?x?xf32>{%k, %n}, i32, i32, i32) -> tensor<?x?xf32>{%m, %n}  
-    return %mlp_result : tensor<?x?xf32>    
+      ]
+    } : (tensor<?x?xf32>{%m, %k}, tensor<?x?xf32>{%k, %n}, i32, i32, i32) -> tensor<?x?xf32>{%m, %n}
+
+    util.return %mlp_result : tensor<?x?xf32>
   }
 
   transform.named_sequence @match_mlp(%root: !transform.any_op {transform.readonly}) -> (!transform.any_value, !transform.any_value) {
@@ -104,10 +102,10 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @cast_and_call_dag(%ins: !transform.any_value {transform.readonly},
                                               %out: !transform.any_value {transform.readonly}) {
     %root = transform.get_defining_op %out : (!transform.any_value) -> !transform.any_op
-    %module = transform.iree.get_nearest_symbol_table %root : (!transform.any_op) -> !transform.any_op
-    %executable = transform.iree.import_symbol @executable into %module if undefined : (!transform.any_op) -> !transform.any_op
-    %func = transform.iree.import_symbol @call_mlp into %module if undefined : (!transform.any_op) -> !transform.any_op
-    transform.func.cast_and_call %func(%ins) -> %out after %root {
+    %module = transform.util.get_nearest_symbol_table %root : (!transform.any_op) -> !transform.any_op
+    %executable = transform.util.import_symbol @executable into %module if undefined : (!transform.any_op) -> !transform.any_op
+    %func = transform.util.import_symbol @call_mlp into %module if undefined : (!transform.any_op) -> !transform.any_op
+    transform.util.cast_and_call %func(%ins) -> %out after %root {
       // This specifies how to resolve type mismatches between the arguments
       // of the function and the inputs from the matcher. In this example,
       // the only casts this will generate are same-rank tensor casts that
@@ -122,7 +120,7 @@ module attributes {transform.with_named_sequence} {
   // add a new symbol to the module's symbol table.
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
     // Gather the set of functions within the module.
-    %funcs = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op   
+    %funcs = transform.structured.match ops{["util.func"]} in %module : (!transform.any_op) -> !transform.any_op
     // For each function in the module, run the matcher on all contained
     // operations.
     transform.foreach %funcs : !transform.any_op {

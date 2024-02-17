@@ -48,9 +48,9 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     }
   }
 
-  // CHECK-LABEL: func.func @simpleDispatch
+  // CHECK-LABEL: util.func public @simpleDispatch
   //  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view
-  func.func @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+  util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
     %c1 = arith.constant 1 : index
     %c4 = arith.constant 4 : index
     %c16 = arith.constant 16 : index
@@ -156,8 +156,8 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
     // CHECK-SAME: type(%[[ELEMENT_TYPE]])
     // CHECK-SAME: encoding(%[[ENCODING_TYPE]])
     %result_view = stream.tensor.export %result_ready : tensor<4xf32> in !stream.resource<external>{%c16} -> !hal.buffer_view
-    // CHECK: return
-    return %result_view : !hal.buffer_view
+    // CHECK: util.return
+    util.return %result_view : !hal.buffer_view
   }
 
 }

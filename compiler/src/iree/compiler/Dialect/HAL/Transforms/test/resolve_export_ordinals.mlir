@@ -15,7 +15,7 @@ hal.executable @exe {
 
 // CHECK-LABEL: @dispatch_with_nested_references
 // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
-func.func @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
+util.func public @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
   %c12 = arith.constant 12 : index
@@ -29,13 +29,13 @@ func.func @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer>
       target(@exe::@target::@entry)
       workgroups([%c10, %c11, %c12])
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @dispatch_already_using_ordinals
-func.func @dispatch_already_using_ordinals(
+util.func public @dispatch_already_using_ordinals(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[EXE:.+]]: !hal.executable
@@ -50,7 +50,7 @@ func.func @dispatch_already_using_ordinals(
   hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
       target(%exe : !hal.executable)[2]
       workgroups([%c10, %c11, %c12])
-  return
+  util.return
 }
 
 // -----
@@ -69,7 +69,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @dispatch_indirect_with_nested_references
-func.func @dispatch_indirect_with_nested_references(
+util.func public @dispatch_indirect_with_nested_references(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[BUF:.+]]: !hal.buffer
@@ -84,13 +84,13 @@ func.func @dispatch_indirect_with_nested_references(
   hal.command_buffer.dispatch.indirect.symbol<%cmd : !hal.command_buffer>
       target(@exe::@target::@entry)
       workgroups(%buf : !hal.buffer)[%c10]
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @dispatch_indirect_already_using_ordinals
-func.func @dispatch_indirect_already_using_ordinals(
+util.func public @dispatch_indirect_already_using_ordinals(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[EXE:.+]]: !hal.executable
@@ -105,5 +105,5 @@ func.func @dispatch_indirect_already_using_ordinals(
   hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
       target(%exe : !hal.executable)[0]
       workgroups(%buf : !hal.buffer)[%c10]
-  return
+  util.return
 }

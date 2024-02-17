@@ -15,7 +15,6 @@
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -497,8 +496,9 @@ struct CmdDispatchOpPattern
     llvm::append_range(callArgs, bindingBuffers);
     llvm::append_range(callArgs, bindingOffsets);
     llvm::append_range(callArgs, adaptor.getResourceLengths());
-    rewriter.replaceOpWithNewOp<func::CallOp>(dispatchOp, callee, TypeRange{},
-                                              callArgs);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        dispatchOp, TypeRange{}, callee.getLeafReference(), callArgs,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };
@@ -516,11 +516,12 @@ struct CmdFuncOpPattern : public OpConversionPattern<IREE::Stream::CmdFuncOp> {
                                                 newResultTypes))) {
       return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
     }
-    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::FuncOp>(
         funcOp, funcOp.getName(),
         rewriter.getFunctionType(newArgTypes, newResultTypes),
-        funcOp.getSymVisibilityAttr(), funcOp.getAllArgAttrs(),
-        funcOp.getAllResultAttrs());
+        /*tied_operands=*/ArrayAttr{}, funcOp.getSymVisibilityAttr(),
+        funcOp.getAllArgAttrs(), funcOp.getAllResultAttrs(),
+        IREE::Util::InliningPolicyAttrInterface{});
     newOp->setDialectAttrs(funcOp->getDialectAttrs());
     return success();
   }
@@ -561,8 +562,9 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
       llvm::append_range(resultTypes, convertedTypes);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
-                                              resultTypes, operands);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        callOp, resultTypes, callOp.getCallee(), operands,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };

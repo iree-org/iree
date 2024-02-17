@@ -18,88 +18,9 @@ namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
 
-// Since all details of the interface are provided via default implementations,
-// we can just have one templated external model to apply per op, vs one
-// explicit model per op.
-struct GenericNumericCastExternalModel {
-  template <typename OpTy>
-  struct ExternalModel
-      : public NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
-                                                     OpTy> {};
-
-  template <typename OpTy>
-  static void add(MLIRContext *ctx) {
-    OpTy::template attachInterface<ExternalModel<OpTy>>(*ctx);
-  }
-
-  template <typename OpTy1, typename OpTy2, typename... More>
-  static void add(MLIRContext *ctx) {
-    add<OpTy1>(ctx);
-    add<OpTy2, More...>(ctx);
-  }
-};
-
-struct InsertSliceOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
-                                            tensor::InsertSliceOp> {
-  Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        insertSliceOp.getDest());
-  }
-
-  ::std::optional<unsigned>
-  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    return {1}; // dest
-  }
-
-  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    return {1}; // dest
-  }
-};
-
-template <typename OpTy>
-struct LinalgOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
-                                            OpTy> {
-  Value getTiedResult(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<OpTy>(op);
-    return IREE::Util::TiedOpInterface::findTiedBaseValue(
-        linalgOp.getDpsInits()[resultIndex]);
-  }
-
-  ::std::optional<unsigned>
-  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
-    auto linalgOp = cast<OpTy>(op);
-    return {linalgOp.getDpsInitsMutable()[resultIndex].getOperandNumber()};
-  }
-
-  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
-    SmallVector<int64_t> result;
-    for (unsigned i = 0; i < op->getNumResults(); ++i)
-      result.push_back(*getTiedResultOperandIndex(op, i));
-    return result;
-  }
-};
-
-/// Helper structure that iterates over all LinalgOps in `OpTys` and registers
-/// the `TiedOpInterface` with each of them.
-template <typename... Ops>
-struct LinalgOpTiedOpInterfaceHelper {
-  static void registerOpInterface(MLIRContext *ctx) {
-    (void)std::initializer_list<int>{
-        0, (Ops::template attachInterface<LinalgOpTiedOpInterface<Ops>>(*ctx),
-            0)...};
-  }
-};
-
 struct GlobalOpInterfaceExternalModel
     : public GlobalOpInterface::ExternalModel<GlobalOpInterfaceExternalModel,
                                               ml_program::GlobalOp> {
-  static void add(MLIRContext *ctx) {
-    ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(*ctx);
-  }
-
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
   }
@@ -157,61 +78,146 @@ struct GlobalOpInterfaceExternalModel
   }
 };
 
+// Since all details of the interface are provided via default implementations,
+// we can just have one templated external model to apply per op, vs one
+// explicit model per op.
+struct GenericNumericCastExternalModel {
+  template <typename OpTy>
+  struct ExternalModel
+      : public NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                     OpTy> {};
+
+  template <typename OpTy>
+  static void add(MLIRContext *context) {
+    OpTy::template attachInterface<ExternalModel<OpTy>>(*context);
+  }
+
+  template <typename OpTy1, typename OpTy2, typename... More>
+  static void add(MLIRContext *context) {
+    add<OpTy1>(context);
+    add<OpTy2, More...>(context);
+  }
+};
+
+struct InsertSliceOpTiedOpInterface
+    : public TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
+                                            tensor::InsertSliceOp> {
+  Value getTiedResult(Operation *op, unsigned resultIndex) const {
+    auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
+    return IREE::Util::TiedOpInterface::findTiedBaseValue(
+        insertSliceOp.getDest());
+  }
+
+  ::std::optional<unsigned>
+  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
+    return {1}; // dest
+  }
+
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    return {1}; // dest
+  }
+};
+
+template <typename OpTy>
+struct LinalgOpTiedOpInterface
+    : public TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
+                                            OpTy> {
+  Value getTiedResult(Operation *op, unsigned resultIndex) const {
+    auto linalgOp = cast<OpTy>(op);
+    return IREE::Util::TiedOpInterface::findTiedBaseValue(
+        linalgOp.getDpsInits()[resultIndex]);
+  }
+
+  ::std::optional<unsigned>
+  getTiedResultOperandIndex(Operation *op, unsigned resultIndex) const {
+    auto linalgOp = cast<OpTy>(op);
+    return {linalgOp.getDpsInitsMutable()[resultIndex].getOperandNumber()};
+  }
+
+  SmallVector<int64_t> getTiedResultOperandIndices(Operation *op) const {
+    SmallVector<int64_t> result;
+    for (unsigned i = 0; i < op->getNumResults(); ++i)
+      result.push_back(*getTiedResultOperandIndex(op, i));
+    return result;
+  }
+};
+
+/// Helper structure that iterates over all LinalgOps in `OpTys` and registers
+/// the `TiedOpInterface` with each of them.
+template <typename... Ops>
+struct LinalgOpTiedOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (void)std::initializer_list<int>{
+        0,
+        (Ops::template attachInterface<LinalgOpTiedOpInterface<Ops>>(*context),
+         0)...};
+  }
+};
+
 } // namespace
 
 void registerUtilExternalModels(DialectRegistry &registry) {
   // Must ensure that any dependent dialects are registered.
-  registry.insert<arith::ArithDialect, linalg::LinalgDialect,
-                  ml_program::MLProgramDialect, tensor::TensorDialect>();
+  registry.insert<arith::ArithDialect>();
+  registry.insert<linalg::LinalgDialect>();
+  registry.insert<ml_program::MLProgramDialect>();
+  registry.insert<tensor::TensorDialect>();
 
-  registry.addExtension(+[](MLIRContext *ctx,
-                            ml_program::MLProgramDialect *dialect) {
-    ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(*ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *context, ml_program::MLProgramDialect *dialect) {
+        ml_program::GlobalOp::attachInterface<GlobalOpInterfaceExternalModel>(
+            *context);
+      });
 
-  registry.addExtension(+[](MLIRContext *ctx, arith::ArithDialect *dialect) {
+  registry.addExtension(+[](MLIRContext *context,
+                            arith::ArithDialect *dialect) {
     GenericNumericCastExternalModel::add<
         arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
         arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,
-        arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(ctx);
+        arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(context);
   });
 
-  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    tensor::InsertSliceOp::attachInterface<InsertSliceOpTiedOpInterface>(*ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *context, tensor::TensorDialect *dialect) {
+        tensor::InsertSliceOp::attachInterface<InsertSliceOpTiedOpInterface>(
+            *context);
+      });
 
-  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
-    // Register all Linalg structured ops. `LinalgOp` is an interface and it is
-    // not possible to attach an external interface to an existing interface.
-    // Therefore, attach the `TiedOpInterface` to all ops one-by-one.
-    LinalgOpTiedOpInterfaceHelper<
+  registry.addExtension(
+      +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
+        // Register all Linalg structured ops. `LinalgOp` is an interface and it
+        // is not possible to attach an external interface to an existing
+        // interface. Therefore, attach the `TiedOpInterface` to all ops
+        // one-by-one.
+        LinalgOpTiedOpInterfaceHelper<
 #define GET_OP_LIST
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
-        >::registerOpInterface(ctx);
-  });
+            >::registerOpInterface(context);
+      });
 
   // TODO(matthias-springer): Use a helper instead of listing all ops. This is
   // tricky because LinalgExtOps.td includes YieldOp.
-  registry.addExtension(+[](MLIRContext *ctx,
+  registry.addExtension(+[](MLIRContext *context,
                             LinalgExt::IREELinalgExtDialect *dialect) {
     LinalgExt::ScatterOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ScatterOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::ScatterOp>>(*context);
     LinalgExt::SortOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::SortOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::SortOp>>(*context);
     LinalgExt::FftOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::FftOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::FftOp>>(*context);
     LinalgExt::ScanOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ScanOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::ScanOp>>(*context);
     LinalgExt::ReverseOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ReverseOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::ReverseOp>>(*context);
     LinalgExt::TopkOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*context);
     LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*context);
     LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(
+        *context);
     LinalgExt::AttentionOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*ctx);
+        LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*context);
   });
 }
 

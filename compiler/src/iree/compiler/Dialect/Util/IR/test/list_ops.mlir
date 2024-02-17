@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @list_init_ops
-func.func @list_init_ops() {
+util.func public @list_init_ops() {
   // CHECK: %[[CAPACITY:.+]] = arith.constant 5
   %capacity = arith.constant 5 : index
   // CHECK: = util.list.create %[[CAPACITY]] : !util.list<?>
@@ -15,14 +15,14 @@ func.func @list_init_ops() {
   // CHECK: util.list.resize %[[LIST]], %[[NEW_SIZE]] : !util.list<?>
   util.list.resize %list, %new_size : !util.list<?>
 
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @list_access
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<i32>)
-func.func @list_access(%list: !util.list<i32>) {
+util.func public @list_access(%list: !util.list<i32>) {
   %c10 = arith.constant 10 : index
 
   // CHECK: = util.list.get %[[LIST]][%c10] : !util.list<i32>
@@ -35,14 +35,14 @@ func.func @list_access(%list: !util.list<i32>) {
   // CHECK: util.list.set %[[LIST]][%c10], %[[NEW_VALUE]] : !util.list<i32>
   util.list.set %list[%c10], %new_value : !util.list<i32>
 
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @list_access_tensor
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<tensor<*xf32>>)
-func.func @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
+util.func public @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
   %c10 = arith.constant 10 : index
 
   // CHECK: = util.list.get %[[LIST]][%c10] : !util.list<tensor<*xf32>> -> tensor<?xf32>
@@ -53,14 +53,14 @@ func.func @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
   // CHECK: util.list.set %[[LIST]][%c10], %[[NEW_VALUE]] : tensor<5xi32> -> !util.list<tensor<*xf32>>
   util.list.set %list[%c10], %new_value : tensor<5xi32> -> !util.list<tensor<*xf32>>
 
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @list_access_variant
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<?>)
-func.func @list_access_variant(%list: !util.list<?>) {
+util.func public @list_access_variant(%list: !util.list<?>) {
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
 
@@ -80,5 +80,5 @@ func.func @list_access_variant(%list: !util.list<?>) {
   // CHECK: util.list.set %[[LIST]][%c11], %[[NEW_TENSOR_VALUE]] : tensor<5xi32> -> !util.list<?>
   util.list.set %list[%c11], %new_tensor_value : tensor<5xi32> -> !util.list<?>
 
-  return
+  util.return
 }

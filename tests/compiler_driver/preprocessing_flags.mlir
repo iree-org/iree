@@ -1,5 +1,5 @@
 // RUN: iree-compile --iree-hal-target-backends=llvm-cpu --compile-to=preprocessing \
-// RUN:   --iree-preprocessing-pass-pipeline="builtin.module(func.func(iree-preprocessing-convert-conv2d-to-img2col,iree-preprocessing-pad-linalg-ops{pad-size=16}))" \
+// RUN:   --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv2d-to-img2col,iree-preprocessing-pad-linalg-ops{pad-size=16}))" \
 // RUN:   --mlir-print-ir-after=iree-preprocessing-convert-conv2d-to-img2col --mlir-print-ir-after=iree-preprocessing-pad-linalg-ops %s 2>&1 \
 // RUN:   | FileCheck %s
 
@@ -8,11 +8,12 @@ func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : te
       outs(%arg2 : tensor<10x30xf32>) -> tensor<10x30xf32>
   return %0 : tensor<10x30xf32>
 }
+
 // Just check that the pass runs, and that the compilation finishes
 //       CHECK: ConvertConv2DToImg2Col (iree-preprocessing-convert-conv2d-to-img2col)
 //       CHECK: PadLinalgOps (iree-preprocessing-pad-linalg-ops)
 // CHECK-LABEL: module
-//  CHECK-NEXT:   func.func @test(
+//  CHECK-NEXT:   util.func public @test(
 //   CHECK-DAG:     %[[ARG0:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input0" : !hal.buffer_view -> tensor<10x20xf32>
 //   CHECK-DAG:     %[[ARG1:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input1" : !hal.buffer_view -> tensor<20x30xf32>
 //   CHECK-DAG:     %[[ARG2:.+]] = hal.tensor.import %{{[a-zA-Z0-9]+}} "input2" : !hal.buffer_view -> tensor<10x30xf32>

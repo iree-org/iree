@@ -31,14 +31,14 @@ flow.executable private @ex1 {
     }
   }
 }
-func.func @main() -> (tensor<4x8xf32>, tensor<8x4xf32>) {
+util.func public @main() -> (tensor<4x8xf32>, tensor<8x4xf32>) {
   %c100 = arith.constant 100 : index
   %c50 = arith.constant 50 : index
   // CHECK: flow.dispatch @ex0::@dispatch0_fill_4x8_f32
   %0 = flow.dispatch @ex0::@dispatch0[%c100, %c50]() : () -> tensor<4x8xf32>
   // CHECK: flow.dispatch @ex1::@dispatch1_fill_8x4_f32
   %1 = flow.dispatch @ex1::@dispatch1[%c100, %c50]() : () -> tensor<8x4xf32>
-  return %0, %1 : tensor<4x8xf32>, tensor<8x4xf32>
+  util.return %0, %1 : tensor<4x8xf32>, tensor<8x4xf32>
 }
 
 // -----

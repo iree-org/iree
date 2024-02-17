@@ -186,9 +186,12 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     break;
   }
   // Transform-dialect pipelines.
-  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-    addTransformDialectPasses(pipeline);
+  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen: {
+    SymbolRefAttr codegenSpec = translationInfo.value().getCodegenSpec();
+    addTransformDialectPasses(
+        pipeline, codegenSpec ? codegenSpec.getLeafReference() : StringRef(""));
     break;
+  }
   default:
     moduleOp.emitOpError("Unsupported pipeline on CPU target.");
     return signalPassFailure();

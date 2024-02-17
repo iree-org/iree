@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -288,16 +287,16 @@ private:
     auto funcName = (StringRef("__constant_block_") +
                      std::to_string(nextUniqueConstantBlockId++))
                         .str();
-    auto funcOp = moduleBuilder.create<func::FuncOp>(blockOp.getLoc(), funcName,
-                                                     blockOp.getFunctionType());
+    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
+        blockOp.getLoc(), funcName, blockOp.getFunctionType());
     funcOp.setPrivate();
     funcOp.getRegion().takeBody(blockOp.getRegion());
 
     // Replace the hal.return with a func.return.
     for (auto returnOp :
          llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
-      OpBuilder(returnOp).create<func::ReturnOp>(returnOp.getLoc(),
-                                                 returnOp.getOperands());
+      OpBuilder(returnOp).create<IREE::Util::ReturnOp>(returnOp.getLoc(),
+                                                       returnOp.getOperands());
       returnOp.erase();
     }
 
@@ -306,8 +305,8 @@ private:
     if (funcOp.getNumArguments() > 0) {
       callOperands.push_back(device);
     }
-    auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
-                                                     callOperands);
+    auto callOp = callerBuilder.create<IREE::Util::CallOp>(
+        blockOp.getLoc(), funcOp, callOperands);
 
     return llvm::map_to_vector(callOp.getResults(),
                                [](OpResult result) -> Value { return result; });

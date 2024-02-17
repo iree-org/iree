@@ -16,7 +16,6 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -228,7 +227,8 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   // Create an exported benchmark function that runs the dispatches.
   auto funcType =
       moduleBuilder.getFunctionType({moduleBuilder.getI32Type()}, {});
-  auto funcOp = moduleBuilder.create<func::FuncOp>(loc, baseName, funcType);
+  auto funcOp =
+      moduleBuilder.create<IREE::Util::FuncOp>(loc, baseName, funcType);
   funcOp.setVisibility(SymbolTable::Visibility::Public);
 
   // Mark the function as being a dispatch benchmark.
@@ -377,7 +377,7 @@ static void appendDispatchBenchmark(IREE::HAL::ExecutableOp executableOp,
   funcBuilder.create<IREE::Util::StatusCheckOkOp>(
       loc, fenceOp.getStatus(), "failed to wait on timepoint");
 
-  funcBuilder.create<mlir::func::ReturnOp>(loc);
+  funcBuilder.create<IREE::Util::ReturnOp>(loc);
 }
 
 // Builds a module exporting one function for each dispatch configuration

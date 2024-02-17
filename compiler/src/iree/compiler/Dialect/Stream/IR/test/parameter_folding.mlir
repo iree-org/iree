@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @FoldParameterLoadTargetSubview
 // CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
-func.func @FoldParameterLoadTargetSubview(%wait: !stream.timepoint, %offset0: index, %length0: index, %offset1: index, %length1: index) -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+util.func private @FoldParameterLoadTargetSubview(%wait: !stream.timepoint, %offset0: index, %length0: index, %offset1: index, %length1: index) -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c50_i64 = arith.constant 50 : i64
   %c51_i64 = arith.constant 51 : i64
   %c100 = arith.constant 100 : index
@@ -23,15 +23,15 @@ func.func @FoldParameterLoadTargetSubview(%wait: !stream.timepoint, %offset0: in
   %subview0 = stream.resource.subview %results#0[%offset0] : !stream.resource<constant>{%c100} -> !stream.resource<constant>{%length0}
   // CHECK-NOT: stream.resource.subview
   %subview1 = stream.resource.subview %results#1[%offset1] : !stream.resource<constant>{%c200} -> !stream.resource<constant>{%length1}
-  // CHECK: return %[[RESULTS]]#0, %[[RESULTS]]#1, %[[SIGNAL]]
-  return %subview0, %subview1, %result_timepoint : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1, %[[SIGNAL]]
+  util.return %subview0, %subview1, %result_timepoint : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @FoldParameterReadTargetSubview
 // CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[TARGET:.+]]: !stream.resource<transient>, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @FoldParameterReadTargetSubview(%wait: !stream.timepoint, %target: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
+util.func private @FoldParameterReadTargetSubview(%wait: !stream.timepoint, %target: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -43,14 +43,14 @@ func.func @FoldParameterReadTargetSubview(%wait: !stream.timepoint, %target: !st
   %subview = stream.resource.subview %target[%offset] : !stream.resource<transient>{%length} -> !stream.resource<transient>{%c300}
   // CHECK: = stream.parameter.read await(%[[WAIT]]) => "scope"::"key"[%[[PARAMETER_OFFSET]]] -> %[[TARGET]][%[[RESOURCE_OFFSET]] for %c200] : !stream.resource<transient>{%[[LENGTH]]} => !stream.timepoint
   %timepoint = stream.parameter.read await(%wait) => "scope"::"key"[%c50_i64] -> %subview[%c100 for %c200] : !stream.resource<transient>{%c300} => !stream.timepoint
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @FoldParameterWriteSourceSubview
 // CHECK-SAME: (%[[WAIT:.+]]: !stream.timepoint, %[[SOURCE:.+]]: !stream.resource<transient>, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @FoldParameterWriteSourceSubview(%wait: !stream.timepoint, %source: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
+util.func private @FoldParameterWriteSourceSubview(%wait: !stream.timepoint, %source: !stream.resource<transient>, %offset: index, %length: index) -> !stream.timepoint {
   %c50_i64 = arith.constant 50 : i64
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -62,5 +62,5 @@ func.func @FoldParameterWriteSourceSubview(%wait: !stream.timepoint, %source: !s
   %subview = stream.resource.subview %source[%offset] : !stream.resource<transient>{%length} -> !stream.resource<transient>{%c300}
   // CHECK: = stream.parameter.write await(%[[WAIT]]) => %[[SOURCE]][%[[RESOURCE_OFFSET]] for %c200] : !stream.resource<transient>{%[[LENGTH]]} -> "scope"::"key"[%[[PARAMETER_OFFSET]]] => !stream.timepoint
   %timepoint = stream.parameter.write await(%wait) => %subview[%c100 for %c200] : !stream.resource<transient>{%c300} -> "scope"::"key"[%c50_i64] => !stream.timepoint
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }

@@ -262,7 +262,6 @@ def PropagateTimepointsPass :
   }];
   let dependentDialects = [
     "mlir::cf::ControlFlowDialect",
-    "mlir::func::FuncDialect",
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
   ];

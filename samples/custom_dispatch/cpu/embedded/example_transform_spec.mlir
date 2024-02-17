@@ -68,7 +68,7 @@ module attributes {transform.with_named_sequence} {
     }  // hal.executable.variant
   }  // hal.executable
 
-  func.func @call_mul_abs_negate(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+  util.func private @call_mul_abs_negate(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
     %c0 = arith.constant 0 : index
     %dim = tensor.dim %arg0, %c0 : tensor<?xf32>
     %dim_i32 = arith.index_cast %dim : index to i32
@@ -79,12 +79,10 @@ module attributes {transform.with_named_sequence} {
         #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>,
         #hal.interface.binding<0, 2>
-      ],
-      // HACK: keep the executable live through DCE. Only required when
-      // using the automatic variant selection.
-      hal.executable.ref = [@executable]
+      ]
     } : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
-    return %0 : tensor<?xf32>
+
+    util.return %0 : tensor<?xf32>
   }
 
   transform.named_sequence @match_mul_abs_negate(%root: !transform.any_op {transform.readonly}) -> (!transform.any_value, !transform.any_value) {
@@ -137,10 +135,10 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @cast_and_call_dag(%ins: !transform.any_value {transform.readonly},
                                               %out: !transform.any_value {transform.readonly}) {
     %root = transform.get_defining_op %out : (!transform.any_value) -> !transform.any_op
-    %module = transform.iree.get_nearest_symbol_table %root : (!transform.any_op) -> !transform.any_op
-    %executable = transform.iree.import_symbol @executable into %module if undefined : (!transform.any_op) -> !transform.any_op
-    %func = transform.iree.import_symbol @call_mul_abs_negate into %module if undefined : (!transform.any_op) -> !transform.any_op
-    transform.func.cast_and_call %func(%ins) -> %out after %root {
+    %module = transform.util.get_nearest_symbol_table %root : (!transform.any_op) -> !transform.any_op
+    %executable = transform.util.import_symbol @executable into %module if undefined : (!transform.any_op) -> !transform.any_op
+    %func = transform.util.import_symbol @call_mul_abs_negate into %module if undefined : (!transform.any_op) -> !transform.any_op
+    transform.util.cast_and_call %func(%ins) -> %out after %root {
           // This specifies how to resolve type mismatches between the arguments
           // of the function and the inputs from the matcher. In this example,
           // the only casts this will generate are same-rank tensor casts that
@@ -155,7 +153,7 @@ module attributes {transform.with_named_sequence} {
   // add a new symbol to the module's symbol table.
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
     // Gather the set of functions within the module.
-    %funcs = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op   
+    %funcs = transform.structured.match ops{["util.func"]} in %module : (!transform.any_op) -> !transform.any_op
     // For each function in the module, run the matcher on all contained
     // operations.
     transform.foreach %funcs : !transform.any_op {

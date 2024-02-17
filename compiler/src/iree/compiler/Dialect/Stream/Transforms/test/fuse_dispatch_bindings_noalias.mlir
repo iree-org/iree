@@ -13,9 +13,9 @@
 stream.executable private @deduplicateBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #noaliasConfig}
   builtin.module  {
-    // CHECK: func.func @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
+    // CHECK:  util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_C:.+]]: !stream.binding,
     // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OPERAND:.+]]: index)
-    func.func @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
+     util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
       %c20 = arith.constant 20 : index
       %c40 = arith.constant 40 : index
@@ -39,12 +39,12 @@ stream.executable private @deduplicateBindingsEx {
 
       // CHECK-NEXT: util.optimization_barrier %[[OPERAND]] : index
       util.optimization_barrier %operand : index
-      return
+      util.return
     }
   }
 }
-// CHECK: func.func @deduplicateBindings(%[[OPERAND:.+]]: index)
-func.func @deduplicateBindings(%operand: index) {
+// CHECK:  util.func public @deduplicateBindings(%[[OPERAND:.+]]: index)
+util.func public @deduplicateBindings(%operand: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -78,5 +78,5 @@ func.func @deduplicateBindings(%operand: index) {
       rw %capture0[%c20 for %c20] : !stream.resource<transient>{%c200}
     }
   } => !stream.timepoint
-  return
+  util.return
 }

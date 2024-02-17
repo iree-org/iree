@@ -5,9 +5,9 @@
 module @eval_i8_scalar {
   util.global private @offset : i8 = -2 : i8
   util.global private @hoisted : i8
-  func.func @main() -> i8 {
+  util.func public @main() -> i8 {
     %hoisted = util.global.load @hoisted : i8
-    return %hoisted : i8
+    util.return %hoisted : i8
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44 : i8
@@ -24,9 +24,9 @@ module @eval_i8_scalar {
 module @eval_i16_scalar {
   util.global private @offset : i16 = -2 : i16
   util.global private @hoisted : i16
-  func.func @main() -> i16 {
+  util.func public @main() -> i16 {
     %hoisted = util.global.load @hoisted : i16
-    return %hoisted : i16
+    util.return %hoisted : i16
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44 : i16
@@ -43,9 +43,9 @@ module @eval_i16_scalar {
 module @eval_i32_scalar {
   util.global private @offset : i32 = -2 : i32
   util.global private @hoisted : i32
-  func.func @main() -> i32 {
+  util.func public @main() -> i32 {
     %hoisted = util.global.load @hoisted : i32
-    return %hoisted : i32
+    util.return %hoisted : i32
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44 : i32
@@ -62,9 +62,9 @@ module @eval_i32_scalar {
 module @eval_i64_scalar {
   util.global private @offset : i64 = -2 : i64
   util.global private @hoisted : i64
-  func.func @main() -> i64 {
+  util.func public @main() -> i64 {
     %hoisted = util.global.load @hoisted : i64
-    return %hoisted : i64
+    util.return %hoisted : i64
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44 : i64
@@ -81,9 +81,9 @@ module @eval_i64_scalar {
 module @eval_f32_scalar {
   util.global private @offset : f32 = -2.0 : f32
   util.global private @hoisted : f32
-  func.func @main() -> f32 {
+  util.func public @main() -> f32 {
     %hoisted = util.global.load @hoisted : f32
-    return %hoisted : f32
+    util.return %hoisted : f32
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44.0 : f32

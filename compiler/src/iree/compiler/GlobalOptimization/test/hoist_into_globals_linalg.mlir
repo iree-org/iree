@@ -6,8 +6,8 @@
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @compute_hoisted {
   // CHECK: util.global private @[[HOISTED:.*]] : tensor<5x6xf32>
-  // CHECK: func.func @main
-  func.func @main() -> (tensor<5x6xf32>) {
+  // CHECK: util.func public @main
+  util.func public @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
 
     // A non-leaf broadcast.
@@ -26,8 +26,8 @@ module @compute_hoisted {
     } -> tensor<5x6xf32>
 
     // CHECK: %[[RESULT:.*]] = util.global.load @[[HOISTED]] : tensor<5x6xf32>
-    // CHECK: return %[[RESULT]]
-    return %3 : tensor<5x6xf32>
+    // CHECK: util.return %[[RESULT]]
+    util.return %3 : tensor<5x6xf32>
   }
   // CHECK: util.initializer
 }
@@ -41,8 +41,8 @@ module @compute_hoisted {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @broadcast_treated_as_leaf {
   // CHECK-NOT: util.global
-  // CHECK: func.func @main
-  func.func @main() -> (tensor<5x6xf32>) {
+  // CHECK: util.func public @main
+  util.func public @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
     // CHECK: tensor.empty()
     %0 = tensor.empty() : tensor<5x6xf32>
@@ -52,8 +52,8 @@ module @broadcast_treated_as_leaf {
     ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
       linalg.yield %arg1 : f32
     } -> tensor<5x6xf32>
-    // CHECK: return
-    return %1 : tensor<5x6xf32>
+    // CHECK: util.return
+    util.return %1 : tensor<5x6xf32>
   }
   // CHECK-NOT: util.initializer
 }

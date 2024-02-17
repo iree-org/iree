@@ -1,34 +1,34 @@
 // RUN: iree-opt --split-input-file --canonicalize -cse %s | iree-opt --split-input-file | FileCheck %s
 
-// CHECK-LABEL: func @FoldBufferLengthOp
+// CHECK-LABEL: @FoldBufferLengthOp
 // CHECK-SAME: (%[[LENGTH:.+]]: index)
-func.func @FoldBufferLengthOp(%length: index) -> index {
+util.func public @FoldBufferLengthOp(%length: index) -> index {
   %c64 = arith.constant 64 : index
   %buffer, %storage = hal_inline.buffer.allocate alignment(%c64) : !hal.buffer{%length} in !util.buffer
   // CHECK-NOT: hal_inline.buffer.length
   %queried_length = hal_inline.buffer.length<%buffer : !hal.buffer> : index
   // CHECK: return %[[LENGTH]]
-  return %queried_length : index
+  util.return %queried_length : index
 }
 
 // -----
 
-// CHECK-LABEL: func @FoldBufferStorageOp
-func.func @FoldBufferStorageOp(%length: index) -> !util.buffer {
+// CHECK-LABEL: @FoldBufferStorageOp
+util.func public @FoldBufferStorageOp(%length: index) -> !util.buffer {
   %c64 = arith.constant 64 : index
   // CHECK: %[[BUFFER:.+]], %[[STORAGE:.+]] = hal_inline.buffer.allocate
   %buffer, %storage = hal_inline.buffer.allocate alignment(%c64) : !hal.buffer{%length} in !util.buffer
   // CHECK-NOT: hal_inline.buffer.storage
   %queried_storage = hal_inline.buffer.storage<%buffer : !hal.buffer> : !util.buffer
   // CHECK: return %[[STORAGE]]
-  return %queried_storage : !util.buffer
+  util.return %queried_storage : !util.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @FoldBufferViewCreateSubspan
 // CHECK-SAME: (%[[BASE_BUFFER:.+]]: !hal.buffer, %[[SUBSPAN_OFFSET:.+]]: index, %[[SUBSPAN_LENGTH:.+]]: index)
-func.func @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offset: index, %subspan_length: index) -> !hal.buffer_view {
+util.func public @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offset: index, %subspan_length: index) -> !hal.buffer_view {
   %subspan = hal_inline.buffer.subspan<%base_buffer : !hal.buffer>[%subspan_offset, %subspan_length] : !hal.buffer
   // CHECK-DAG: %[[VIEW_OFFSET:.+]] = arith.constant 512
   %view_offset = arith.constant 512 : index
@@ -44,14 +44,14 @@ func.func @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offse
                                  shape([%dim0])
                                  type(%type)
                                  encoding(%encoding) : !hal.buffer_view
-  return %view : !hal.buffer_view
+  util.return %view : !hal.buffer_view
 }
 
 // -----
 
-// CHECK-LABEL: func @SkipBufferViewBufferOp
+// CHECK-LABEL: @SkipBufferViewBufferOp
 // CHECK-SAME: (%[[BUFFER:.+]]: !hal.buffer)
-func.func @SkipBufferViewBufferOp(%buffer: !hal.buffer) -> !hal.buffer {
+util.func public @SkipBufferViewBufferOp(%buffer: !hal.buffer) -> !hal.buffer {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : i32
   %c10 = arith.constant 10 : index
@@ -64,5 +64,5 @@ func.func @SkipBufferViewBufferOp(%buffer: !hal.buffer) -> !hal.buffer {
                                         encoding(%c1) : !hal.buffer_view
   %view_buffer = hal_inline.buffer_view.buffer<%view : !hal.buffer_view> : !hal.buffer
   // CHECK: return %[[BUFFER]]
-  return %view_buffer : !hal.buffer
+  util.return %view_buffer : !hal.buffer
 }

@@ -32,7 +32,7 @@ module attributes {transform.with_named_sequence} {
       count(%device: !hal.device, %workload: index) -> (index, index, index) {
         %c1_0 = arith.constant 1 : index
         hal.return %c1_0, %c1_0, %c1_0 : index, index, index
-      }   
+      }
       layout(#hal.pipeline.layout<push_constants = 1, sets = [
         <0, bindings = [
             <0, storage_buffer, ReadOnly>,
@@ -40,11 +40,11 @@ module attributes {transform.with_named_sequence} {
         ]>
       ]>)
       bindings([
-        #hal.interface.binding<0, 0>, 
+        #hal.interface.binding<0, 0>,
         #hal.interface.binding<0, 1>
-      ])  
+      ])
       objects({
-        #spirv_target ordinal(0) = [ 
+        #spirv_target ordinal(0) = [
           #hal.executable.object<{
             path = "samples/custom_dispatch/vulkan/shaders/one_workgroup_argmax_subgroup_f32.spv"
           }>
@@ -78,8 +78,8 @@ module attributes {transform.with_named_sequence} {
       transform.match.param.cmpi eq %n_inputs, %c1 : !transform.param<i64>
       %n_outputs = transform.match.structured.num_inits %argmax : (!transform.any_op) -> !transform.param<i64>
       transform.match.param.cmpi eq %n_outputs, %c2 : !transform.param<i64>
-  
-      transform.match.structured.yield %argmax : !transform.any_op 
+
+      transform.match.structured.yield %argmax : !transform.any_op
     }
 
     // Verify the operand shapes of the linalg op. For example, in the below,
@@ -125,8 +125,8 @@ module attributes {transform.with_named_sequence} {
   // custom kernel authored above, and replace the users of the argmax with a
   // call to the function.
   transform.named_sequence @cast_and_call_argmax(%argmax: !transform.any_op {transform.readonly}) {
-    %module = transform.iree.get_nearest_symbol_table %argmax : (!transform.any_op) -> !transform.any_op
-    %func = transform.iree.import_symbol @argmax_1d_f32_entry_point into %module : (!transform.any_op) -> !transform.any_op
+    %module = transform.util.get_nearest_symbol_table %argmax : (!transform.any_op) -> !transform.any_op
+    %func = transform.util.import_symbol @argmax_1d_f32_entry_point into %module : (!transform.any_op) -> !transform.any_op
     %ins = transform.get_operand %argmax[0] : (!transform.any_op) -> !transform.any_value
     %outs = transform.get_result %argmax[1] : (!transform.any_op) -> !transform.any_value
     transform.func.cast_and_call %func(%ins) -> %outs before %argmax {
@@ -144,7 +144,7 @@ module attributes {transform.with_named_sequence} {
   // add a new symbol to the module's symbol table.
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
     // Gather the set of functions within the module.
-    %funcs = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op   
+    %funcs = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op
     // For each function in the module, run the matcher on all contained
     // operations.
     transform.foreach %funcs : !transform.any_op {

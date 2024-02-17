@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @dispatchTypes
-func.func @dispatchTypes(
+util.func public @dispatchTypes(
     // CHECK-SAME: %arg0: !flow.dispatch.tensor<readonly:tensor<f32>>
     %arg0: !flow.dispatch.tensor<readonly:tensor<f32>>,
     // CHECK-SAME: %arg1: !flow.dispatch.tensor<readonly:tensor<4x4xf32>>
@@ -23,5 +23,5 @@ func.func @dispatchTypes(
     // CHECK-SAME: %arg9: !flow.dispatch.tensor<writeonly:tensor<1x?x3xf32>>
     %arg9: !flow.dispatch.tensor<writeonly:tensor<1x?x3xf32>>
     ) {
-  return
+  util.return
 }

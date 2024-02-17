@@ -48,7 +48,7 @@ module attributes {hal.device.targets = [
       }
     }
   }
-  func.func @main(%arg0: !stream.resource<constant>, %arg1: !stream.resource<transient>, %arg2: index, %arg3: i32) -> !stream.resource<transient> {
+  util.func public @main(%arg0: !stream.resource<constant>, %arg1: !stream.resource<transient>, %arg2: index, %arg3: i32) -> !stream.resource<transient> {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c2 = arith.constant 2 : index
@@ -67,7 +67,7 @@ module attributes {hal.device.targets = [
       }
     } => !stream.timepoint
     %2 = stream.timepoint.await %1 => %0 : !stream.resource<transient>{%arg2}
-    return %2 : !stream.resource<transient>
+    util.return %2 : !stream.resource<transient>
   }
 }
 

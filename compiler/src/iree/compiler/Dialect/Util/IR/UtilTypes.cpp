@@ -228,6 +228,17 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
   return false;
 }
 
+bool isPublicOrExternal(CallableOpInterface callableOp) {
+  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
+    if (symbolOp.isPublic())
+      return true;
+  }
+  auto *region = callableOp.getCallableRegion();
+  if (!region || region->empty())
+    return true;
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Global and structural interface utilities
 //===----------------------------------------------------------------------===//
@@ -349,6 +360,22 @@ lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
+
+void detail::getAllTiedOperands(Operation *op,
+                                SmallVectorImpl<int64_t> &indices) {
+  if (auto tiedOperandsAttr = op->getAttrOfType<ArrayAttr>(
+          IREE::Util::TiedOpInterface::getStorageAttrName())) {
+    for (auto indexAttr : tiedOperandsAttr.getAsRange<IntegerAttr>()) {
+      indices.push_back(indexAttr.getInt());
+    }
+  } else if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    indices.assign(op->getNumResults(),
+                   IREE::Util::TiedOpInterface::kUntiedIndex);
+  } else if (auto callableOp = dyn_cast<CallableOpInterface>(op)) {
+    indices.assign(callableOp.getResultTypes().size(),
+                   IREE::Util::TiedOpInterface::kUntiedIndex);
+  }
+}
 
 std::optional<unsigned>
 detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {
