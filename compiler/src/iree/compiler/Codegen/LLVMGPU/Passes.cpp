@@ -48,6 +48,12 @@ static llvm::cl::opt<unsigned>
     logSwizzleTile("iree-codegen-log-swizzle-tile",
                    llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
 
+llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
+    "iree-llvmgpu-shared-memory-limit",
+    llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
+                   "allocated for the given target"),
+    llvm::cl::init(163 * 1024));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -694,8 +700,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface) {
-    return 163 * 1024;
+  int64_t limit = clLLVMGPUSharedMemoryLimit;
+  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
+    return limit;
   };
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
