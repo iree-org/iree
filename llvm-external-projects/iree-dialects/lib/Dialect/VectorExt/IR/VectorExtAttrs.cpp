@@ -258,7 +258,8 @@ LogicalResult NestedLayoutAttr::verify(
     ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
     ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
-    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
+    ArrayRef<int64_t> subgroupBasis, ArrayRef<int64_t> threadBasis) {
 
   size_t rank = subgroupsPerWorkgroup.size();
   auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
@@ -277,7 +278,9 @@ LogicalResult NestedLayoutAttr::verify(
       failed(checkTile(batchesPerSubgroup, batchOrder)) ||
       failed(checkTile(outersPerBatch, outerOrder)) ||
       failed(checkTile(threadsPerOuter, threadOrder)) ||
-      failed(checkTile(elementsPerThread, elementOrder))) {
+      failed(checkTile(elementsPerThread, elementOrder)) ||
+      failed(checkTile(subgroupBasis, subgroupOrder)) ||
+      failed(checkTile(threadBasis, threadOrder))) {
     return failure();
   }
 
@@ -290,10 +293,10 @@ ValueRange NestedLayoutAttr::computeThreadIds(Value threadId,
                                               RewriterBase &rewriter) const {
   SmallVector<OpFoldResult> basis;
   for (auto warpTy : getSubgroupOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getSubgroupsPerWorkgroup()[warpTy]));
+    basis.push_back(rewriter.getIndexAttr(getSubgroupBasis()[warpTy]));
   }
   for (auto threadTy : getThreadOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getThreadsPerOuter()[threadTy]));
+    basis.push_back(rewriter.getIndexAttr(getThreadBasis()[threadTy]));
   }
 
   auto delinearized = rewriter.create<mlir::affine::AffineDelinearizeIndexOp>(

@@ -279,7 +279,10 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
 
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
-    ArrayRefParameter<"int64_t", "element_order">:$elementOrder
+    ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
+
+    ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
+    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis
   );
 
   // TODO: add custom parser/printer and builder to elide default value array
@@ -295,7 +298,10 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `batch_order`             `=` `[` $batchOrder `]` `,`
         `outer_order`             `=` `[` $outerOrder `]` `,`
         `thread_order`            `=` `[` $threadOrder `]` `,`
-        `element_order`           `=` `[` $elementOrder `]` 
+        `element_order`           `=` `[` $elementOrder `]` `,`
+
+        `subgroup_basis`          `=` `[` $subgroupBasis `]` `,`
+        `thread_basis`            `=` `[` $threadBasis `]`
     `>`
   }];
 

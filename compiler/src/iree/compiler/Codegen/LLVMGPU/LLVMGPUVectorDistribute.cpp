@@ -244,9 +244,14 @@ private:
       batchSizes[dim] = vectorSize;
     }
 
+    // TODO: This is not always true. Someone should check if this is the right
+    // thread grid.
+    SmallVector<int64_t> subgroupBasis = subgroupCounts;
+    SmallVector<int64_t> threadBasis = threadCounts;
+
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
-        threadCounts, order, elementSizes, order);
+        threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
     analysis.setAnchor(transfer.getResult(), layout);
   }
 

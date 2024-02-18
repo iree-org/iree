@@ -11,7 +11,10 @@
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 // CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 + 8)>
@@ -61,7 +64,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [4, 8]
 >
 
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
@@ -110,7 +116,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1)>
@@ -160,7 +169,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [4, 8]
 >
 
 func.func @distribute_transfer_read_col_major_with_broadcast(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<16x16xf16> {
@@ -205,7 +217,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 // CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0, s1] -> (s0 + s1)>
@@ -257,7 +272,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [4, 8]
 >
 
 // CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d3, d2)>
@@ -298,7 +316,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 2, 3, 0],
   outer_order             = [0, 3, 1, 2],
   thread_order            = [0, 1, 3, 2],
-  element_order           = [0, 1, 2, 3]
+  element_order           = [0, 1, 2, 3],
+
+  subgroup_basis          = [7, 3, 1, 1],
+  thread_basis            = [1, 1, 2, 2]
 >
 
 func.func @distribute_transfer_read_row_major_with_permutations(%a: index, %b: index, %arg0: memref<32x32x32x32xf16>) -> vector<21x15x8x16xf16> {
@@ -339,7 +360,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 // CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 + 8)>
@@ -386,7 +410,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [4, 8]
 >
 
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
@@ -433,7 +460,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 // CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1)>
@@ -488,7 +518,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [8, 1]
 >
 
 func.func @distribute_transfer_read_write(%a: index, %b: index,
