@@ -701,7 +701,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   // Run checks on shared memory usage.
   // TODO: query this from the target.
   int64_t limit = clLLVMGPUSharedMemoryLimit;
-  auto getSharedMemoryLimit = [&](mlir::FunctionOpInterface) { return limit; };
+  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
+    return limit;
+  };
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
