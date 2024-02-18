@@ -184,6 +184,11 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       symbols, hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
       "hipModuleLoadDataEx");
+  if (!iree_status_is_ok(status)) {
+    status = iree_status_annotate(
+        status,
+        IREE_SV("mismatched target chip? missing/wrong bitcode directory?"));
+  }
 
   // Query max optin shared memory per block - we'll use it to compare with
   // kernel usages.
@@ -220,11 +225,11 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
 
       if (shared_memory_sizes_vec[i] > max_shared_memory) {
-        status =
-            iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                             "requested shared memory size of %u bytes "
-                             "larger than allowed size of %u bytes",
-                             shared_memory_sizes_vec[i], max_shared_memory);
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "function '%s' requested shared memory size of %u bytes larger "
+            "than allowed size of %u bytes",
+            entry_name, shared_memory_sizes_vec[i], max_shared_memory);
       } else {
         status = IREE_HIP_RESULT_TO_STATUS(
             symbols,

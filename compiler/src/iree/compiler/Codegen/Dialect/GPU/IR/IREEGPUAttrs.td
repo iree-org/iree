@@ -18,8 +18,9 @@ def IREEGPU_MmaArrayAttr : TypedArrayAttrBase<IREEGPU_MmaAttr,
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr,[
+  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr, [
     "getABCElementTypes",
+    "getABCVectorTypes",
     "getContractionLayout",
     "getMNKShape",
   ]>
@@ -48,7 +49,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
   }];
 
-    
+
   let parameters = (ins
     mmaintrinsic:$intrinsic,
     "int64_t":$mSize,
@@ -59,7 +60,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "::mlir::Type":$cType
   );
 
-  let extraClassDeclaration = [{
+  string baseExtraClassDeclaration = [{
     ::std::tuple<Type, Type, Type> getABCElementTypes() {
       return ::std::make_tuple(getAType(), getBType(), getCType());
     }
@@ -90,7 +91,7 @@ def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
     "Descriptor for different MFMA operations", [
       F16_16x16x16_F32,
       F16_32x32x8_F32,
-    ]>; 
+    ]>;
 
 def IREEGPU_MFMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MFMAIntrinsic, "mfma_intrinsic">;
@@ -116,6 +117,10 @@ def IREEGPU_MFMA : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
   let builders = [
     AttrBuilder<(ins "MFMAIntrinsic":$intrinsic)>
   ];
+
+  let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
+    int64_t getBlockSize();
+  }]);
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
