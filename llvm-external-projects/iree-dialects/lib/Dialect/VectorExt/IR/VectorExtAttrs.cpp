@@ -289,19 +289,42 @@ LogicalResult NestedLayoutAttr::verify(
 
 /// Given a single flat thread ID, compute the indices of the distributed
 /// dimensions (subgroup and thread ids).
-ValueRange NestedLayoutAttr::computeThreadIds(Value threadId,
-                                              RewriterBase &rewriter) const {
-  SmallVector<OpFoldResult> basis;
-  for (auto warpTy : getSubgroupOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getSubgroupBasis()[warpTy]));
-  }
-  for (auto threadTy : getThreadOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getThreadBasis()[threadTy]));
+SmallVector<Value>
+NestedLayoutAttr::computeThreadIds(Value threadId,
+                                   RewriterBase &rewriter) const {
+  auto basisSizes = llvm::concat<const int64_t>(
+      applyPermutation(getSubgroupBasis(), getSubgroupOrder()),
+      applyPermutation(getThreadBasis(), getThreadOrder()));
+
+  SmallVector<OpFoldResult> basisIndexAttr;
+  for (int64_t basisIndex : basisSizes) {
+    basisIndexAttr.push_back(rewriter.getIndexAttr(basisIndex));
   }
 
-  auto delinearized = rewriter.create<mlir::affine::AffineDelinearizeIndexOp>(
-      threadId.getLoc(), threadId, basis);
-  return delinearized->getResults();
+  SmallVector<Value> delinearized =
+      rewriter
+          .create<mlir::affine::AffineDelinearizeIndexOp>(
+              threadId.getLoc(), threadId, basisIndexAttr)
+          .getResults();
+
+  // Modulo the delinearized index by the actual tile sizes.
+  auto tileSizes = llvm::concat<const int64_t>(
+      applyPermutation(getSubgroupsPerWorkgroup(), getSubgroupOrder()),
+      applyPermutation(getThreadsPerOuter(), getThreadOrder()));
+
+  for (auto [delinearized, basis, tile] :
+       llvm::zip(delinearized, basisSizes, tileSizes)) {
+    if (basis == tile) {
+      continue;
+    }
+
+    AffineMap modMap =
+        AffineMap::get(1, 0, rewriter.getAffineDimExpr(0) % tile);
+    delinearized = rewriter.create<affine::AffineApplyOp>(threadId.getLoc(),
+                                                          modMap, delinearized);
+  }
+
+  return delinearized;
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
