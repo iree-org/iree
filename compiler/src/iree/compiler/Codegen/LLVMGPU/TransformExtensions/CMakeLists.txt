@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRViewLikeInterface
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::LLVMGPU::Utils
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
