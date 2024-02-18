@@ -69,6 +69,9 @@ uint32_t findMmt4dUkernelType(Type lhsElemType, Type rhsElemType,
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
     return IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
+  } else if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(4) &&
+      outElemType.isSignlessInteger(32)) {
+    return IREE_UK_FLAG_MMT4D_TYPE_S8S4S32;
   } else if (lhsElemType.isSignlessInteger(16) &&
              rhsElemType.isSignlessInteger(16) &&
              outElemType.isSignlessInteger(32)) {
