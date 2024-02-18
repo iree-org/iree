@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "dispatch_linalg_on_tensors_default.mlir"
     "dispatch_linalg_on_tensors_fusion_with_transpose.mlir"
     "dispatch_linalg_transform_dialect.mlir"
+    "dump_executable_functions.mlir"
     "export_benchmark_funcs.mlir"
     "fold_unit_dims.mlir"
     "form_dispatch_regions.mlir"

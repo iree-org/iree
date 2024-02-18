@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -207,6 +208,11 @@ std::unique_ptr<Pass> createCollapseDimsPass();
 /// Creates a pass to dump a graph for dispatches
 std::unique_ptr<Pass>
 createDumpDispatchGraphPass(raw_ostream &os = llvm::errs());
+
+// Create a pass to initialize all empty tensors after dispatch formation to
+// zero or uninitialized allocations.
+std::unique_ptr<OperationPass<ModuleOp>>
+createDumpExecutableFunctionsPass(std::string path = "");
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

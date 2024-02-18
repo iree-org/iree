@@ -57,6 +57,26 @@ def DeduplicateExecutables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDeduplicateExecutablesPass()";
 }
 
+def DumpExecutableFunctionsPass :
+    Pass<"iree-flow-dump-executable-functions", "mlir::ModuleOp"> {
+  let summary = "Dumps standalone flow.executables to the provided path.";
+  let description = [{
+    Dumps one MLIR file per flow.executable containing the executable contents
+    and a single function with a flow.dispatch into the single entry point for
+    the executable. This is intended as a part of a developer flow for dumping
+    target agnostic executables and then compiling them in isolation for
+    comparison across backends.
+  }];
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDumpExecutableFunctionsPass()";
+  let options = [
+    Option<
+      "path", "path",
+      "std::string", "",
+      "File system path to write each executable MLIR file."
+    >,
+  ];
+}
+
 def FoldUnitExtentDims :
     InterfacePass<"iree-flow-fold-unit-extent-dims", "mlir::FunctionOpInterface"> {
   let summary = "Fold unit extent dimension of operations";

@@ -40,6 +40,7 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
+    "DumpExecutableFunctions.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"

@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "convert_region_to_workgroups.mlir",
             "deduplicate_executables.mlir",
             "dispatch_linalg_on_tensors.mlir",
+            "dump_executable_functions.mlir",
             "collapse_linalg_generic_on_tensors.mlir",
             "dispatch_linalg_on_tensors_default.mlir",
             "dispatch_linalg_on_tensors_fusion_with_transpose.mlir",

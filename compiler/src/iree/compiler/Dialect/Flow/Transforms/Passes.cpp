@@ -111,6 +111,12 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string> clDumpFlowExecutableFunctions(
+    "iree-flow-dump-executable-functions-to",
+    llvm::cl::desc("directory path to dump individual mlir files for all flow "
+                   "executables."),
+    llvm::cl::init(""));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -287,6 +293,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
           IREE::Flow::createDumpDispatchGraphPass(dotFile->os()));
       dotFile->keep();
     }
+  }
+
+  if (!clDumpFlowExecutableFunctions.empty()) {
+    std::string path = clDumpFlowExecutableFunctions;
+    passManager.addPass(IREE::Flow::createDumpExecutableFunctionsPass(path));
   }
 }
 
