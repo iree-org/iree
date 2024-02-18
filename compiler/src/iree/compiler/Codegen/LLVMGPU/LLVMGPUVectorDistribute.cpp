@@ -244,8 +244,8 @@ private:
       batchSizes[dim] = vectorSize;
     }
 
-    // TODO: This is not always true. Someone should check if this is the right
-    // thread grid.
+    // This is true for the particular way we construct this layout. If this
+    // is ever changed, we should
     SmallVector<int64_t> subgroupBasis = subgroupCounts;
     SmallVector<int64_t> threadBasis = threadCounts;
 
