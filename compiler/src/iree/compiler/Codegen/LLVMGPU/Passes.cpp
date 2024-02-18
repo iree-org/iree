@@ -539,7 +539,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
-    options.maxVectorSize = 16384;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
