@@ -20,7 +20,7 @@ namespace {
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
 
-// A class for querying information about a contract op.
+/// A class for querying information about a contract op.
 class ContractOpDetail {
 public:
   enum class OpKind { MK_KN_MN, MK_NK_MN, UNKNOWN };
