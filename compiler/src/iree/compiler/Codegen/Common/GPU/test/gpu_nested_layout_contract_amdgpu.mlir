@@ -36,7 +36,7 @@
   element_order           = [1, 0]
 >
 
-// C: vector<32x32>, layout = layoutC
+// C: shape = 32x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [1, 1],
@@ -183,7 +183,7 @@ builtin.module attributes { transform.with_named_sequence } {
 #map2 = affine_map<(m, n, k) -> (k, n)>
 #map3 = affine_map<(m, n, k) -> (m, n)>
 
-// A: shape = 32x8, layout = layoutA
+// A: shape = 64x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 1],
@@ -213,7 +213,7 @@ builtin.module attributes { transform.with_named_sequence } {
   element_order           = [1, 0]
 >
 
-// C: vector<32x32>, layout = layoutC
+// C: shape = 64x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 1],
@@ -279,7 +279,7 @@ builtin.module attributes { transform.with_named_sequence } {
 #map2 = affine_map<(m, n, k) -> (k, n)>
 #map3 = affine_map<(m, n, k) -> (m, n)>
 
-// A: shape = 32x8, layout = layoutA
+// A: shape = 32x16, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [1, 2],
@@ -294,7 +294,7 @@ builtin.module attributes { transform.with_named_sequence } {
   element_order           = [0, 1]
 >
 
-// B: shape = 8x32, layout = layoutB
+// B: shape = 16x32, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 1],
@@ -309,7 +309,7 @@ builtin.module attributes { transform.with_named_sequence } {
   element_order           = [1, 0]
 >
 
-// C: vector<32x32>, layout = layoutC
+// C: shape = 32x32, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [1, 1],
@@ -374,7 +374,7 @@ builtin.module attributes { transform.with_named_sequence } {
 #map2 = affine_map<(m, n, k) -> (k, n)>
 #map3 = affine_map<(m, n, k) -> (m, n)>
 
-// A: shape = 32x8, layout = layoutA
+// A: shape = 64x8, layout = layoutA
 #layout_a = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 1],
@@ -389,7 +389,7 @@ builtin.module attributes { transform.with_named_sequence } {
   element_order           = [0, 1]
 >
 
-// B: shape = 8x32, layout = layoutB
+// B: shape = 8x96, layout = layoutB
 #layout_b = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [1, 3],
@@ -404,7 +404,7 @@ builtin.module attributes { transform.with_named_sequence } {
   element_order           = [1, 0]
 >
 
-// C: vector<32x32>, layout = layoutC
+// C: shape = 64x96, layout = layoutC
 #layout_c = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 3],
@@ -463,3 +463,90 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   amdgpu.mfma
 //       CHECK:   %[[INS5:.+]] = vector.insert %{{.+}}, %[[INS4]] [2, 1] : vector<4x1x1x4xf32> into vector<3x2x4x1x1x4xf32>
 //       CHECK:   iree_vector_ext.to_simd %[[INS5]] : vector<3x2x4x1x1x4xf32> -> vector<64x96xf32>
+
+// -----
+
+// (M, K) x (N, K) -> (M, N)
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (n, k)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 32x8, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 1],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [32, 2],
+  elements_per_thread     = [1, 4],
+
+  subgroup_order          = [0, 1],
+  batch_order             = [0, 1],
+  outer_order             = [0, 1],
+  thread_order            = [1, 0],
+  element_order           = [0, 1]
+>
+
+// B: shape = 64x8, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [2, 1],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [32, 2],
+  elements_per_thread     = [1, 4],
+
+  subgroup_order          = [0, 1],
+  batch_order             = [0, 1],
+  outer_order             = [0, 1],
+  thread_order            = [1, 0],
+  element_order           = [0, 1]
+>
+
+// C: shape = 32x64, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 2],
+  outers_per_batch        = [4, 1],
+  threads_per_outer       = [2, 32],
+  elements_per_thread     = [4, 1],
+
+  subgroup_order          = [0, 1],
+  batch_order             = [0, 1],
+  outer_order             = [0, 1],
+  thread_order            = [0, 1],
+  element_order           = [1, 0]
+>
+
+func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8xf16>, %c : vector<32x64xf32>) -> vector<32x64xf32> {
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    "__vector_layout_test_anchor_operand_0" = #layout_a,
+    "__vector_layout_test_anchor_operand_1" = #layout_b,
+    "__vector_layout_test_anchor_operand_2" = #layout_c,
+    "__vector_layout_test_anchor_result_0" = #layout_c
+  } %a, %b, %c : vector<32x8xf16>, vector<64x8xf16> into vector<32x64xf32>
+  return %output : vector<32x64xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func.func @contract_to_mfma_32x32x8_mmt
+// CHECK:   %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x2x4x1x1x4xf32>
+// CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %{{.+}} : vector<64x8xf16> -> vector<2x1x1x1x1x4xf16>
+// CHECK:   vector.extract %[[B_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<2x1x1x1x1x4xf16>
+// CHECK:   amdgpu.mfma
+// CHECK:   %[[INS0:.+]] = vector.insert %{{.+}}, %[[INIT]] [0, 0] : vector<4x1x1x4xf32> into vector<1x2x4x1x1x4xf32>
+// CHECK:   vector.extract %[[B_SIMT]][1, 0] : vector<1x1x1x4xf16> from vector<2x1x1x1x1x4xf16>
+// CHECK:   amdgpu.mfma
+// CHECK:   %[[INS1:.+]] = vector.insert %17, %[[INS0]] [0, 1] : vector<4x1x1x4xf32> into vector<1x2x4x1x1x4xf32>
+// CHECK:   iree_vector_ext.to_simd %[[INS1]] : vector<1x2x4x1x1x4xf32> -> vector<32x64xf32>
+
