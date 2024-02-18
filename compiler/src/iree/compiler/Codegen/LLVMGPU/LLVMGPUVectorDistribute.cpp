@@ -112,16 +112,17 @@ private:
   //    subgroups_per_workgroup = [1, ..., 1]
   //    batches_per_subgroup =    [<remaining undistributed elements>]
   //    outers_per_batch =        [1, ..., 1]
-  //    threads_per_outer =       [<greedy from inner most memref dim>]
-  //    elements_per_thread =     [1, ..., 128/bitwidth, ..., 1]
-  //            inner_most_memref_dimension ^
+  //    threads_per_outer =       [<greedy from innermost memref dim>]
+  //    elements_per_thread =     [1, ..., 128/element_bitwidth, ..., 1]
+  //            innermost_memref_dimension ^^^^^^
   //
-  // All orders are the same
+  // (All orders are the same)
   //    *_order = [<broadcasted_dims>, <transfer_permutation>]>
   //
-  // So for the following transfer_read with 64 threads
+  // So for the following transfer_read with 64 threads:
   //  vector.transfer_read ... : memref<16x256xf16>, vector<16x32xf16>
   //
+  // We use the following layout:
   // #layout = #iree_vector_ext.nested_layout<
   //    subgroups_per_workgroup = [1, 1]
   //    batches_per_subgroup =    [1, 1]
@@ -164,7 +165,7 @@ private:
       return;
     }
 
-    // Select the inner most dim of the memref as the contiguous dim to load
+    // Select the innermost dim of the memref as the contiguous dim to load
     // from.
     int64_t transferRank = transfer.getVectorType().getRank();
     std::optional<unsigned> maybeDim = transferMap.getResultPosition(
@@ -173,9 +174,9 @@ private:
 
     ArrayRef<int64_t> vectorShape = transfer.getVectorType().getShape();
 
-    // Limit the maximum inner vector read width to the inner most contiguous
+    // Limit the maximum inner vector read width to the innermost contiguous
     // dimension. We could try to be clever and extend this to adjacent
-    // dimensions in cases where the inner most read vector dimension is small,
+    // dimensions in cases where the innermost read vector dimension is small,
     // but that requires comparing memref strides and is uncommon. For now
     // prioritize warp contiguity over 128-bit read granularity.
     numElementsPerThread =
@@ -183,13 +184,13 @@ private:
 
     llvm::SetVector<unsigned> vectorDimDistributionOrder;
     // Get the order in which to distribute vector dimensions to threads, going
-    // from inner most to outer most memref dimension. It's important to note
+    // from innermost to outermost memref dimension. It's important to note
     // that this heuristic only applies to matrix multiplication cases where
     // we are promoting the operands of a contraction to shared memory and we
     // have no producers fused with the matmul. In general there is no universal
     // way to set an anchoring layout for reads without doing an analysis of how
     // the read values are used.
-    for (int i = transferMap.getNumDims() - 1, e = 0; i >= e; --i) {
+    for (int i = transferMap.getNumDims() - 1; i >= 0; --i) {
       std::optional<unsigned> maybeDim =
           transferMap.getResultPosition(getAffineDimExpr(i, context));
       if (maybeDim) {
@@ -214,13 +215,13 @@ private:
     // workgroup contiguous load.
     SmallVector<int64_t> subgroupCounts(transferRank, 1);
     SmallVector<int64_t> batchSizes(transferRank, 1);
-    SmallVector<int64_t> otherSizes(transferRank, 1);
+    SmallVector<int64_t> outerSizes(transferRank, 1);
     SmallVector<int64_t> threadCounts(transferRank, 1);
     SmallVector<int64_t> elementSizes(transferRank, 1);
 
     for (auto dim : llvm::reverse(order)) {
       int64_t vectorSize = vectorShape[dim];
-      // Set the element count for the inner most vector dimension.
+      // Set the element count for the innermost vector dimension.
       if (residualElements != 1) {
         elementSizes[dim] = residualElements;
         vectorSize /= residualElements;
@@ -244,10 +245,8 @@ private:
     }
 
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
-        context, subgroupCounts, order, batchSizes, order, otherSizes, order,
+        context, subgroupCounts, order, batchSizes, order, outerSizes, order,
         threadCounts, order, elementSizes, order);
-    layout.dump();
-    transfer.dump();
     analysis.setAnchor(transfer.getResult(), layout);
   }
 
