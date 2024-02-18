@@ -138,164 +138,182 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     This level of tiling is also known as "subgroup/warp distribution". It
     represents how subgroups are distributed in a workgroup. 
 
-    The subgroups are placed contiguously with their shape and ordering
-    determined by:
-      - `subgroups_per_workgroup`: Sizes of this level of tiling
-      - `subgroup_order`: Ordering of dimensions, from outermost to innermost
-
-    For example, subgroups_per_workgroup=[4, 2], subgroup_order=[1, 0] will
-    arrange the subgroups in the order:
-
-    0 4
-    1 5
-    2 6
-    3 7
-
-    The total number of subgroups used (computed by multiplying each dim in
-    subgroups_per_workgroup) should be a multiple of number of subgroups in the
-    harware. If the total number of subgroups used exceeds the number of
-    subgroups of the hardware, then the subgroup used (say x) is 
-    x mod num_subgroups:
-
-    num_subgroups = 4
-
-    0 4               0 0
-    1 5    x mod 4    1 1
-    2 6    ------->   2 2
-    3 7               3 3
+    The size of this tile is represented by `subgroups_per_workgroup`. How
+    the subgroups are arranged in this tile is represented by the layout
+    of this level of hierarchy, which is explained later.
 
     2. Threads per Subgroup:
 
-    Threads in a subgroup are distributed in three levels.
+    This level of tiling represents how threads are distributed in a subgroup.
 
-    The first level, batches, are a way to represent instruction unrolling. For
-    example, an intrinsic which can only take 4x4 shape at a time, uses batches
-    to unroll a 16x16 shape to the native intrinsice shape.
-
-    Batches can be thought of as loops around the original layout:
-
-    for b_0 in range(batch_0):
-      for b_1 in range(batch_1):
-        ...
-
-    Batches are represented using two attributes:
-      - batches_per_subgroup: Ranges of each loop
-      - batch_order: Ordering of each loop, from outermost to innermost
-
-    The second level, outers, is a way to represent thread layout duplication
-    required by a particular intrinsic. For example, some AMDGPU matrix
-    multiplication variants require threads to be distributed
-    like:
-
-    0 1 2 3 4
-    5 6 7 8 9
-    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5 
-    0 1 2 3 4     outers_per_batch=[2, 1]
-    5 6 7 8 9     threads_per_outer=[2, 5]
-
-    Outers is represented using two attributes:
-      - outers_per_batch: Number of outers in a batch
-      - outer_order: Ordering of outers, from outermost to innermost
-
-    Finally, threads are distributed in a single outer. The thread
-    distribution is represented by:
-
-      - threads_per_outer: Sizes of this level of tiling
-      - thread_order: Ordering of dimensions, from outermost to innermost
-
-    Examples of thread distribution over a 8x4 shape:
-
-    {
-      batches_per_subgroup = [2, 1]
-      outers_per_batch = [2, 2]
-      threads_per_outer = [2, 2]
-
-      batch_order = [0, 1]
-      outer_order = [0, 1]
-      thread_order = [1, 0]
-    }
-
-    Distributed tile:
-
-    {
-      [0 2]|[0 2]      0,1,2,3 --> thread ids
-      [1 3]|[1 3]      
-      ------------     [x z]   --> a single outer tile
-      [0 2]|[0 2]      [y w]
-      [1 3]|[1 3]
-    }{
-      [0 2]|[0 2]      { ... } --> a single batch tile
-      [1 3]|[1 3]
-      ------------
-      [0 2]|[0 2]
-      [1 3]|[1 3]
-    }
-
-    So, the thread distribution looks like:
-
-    [0 2 0 2]
-    [1 3 1 3]
-    [0 2 0 2]
-    [1 3 1 3]
-    [0 2 0 2]
-    [1 3 1 3]
-    [0 2 0 2]
-    [1 3 1 3]
-
-    The total number of threads used (computed by multiplying each dim in
-    threads_per_outer) should be a multiple of subgroup size of the
-    harware. If the total number of threads used exceeds the subgroup size of
-    the hardware, then the threads used (say tid) is tid mod subgroup_size:
-
-    subgroup_size = 4
-
-    0 1                0 0
-    2 3    tid mod 4   1 1
-    4 5    -------->   2 2
-    6 7                3 3
+    The size of this tile is represented by `threads_per_subgroup`. How the
+    threads in this tile are arranged in this tile is represented by the layout
+    of this level of hierarchy, which is explained later.
 
     3. Elements per Thread
 
     The final level of tiling, representing the minimum shape of vector that
     is treated as an atom.
 
-    The elements are placed contigiously with their shape and ordering
-    determined by:
-      - `elements_per_thread`: Sizes of this level of tiling
-      - `element_order`: Ordering of dimensions, from outermost to innermost
-  }];
+    The size of this tile is represented by `elements_per_thread`.
 
+    Now, we describe the "layout" of a level of hierarchy that we talked about
+    earlier.
+
+    Given a tile of size X, the layout L describes how the tiles of next level
+    are arranged in X. L is a function: (id) -> (index in X). Ideally, we would
+    like to be in a state where this layout is just another attribute, but for
+    now, we describe the layout using:
+      - `layout_shape`
+      - `layout_order`
+
+    These two attributes define a contigious mapping of a `id` to a shape.
+    For example:
+
+    layout_shape=[2, 2]              layout_shape=[3, 2]
+    layout_order=[1, 0]              layout_order=[0, 1]
+
+    L: 0 2                          L: 0 1
+       1 3                             2 3
+                                       4 5
+
+    Now let's see how the layout is distributed over the tile shape. There
+    are three cases to consider (For each dimension):
+      1. layout_shape[i] = tile_shape[i]:
+        This case is obvious and we distribute the layout completely over the
+        shape.
+      2. layout_shape[i] > tile_shape[i]
+        In this case, the layout is larger than the tile shape dimension. We
+        distribute multiple users over the same tile. For example,
+
+        tile_shape=[1, 2]
+        layout_shape=[2, 2]
+        layout_order=[1, 0]
+
+        L:
+        0 2
+        1 3
+
+        Distribution over shape:
+        [0 1, 2 3]
+
+        So the same tile has multiple users using it.
+
+      3. layout_shape[i] < tile_shape[i]
+        In this case the layout is smaller than the tile shape dimension. We
+        make each user hold multiple tiles by duplicating the layout. For example,
+
+        tile_shape=[3, 2]
+        layout_shape=[1, 2]
+        layout_order=[0, 1]
+
+        L:
+        0 1
+
+        Distribution over shape:
+        [0 1]
+        [0 1]
+        [0 1]
+
+    If a user is holding more than one tile, then the tiles are iterated in
+    the order of iteration of the original vector.
+
+    For example:
+
+    [0 1 2 3 0 1 2 3]
+    [0 1 2 3 0 1 2 3]
+
+    Here, id 0 is holding 4 tiles. Let's say the order of dim iteration in the
+    original vector is: [1, 0]. Then, id 0 will iterate over the tiles in that order:
+
+    [0 1 2 3 0 1 2 3]
+     ^       ^
+     0       2
+    [0 1 2 3 0 1 2 3]
+     ^       ^
+     1       3
+
+    This shape/order layout style is inspired from Triton:
+    https://github.com/openai/triton/blob/main/include/triton/Dialect/TritonGPU/IR/TritonGPUAttrDefs.td
+
+    Finally, the `dim_order` keeps track of the order of iteration over the
+    dimensions of the vector. Note that since we keep track of this,
+    transpose over a vector is a no-op and the layout keeps track of the
+    iteration order.
+
+    Example of a layout for MFMA A, B and C matrix:
+
+    A: vector<128x32> B: vector<32x64> C: vector<128x64>
+
+    mfma_layout_A = {
+      subgroups_per_workgroup = [2, 1]
+      threads_per_subgroup = [64, 8]
+      elements_per_thread = [1, 4]
+
+      subgroup_layout_shape = [2, 2]
+      subgroup_layout_order = [1, 0]
+
+      thread_layout_shape = [32, 2]
+      thread_layout_order = [1, 0]
+
+      dim_order = [0, 1]
+    }
+
+    mfma_layout_B = {
+      subgroups_per_workgroup = [1, 2]
+      threads_per_subgroup = [8, 32]
+      elements_per_thread = [4, 1]
+
+      subgroup_layout_shape = [2, 2]
+      subgroup_layout_order = [0, 1]
+
+      thread_layout_shape = [2, 32]
+      thread_layout_order = [0, 1]
+
+      dim_order = [1, 0]
+    }
+
+    mfma_layout_C = {
+      subgroups_per_workgroup = [2, 2]
+      threads_per_subgroup = [16, 32]
+      elements_per_thread = [4, 1]
+
+      subgroup_layout_shape = [2, 2]
+      subgroup_layout_order = [1, 0]
+
+      thread_layout_shape = [2, 32]
+      thread_layout_order = [0, 1]
+
+      dim_order = [1, 0]
+    }
+  }];
+      
   let parameters = (ins
     ArrayRefParameter<"int64_t", "subgroups_per_workgroup">:$subgroupsPerWorkgroup,
-    ArrayRefParameter<"int64_t", "subgroup_order">:$subgroupOrder,
-
-    ArrayRefParameter<"int64_t", "batches_per_subgroup">:$batchesPerSubgroup,
-    ArrayRefParameter<"int64_t", "batch_order">:$batchOrder,
-
-    ArrayRefParameter<"int64_t", "outers_per_batch">:$outersPerBatch,
-    ArrayRefParameter<"int64_t", "outer_order">:$outerOrder,
-
-    ArrayRefParameter<"int64_t", "threads_per_outer">:$threadsPerOuter,
-    ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
-
+    ArrayRefParameter<"int64_t", "threads_per_subgroup">:$threadsPerOuter,
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
-    ArrayRefParameter<"int64_t", "element_order">:$elementOrder
+
+    ArrayRefParameter<"int64_t", "subgroup_layout_shape">:$subgroupLayoutShape,
+    ArrayRefParameter<"int64_t", "subgroup_layout_order">:$subgroupLayoutOrder,
+
+    ArrayRefParameter<"int64_t", "thread_layout_shape">:$threadLayoutShape,
+    ArrayRefParameter<"int64_t", "thread_layout_order">:$threadLayoutOrder,
+
+    ArrayRefParameter<"int64_t", "dim_order">:$dimOrder,
   );
 
-  // TODO: add custom parser/printer and builder to elide default value array
-  // refs.
   let assemblyFormat = [{
     `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
-        `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
-        `outers_per_batch`        `=` `[` $outersPerBatch `]` `,`
-        `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
+        `threads_per_subgroup`    `=` `[` $threadsPerSubgroup `]` `,`
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
-        `subgroup_order`          `=` `[` $subgroupOrder `]` `,`
-        `batch_order`             `=` `[` $batchOrder `]` `,`
-        `outer_order`             `=` `[` $outerOrder `]` `,`
-        `thread_order`            `=` `[` $threadOrder `]` `,`
-        `element_order`           `=` `[` $elementOrder `]` 
+        `subgroup_layout_shape`   `=` `[` $subgroupLayoutShape `]` `,`
+        `subgroup_layout_order`   `=` `[` $subgroupLayoutOrder `]` `,`
+
+        `thread_layout_shape`     `=` `[` $threadLayoutShape `]` `,`
+        `thread_layout_order`     `=` `[` $threadLayoutOrder `]` `,`
+
+        `dim_order`               `=` `[` $dimOrder `]`
     `>`
   }];
 
