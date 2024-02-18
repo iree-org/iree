@@ -15,15 +15,16 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
 
   let description = [{
     Interface used to query information needed to generate code targeting a
-    specific matrix multiplication intrinsic/instruction. Layout information
-    can be explicit or opaque, however all such attributes must specify the
-    static shape of the operation and the required element types.
+    specific Matrix Multiply–Accumulate (MMA) machine intrinsic instruction.
+    Layout information can be explicit or opaque, however all such attributes
+    must specify the static shape of the operation and the required element
+    types.
   }];
 
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
-        Returns the shape of the mma operation described by this attribute.
+        Returns the shape of the MMA operation:
         ```
           C += A * B
         ```
@@ -36,7 +37,7 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the element types of the operands to the mma operation
+        Returns the element types of the operands to the MMA operation:
         ```
           C += A * B
         ```
@@ -47,11 +48,11 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the vector types of the operands to the mma operation.
+        Returns the vector types of the operands to the MMA operation:
         ```
           C += A * B
         ```
-        Each thread participating in the mma operation is responsible for
+        Each thread participating in the MMA operation is responsible for
         storing such shaped vectors in the registers.
       }],
       /*retTy=*/"::std::tuple<::mlir::VectorType, ::mlir::VectorType, ::mlir::VectorType>",
@@ -60,7 +61,7 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Returns the vector layout for the A matrix of the mma operation
+        Returns the vector layout for the A/B/C matrix of the MMA operation:
         ```
           C += A * B
         ```
