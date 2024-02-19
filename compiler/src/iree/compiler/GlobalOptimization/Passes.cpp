@@ -144,9 +144,15 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());
   }
-  // Generalize transposes and any other remaining named linalg ops that can now
-  // be represented as generics.
+  // Generalize transposes and any other remaining named linalg ops that can
+  // now be represented as generics.
   FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
+
+  // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
+  FunctionLikeNest(mainPassManager)
+      .addPass(createGlobalLoopInvariantCodeMotionPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
