@@ -18,7 +18,10 @@
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // B: shape = 8x32, layout = layoutB
@@ -33,7 +36,10 @@
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 // C: shape = 32x32, layout = layoutC
@@ -48,7 +54,10 @@
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
@@ -113,7 +122,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [16, 4]
 >
 
 // B: shape = 16x16, layout = layoutB
@@ -128,7 +140,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [4, 16]
 >
 
 // C: shape = 16x16, layout = layoutB
@@ -195,7 +210,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // B: shape = 8x32, layout = layoutB
@@ -210,7 +228,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 // C: shape = 64x32, layout = layoutC
@@ -225,7 +246,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vector<8x32xf16>, %c : vector<64x32xf32>) -> vector<64x32xf32> {
@@ -291,7 +315,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // B: shape = 16x32, layout = layoutB
@@ -306,7 +333,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 // C: shape = 32x32, layout = layoutC
@@ -321,7 +351,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vector<16x32xf16>, %c : vector<32x32xf32>) -> vector<32x32xf32> {
@@ -386,7 +419,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // B: shape = 8x96, layout = layoutB
@@ -401,7 +437,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 // C: shape = 64x96, layout = layoutC
@@ -416,7 +455,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 0],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b : vector<8x96xf16>, %c : vector<64x96xf32>) -> vector<64x96xf32> {
@@ -484,7 +526,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // B: shape = 64x8, layout = layoutB
@@ -499,7 +544,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1]
+  element_order           = [0, 1],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [32, 2]
 >
 
 // C: shape = 32x64, layout = layoutC
@@ -514,7 +562,10 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [0, 1],
   outer_order             = [0, 1],
   thread_order            = [0, 1],
-  element_order           = [1, 0]
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
 >
 
 func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8xf16>, %c : vector<32x64xf32>) -> vector<32x64xf32> {

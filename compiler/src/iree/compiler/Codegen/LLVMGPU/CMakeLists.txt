@@ -111,6 +111,7 @@ iree_cc_library(
     MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithToAMDGPU
