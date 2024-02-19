@@ -15,8 +15,7 @@
 // CHECK-LABEL: @exeLayoutLookup
 util.func public @exeLayoutLookup(%device : !hal.device) -> !hal.pipeline_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_pipeline_layout_0 : !hal.pipeline_layout
-  %0 = hal.pipeline_layout.lookup device(%device : !hal.device)
-                                    layout(#hal.pipeline.layout<push_constants = 1, sets = [
+  %0 = hal.pipeline_layout.lookup device(%device : !hal.device) layout(#hal.pipeline.layout<push_constants = 1, sets = [
     #hal.descriptor_set.layout<0, bindings = [
       #hal.descriptor_set.binding<0, storage_buffer>,
       #hal.descriptor_set.binding<1, storage_buffer>
