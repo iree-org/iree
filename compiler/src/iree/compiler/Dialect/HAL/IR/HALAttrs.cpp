@@ -1122,25 +1122,24 @@ Value IREE::HAL::DeviceSelectAttr::buildDeviceEnumeration(
 }
 
 //===----------------------------------------------------------------------===//
-// #hal.affinity.queue<*>
+// #hal.device.affinity<*>
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
-  int64_t mask = 0;
-  // `<`
-  if (failed(p.parseLess()))
+Attribute DeviceAffinityAttr::parse(AsmParser &p, Type type) {
+  // `<@device`
+  StringAttr deviceName;
+  int64_t queueMask = -1;
+  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName)))
     return {};
-  // `*` (any)
-  if (succeeded(p.parseOptionalStar())) {
-    mask = -1;
-  } else {
+  if (succeeded(p.parseOptionalComma())) {
     // `[`queue_bit[, ...] `]`
+    queueMask = 0;
     if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
           int64_t i = 0;
           if (failed(p.parseInteger(i)))
             return failure();
-          mask |= 1ll << i;
+          queueMask |= 1ll << i;
           return success();
         }))) {
       return {};
@@ -1149,19 +1148,18 @@ Attribute AffinityQueueAttr::parse(AsmParser &p, Type type) {
   // `>`
   if (failed(p.parseGreater()))
     return {};
-  return get(p.getContext(), mask);
+  return get(p.getContext(), FlatSymbolRefAttr::get(deviceName), queueMask);
 }
 
-void AffinityQueueAttr::print(AsmPrinter &p) const {
+void DeviceAffinityAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
   os << "<";
-  int64_t mask = getMask();
-  if (mask == -1) {
-    os << "*";
-  } else {
-    os << "[";
-    for (int i = 0, j = 0; i < sizeof(mask) * 8; ++i) {
-      if (mask & (1ll << i)) {
+  os << getDevice();
+  int64_t queueMask = getQueueMask();
+  if (queueMask != -1) {
+    os << ", [";
+    for (int i = 0, j = 0; i < sizeof(queueMask) * 8; ++i) {
+      if (queueMask & (1ll << i)) {
         if (j++ > 0)
           os << ", ";
         os << i;
@@ -1172,45 +1170,62 @@ void AffinityQueueAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-bool AffinityQueueAttr::isExecutableWith(
+bool DeviceAffinityAttr::isExecutableWith(
     IREE::Stream::AffinityAttr other) const {
   if (!other)
     return true;
-  // Only compatible with other queue affinities today. When we extend the
-  // attributes to specify device targets we'd want to check here.
-  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
-  if (!otherQueueAttr)
+  // Only compatible with the same exact devices today. We could support a
+  // peering model to allow operations to move across devices in a peered set
+  // but that may be best done at higher levels and avoided once we get to the
+  // "are these the same device" stage.
+  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  if (!otherAffinityAttr || getDevice() != otherAffinityAttr.getDevice())
     return false;
   // If this affinity is a subset of the target affinity then it can execute
   // with it.
-  if ((getMask() & otherQueueAttr.getMask()) == getMask())
+  if ((getQueueMask() & otherAffinityAttr.getQueueMask()) == getQueueMask())
     return true;
   // Otherwise not compatible.
   return false;
 }
 
 IREE::Stream::AffinityAttr
-AffinityQueueAttr::joinOR(IREE::Stream::AffinityAttr other) const {
+DeviceAffinityAttr::joinOR(IREE::Stream::AffinityAttr other) const {
   if (!other)
     return *this;
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
-  return AffinityQueueAttr::get(getContext(),
-                                getMask() | otherQueueAttr.getMask());
+  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  return DeviceAffinityAttr::get(getContext(), getDevice(),
+                                 getQueueMask() |
+                                     otherAffinityAttr.getQueueMask());
 }
 
 IREE::Stream::AffinityAttr
-AffinityQueueAttr::joinAND(IREE::Stream::AffinityAttr other) const {
+DeviceAffinityAttr::joinAND(IREE::Stream::AffinityAttr other) const {
   if (!other)
     return *this;
   if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
     return nullptr;
   }
-  auto otherQueueAttr = llvm::dyn_cast_if_present<AffinityQueueAttr>(other);
-  return AffinityQueueAttr::get(getContext(),
-                                getMask() & otherQueueAttr.getMask());
+  auto otherAffinityAttr = llvm::dyn_cast_if_present<DeviceAffinityAttr>(other);
+  return DeviceAffinityAttr::get(getContext(), getDevice(),
+                                 getQueueMask() &
+                                     otherAffinityAttr.getQueueMask());
+}
+
+bool DeviceAffinityAttr::isLegalToInline(Operation *inlineSite,
+                                         Operation *inlinable) const {
+  // Look up the affinity of the inlining target site and only allow inlining if
+  // it matches exactly. We could make a decision as to whether we allow
+  // inlining when queues are subsets (so if the target site allows any queue
+  // and the inlinable allows queue 2 then allow, etc). In the future we may
+  // want to allow util.scope restrictions within the inline target to keep
+  // queue specification tighter but today most queue masks are wildcarded
+  // anyway.
+  auto targetAffinityAttr = IREE::Stream::AffinityAttr::lookup(inlineSite);
+  return *this == targetAffinityAttr;
 }
 
 //===----------------------------------------------------------------------===//

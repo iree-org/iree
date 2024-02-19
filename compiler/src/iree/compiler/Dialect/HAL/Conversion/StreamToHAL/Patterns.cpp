@@ -23,24 +23,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Returns the device queue affinity mask indicating which device queues the
-// operations are allowed to execute on.
-static Value buildQueueAffinityMask(Location loc,
-                                    IREE::Stream::AffinityAttr affinityAttr,
-                                    Value device, OpBuilder &builder) {
-  // Try to find a specified affinity. This may be on the op provided or one of
-  // its parent regions.
-  if (auto queueAffinityAttr =
-          llvm::dyn_cast_if_present<IREE::HAL::AffinityQueueAttr>(
-              affinityAttr)) {
-    return builder.create<arith::ConstantIntOp>(
-        loc, queueAffinityAttr.getMask(), 64);
-  }
-
-  // No affinity specified; use default (any) affinity.
-  return builder.create<arith::ConstantIntOp>(loc, -1, 64);
-}
-
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -50,9 +32,37 @@ struct ContextResolveOpPattern
     auto resultTypes = llvm::to_vector(resolveOp.getResultTypes());
     assert(!resultTypes.empty() && "must have at least one result");
 
-    // TODO(multi-device): emit get with derived ordinal or lookup with attr.
-    Value device =
-        IREE::HAL::DeviceType::resolveAny(resolveOp.getLoc(), rewriter);
+    // Get the affinity from the op or an ancestor. Note that there may be no
+    // affinity specified at all.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(resolveOp);
+
+    // We currently only handle HAL device affinities.
+    // We could make this an interface to select the device and allow users to
+    // provide their own affinities to convert to HAL but for now we just have
+    // one way to specify device globals. Users may want to provide devices as
+    // arguments to their functions or are stored dynamically after
+    // initialization time.
+    auto deviceAffinityAttr =
+        dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
+    if (!deviceAffinityAttr) {
+      resolveOp.emitOpError() << "failed to resolve affinity: only HAL device "
+                                 "affinities are supported";
+      return rewriter.notifyMatchFailure(
+          resolveOp, "only HAL device affinities are supported");
+    }
+
+    // Get the device handle and queue.
+    //
+    // TODO(multi-device): specialized types; may need analysis we don't have
+    // or at least a symbol lookup. An alternative would be an optional type
+    // on the affinity in cases where we've evaluated it early but for now
+    // we assume all device types are unspecialized.
+    auto deviceType = rewriter.getType<IREE::HAL::DeviceType>();
+    Value device = rewriter.create<IREE::Util::GlobalLoadOp>(
+        resolveOp.getLoc(), deviceType,
+        deviceAffinityAttr.getDevice().getValue(),
+        /*is_immutable=*/true);
+    int64_t queueMask = deviceAffinityAttr.getQueueMask();
 
     SmallVector<Value> results;
     if (isa<IREE::HAL::DeviceType>(resultTypes[0])) {
@@ -66,8 +76,8 @@ struct ContextResolveOpPattern
     }
     if (resultTypes.size() > 1) {
       if (isa<IntegerType>(resultTypes[1])) {
-        results.push_back(buildQueueAffinityMask(
-            resolveOp.getLoc(), resolveOp.getAffinityAttr(), device, rewriter));
+        results.push_back(rewriter.create<arith::ConstantIntOp>(
+            resolveOp.getLoc(), queueMask, 64));
       } else {
         return rewriter.notifyMatchFailure(
             resolveOp,

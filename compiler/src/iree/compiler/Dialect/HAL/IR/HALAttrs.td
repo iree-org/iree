@@ -977,41 +977,40 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
 }
 
 //===----------------------------------------------------------------------===//
-// #hal.affinity.queue<*>
+// #hal.device.affinity<*>
 //===----------------------------------------------------------------------===//
 
-def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
+def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
     "isExecutableWith",
     "joinOR",
     "joinAND",
   ]>,
   Util_HoistableAttrInterface,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
 ]> {
-  let mnemonic = "affinity.queue";
-  let summary = [{specifies a set of allowed queues for an operation}];
+  let mnemonic = "device.affinity";
+  let summary = [{specifies a named device and optional queue affinity}];
   let description = [{
-    WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
-    This may change in the future to either be a nested attribute on a larger
-    affinity struct or be defined by an implementation of the affinity attr
-    interface. For now this allows higher levels of the stack to specify
-    queues such that the stream dialect can understand them and they can be
-    lowered into the HAL dialect.
-
     Specifies that an annotated operation or scope is only allowed to execute on
-    the set of queues (0-64) provided. Operations will not run on other queues.
+    a specific device and optionally a set of queues (0-64) provided.
+    Operations will not run on other queues. If the queue mask is omitted then
+    any queue on the device is allowed to execute the specified operations.
 
     Example:
     ```mlir
-    // any queue
-    #hal.affinity.queue<*>
-    // queues 4 and 5
-    #hal.affinity.queue<[4, 5]>
+    // Any queue on @device_a.
+    #hal.device.affinity<@device_a>
+    // Queues 4 and 5 on @device_b.
+    #hal.device.affinity<@device_b, [4, 5]>
     ```
   }];
 
   let parameters = (ins
-    AttrParameter<"int64_t", "">:$mask
+    AttrParameter<"FlatSymbolRefAttr", "">:$device,
+    AttrParameter<"int64_t", "">:$queue_mask
   );
 
   let hasCustomAssemblyFormat = 1;
