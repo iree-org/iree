@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
@@ -35,6 +36,59 @@ static bool has16x16Transpose(mlir::FunctionOpInterface funcOp) {
   return res;
 }
 
+class Break2DTransposeToSquareTiles
+    : public OpRewritePattern<vector::TransposeOp> {
+public:
+  using OpRewritePattern<vector::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp op,
+                                PatternRewriter &rewriter) const override {
+    VectorType srcType = op.getSourceVectorType();
+    if (srcType.getRank() != 2)
+      return failure();
+    int64_t m = srcType.getShape()[0];
+    int64_t n = srcType.getShape()[1];
+    if (m == 1 || n == 1)
+      return failure();
+
+    if (m == n)
+      return failure();
+
+    int64_t factor = std::min(m, n);
+    if (m % factor != 0 || n % factor != 0)
+      return failure();
+
+    Location loc = op.getLoc();
+    SmallVector<int64_t> tileShape = {factor, factor};
+    SmallVector<int64_t> strides = {1, 1};
+
+    Value result = rewriter.create<arith::ConstantOp>(
+        loc, op.getResultVectorType(),
+        rewriter.getZeroAttr(op.getResultVectorType()));
+    for (int64_t origI = 0, origJ = 0, newI = 0, newJ = 0;
+         origI < m && origJ < n;) {
+      SmallVector<int64_t> srcOffsets = {origI, origJ};
+      SmallVector<int64_t> destOffsets = {newI, newJ};
+      Value tile = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, op.getVector(), srcOffsets, tileShape, strides);
+      tile =
+          rewriter.create<vector::TransposeOp>(loc, tile, op.getPermutation());
+      result = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, tile, result, destOffsets, strides);
+
+      if (factor == m) {
+        origJ += factor;
+        newI += factor;
+      } else {
+        origI += factor;
+        newJ += factor;
+      }
+    }
+    rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
 class LLVMCPUVectorTransposeLoweringPass
     : public LLVMCPUVectorTransposeLoweringBase<
           LLVMCPUVectorTransposeLoweringPass> {
@@ -53,6 +107,12 @@ public:
 void LLVMCPUVectorTransposeLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+
+  {
+    RewritePatternSet patterns(ctx);
+    patterns.insert<Break2DTransposeToSquareTiles>(ctx);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 
   auto vectorTransformOptions =
       vector::VectorTransformsOptions().setVectorTransposeLowering(
