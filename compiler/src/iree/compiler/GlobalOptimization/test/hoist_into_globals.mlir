@@ -142,12 +142,14 @@ module @hoist_inline_parameters {
 
 // CHECK-LABEL: @hoist_dialect_attrs
 module @hoist_dialect_attrs {
+  //      CHECK: util.global private @device
+  util.global private @device : !hal.device
   //      CHECK: util.global private @[[HOISTED:[a-z0-9_]+]]
-  // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>
+  // CHECK-SAME:   stream.affinity = #hal.device.affinity<@device>
   //      CHECK: util.initializer
-  // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>
+  // CHECK-SAME:   stream.affinity = #hal.device.affinity<@device>
   util.func public @main() -> tensor<i32> attributes {
-    hal.affinity = #hal.affinity.queue<[0, 1]>
+    stream.affinity = #hal.device.affinity<@device>
   } {
     %0 = arith.constant dense<3> : tensor<i32>
     %1 = "iree_unregistered.const_expr"(%0) : (tensor<i32>) -> tensor<i32>

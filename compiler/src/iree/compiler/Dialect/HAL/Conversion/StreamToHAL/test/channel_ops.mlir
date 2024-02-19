@@ -1,15 +1,17 @@
 // RUN: iree-opt --split-input-file --iree-hal-conversion %s | FileCheck %s
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: () -> !hal.channel
 util.func public @channel_create() -> !stream.channel {
-  // CHECK-DAG: %[[DEVICE:.+]] = hal.devices.get %{{.+}} : !hal.device
+  // CHECK-DAG: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant 3
   // CHECK-DAG: %[[ID:.+]] = util.null : !util.buffer
   // CHECK-DAG: %[[GROUP:.+]] = util.buffer.constant : !util.buffer = "group"
   // CHECK-DAG: %[[DEFAULT:.+]] = arith.constant -1
   // CHECK: %[[CHANNEL:.+]] = hal.channel.create device(%[[DEVICE]] : !hal.device) affinity(%[[AFFINITY]]) flags(0) id(%[[ID]]) group(%[[GROUP]]) rank(%[[DEFAULT]]) count(%[[DEFAULT]]) : !hal.channel
-  %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) group("group") : !stream.channel
+  %channel = stream.channel.create on(#hal.device.affinity<@device, [0, 1]>) group("group") : !stream.channel
   // CHECK: util.return %[[CHANNEL]]
   util.return %channel : !stream.channel
 }
