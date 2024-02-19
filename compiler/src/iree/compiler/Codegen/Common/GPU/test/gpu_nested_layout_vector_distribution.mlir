@@ -615,16 +615,16 @@ builtin.module attributes { transform.with_named_sequence } {
   thread_basis            = [2, 32]
 >
 
-// CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1)>
-// CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 4)>
-// CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4)>
-// CHECK-DAG: #[[MAP3:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 8)>
-// CHECK-DAG: #[[MAP4:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 16)>
-// CHECK-DAG: #[[MAP5:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 24)>
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 * 4)>
+// CHECK-DAG: #[[$MAP2:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4)>
+// CHECK-DAG: #[[$MAP3:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 8)>
+// CHECK-DAG: #[[$MAP4:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 16)>
+// CHECK-DAG: #[[$MAP5:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1 * 4 + 24)>
 // CHECK-LABEL: @mfma_64x128x8_read
 func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
                               %mem1: memref<8x64xf16>,
-                              %mem2: memref<128x64xf16>) 
+                              %mem2: memref<128x64xf16>)
                 -> (vector<128x8xf16>, vector<8x64xf16>, vector<128x64xf16>) {
 
   %c0 = arith.constant 0 : index
@@ -633,19 +633,15 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   // CHECK: %[[IDX:.+]] = gpu.thread_id  x
   // CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %[[IDX]] into (%c4, %c2, %c2, %c32) : index, index, index, index
 
-  // m
-  // CHECK-DAG: %[[M:.+]] = affine.apply #[[MAP]]()[%[[IDS]]#0, %[[IDS]]#3]
-  // n
-  // CHECK-DAG: %[[N:.+]] = affine.apply #[[MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
+  // CHECK-DAG: %[[M:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#0, %[[IDS]]#3]
+  // CHECK-DAG: %[[N:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
+  // CHECK-DAG: %[[K:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#2]
 
-  // k
-  // CHECK-DAG: %[[K:.+]] = affine.apply #[[MAP1]]()[%[[IDS]]#2]
-
-  // m unrolled 4 times
-  // CHECK-DAG: %[[M0:.+]] = affine.apply #[[MAP2]]()[%[[IDS]]#0, %[[IDS]]#2]
-  // CHECK-DAG: %[[M1:.+]] = affine.apply #[[MAP3]]()[%[[IDS]]#0, %[[IDS]]#2]
-  // CHECK-DAG: %[[M2:.+]] = affine.apply #[[MAP4]]()[%[[IDS]]#0, %[[IDS]]#2]
-  // CHECK-DAG: %[[M3:.+]] = affine.apply #[[MAP5]]()[%[[IDS]]#0, %[[IDS]]#2]
+  // M is unrolled 4 times.
+  // CHECK-DAG: %[[M0:.+]] = affine.apply #[[$MAP2]]()[%[[IDS]]#0, %[[IDS]]#2]
+  // CHECK-DAG: %[[M1:.+]] = affine.apply #[[$MAP3]]()[%[[IDS]]#0, %[[IDS]]#2]
+  // CHECK-DAG: %[[M2:.+]] = affine.apply #[[$MAP4]]()[%[[IDS]]#0, %[[IDS]]#2]
+  // CHECK-DAG: %[[M3:.+]] = affine.apply #[[$MAP5]]()[%[[IDS]]#0, %[[IDS]]#2]
 
   // M, K
   // CHECK-DAG: transfer_read %{{.*}}[%[[M]], %[[K]]]
@@ -657,15 +653,15 @@ func.func @mfma_64x128x8_read(%mem: memref<128x8xf16>,
   // CHECK-DAG: transfer_read %{{.*}}[%[[M2]], %[[N]]]
   // CHECK-DAG: transfer_read %{{.*}}[%[[M3]], %[[N]]
 
-  %a = vector.transfer_read %mem[%c0, %c0], %cst 
+  %a = vector.transfer_read %mem[%c0, %c0], %cst
           {in_bounds = [true, true],
            "__vector_layout_test_anchor_result_0" = #layout_a}
   : memref<128x8xf16>, vector<128x8xf16>
-  %b = vector.transfer_read %mem1[%c0, %c0], %cst 
+  %b = vector.transfer_read %mem1[%c0, %c0], %cst
           {in_bounds = [true, true],
            "__vector_layout_test_anchor_result_0" = #layout_b}
   : memref<8x64xf16>, vector<8x64xf16>
-  %c = vector.transfer_read %mem2[%c0, %c0], %cst 
+  %c = vector.transfer_read %mem2[%c0, %c0], %cst
           {in_bounds = [true, true],
            "__vector_layout_test_anchor_result_0" = #layout_c}
   : memref<128x64xf16>, vector<128x64xf16>

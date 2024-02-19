@@ -244,8 +244,9 @@ private:
       batchSizes[dim] = vectorSize;
     }
 
-    // This is true for the particular way we construct this layout. If this
-    // is ever changed, we should
+    // Note that the layout setting logic here necessarily uses all threads in
+    // the workgroup to perform the read. As a result we can always directly
+    // use the counts as the basis for computing the subgroup/thread indices.
     SmallVector<int64_t> subgroupBasis = subgroupCounts;
     SmallVector<int64_t> threadBasis = threadCounts;
 
