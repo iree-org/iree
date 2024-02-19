@@ -123,8 +123,8 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     (`uninitialized` $uninitialized^)?
+    (`on` `(` $affinity^ `)`)?
     attr-dict `:`
     type($result) `{` $storage_size `}`
   }];
@@ -1772,15 +1772,15 @@ def Stream_TensorTraceOp : Stream_Op<"tensor.trace", [
 } // OpGroupTensorOps
 
 //===----------------------------------------------------------------------===//
-// Resource transfer ops
+// Async (stream.async*) ops
 //===----------------------------------------------------------------------===//
 
-def OpGroupResourceTransferOps : OpDocGroup {
-  let summary = "Resource transfer ops";
+def OpGroupAsyncOps : OpDocGroup {
+  let summary = "Async ops";
   let description = "";
 }
 
-let opDocGroup = OpGroupResourceTransferOps in {
+let opDocGroup = OpGroupAsyncOps in {
 
 def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
   DeclareOpInterfaceMethods<Stream_AffinityOp, [
@@ -2460,7 +2460,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
   let hasCanonicalizer = 1;
 }
 
-} // OpGroupResourceTransferOps
+} // OpGroupAsyncOps
 
 //===----------------------------------------------------------------------===//
 // Async control flow ops
@@ -2855,15 +2855,15 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
 } // OpGroupAsyncControlFlowOps
 
 //===----------------------------------------------------------------------===//
-// Explicit command ops
+// Explicit command (stream.cmd.*) ops
 //===----------------------------------------------------------------------===//
 
-def OpGroupExplicitCommandOps : OpDocGroup {
+def OpGroupCmdOps : OpDocGroup {
   let summary = "Explicit command ops";
   let description = "";
 }
 
-let opDocGroup = OpGroupExplicitCommandOps in {
+let opDocGroup = OpGroupCmdOps in {
 
 def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
   Stream_CmdPhaseOp,
@@ -3531,7 +3531,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let hasCanonicalizer = 1;
 }
 
-} // OpGroupExplicitCommandOps
+} // OpGroupCmdOps
 
 //===----------------------------------------------------------------------===//
 // Synchronization ops

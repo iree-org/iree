@@ -23,24 +23,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Returns the device queue affinity mask indicating which device queues the
-// operations are allowed to execute on.
-static Value buildQueueAffinityMask(Location loc,
-                                    IREE::Stream::AffinityAttr affinityAttr,
-                                    Value device, OpBuilder &builder) {
-  // Try to find a specified affinity. This may be on the op provided or one of
-  // its parent regions.
-  if (auto queueAffinityAttr =
-          llvm::dyn_cast_if_present<IREE::HAL::AffinityQueueAttr>(
-              affinityAttr)) {
-    return builder.create<arith::ConstantIntOp>(
-        loc, queueAffinityAttr.getMask(), 64);
-  }
-
-  // No affinity specified; use default (any) affinity.
-  return builder.create<arith::ConstantIntOp>(loc, -1, 64);
-}
-
 struct ContextResolveOpPattern
     : public StreamConversionPattern<IREE::Stream::ContextResolveOp> {
   using StreamConversionPattern::StreamConversionPattern;
@@ -50,9 +32,36 @@ struct ContextResolveOpPattern
     auto resultTypes = llvm::to_vector(resolveOp.getResultTypes());
     assert(!resultTypes.empty() && "must have at least one result");
 
-    // TODO(multi-device): emit get with derived ordinal or lookup with attr.
-    Value device =
-        IREE::HAL::DeviceType::resolveAny(resolveOp.getLoc(), rewriter);
+    // Get the affinity from the op or an ancestor. Note that there may be no
+    // affinity specified at all.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(resolveOp);
+
+    // We currently only handle HAL device affinities.
+    // We could make this an interface to select the device and allow users to
+    // provide their own affinities to convert to HAL. In the future users may
+    // also want to provide devices as function arguments post-initialization.
+    // For now we just have one way to specify device globals.
+    auto deviceAffinityAttr =
+        dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
+    if (!deviceAffinityAttr) {
+      resolveOp.emitOpError() << "failed to resolve affinity: only HAL device "
+                                 "affinities are supported";
+      return rewriter.notifyMatchFailure(
+          resolveOp, "only HAL device affinities are supported");
+    }
+
+    // Get the device handle and queue.
+    //
+    // TODO(multi-device): specialized types; may need analysis we don't have
+    // or at least a symbol lookup. An alternative would be an optional type
+    // on the affinity in cases where we've evaluated it early but for now
+    // we assume all device types are unspecialized.
+    auto deviceType = rewriter.getType<IREE::HAL::DeviceType>();
+    Value device = rewriter.create<IREE::Util::GlobalLoadOp>(
+        resolveOp.getLoc(), deviceType,
+        deviceAffinityAttr.getDevice().getValue(),
+        /*is_immutable=*/true);
+    int64_t queueMask = deviceAffinityAttr.getQueueMask();
 
     SmallVector<Value> results;
     if (isa<IREE::HAL::DeviceType>(resultTypes[0])) {
@@ -66,8 +75,8 @@ struct ContextResolveOpPattern
     }
     if (resultTypes.size() > 1) {
       if (isa<IntegerType>(resultTypes[1])) {
-        results.push_back(buildQueueAffinityMask(
-            resolveOp.getLoc(), resolveOp.getAffinityAttr(), device, rewriter));
+        results.push_back(rewriter.create<arith::ConstantIntOp>(
+            resolveOp.getLoc(), queueMask, 64));
       } else {
         return rewriter.notifyMatchFailure(
             resolveOp,
@@ -698,53 +707,66 @@ struct CmdDispatchOpPattern
       caseExportOps.push_back(std::make_pair(entryPointAttr, exportOp));
     });
 
-    // Select the variant index.
-    Value selectedIndex = buildIfElseTree(
-        loc, caseExportOps.size(),
-        [&](Location loc, size_t i, OpBuilder &builder) {
-          auto exportOp = caseExportOps[i].second;
-          auto variantOp =
-              exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-          return variantOp.buildCondition(device, rewriter);
-        },
-        rewriter);
-
-    // Allow each variant to define how it is dispatched.
-    auto switchOp = rewriter.replaceOpWithNewOp<scf::IndexSwitchOp>(
-        dispatchOp, TypeRange{}, selectedIndex, caseIndices,
-        caseIndices.size());
-    for (size_t i = 0; i < caseExportOps.size(); ++i) {
-      auto entryPointAttr = caseExportOps[i].first;
-      auto exportOp = caseExportOps[i].second;
-      auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
-      auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
-
+    auto recordDispatch = [&](SymbolRefAttr entryPointAttr,
+                              IREE::HAL::ExecutableExportOp exportOp,
+                              OpBuilder &builder) {
       // Record push constants and buffer bindings.
       recordParameters(loc, affinityAttr, device, commandBuffer, exportOp,
-                       dispatchOp, adaptor, caseBuilder);
+                       dispatchOp, adaptor, builder);
 
       // Dispatch with a target-specific workgroup count.
-      auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, device, adaptor.getWorkload(), caseBuilder);
-      Value executable = caseBuilder.create<IREE::HAL::ExecutableLookupOp>(
-          loc, caseBuilder.getType<IREE::HAL::ExecutableType>(), device,
+      auto workgroupCount = exportOp.calculateWorkgroupCount(
+          loc, device, adaptor.getWorkload(), builder);
+      Value executable = builder.create<IREE::HAL::ExecutableLookupOp>(
+          loc, builder.getType<IREE::HAL::ExecutableType>(), device,
           entryPointAttr.getRootReference().getValue());
-      Value ordinal = caseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
-          loc, caseBuilder.getIndexType(), entryPointAttr);
-      auto flags = caseBuilder.getAttr<IREE::HAL::DispatchFlagsAttr>(
+      Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+          loc, builder.getIndexType(), entryPointAttr);
+      auto flags = builder.getAttr<IREE::HAL::DispatchFlagsAttr>(
           IREE::HAL::DispatchFlags::None);
-      caseBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, ordinal, caseWorkgroupCount[0],
-          caseWorkgroupCount[1], caseWorkgroupCount[2], flags);
+      return builder.create<IREE::HAL::CommandBufferDispatchOp>(
+          loc, commandBuffer, executable, ordinal, workgroupCount[0],
+          workgroupCount[1], workgroupCount[2], flags);
+    };
 
-      caseBuilder.create<scf::YieldOp>(loc);
+    // If there is only one variant we can emit that directly without a
+    // conditional check. The same result should occur later on but it saves
+    // a lot of IR during generation if we know we can avoid it.
+    if (caseExportOps.size() == 1) {
+      auto [entryPointAttr, exportOp] = caseExportOps.front();
+      rewriter.replaceOp(dispatchOp,
+                         recordDispatch(entryPointAttr, exportOp, rewriter));
+    } else {
+      // Select the variant index.
+      Value selectedIndex = buildIfElseTree(
+          loc, caseExportOps.size(),
+          [&](Location loc, size_t i, OpBuilder &builder) {
+            auto exportOp = caseExportOps[i].second;
+            auto variantOp =
+                exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+            return variantOp.buildCondition(device, rewriter);
+          },
+          rewriter);
+
+      // Allow each variant to define how it is dispatched.
+      auto switchOp = rewriter.create<scf::IndexSwitchOp>(
+          loc, TypeRange{}, selectedIndex, caseIndices, caseIndices.size());
+      for (size_t i = 0; i < caseExportOps.size(); ++i) {
+        auto [entryPointAttr, exportOp] = caseExportOps[i];
+        auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+        auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
+        recordDispatch(entryPointAttr, exportOp, caseBuilder);
+        caseBuilder.create<scf::YieldOp>(loc);
+      }
+
+      // Fallback for no available variant. Today we just no-op as executable
+      // loading should have already failed.
+      auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+      auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+      defaultBuilder.create<scf::YieldOp>(loc);
+
+      rewriter.replaceOp(dispatchOp, switchOp);
     }
-
-    // Fallback for no available variant. Today we just no-op as executable
-    // loading should have already failed.
-    auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
-    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
-    defaultBuilder.create<scf::YieldOp>(loc);
 
     return success();
   }
