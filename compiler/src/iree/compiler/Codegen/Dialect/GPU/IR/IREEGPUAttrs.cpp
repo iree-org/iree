@@ -31,7 +31,7 @@ using LayoutAttr = mlir::iree_compiler::IREE::VectorExt::LayoutAttr;
 namespace mlir::iree_compiler::IREE::GPU {
 
 namespace {
-// Helper structures for passing around mma related shapes and types.
+// Struct containing abstract MMA shape and type information.
 struct OpaqueMmaLayout {
   int64_t mSize;
   int64_t nSize;
@@ -40,6 +40,8 @@ struct OpaqueMmaLayout {
   Type bType;
   Type cType;
 };
+
+// Struct containing concrete MMA shape, type, and layout information.
 struct ConcreteMmaLayout {
   OpaqueMmaLayout base;
   PerDimLayoutAttr aMLayout;
@@ -216,17 +218,14 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
   (void)laneZ, (void)vectorZ;
   switch (type) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
-    // #row_layout = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #col_layout = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
-    // #row_layout2 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
-    // #col_layout2 = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
-    // #layout_a = #iree_vector_ext.layout<#row_layout, #col_layout>
-    // #layout_b = #iree_vector_ext.layout<#row_layout, #col_layout>
-    // #layout_c = #iree_vector_ext.layout<#row_layout2, #col_layout2>
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
+    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
+    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
 
-    PerDimLayoutAttr outer = PerDimLayoutAttr::get(context, {laneX}, {16});
-    PerDimLayoutAttr inner =
-        PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {4, 4});
     auto aMLayout = outer;
     auto aKLayout = inner;
     auto bKLayout = inner;
@@ -237,26 +236,23 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
                              bNLayout,     cMLayout, cNLayout};
   }
   case MFMAIntrinsic::F16_32x32x8_F32: {
-    // #row_layout = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
-    // #col_layout = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
-    // #row_layout1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
-    // #col_layout1 = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
-    // #row_layout2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
-    // [4, 2, 4]> #col_layout2 = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
-    // #layout_a = #iree_vector_ext.layout<#row_layout, #col_layout>
-    // #layout_b = #iree_vector_ext.layout<#row_layout1, #col_layout1>
-    // #layout_c = #iree_vector_ext.layout<#row_layout2, #col_layout2>
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [32]>
+    // #inner1 = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [2, 4]>
+    // #inner2 = #iree_vector_ext.per_dim_layout<[VECTORY, LANEY, VECTORX],
+    //                                           [4, 2, 4]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner1>
+    // #layout_b = #iree_vector_ext.layout<#inner1, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner2, #outer>
 
-    PerDimLayoutAttr outer = PerDimLayoutAttr::get(context, {laneX}, {32});
-    PerDimLayoutAttr inner =
-        PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 4});
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {32});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {2, 4});
     auto aMLayout = outer;
     auto aKLayout = inner;
     auto bKLayout = inner;
     auto bNLayout = outer;
-    PerDimLayoutAttr cMLayout =
+    auto cMLayout =
         PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {4, 2, 4});
-    PerDimLayoutAttr cNLayout = outer;
+    auto cNLayout = outer;
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
