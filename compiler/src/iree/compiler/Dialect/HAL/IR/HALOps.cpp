@@ -1454,17 +1454,9 @@ Value ExecutableVariantOp::createConditionOp(OpBuilder &builder) {
 
 Value ExecutableVariantOp::buildCondition(Value device, OpBuilder &builder) {
   // Base case dependent on target information.
-  // TODO(multi-device): condition on device target ID and other queries that
-  // may be useful for disambiguating two devices that support the same
-  // executable targets. Today executable targets are unique per device target
-  // but that need not always be the case.
-  auto i1Type = builder.getI1Type();
-  Value selected = builder
-                       .create<IREE::HAL::DeviceQueryOp>(
-                           getLoc(), i1Type, i1Type, device,
-                           builder.getStringAttr("hal.executable.format"),
-                           getTarget().getFormat(), builder.getZeroAttr(i1Type))
-                       .getValue();
+  Value selected = IREE::HAL::DeviceQueryOp::createI1(
+      getLoc(), device, "hal.executable.format",
+      getTarget().getFormat().getValue(), builder);
 
   // Factor in variant condition region, if any.
   auto conditionOp = getConditionOp();

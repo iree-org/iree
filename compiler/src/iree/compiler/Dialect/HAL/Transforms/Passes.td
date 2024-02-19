@@ -55,7 +55,7 @@ def VerifyTargetEnvironmentPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -70,7 +70,7 @@ def AssignTargetDevicesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     ListOption<
       "targetBackends", "targetBackends",
@@ -213,7 +213,7 @@ def ConfigureExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -229,7 +229,7 @@ def ConfigureTargetExecutableVariantsPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -251,7 +251,7 @@ def TranslateExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -268,7 +268,7 @@ def TranslateTargetExecutableVariantsPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -300,7 +300,7 @@ def LinkExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }
@@ -318,7 +318,7 @@ def LinkTargetExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -354,7 +354,7 @@ def SerializeExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "debugLevel", "debug-level",
@@ -386,7 +386,7 @@ def SerializeTargetExecutablesPass :
     Option<
       "targetRegistry", "target-registry",
       "llvm::cl::TargetRegistryRef", "",
-      "Target backend registry containing the list of available backends."
+      "Target registry containing the list of available devices and backends."
     >,
     Option<
       "target", "target",
@@ -435,6 +435,28 @@ def MaterializeDispatchInstrumentationPass :
     "mlir::arith::ArithDialect",
     "IREE::HAL::HALDialect",
     "IREE::Stream::StreamDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
+def InitializeDevicesPass :
+    Pass<"iree-hal-initialize-devices", "mlir::ModuleOp"> {
+  let summary = "Initializes global device handles based on their specification.";
+  let description = [{
+    Initializes each global `!hal.device` based on the specification attribute
+    by building initializers that enumerate and select the appropriate device.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
+    >,
+  ];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::scf::SCFDialect",
+    "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",
   ];
 }
