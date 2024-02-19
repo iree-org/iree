@@ -32,11 +32,20 @@ TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](ht
 
 ### ASan (AddressSanitizer)
 
-Enabling ASan in the IREE build is a simple matter of setting the
-`IREE_ENABLE_ASAN` CMake option:
+To enable ASan:
 
 ```shell
 cmake -DIREE_ENABLE_ASAN=ON ...
+```
+
+Several `_asan` tests like
+`iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_asan_abs.mlir` are
+also defined when using this configuration. These tests include AddressSanitizer
+in compiled CPU code as well by using these `iree-compile` flags:
+
+```shell
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address
 ```
 
 ### TSan (ThreadSanitizer)
@@ -44,16 +53,22 @@ cmake -DIREE_ENABLE_ASAN=ON ...
 To enable TSan:
 
 ```shell
-cmake \
-  -DIREE_ENABLE_TSAN=ON
-  ...
+cmake -DIREE_ENABLE_TSAN=ON ...
 ```
 
-In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
-all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
-load a IREE compiled LLVM/CPU module unless the following flags were passed to
-the IREE compiler: `--iree-llvmcpu-sanitize=thread` and
-`--iree-llvmcpu-link-embedded=false`.
+Several `_tsan` tests like
+`iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_tsan_abs.mlir` are
+also defined when using this configuration. These tests include ThreadSanitizer
+in compiled CPU code as well by using these `iree-compile` flags:
+
+```shell
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address
+```
+
+Note that a IREE runtime built with TSan cannot load a IREE compiled LLVM/CPU
+module unless those flags are used, so other tests are excluded using the
+`notsan` label.
 
 ### MSan (MemorySanitizer)
 
