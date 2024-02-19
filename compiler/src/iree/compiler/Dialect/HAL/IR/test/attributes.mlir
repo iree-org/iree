@@ -62,15 +62,41 @@
 
 // CHECK-LABEL: "device.targets"
 "device.targets"() {
-  // CHECK-SAME: target_0 = #hal.device.target<"a">
-  target_0 = #hal.device.target<"a">,
-  // CHECK-SAME: target_1 = #hal.device.target<"b", {config}>,
-  target_1 = #hal.device.target<"b", {config}>,
-  // CHECK-SAME: target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
-  target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
-  // CHECK-SAME: target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
-  target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
+  // CHECK-SAME: target_0 = #hal.device.target<"a"> : !hal.device
+  target_0 = #hal.device.target<"a"> : !hal.device,
+  // CHECK-SAME: target_1 = #hal.device.target<"b", {config}> : !hal.device,
+  target_1 = #hal.device.target<"b", {config}> : !hal.device,
+  // CHECK-SAME: target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device,
+  target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device,
+  // CHECK-SAME: target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device
+  target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]> : !hal.device
 } : () -> ()
+
+// -----
+
+// CHECK: util.global private @device_a = #hal.device.target<"a"> : !hal.device
+util.global private @device_a = #hal.device.target<"a"> : !hal.device
+// CHECK: util.global private @device_0 = #hal.device.ordinal<0> : !hal.device
+util.global private @device_0 = #hal.device.ordinal<0> : !hal.device
+
+// -----
+
+//      CHECK: util.global private @main = #hal.device.select<[
+// CHECK-SAME:   #hal.device.target<"a"> : !hal.device
+// CHECK-SAME: ]> : !hal.device
+util.global private @main = #hal.device.select<[
+  #hal.device.target<"a"> : !hal.device
+]> : !hal.device
+//      CHECK: util.global private @optional = #hal.device.select<[
+// CHECK-SAME:   #hal.device.target<"b"> : !hal.device,
+// CHECK-SAME:   #hal.device.ordinal<1> : !hal.device,
+// CHECK-SAME:   #hal.device.fallback<@main> : !hal.device
+// CHECK-SAME: ]> : !hal.device
+util.global private @optional = #hal.device.select<[
+  #hal.device.target<"b"> : !hal.device,
+  #hal.device.ordinal<1> : !hal.device,
+  #hal.device.fallback<@main> : !hal.device
+]> : !hal.device
 
 // -----
 

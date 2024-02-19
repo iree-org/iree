@@ -65,14 +65,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i64(
     iree_string_view_t key, int64_t* out_value) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_value);
-
-  if (iree_string_view_equal(category,
-                             iree_make_cstring_view("hal.device.id"))) {
-    *out_value =
-        iree_string_view_match_pattern(iree_hal_device_id(device), key) ? 1 : 0;
-    return iree_ok_status();
-  }
-
   return _VTABLE_DISPATCH(device, query_i64)(device, category, key, out_value);
 }
 
