@@ -125,3 +125,18 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:VectorTransforms",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "GPUHeuristics",
+    srcs = [
+        "GPUHeuristics.cpp",
+    ],
+    hdrs = [
+        "GPUHeuristics.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+    ],
+)
