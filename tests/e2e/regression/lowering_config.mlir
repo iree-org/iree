@@ -31,8 +31,8 @@ func.func @lowering_config_test() {
     lowering_config = <tile_sizes = [[0, 7, 7, 64, 0, 0, 0], [6, 7, 1, 32, 0, 0, 0], [0, 0, 0, 0, 3, 1, 4], [0, 0, 0, 0, 0, 0, 0]]>,
     translation_info = <CPUConvTileAndDecomposeExpert>>
 func.func @conv() {
-  %input = util.unfoldable_constant dense<1.0> : tensor<36x7x7x512xf32>
-  %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x512x512xf32>
+  %input = util.unfoldable_constant dense<1.0> : tensor<12x7x7x512xf32>
+  %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x512x128xf32>
   %0 = "stablehlo.convolution"(%input, %filter) {
     compilation_info = #conv_compilation0,
     batch_group_count = 1 : i64,
@@ -41,7 +41,7 @@ func.func @conv() {
     padding = dense<1> : tensor<2x2xi64>,
     rhs_dilation = dense<1> : tensor<2xi64>,
     window_strides = dense<1> : tensor<2xi64>
-  } : (tensor<36x7x7x512xf32>, tensor<3x3x512x512xf32>) -> tensor<36x7x7x512xf32>
+  } : (tensor<12x7x7x512xf32>, tensor<3x3x512x128xf32>) -> tensor<12x7x7x128xf32>
   %1 = "stablehlo.convolution"(%input, %filter) {
     compilation_info = #conv_compilation1,
     batch_group_count = 1 : i64,
@@ -50,7 +50,7 @@ func.func @conv() {
     padding = dense<1> : tensor<2x2xi64>,
     rhs_dilation = dense<1> : tensor<2xi64>,
     window_strides = dense<1> : tensor<2xi64>
-  } : (tensor<36x7x7x512xf32>, tensor<3x3x512x512xf32>) -> tensor<36x7x7x512xf32>
-  check.expect_almost_eq(%0, %1) : tensor<36x7x7x512xf32>
+  } : (tensor<12x7x7x512xf32>, tensor<3x3x512x128xf32>) -> tensor<12x7x7x128xf32>
+  check.expect_almost_eq(%0, %1) : tensor<12x7x7x128xf32>
   return
 }

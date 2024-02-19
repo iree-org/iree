@@ -42,9 +42,8 @@ declare -a label_exclude_args=(
   "^noriscv$"
 )
 
-# TODO(#10462): Investigate the lowering_config test issue.
 declare -a test_exclude_args=(
-  "regression_llvm-cpu_lowering_config"
+  " "
 )
 
 if [[ "${BUILD_PRESET}" == "benchmark-suite-test" ]]; then
