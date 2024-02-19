@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -38,8 +39,8 @@
 using llvm::divideCeil;
 using llvm::APIntOps::GreatestCommonDivisor;
 
-// The default number of tiles along K dimension to use per workgroup.
-constexpr unsigned numTilesPerSubgroupDimK = 2;
+// The default number of tiles along K dimension to use per subgroup/workgroup.
+constexpr unsigned numKTilesPerSubgroup = 2;
 
 constexpr int kMaxVectorNumBits = 128;
 
@@ -55,28 +56,6 @@ using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 //===----------------------------------------------------------------------===//
 // Utility Functions
 //===----------------------------------------------------------------------===//
-
-bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
-  // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
-  if (!linalg::isaContractionOpInterface(linalgOp) ||
-      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops()))
-    return false;
-
-  // Also exclude the case of matvec, which has only one non-unit parallel dim.
-  // They should go down different pipelines.
-  int nonUnitParallelDimCount = 0;
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
-      mlir::linalg::inferContractionDims(linalgOp);
-  assert(succeeded(contractionDims) && "Could not infer contraction dims");
-  for (auto mDim : contractionDims->m) {
-    nonUnitParallelDimCount += bounds[mDim] != 1;
-  }
-  for (auto nDim : contractionDims->n) {
-    nonUnitParallelDimCount += bounds[nDim] != 1;
-  }
-  return nonUnitParallelDimCount > 1;
-}
 
 // Check if the given linalg op is fused with another op that may result
 // in too much shared memory usage.
@@ -929,7 +908,7 @@ LogicalResult setCooperativeMatrixConfig(
   }
 
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
-                             numTilesPerSubgroupDimK};
+                             numKTilesPerSubgroup};
 
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds);

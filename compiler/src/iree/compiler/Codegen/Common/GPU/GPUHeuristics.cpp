@@ -20,7 +20,7 @@ std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
                   const GPUMMAHeuristicSeeds &seeds) {
-  for (const GPUMatmulShapeType &intrinsic : intrinsics) {
+  for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType ||
         problem.cType != intrinsic.cType) {
       continue; // Cannot use this intrinsic for mismatched types
@@ -35,8 +35,8 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
     int64_t mTotalTileCount = problem.mSize / intrinsic.mSize;
     int64_t nTotalTileCount = problem.nSize / intrinsic.nSize;
 
-    int64_t remainingWarps = seeds.numSubgroupsPerWorkgroup;
-    int64_t remainingTiles = seeds.numMNTilesPerSubgroup;
+    int64_t remainingWarps = seeds.bestSubgroupCountPerWorkgroup;
+    int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
     // Assign more warps to the M dimension (used later) to balance thread
     // counts along X and Y dimensions.
     int64_t warpSqrt = 1ull
@@ -90,8 +90,8 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
     }
 
     const uint64_t kTotalTileCount = problem.kSize / intrinsic.kSize;
-    APInt kGCD = GreatestCommonDivisor(APInt(64, kTotalTileCount),
-                                       APInt(64, seeds.numKTilesPerSubgroup));
+    APInt kGCD = GreatestCommonDivisor(
+        APInt(64, kTotalTileCount), APInt(64, seeds.bestKTileCountPerSubgroup));
     int64_t kTileCount = kGCD.getSExtValue();
 
     LLVM_DEBUG({
@@ -103,9 +103,9 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       llvm::dbgs() << "  subgroup tile count (M, N, K) = (" << mTileCount
                    << ", " << nTileCount << ", " << kTileCount << ")\n";
     });
-    return GPUMMASchedule{intrinsic.mSize, intrinsic.nSize, intrinsic.kSize,
-                          mWarpCount,      nWarpCount,      mTileCount,
-                          nTileCount,      kTileCount};
+    return GPUMMASchedule{index,           intrinsic.mSize, intrinsic.nSize,
+                          intrinsic.kSize, mWarpCount,      nWarpCount,
+                          mTileCount,      nTileCount,      kTileCount};
   }
   return std::nullopt;
 }

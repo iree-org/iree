@@ -13,9 +13,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -28,6 +29,9 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/LogicalResult.h"
+
+#define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
 using LayoutDimension = mlir::iree_compiler::IREE::VectorExt::LayoutDimension;
 using LayoutDimensionAttr =
@@ -50,9 +54,12 @@ namespace {
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root, ArrayAttr types,
-                                 ArrayRef<int64_t> workgroupSize, Value laneId)
+                                 ArrayRef<int64_t> workgroupSize,
+                                 IREE::GPU::MMAScheduleAttr schedule,
+                                 Value laneId)
       : VectorLayoutOptions(root), mmaTypes(types),
-        workgroupSize(workgroupSize), patterns(root->getContext()) {
+        workgroupSize(workgroupSize), schedule(schedule),
+        patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
     populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
@@ -80,24 +87,28 @@ private:
   void setContractionAnchor(MLIRContext *context,
                             VectorLayoutAnalysis &analysis,
                             vector::ContractionOp contract) {
-    std::optional<IREE::GPU::MmaAttr> maybeMmaType =
-        getCompatibleMmaAttr(mmaTypes, contract);
     // TODO: Add SIMT fallback.
-    assert(maybeMmaType && "incompatible contraction op");
+    assert(schedule && "incompatible contraction op");
 
-    auto mmaType = *maybeMmaType;
-    auto maybeLayouts = mmaType.getContractionLayout(contract);
-    assert(maybeMmaType && "mma layout type must not be opaque");
+    auto layouts = schedule.getContractionLayout(contract);
+    assert(layouts && "mma layout type must not be opaque");
 
-    auto [aLayout, bLayout, cLayout] = *maybeLayouts;
+    auto [aLayout, bLayout, cLayout] = *layouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
     analysis.setAnchor(contract.getRhs(), bLayout);
     analysis.setAnchor(contract.getAcc(), cLayout);
     analysis.setAnchor(contract.getResult(), cLayout);
+    contract->setAttr("iree.amdgpu.mfma", schedule.getIntrinsic());
+    LLVM_DEBUG({
+      llvm::dbgs() << "chosen a layout: " << aLayout << "\n";
+      llvm::dbgs() << "chosen b layout: " << bLayout << "\n";
+      llvm::dbgs() << "chosen c layout: " << cLayout << "\n";
+      llvm::dbgs() << "anchor set on contract: " << contract << "\n";
+    });
 
-    if (isa<IREE::GPU::MFMAAttr>(mmaType)) {
+    if (isa<IREE::GPU::MFMAAttr>(schedule.getIntrinsic())) {
       if (!populatedMfma) {
-        populateAMDGPUDistributionPatterns(patterns);
+        populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
         populatedMfma = true;
       }
     } else {
@@ -258,6 +269,7 @@ private:
 
   ArrayAttr mmaTypes;
   SmallVector<int64_t, 3> workgroupSize;
+  IREE::GPU::MMAScheduleAttr schedule;
 
   bool populatedMfma = false;
   RewritePatternSet patterns;
@@ -293,7 +305,6 @@ public:
     } else {
       maybeSubgroupSize = getSubgroupSize(func);
     }
-
     if (!maybeSubgroupSize) {
       func.emitError() << "subgroup size required for vector distribution";
       return signalPassFailure();
@@ -306,6 +317,7 @@ public:
         builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
         builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
                                               gpu::Dimension::z)};
+
     std::array<int64_t, 3> workgroupSize;
     if (func->hasAttr("subgroup_size")) {
       auto tmpSizes =
@@ -316,6 +328,21 @@ public:
     } else {
       workgroupSize = getWorkgroupSize(func);
     }
+
+    llvm::StringLiteral scheduleAttrName =
+        IREE::GPU::MMAScheduleAttr::getMnemonic();
+    auto scheduleAttr =
+        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
+    if (!scheduleAttr) {
+      IREE::HAL::ExecutableExportOp entryPoint = *getEntryPoint(func);
+      scheduleAttr = entryPoint->getAttrOfType<IREE::GPU::MMAScheduleAttr>(
+          scheduleAttrName);
+    }
+    LLVM_DEBUG({
+      if (scheduleAttr)
+        llvm::dbgs() << "schedule: " << scheduleAttr << "\n";
+    });
+
     AffineExpr x, y, z;
     bindSymbols(func.getContext(), x, y, z);
     // Construct the expression for linearizing the thread indices.
@@ -349,8 +376,8 @@ public:
     Value laneVal = affine::makeComposedAffineApply(builder, func.getLoc(),
                                                     laneId, threadGrid);
 
-    ContractionVectorLayoutOptions options(func, *maybeSupportedTypes,
-                                           workgroupSize, laneVal);
+    ContractionVectorLayoutOptions options(
+        func, *maybeSupportedTypes, workgroupSize, scheduleAttr, laneVal);
     // TODO: This should return failure when distribution fails for any op.
     distributeVectorOps(func, options.getPatterns(), options);
   }
