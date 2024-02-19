@@ -33,9 +33,7 @@
 // CHECK: hal.executable private @ex
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_aarch64 target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_0) attributes {
-      translation_info = #iree_codegen.translation_info<CPUDefault>
-    } {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_0) {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
@@ -53,8 +51,7 @@ hal.executable private @ex {
         #hal.interface.binding<0, 4>,
         #hal.interface.binding<1, 5>,
         #hal.interface.binding<1, 6>
-      ],
-      translation_info = #iree_codegen.translation_info<CPUDefault>
+      ]
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
