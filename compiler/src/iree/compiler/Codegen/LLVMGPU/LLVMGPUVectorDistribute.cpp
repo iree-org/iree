@@ -244,9 +244,15 @@ private:
       batchSizes[dim] = vectorSize;
     }
 
+    // Note that the layout setting logic here necessarily uses all threads in
+    // the workgroup to perform the read. As a result we can always directly
+    // use the counts as the basis for computing the subgroup/thread indices.
+    SmallVector<int64_t> subgroupBasis = subgroupCounts;
+    SmallVector<int64_t> threadBasis = threadCounts;
+
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
-        threadCounts, order, elementSizes, order);
+        threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
     analysis.setAnchor(transfer.getResult(), layout);
   }
 

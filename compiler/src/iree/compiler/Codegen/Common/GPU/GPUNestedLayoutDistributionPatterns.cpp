@@ -155,7 +155,8 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
   int64_t rank = vectorLayout.getBatchOrder().size();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
-  ValueRange threadIds = vectorLayout.computeThreadIds(threadId, rewriter);
+  SmallVector<Value> threadIds =
+      vectorLayout.computeThreadIds(threadId, rewriter);
 
   // Subgroup and thread (lane) indices normalized to the order in which
   // they are used by each dimension.

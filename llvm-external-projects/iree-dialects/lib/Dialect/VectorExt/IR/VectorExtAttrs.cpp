@@ -258,7 +258,8 @@ LogicalResult NestedLayoutAttr::verify(
     ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
     ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
-    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder) {
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
+    ArrayRef<int64_t> subgroupBasis, ArrayRef<int64_t> threadBasis) {
 
   size_t rank = subgroupsPerWorkgroup.size();
   auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
@@ -277,7 +278,9 @@ LogicalResult NestedLayoutAttr::verify(
       failed(checkTile(batchesPerSubgroup, batchOrder)) ||
       failed(checkTile(outersPerBatch, outerOrder)) ||
       failed(checkTile(threadsPerOuter, threadOrder)) ||
-      failed(checkTile(elementsPerThread, elementOrder))) {
+      failed(checkTile(elementsPerThread, elementOrder)) ||
+      failed(checkTile(subgroupBasis, subgroupOrder)) ||
+      failed(checkTile(threadBasis, threadOrder))) {
     return failure();
   }
 
@@ -286,19 +289,42 @@ LogicalResult NestedLayoutAttr::verify(
 
 /// Given a single flat thread ID, compute the indices of the distributed
 /// dimensions (subgroup and thread ids).
-ValueRange NestedLayoutAttr::computeThreadIds(Value threadId,
-                                              RewriterBase &rewriter) const {
-  SmallVector<OpFoldResult> basis;
-  for (auto warpTy : getSubgroupOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getSubgroupsPerWorkgroup()[warpTy]));
-  }
-  for (auto threadTy : getThreadOrder()) {
-    basis.push_back(rewriter.getIndexAttr(getThreadsPerOuter()[threadTy]));
+SmallVector<Value>
+NestedLayoutAttr::computeThreadIds(Value threadId,
+                                   RewriterBase &rewriter) const {
+  auto basisSizes = llvm::concat<const int64_t>(
+      applyPermutation(getSubgroupBasis(), getSubgroupOrder()),
+      applyPermutation(getThreadBasis(), getThreadOrder()));
+
+  SmallVector<OpFoldResult> basisIndexAttr;
+  for (int64_t basisIndex : basisSizes) {
+    basisIndexAttr.push_back(rewriter.getIndexAttr(basisIndex));
   }
 
-  auto delinearized = rewriter.create<mlir::affine::AffineDelinearizeIndexOp>(
-      threadId.getLoc(), threadId, basis);
-  return delinearized->getResults();
+  SmallVector<Value> delinearized =
+      rewriter
+          .create<mlir::affine::AffineDelinearizeIndexOp>(
+              threadId.getLoc(), threadId, basisIndexAttr)
+          .getResults();
+
+  // Modulo the delinearized index by the actual tile sizes.
+  auto tileSizes = llvm::concat<const int64_t>(
+      applyPermutation(getSubgroupsPerWorkgroup(), getSubgroupOrder()),
+      applyPermutation(getThreadsPerOuter(), getThreadOrder()));
+
+  for (auto [delinearized, basis, tile] :
+       llvm::zip(delinearized, basisSizes, tileSizes)) {
+    if (basis == tile) {
+      continue;
+    }
+
+    AffineMap modMap =
+        AffineMap::get(1, 0, rewriter.getAffineDimExpr(0) % tile);
+    delinearized = rewriter.create<affine::AffineApplyOp>(threadId.getLoc(),
+                                                          modMap, delinearized);
+  }
+
+  return delinearized;
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
