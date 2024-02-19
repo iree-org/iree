@@ -113,8 +113,33 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-      out.isSignlessInteger(32)) {
+  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      rhs.isSignlessInteger(4) && out.isSignlessInteger(32)) {
+    if (hasFeature(target, "+i8mm")) {
+      return {
+          TileMxNxK{8, 8, 16}, // Aim to use SMMLA.
+          TileMxNxK{4, 8, 16}, // Truncation of the above.
+          TileMxNxK{2, 8, 16}, // Truncation of the above.
+          TileMxNxK{1, 8, 16}, // Truncation of the above.
+      };
+    }
+    if (hasFeature(target, "+dotprod")) {
+      return {
+        TileMxNxK{8, 4, 8}, // Aim to use SDOT.
+        TileMxNxK{4, 4, 8}, // Truncation of the above.
+        TileMxNxK{2, 4, 8}, // Truncation of the above.
+        TileMxNxK{1, 4, 8}, // Truncation of the above.
+      };
+    }
+    return {
+      TileMxNxK{4, 16, 2}, // Aim to use SMLAL.
+      TileMxNxK{2, 16, 2}, // Truncation of the above.
+      TileMxNxK{1, 16, 2}, // Truncation of the above.
+    };
+  }
+
+  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      rhs.isSignlessInteger(8) && out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
           TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
@@ -123,7 +148,7 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 8}, // Truncation of the above.
       };
     }
-    if (hasFeature(target, "+dotprod")) {
+    if (hasUkernel(target) && hasFeature(target, "+dotprod")) {
       return {
           TileMxNxK{8, 8, 4}, // Aim to use SDOT.
           TileMxNxK{4, 8, 4}, // Truncation of the above.
@@ -131,11 +156,16 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 4}, // Truncation of the above.
       };
     }
+  }
+
+  if (!hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      (rhs.isSignlessInteger(8) || rhs.isSignlessInteger(4)) &&
+      (out.isSignlessInteger(32) || out.isF32())) {
     return {
-        TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
-        TileMxNxK{4, 8, 1}, // Truncation of the above.
-        TileMxNxK{2, 8, 1}, // Truncation of the above.
-        TileMxNxK{1, 8, 1}, // Truncation of the above.
+        TileMxNxK{6, 16, 1}, // Aim to use SMLAL.
+        TileMxNxK{4, 16, 1}, // Truncation of the above.
+        TileMxNxK{2, 32, 1}, // Truncation of the above.
+        TileMxNxK{1, 64, 1}, // Truncation of the above.
     };
   }
 
