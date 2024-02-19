@@ -781,7 +781,7 @@ static SmallVector<int64_t> getDefaultMatmulCacheSizes(linalg::LinalgOp op,
 static LogicalResult setMatmulPeelingRootConfig(
     mlir::FunctionOpInterface entryPointFn, linalg::ContractionOpInterface op,
     ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> cacheTileSizes,
-    ArrayRef<bool> inputVecScalableTileFlags, ArrayRef<int64_t> vecTileSizes,
+    ArrayRef<int64_t> vecTileSizes, ArrayRef<bool> inputVecScalableTileFlags,
     int vectorSize) {
 
   // 0. Preprocess for scalable vectors
@@ -851,25 +851,22 @@ static LogicalResult setMatmulPeelingRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
 }
 
-static LogicalResult
-setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
-                    linalg::ContractionOpInterface op,
-                    const TileSizesListTypeRef inputTileSizes,
-                    const ScalableTileFlagsListTypeRef inputScalableTileFlags,
-                    int vectorSize, VectorPreProcStrategy vecPreProcStrategy) {
+static LogicalResult setMatmulNonPeelingRootConfig(
+    mlir::FunctionOpInterface entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> distTileSizes, ArrayRef<int64_t> vecTileSizes,
+    ArrayRef<bool> inputVecScalableTileFlags, int vectorSize,
+    VectorPreProcStrategy vecPreProcStrategy) {
   auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
   // The tiling for parallel dims and reduction dims are separated.
-  const SmallVectorImpl<int64_t> &vecTileSizes = inputTileSizes.back();
-  const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
   SmallVector<int64_t> parallelTileSizes;
   SmallVector<bool> parallelScalableFlags;
-  int numScalableDims = llvm::count(vecScalableDims, true);
+  int numScalableDims = llvm::count(inputVecScalableTileFlags, true);
 
   for (auto [index, tileSize] : llvm::enumerate(vecTileSizes)) {
     int64_t sz = tileSize;
-    bool isScalable = vecScalableDims[index];
+    bool isScalable = inputVecScalableTileFlags[index];
     // The backend struggles to legalize non-power-of-two scalable vectors.
     bool enforcePowerOfTwo = isScalable;
 
@@ -907,20 +904,16 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
       parallelScalableFlags[i] = false;
   }
 
-  TileSizesListType newTileSizes;
-  // Copy all the tile size levels except the vector tile sizes which are split
-  // into parallel and reduction.
-  std::copy(inputTileSizes.begin(), inputTileSizes.end() - 1,
-            std::back_inserter(newTileSizes));
-  newTileSizes.push_back(parallelTileSizes);
-  newTileSizes.push_back(reductionTileSizes);
+  TileSizesListType newTileSizes = {SmallVector<int64_t>(distTileSizes),
+                                    parallelTileSizes, reductionTileSizes};
   // No need for tiling inner parallel dims.
   newTileSizes.emplace_back(numTilingDims, 0);
 
-  // Mirror the same layout for the scalable dims.
   ScalableTileFlagsListType newScalableTileFlags;
-  std::copy(inputScalableTileFlags.begin(), inputScalableTileFlags.end() - 1,
-            std::back_inserter(newScalableTileFlags));
+  // No scalable:
+  // * distribution,
+  // tile sizes.
+  newScalableTileFlags.emplace_back(numTilingDims, false);
   newScalableTileFlags.push_back(parallelScalableFlags);
   newScalableTileFlags.push_back(reductionScalableFlags);
   // No scalable inner parallel dims.
@@ -932,9 +925,6 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
                        << newScalableTileFlags << "\n");
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-  if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
-  }
   return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, newTileSizes,
                                                newScalableTileFlags, pipeline);
 }
@@ -1247,13 +1237,7 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // smaller than `minTileSizes`, so we have to adjust the cache sizes again.
   cacheTileSizes = distTileSizes;
 
-  SmallVector<bool> distScalableTileFlags(distTileSizes.size(), false);
-  ScalableTileFlagsListType scalableTileFlags = {distScalableTileFlags,
-                                                 vecScalableFlags};
-
   LLVM_DEBUG(KD_DBGS() << "Distribution tile sizes: " << distTileSizes << "\n");
-  LLVM_DEBUG(KD_DBGS() << "Distribution scalable tile sizes: "
-                       << distScalableTileFlags << "\n");
   LLVM_DEBUG(KD_DBGS() << "Cache tile sizes: " << cacheTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector tile sizes: " << vecTileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Vector scalable tile flags: " << vecScalableFlags
@@ -1263,12 +1247,12 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
   if (usePeelingPipeline) {
     return setMatmulPeelingRootConfig(
         entryPointFn, contractionOp, distTileSizes, cacheTileSizes,
-        vecScalableFlags, vecTileSizes, vectorSize);
+        vecTileSizes, vecScalableFlags, vectorSize);
   }
 
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
-  return setMatmulRootConfig(entryPointFn, contractionOp, tileSizes,
-                             scalableTileFlags, vectorSize, vecPreProcStrategy);
+  return setMatmulNonPeelingRootConfig(
+      entryPointFn, contractionOp, distTileSizes, vecTileSizes,
+      vecScalableFlags, vectorSize, vecPreProcStrategy);
 }
 
 static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
