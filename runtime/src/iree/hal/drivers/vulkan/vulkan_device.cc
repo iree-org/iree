@@ -1712,8 +1712,13 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
   };
   IREE_RETURN_IF_ERROR(queue->Submit(1, &batch));
   // HACK: we don't track async resource lifetimes so we have to block.
-  return iree_hal_semaphore_list_wait(signal_semaphore_list,
-                                      iree_infinite_timeout());
+  IREE_RETURN_IF_ERROR(iree_hal_semaphore_list_wait(signal_semaphore_list,
+                                                    iree_infinite_timeout()));
+  iree_hal_vulkan_tracing_context_t* tracing_context = queue->tracing_context();
+  if (tracing_context) {
+    iree_hal_vulkan_tracing_context_collect(tracing_context, VK_NULL_HANDLE);
+  }
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_device_queue_flush(
