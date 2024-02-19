@@ -12,6 +12,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Parser/Parser.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
@@ -23,7 +24,7 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 //===----------------------------------------------------------------------===//
-// Enum utilities
+// Utilities
 //===----------------------------------------------------------------------===//
 
 template <typename AttrType>
@@ -346,6 +347,80 @@ DeviceTargetAttr::lookupExecutableTargets(Operation *op) {
     }
   }
   return resultAttrs;
+}
+
+void IREE::HAL::DeviceTargetAttr::printStatusDescription(
+    llvm::raw_ostream &os) const {
+  cast<Attribute>().print(os, /*elideType=*/true);
+}
+
+// Produces a while-loop that enumerates each device available and tries to
+// match it against the target information. SCF is... not very wieldy, but this
+// is effectively:
+// ```
+//   %device_count = hal.devices.count : index
+//   %result:2 = scf.while(%i = 0, %device = null) {
+//     %is_null = util.cmp.eq %device, null : !hal.device
+//     %in_bounds = arith.cmpi slt %i, %device_count : index
+//     %continue_while = arith.andi %is_null, %in_bounds : i1
+//     scf.condition(%continue_while) %i, %device : index, !hal.device
+//   } do {
+//     %device_i = hal.devices.get %i : !hal.device
+//     %is_match = <<buildDeviceMatch>>(%device_i)
+//     %try_device = arith.select %is_match, %device_i, null : !hal.device
+//     %next_i = arith.addi %i, %c1 : index
+//     scf.yield %next_i, %try_device : index, !hal.device
+//   }
+// ```
+// Upon completion %result#1 contains the device (or null).
+Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
+    Location loc, const IREE::HAL::TargetRegistry &targetRegistry,
+    OpBuilder &builder) const {
+  // Defers to the target backend to build the device match or does a simple
+  // fallback for unregistered backends (usually for testing, but may be used
+  // as a way to bypass validation for out-of-tree experiments).
+  auto buildDeviceMatch = [&](Location loc, Value device,
+                              OpBuilder &builder) -> Value {
+    // Ask the target backend to build the match expression. It may opt to
+    // let the default handling take care of things.
+    Value match;
+    auto targetDevice = targetRegistry.getTargetDevice(getDeviceID());
+    if (targetDevice)
+      match = targetDevice->buildDeviceTargetMatch(loc, device, *this, builder);
+    if (match)
+      return match;
+    return buildDeviceIDAndExecutableFormatsMatch(
+        loc, device, getDeviceID(), getExecutableTargets(), builder);
+  };
+
+  // Enumerate all devices and match the first one found (if any).
+  Type indexType = builder.getIndexType();
+  Type deviceType = builder.getType<IREE::HAL::DeviceType>();
+  Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value c1 = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  Value deviceCount = builder.create<IREE::HAL::DevicesCountOp>(loc, indexType);
+  auto whileOp = builder.create<scf::WhileOp>(
+      loc, TypeRange{indexType, deviceType}, ValueRange{c0, nullDevice},
+      [&](OpBuilder &beforeBuilder, Location loc, ValueRange operands) {
+        Value isNull = beforeBuilder.create<IREE::Util::CmpEQOp>(
+            loc, operands[1], nullDevice);
+        Value inBounds = beforeBuilder.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::slt, operands[0], deviceCount);
+        Value continueWhile =
+            beforeBuilder.create<arith::AndIOp>(loc, isNull, inBounds);
+        beforeBuilder.create<scf::ConditionOp>(loc, continueWhile, operands);
+      },
+      [&](OpBuilder &afterBuilder, Location loc, ValueRange operands) {
+        Value device = afterBuilder.create<IREE::HAL::DevicesGetOp>(
+            loc, deviceType, operands[0]);
+        Value isMatch = buildDeviceMatch(loc, device, afterBuilder);
+        Value tryDevice = afterBuilder.create<arith::SelectOp>(
+            loc, isMatch, device, nullDevice);
+        Value nextI = afterBuilder.create<arith::AddIOp>(loc, operands[0], c1);
+        afterBuilder.create<scf::YieldOp>(loc, ValueRange{nextI, tryDevice});
+      });
+  return whileOp.getResult(1);
 }
 
 //===----------------------------------------------------------------------===//
@@ -671,6 +746,379 @@ std::optional<ArrayAttr> ExecutableObjectsAttr::getApplicableObjects(
   if (allObjectAttrs.empty())
     return std::nullopt;
   return ArrayAttr::get(specificTargetAttr.getContext(), allObjectAttrs);
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.alias<*>
+//===----------------------------------------------------------------------===//
+
+// static
+DeviceAliasAttr DeviceAliasAttr::get(MLIRContext *context, StringRef deviceID) {
+  return get(context, IREE::HAL::DeviceType::get(context),
+             StringAttr::get(context, deviceID), std::nullopt,
+             DictionaryAttr::get(context));
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.target<*>
+//===----------------------------------------------------------------------===//
+
+// static
+DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
+                                       StringRef deviceID) {
+  // TODO(benvanik): query default configuration from the target backend.
+  return get(context, StringAttr::get(context, deviceID),
+             DictionaryAttr::get(context), {});
+}
+
+// static
+Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
+  StringAttr deviceIDAttr;
+  DictionaryAttr configAttr;
+  SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+  // `<"device-id"`
+  if (failed(p.parseLess()) || failed(p.parseAttribute(deviceIDAttr))) {
+    return {};
+  }
+  // `, `
+  if (succeeded(p.parseOptionalComma())) {
+    if (succeeded(p.parseOptionalLSquare())) {
+      // `[targets, ...]` (optional)
+      do {
+        IREE::HAL::ExecutableTargetAttr executableTargetAttr;
+        if (failed(p.parseAttribute(executableTargetAttr)))
+          return {};
+        executableTargetAttrs.push_back(executableTargetAttr);
+      } while (succeeded(p.parseOptionalComma()));
+      if (failed(p.parseRSquare()))
+        return {};
+    } else {
+      // `{config dict}` (optional)
+      if (failed(p.parseAttribute(configAttr)))
+        return {};
+      // `, [targets, ...]` (optional)
+      if (succeeded(p.parseOptionalComma())) {
+        if (failed(p.parseLSquare()))
+          return {};
+        do {
+          IREE::HAL::ExecutableTargetAttr executableTargetAttr;
+          if (failed(p.parseAttribute(executableTargetAttr)))
+            return {};
+          executableTargetAttrs.push_back(executableTargetAttr);
+        } while (succeeded(p.parseOptionalComma()));
+        if (failed(p.parseRSquare()))
+          return {};
+      }
+    }
+  }
+  // `>`
+  if (failed(p.parseGreater())) {
+    return {};
+  }
+  return get(p.getContext(), deviceIDAttr, configAttr, executableTargetAttrs);
+}
+
+void DeviceTargetAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<";
+  p.printAttribute(getDeviceID());
+  auto configAttr = getConfiguration();
+  if (configAttr && !configAttr.empty()) {
+    os << ", ";
+    p.printAttribute(configAttr);
+  }
+  auto executableTargetAttrs = getExecutableTargets();
+  if (!executableTargetAttrs.empty()) {
+    os << ", [";
+    llvm::interleaveComma(executableTargetAttrs, os,
+                          [&](auto executableTargetAttr) {
+                            p.printAttribute(executableTargetAttr);
+                          });
+    os << "]";
+  }
+  os << ">";
+}
+
+std::string DeviceTargetAttr::getSymbolNameFragment() {
+  return sanitizeSymbolName(getDeviceID().getValue().lower());
+}
+
+bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
+  auto configAttr = getConfiguration();
+  return configAttr && configAttr.get(name);
+}
+
+void DeviceTargetAttr::getExecutableTargets(
+    SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs) {
+  for (auto attr : getExecutableTargets()) {
+    resultAttrs.insert(attr);
+  }
+}
+
+void IREE::HAL::DeviceTargetAttr::printStatusDescription(
+    llvm::raw_ostream &os) const {
+  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+}
+
+// Produces a while-loop that enumerates each device available and tries to
+// match it against the target information. SCF is... not very wieldy, but this
+// is effectively:
+// ```
+//   %device_count = hal.devices.count : index
+//   %result:3 = scf.while(%i = 0, %match_ordinal = 0, %device = null) {
+//     %is_null = util.cmp.eq %device, null : !hal.device
+//     %in_bounds = arith.cmpi slt %i, %device_count : index
+//     %continue_while = arith.andi %is_null, %in_bounds : i1
+//     scf.condition(%continue_while) %i, %match_ordinal %device
+//         : index, index, !hal.device
+//   } do {
+//     %device_i = hal.devices.get %i : !hal.device
+//     %device_match = <<buildDeviceMatch>>(%device_i)
+//     %ordinal_match = arith.cmpi eq %match_ordinal, %device_ordinal : index
+//     %is_match = arith.andi %device_match, %ordinal_match : i1
+//     %try_device = arith.select %is_match, %device_i, null : !hal.device
+//     %next_i = arith.addi %i, %c1 : index
+//     %match_adv = arith.select %device_match, %c1, %c0 : index
+//     %next_match_ordinal = arith.addi %match_ordinal, %match_adv : index
+//     scf.yield %next_i, %next_match_ordinal, %try_device
+//         : index, index !hal.device
+//   }
+// ```
+// Upon completion %result#1 contains the device (or null).
+// If the target had an ordinal specified we skip matches until a match with the
+// specified ordinal is reached.
+Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
+    Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
+    OpBuilder &builder) const {
+  // Device configuration can control selection beyond just the match
+  // expression.
+  auto configAttr = getConfiguration();
+  IntegerAttr deviceOrdinalAttr =
+      configAttr ? configAttr.getAs<IntegerAttr>("ordinal") : IntegerAttr{};
+
+  // Defers to the target backend to build the device match or does a simple
+  // fallback for unregistered backends (usually for testing, but may be used
+  // as a way to bypass validation for out-of-tree experiments).
+  auto buildDeviceMatch = [&](Location loc, Value device,
+                              OpBuilder &builder) -> Value {
+    // Ask the target backend to build the match expression. It may opt to
+    // let the default handling take care of things.
+    Value match = buildDeviceTargetMatch(loc, device, *this, builder);
+    if (match)
+      return match;
+    return IREE::HAL::DeviceTargetAttr::buildDeviceIDAndExecutableFormatsMatch(
+        loc, device, getDeviceID(), getExecutableTargets(), builder);
+  };
+
+  // Enumerate all devices and match the first one found (if any).
+  Type indexType = builder.getIndexType();
+  Type deviceType = builder.getType<IREE::HAL::DeviceType>();
+  Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value c1 = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  Value deviceOrdinal = deviceOrdinalAttr
+                            ? builder.create<arith::ConstantIndexOp>(
+                                  loc, deviceOrdinalAttr.getInt())
+                            : c0;
+  Value deviceCount = builder.create<IREE::HAL::DevicesCountOp>(loc, indexType);
+  auto whileOp = builder.create<scf::WhileOp>(
+      loc,
+      TypeRange{
+          /*i=*/indexType,
+          /*match_ordinal=*/indexType,
+          /*device=*/deviceType,
+      },
+      ValueRange{
+          /*i=*/c0,
+          /*match_ordinal=*/c0,
+          /*device=*/nullDevice,
+      },
+      [&](OpBuilder &beforeBuilder, Location loc, ValueRange operands) {
+        Value isNull = beforeBuilder.create<IREE::Util::CmpEQOp>(
+            loc, operands[/*device=*/2], nullDevice);
+        Value inBounds = beforeBuilder.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::slt, operands[/*i=*/0], deviceCount);
+        Value continueWhile =
+            beforeBuilder.create<arith::AndIOp>(loc, isNull, inBounds);
+        beforeBuilder.create<scf::ConditionOp>(loc, continueWhile, operands);
+      },
+      [&](OpBuilder &afterBuilder, Location loc, ValueRange operands) {
+        // Check whether the device is a match.
+        Value device = afterBuilder.create<IREE::HAL::DevicesGetOp>(
+            loc, deviceType, operands[/*i=*/0]);
+        Value isDeviceMatch = buildDeviceMatch(loc, device, afterBuilder);
+
+        // Check whether whether this matching device ordinal is the requested
+        // ordinal out of all matching devices.
+        Value isOrdinalMatch = afterBuilder.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, operands[/*match_ordinal=*/1],
+            deviceOrdinal);
+        Value nextMatchOrdinal = afterBuilder.create<arith::AddIOp>(
+            loc, operands[/*match_ordinal=*/1],
+            afterBuilder.create<arith::SelectOp>(loc, isDeviceMatch, c1, c0));
+
+        // Break if the device and ordinal match, otherwise continue with null.
+        Value isMatch = afterBuilder.create<arith::AndIOp>(loc, isDeviceMatch,
+                                                           isOrdinalMatch);
+        Value tryDevice = afterBuilder.create<arith::SelectOp>(
+            loc, isMatch, device, nullDevice);
+
+        Value nextI =
+            afterBuilder.create<arith::AddIOp>(loc, operands[/*i=*/0], c1);
+        afterBuilder.create<scf::YieldOp>(
+            loc, ValueRange{
+                     /*i=*/nextI,
+                     /*match_ordinal=*/nextMatchOrdinal,
+                     /*device=*/tryDevice,
+                 });
+      });
+  return whileOp.getResult(/*device=*/2);
+}
+
+// static
+Value DeviceTargetAttr::buildDeviceIDAndExecutableFormatsMatch(
+    Location loc, Value device, StringRef deviceIDPattern,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
+    OpBuilder &builder) {
+  // Match first on the device ID, as that's the top-level filter.
+  Value idMatch = IREE::HAL::DeviceQueryOp::createI1(
+      loc, device, "hal.device.id", deviceIDPattern, builder);
+
+  // If there are executable formats defined we should check at least one of
+  // them is supported.
+  if (executableTargetAttrs.empty()) {
+    return idMatch; // just device ID
+  } else {
+    auto ifOp = builder.create<scf::IfOp>(loc, builder.getI1Type(), idMatch,
+                                          true, true);
+    auto thenBuilder = ifOp.getThenBodyBuilder();
+    Value anyFormatMatch = buildExecutableFormatMatch(
+        loc, device, executableTargetAttrs, thenBuilder);
+    thenBuilder.create<scf::YieldOp>(loc, anyFormatMatch);
+    auto elseBuilder = ifOp.getElseBodyBuilder();
+    Value falseValue = elseBuilder.create<arith::ConstantIntOp>(loc, 0, 1);
+    elseBuilder.create<scf::YieldOp>(loc, falseValue);
+    return ifOp.getResult(0);
+  }
+}
+
+// static
+Value DeviceTargetAttr::buildExecutableFormatMatch(
+    Location loc, Value device,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs,
+    OpBuilder &builder) {
+  if (executableTargetAttrs.empty())
+    return builder.create<arith::ConstantIntOp>(loc, 1, 1);
+  Value anyFormatMatch;
+  for (auto executableTargetAttr : executableTargetAttrs) {
+    Value formatMatch = IREE::HAL::DeviceQueryOp::createI1(
+        loc, device, "hal.executable.format",
+        executableTargetAttr.getFormat().getValue(), builder);
+    if (!anyFormatMatch) {
+      anyFormatMatch = formatMatch;
+    } else {
+      anyFormatMatch =
+          builder.create<arith::OrIOp>(loc, anyFormatMatch, formatMatch);
+    }
+  }
+  return anyFormatMatch;
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.ordinal<*>
+//===----------------------------------------------------------------------===//
+
+void IREE::HAL::DeviceOrdinalAttr::printStatusDescription(
+    llvm::raw_ostream &os) const {
+  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+}
+
+Value IREE::HAL::DeviceOrdinalAttr::buildDeviceEnumeration(
+    Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
+    OpBuilder &builder) const {
+  return builder.create<IREE::HAL::DevicesGetOp>(
+      loc, getType(),
+      builder.create<arith::ConstantIndexOp>(loc, getOrdinal()));
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.fallback<*>
+//===----------------------------------------------------------------------===//
+
+void IREE::HAL::DeviceFallbackAttr::printStatusDescription(
+    llvm::raw_ostream &os) const {
+  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+}
+
+Value IREE::HAL::DeviceFallbackAttr::buildDeviceEnumeration(
+    Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
+    OpBuilder &builder) const {
+  // TODO(benvanik): hal.device.cast if needed - may need to look up the global
+  // to do it as we don't encode what the device is here in a way that is
+  // guaranteed to be consistent.
+  return builder.create<IREE::Util::GlobalLoadOp>(loc, getType(),
+                                                  getName().getValue());
+}
+
+//===----------------------------------------------------------------------===//
+// #hal.device.select<*>
+//===----------------------------------------------------------------------===//
+
+// static
+LogicalResult
+DeviceSelectAttr::verify(function_ref<mlir::InFlightDiagnostic()> emitError,
+                         Type type, ArrayAttr devicesAttr) {
+  if (devicesAttr.empty())
+    return emitError() << "must have at least one device to select";
+  for (auto deviceAttr : devicesAttr) {
+    if (!deviceAttr.isa<IREE::HAL::DeviceInitializationAttrInterface>()) {
+      return emitError() << "can only select between #hal.device.target, "
+                            "#hal.device.ordinal, #hal.device.fallback, or "
+                            "other device initialization attributes";
+    }
+  }
+  // TODO(benvanik): when !hal.device is parameterized we should check that the
+  // type is compatible with the entries.
+  return success();
+}
+
+void IREE::HAL::DeviceSelectAttr::printStatusDescription(
+    llvm::raw_ostream &os) const {
+  // TODO(benvanik): print something easier to read (newline per device, etc).
+  mlir::cast<Attribute>(this)->print(os, /*elideType=*/true);
+}
+
+// Builds a recursive nest of try-else blocks for each device specified.
+Value IREE::HAL::DeviceSelectAttr::buildDeviceEnumeration(
+    Location loc, IREE::HAL::BuildDeviceTargetMatchFn buildDeviceTargetMatch,
+    OpBuilder &builder) const {
+  Type deviceType = builder.getType<IREE::HAL::DeviceType>();
+  Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  std::function<Value(ArrayRef<IREE::HAL::DeviceInitializationAttrInterface>,
+                      OpBuilder &)>
+      buildTry;
+  buildTry =
+      [&](ArrayRef<IREE::HAL::DeviceInitializationAttrInterface> deviceAttrs,
+          OpBuilder &tryBuilder) -> Value {
+    auto deviceAttr = deviceAttrs.front();
+    Value tryDevice = deviceAttr.buildDeviceEnumeration(
+        loc, buildDeviceTargetMatch, tryBuilder);
+    if (deviceAttrs.size() == 1)
+      return tryDevice; // termination case
+    Value isNull =
+        tryBuilder.create<IREE::Util::CmpEQOp>(loc, tryDevice, nullDevice);
+    auto ifOp =
+        tryBuilder.create<scf::IfOp>(loc, deviceType, isNull, true, true);
+    auto thenBuilder = ifOp.getThenBodyBuilder();
+    Value tryChainDevice = buildTry(deviceAttrs.drop_front(1), thenBuilder);
+    thenBuilder.create<scf::YieldOp>(loc, tryChainDevice);
+    auto elseBuilder = ifOp.getElseBodyBuilder();
+    elseBuilder.create<scf::YieldOp>(loc, tryDevice);
+    return ifOp.getResult(0);
+  };
+  SmallVector<IREE::HAL::DeviceInitializationAttrInterface> deviceAttrs(
+      getDevices().getAsRange<IREE::HAL::DeviceInitializationAttrInterface>());
+  return buildTry(deviceAttrs, builder);
 }
 
 //===----------------------------------------------------------------------===//
