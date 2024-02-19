@@ -28,12 +28,11 @@ static llvm::cl::opt<bool> clEnableFuseSiluHorizontalMatmul(
     llvm::cl::desc(
         "Enables fusing specifically structured matmuls (experimental)."),
     llvm::cl::init(false));
-// TODO(#15973): Make default to true after fixing the CPU DT regression.
 static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
         "Enables propagation of transpose ops to improve fusion chances."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
