@@ -22,14 +22,12 @@
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Support/LogicalResult.h"
 
 #define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
@@ -53,13 +51,12 @@ namespace {
 // setting for other problems like reductions is TODO.
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  ContractionVectorLayoutOptions(Operation *root, ArrayAttr types,
+  ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
                                  Value laneId)
-      : VectorLayoutOptions(root), mmaTypes(types),
-        workgroupSize(workgroupSize), schedule(schedule),
-        patterns(root->getContext()) {
+      : VectorLayoutOptions(root), workgroupSize(workgroupSize),
+        schedule(schedule), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
     populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
@@ -267,7 +264,6 @@ private:
     analysis.setAnchor(transfer.getResult(), layout);
   }
 
-  ArrayAttr mmaTypes;
   SmallVector<int64_t, 3> workgroupSize;
   IREE::GPU::MMAScheduleAttr schedule;
 
@@ -287,16 +283,6 @@ public:
 
   void runOnOperation() override {
     auto func = getOperation();
-
-    FailureOr<ArrayAttr> maybeSupportedTypes =
-        getSupportedMmaTypes(llvm::cast<func::FuncOp>(func));
-    // TODO: Support FMA fallback. Contractions always benefit from an anchoring
-    // layout because they do implicit shuffles, or broadcast when loading data.
-    if (failed(maybeSupportedTypes)) {
-      func->emitError() << "Failed to collect the set of supported mma types "
-                           "for vector distribution";
-      return signalPassFailure();
-    }
 
     std::optional<int64_t> maybeSubgroupSize = std::nullopt;
     if (func->hasAttr("subgroup_size")) {
@@ -376,8 +362,8 @@ public:
     Value laneVal = affine::makeComposedAffineApply(builder, func.getLoc(),
                                                     laneId, threadGrid);
 
-    ContractionVectorLayoutOptions options(
-        func, *maybeSupportedTypes, workgroupSize, scheduleAttr, laneVal);
+    ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
+                                           laneVal);
     // TODO: This should return failure when distribution fails for any op.
     distributeVectorOps(func, options.getPatterns(), options);
   }

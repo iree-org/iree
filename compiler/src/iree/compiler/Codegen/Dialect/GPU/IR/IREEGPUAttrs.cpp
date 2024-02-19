@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -500,83 +499,3 @@ void IREEGPUDialect::registerAttributes() {
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
-
-namespace mlir::iree_compiler {
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, vector::ContractionOp contract) {
-  SmallVector<int64_t> iterationBounds;
-  contract.getIterationBounds(iterationBounds);
-  return getCompatibleMmaAttr(mmaKinds, contract.getIndexingMapsArray(),
-                              iterationBounds, contract->getOperandTypes());
-}
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, linalg::LinalgOp linalgOp) {
-  return getCompatibleMmaAttr(mmaKinds, linalgOp.getIndexingMapsArray(),
-                              linalgOp.getStaticLoopRanges(),
-                              linalgOp->getOperandTypes());
-}
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, ArrayRef<AffineMap> indexingMaps,
-                     ArrayRef<int64_t> iterationBounds, TypeRange inputTypes) {
-  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
-      linalg::inferContractionDims(indexingMaps);
-  if (failed(maybeContractionDims)) {
-    return std::nullopt;
-  }
-  auto contractionDims = *maybeContractionDims;
-
-  // TODO: Relax this condition once distribution supports it.
-  if (contractionDims.k.size() != 1 || contractionDims.m.size() != 1 ||
-      contractionDims.n.size() != 1) {
-    return std::nullopt;
-  }
-
-  unsigned mDim = contractionDims.m[0];
-  unsigned nDim = contractionDims.n[0];
-  unsigned kDim = contractionDims.k[0];
-
-  int64_t problemMSize = iterationBounds[mDim];
-  int64_t problemNSize = iterationBounds[nDim];
-  int64_t problemKSize = iterationBounds[kDim];
-
-  // Bail on dynamic shapes. Once better support for dynamic cases is in place,
-  // a separate helper should be added for dynamic and unaligned.
-  if (ShapedType::isDynamic(problemMSize) ||
-      ShapedType::isDynamic(problemNSize) ||
-      ShapedType::isDynamic(problemKSize)) {
-    return std::nullopt;
-  }
-
-  if (inputTypes.size() != 3) {
-    return std::nullopt;
-  }
-
-  Type lhsType = getElementTypeOrSelf(inputTypes[0]);
-  Type rhsType = getElementTypeOrSelf(inputTypes[1]);
-  Type accType = getElementTypeOrSelf(inputTypes[2]);
-
-  for (Attribute a : mmaKinds.getValue()) {
-    auto mmaKind = dyn_cast<IREE::GPU::MmaAttr>(a);
-    if (!mmaKind) {
-      return std::nullopt;
-    }
-
-    auto [typeA, typeB, typeC] = mmaKind.getABCElementTypes();
-    if (typeA != lhsType || typeB != rhsType || typeC != accType) {
-      continue;
-    }
-
-    auto [sizeM, sizeN, sizeK] = mmaKind.getMNKShape();
-    if (problemMSize % sizeM != 0 || problemNSize % sizeN != 0 ||
-        problemKSize % sizeK != 0) {
-      continue;
-    }
-    return mmaKind;
-  }
-  return std::nullopt;
-}
-
-} // namespace mlir::iree_compiler
