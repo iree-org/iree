@@ -973,6 +973,17 @@ LogicalResult DeviceQueryOp::verify() {
   return success();
 }
 
+// static
+Value DeviceQueryOp::createI1(Location loc, Value device, StringRef category,
+                              StringRef key, OpBuilder &builder) {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device, builder.getStringAttr(category),
+          builder.getStringAttr(key), builder.getIntegerAttr(i1Type, 0))
+      .getValue();
+}
+
 //===----------------------------------------------------------------------===//
 // hal.device.queue.*
 //===----------------------------------------------------------------------===//

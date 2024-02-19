@@ -1629,7 +1629,10 @@ def HAL_DeviceQueryOp :
 
     Well-known keys:
 
-    * hal.executable.format :: {some format}
+    * hal.device.id :: {some id pattern}
+      Returns 1 if the device identifier matches the given pattern string.
+
+    * hal.executable.format :: {some format pattern}
       Returns 1 if the given format is supported by the device loader.
 
     * hal.device :: concurrency
@@ -1660,6 +1663,14 @@ def HAL_DeviceQueryOp :
     `:` type($ok) `,` type($value)
     (`=` $default_value^)?
     attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns a true i1 if the given query returns a non-zero value.
+    // Returns false if the query fails or returns a zero value.
+    static Value createI1(Location loc, Value device,
+                          StringRef category, StringRef key,
+                          OpBuilder &builder);
   }];
 
   let hasVerifier = 1;
