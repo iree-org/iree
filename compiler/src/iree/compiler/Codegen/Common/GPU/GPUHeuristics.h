@@ -42,8 +42,8 @@ struct GPUMMASchedule {
   int64_t kTileCount; // Number of tiles along K dimension
 };
 
-/// Returns a schedule for using one of th the given MMA |intrinsics| to target
-/// the input |problem|. Returns std::nullopt if we cannot find such a schedule.
+/// Returns a schedule for using one of the given MMA |intrinsics| to target the
+/// input |problem|. Returns std::nullopt if we cannot find such a schedule.
 std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
