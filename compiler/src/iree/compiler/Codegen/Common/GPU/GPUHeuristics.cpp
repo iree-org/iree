@@ -16,8 +16,6 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
-/// Returns the cooperative matrix (M, N, K) sizes that are supported by the
-/// target environment and match the given parameters.
 std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
