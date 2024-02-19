@@ -38,6 +38,9 @@ util.func public @partitioning(%arg0: !stream.resource<external>, %arg1: !stream
 // Dispatches with the same affinities should be placed into the same execution
 // regions.
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
 // CHECK-LABEL: @partitioningWithAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
 util.func public @partitioningWithAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
@@ -48,31 +51,31 @@ util.func public @partitioningWithAffinities(%arg0: !stream.resource<external>) 
   %c255_i32 = arith.constant 255 : i32
 
   // CHECK: %[[TRANSIENTS:.+]]:2, %[[TIMEPOINT0:.+]] = stream.async.execute
-  // CHECK-SAME: on(#hal.affinity.queue<[0]>)
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
   // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c20})
   // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
   // CHECK-NEXT: %[[SPLAT:.+]] = stream.async.splat
   %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE]][{{.+}}], %[[SPLAT]][{{.+}}])
-  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  %dispatch0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE]][{{.+}}], %[[SPLAT]][{{.+}}])
-  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  %dispatch1 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[DISPATCH1]]
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK: %[[RESULT:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
-  // CHECK-SAME: on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME: on(#hal.device.affinity<@device_b>)
   // CHECK-SAME: await(%[[TIMEPOINT0]])
   // CHECK-SAME: with(%[[TRANSIENTS]]#0 as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
   // CHECK-SAME:      %[[TRANSIENTS]]#1 as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
   // CHECK-SAME: -> !stream.resource<external>{%c20}
   // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]][{{.+}}], %[[TRANSIENT1_CAPTURE]][{{.+}}])
-  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  %dispatch2 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH2]]
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
-  // CHECK-SAME:   on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME:   on(#hal.device.affinity<@device_b>)
   // CHECK-SAME:   %[[TIMEPOINT1]] => %[[RESULT]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: util.return %[[READY]]
   util.return %dispatch2 : !stream.resource<external>
@@ -84,6 +87,10 @@ util.func public @partitioningWithAffinities(%arg0: !stream.resource<external>) 
 // dependencies. Unrelated dispatches with differing affinities should end up
 // in concurrently executable regions.
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+util.global private @device_c : !hal.device
+
 // CHECK-LABEL: @partitioningWithConcurrentAffinities
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
 util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<external>) -> !stream.resource<external> {
@@ -94,23 +101,23 @@ util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<e
   %c255_i32 = arith.constant 255 : i32
 
   // CHECK: %[[TRANSIENT0:.+]], %[[TIMEPOINT0:.+]] = stream.async.execute
-  // CHECK-SAME: on(#hal.affinity.queue<[0]>)
+  // CHECK-SAME: on(#hal.device.affinity<@device_a>)
   // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE0:.+]]: !stream.resource<external>{%c20})
   // CHECK-SAME: !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
   %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1](%[[ARG0_CAPTURE0]][{{.+}}], %[[SPLAT0]][{{.+}}])
-  %dispatch0 = stream.async.dispatch on(#hal.affinity.queue<[0]>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
+  %dispatch0 = stream.async.dispatch on(#hal.device.affinity<@device_a>) @ex::@dispatch_0[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: stream.yield %[[DISPATCH0]]
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK: %[[TRANSIENT1:.+]], %[[TIMEPOINT1:.+]] = stream.async.execute
-  // CHECK-SAME: on(#hal.affinity.queue<[1]>)
+  // CHECK-SAME: on(#hal.device.affinity<@device_b>)
   // CHECK-SAME: with(%[[ARG0]] as %[[ARG0_CAPTURE1:.+]]: !stream.resource<external>{%c20})
   // CHECK-SAME: -> !stream.resource<transient>{%c20} {
   // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat
   // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1](%[[ARG0_CAPTURE1]][{{.+}}], %[[SPLAT1]][{{.+}}])
-  %dispatch1 = stream.async.dispatch on(#hal.affinity.queue<[1]>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
+  %dispatch1 = stream.async.dispatch on(#hal.device.affinity<@device_b>) @ex::@dispatch_1[%c1](%arg0[%c0 to %c20 for %c20], %splat[%c0 to %c20 for %c20]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH1]]
   // CHECK-NEXT: } => !stream.timepoint
 
@@ -121,12 +128,12 @@ util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<e
   // CHECK-SAME: with(%[[TRANSIENT0]] as %[[TRANSIENT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
   // CHECK-SAME:      %[[TRANSIENT1]] as %[[TRANSIENT1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
   // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1](%[[TRANSIENT0_CAPTURE]][{{.+}}], %[[TRANSIENT1_CAPTURE]][{{.+}}])
-  %dispatch2 = stream.async.dispatch on(#hal.affinity.queue<[2]>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
+  %dispatch2 = stream.async.dispatch on(#hal.device.affinity<@device_c>) @ex::@dispatch_2[%c1](%dispatch0[%c0 to %c1280 for %c1280], %dispatch1[%c0 to %c20 for %c20]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
   // CHECK-NEXT: stream.yield %[[DISPATCH2]]
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
-  // CHECK-SAME:   on(#hal.affinity.queue<[2]>)
+  // CHECK-SAME:   on(#hal.device.affinity<@device_c>)
   // CHECK-SAME:   %[[TIMEPOINT2]] => %[[RESULT]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: util.return %[[READY]]
   util.return %dispatch2 : !stream.resource<external>

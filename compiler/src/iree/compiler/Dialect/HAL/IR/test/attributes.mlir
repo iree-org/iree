@@ -1,4 +1,5 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --inline --allow-unregistered-dialect --split-input-file --mlir-print-local-scope %s | FileCheck %s --check-prefix=CHECK-INLINE
 
 // CHECK-LABEL: descriptor_set_layout_binding.basic
 "descriptor_set_layout_binding.basic"() {
@@ -100,11 +101,52 @@ util.global private @optional = #hal.device.select<[
 
 // -----
 
-"affinity.queue"() {
-  // CHECK: any = #hal.affinity.queue<*>
-  any = #hal.affinity.queue<*>,
-  // CHECK: q0 = #hal.affinity.queue<[0]>
-  q0 = #hal.affinity.queue<[0]>,
-  // CHECK: q123 = #hal.affinity.queue<[1, 2, 3]>
-  q123 = #hal.affinity.queue<[1, 2, 3]>
+util.global private @device : !hal.device
+"device.affinity"() {
+  // CHECK: device_any = #hal.device.affinity<@device>
+  device_any = #hal.device.affinity<@device>,
+  // CHECK: device_queue_0 = #hal.device.affinity<@device, [0]>
+  device_queue_0 = #hal.device.affinity<@device, [0]>,
+  // CHECK: device_queue_123 = #hal.device.affinity<@device, [1, 2, 3]>
+  device_queue_123 = #hal.device.affinity<@device, [1, 2, 3]>
 } : () -> ()
+
+// -----
+
+// Tests that differing device affinities blocks inlining.
+// Here the @inline_target is using the default affinity specified on the
+// module and only functions also using the default affinity or a matching
+// specified affinity will be inlined. The #hal.device.affinity controls this
+// behavior and in the future we could allow inlining of compatible devices,
+// the same device on differing queues, etc.
+
+builtin.module attributes {
+  stream.affinity = #hal.device.affinity<@device_a>
+} {
+  util.global private @device_a : !hal.device
+  util.global private @device_b : !hal.device
+  // CHECK-INLINE: util.func public @inline_target
+  util.func public @inline_target() -> (i32, i32) {
+    // CHECK-INLINE-NOT: util.call @compat_inlinable
+    // CHECK-INLINE: %[[A:.+]] = arith.constant 0
+    %a = util.call @compat_inlinable() : () -> i32
+    // CHECK-INLINE: %[[B:.+]] = util.call @noncompat_inlinable
+    %b = util.call @noncompat_inlinable() : () -> i32
+    // CHECK-INLINE: util.return %[[A]], %[[B]]
+    util.return %a, %b : i32, i32
+  }
+  // CHECK-INLINE-NOT: util.func private @compat_inlinable
+  util.func private @compat_inlinable() -> i32 attributes {
+    stream.affinity = #hal.device.affinity<@device_a>
+  } {
+    %c0 = arith.constant 0 : i32
+    util.return %c0 : i32
+  }
+  // CHECK-INLINE: util.func private @noncompat_inlinable
+  util.func private @noncompat_inlinable() -> i32 attributes {
+    stream.affinity = #hal.device.affinity<@device_b>
+  } {
+    %c1 = arith.constant 1 : i32
+    util.return %c1 : i32
+  }
+}
