@@ -681,7 +681,7 @@ public:
       }
     }
 
-    LDBG("after converting convolutions to channels last\n" << op);
+    LDBG("after converting convolutions to channels last\n" << *op);
 
     // Propagate packs introduced by the conversion patterns through adjacent
     // pads. Note that packs introduced by the above patterns will never include
@@ -695,19 +695,20 @@ public:
       }
     }
 
-    LDBG("after propagating packs/unpacks\n" << op);
+    LDBG("after propagating packs/unpacks\n" << *op);
 
     // Run pack/unpack canonicalization to try to cancel any packs.
     {
       RewritePatternSet patterns(context);
       tensor::PackOp::getCanonicalizationPatterns(patterns, context);
       tensor::UnPackOp::getCanonicalizationPatterns(patterns, context);
+      linalg::FillOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
-    LDBG("after canonicalizing packs/unpacks\n" << op);
+    LDBG("after canonicalizing packs/unpacks\n" << *op);
 
     // Generalize leftover packs and unpacks that are just transposes to allow
     // for transpose propagation and unit dim folding to handle them more
@@ -721,7 +722,7 @@ public:
       }
     }
 
-    LDBG("after generalizing all remaining packs/unpacks\n" << op);
+    LDBG("after generalizing all remaining packs/unpacks\n" << *op);
   }
 
 private:
