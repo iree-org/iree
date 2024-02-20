@@ -49,6 +49,7 @@ iree_cc_library(
     "Utils.h"
   SRCS
     "ConvertToLLVM.cpp"
+    "DecomposeMatmulTransposeBPass.cpp"
     "DispatchABI.cpp"
     "ExpandF16OpToF32Pass.cpp"
     "KernelDispatch.cpp"

@@ -47,6 +47,8 @@ createLLVMCPULowerExecutableTargetPass();
 /// and then returing a f16 output back after preforming the operation.
 /// Can handel more operations if required in future.
 std::unique_ptr<Pass> createExpandF16OpToF32Pass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDecomposeMatmulTransposeBPass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUMmt4dVectorLoweringPass();

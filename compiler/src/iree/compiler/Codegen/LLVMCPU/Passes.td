@@ -25,6 +25,13 @@ def ConvertToLLVM :
   ];
 }
 
+def DecomposeMatmulTransposeB :
+    InterfacePass<"iree-llvmcpu-decompose-matmul-transpose-b", "mlir::FunctionOpInterface"> {
+  let summary =
+      "TBD";
+  let constructor = "mlir::iree_compiler::createDecomposeMatmulTransposeBPass()";
+}
+
 def ExpandF16OpToF32 :
     Pass<"iree-llvmcpu-expand-f16-op-to-f32", ""> {
   let summary =

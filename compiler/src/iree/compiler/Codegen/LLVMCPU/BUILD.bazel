@@ -49,6 +49,7 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "DispatchABI.cpp",
+        "DecomposeMatmulTransposeBPass.cpp",
         "ExpandF16OpToF32Pass.cpp",
         "KernelDispatch.cpp",
         "LLVMCPUAssignConstantOrdinals.cpp",
