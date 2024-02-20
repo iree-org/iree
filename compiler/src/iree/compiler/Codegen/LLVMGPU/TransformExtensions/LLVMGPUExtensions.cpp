@@ -1501,9 +1501,10 @@ void transform_dialect::PackSharedMemoryAllocOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-class TestVectorLayoutOptions : public VectorLayoutOptions {
+class TransformVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+  TransformVectorLayoutOptions(Operation *root, bool fullConversion)
+      : VectorLayoutOptions(root, fullConversion) {}
 
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
@@ -1515,7 +1516,7 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  TestVectorLayoutOptions options(target);
+  TransformVectorLayoutOptions options(target, !getTestConversion());
   RewritePatternSet patterns(target.getContext());
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
@@ -1527,7 +1528,9 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   populateGPUReductionDistributionPatterns(patterns);
   populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   populateAMDGPUDistributionPatterns(patterns);
-  distributeVectorOps(target, patterns, options);
+  if (failed(distributeVectorOps(target, patterns, options))) {
+    return emitDefaultSilenceableFailure(target);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -706,10 +706,14 @@ def AMDGPUDistributeVectorsOp :
     This transform does not consume the target handle and always return success.
     }];
 
-    let arguments = (ins TransformHandleTypeInterface:$target);
+    let arguments = (ins TransformHandleTypeInterface:$target,
+                         UnitAttr:$test_conversion);
     let results = (outs);
 
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let assemblyFormat = [{
+      $target (`test_conversion` $test_conversion^)?
+      attr-dict `:` type($target)
+    }];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
     let extraClassDeclaration = [{
