@@ -28,9 +28,7 @@
   executable_targets = [
     #nvptx_sm_52_target,
     #nvptx_sm_80_target
-  ],
-  // HACK: CUDA target currently uses the legacy synchronous execution model.
-  legacy_sync
+  ]
 }>
 
 module @example attributes {hal.device.targets = [#cuda_target]} {

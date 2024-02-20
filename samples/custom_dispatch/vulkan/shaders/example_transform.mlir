@@ -32,9 +32,7 @@
 // kernel that supports multiple targets by specifying an object per-target, but
 // that requires authoring the kernel for multiple targets.
 #vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target],
-  // HACK: Vulkan target currently uses the legacy synchronous execution model.
-  legacy_sync
+  executable_targets = [#spirv_target]
 }>
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
