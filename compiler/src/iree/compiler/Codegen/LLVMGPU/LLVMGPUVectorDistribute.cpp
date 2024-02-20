@@ -19,6 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -142,6 +143,19 @@ private:
   void setTransferReadAnchor(MLIRContext *context,
                              VectorLayoutAnalysis &analysis,
                              vector::TransferReadOp transfer) {
+
+    // Get the forward slice of the transfer to approximate whether it will take
+    // the layout of a contraction instead.
+    SetVector<Operation *> forwardSlice;
+    ForwardSliceOptions options;
+    getForwardSlice(transfer.getResult(), &forwardSlice, options);
+
+    if (llvm::any_of(forwardSlice, [](Operation *op) {
+          return llvm::isa<vector::ContractionOp>(op);
+        })) {
+      return;
+    }
+
     // TODO: Support masking.
     if (transfer.getMask()) {
       return;
