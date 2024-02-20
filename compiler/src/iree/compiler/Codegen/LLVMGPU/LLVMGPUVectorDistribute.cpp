@@ -145,7 +145,11 @@ private:
                              vector::TransferReadOp transfer) {
 
     // Get the forward slice of the transfer to approximate whether it will take
-    // the layout of a contraction instead.
+    // the layout of a contraction instead. Transfer_read ops used directly by a
+    // contraction (i.e. without a copy to shared memory in between) should take
+    // the layout of the contraction op. This is common for cases where the
+    // initial values of the accumulator in a linalg.matmul is read from memory
+    // instead of just being a zerofill.
     SetVector<Operation *> forwardSlice;
     ForwardSliceOptions options;
     getForwardSlice(transfer.getResult(), &forwardSlice, options);
