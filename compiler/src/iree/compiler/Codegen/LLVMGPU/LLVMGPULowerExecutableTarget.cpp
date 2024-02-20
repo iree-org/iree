@@ -83,6 +83,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
     addGPUDefaultPassPipeline(pipeline, enableMicrokernels);
     break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering:
+    addGPUBaseLoweringPassPipeline(pipeline);
+    break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute:
     addGPUSimpleDistributePassPipeline(pipeline);
     break;
