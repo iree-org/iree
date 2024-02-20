@@ -196,59 +196,55 @@ hal.executable private @both_workgroup_and_workitem  {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4], [4], [0]]>
-#device_target_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>]}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #map0 = affine_map<()[s0] -> (s0 ceildiv 4)>
 #map1 = affine_map<()[s0] -> (s0 * 4)>
 #map2 = affine_map<()[s0, s1] -> (-((s0 * -4 + 4) mod (s1 * 4)) + 4)>
 #map3 = affine_map<(d0)[s0] -> (d0 + s0)>
-module attributes {hal.device.targets = [#device_target_cpu]} {
-  hal.executable private @simple_mul {
-    hal.executable.variant public @embedded_elf_x86_64 target(#hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>) {
-      hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
-      ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-        %c1 = arith.constant 1 : index
-        %0 = affine.apply #map0()[%arg1]
-        hal.return %0, %c1, %c1 : index, index, index
-      }
-      builtin.module {
-        func.func @simple_mul() {
-          %cst = arith.constant 0.000000e+00 : f32
-          %c4 = arith.constant 4 : index
-          %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
-          memref.assume_alignment %0, 64 : memref<4xf32>
-          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
-          memref.assume_alignment %1, 64 : memref<4xf32>
-          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
-          memref.assume_alignment %2, 64 : memref<4xf32>
-          %workgroup_id_x = hal.interface.workgroup.id[0] : index
-          %workgroup_count_x = hal.interface.workgroup.count[0] : index
-          %3 = affine.apply #map1()[%workgroup_id_x]
-          %4 = affine.apply #map1()[%workgroup_count_x]
-          %5 = affine.apply #map2()[%workgroup_id_x, %workgroup_count_x]
-          scf.for %arg0 = %3 to %5 step %4 {
-            %6 = memref.subview %2[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %7 = memref.subview %0[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %8 = memref.subview %1[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %9 = vector.transfer_read %7[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
-            %10 = vector.transfer_read %8[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
-            %11 = arith.mulf %9, %10 : vector<4xf32>
-            vector.transfer_write %11, %6[%c0] {in_bounds = [true]} : vector<4xf32>, memref<4xf32, #map3>
-          }
-          scf.for %arg0 = %5 to %c4 step %4 {
-            %6 = memref.subview %2[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %7 = memref.subview %0[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %8 = memref.subview %1[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
-            %9 = vector.transfer_read %7[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
-            %10 = vector.transfer_read %8[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
-            %11 = arith.mulf %9, %10 : vector<4xf32>
-            vector.transfer_write %11, %6[%c0] {in_bounds = [true]} : vector<4xf32>, memref<4xf32, #map3>
-          }
-          return
+hal.executable private @simple_mul {
+  hal.executable.variant public @variant target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
+      %c1 = arith.constant 1 : index
+      %0 = affine.apply #map0()[%arg1]
+      hal.return %0, %c1, %c1 : index, index, index
+    }
+    builtin.module {
+      func.func @simple_mul() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c4 = arith.constant 4 : index
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        memref.assume_alignment %0, 64 : memref<4xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        memref.assume_alignment %1, 64 : memref<4xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<4xf32>
+        memref.assume_alignment %2, 64 : memref<4xf32>
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %3 = affine.apply #map1()[%workgroup_id_x]
+        %4 = affine.apply #map1()[%workgroup_count_x]
+        %5 = affine.apply #map2()[%workgroup_id_x, %workgroup_count_x]
+        scf.for %arg0 = %3 to %5 step %4 {
+          %6 = memref.subview %2[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %7 = memref.subview %0[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %8 = memref.subview %1[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %9 = vector.transfer_read %7[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
+          %10 = vector.transfer_read %8[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
+          %11 = arith.mulf %9, %10 : vector<4xf32>
+          vector.transfer_write %11, %6[%c0] {in_bounds = [true]} : vector<4xf32>, memref<4xf32, #map3>
         }
+        scf.for %arg0 = %5 to %c4 step %4 {
+          %6 = memref.subview %2[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %7 = memref.subview %0[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %8 = memref.subview %1[%arg0] [4] [1] : memref<4xf32> to memref<4xf32, #map3>
+          %9 = vector.transfer_read %7[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
+          %10 = vector.transfer_read %8[%c0], %cst {in_bounds = [true]} : memref<4xf32, #map3>, vector<4xf32>
+          %11 = arith.mulf %9, %10 : vector<4xf32>
+          vector.transfer_write %11, %6[%c0] {in_bounds = [true]} : vector<4xf32>, memref<4xf32, #map3>
+        }
+        return
       }
     }
   }
