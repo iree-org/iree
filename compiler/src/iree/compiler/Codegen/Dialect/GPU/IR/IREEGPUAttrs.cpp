@@ -6,12 +6,14 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -27,6 +29,7 @@ using VectorLayoutInterface =
     mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface;
 using PerDimLayoutAttr = mlir::iree_compiler::IREE::VectorExt::PerDimLayoutAttr;
 using LayoutAttr = mlir::iree_compiler::IREE::VectorExt::LayoutAttr;
+using NestedLayoutAttr = mlir::iree_compiler::IREE::VectorExt::NestedLayoutAttr;
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -324,7 +327,7 @@ MFMAAttr::getContractionLayout(vector::ContractionOp contract) const {
   return IREE::GPU::getContractionLayout(contract, layout);
 }
 
-int64_t MFMAAttr::getBlockSize() {
+int64_t MFMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
     return 1;
@@ -337,8 +340,162 @@ int64_t MFMAAttr::getBlockSize() {
   return 0;
 }
 
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*element=*/{1, 4}};
+  }
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*element=*/{1, 4}};
+  }
+  }
+  return {};
+}
+
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutCount() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
+  }
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
+  }
+  }
+  return {};
+}
+
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
+  }
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
+  }
+  }
+  return {};
+}
+
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutOrder() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32:
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{0, 1}, /*thread=*/{1, 0}, /*element=*/{0, 1}};
+  }
+  }
+  return {};
+}
+
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutOrder() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32:
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
+  }
+  }
+  return {};
+}
+
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutOrder() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::F16_16x16x16_F32:
+  case MFMAIntrinsic::F16_32x32x8_F32: {
+    return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
+  }
+  }
+  return {};
+}
+
 //===----------------------------------------------------------------------===//
-// Initialize attributes
+// MMA Schedule Attributes
+//===----------------------------------------------------------------------===//
+
+std::optional<std::tuple<VectorExt::VectorLayoutInterface,
+                         VectorExt::VectorLayoutInterface,
+                         VectorExt::VectorLayoutInterface>>
+MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
+  VectorContractOpInfo opInfo(contractOp);
+  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN)
+    return std::nullopt;
+
+  auto [aM, bN] = *opInfo.getOperandMNIndex();
+  auto [aK, bK] = *opInfo.getOperandKIndex();
+  auto [cM, cN] = *opInfo.getResultMNIndex();
+  SmallVector<int64_t, 2> aPermute = {aM, aK};
+  SmallVector<int64_t, 2> bPermute = {bK, bN};
+  SmallVector<int64_t, 2> cPermute = {cM, cN};
+
+  // TODO: drop this and permute the following fields.
+  if (!isIdentityPermutation(aPermute) || !isIdentityPermutation(bPermute) ||
+      !isIdentityPermutation(cPermute))
+    return std::nullopt;
+
+  auto mfmaAttr = llvm::cast<MFMAAttr>(getIntrinsic());
+
+  // TODO: revisit the handling of subgroup/thread basis.
+  SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(),
+                                           getSubgroupNCount()};
+
+  // C matrix layout
+  MFMAAttr::SingleSubgroupLayout cCounts =
+      mfmaAttr.getCSingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout cOrders =
+      mfmaAttr.getCSingleSubgroupLayoutOrder();
+
+  SmallVector<int64_t, 2> cSubgroupPerWorkgroup = {getSubgroupMCount(),
+                                                   getSubgroupNCount()};
+  SmallVector<int64_t, 2> cBatchesPerSubgroup = {getSubgroupMTileCount(),
+                                                 getSubgroupNTileCount()};
+  SmallVector<int64_t, 2> cSubgroupOrder = {0, 1};
+  SmallVector<int64_t, 2> cBatchOrder = {0, 1};
+  SmallVector<int64_t, 2> cThreadBasis = cCounts.thread;
+
+  auto cLayout = NestedLayoutAttr::get(
+      getContext(), cSubgroupPerWorkgroup, cSubgroupOrder, cBatchesPerSubgroup,
+      cBatchOrder, cCounts.outer, cOrders.outer, cCounts.thread, cOrders.thread,
+      cCounts.element, cOrders.element, subgroupBasis, cThreadBasis);
+
+  // A matrix layout
+  MFMAAttr::SingleSubgroupLayout aCounts =
+      mfmaAttr.getASingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout aOrders =
+      mfmaAttr.getASingleSubgroupLayoutOrder();
+
+  SmallVector<int64_t, 2> aSubgroupPerWorkgroup = {getSubgroupMCount(), 1};
+  SmallVector<int64_t, 2> aBatchesPerSubgroup = {getSubgroupMTileCount(),
+                                                 getSubgroupKTileCount()};
+  SmallVector<int64_t, 2> aSubgroupOrder = {0, 1};
+  SmallVector<int64_t, 2> aBatchOrder = {0, 1};
+  SmallVector<int64_t, 2> aThreadBasis = aCounts.thread;
+
+  auto aLayout = NestedLayoutAttr::get(
+      getContext(), aSubgroupPerWorkgroup, aSubgroupOrder, aBatchesPerSubgroup,
+      aBatchOrder, aCounts.outer, aOrders.outer, aCounts.thread, aOrders.thread,
+      aCounts.element, aOrders.element, subgroupBasis, aThreadBasis);
+
+  // B matrix layout
+  MFMAAttr::SingleSubgroupLayout bCounts =
+      mfmaAttr.getBSingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout bOrders =
+      mfmaAttr.getBSingleSubgroupLayoutOrder();
+
+  SmallVector<int64_t, 2> bSubgroupPerWorkgroup = {1, getSubgroupNCount()};
+  SmallVector<int64_t, 2> bBatchesPerSubgroup = {getSubgroupKTileCount(),
+                                                 getSubgroupNTileCount()};
+  SmallVector<int64_t, 2> bSubgroupOrder = {0, 1};
+  SmallVector<int64_t, 2> bBatchOrder = {0, 1};
+  SmallVector<int64_t, 2> bThreadBasis = bCounts.thread;
+
+  auto bLayout = NestedLayoutAttr::get(
+      getContext(), bSubgroupPerWorkgroup, bSubgroupOrder, bBatchesPerSubgroup,
+      bBatchOrder, bCounts.outer, bOrders.outer, bCounts.thread, bOrders.thread,
+      bCounts.element, bOrders.element, subgroupBasis, bThreadBasis);
+
+  return std::make_tuple(aLayout, bLayout, cLayout);
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute Registration
 //===----------------------------------------------------------------------===//
 
 void IREEGPUDialect::registerAttributes() {
@@ -349,83 +506,3 @@ void IREEGPUDialect::registerAttributes() {
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
-
-namespace mlir::iree_compiler {
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, vector::ContractionOp contract) {
-  SmallVector<int64_t> iterationBounds;
-  contract.getIterationBounds(iterationBounds);
-  return getCompatibleMmaAttr(mmaKinds, contract.getIndexingMapsArray(),
-                              iterationBounds, contract->getOperandTypes());
-}
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, linalg::LinalgOp linalgOp) {
-  return getCompatibleMmaAttr(mmaKinds, linalgOp.getIndexingMapsArray(),
-                              linalgOp.getStaticLoopRanges(),
-                              linalgOp->getOperandTypes());
-}
-
-std::optional<IREE::GPU::MmaAttr>
-getCompatibleMmaAttr(ArrayAttr mmaKinds, ArrayRef<AffineMap> indexingMaps,
-                     ArrayRef<int64_t> iterationBounds, TypeRange inputTypes) {
-  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
-      linalg::inferContractionDims(indexingMaps);
-  if (failed(maybeContractionDims)) {
-    return std::nullopt;
-  }
-  auto contractionDims = *maybeContractionDims;
-
-  // TODO: Relax this condition once distribution supports it.
-  if (contractionDims.k.size() != 1 || contractionDims.m.size() != 1 ||
-      contractionDims.n.size() != 1) {
-    return std::nullopt;
-  }
-
-  unsigned mDim = contractionDims.m[0];
-  unsigned nDim = contractionDims.n[0];
-  unsigned kDim = contractionDims.k[0];
-
-  int64_t problemMSize = iterationBounds[mDim];
-  int64_t problemNSize = iterationBounds[nDim];
-  int64_t problemKSize = iterationBounds[kDim];
-
-  // Bail on dynamic shapes. Once better support for dynamic cases is in place,
-  // a separate helper should be added for dynamic and unaligned.
-  if (ShapedType::isDynamic(problemMSize) ||
-      ShapedType::isDynamic(problemNSize) ||
-      ShapedType::isDynamic(problemKSize)) {
-    return std::nullopt;
-  }
-
-  if (inputTypes.size() != 3) {
-    return std::nullopt;
-  }
-
-  Type lhsType = getElementTypeOrSelf(inputTypes[0]);
-  Type rhsType = getElementTypeOrSelf(inputTypes[1]);
-  Type accType = getElementTypeOrSelf(inputTypes[2]);
-
-  for (Attribute a : mmaKinds.getValue()) {
-    auto mmaKind = dyn_cast<IREE::GPU::MmaAttr>(a);
-    if (!mmaKind) {
-      return std::nullopt;
-    }
-
-    auto [typeA, typeB, typeC] = mmaKind.getABCElementTypes();
-    if (typeA != lhsType || typeB != rhsType || typeC != accType) {
-      continue;
-    }
-
-    auto [sizeM, sizeN, sizeK] = mmaKind.getMNKShape();
-    if (problemMSize % sizeM != 0 || problemNSize % sizeN != 0 ||
-        problemKSize % sizeK != 0) {
-      continue;
-    }
-    return mmaKind;
-  }
-  return std::nullopt;
-}
-
-} // namespace mlir::iree_compiler

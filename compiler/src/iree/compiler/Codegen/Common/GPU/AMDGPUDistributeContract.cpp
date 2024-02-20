@@ -12,7 +12,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
-#define DEBUG_TYPE "iree-amdgpu-distribute-contract"
+#define DEBUG_TYPE "iree-codegen-amdgpu-distribute-contract"
 
 namespace mlir::iree_compiler {
 namespace {

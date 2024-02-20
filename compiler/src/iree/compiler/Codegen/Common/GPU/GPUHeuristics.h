@@ -23,15 +23,17 @@ struct GPUMatmulShapeType {
 
 /// Struct containing seed tile sizes for GPU MMA heuristics deduction logic.
 struct GPUMMAHeuristicSeeds {
-  // The default number of subgroups to use per workgroup
-  int64_t numSubgroupsPerWorkgroup;
-  // The default number of tiles along M/N dimension to use per workgroup
-  int64_t numMNTilesPerSubgroup;
-  // The default number of tiles along K dimension to use per subgroup
-  int64_t numKTilesPerSubgroup;
+  // The best number of subgroups to use per workgroup
+  int64_t bestSubgroupCountPerWorkgroup;
+  // The best number of total tiles along M*N dimensions per subgroup
+  int64_t bestMNTileCountPerSubgroup;
+  // The best number of tiles along K dimension per subgroup
+  int64_t bestKTileCountPerSubgroup;
 };
 
 struct GPUMMASchedule {
+  // Index of the chosen intrinsic into the list of given MMA intrinsics
+  uint64_t index;
   int64_t mSize;      // Native MMA size along M dimension
   int64_t nSize;      // Native MMA size along N dimension
   int64_t kSize;      // Native MMA size along K dimension
