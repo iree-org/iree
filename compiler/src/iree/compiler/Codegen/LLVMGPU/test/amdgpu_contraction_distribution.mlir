@@ -43,7 +43,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
     transform.yield
   }
 }
@@ -84,7 +84,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
     transform.yield
   }
 }
@@ -132,7 +132,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
     transform.yield
   }
 }
@@ -179,7 +179,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
     transform.yield
   }
 }
