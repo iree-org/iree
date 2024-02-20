@@ -433,7 +433,8 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   auto mfmaAttr = llvm::cast<MFMAAttr>(getIntrinsic());
 
   // TODO: revisit the handling of subgroup/thread basis
-  SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(), getSubgroupNCount()};
+  SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(),
+                                           getSubgroupNCount()};
 
   // C matrix layout
   MFMAAttr::OuterThreadElement cCounts = mfmaAttr.getCOuterThreadElementCount();
