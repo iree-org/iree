@@ -351,8 +351,10 @@ public:
 
     ContractionVectorLayoutOptions options(func, *maybeSupportedTypes,
                                            workgroupSize, laneVal);
-    // TODO: This should return failure when distribution fails for any op.
-    distributeVectorOps(func, options.getPatterns(), options);
+    if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
+      func->emitOpError() << "failed to distribute";
+      return signalPassFailure();
+    }
   }
 };
 } // namespace

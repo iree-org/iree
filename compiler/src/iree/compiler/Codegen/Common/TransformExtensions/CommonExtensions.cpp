@@ -939,7 +939,8 @@ void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
 
 class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+  TestVectorLayoutOptions(Operation *root)
+      : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
@@ -970,7 +971,9 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (getExperimental())
     populateGPULayoutResolutionDistributionPatterns(patterns);
-  distributeVectorOps(target, patterns, options);
+  if (failed(distributeVectorOps(target, patterns, options))) {
+    return emitDefaultDefiniteFailure(target);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 
