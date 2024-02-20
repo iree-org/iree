@@ -950,15 +950,6 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.lookup
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutLookupOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set_layout");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.device.allocator
 //===----------------------------------------------------------------------===//
 
