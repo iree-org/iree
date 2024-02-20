@@ -25,9 +25,7 @@
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary.
 #vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target],
-  // HACK: Vulkan target currently uses the legacy synchronous execution model.
-  legacy_sync
+  executable_targets = [#spirv_target]
 }>
 
 module @example attributes {hal.device.targets = [#vulkan_target]} {
