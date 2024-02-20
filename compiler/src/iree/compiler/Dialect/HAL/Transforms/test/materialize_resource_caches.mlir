@@ -116,8 +116,6 @@ util.func public @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.
   ]>
 ]>
 
-module attributes {hal.device.targets = [#hal.device.target<"llvm-cpu">]} {
-
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
@@ -224,8 +222,6 @@ util.func public @exeLookup(%device : !hal.device) -> !hal.executable {
   util.return %0 : !hal.executable
 }
 
-}
-
 // -----
 
 // Tests that materialization no-ops when resource caches have already been
@@ -241,8 +237,6 @@ util.func public @exeLookup(%device : !hal.device) -> !hal.executable {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-
-module attributes {hal.device.targets = [#hal.device.target<"llvm-cpu">]} {
 
 util.global private @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 util.initializer {
@@ -298,6 +292,4 @@ util.func public @exeLookup(%device : !hal.device) -> !hal.executable {
   %0 = util.global.load @_executable_exe : !hal.executable
   // CHECK-NEXT: util.return %[[EXE]]
   util.return %0 : !hal.executable
-}
-
 }
