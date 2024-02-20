@@ -15,7 +15,10 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
-        ["smoketest.mlir"],
+        [
+            "smoketest.mlir",
+            "target_device_features.mlir",
+        ],
         include = ["*.mlir"],
     ),
     cfg = "//compiler:lit.cfg.py",
