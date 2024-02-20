@@ -191,8 +191,14 @@ static void iree_hal_rocm_replace_channel_provider(
 static iree_status_t iree_hal_rocm_device_query_i64(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int64_t* out_value) {
-  // iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
+  iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   *out_value = 0;
+
+  if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
+    *out_value =
+        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+    return iree_ok_status();
+  }
 
   if (iree_string_view_equal(category,
                              iree_make_cstring_view("hal.executable.format"))) {

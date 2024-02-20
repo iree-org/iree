@@ -408,6 +408,12 @@ static iree_status_t iree_hal_cuda_device_query_i64(
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   *out_value = 0;
 
+  if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
+    *out_value =
+        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+    return iree_ok_status();
+  }
+
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value = iree_string_view_equal(key, IREE_SV("cuda-nvptx-fb")) ? 1 : 0;
     return iree_ok_status();
