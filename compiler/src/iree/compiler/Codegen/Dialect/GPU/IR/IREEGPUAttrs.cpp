@@ -432,6 +432,9 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 
   auto mfmaAttr = llvm::cast<MFMAAttr>(getIntrinsic());
 
+  // TODO: revisit the handling of subgroup/thread basis
+  SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(), getSubgroupNCount()};
+
   // C matrix layout
   MFMAAttr::OuterThreadElement cCounts = mfmaAttr.getCOuterThreadElementCount();
   MFMAAttr::OuterThreadElement cOrders = mfmaAttr.getCOuterThreadElementOrder();
@@ -442,13 +445,12 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
                                                  getSubgroupNTileCount()};
   SmallVector<int64_t, 2> cSubgroupOrder = {0, 1};
   SmallVector<int64_t, 2> cBatchOrder = {0, 1};
-  SmallVector<int64_t, 2> cSubgroupBasis = cSubgroupPerWorkgroup;
   SmallVector<int64_t, 2> cThreadBasis = cCounts.thread;
 
   auto cLayout = NestedLayoutAttr::get(
       getContext(), cSubgroupPerWorkgroup, cSubgroupOrder, cBatchesPerSubgroup,
       cBatchOrder, cCounts.outer, cOrders.outer, cCounts.thread, cOrders.thread,
-      cCounts.element, cOrders.element, cSubgroupBasis, cThreadBasis);
+      cCounts.element, cOrders.element, subgroupBasis, cThreadBasis);
 
   // A matrix layout
   MFMAAttr::OuterThreadElement aCounts = mfmaAttr.getAOuterThreadElementCount();
@@ -459,13 +461,12 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
                                                  getSubgroupKTileCount()};
   SmallVector<int64_t, 2> aSubgroupOrder = {0, 1};
   SmallVector<int64_t, 2> aBatchOrder = {0, 1};
-  SmallVector<int64_t, 2> aSubgroupBasis = aSubgroupPerWorkgroup;
   SmallVector<int64_t, 2> aThreadBasis = aCounts.thread;
 
   auto aLayout = NestedLayoutAttr::get(
       getContext(), aSubgroupPerWorkgroup, aSubgroupOrder, aBatchesPerSubgroup,
       aBatchOrder, aCounts.outer, aOrders.outer, aCounts.thread, aOrders.thread,
-      aCounts.element, aOrders.element, aSubgroupBasis, aThreadBasis);
+      aCounts.element, aOrders.element, subgroupBasis, aThreadBasis);
 
   // B matrix layout
   MFMAAttr::OuterThreadElement bCounts = mfmaAttr.getBOuterThreadElementCount();
@@ -476,13 +477,12 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
                                                  getSubgroupNTileCount()};
   SmallVector<int64_t, 2> bSubgroupOrder = {0, 1};
   SmallVector<int64_t, 2> bBatchOrder = {0, 1};
-  SmallVector<int64_t, 2> bSubgroupBasis = bSubgroupPerWorkgroup;
   SmallVector<int64_t, 2> bThreadBasis = bCounts.thread;
 
   auto bLayout = NestedLayoutAttr::get(
       getContext(), bSubgroupPerWorkgroup, bSubgroupOrder, bBatchesPerSubgroup,
       bBatchOrder, bCounts.outer, bOrders.outer, bCounts.thread, bOrders.thread,
-      bCounts.element, bOrders.element, bSubgroupBasis, bThreadBasis);
+      bCounts.element, bOrders.element, subgroupBasis, bThreadBasis);
 
   return std::make_tuple(aLayout, bLayout, cLayout);
 }
