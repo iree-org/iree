@@ -374,14 +374,14 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // for later access in the pipeline.
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      op.getContext(), mmaAttrs[schedule->index], schedule->mWarpCount,
+      context, mmaAttrs[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
       schedule->kTileCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(
       StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
       scheduleAttr);
-  auto configDict = DictionaryAttr::get(op.getContext(), attrs);
+  auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
