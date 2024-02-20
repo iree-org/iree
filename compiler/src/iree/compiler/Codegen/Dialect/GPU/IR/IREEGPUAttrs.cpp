@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -17,6 +18,8 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
+
+#define DEBUG_TYPE "iree-gpu-attrs"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.cpp.inc"
 #define GET_ATTRDEF_CLASSES
@@ -410,6 +413,34 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutOrder() const {
 // MMA Schedule Attributes
 //===----------------------------------------------------------------------===//
 
+NestedLayoutAttr permuteAndCreateNestedLayout(
+    MLIRContext *context, ArrayRef<int64_t> permute,
+    SmallVector<int64_t, 2> subgroupCount,
+    SmallVector<int64_t, 2> subgroupOrder, SmallVector<int64_t, 2> batchCount,
+    SmallVector<int64_t, 2> batchOrder, SmallVector<int64_t, 2> outerCount,
+    SmallVector<int64_t, 2> outerOrder, SmallVector<int64_t, 2> threadCount,
+    SmallVector<int64_t, 2> threadOrder, SmallVector<int64_t, 2> elementCount,
+    SmallVector<int64_t, 2> elementOrder, ArrayRef<int64_t> subgroupBasis,
+    ArrayRef<int64_t> threadBasis) {
+  if (!isIdentityPermutation(permute)) {
+    applyPermutationToVector(subgroupCount, permute);
+    applyPermutationToVector(subgroupOrder, permute);
+    applyPermutationToVector(batchCount, permute);
+    applyPermutationToVector(batchOrder, permute);
+    applyPermutationToVector(outerCount, permute);
+    applyPermutationToVector(outerOrder, permute);
+    applyPermutationToVector(threadCount, permute);
+    applyPermutationToVector(threadOrder, permute);
+    applyPermutationToVector(elementCount, permute);
+    applyPermutationToVector(elementOrder, permute);
+  }
+
+  return NestedLayoutAttr::get(context, subgroupCount, subgroupOrder,
+                               batchCount, batchOrder, outerCount, outerOrder,
+                               threadCount, threadOrder, elementCount,
+                               elementOrder, subgroupBasis, threadBasis);
+}
+
 std::optional<std::tuple<VectorExt::VectorLayoutInterface,
                          VectorExt::VectorLayoutInterface,
                          VectorExt::VectorLayoutInterface>>
@@ -425,16 +456,39 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t, 2> bPermute = {bK, bN};
   SmallVector<int64_t, 2> cPermute = {cM, cN};
 
-  // TODO: drop this and permute the following fields.
-  if (!isIdentityPermutation(aPermute) || !isIdentityPermutation(bPermute) ||
-      !isIdentityPermutation(cPermute))
-    return std::nullopt;
-
   auto mfmaAttr = llvm::cast<MFMAAttr>(getIntrinsic());
+  MLIRContext *context = getContext();
 
-  // TODO: revisit the handling of subgroup/thread basis.
+  // Get the concrete nested layout for each matrix. Note that the struct
+  // MFMAAttr::SingleSubgroupLayout contains the partial layout for the
+  // canonical (M, K) x (K, N) -> (M, N) matmul form; while the specific
+  // contract op we are looking at right now may not be exactly in that form.
+  // So here we need to permute/transpose the canonical layout to match with
+  // the concrete contract op.
+
+  // Note that no matter how we permute/transpose the input contraction problem,
+  // the way we view the hardware warps remain the same--that is, from the
+  // hardware's perspective, a single warp has the same warp ID no matter what
+  // part of the contraction it works on. Similarly here, we are delinearizing
+  // the linearized GPU hardware lane ID into a n-D concatenated logical
+  // warp+thread using the subgroup/thread basis, so the subgroup basis should
+  // remain the same for all A/B/C matrix.
   SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(),
                                            getSubgroupNCount()};
+
+  // For threads though, we also need to make sure the basis is consistent
+  // across A, B, and C matrix. Though here we need to additionally think it
+  // from the matching of how the MMA intrinsics expect the treads organize and
+  // how we distribute the large input contraction problem to the threads.
+  // The intrinsics expect a certain 2-D (x, y) thread layout, where it's not
+  // guaranteed that y is always the fastest moving dimension. But when we
+  // distribute the large input contraction problem, we always associate the
+  // fastest moving dimension to the innermost thread ID dimension. Therefore,
+  // we need to "adjust" the intrinsic thread shape to from the slowest moving
+  // dimension to the fastest one. That is, to apply the corresponding order
+  // permutation vector. Because how the intrinsics are designed, the end result
+  // is actually we are basically guaranteed to see the same thread basis for A,
+  // B, and C matrix. But still..
 
   // C matrix layout
   MFMAAttr::SingleSubgroupLayout cCounts =
@@ -442,18 +496,19 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   MFMAAttr::SingleSubgroupLayout cOrders =
       mfmaAttr.getCSingleSubgroupLayoutOrder();
 
-  SmallVector<int64_t, 2> cSubgroupPerWorkgroup = {getSubgroupMCount(),
-                                                   getSubgroupNCount()};
-  SmallVector<int64_t, 2> cBatchesPerSubgroup = {getSubgroupMTileCount(),
-                                                 getSubgroupNTileCount()};
-  SmallVector<int64_t, 2> cSubgroupOrder = {0, 1};
-  SmallVector<int64_t, 2> cBatchOrder = {0, 1};
   SmallVector<int64_t, 2> cThreadBasis = cCounts.thread;
+  applyPermutationToVector(cThreadBasis, cOrders.thread);
 
-  auto cLayout = NestedLayoutAttr::get(
-      getContext(), cSubgroupPerWorkgroup, cSubgroupOrder, cBatchesPerSubgroup,
-      cBatchOrder, cCounts.outer, cOrders.outer, cCounts.thread, cOrders.thread,
-      cCounts.element, cOrders.element, subgroupBasis, cThreadBasis);
+  auto cLayout = permuteAndCreateNestedLayout(
+      context, cPermute,
+      /*subgroupCount=*/{getSubgroupMCount(), getSubgroupNCount()},
+      /*subgroupOrder=*/{0, 1},
+      /*batchCount=*/{getSubgroupMTileCount(), getSubgroupNTileCount()},
+      /*batchOrder=*/{0, 1}, /*outerCount=*/cCounts.outer,
+      /*outerOrder=*/cOrders.outer, /*threadCount=*/cCounts.thread,
+      /*threadOrder=*/cOrders.thread,
+      /*elementCount=*/cCounts.element, /*elementOrder=*/cOrders.element,
+      subgroupBasis, cThreadBasis);
 
   // A matrix layout
   MFMAAttr::SingleSubgroupLayout aCounts =
@@ -461,17 +516,19 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   MFMAAttr::SingleSubgroupLayout aOrders =
       mfmaAttr.getASingleSubgroupLayoutOrder();
 
-  SmallVector<int64_t, 2> aSubgroupPerWorkgroup = {getSubgroupMCount(), 1};
-  SmallVector<int64_t, 2> aBatchesPerSubgroup = {getSubgroupMTileCount(),
-                                                 getSubgroupKTileCount()};
-  SmallVector<int64_t, 2> aSubgroupOrder = {0, 1};
-  SmallVector<int64_t, 2> aBatchOrder = {0, 1};
   SmallVector<int64_t, 2> aThreadBasis = aCounts.thread;
+  applyPermutationToVector(aThreadBasis, aOrders.thread);
 
-  auto aLayout = NestedLayoutAttr::get(
-      getContext(), aSubgroupPerWorkgroup, aSubgroupOrder, aBatchesPerSubgroup,
-      aBatchOrder, aCounts.outer, aOrders.outer, aCounts.thread, aOrders.thread,
-      aCounts.element, aOrders.element, subgroupBasis, aThreadBasis);
+  auto aLayout = permuteAndCreateNestedLayout(
+      context, aPermute,
+      /*subgroupCount=*/{getSubgroupMCount(), 1},
+      /*subgroupOrder=*/{0, 1},
+      /*batchCount=*/{getSubgroupMTileCount(), getSubgroupKTileCount()},
+      /*batchOrder=*/{0, 1}, /*outerCount=*/aCounts.outer,
+      /*outerOrder=*/aOrders.outer, /*threadCount=*/aCounts.thread,
+      /*threadOrder=*/aOrders.thread,
+      /*elementCount=*/aCounts.element, /*elementOrder=*/aOrders.element,
+      subgroupBasis, aThreadBasis);
 
   // B matrix layout
   MFMAAttr::SingleSubgroupLayout bCounts =
@@ -479,17 +536,19 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   MFMAAttr::SingleSubgroupLayout bOrders =
       mfmaAttr.getBSingleSubgroupLayoutOrder();
 
-  SmallVector<int64_t, 2> bSubgroupPerWorkgroup = {1, getSubgroupNCount()};
-  SmallVector<int64_t, 2> bBatchesPerSubgroup = {getSubgroupKTileCount(),
-                                                 getSubgroupNTileCount()};
-  SmallVector<int64_t, 2> bSubgroupOrder = {0, 1};
-  SmallVector<int64_t, 2> bBatchOrder = {0, 1};
   SmallVector<int64_t, 2> bThreadBasis = bCounts.thread;
+  applyPermutationToVector(bThreadBasis, bOrders.thread);
 
-  auto bLayout = NestedLayoutAttr::get(
-      getContext(), bSubgroupPerWorkgroup, bSubgroupOrder, bBatchesPerSubgroup,
-      bBatchOrder, bCounts.outer, bOrders.outer, bCounts.thread, bOrders.thread,
-      bCounts.element, bOrders.element, subgroupBasis, bThreadBasis);
+  auto bLayout = permuteAndCreateNestedLayout(
+      context, bPermute,
+      /*subgroupCount=*/{1, getSubgroupNCount()},
+      /*subgroupOrder=*/{0, 1},
+      /*batchCount=*/{getSubgroupKTileCount(), getSubgroupNTileCount()},
+      /*batchOrder=*/{0, 1}, /*outerCount=*/bCounts.outer,
+      /*outerOrder=*/bOrders.outer, /*threadCount=*/bCounts.thread,
+      /*threadOrder=*/bOrders.thread,
+      /*elementCount=*/bCounts.element, /*elementOrder=*/bOrders.element,
+      subgroupBasis, bThreadBasis);
 
   return std::make_tuple(aLayout, bLayout, cLayout);
 }
