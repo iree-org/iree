@@ -96,12 +96,12 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
   if (enableVectorContractCustomKernels) {
     // Special-case vector.contract codegen paths. This needs to happen
     // just before the generic vector ops lowerings.
-    RewritePatternSet patterns(context);
-    auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-    populateVectorContractCustomKernelsPatterns(target, patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
+    // RewritePatternSet patterns(context);
+    // auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    // populateVectorContractCustomKernelsPatterns(target, patterns);
+    // if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    //   return signalPassFailure();
+    // }
   }
 }
 

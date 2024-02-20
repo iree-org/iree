@@ -158,8 +158,20 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
   }
 
   if (!hasUkernel(target)) {
+    if (hasFeature(target, "+i8mm") && lhs.isSignlessInteger(8) &&
+        (rhs.isSignlessInteger(8) || rhs.isSignlessInteger(4)) &&
+        out.isSignlessInteger(32)) {
+      llvm::dbgs() << "I'm returning i8mm tile size.\n";
+      return {
+          TileMxNxK{8, 8, 8},
+          TileMxNxK{4, 8, 8},
+          TileMxNxK{2, 8, 8},
+          TileMxNxK{1, 8, 8},
+      };
+    }
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
         (out.isSignlessInteger(32) || out.isF32())) {
+      llvm::dbgs() << "Marker 5\n";
       return {
           TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
           TileMxNxK{4, 8, 1}, // Truncation of the above.
@@ -469,6 +481,9 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
+
+  llvm::dbgs() << "The chosen tile size: [" << chosenTileMxNxK.M << ", "
+               << chosenTileMxNxK.N << ", " << chosenTileMxNxK.K << "]\n";
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
   auto rank = tensorType.getRank();

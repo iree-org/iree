@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmNeon/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -26,7 +28,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, vector::VectorDialect>();
+    registry.insert<linalg::LinalgDialect, vector::VectorDialect,
+                    arm_neon::ArmNeonDialect>();
   }
   void runOnOperation() override;
 };
@@ -53,6 +56,8 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorTransferSplit(vectorTransferSplit);
 
   RewritePatternSet patterns(ctx);
+  arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
+
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
   vector::populateVectorGatherLoweringPatterns(patterns);
   vector::populateVectorContractLoweringPatterns(
