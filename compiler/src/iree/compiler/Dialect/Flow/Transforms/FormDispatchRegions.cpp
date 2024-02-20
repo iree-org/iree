@@ -699,11 +699,6 @@ isFusableWithProducer(OpOperand &operand,
     return false;
   }
 
-  auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (!consumerLinalgOp.isDpsInit(&operand)) {
-    return false;
-  }
-
   return areOpsFusable(producer, consumer, rootOuterParallelLoops);
 }
 
