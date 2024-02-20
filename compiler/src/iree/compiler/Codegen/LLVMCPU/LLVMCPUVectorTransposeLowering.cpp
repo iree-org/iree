@@ -57,6 +57,12 @@ public:
     int64_t factor = std::min(m, n);
     if (m % factor != 0 || n % factor != 0)
       return failure();
+    if (factor % 16 == 0)
+      factor = 16;
+    else if (factor % 8 == 0)
+      factor = 8;
+    else
+      return failure();
 
     Location loc = op.getLoc();
     SmallVector<int64_t> tileShape = {factor, factor};
@@ -65,8 +71,7 @@ public:
     Value result = rewriter.create<arith::ConstantOp>(
         loc, op.getResultVectorType(),
         rewriter.getZeroAttr(op.getResultVectorType()));
-    for (int64_t origI = 0, origJ = 0, newI = 0, newJ = 0;
-         origI < m && origJ < n;) {
+    for (int64_t origI = 0, origJ = 0, newI = 0, newJ = 0; origI < m;) {
       SmallVector<int64_t> srcOffsets = {origI, origJ};
       SmallVector<int64_t> destOffsets = {newI, newJ};
       Value tile = rewriter.create<vector::ExtractStridedSliceOp>(
@@ -76,12 +81,13 @@ public:
       result = rewriter.create<vector::InsertStridedSliceOp>(
           loc, tile, result, destOffsets, strides);
 
-      if (factor == m) {
-        origJ += factor;
-        newI += factor;
-      } else {
+      origJ += factor;
+      newI += factor;
+      if (origJ == n) {
         origI += factor;
         newJ += factor;
+        origJ = 0;
+        newI = 0;
       }
     }
     rewriter.replaceOp(op, result);

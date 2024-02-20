@@ -937,7 +937,11 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
                             SmallVectorImpl<bool> &scalableSizeFlags) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({8, 32, 16});
+    if (isa<linalg::MatmulOp>(op.getOperation())) {
+      sizes.append({8, 32, 16});
+    } else {
+      sizes.append({8, 32, 16});
+    }
     return;
   }
 
