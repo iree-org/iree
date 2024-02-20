@@ -26,6 +26,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -339,6 +340,9 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
+  // Note that the following heuristic seeds are just placeholder values.
+  // We need to clean it up and make it adjusting to different targets.
+  // See https://github.com/openxla/iree/issues/16341 for details.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
@@ -368,18 +372,21 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
+  MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       op.getContext(), mmaAttrs[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
       schedule->kTileCount);
-
-  (*getEntryPoint(entryPoint))
-      ->setAttr(IREE::GPU::MMAScheduleAttr::getMnemonic(), scheduleAttr);
+  SmallVector<NamedAttribute, 1> attrs;
+  attrs.emplace_back(
+      StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
+      scheduleAttr);
+  auto configDict = DictionaryAttr::get(op.getContext(), attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize);
+      workgroupSize, subgroupSize, configDict);
 }
 
 static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,

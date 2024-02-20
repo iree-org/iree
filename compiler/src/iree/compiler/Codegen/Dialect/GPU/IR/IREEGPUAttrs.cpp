@@ -340,7 +340,7 @@ int64_t MFMAAttr::getBlockSize() const {
   return 0;
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getAOuterThreadElementCount() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*element=*/{1, 4}};
@@ -352,7 +352,7 @@ MFMAAttr::OuterThreadElement MFMAAttr::getAOuterThreadElementCount() const {
   return {};
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getBOuterThreadElementCount() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutCount() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
@@ -364,7 +364,7 @@ MFMAAttr::OuterThreadElement MFMAAttr::getBOuterThreadElementCount() const {
   return {};
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getCOuterThreadElementCount() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
@@ -376,7 +376,7 @@ MFMAAttr::OuterThreadElement MFMAAttr::getCOuterThreadElementCount() const {
   return {};
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getAOuterThreadElementOrder() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32:
   case MFMAIntrinsic::F16_32x32x8_F32: {
@@ -386,7 +386,7 @@ MFMAAttr::OuterThreadElement MFMAAttr::getAOuterThreadElementOrder() const {
   return {};
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getBOuterThreadElementOrder() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32:
   case MFMAIntrinsic::F16_32x32x8_F32: {
@@ -396,7 +396,7 @@ MFMAAttr::OuterThreadElement MFMAAttr::getBOuterThreadElementOrder() const {
   return {};
 }
 
-MFMAAttr::OuterThreadElement MFMAAttr::getCOuterThreadElementOrder() const {
+MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32:
   case MFMAIntrinsic::F16_32x32x8_F32: {
@@ -425,20 +425,22 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t, 2> bPermute = {bK, bN};
   SmallVector<int64_t, 2> cPermute = {cM, cN};
 
-  // TODO: drop this and permute the following fields
+  // TODO: drop this and permute the following fields.
   if (!isIdentityPermutation(aPermute) || !isIdentityPermutation(bPermute) ||
       !isIdentityPermutation(cPermute))
     return std::nullopt;
 
   auto mfmaAttr = llvm::cast<MFMAAttr>(getIntrinsic());
 
-  // TODO: revisit the handling of subgroup/thread basis
+  // TODO: revisit the handling of subgroup/thread basis.
   SmallVector<int64_t, 2> subgroupBasis = {getSubgroupMCount(),
                                            getSubgroupNCount()};
 
   // C matrix layout
-  MFMAAttr::OuterThreadElement cCounts = mfmaAttr.getCOuterThreadElementCount();
-  MFMAAttr::OuterThreadElement cOrders = mfmaAttr.getCOuterThreadElementOrder();
+  MFMAAttr::SingleSubgroupLayout cCounts =
+      mfmaAttr.getCSingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout cOrders =
+      mfmaAttr.getCSingleSubgroupLayoutOrder();
 
   SmallVector<int64_t, 2> cSubgroupPerWorkgroup = {getSubgroupMCount(),
                                                    getSubgroupNCount()};
@@ -454,8 +456,10 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       cCounts.element, cOrders.element, subgroupBasis, cThreadBasis);
 
   // A matrix layout
-  MFMAAttr::OuterThreadElement aCounts = mfmaAttr.getAOuterThreadElementCount();
-  MFMAAttr::OuterThreadElement aOrders = mfmaAttr.getAOuterThreadElementOrder();
+  MFMAAttr::SingleSubgroupLayout aCounts =
+      mfmaAttr.getASingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout aOrders =
+      mfmaAttr.getASingleSubgroupLayoutOrder();
 
   SmallVector<int64_t, 2> aSubgroupPerWorkgroup = {getSubgroupMCount(), 1};
   SmallVector<int64_t, 2> aBatchesPerSubgroup = {getSubgroupMTileCount(),
@@ -470,8 +474,10 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       aCounts.element, aOrders.element, subgroupBasis, aThreadBasis);
 
   // B matrix layout
-  MFMAAttr::OuterThreadElement bCounts = mfmaAttr.getBOuterThreadElementCount();
-  MFMAAttr::OuterThreadElement bOrders = mfmaAttr.getBOuterThreadElementOrder();
+  MFMAAttr::SingleSubgroupLayout bCounts =
+      mfmaAttr.getBSingleSubgroupLayoutCount();
+  MFMAAttr::SingleSubgroupLayout bOrders =
+      mfmaAttr.getBSingleSubgroupLayoutOrder();
 
   SmallVector<int64_t, 2> bSubgroupPerWorkgroup = {1, getSubgroupNCount()};
   SmallVector<int64_t, 2> bBatchesPerSubgroup = {getSubgroupKTileCount(),

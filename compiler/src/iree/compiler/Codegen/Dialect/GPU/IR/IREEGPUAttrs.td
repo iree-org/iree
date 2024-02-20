@@ -122,19 +122,32 @@ def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> 
   let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
     int64_t getBlockSize() const;
 
-    struct OuterThreadElement {
+    // Partial nested layout for an MMA intrinsic's matrix input/output inside
+    // a single subgroup.
+    //
+    // Note that this is just a container used by the following methods; it can
+    // contain both the shape and the order.
+    struct SingleSubgroupLayout {
       SmallVector<int64_t, 2> outer;
       SmallVector<int64_t, 2> thread;
       SmallVector<int64_t, 2> element;
     };
 
-    OuterThreadElement getAOuterThreadElementCount() const;
-    OuterThreadElement getBOuterThreadElementCount() const;
-    OuterThreadElement getCOuterThreadElementCount() const;
+    // Returns the A/B/C matrix's partial nested layout shape inside a single
+    // subgroup. Shape at each outer/thread/element level is a 2-D value,
+    // following canonical matmul order--(M, K) for A, (K, N) for B, and
+    // (M, N) for C.
+    SingleSubgroupLayout getASingleSubgroupLayoutCount() const;
+    SingleSubgroupLayout getBSingleSubgroupLayoutCount() const;
+    SingleSubgroupLayout getCSingleSubgroupLayoutCount() const;
 
-    OuterThreadElement getAOuterThreadElementOrder() const;
-    OuterThreadElement getBOuterThreadElementOrder() const;
-    OuterThreadElement getCOuterThreadElementOrder() const;
+    // Returns the A/B/C matrix's partial nested layout order inside a single
+    // subgroup. Order at each outer/thread/element level is a 2-value
+    // permuation vector, following canonical matmul order--(M, K) for A,
+    // (K, N) for B, and (M, N) for C.
+    SingleSubgroupLayout getASingleSubgroupLayoutOrder() const;
+    SingleSubgroupLayout getBSingleSubgroupLayoutOrder() const;
+    SingleSubgroupLayout getCSingleSubgroupLayoutOrder() const;
   }]);
 }
 

@@ -10,11 +10,11 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -320,14 +321,10 @@ public:
     auto scheduleAttr =
         func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
     if (!scheduleAttr) {
-      IREE::HAL::ExecutableExportOp entryPoint = *getEntryPoint(func);
-      scheduleAttr = entryPoint->getAttrOfType<IREE::GPU::MMAScheduleAttr>(
-          scheduleAttrName);
+      DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
+      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+          configDict.get(scheduleAttrName));
     }
-    LLVM_DEBUG({
-      if (scheduleAttr)
-        llvm::dbgs() << "schedule: " << scheduleAttr << "\n";
-    });
 
     AffineExpr x, y, z;
     bindSymbols(func.getContext(), x, y, z);

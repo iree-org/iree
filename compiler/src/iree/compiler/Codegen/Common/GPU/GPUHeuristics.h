@@ -32,7 +32,8 @@ struct GPUMMAHeuristicSeeds {
 };
 
 struct GPUMMASchedule {
-  uint64_t index;     // Index of the chosen intrinsic
+  // Index of the chosen intrinsic into the list of given MMA intrinsics
+  uint64_t index;
   int64_t mSize;      // Native MMA size along M dimension
   int64_t nSize;      // Native MMA size along N dimension
   int64_t kSize;      // Native MMA size along K dimension

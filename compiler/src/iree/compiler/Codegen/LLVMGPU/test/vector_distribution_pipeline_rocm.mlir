@@ -39,9 +39,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // Basic pipeline test to make sure it generates the instructions we expect.
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute>
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2>
+
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256
-//  CHECK-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2>
 //  CHECK-SAME:    subgroup_size = 64
 //  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
