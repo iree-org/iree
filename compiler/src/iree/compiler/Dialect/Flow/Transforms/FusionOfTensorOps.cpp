@@ -115,8 +115,7 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
         linalgConsumerOp.getNumLoops()) {
       return true;
     }
-    if (linalgConsumerOp.getNumReductionLoops() != 1 ||
-        !linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
+    if (!linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
              .isPermutation()) {
       return false;
     }
