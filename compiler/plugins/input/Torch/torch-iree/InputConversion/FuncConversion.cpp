@@ -167,6 +167,65 @@ class FuncReturnOpPattern : public OpConversionPattern<func::ReturnOp> {
 };
 
 //===----------------------------------------------------------------------===//
+// Immutable tensor type conversion.
+//===----------------------------------------------------------------------===//
+
+std::optional<std::pair<Value, Value>> getParentWaitSignalFences(Value value) {
+  auto parentFuncOp =
+      dyn_cast<IREE::Util::FuncOp>(value.getParentRegion()->getParentOp());
+  if (!parentFuncOp) {
+    return {};
+  }
+  Block *entryBlock = &parentFuncOp.front();
+  auto numArguments = entryBlock->getNumArguments();
+  Value coarseWaitFence = entryBlock->getArgument(numArguments - 2);
+  Value coarseSignalFence = entryBlock->getArgument(numArguments - 1);
+  return std::make_pair(coarseWaitFence, coarseSignalFence);
+}
+
+void setupImmutableTensorConversion(ConversionTarget &target,
+                                    RewritePatternSet &patterns,
+                                    TypeConverter &typeConverter) {
+  // target.addIllegalOp<Torch::CopyToValueTensorOp>();
+  //  target.addIllegalOp<Torch::CopyToNonValueTensorOp>();
+  //  target.addIllegalOp<Torch::OverwriteTensorContentsOp>();
+  //  patterns.insert<CopyEntryArgToValueTensorPattern>(typeConverter,
+  //                                                    patterns.getContext());
+
+  typeConverter.addConversion(
+      [](Torch::ValueTensorType type) -> std::optional<Type> {
+        return IREE::HAL::BufferViewType::get(type.getContext());
+      });
+  auto sourceMaterialization = [](OpBuilder &builder,
+                                  Torch::ValueTensorType type,
+                                  ValueRange inputs, Location loc) -> Value {
+    Value source = inputs.front();
+    auto waitSignalFences = getParentWaitSignalFences(source);
+    if (!waitSignalFences)
+      return {};
+    Value waitFence = waitSignalFences->first;
+
+    TensorType builtinTensorType = type.toBuiltinTensor();
+    Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
+        loc, builtinTensorType, source, TypeAttr::get(builtinTensorType),
+        waitFence,
+        /*name=*/StringAttr());
+    return builder.create<TorchConversion::FromBuiltinTensorOp>(loc, type,
+                                                                importedTensor);
+  };
+  auto targetMaterialization = [](OpBuilder &builder,
+                                  IREE::HAL::BufferViewType type,
+                                  ValueRange inputs, Location loc) -> Value {
+    auto castOp = builder.create<UnrealizedConversionCastOp>(loc, type, inputs);
+    castOp->setAttr("torch.export.immutable_tensor", builder.getUnitAttr());
+    return castOp.getResult(0);
+  };
+  typeConverter.addArgumentMaterialization(sourceMaterialization);
+  typeConverter.addSourceMaterialization(sourceMaterialization);
+  typeConverter.addTargetMaterialization(targetMaterialization);
+}
+
+//===----------------------------------------------------------------------===//
 // Mutable tensor type conversion.
 // Here we rely on the characteristic that at the torch level, conversion to
 // and from the value domain is only legal at certain well defined points in
@@ -295,13 +354,30 @@ void setupMutableTensorConversion(ConversionTarget &target,
 LogicalResult postProcessFunctionMutation(IREE::Util::FuncOp funcOp) {
   // Walk to find arguments subject to some mutation.
   SmallPtrSet<Value, 4> coarseSignalArgs;
+  SmallPtrSet<Value, 4> coarseSignalExportTensors;
   SmallVector<IREE::Util::ReturnOp> returnOps;
   funcOp.walk([&](Operation *op) {
+    OpBuilder builder(op);
     if (auto castOp = dyn_cast<UnrealizedConversionCastOp>(op)) {
       if (castOp->hasAttr("torch.coarse_signal_mutation")) {
         Value source = castOp.getOperand(0);
         Value target = castOp.getResult(0);
         coarseSignalArgs.insert(source);
+
+        // Makes the IR invalid for any consumers, but that is fine. If we do
+        // not transform the consumers, we will fail anyway, and eliminating the
+        // cast here makes everything simpler.
+        target.replaceAllUsesWith(source);
+        castOp->erase();
+      } else if (castOp->hasAttr("torch.export.immutable_tensor")) {
+        // This cast is placed when going from an immutable vtensor to a
+        // BufferView. We do this by exporting and including in the coarse
+        // barrier.
+        Value source = castOp.getOperand(0);
+        Value target = castOp.getResult(0);
+
+        source = convertToBuiltinTensor(builder, source);
+        coarseSignalExportTensors.insert(source);
 
         // Makes the IR invalid for any consumers, but that is fine. If we do
         // not transform the consumers, we will fail anyway, and eliminating the
@@ -341,10 +417,9 @@ LogicalResult postProcessFunctionMutation(IREE::Util::FuncOp funcOp) {
   // Tensors that need to be joined in a barrier on the coarse signal fence
   // and exported.
   SmallVector<Value> barrierSources;
-  SmallVector<Value> exportBuffers;
-  SmallVector<bool> exportIsMutation;
+  SmallVector<Value> tiedTargetStorages;
 
-  // Process each arg that participates in coarse signaling.
+  // Process each function arg that participates in coarse mutation signaling.
   for (Value bufferArg : coarseSignalArgs) {
     Value overwriteTensor;
     for (OpOperand &use : bufferArg.getUses()) {
@@ -363,8 +438,7 @@ LogicalResult postProcessFunctionMutation(IREE::Util::FuncOp funcOp) {
         }
         overwriteTensor = convertToBuiltinTensor(builder, overwrite.getValue());
         barrierSources.push_back(overwriteTensor);
-        exportIsMutation.push_back(true);
-        exportBuffers.push_back(bufferArg);
+        tiedTargetStorages.push_back(bufferArg);
         eraseOps.push_back(overwrite);
       } else {
         return emitError(useOp->getLoc())
@@ -373,20 +447,32 @@ LogicalResult postProcessFunctionMutation(IREE::Util::FuncOp funcOp) {
     }
   }
 
+  // Process each unbacked tensor that must be exported and synchronized.
+  for (Value unbackedTensor : coarseSignalExportTensors) {
+    barrierSources.push_back(unbackedTensor);
+    tiedTargetStorages.push_back(nullptr);
+  }
+
   // Generate barriers and exports.
   auto barrierOp = builder.create<IREE::HAL::TensorBarrierOp>(
       funcOp.getLoc(), barrierSources, coarseSignalFence);
-  for (auto [sourceTensor, isMutation, barrierTensor] : llvm::zip_equal(
-           barrierSources, exportIsMutation, barrierOp.getResults())) {
+  for (auto [sourceTensor, tiedTargetStorage, barrierTensor] : llvm::zip_equal(
+           barrierSources, tiedTargetStorages, barrierOp.getResults())) {
     Value exportedValue = builder.create<IREE::HAL::TensorExportOp>(
         sourceTensor.getLoc(), builder.getType<IREE::HAL::BufferViewType>(),
-        barrierTensor, TypeAttr::get(sourceTensor.getType()), StringAttr());
-    if (isMutation) {
+        barrierTensor, TypeAttr::get(sourceTensor.getType()), tiedTargetStorage,
+        StringAttr());
+    if (tiedTargetStorage) {
       // We must not drop exports of mutation, so hold on to it.
       builder.create<IREE::Util::OptimizationBarrierOp>(sourceTensor.getLoc(),
                                                         exportedValue);
     }
-    returnMapping.map(sourceTensor, barrierTensor);
+    returnMapping.map(sourceTensor, exportedValue);
+  }
+
+  // Update the return op with mapped values.
+  for (OpOperand &operand : returnOp->getOpOperands()) {
+    operand.assign(returnMapping.lookupOrDefault(operand.get()));
   }
 
   // Clean up.
@@ -396,48 +482,6 @@ LogicalResult postProcessFunctionMutation(IREE::Util::FuncOp funcOp) {
 
   return success();
 }
-
-// class OverwriteEntryArgTensorContents
-//     : public OpConversionPattern<Torch::OverwriteTensorContentsOp> {
-//   using OpConversionPattern<
-//       Torch::OverwriteTensorContentsOp>::OpConversionPattern;
-//   LogicalResult
-//   matchAndRewrite(Torch::OverwriteTensorContentsOp srcOp, OpAdaptor adaptor,
-//                   ConversionPatternRewriter &rewriter) const override {
-//     // Access the type converted buffer view.
-//     auto bufferView = dyn_cast<BlockArgument>(adaptor.getOverwritten());
-//     if (!bufferView) {
-//       return rewriter.notifyMatchFailure(
-//           srcOp, "not overwriting into a BlockArgument");
-//     }
-//     Block *producerBlock = bufferView.getOwner();
-//     if (!isa<IREE::Util::FuncOp>(producerBlock->getParentOp())) {
-//       return rewriter.notifyMatchFailure(
-//           srcOp, "not produced directly by parent function");
-//     }
-//     if (!producerBlock->isEntryBlock()) {
-//       return rewriter.notifyMatchFailure(srcOp, "not produced by entry
-//       block");
-//     }
-//     if (!isa<IREE::Util::FuncOp>(srcOp->getParentOp())) {
-//       return rewriter.notifyMatchFailure(srcOp, "not a direct child of a
-//       func");
-//     }
-
-//     // The producer block will always end in {wait_fence, signal_fence}.
-//     Value signalFence =
-//         producerBlock->getArgument(producerBlock->getNumArguments() - 1);
-//     auto barrierOp = rewriter.create<IREE::HAL::TensorBarrierOp>(
-//         srcOp.getLoc(), ValueRange{adaptor.getValue()}, signalFence);
-//     // Signals that the overall pass should post-process combine these into a
-//     // single barrier.
-//     barrierOp->setAttr("torch.combine_func_barrier_signal",
-//                        rewriter.getUnitAttr());
-
-//     rewriter.eraseOp(srcOp);
-//     return success();
-//   }
-// };
 
 } // namespace
 
@@ -454,6 +498,7 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
 
     ConversionTarget target(*context);
     target.addLegalOp<ModuleOp>();
+    target.addLegalOp<UnrealizedConversionCastOp>();
     target.addLegalDialect<IREE::Util::UtilDialect>();
     target.markUnknownOpDynamicallyLegal([&](Operation *op) { return true; });
 
@@ -476,6 +521,7 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
     patterns.insert<FuncReturnOpPattern>(typeConverter, context);
 
     // Mutable tensor at the graph edges conversion.
+    setupImmutableTensorConversion(target, patterns, typeConverter);
     setupMutableTensorConversion(target, patterns, typeConverter);
     // patterns.insert<CopyEntryArgToValueTensorPattern>(typeConverter,
     // context); patterns.insert<OverwriteEntryArgTensorContents>(typeConverter,
