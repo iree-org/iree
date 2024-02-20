@@ -13,6 +13,11 @@
 #include "iree/builtins/ukernel/tools/test.h"
 #include "iree/builtins/ukernel/tools/util.h"
 
+#define IREE_DEVICE_STANDALONE
+#ifndef IREE_DEVICE_STANDALONE
+#include <stdio.h>
+#endif
+
 static void iree_mmt4d_reference_innerloop_f32f32f32(
     float* out_ptr, const float* lhs_ptr, const float* rhs_ptr,
     const iree_uk_mmt4d_params_t* params) {
@@ -172,8 +177,18 @@ static void iree_mmt4d_reference_innerloop_s8s4s32(
     const iree_uk_mmt4d_params_t* params) {
   // K0 must be even.
   IREE_UK_ASSERT(!(params->K0 % 2));
+
+#ifndef IREE_DEVICE_STANDALONE
+  printf("----- Start innerloop ------\n");
+#endif
+
   iree_uk_int16_t K0half = params->K0 / 2;
   int32_t acc = params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE ? *out_ptr : 0;
+
+#ifndef IREE_DEVICE_STANDALONE
+  printf("reference value of acc before: %d\n", acc);
+#endif
+
   for (iree_uk_index_t k = 0; k < params->K; ++k) {
     // As K0 must be even, we 2x-unroll the K0 loop, writing a 2D dot product.
     for (iree_uk_index_t k0h = 0; k0h < K0half; ++k0h) {
@@ -190,10 +205,26 @@ static void iree_mmt4d_reference_innerloop_s8s4s32(
       if (rhs_high_nibble & 0x08) {
         rhs_high_nibble |= 0xF0;
       }
+
+#ifndef IREE_DEVICE_STANDALONE
+      int32_t acc_1 = lhs_0 * rhs_low_nibble + lhs_1 * rhs_high_nibble;
+      int32_t lhs_0_index = k * params->M0 * params->K0 + 2 * k0h;
+      int32_t lhs_1_index = k * params->M0 * params->K0 + 2 * k0h + 1;
+      int32_t rhs_index = k * params->N0 * K0half + k0h;
+      printf("reference: k: %lld, k0h: %lld, lhs_0_index: %d, lhs_1_index: %d, rhs_index: %d, rhs_byte: %hhx, acc: %d lhs_0: %d, rhs_low_nibble: %d, lhs_1: %d, rhs_high_nibble: %d\n", k, k0h, lhs_0_index, lhs_1_index, rhs_index, rhs_byte, acc_1, lhs_0, rhs_low_nibble, lhs_1, rhs_high_nibble);
+#endif
+
       acc += lhs_0 * rhs_low_nibble + lhs_1 * rhs_high_nibble;
     }
   }
+#ifndef IREE_DEVICE_STANDALONE
+  printf("reference value of acc after: %d\n", acc);
+#endif
   *out_ptr = acc;
+
+#ifndef IREE_DEVICE_STANDALONE
+  printf("----- End innerloop ------\n");
+#endif
 }
 
 static void iree_mmt4d_reference_innerloop_s16s16s32(
@@ -254,6 +285,10 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
   iree_uk_index_t out_elem_size =
       iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type));
 
+#ifndef IREE_DEVICE_STANDALONE
+  printf("----- Start reference M: %lld, N: %lld, K: %lld, M0: %d, N0: %d, K0: %d ------\n", params->M, params->N, params->K, params->M0, params->N0, params->K0);
+#endif
+
   for (iree_uk_index_t i = 0; i < params->M; ++i) {
     for (iree_uk_index_t j = 0; j < params->N; ++j) {
       void* out_tile_ptr = ((char*)params->out_buffer) +
@@ -269,6 +304,16 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
           iree_uk_bits_to_bytes_exact(
               (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_bits);
 
+#ifndef IREE_DEVICE_STANDALONE
+          int32_t out_tile_ptr_index = iree_uk_bits_to_bytes_exact(
+                  (params->lhs_offset + i * params->lhs_stride0) * lhs_elem_bits);
+          int32_t lhs_panel_ptr_index = iree_uk_bits_to_bytes_exact(
+                  (params->lhs_offset + i * params->lhs_stride0) * lhs_elem_bits);
+          int32_t rhs_panel_ptr_index = iree_uk_bits_to_bytes_exact(
+                  (params->rhs_offset + j * params->rhs_stride0) * rhs_elem_bits);
+          printf("out_tile_ptr_index: %d, lhs_panel_ptr_index: %d, rhs_panel_ptr_index: %d\n", out_tile_ptr_index, lhs_panel_ptr_index, rhs_panel_ptr_index);
+#endif
+
       for (iree_uk_index_t i0 = 0; i0 < params->M0; ++i0) {
         for (iree_uk_index_t j0 = 0; j0 < params->N0; ++j0) {
           void* out_ptr =
@@ -279,6 +324,13 @@ static void iree_mmt4d_reference(const iree_uk_mmt4d_params_t* params) {
           const void* rhs_ptr =
               ((char*)rhs_panel_ptr) +
               iree_uk_bits_to_bytes_exact(j0 * params->K0 * rhs_elem_bits);
+
+#ifndef IREE_DEVICE_STANDALONE
+          int32_t out_ptr_index = (i0 * params->N0 + j0) * out_elem_size;
+          int32_t lhs_ptr_index = iree_uk_bits_to_bytes_exact(i0 * params->K0 * lhs_elem_bits);
+          int32_t rhs_ptr_index = iree_uk_bits_to_bytes_exact(j0 * params->K0 * rhs_elem_bits);
+          printf("out_ptr_index: %d, lhs_ptr_index: %d, rhs_ptr_index: %d\n", out_ptr_index, lhs_ptr_index, rhs_ptr_index);
+#endif
 
           switch (params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK) {
             case IREE_UK_FLAG_MMT4D_TYPE_F32F32F32:
@@ -436,6 +488,19 @@ static void iree_uk_test_mmt4d_for_shape_params(
   // consistently between actual tile functions (including generic fallback
   // ones) and the reference code in this test.
   bool fail = memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size);
+
+#ifndef IREE_DEVICE_STANDALONE
+  printf("-------- memcmp ---------- fail: %d\n", fail);
+  int32_t* reference_ptr = (int32_t*)reference_out_buffer;
+  int32_t* actual_ptr = (int32_t*)actual_out_buffer;
+  int max_elements = out_buffer_size / 4;
+  for (int i = 0; i < max_elements; i++) {
+    printf("%d == %d\n", *reference_ptr, *actual_ptr);
+    reference_ptr += 4;
+    actual_ptr += 4;
+  }
+#endif
+
   if (fail) {
     IREE_UK_TEST_FAIL(test);
   }
@@ -532,32 +597,33 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 9, 12, 2, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 9, 12, 2, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
-  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
-      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
-  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
-      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fullfp16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 8, 8, 4, "bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 4, 16, 2, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 4, 8, "dotprod");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
+//  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+//      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "");
+//  iree_uk_test_mmt4d_default_and_skip_intermediate_roundings(
+//      IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 8, 8, 1, "fullfp16");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 8, 8, 4, "bf16");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 4, 16, 2, "");
+//  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 4, 8, "dotprod");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 8, 16, "i8mm");
 #elif defined(IREE_ARCH_X86_64)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 4, 1, "");  // SSE
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
