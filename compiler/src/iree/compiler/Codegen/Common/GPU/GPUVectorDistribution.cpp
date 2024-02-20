@@ -10,10 +10,12 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-vector-distribution"
 
@@ -250,11 +252,21 @@ LogicalResult distributeVectorOps(Operation *root,
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
   applyVectorDistribution(root, frozenPatterns);
 
+  RewritePatternSet patterns(root->getContext());
+  IREE::VectorExt::ToSIMDOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  IREE::VectorExt::ToSIMTOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  if (failed(applyPatternsAndFoldGreedily(root, std::move(patterns)))) {
+    return failure();
+  }
+
   if (options.verifyConversion()) {
     WalkResult hasConversionOp = root->walk([](Operation *op) {
       if (isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(op)) {
         for (auto user : op->getUsers()) {
-          if (!isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(op)) {
+          if (!isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(
+                  user)) {
             LLVM_DEBUG({
               llvm::dbgs() << "Found live cast op: " << *op << "\n";
               llvm::dbgs() << "With live user: " << *user << "\n";
