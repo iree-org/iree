@@ -17,7 +17,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "smoketest.mlir",
-            "target_device_features.mlir"
+            "target_device_features.mlir",
         ],
         include = ["*.mlir"],
     ),
