@@ -6,6 +6,7 @@
 
 #include "torch-iree/InputConversion/Passes.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -65,15 +66,19 @@ void createTorchToIREEPipeline(
   // The resolution of `dim` ops tends to create identical ops. CSE them.
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
+  pm.addPass(createFuncConversionPass());
+  pm.addNestedPass<IREE::Util::FuncOp>(createCanonicalizerPass());
+  pm.addPass(createSymbolDCEPass());
+
   // Finish the type conversion from `torch` types to the types of the
   // linalg-on-tensors backend contract.
-  pm.addPass(torch::TorchConversion::createFuncBackendTypeConversionPass());
-  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<func::FuncOp>(
+  //   pm.addPass(torch::TorchConversion::createFuncBackendTypeConversionPass());
+  //   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<IREE::Util::FuncOp>(
       torch::TorchConversion::createFinalizingBackendTypeConversionPass());
 
   // TODO: Add validation pass.
-  pm.addPass(createSymbolDCEPass());
+  // pm.addPass(createSymbolDCEPass());
 }
 
 void registerTMTensorConversionPasses() {
