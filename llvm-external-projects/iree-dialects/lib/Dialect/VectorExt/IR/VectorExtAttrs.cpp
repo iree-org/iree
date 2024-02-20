@@ -292,9 +292,17 @@ LogicalResult NestedLayoutAttr::verify(
 SmallVector<Value>
 NestedLayoutAttr::computeThreadIds(Value threadId,
                                    RewriterBase &rewriter) const {
-  auto basisSizes = llvm::concat<const int64_t>(
-      applyPermutation(getSubgroupBasis(), getSubgroupOrder()),
-      applyPermutation(getThreadBasis(), getThreadOrder()));
+  // The subgroup/thread bases tell us the ranges of the corresponding id from
+  // slowest varying to fastest varying. Thus to get the correct basis ids, we
+  // simply concatenate the sizes and delinearize the single thread id to those
+  // sizes. For example:
+  //
+  // subgroup_basis = [3, 5]
+  // thread_basis = [7, 9]
+  //
+  // subgroup_id(Y, X), thread_id(Y, X) = affine.delinearize_index(3, 5, 7, 9)
+  auto basisSizes =
+      llvm::concat<const int64_t>(getSubgroupBasis(), getThreadBasis());
 
   SmallVector<OpFoldResult> basisIndexAttr;
   for (int64_t basisIndex : basisSizes) {
@@ -307,11 +315,17 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
               threadId.getLoc(), threadId, basisIndexAttr)
           .getResults();
 
-  // Modulo the delinearized index by the actual tile sizes.
+  // The subgroups_per_workgroup and threads_per_outer fields represent the
+  // number of subgroups/threads along each vector dimension. To get the sizes
+  // in the order of slowest varying to fastest varying (to match with the ids
+  // delinearized based on the basis), we need to apply the subgroup/thread
+  // permutation orders.
   auto tileSizes = llvm::concat<const int64_t>(
       applyPermutation(getSubgroupsPerWorkgroup(), getSubgroupOrder()),
       applyPermutation(getThreadsPerOuter(), getThreadOrder()));
 
+  // Modulo the delinearized subgroup/thread ids by the number of unique
+  // elements distributed to those ids.
   for (auto [delinearized, basis, tile] :
        llvm::zip(delinearized, basisSizes, tileSizes)) {
     if (basis == tile) {
