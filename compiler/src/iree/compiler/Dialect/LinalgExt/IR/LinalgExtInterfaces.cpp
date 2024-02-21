@@ -31,7 +31,7 @@ IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
 template <typename Ty, typename DimOpTy>
 static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
                          SmallVector<OpFoldResult> &dimVals) {
-  for (const auto &[idx, val] : llvm::enumerate(t.getShape())) {
+  for (auto [idx, val] : llvm::enumerate(t.getShape())) {
     if (ShapedType::isDynamic(val)) {
       dimVals.push_back(b.create<DimOpTy>(loc, v, idx).getResult());
     } else {

@@ -367,7 +367,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   auto updateIvs = ivs.drop_front(1);
 
   int64_t offset = starts.size() - updateIvs.size();
-  for (const auto &[idx, iv] : llvm::enumerate(updateIvs)) {
+  for (auto [idx, iv] : llvm::enumerate(updateIvs)) {
     starts[idx + offset] = iv;
   }
 
@@ -436,7 +436,7 @@ LogicalResult SortOp::verify() {
   }
 
   ArrayRef<int64_t> shape = getOperandShape();
-  for (const auto &[index, operand] : llvm::enumerate(getOutputs())) {
+  for (auto [index, operand] : llvm::enumerate(getOutputs())) {
     auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
       return op->emitOpError("expected operand ")
@@ -502,7 +502,7 @@ SortOp::getTiledImplementation(OpBuilder &builder,
   auto oneAttr = builder.getI64IntegerAttr(1);
   SmallVector<OpFoldResult> strides(rank, oneAttr);
   SmallVector<Value> tiledOperands(getOutputs().size());
-  for (const auto &[idx, output] : llvm::enumerate(getOutputs())) {
+  for (auto [idx, output] : llvm::enumerate(getOutputs())) {
     tiledOperands[idx] =
         getSlice(builder, getLoc(), output, offsets, sizes, strides);
     assert(tiledOperands[idx] && "failed to get slice of operand");
@@ -651,8 +651,7 @@ SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  for (const auto &[idx, val] :
-       llvm::enumerate(getOperandShape().drop_back())) {
+  for (auto [idx, val] : llvm::enumerate(getOperandShape().drop_back())) {
     Value size;
     if (ShapedType::isDynamic(val)) {
       size = getDimValue(builder, loc, getReal(), idx);
@@ -1326,7 +1325,7 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value source = values();
-  for (const auto &[idx, val] : llvm::enumerate(getInputType().getShape())) {
+  for (auto [idx, val] : llvm::enumerate(getInputType().getShape())) {
     loopBounds[idx].offset = zero;
     loopBounds[idx].size = getDimValue(builder, loc, source, idx);
     loopBounds[idx].stride = one;
@@ -1757,7 +1756,7 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
     ArrayRef<int64_t> sourceShape, ArrayRef<int64_t> innerTileSizes,
     ArrayRef<int64_t> innerDimsPos, ArrayRef<int64_t> outerDimsPerm) {
   SmallVector<int64_t> resultShape = llvm::to_vector(sourceShape);
-  for (const auto &[idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
+  for (auto [idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
     if (ShapedType::isDynamic(resultShape[tiledDim])) {
       continue;
     }
@@ -1785,7 +1784,7 @@ SmallVector<OpFoldResult> PackOp::getResultShape(
   AffineExpr s0, s1;
   bindSymbols(builder.getContext(), s0, s1);
   AffineExpr ceilDivExpr = s0.ceilDiv(s1);
-  for (const auto &[idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
+  for (auto [idx, tiledDim] : llvm::enumerate(innerDimsPos)) {
     resultDims[tiledDim] = affine::makeComposedFoldedAffineApply(
         builder, loc, ceilDivExpr, {resultDims[tiledDim], innerTileSizes[idx]});
   }
@@ -2597,8 +2596,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   ArrayRef<int64_t> queryShape = getQueryType().getShape();
   SmallVector<OpFoldResult> queryOutputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(queryShape));
-  for (const auto &[idx, info] :
-       llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
+  for (auto [idx, info] : llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
     queryOutputOffsets[idx] = std::get<0>(info);
     queryOutputSizes[idx] = std::get<1>(info);
   }
@@ -2642,8 +2640,7 @@ LogicalResult AttentionOp::getResultTilePosition(
     resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
     resultOffsets =
         SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-    for (const auto &[idx, info] :
-         llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
+    for (auto [idx, info] : llvm::enumerate(llvm::zip_equal(offsets, sizes))) {
       resultOffsets[idx] = std::get<0>(info);
       resultSizes[idx] = std::get<1>(info);
     }

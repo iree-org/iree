@@ -370,8 +370,7 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   SmallVector<int64_t> keyShape{queryShape};
   if (tileSize) {
     keyValueTileLength = rewriter.getIndexAttr(tileSize.value());
-    for (const auto &[idx, val] :
-         llvm::enumerate(attnOp.getKeyType().getShape())) {
+    for (auto [idx, val] : llvm::enumerate(attnOp.getKeyType().getShape())) {
       keyShape[idx] = idx == 1 ? tileSize.value() : val;
     }
   }

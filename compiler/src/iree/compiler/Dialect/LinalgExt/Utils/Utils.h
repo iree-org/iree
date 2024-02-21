@@ -31,7 +31,7 @@ SmallVector<T> interchange(ArrayRef<T> elements,
                            ArrayRef<int64_t> interchangeVector,
                            int offset = 0) {
   SmallVector<T> vec = llvm::to_vector(elements);
-  for (const auto &[idx, val] : llvm::enumerate(interchangeVector)) {
+  for (auto [idx, val] : llvm::enumerate(interchangeVector)) {
     vec[idx + offset] = elements[val + offset];
   }
   return vec;
@@ -41,7 +41,7 @@ SmallVector<T> undoInterchange(ArrayRef<T> elements,
                                ArrayRef<int64_t> interchangeVector,
                                int offset = 0) {
   SmallVector<T> vec = llvm::to_vector(elements);
-  for (const auto &[idx, val] : llvm::enumerate(interchangeVector)) {
+  for (auto [idx, val] : llvm::enumerate(interchangeVector)) {
     vec[val + offset] = elements[idx + offset];
   }
   return vec;
