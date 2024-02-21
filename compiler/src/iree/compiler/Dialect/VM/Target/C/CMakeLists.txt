@@ -35,6 +35,7 @@ iree_cc_library(
     "TranslationRegistration.cpp"
   DEPS
     LLVMSupport
+    MLIRControlFlowDialect
     MLIRIR
     MLIRPass
     MLIRSupport
