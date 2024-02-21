@@ -138,7 +138,7 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
       (rhs.isSignlessInteger(8) || rhs.isSignlessInteger(4)) &&
       (out.isSignlessInteger(32) || out.isF32())) {
     return {
-        TileMxNxK{6, 16, 1}, // Aim to use SMLAL.
+        TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
         TileMxNxK{4, 16, 1}, // Truncation of the above.
         TileMxNxK{2, 32, 1}, // Truncation of the above.
         TileMxNxK{1, 64, 1}, // Truncation of the above.
