@@ -117,6 +117,28 @@ ExecutableLookupOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal_loader.executable.export.ordinal
+//===----------------------------------------------------------------------===//
+
+void ExecutableExportOrdinalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(getResult(), "ordinal");
+}
+
+LogicalResult ExecutableExportOrdinalOp::verifySymbolUses(
+    SymbolTableCollection &symbolTable) {
+  Operation *op = getOperation();
+  auto exportOp =
+      symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+          op, getEntryPointAttr());
+  if (!exportOp) {
+    return op->emitOpError()
+           << "undefined executable export: " << getEntryPointAttr();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal_loader.executable.dispatch
 //===----------------------------------------------------------------------===//
 
@@ -128,19 +150,6 @@ static LogicalResult verifyDispatchBindings(Operation *op, OperandRange buffers,
            << buffers.size() << "/" << offsets.size() << "/" << lengths.size();
   }
   return success();
-}
-
-LogicalResult ExecutableDispatchSymbolOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
-  Operation *op = getOperation();
-  auto exportOp =
-      symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-          op, getEntryPoint());
-  if (!exportOp) {
-    return op->emitOpError() << "undefined entry point: " << getEntryPoint();
-  }
-  return verifyDispatchBindings(getOperation(), getBindingBuffers(),
-                                getBindingOffsets(), getBindingLengths());
 }
 
 LogicalResult ExecutableDispatchOp::verify() {

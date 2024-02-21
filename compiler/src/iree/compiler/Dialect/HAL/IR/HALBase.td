@@ -168,6 +168,7 @@ def HAL_BufferType : AnyTypeOf<[
   HAL_Buffer,
 ]>;
 
+def HAL_Ordinal : TypeAlias<Index>;
 def HAL_OrdinalAttr : Util_IndexAttrBase<"size_t">;
 def HAL_OrdinalArrayAttr : TypedArrayAttrBase<HAL_OrdinalAttr, "Array of index ordinal attributes">;
 

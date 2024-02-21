@@ -224,12 +224,14 @@ util.func public @command_buffer_dispatch(
   %arg0: !hal.command_buffer,
   %arg1: !hal.executable
 ) {
+  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %zero, %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %[[ORDINAL]], %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   hal.command_buffer.dispatch<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[0]
+      target(%arg1 : !hal.executable)[%ordinal]
       workgroups([%c100, %c200, %c300])
   util.return
 }
@@ -242,10 +244,12 @@ util.func public @command_buffer_dispatch_indirect(
   %arg1: !hal.executable,
   %arg2: !hal.buffer
 ) {
+  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %zero, %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %[[ORDINAL]], %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
   hal.command_buffer.dispatch.indirect<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[0]
+      target(%arg1 : !hal.executable)[%ordinal]
       workgroups(%arg2 : !hal.buffer)[%c100]
   util.return
 }

@@ -319,6 +319,7 @@ def ResolveExportOrdinalsPass :
     subsequent passes to collapse the executables into opaque blobs.
   }];
   let dependentDialects = [
+    "arith::ArithDialect",
     "IREE::HAL::HALDialect",
   ];
 }
