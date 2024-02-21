@@ -14,7 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "pipeline_vector_distribution.mlir"
+    "config_vector_distribute.mlir"
+    "pipeline_vector_distribute.mlir"
     "pipeline_warp_reduction.mlir"
   TOOLS
     FileCheck

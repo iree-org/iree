@@ -18,7 +18,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "pipeline_vector_distribution.mlir",
+            "config_vector_distribute.mlir",
+            "pipeline_vector_distribute.mlir",
             "pipeline_warp_reduction.mlir",
         ],
         include = ["*.mlir"],
