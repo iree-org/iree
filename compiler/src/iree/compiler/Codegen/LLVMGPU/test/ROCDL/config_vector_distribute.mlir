@@ -1,5 +1,9 @@
 // RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" %s | FileCheck %s
+
+// TODO: This test is still using the legacy LLVMGPU kernel config. This needs
+// to be migrated to the rocdl heuristics, but for now is just physically
+// located here.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -10,8 +14,7 @@
 hal.executable @matmul_256x256x256 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = []
   }>) {
   hal.executable.export @matmul_256x256x256 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -20,8 +23,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
     }
   builtin.module {
     func.func @matmul_256x256x256() {
-      %cst = arith.constant 0.000000e+00 : f32 
-      %c0 = arith.constant 0 : index 
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
       %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
@@ -37,15 +40,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 }
 
-// Basic pipeline test to make sure it generates the instructions we expect.
-
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute>
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256
-// CHECK-SAME:    subgroup_size = 64
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-// CHECK-LABEL:     func.func @matmul_256x256x256
-// CHECK-COUNT:       scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<1x1x4xf32>)
-// CHECK-COUNT-2:       amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-// CHECK:               scf.yield %{{.*}} : vector<1x1x4xf32>
-// CHECK-COUNT-4:     vector.store {{.*}} : memref<256x256xf32, #hal.descriptor_type<storage_buffer>>, vector<1xf32>
+// Check that we do not use the distribute pipeline if there are no supported
+// intrinsics.
+//       CHECK-NOT: iree_codegen.translation_info<LLVMGPUVectorDistribute

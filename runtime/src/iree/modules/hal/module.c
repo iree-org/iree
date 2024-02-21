@@ -1155,13 +1155,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_devices_count,  //
 IREE_VM_ABI_EXPORT(iree_hal_module_devices_get,  //
                    iree_hal_module_state_t,      //
                    i, r) {
-  if (args->i0 >= state->device_count) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "device index %d out of bounds (%" PRIhsz
-                            " devices available)",
-                            args->i0, state->device_count);
+  if (args->i0 < state->device_count) {
+    rets->r0 = iree_hal_device_retain_ref(state->devices[args->i0]);
+  } else {
+    rets->r0 = iree_vm_ref_null();
   }
-  rets->r0 = iree_hal_device_retain_ref(state->devices[args->i0]);
   return iree_ok_status();
 }
 

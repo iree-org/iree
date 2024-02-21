@@ -41,16 +41,12 @@ struct MaterializeResourceCachesPass
     // likely it's already been run. We could fix the pass to better support
     // partial materialization but there's no use cases for that today.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
-    SmallVector<IREE::HAL::DescriptorSetLayoutLookupOp>
-        descriptorSetLayoutLookupOps;
     SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
     for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
-          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
-            descriptorSetLayoutLookupOps.push_back(lookupOp);
-          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+          if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
             pipelineLayoutLookupOps.push_back(lookupOp);
           } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
             executableLookupOps.push_back(lookupOp);
@@ -58,8 +54,7 @@ struct MaterializeResourceCachesPass
         });
       }
     }
-    if (descriptorSetLayoutLookupOps.empty() &&
-        pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
+    if (pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
       return;
     }
 
@@ -85,9 +80,6 @@ struct MaterializeResourceCachesPass
 
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
-    for (auto lookupOp : descriptorSetLayoutLookupOps) {
-      replaceDescriptorSetLayoutLookupOp(lookupOp);
-    }
     for (auto lookupOp : pipelineLayoutLookupOps) {
       replacePipelineLayoutLookupOp(lookupOp);
     }
@@ -310,17 +302,6 @@ private:
 
     return llvm::map_to_vector(callOp.getResults(),
                                [](OpResult result) -> Value { return result; });
-  }
-
-  void
-  replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
-    OpBuilder builder(lookupOp);
-    auto globalOp = defineDescriptorSetLayoutOp(
-        lookupOp.getLoc(), lookupOp.getBindings(), lookupOp.getFlags());
-    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
-                           .getLoadedGlobalValue();
-    lookupOp.replaceAllUsesWith(loadedValue);
-    lookupOp.erase();
   }
 
   void replacePipelineLayoutLookupOp(PipelineLayoutLookupOp &lookupOp) {

@@ -9,12 +9,16 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -677,6 +681,92 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
+// Named GEMM-like extensions
+//===----------------------------------------------------------------------===//
+
+template <typename OpTy>
+class NamedImplicitCastOpConversion : public OpInterfaceRewritePattern<OpTy> {
+public:
+  using OpInterfaceRewritePattern<OpTy>::OpInterfaceRewritePattern;
+  NamedImplicitCastOpConversion(MLIRContext *ctx, PatternBenefit b = 1)
+      : OpInterfaceRewritePattern<OpTy>(ctx, b) {}
+
+  LogicalResult matchAndRewrite(OpTy namedOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(namedOp)) {
+      return failure();
+    }
+
+    // Look for a producer of the given operand that does an elementwise extend
+    // and replace the operand with the source of the elementwise producer.
+    // Returns true if the operand was updated to inform the pattern rewriter
+    // of a change.
+    Type outElementType = getElementTypeOrSelf(namedOp->getResultTypes()[0]);
+    bool didChangeOperand = false;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *block = &namedOp->getRegion(0).front();
+      rewriter.setInsertionPointToStart(block);
+      auto replaceOperandWithTypeCast = [&](OpOperand &operand) {
+        // If the op already has implicit casting semantics for this operand,
+        // do not fuse.
+        if (getElementTypeOrSelf(operand.get().getType()) != outElementType) {
+          return false;
+        }
+        auto producer = operand.get().getDefiningOp<linalg::GenericOp>();
+        if (!producer) {
+          return false;
+        }
+        if (!linalg::isElementwise(producer) ||
+            producer.getNumDpsInputs() != 1 || producer.getNumDpsInits() != 1) {
+          return false;
+        }
+
+        if (!llvm::hasSingleElement(
+                producer.getBlock()->without_terminator())) {
+          return false;
+        }
+        // We only handle arith.extf here for two reasons:
+        //  1) This pattern is being applied to convolution/contraction
+        //     interfaces. Extension semantics for integers depend on the named
+        //     op and requires a slightly different pattern.
+        //  2) Truncating operations like `arith.truncf` should not be fused
+        //     with consumers; it would be preferred to fuse those with
+        //     producers (and the consumer fusion is arguably the less canonical
+        //     form).
+        if (!llvm::isa<arith::ExtFOp>(
+                *producer.getBlock()->without_terminator().begin())) {
+          return false;
+        }
+        Type producerElementType = getElementTypeOrSelf(
+            producer.getDpsInputOperand(0)->get().getType());
+        int64_t operandNumber = operand.getOperandNumber();
+        // Set the operand to the linalg op to the smaller one.
+        namedOp->setOperand(operandNumber, producer->getOperand(0));
+
+        // Insert a new block argument into the body of the named op with the
+        // correct type.
+        Value blockArg = block->insertArgument(
+            operandNumber, producerElementType, namedOp.getLoc());
+        // Create the extf.
+        auto ext = rewriter.create<arith::ExtFOp>(namedOp.getLoc(),
+                                                  outElementType, blockArg);
+        // Replace uses of the old argument with the extended value.
+        rewriter.replaceAllUsesWith(block->getArgument(operandNumber + 1),
+                                    ext.getResult());
+        // Erase the old argument.
+        block->eraseArgument(operandNumber + 1);
+        return true;
+      };
+
+      didChangeOperand = replaceOperandWithTypeCast(namedOp->getOpOperand(0));
+      didChangeOperand |= replaceOperandWithTypeCast(namedOp->getOpOperand(1));
+    }
+    return success(didChangeOperand);
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Pass Implementation
 //===----------------------------------------------------------------------===//
 
@@ -686,6 +776,20 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   }
 
   void runOnOperation() override {
+
+    // First fuse named gemm-like ops with adjacent elementwise conversions.
+    {
+      RewritePatternSet patterns(&getContext());
+      patterns.insert<
+          NamedImplicitCastOpConversion<linalg::ConvolutionOpInterface>,
+          NamedImplicitCastOpConversion<linalg::ContractionOpInterface>>(
+          &getContext());
+      if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                              std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
     IRRewriter rewriter(&getContext());
 
     getOperation()->walk([&](linalg::GenericOp op) {

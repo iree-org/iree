@@ -81,6 +81,32 @@ module @hoist_sub_byte_tensor_transitive {
 
 // -----
 
+// CHECK-LABEL: @hoist_sub_byte_aligned_scalar_transitive
+// CHECK-NOT: util.global
+module @hoist_sub_byte_aligned_scalar_transitive {
+ func.func @main() -> i4 {
+    %c1_i4 = arith.constant 1 : i4
+    %0 = "iree_unregistered.const_expr"(%c1_i4) : (i4) -> i4
+    return %0 : i4
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @hoist_constant_pack_computation
+// CHECK: util.global
+module @hoist_constant_pack_computation {
+  func.func @main() -> tensor<4x1x16x2xi4> {
+  %pad = arith.constant 5 : i4
+  %val1 = stablehlo.constant dense<3> : tensor<7x15xi4>
+  %val2 = tensor.empty() : tensor<4x1x16x2xi4>
+  %ret = tensor.pack %val1 padding_value(%pad : i4) inner_dims_pos = [1, 0] inner_tiles = [16, 2] into %val2 : tensor<7x15xi4> -> tensor<4x1x16x2xi4>
+  return %ret : tensor<4x1x16x2xi4>
+ }
+}
+
+// -----
+
 // We should not hoist metadata ops alone.
 // CHECK-LABEL: @do_not_hoist_metadata_leaf
 // CHECK-NOT: util.global
@@ -91,3 +117,4 @@ module @do_not_hoist_metadata_leaf {
     util.return %1 : tensor<1xi32>
   }
 }
+

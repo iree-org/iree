@@ -203,17 +203,17 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index)
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index)
 util.func public @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
-    %x: index,
-    %y: index,
-    %z: index) {
-  //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(@ex::@backend::@entry0)
+    %executable: !hal.executable, %ordinal: index,
+    %x: index, %y: index, %z: index) {
+  //      CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups([%[[X]], %[[Y]], %[[Z]]])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer>
-      target(@ex::@backend::@entry0)
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%ordinal]
       workgroups([%x, %y, %z])
   util.return
 }
@@ -233,17 +233,17 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME:  %[[OFFSET:.+]]: index)
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:.+]]: index,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer, %[[OFFSET:.+]]: index)
 util.func public @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
-    %buffer: !hal.buffer,
-    %offset: index) {
-  //      CHECK: hal.command_buffer.dispatch.indirect.symbol<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(@ex::@backend::@entry0)
+    %executable: !hal.executable, %ordinal: index,
+    %buffer: !hal.buffer, %offset: index) {
+  //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]]]
-  hal.command_buffer.dispatch.indirect.symbol<%cmd : !hal.command_buffer>
-      target(@ex::@backend::@entry0)
+  hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer : !hal.buffer)[%offset]
   util.return
 }

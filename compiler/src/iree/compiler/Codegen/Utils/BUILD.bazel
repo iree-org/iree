@@ -67,3 +67,19 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
+
+iree_compiler_cc_library(
+    name = "VectorOpUtils",
+    srcs = [
+        "VectorOpUtils.cpp",
+    ],
+    hdrs = [
+        "VectorOpUtils.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
+    ],
+)

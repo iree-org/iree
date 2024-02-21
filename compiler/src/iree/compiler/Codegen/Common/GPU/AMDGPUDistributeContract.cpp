@@ -6,88 +6,19 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
-#define DEBUG_TYPE "iree-amdgpu-distribute-contract"
+#define DEBUG_TYPE "iree-codegen-amdgpu-distribute-contract"
 
 namespace mlir::iree_compiler {
 namespace {
 
 using namespace mlir::iree_compiler::IREE::VectorExt;
 using VectorValue = TypedValue<VectorType>;
-
-/// A class for querying information about a contract op.
-class ContractOpDetail {
-public:
-  enum class OpKind { MK_KN_MN, MK_NK_MN, UNKNOWN };
-
-  explicit ContractOpDetail(vector::ContractionOp op) {
-    opKind = inferOpKind(op.getContext(), op.getIndexingMapsArray());
-  }
-
-  OpKind getOpKind() const { return opKind; }
-
-  // Returns the (LHS M, RHS N) dimension index pair.
-  std::optional<std::pair<int, int>> getOperandMNIndex() const {
-    switch (opKind) {
-    case OpKind::MK_KN_MN:
-      return std::make_pair(0, 1);
-    case OpKind::MK_NK_MN:
-      return std::make_pair(0, 0);
-    case OpKind::UNKNOWN:
-      break;
-    }
-    return std::nullopt;
-  }
-
-  // Returns the (LHS K, RHS K) dimension index pair.
-  std::optional<std::pair<int, int>> getOperandKIndex() const {
-    switch (opKind) {
-    case OpKind::MK_KN_MN:
-      return std::make_pair(1, 0);
-    case OpKind::MK_NK_MN:
-      return std::make_pair(1, 1);
-    case OpKind::UNKNOWN:
-      break;
-    }
-    return std::nullopt;
-  }
-
-  // Returns the result (M, N) dimension index pair.
-  std::optional<std::pair<int, int>> getResultMNIndex() const {
-    switch (opKind) {
-    case OpKind::MK_KN_MN:
-    case OpKind::MK_NK_MN:
-      return std::make_pair(0, 1);
-    default:
-      break;
-    }
-    return std::nullopt;
-  }
-
-private:
-  // Gets the kind of a contract op with the given indexing |maps|.
-  OpKind inferOpKind(MLIRContext *ctx, SmallVector<AffineMap> maps) {
-    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [&](MapList m) {
-      return AffineMap::inferFromExprList(m, ctx);
-    };
-    AffineExpr m, n, k;
-    bindDims(ctx, m, n, k);
-    if (maps == infer({{m, k}, {k, n}, {m, n}}))
-      return OpKind::MK_KN_MN;
-    if (maps == infer({{m, k}, {n, k}, {m, n}}))
-      return OpKind::MK_NK_MN;
-    return OpKind::UNKNOWN;
-  }
-
-private:
-  OpKind opKind = OpKind::UNKNOWN;
-};
 
 /// Distributes `vector.contract` ops with nested layouts.
 struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
@@ -140,8 +71,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     mfmaParams.blocks = mfmaAttr.getBlockSize();
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
-    ContractOpDetail opDetail(contractOp);
-    if (opDetail.getOpKind() == ContractOpDetail::OpKind::UNKNOWN) {
+    VectorContractOpInfo opDetail(contractOp);
+    if (opDetail.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
       return rewriter.notifyMatchFailure(contractOp, "unknown contract kind");
     }
 
@@ -243,7 +174,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   }
 
   // Gets the batch size for matmul K dimensions.
-  std::optional<int64_t> getKBatchSize(const ContractOpDetail &opDetail,
+  std::optional<int64_t> getKBatchSize(const VectorContractOpInfo &opDetail,
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
     auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
@@ -257,7 +188,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
   // Given a contract op's batch |resultOffsets|, fills its batch offsets for
   // both LHS and RHS.
-  void fillOperandBatchOffsets(const ContractOpDetail &opDetail,
+  void fillOperandBatchOffsets(const VectorContractOpInfo &opDetail,
                                int64_t kOffset, ArrayRef<int64_t> resultOffsets,
                                NestedLayoutAttr resultLayout,
                                SmallVector<int64_t, 2> &lhsOffsets,

@@ -134,7 +134,6 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
-  options.maxVectorSize = 4096;
   pm.addNestedPass<func::FuncOp>(createGenericVectorizationPass(options));
   pm.addNestedPass<func::FuncOp>(createOptimizeTensorInsertExtractSlicesPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
