@@ -81,7 +81,6 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x4x8_to_8x4x8_arm_64_dotprod(
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
   IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
-  IREE_UK_ASSERT(!(params->K0 % 8));
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
@@ -91,11 +90,13 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x4x8_to_8x4x8_arm_64_dotprod(
 
   int32x4_t acc[8];
   for (int i = 0; i < 8; i++) {
+    // We start with zero accumulators and add the value of *out_ptr later.
+    // This is required for the int4 left shift described later.
     acc[i] = vdupq_n_s32(0);
   }
 
   for (int k = 0; k < params->K; ++k) {
-    int8x16_t rhs = vld1q_s8(rhs_ptr);
+    int8x16_t r = vld1q_s8(rhs_ptr);
     rhs_ptr += 16;
 
     // We unpack int4s into individual int8s. To preserve signedness,
@@ -104,8 +105,9 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x4x8_to_8x4x8_arm_64_dotprod(
     // accumulator values by 16 before storing to memory.
     // This int4 conversion trick is borrowed from the `qd8-f32-qc4w-gemm*`
     // kernels in https://github.com/google/XNNPACK.
-    int8x16_t rhs_0 = vshlq_n_s8(rhs, 4);
-    int8x16_t rhs_1 = vandq_s8(rhs, vmask);
+    int8x16_t rhs[2];
+    rhs[0] = vshlq_n_s8(r, 4);
+    rhs[1] = vandq_s8(r, vmask);
 
     if (M0 == 8) {
       // 8x2 * 2x4 -> 8x4.
@@ -118,80 +120,78 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x4x8_to_8x4x8_arm_64_dotprod(
         lhs_ptr += 32;
       }
 
-      int8x8_t lhs_0 = vget_low_s8(lhs_uzp[0].val[0]);
-      int8x8_t lhs_1 = vget_low_s8(lhs_uzp[0].val[1]);
-      int8x8_t lhs_2 = vget_high_s8(lhs_uzp[0].val[0]);
-      int8x8_t lhs_3 = vget_high_s8(lhs_uzp[0].val[1]);
-      int8x8_t lhs_4 = vget_low_s8(lhs_uzp[1].val[0]);
-      int8x8_t lhs_5 = vget_low_s8(lhs_uzp[1].val[1]);
-      int8x8_t lhs_6 = vget_high_s8(lhs_uzp[1].val[0]);
-      int8x8_t lhs_7 = vget_high_s8(lhs_uzp[1].val[1]);
+      int8x8_t lhs[8];
+      lhs[0] = vget_low_s8(lhs_uzp[0].val[0]);
+      lhs[1] = vget_high_s8(lhs_uzp[0].val[0]);
+      lhs[2] = vget_low_s8(lhs_uzp[1].val[0]);
+      lhs[3] = vget_high_s8(lhs_uzp[1].val[0]);
+      lhs[4] = vget_low_s8(lhs_uzp[0].val[1]);
+      lhs[5] = vget_high_s8(lhs_uzp[0].val[1]);
+      lhs[6] = vget_low_s8(lhs_uzp[1].val[1]);
+      lhs[7] = vget_high_s8(lhs_uzp[1].val[1]);
 
-      acc[0] = vdotq_lane_s32(acc[0], rhs_0, lhs_0, 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_0, lhs_0, 1);
-      acc[2] = vdotq_lane_s32(acc[2], rhs_0, lhs_2, 0);
-      acc[3] = vdotq_lane_s32(acc[3], rhs_0, lhs_2, 1);
-      acc[4] = vdotq_lane_s32(acc[4], rhs_0, lhs_4, 0);
-      acc[5] = vdotq_lane_s32(acc[5], rhs_0, lhs_4, 1);
-      acc[6] = vdotq_lane_s32(acc[6], rhs_0, lhs_6, 0);
-      acc[7] = vdotq_lane_s32(acc[7], rhs_0, lhs_6, 1);
-
-      acc[0] = vdotq_lane_s32(acc[0], rhs_1, lhs_1, 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_1, lhs_1, 1);
-      acc[2] = vdotq_lane_s32(acc[2], rhs_1, lhs_3, 0);
-      acc[3] = vdotq_lane_s32(acc[3], rhs_1, lhs_3, 1);
-      acc[4] = vdotq_lane_s32(acc[4], rhs_1, lhs_5, 0);
-      acc[5] = vdotq_lane_s32(acc[5], rhs_1, lhs_5, 1);
-      acc[6] = vdotq_lane_s32(acc[6], rhs_1, lhs_7, 0);
-      acc[7] = vdotq_lane_s32(acc[7], rhs_1, lhs_7, 1);
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+          acc[4 * j + 0] =
+              vdotq_lane_s32(acc[4 * j + 0], rhs[i], lhs[4 * i + 2 * j + 0], 0);
+          acc[4 * j + 1] =
+              vdotq_lane_s32(acc[4 * j + 1], rhs[i], lhs[4 * i + 2 * j + 0], 1);
+          acc[4 * j + 2] =
+              vdotq_lane_s32(acc[4 * j + 2], rhs[i], lhs[4 * i + 2 * j + 1], 0);
+          acc[4 * j + 3] =
+              vdotq_lane_s32(acc[4 * j + 3], rhs[i], lhs[4 * i + 2 * j + 1], 1);
+        }
+      }
     } else if (M0 == 4) {
       // 4x2 * 2x4 -> 4x4.
       int8x16x2_t lhs_uzp = vld2q_s8(lhs_ptr);
       lhs_ptr += 32;
 
-      int8x8_t lhs_0 = vget_low_s8(lhs_uzp.val[0]);
-      int8x8_t lhs_1 = vget_low_s8(lhs_uzp.val[1]);
-      int8x8_t lhs_2 = vget_high_s8(lhs_uzp.val[0]);
-      int8x8_t lhs_3 = vget_high_s8(lhs_uzp.val[1]);
+      int8x8_t lhs[4];
+      lhs[0] = vget_low_s8(lhs_uzp.val[0]);
+      lhs[1] = vget_high_s8(lhs_uzp.val[0]);
+      lhs[2] = vget_low_s8(lhs_uzp.val[1]);
+      lhs[3] = vget_high_s8(lhs_uzp.val[1]);
 
-      acc[0] = vdotq_lane_s32(acc[0], rhs_0, lhs_0, 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_0, lhs_0, 1);
-      acc[2] = vdotq_lane_s32(acc[2], rhs_0, lhs_2, 0);
-      acc[3] = vdotq_lane_s32(acc[3], rhs_0, lhs_2, 1);
-
-      acc[0] = vdotq_lane_s32(acc[0], rhs_1, lhs_1, 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_1, lhs_1, 1);
-      acc[2] = vdotq_lane_s32(acc[2], rhs_1, lhs_3, 0);
-      acc[3] = vdotq_lane_s32(acc[3], rhs_1, lhs_3, 1);
+      for (int i = 0; i < 2; i++) {
+        acc[0] = vdotq_lane_s32(acc[0], rhs[i], lhs[2 * i + 0], 0);
+        acc[1] = vdotq_lane_s32(acc[1], rhs[i], lhs[2 * i + 0], 1);
+        acc[2] = vdotq_lane_s32(acc[2], rhs[i], lhs[2 * i + 1], 0);
+        acc[3] = vdotq_lane_s32(acc[3], rhs[i], lhs[2 * i + 1], 1);
+      }
     } else if (M0 == 2) {
       // 2x2 * 2x4 -> 2x4.
       int8x8x2_t lhs_uzp = vld2_s8(lhs_ptr);
       lhs_ptr += 16;
 
-      acc[0] = vdotq_lane_s32(acc[0], rhs_0, lhs_uzp.val[0], 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_0, lhs_uzp.val[0], 1);
-
-      acc[0] = vdotq_lane_s32(acc[0], rhs_1, lhs_uzp.val[1], 0);
-      acc[1] = vdotq_lane_s32(acc[1], rhs_1, lhs_uzp.val[1], 1);
+      acc[0] = vdotq_lane_s32(acc[0], rhs[0], lhs_uzp.val[0], 0);
+      acc[1] = vdotq_lane_s32(acc[1], rhs[0], lhs_uzp.val[0], 1);
+      acc[0] = vdotq_lane_s32(acc[0], rhs[1], lhs_uzp.val[1], 0);
+      acc[1] = vdotq_lane_s32(acc[1], rhs[1], lhs_uzp.val[1], 1);
     } else if (M0 == 1) {
       // 1x2 * 2x4 -> 1x4.
       int8x8_t lhs = vld1_s8(lhs_ptr);
       lhs_ptr += 8;
       int8x8x2_t lhs_uzp = vuzp_s8(lhs, vzero);
 
-      acc[0] = vdotq_lane_s32(acc[0], rhs_0, lhs_uzp.val[0], 0);
-      acc[0] = vdotq_lane_s32(acc[0], rhs_1, lhs_uzp.val[1], 0);
+      acc[0] = vdotq_lane_s32(acc[0], rhs[0], lhs_uzp.val[0], 0);
+      acc[0] = vdotq_lane_s32(acc[0], rhs[1], lhs_uzp.val[1], 0);
     }
   }
 
-  for (int i = 0; i < M0; i++) {
-    acc[i] = vshrq_n_s32(acc[i], 4);
-    if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    for (int i = 0; i < M0; i++) {
       int32x4_t existing_acc = vld1q_s32(out_ptr);
-      acc[i] = vaddq_s32(acc[i], existing_acc);
+      acc[i] = vsraq_n_s32(existing_acc, acc[i], 4);
+      vst1q_s32(out_ptr, acc[i]);
+      out_ptr += 4;
     }
-    vst1q_s32(out_ptr, acc[i]);
-    out_ptr += 4;
+  } else {
+    for (int i = 0; i < M0; i++) {
+      acc[i] = vshrq_n_s32(acc[i], 4);
+      vst1q_s32(out_ptr, acc[i]);
+      out_ptr += 4;
+    }
   }
 }
 
