@@ -51,7 +51,7 @@ void createTorchToIREEPipeline(
       torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
   pm.addNestedPass<func::FuncOp>(
-          TorchInput::createConvertTMTensorToLinalgExtPass());
+      TorchInput::createConvertTMTensorToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());

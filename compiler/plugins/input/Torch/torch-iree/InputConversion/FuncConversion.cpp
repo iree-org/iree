@@ -44,7 +44,7 @@ namespace {
 // Since torch functions are single-exit, practically, this involves:
 //   * Adding preambles to convert function arguments to `tensor` (and native
 //     torch types via `torch_c`), adding coarse synchronization on import
-//     (presently for all buffer arguments but in the future could only be 
+//     (presently for all buffer arguments but in the future could only be
 //     those which are not tied to fine grained fences).
 //   * Adding a postamble with a synchronization barrier on any produced
 //     or mutated tensors and appropriate exports/in-place tieing to buffers.
@@ -57,11 +57,11 @@ namespace {
 //
 // Immutable tensor arguments are mostly handled by the type converter:
 //   * Materializing a `hal.tensor.import` on a source use.
-//   * Generating an 
+//   * Generating an
 //     `unrealized_conversion_cast {torch.export.immutable_tensor}` on a target
 //     use (i.e. consuming as part of return, etc). These will be fixed up
 //     in the post-processing phase.
-// 
+//
 // Mutable types
 // -------------
 // Here we rely on the characteristic that at the torch level, conversion to
@@ -81,13 +81,13 @@ namespace {
 // invalid program.
 //
 // Mutable tensor arguments are handled as:
-//   * `torch.copy.to_vtensor` is handled directly as a conversion pattern 
-//     because it is pure (with the only constraint that it has to happen after 
+//   * `torch.copy.to_vtensor` is handled directly as a conversion pattern
+//     because it is pure (with the only constraint that it has to happen after
 //     the function level wait fence). It must source from the mutable entry arg
 //     and generates a `hal.tensor.import`.
 //   * The mutation ops are not handled during conversion, but the type
 //     converter will emit a materialization of
-//     `unrealized_conversion_cast {torch.coarse_signal_mutation}` from the 
+//     `unrealized_conversion_cast {torch.coarse_signal_mutation}` from the
 //     block-arg !hal.buffer_view to unhandled ops. These will be fixed up
 //     in post-processing.
 //
@@ -166,6 +166,7 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
           srcOp.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
       if (tiedAttr) {
         tiedOperands.push_back(tiedAttr.getInt());
+        anyTiedOperands = true;
       } else {
         tiedOperands.push_back(-1);
       }
@@ -216,9 +217,6 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     // Allowlist of function attributes to retain when importing funcs.
     constexpr const char *kRetainedAttributes[] = {
         "iree.reflection",
-        "vm.fallback",
-        "vm.signature",
-        "vm.version",
     };
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,
@@ -274,8 +272,12 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     SmallVector<Value> callOperands(entryBlock->getArguments());
     callOperands.push_back(waitFence);
     callOperands.push_back(signalFence);
+    std::optional<ArrayAttr> targetTiedOperands = asyncFuncOp.getTiedOperands();
     auto callResults =
-        rewriter.create<IREE::Util::CallOp>(loc, asyncFuncOp, callOperands)
+        rewriter
+            .create<IREE::Util::CallOp>(loc, asyncFuncOp, callOperands,
+                                        targetTiedOperands ? *targetTiedOperands
+                                                           : ArrayAttr{})
             .getResults();
 
     // Wait forever for signal.
