@@ -8,7 +8,6 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Support/MathExtras.h"
@@ -41,7 +40,7 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
         maybeSubgroupSize ? maybeSubgroupSize->getSExtValue() : kCudaWarpSize;
 
     IRRewriter rewriter(funcOp->getContext());
-    rewriter.setInsertionPointToStart(&funcOp.getBody().front());
+    rewriter.setInsertionPointToStart(&funcOp.front());
     DiagnosedSilenceableFailure result =
         mlir::transform::gpu::mapNestedForallToThreadsImpl(
             rewriter, std::nullopt, funcOp, workgroupSize, subgroupSize, false);
@@ -51,7 +50,8 @@ struct GPUDistributePass : public GPUDistributeBase<GPUDistributePass> {
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createGPUDistribute() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUDistribute() {
   return std::make_unique<GPUDistributePass>();
 }
 

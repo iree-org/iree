@@ -15,27 +15,7 @@ if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_entry_points
-  ARCH
-    wasm_64
-  INTERNAL_HDRS
-    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
-    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
-    "common_x86_64.h"
-    "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
-  SRCS
-    "mmt4d_x86_64_entry_point.c"
-    "pack_x86_64_entry_point.c"
-    "query_tile_sizes_x86_64_entry_point.c"
-    "unpack_x86_64_entry_point.c"
-)
-
-iree_bitcode_library(
-  NAME
-    ukernel_bitcode_x86_64_avx2_fma
+    ukernel_bitcode_arch_x86_64_entry_points
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -44,12 +24,23 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
+  SRCS
+    "mmt4d_x86_64_entry_point.c"
+)
+
+iree_bitcode_library(
+  NAME
+    ukernel_bitcode_arch_x86_64_avx2_fma
+  ARCH
+    x86_64
+  INTERNAL_HDRS
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
+    "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
+    "common_x86_64.h"
+    "common_x86_64_entry_point.h"
+    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
-    "pack_x86_64_avx2_fma.c"
-    "unpack_x86_64_avx2_fma.c"
   COPTS
     "-mavx"
     "-mavx2"
@@ -59,7 +50,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_base
+    ukernel_bitcode_arch_x86_64_avx512_base
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -68,12 +59,8 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
-    "pack_x86_64_avx512_base.c"
-    "unpack_x86_64_avx512_base.c"
   COPTS
     "-mavx"
     "-mavx2"
@@ -88,7 +75,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_vnni
+    ukernel_bitcode_arch_x86_64_avx512_vnni
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -97,8 +84,6 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -116,7 +101,7 @@ iree_bitcode_library(
 
 iree_bitcode_library(
   NAME
-    ukernel_bitcode_x86_64_avx512_bf16
+    ukernel_bitcode_arch_x86_64_avx512_bf16
   ARCH
     x86_64
   INTERNAL_HDRS
@@ -125,8 +110,6 @@ iree_bitcode_library(
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
     "mmt4d_x86_64_internal.h"
-    "pack_x86_64_internal.h"
-    "unpack_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_bf16.c"
   COPTS
@@ -144,18 +127,18 @@ iree_bitcode_library(
 
 iree_link_bitcode(
   NAME
-    ukernel_bitcode_x86_64
+    ukernel_bitcode_arch_x86_64
   SRCS
-    "ukernel_bitcode_x86_64_avx2_fma.bc"
-    "ukernel_bitcode_x86_64_avx512_base.bc"
-    "ukernel_bitcode_x86_64_avx512_bf16.bc"
-    "ukernel_bitcode_x86_64_avx512_vnni.bc"
+    "ukernel_bitcode_arch_x86_64_avx2_fma.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_base.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_bf16.bc"
+    "ukernel_bitcode_arch_x86_64_avx512_vnni.bc"
+    "ukernel_bitcode_arch_x86_64_entry_points.bc"
 
 )
 
 elseif(IREE_BUILD_COMPILER AND IREE_TARGET_BACKEND_LLVM_CPU)
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64.bc")
-iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_x86_64_entry_points.bc")
+iree_make_empty_file("${CMAKE_CURRENT_BINARY_DIR}/ukernel_bitcode_arch_x86_64.bc")
 endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
@@ -172,7 +155,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX2_FMA
     "-mavx2"
     "-mfma"
     "-mf16c"
-  MSVC
+  MSVC_OR_CLANG_CL
     "/arch:AVX2"
 )
 
@@ -200,7 +183,7 @@ iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_BASE
     "-mavx512cd"
     "-mavx512bw"
     "-mavx512dq"
-  MSVC
+  MSVC_OR_CLANG_CL
     "/arch:AVX512"
 )
 
@@ -209,7 +192,8 @@ iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_BASE
 iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_VNNI_RELATIVE
   CLANG_OR_GCC
     "-mavx512vnni"
-  MSVC
+  CLANG_CL
+    "/clang:-mavx512vnni"
 )
 set(IREE_UK_COPTS_X86_64_AVX512_VNNI
   "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
@@ -221,7 +205,8 @@ set(IREE_UK_COPTS_X86_64_AVX512_VNNI
 iree_select_compiler_opts(IREE_UK_COPTS_X86_64_AVX512_BF16_RELATIVE
   CLANG_OR_GCC
     "-mavx512bf16"
-  MSVC
+  CLANG_CL
+    "/clang:-mavx512bf16"
 )
 set(IREE_UK_COPTS_X86_64_AVX512_BF16
   "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
@@ -241,8 +226,8 @@ set(IREE_UK_TRY_X86_64_AVX512_BF16 ON)
 # /arch: flag is often too coarse-grained to be meaningful.
 
 # GCC version check
-if ((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
-    (CMAKE_C_COMPILER_VERSION VERSION_LESS 12))
+if((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
+   (CMAKE_C_COMPILER_VERSION VERSION_LESS 12))
   # Old GCC versions have incompatible x86 intrinsics. Supporting them
   # is not considered worth it. By not defining these tokens, we leave these
   # code paths out. At least GCC 9 is known to be problematic, while GCC 12 is
@@ -254,27 +239,79 @@ if ((CMAKE_C_COMPILER_ID STREQUAL GNU) AND
 endif()  # GCC version check
 
 # MSVC version check for AVX-512-BF16
-if (MSVC_VERSION AND ("${MSVC_VERSION}" VERSION_LESS 1937))
+if(MSVC_VERSION AND ("${MSVC_VERSION}" VERSION_LESS 1937))
   # Missing _mm512_cvtpbh_ps intrinsic at _MSC_VER=1930.
   set(IREE_UK_TRY_X86_64_AVX512_BF16 OFF)
 endif()  # MSVC version check for AVX-512-BF16
 
+# clang-cl version check for vnni bf16 bug.
+# Version 16-17 crash compiling the file and in clang-cl we can't use the
+# inline asm workaround: https://github.com/llvm/llvm-project/issues/68117.
+if((CMAKE_C_COMPILER_ID MATCHES "Clang" AND
+    CMAKE_C_SIMULATE_ID MATCHES "MSVC") AND
+   (CMAKE_C_COMPILER_VERSION VERSION_LESS 18))
+  set(IREE_UK_TRY_X86_64_AVX512_BF16 OFF)
+endif()
+
 # Now check compiler support for what we've decided to try.
+# Some instructions are not available with baseline arch flags and need to be
+# tested via compilation. We include the intrinsics used by the kernels whose
+# presence indicates availability of all required intrinsics (vs testing each).
 
-if (IREE_UK_TRY_X86_64_AVX2_FMA)
-  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX2_FMA}" IREE_UK_BUILD_X86_64_AVX2_FMA)
+if(IREE_UK_TRY_X86_64_AVX2_FMA)
+  check_cxx_compiler_flag(
+    "${IREE_UK_COPTS_X86_64_AVX2_FMA}"
+    IREE_UK_BUILD_X86_64_AVX2_FMA
+  )
+else()
+  set(IREE_UK_BUILD_X86_64_AVX2_FMA OFF)
 endif()
 
-if (IREE_UK_TRY_X86_64_AVX512_BASE)
-  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BASE}" IREE_UK_BUILD_X86_64_AVX512_BASE)
+if(IREE_UK_TRY_X86_64_AVX512_BASE)
+  check_cxx_compiler_flag(
+    "${IREE_UK_COPTS_X86_64_AVX512_BASE}"
+    IREE_UK_BUILD_X86_64_AVX512_BASE
+  )
+else()
+  set(IREE_UK_BUILD_X86_64_AVX512_BASE OFF)
 endif()
 
-if (IREE_UK_TRY_X86_64_AVX512_VNNI)
-  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_VNNI}" IREE_UK_BUILD_X86_64_AVX512_VNNI)
+if(IREE_UK_TRY_X86_64_AVX512_VNNI)
+  string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_X86_64_AVX512_VNNI}")
+  string(JOIN "\n" IREE_UK_BUILD_X86_64_AVX512_VNNI_TEST
+    "#include <immintrin.h>"
+    "int main() {"
+    "  __m512i a, b, d;"
+    "  _mm512_dpwssd_epi32(d, a, b);"
+    "  return 0;"
+    "}"
+  )
+  check_c_source_compiles(
+    "${IREE_UK_BUILD_X86_64_AVX512_VNNI_TEST}"
+    IREE_UK_BUILD_X86_64_AVX512_VNNI
+  )
+  unset(CMAKE_REQUIRED_FLAGS)
+else()
+  set(IREE_UK_BUILD_X86_64_AVX512_VNNI OFF)
 endif()
 
-if (IREE_UK_TRY_X86_64_AVX512_BF16)
-  check_cxx_compiler_flag("${IREE_UK_COPTS_X86_64_AVX512_BF16}" IREE_UK_BUILD_X86_64_AVX512_BF16)
+if(IREE_UK_TRY_X86_64_AVX512_BF16)
+  string(REPLACE ";" " " CMAKE_REQUIRED_FLAGS "${IREE_UK_COPTS_X86_64_AVX512_BF16}")
+  string(JOIN "\n" IREE_UK_BUILD_X86_64_AVX512_BF16_TEST
+    "#include <immintrin.h>"
+    "int main() {"
+    "  __m256bh a;"
+    "  _mm512_cvtneps_pbh(a);"
+    "  return 0;"
+    "}"
+  )
+  check_c_source_compiles(
+    "${IREE_UK_BUILD_X86_64_AVX512_BF16_TEST}"
+    IREE_UK_BUILD_X86_64_AVX512_BF16
+  )
+  unset(CMAKE_REQUIRED_FLAGS)
+else()
+  set(IREE_UK_BUILD_X86_64_AVX512_BF16 OFF)
 endif()
 
 # Now generate the configured header. This needs to happen after all

@@ -4,8 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Utils/EquivalenceUtils.h"
+
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/ADT/SetVector.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/RegionGraphTraits.h"
@@ -13,15 +15,90 @@
 
 namespace mlir::iree_compiler {
 
+OperationEquivalenceCache::OperationEquivalenceCache(MLIRContext *context)
+    : functionRefName(StringAttr::get(context, "function_ref")),
+      symbolAttrName(
+          StringAttr::get(context, SymbolTable::getSymbolAttrName())) {}
+
+OperationEquivalenceCache::~OperationEquivalenceCache() {
+  for (auto *mapping : mappingFreeList)
+    delete mapping;
+  for (auto region : regions)
+    delete region.second;
+  for (auto block : blocks)
+    delete block.second;
+  for (auto op : ops)
+    delete op.second;
+}
+
+bool OperationEquivalenceCache::isSymbolAttrName(StringAttr name) const {
+  return name == functionRefName || name == symbolAttrName;
+}
+
+OperationEquivalenceCache::IRMappingPtr
+OperationEquivalenceCache::acquireMapping() {
+  IRMapping *mapping = nullptr;
+  if (!mappingFreeList.empty()) {
+    mapping = mappingFreeList.pop_back_val();
+  } else {
+    mapping = new IRMapping();
+  }
+  return IRMappingPtr(mapping, [this](IRMapping *mapping) {
+    mapping->clear();
+    mappingFreeList.push_back(mapping);
+  });
+}
+
+OperationEquivalenceCache::RegionEntry &
+OperationEquivalenceCache::getRegion(Region *region) {
+  auto it = regions.find(region);
+  if (it != regions.end())
+    return *it->second;
+  RegionEntry *entry = new RegionEntry();
+  for (Block &block : region->getBlocks()) {
+    llvm::ReversePostOrderTraversal<Block *> traversal(&block);
+    entry->blocks.insert(traversal.begin(), traversal.end());
+  }
+  regions[region] = entry;
+  return *entry;
+}
+
+OperationEquivalenceCache::BlockEntry &
+OperationEquivalenceCache::getBlock(Block *block) {
+  auto it = blocks.find(block);
+  if (it != blocks.end())
+    return *it->second;
+  BlockEntry *entry = new BlockEntry();
+  entry->count = block->getOperations().size();
+  blocks[block] = entry;
+  return *entry;
+}
+
+OperationEquivalenceCache::OperationEntry &
+OperationEquivalenceCache::getOp(Operation *op) {
+  auto it = ops.find(op);
+  if (it != ops.end())
+    return *it->second;
+  OperationEntry *entry = new OperationEntry();
+  entry->attrs.append(op->getRawDictionaryAttrs().getValue());
+  if (op->getPropertiesStorageSize()) {
+    op->getName().populateInherentAttrs(op, entry->attrs);
+  }
+  ops[op] = entry;
+  return *entry;
+}
+
 template <typename Range, typename Pred>
 bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   auto lhsIt = lhs.begin();
   auto rhsIt = rhs.begin();
-  while (lhsIt != lhs.end() && rhsIt != rhs.end()) {
+  auto lhsEnd = lhs.end();
+  auto rhsEnd = rhs.end();
+  while (lhsIt != lhsEnd && rhsIt != rhsEnd) {
     if (!pred(*lhsIt++, *rhsIt++))
       return false;
   }
-  if ((lhsIt == lhs.end()) != (rhsIt == rhs.end())) {
+  if ((lhsIt == lhsEnd) != (rhsIt == rhsEnd)) {
     // Block count mismatch. We do this here so that we avoid the O(n) scan
     // that would have been required to calculate the size above.
     return false;
@@ -29,18 +106,31 @@ bool compare_ranges(Range &&lhs, Range &&rhs, Pred pred) {
   return true;
 }
 
-static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
-                                       IRMapping &parentMapping);
-static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
+static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                       Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping);
 
-static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
-  IRMapping mapping;
-  return isStructurallyEquivalentTo(lhs, rhs, mapping);
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs) {
+  auto mapping = cache.acquireMapping();
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
+
+bool isStructurallyEquivalentTo(Region &lhs, Region &rhs) {
+  OperationEquivalenceCache cache(lhs.getContext());
+  return isStructurallyEquivalentTo(cache, lhs, rhs);
+}
+
 bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs) {
-  IRMapping mapping;
-  return isStructurallyEquivalentTo(lhs, rhs, mapping);
+  OperationEquivalenceCache cache(lhs.getContext());
+  auto mapping = cache.acquireMapping();
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
+}
+
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                Operation &lhs, Operation &rhs) {
+  auto mapping = cache.acquireMapping();
+  return isStructurallyEquivalentTo(cache, lhs, rhs, *mapping);
 }
 
 // Recursively compares two regions for structural equivalence.
@@ -63,52 +153,40 @@ bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs) {
 //
 // TODO(#3996): upstream into mlir::OperationEquivalence if this works.
 // TODO(#3996): add symbol ref comparison (add to IRMapping).
-static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
-                                       IRMapping &mapping) {
-  // Use compare_ranges to walk the block list in parallel and get a boolean in
-  // the case of size mismatch without an O(N) linked-list size query.
-  if (!compare_ranges(
-          lhs.getBlocks(), rhs.getBlocks(),
-          [&](Block &lhsBlock, Block &rhsBlock) {
-            if (lhsBlock.getNumArguments() != rhsBlock.getNumArguments()) {
-              return false;
-            }
-            for (auto [lhsArg, rhsArg] : llvm::zip_equal(
-                     lhsBlock.getArguments(), rhsBlock.getArguments())) {
-              if (lhsArg.getType() != rhsArg.getType())
-                return false;
-              mapping.map(lhsArg, rhsArg);
-            }
-            mapping.map(&lhsBlock, &rhsBlock);
-            return true;
-          })) {
-    return false; // block mismatch
+bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache, Region &lhs,
+                                Region &rhs, IRMapping &mapping) {
+  auto &lhsRegionEntry = cache.getRegion(&lhs);
+  auto &rhsRegionEntry = cache.getRegion(&rhs);
+  if (lhsRegionEntry.blocks.size() != rhsRegionEntry.blocks.size())
+    return false;
+
+  // Map blocks and their arguments so that we can compare their use by ops.
+  for (auto [lhsBlock, rhsBlock] :
+       llvm::zip_equal(lhsRegionEntry.blocks, rhsRegionEntry.blocks)) {
+    if (lhsBlock->getNumArguments() != rhsBlock->getNumArguments())
+      return false;
+    for (auto [lhsArg, rhsArg] :
+         llvm::zip_equal(lhsBlock->getArguments(), rhsBlock->getArguments())) {
+      if (lhsArg.getType() != rhsArg.getType())
+        return false;
+      mapping.map(lhsArg, rhsArg);
+    }
+    mapping.map(lhsBlock, rhsBlock);
   }
 
-  // Walk the blocks again now that we have a populated mapping.
-  // We do this in topological order so that we have all values required by a
-  // block mapped by the time we reach it observing transitive block dominance.
-  llvm::SetVector<Block *> lhsBlocks;
-  for (Block &b : lhs.getBlocks()) {
-    llvm::ReversePostOrderTraversal<Block *> traversal(&b);
-    lhsBlocks.insert(traversal.begin(), traversal.end());
-  }
-  llvm::SetVector<Block *> rhsBlocks;
-  for (Block &b : rhs.getBlocks()) {
-    llvm::ReversePostOrderTraversal<Block *> traversal(&b);
-    rhsBlocks.insert(traversal.begin(), traversal.end());
-  }
-  if (lhsBlocks.size() != rhsBlocks.size())
-    return false;
-  for (auto [lhsBlock, rhsBlock] : llvm::zip_equal(lhsBlocks, rhsBlocks)) {
-    auto &lhsOperations = lhsBlock->getOperations();
-    auto &rhsOperations = rhsBlock->getOperations();
-    if (lhsOperations.size() != rhsOperations.size())
+  // Walk the blocks and populate a mapping. The blocks are stored in reverse
+  // dominance order so that we always have the mappings available.
+  for (auto [lhsBlock, rhsBlock] :
+       llvm::zip_equal(lhsRegionEntry.blocks, rhsRegionEntry.blocks)) {
+    const auto &lhsBlockEntry = cache.getBlock(lhsBlock);
+    const auto &rhsBlockEntry = cache.getBlock(rhsBlock);
+    if (lhsBlockEntry.count != rhsBlockEntry.count)
       return false;
-    for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsOperations, rhsOperations)) {
-      if (!isStructurallyEquivalentTo(lhsOp, rhsOp, mapping)) {
+
+    for (auto [lhsOp, rhsOp] : llvm::zip_equal(lhsBlock->getOperations(),
+                                               rhsBlock->getOperations())) {
+      if (!isStructurallyEquivalentTo(cache, lhsOp, rhsOp, mapping))
         return false;
-      }
     }
   }
 
@@ -116,31 +194,30 @@ static bool isStructurallyEquivalentTo(Region &lhs, Region &rhs,
   return true;
 }
 
-static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
+static bool isStructurallyEquivalentTo(OperationEquivalenceCache &cache,
+                                       Operation &lhs, Operation &rhs,
                                        IRMapping &parentMapping) {
   // Check operation metadata for early-exit opportunities.
-  if (lhs.getName() != rhs.getName())
+  if (lhs.getName() != rhs.getName() ||
+      lhs.getNumOperands() != rhs.getNumOperands() ||
+      lhs.getNumResults() != rhs.getNumResults() ||
+      lhs.getNumRegions() != rhs.getNumRegions() ||
+      lhs.getNumSuccessors() != rhs.getNumSuccessors()) {
     return false;
-  if (lhs.getNumOperands() != rhs.getNumOperands())
-    return false;
-  if (lhs.getNumResults() != rhs.getNumResults())
-    return false;
-  if (lhs.getNumRegions() != rhs.getNumRegions())
-    return false;
-  if (lhs.getNumSuccessors() != rhs.getNumSuccessors())
-    return false;
+  }
+
+  auto &lhsEntry = cache.getOp(&lhs);
+  auto &rhsEntry = cache.getOp(&rhs);
 
   // TODO(#3996): symbol mapping; for now allow them to differ unconditionally.
-  if (!compare_ranges(
-          lhs.getAttrs(), rhs.getAttrs(),
-          [&](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-            if (lhs.getName() == "function_ref" ||
-                lhs.getName() == SymbolTable::getSymbolAttrName()) {
-              return true;
-            }
-            return lhs == rhs;
-          })) {
+  if (lhsEntry.attrs.getAttrs().size() != rhsEntry.attrs.getAttrs().size())
     return false;
+  for (auto [lhsAttr, rhsAttr] :
+       llvm::zip_equal(lhsEntry.attrs, rhsEntry.attrs)) {
+    if (!cache.isSymbolAttrName(lhsAttr.getName())) {
+      if (lhsAttr != rhsAttr)
+        return false;
+    }
   }
 
   // If the op references blocks (such as a branch) then we expect to have them
@@ -177,12 +254,18 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
        llvm::zip_equal(lhs.getRegions(), rhs.getRegions())) {
     // If the region is isolated we don't want to reuse any parent mapping or
     // pollute it with our mappings.
-    IRMapping scopedRegionMapping;
-    IRMapping regionMapping = lhs.hasTrait<OpTrait::IsIsolatedFromAbove>()
-                                  ? scopedRegionMapping
-                                  : parentMapping;
-    if (!isStructurallyEquivalentTo(lhsRegion, rhsRegion, regionMapping)) {
-      return false;
+    if (lhs.hasTrait<OpTrait::IsIsolatedFromAbove>()) {
+      auto scopedRegionMapping = cache.acquireMapping();
+      if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
+                                      *scopedRegionMapping)) {
+        return false;
+      }
+    } else {
+      IRMapping clonedParentMapping = parentMapping;
+      if (!isStructurallyEquivalentTo(cache, lhsRegion, rhsRegion,
+                                      clonedParentMapping)) {
+        return false;
+      }
     }
   }
 

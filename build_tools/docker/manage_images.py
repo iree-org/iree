@@ -50,10 +50,7 @@ IMAGES_TO_DEPENDENCIES = {
     "nvidia": ["base"],
     "riscv": ["base"],
     "riscv-toolchain-builder": [],
-    "frontends": ["android"],
-    "shark": [],
     "samples": ["base"],
-    "frontends-nvidia": ["frontends"],
     # Containers with all the newest versions of dependencies that we support
     # instead of the oldest.
     "base-bleeding-edge": [],

@@ -10,7 +10,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,7 +28,7 @@ void mlir::iree_compiler::Reducer::reduceLinalgOnTensorsDelta(
   SmallVector<linalg::LinalgOp> linalgOps;
   SmallVector<linalg::LinalgOp> keepOps;
   module.walk([&](linalg::LinalgOp op) {
-    if (!op.hasTensorSemantics())
+    if (!op.hasPureTensorSemantics())
       return;
     // Op should have at least one tensor input, otherwise the operation is
     // already a fill-like operation.

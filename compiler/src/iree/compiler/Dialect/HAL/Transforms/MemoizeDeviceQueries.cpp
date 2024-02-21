@@ -97,21 +97,18 @@ struct MemoizeDeviceQueriesPass
           fusedLoc, funcBuilder.getI1Type(), queryType, device,
           anyQueryOp.getCategoryAttr(), anyQueryOp.getKeyAttr(),
           anyQueryOp.getDefaultValueAttr());
-      funcBuilder.create<IREE::Util::GlobalStoreOp>(fusedLoc, queryOp.getOk(),
-                                                    okGlobalOp.getName());
-      funcBuilder.create<IREE::Util::GlobalStoreOp>(
-          fusedLoc, queryOp.getValue(), valueGlobalOp.getName());
-      funcBuilder.create<IREE::Util::InitializerReturnOp>(fusedLoc);
+      okGlobalOp.createStoreOp(fusedLoc, queryOp.getOk(), funcBuilder);
+      valueGlobalOp.createStoreOp(fusedLoc, queryOp.getValue(), funcBuilder);
+      funcBuilder.create<IREE::Util::ReturnOp>(fusedLoc);
 
       for (auto queryOp : queryOps) {
         OpBuilder replaceBuilder(queryOp);
-        auto okLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, okGlobalOp.getType(), okGlobalOp.getName());
-        auto resultLoadOp = replaceBuilder.create<IREE::Util::GlobalLoadOp>(
-            fusedLoc, valueGlobalOp.getType(), valueGlobalOp.getName());
+        auto okLoadOp = okGlobalOp.createLoadOp(fusedLoc, replaceBuilder);
+        auto resultLoadOp =
+            valueGlobalOp.createLoadOp(fusedLoc, replaceBuilder);
         queryOp.replaceAllUsesWith(ValueRange{
-            okLoadOp.getResult(),
-            resultLoadOp.getResult(),
+            okLoadOp.getLoadedGlobalValue(),
+            resultLoadOp.getLoadedGlobalValue(),
         });
         queryOp.erase();
       }

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-decompose-pack-unpack-ops --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-pack-unpack-ops))" --split-input-file %s | FileCheck %s
 
 func.func @simple_KCRS_to_KCRSsr(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<1x1x1x1x8x32xf32>) -> tensor<1x1x1x1x8x32xf32> {
   %0 = tensor.pack %arg0 inner_dims_pos = [3, 2] inner_tiles = [8, 32] into %arg1 : tensor<1x1x32x8xf32> -> tensor<1x1x1x1x8x32xf32>
@@ -233,14 +233,11 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
 // CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x16x?x1xf32>
-// CHECK:        %[[TILE:.+]] = tensor.extract_slice %expanded
-// CHECK-SAME:     : tensor<?x16x?x1xf32> to tensor<?x16x?xf32>
-// CHECK:        %[[EMPTY:.+]] = tensor.empty({{.+}}) : tensor<?x?x16xf32>
 // CHECK:        %[[TRANSP:.+]] = linalg.transpose
-// CHECK-SAME:     ins(%[[TILE]] : tensor<?x16x?xf32>)
-// CHECK-SAME:     outs(%[[EMPTY]] : tensor<?x?x16xf32>)
-// CHECK-SAME:   permutation = [0, 2, 1]
-// CHECK:        %{{.+}} = tensor.insert_slice %[[TRANSP]] into %[[OUT]]
+// CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x16x?x1xf32>)
+// CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
+// CHECK-SAME:   permutation = [0, 2, 1, 3]
+// CHECK:        return %[[TRANSP]]
 
 // -----
 

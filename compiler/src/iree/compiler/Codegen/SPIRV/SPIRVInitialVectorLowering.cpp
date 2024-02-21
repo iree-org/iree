@@ -39,10 +39,10 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-void debugPrint(func::FuncOp funcOp, const char *message) {
+void debugPrint(Operation *op, const char *message) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- " << message << " ---//\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    op->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 }
@@ -259,7 +259,7 @@ void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 }
 
 /// Returns true when the target environment support integer dot product ops.
-bool supportsIntegerDotProductOps(func::FuncOp fn) {
+bool supportsIntegerDotProductOps(mlir::FunctionOpInterface fn) {
   spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(fn);
   if (!targetEnvAttr) {
     // Alternatively, check if the function op itself has a target env
@@ -297,7 +297,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     bool emitIntegerDotProdOps = supportsIntegerDotProductOps(funcOp);
 
@@ -508,7 +508,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVInitialVectorLoweringPass() {
   return std::make_unique<SPIRVInitialLoweringPass>();
 }

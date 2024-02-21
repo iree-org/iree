@@ -8,7 +8,7 @@ module @main {
     %capacity = arith.constant 25 : index
     %0 = util.list.create %capacity : !util.list<?>
     util.global.store %0, @tokens_list : !util.list<?>
-    util.initializer.return
+    util.return
   }
 
   func.func public @add_tokens(%ids : tensor<?xi32>) -> i32 {

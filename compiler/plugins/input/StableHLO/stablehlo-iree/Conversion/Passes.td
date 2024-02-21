@@ -23,7 +23,7 @@ def ConvertStableHloToIreeInputDialects :
 }
 
 def ConvertStableHloToLinalgExt :
-    Pass<"iree-stablehlo-to-linalg-ext", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-to-linalg-ext", "mlir::FunctionOpInterface"> {
   let summary =
       "Converts from StableHLO ops to LinalgExt ops and distribute to Flow ops";
 }
@@ -42,17 +42,22 @@ def ConvertStableHloToLinalg :
 }
 
 def LegalizeControlFlow :
-    Pass<"iree-stablehlo-legalize-control-flow", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-legalize-control-flow", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes from StableHLO control flow to SCF control flow";
 }
 
 def LegalizeChlo :
-    Pass<"iree-stablehlo-legalize-chlo", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-legalize-chlo", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes from CHLO ops flow to StableHLO and Shape ops";
 }
 
+def LegalizeStableHLOCustomCalls :
+    InterfacePass<"iree-stablehlo-legalize-custom-calls", "mlir::FunctionOpInterface"> {
+  let summary = "Legalizes specialized custom calls to decomposed implementations";
+}
+
 def LegalizeShapeComputations :
-    Pass<"iree-stablehlo-legalize-shape-computations", "func::FuncOp"> {
+    InterfacePass<"iree-stablehlo-legalize-shape-computations", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes StableHLO shape operations to core-mlir operations";
 }
 

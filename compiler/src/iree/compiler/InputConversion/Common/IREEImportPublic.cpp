@@ -27,14 +27,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Allowlist of function attributes to retain when importing funcs.
-constexpr const char *kRetainedAttributes[] = {
-    "iree.abi",
-    "iree.reflection",
-    "sym_visibility",
-    "noinline",
-};
-
 struct IREEImportPublicPass
     : public IREEImportPublicBase<IREEImportPublicPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -295,8 +287,10 @@ class ExecutableExportPattern
 };
 
 //===----------------------------------------------------------------------===//
+// Func dialect -> Util patterns
+//===----------------------------------------------------------------------===//
 
-class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
+class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern<func::FuncOp>::OpConversionPattern;
   LogicalResult
   matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
@@ -320,26 +314,62 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
       return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
     }
 
+    // Build tied operands index mapping results back to operands.
+    SmallVector<int64_t> tiedOperands;
+    bool anyTiedOperands = false;
+    for (unsigned i = 0; i < srcFuncType.getNumResults(); ++i) {
+      auto tiedAttr =
+          srcOp.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
+      if (tiedAttr) {
+        tiedOperands.push_back(tiedAttr.getInt());
+      } else {
+        tiedOperands.push_back(-1);
+      }
+    }
+    auto tiedOperandsAttr = anyTiedOperands
+                                ? rewriter.getIndexArrayAttr(tiedOperands)
+                                : ArrayAttr{};
+
     // Create new function with converted argument and result types.
     // Note that attributes are dropped. Consider preserving some if needed.
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
-    auto newFuncOp = rewriter.create<func::FuncOp>(
-        srcOp.getLoc(), srcOp.getName(), newFuncType);
+    auto newFuncOp = rewriter.create<IREE::Util::FuncOp>(
+        srcOp.getLoc(), srcOp.getName(), newFuncType, tiedOperandsAttr);
+    newFuncOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getFunctionBody(),
                                 newFuncOp.end());
 
-    // Retain function attributes in the allowlist.
+    // Handle defacto attrs to specialized ones.
+    if (srcOp->hasAttr("noinline")) {
+      newFuncOp.setInliningPolicyAttr(
+          rewriter.getAttr<IREE::Util::InlineNeverAttr>());
+    }
+
+    // Allowlist of function attributes to retain when importing funcs.
+    constexpr const char *kRetainedAttributes[] = {
+        "iree.reflection",
+        "vm.fallback",
+        "vm.signature",
+        "vm.version",
+    };
     auto retainedAttributes = ArrayRef<const char *>(
         kRetainedAttributes,
         sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
     for (auto retainAttrName : retainedAttributes) {
       StringRef attrName(retainAttrName);
       Attribute attr = srcOp->getAttr(attrName);
-      if (attr) {
+      if (attr)
         newFuncOp->setAttr(attrName, attr);
-      }
+    }
+
+    // Copy all arg/result attrs. We could filter these.
+    if (auto argAttrs = srcOp.getAllArgAttrs()) {
+      newFuncOp.setAllArgAttrs(argAttrs);
+    }
+    if (auto resultAttrs = srcOp.getAllResultAttrs()) {
+      newFuncOp.setAllResultAttrs(resultAttrs);
     }
 
     // Tell the rewriter to convert the region signature.
@@ -354,6 +384,40 @@ class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     return success();
   }
 };
+
+class FuncCallOpPattern : public OpConversionPattern<func::CallOp> {
+  using OpConversionPattern<func::CallOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(func::CallOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type, 1> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(srcOp.getResultTypes(),
+                                                resultTypes))) {
+      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
+    }
+    auto tiedOperandsAttr =
+        srcOp->getAttrOfType<ArrayAttr>("iree.abi.tied_operands");
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        srcOp, resultTypes, srcOp.getCallee(), adaptor.getOperands(),
+        tiedOperandsAttr);
+    return success();
+  }
+};
+
+class FuncReturnOpPattern : public OpConversionPattern<func::ReturnOp> {
+  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(func::ReturnOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(srcOp,
+                                                      adaptor.getOperands());
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Generic conversion
+//===----------------------------------------------------------------------===//
 
 class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -376,7 +440,7 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
           srcOp.getLoc(), srcOp.getInitializerAttr(), TypeRange{newType});
       rewriter.create<IREE::Util::GlobalStoreOp>(
           srcOp.getLoc(), callOp.getResult(0), srcOp.getName());
-      rewriter.create<IREE::Util::InitializerReturnOp>(srcOp.getLoc());
+      rewriter.create<IREE::Util::ReturnOp>(srcOp.getLoc());
       rewriter.restoreInsertionPoint(ip);
     }
     return success();
@@ -466,36 +530,29 @@ void IREEImportPublicPass::runOnOperation() {
     }
     return true;
   };
-
-  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
-    for (Type type : funcOp.getFunctionType().getInputs()) {
-      if (isIllegalType(type))
-        return false;
-    }
-    for (Type type : funcOp.getFunctionType().getResults()) {
-      if (isIllegalType(type))
-        return false;
-    }
-    for (Block &block : funcOp.getFunctionBody()) {
-      for (Type type : block.getArgumentTypes()) {
-        if (isIllegalType(type))
-          return false;
-      }
-    }
-    return true;
-  });
   target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
   IREETypeConverter typeConverter;
   PatternBenefit specific_benefit = 100;
   patterns.insert<GenericTypeConvert>(typeConverter, &getContext(), 0);
-  patterns.insert<BuiltinFuncOpPattern>(typeConverter, &getContext(),
-                                        specific_benefit);
   patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
   patterns.insert<TensorExportPattern, TensorImportPattern>(
       typeConverter, &getContext(), specific_benefit);
   patterns.insert<ExecutableSourcePattern, ExecutableExportPattern>(
       typeConverter, &getContext(), specific_benefit);
+
+  target.addDynamicallyLegalDialect<func::FuncDialect>(
+      [&](Operation *op) -> std::optional<bool> {
+        // Allow the func dialect within nested modules but not in the top-level
+        // one that represents the host program.
+        return op->getParentOfType<mlir::ModuleOp>() != getOperation();
+      });
+  patterns.insert<FuncFuncOpPattern>(typeConverter, &getContext(),
+                                     specific_benefit);
+  patterns.insert<FuncCallOpPattern>(typeConverter, &getContext(),
+                                     specific_benefit);
+  patterns.insert<FuncReturnOpPattern>(typeConverter, &getContext(),
+                                       specific_benefit);
 
 #define ONE_TO_ONE(SrcOpTy, TargetOpTy)                                        \
   patterns.insert<OneToOneConverionPattern>(                                   \

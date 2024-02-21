@@ -169,7 +169,7 @@ TEST(RoundingTest, UpToNextPow264) {
 
 TEST(F16ConversionTest, F32ToF16) {
   constexpr float kF16Max = 65504.f;
-  constexpr float kF16Min = 0.0000610351563f;
+  constexpr float kF16Min = 1.f / 16384.f;
   // Within range, normal truncation.
   EXPECT_EQ(0x3400, iree_math_f32_to_f16(0.25f));
   EXPECT_EQ(0xd646, iree_math_f32_to_f16(-100.375f));
@@ -201,7 +201,7 @@ TEST(F16ConversionTest, F32ToF16) {
 
 TEST(F16ConversionTest, F32ToF16ToF32) {
   constexpr float kF16Max = 65504.f;
-  constexpr float kF16Min = 0.0000610351563f;
+  constexpr float kF16Min = 1.f / 16384.f;
   // Within range, should just round.
   EXPECT_EQ(0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(0.25f)));
   EXPECT_EQ(-0.25f, iree_math_f16_to_f32(iree_math_f32_to_f16(-0.25f)));
@@ -256,6 +256,10 @@ TEST(F16ConversionTest, F32ToF16ToF32) {
   float nan = iree_math_f16_to_f32(iree_math_f32_to_f16(NAN));
   EXPECT_NE(nan, nan);
 }
+
+//==============================================================================
+// Bfloat16 support
+//==============================================================================
 
 TEST(BF16ConversionTest, F32ToBF16) {
   // Within range, normal truncation.
@@ -316,6 +320,206 @@ TEST(BF16ConversionTest, F32ToBF16ToF32) {
   EXPECT_EQ(-INFINITY, iree_math_bf16_to_f32(iree_math_f32_to_bf16(-INFINITY)));
   // Check that the result is a Nan with nan != nan.
   float nan = iree_math_bf16_to_f32(iree_math_f32_to_bf16(NAN));
+  EXPECT_NE(nan, nan);
+}
+
+//==============================================================================
+// F8E5M2 support
+//==============================================================================
+
+TEST(F8E5M2ConversionTest, F32ToF8E5M2) {
+  // See https://arxiv.org/pdf/2209.05433.pdf, Table 1.
+  constexpr float kF8E5M2Max = 57344.f;
+  constexpr float kF8E5M2Min = 1.f / 16384.f;
+  // Within range, normal truncation.
+  EXPECT_EQ(0x34, iree_math_f32_to_f8e5m2(0.25f));
+  EXPECT_EQ(0xd6, iree_math_f32_to_f8e5m2(-100.375f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e5m2(49152.f));
+  EXPECT_EQ(0xFA, iree_math_f32_to_f8e5m2(-49152.f));
+  EXPECT_EQ(0x7B, iree_math_f32_to_f8e5m2(kF8E5M2Max));
+  EXPECT_EQ(0xFB, iree_math_f32_to_f8e5m2(-kF8E5M2Max));
+  EXPECT_EQ(0x04, iree_math_f32_to_f8e5m2(kF8E5M2Min));
+  EXPECT_EQ(0x84, iree_math_f32_to_f8e5m2(-kF8E5M2Min));
+  // Infinity
+  EXPECT_EQ(0x7c, iree_math_f32_to_f8e5m2(INFINITY));
+  EXPECT_EQ(0xfc, iree_math_f32_to_f8e5m2(-INFINITY));
+  // Overflow
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e5m2(FLT_MAX));
+  EXPECT_EQ(0xFC, iree_math_f32_to_f8e5m2(-FLT_MAX));
+  // Important case to test: overflow due to rounding to nearest-even of 61440
+  // to 65536.
+  EXPECT_EQ(0x7B, iree_math_f32_to_f8e5m2(61439.f));
+  EXPECT_EQ(0xFB, iree_math_f32_to_f8e5m2(-61439.f));
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e5m2(61440.f));
+  EXPECT_EQ(0xFC, iree_math_f32_to_f8e5m2(-61440.f));
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e5m2(65536.f));
+  EXPECT_EQ(0xFC, iree_math_f32_to_f8e5m2(-65536.f));
+  // Underflow
+  EXPECT_EQ(0, iree_math_f32_to_f8e5m2(FLT_MIN));
+  EXPECT_EQ(0x80, iree_math_f32_to_f8e5m2(-FLT_MIN));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  uint16_t positive_denormal = iree_math_f32_to_f8e5m2(kF8E5M2Min / 2);
+  EXPECT_TRUE(positive_denormal == 0 || positive_denormal == 0x02);
+  uint16_t negative_denormal = iree_math_f32_to_f8e5m2(-kF8E5M2Min / 2);
+  EXPECT_TRUE(negative_denormal == 0x80 || negative_denormal == 0x82);
+}
+
+TEST(F8E5M2ConversionTest, F32ToF8E5M2ToF32) {
+  // See https://arxiv.org/pdf/2209.05433.pdf, Table 1.
+  constexpr float kF8E5M2Max = 57344.f;
+  constexpr float kF8E5M2Min = 1.f / 16384.f;
+  // Within range, should just round.
+  EXPECT_EQ(0.25f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(0.25f)));
+  EXPECT_EQ(-0.25f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-0.25f)));
+  EXPECT_EQ(96.f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(100.375f)));
+  EXPECT_EQ(-96.f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-100.375f)));
+  EXPECT_EQ(96.f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(96.f)));
+  EXPECT_EQ(-96.f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-96.f)));
+  EXPECT_EQ(kF8E5M2Max,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Max)));
+  EXPECT_EQ(-kF8E5M2Max,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-kF8E5M2Max)));
+  EXPECT_EQ(kF8E5M2Min,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Min)));
+  EXPECT_EQ(-kF8E5M2Min,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-kF8E5M2Min)));
+  // Powers of two should always be exactly representable across the
+  // exponent range.
+  EXPECT_EQ(32768.f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(32768.f)));
+  EXPECT_EQ(-32768.f,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-32768.f)));
+  // Overflow
+  EXPECT_EQ(INFINITY,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(FLT_MAX)));
+  EXPECT_EQ(-INFINITY,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-FLT_MAX)));
+  EXPECT_GT(kF8E5M2Max + 1.f,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Max + 1.f)));
+  // Underflow
+  EXPECT_EQ(0.0f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(FLT_MIN)));
+  EXPECT_EQ(0.0f, iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-FLT_MIN)));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  float positive_denormal =
+      iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(kF8E5M2Min / 2));
+  EXPECT_TRUE(positive_denormal == 0.0f ||
+              positive_denormal == 3.05175781e-05f);
+  // Inf and Nan
+  EXPECT_EQ(INFINITY,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(INFINITY)));
+  EXPECT_EQ(-INFINITY,
+            iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(-INFINITY)));
+  // Check that the result is a Nan with nan != nan.
+  float nan = iree_math_f8e5m2_to_f32(iree_math_f32_to_f8e5m2(NAN));
+  EXPECT_NE(nan, nan);
+}
+
+//==============================================================================
+// F8E4M3 support
+//==============================================================================
+
+TEST(F8E4M3ConversionTest, F32ToF8E4M3) {
+  // See https://arxiv.org/pdf/2209.05433.pdf, Table 1.
+  // The F8E4M3 format is special: it has no infinities, and has some larger
+  // finite values instead.
+  constexpr float kF8E4M3Max = 448.f;
+  constexpr float kF8E4M3Min = 1.f / 64.f;
+  // Within range, normal truncation.
+  EXPECT_EQ(0x28, iree_math_f32_to_f8e4m3(0.25f));
+  EXPECT_EQ(0xED, iree_math_f32_to_f8e4m3(-100.375f));
+  // Extra large finite values thanks to not having infinities.
+  EXPECT_EQ(0x78, iree_math_f32_to_f8e4m3(256.0f));
+  EXPECT_EQ(0x79, iree_math_f32_to_f8e4m3(288.0f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3(320.0f));
+  EXPECT_EQ(0x7B, iree_math_f32_to_f8e4m3(352.0f));
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e4m3(384.0f));
+  EXPECT_EQ(0x7D, iree_math_f32_to_f8e4m3(416.0f));
+  EXPECT_EQ(0x7E, iree_math_f32_to_f8e4m3(kF8E4M3Max));
+  EXPECT_EQ(0xFE, iree_math_f32_to_f8e4m3(-kF8E4M3Max));
+  // Min normal values.
+  EXPECT_EQ(0x08, iree_math_f32_to_f8e4m3(kF8E4M3Min));
+  EXPECT_EQ(0x88, iree_math_f32_to_f8e4m3(-kF8E4M3Min));
+  // Infinity
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e4m3(INFINITY));
+  EXPECT_EQ(0xfF, iree_math_f32_to_f8e4m3(-INFINITY));
+  // Overflow
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e4m3(FLT_MAX));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e4m3(-FLT_MAX));
+  // Test some round-to-nearest-even behavior.
+  EXPECT_EQ(0x70, iree_math_f32_to_f8e4m3(136.0f));
+  EXPECT_EQ(0x72, iree_math_f32_to_f8e4m3(152.0f));
+  EXPECT_EQ(0x72, iree_math_f32_to_f8e4m3(168.0f));
+  EXPECT_EQ(0x74, iree_math_f32_to_f8e4m3(184.0f));
+  EXPECT_EQ(0x78, iree_math_f32_to_f8e4m3(272.0f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3(304.0f));
+  EXPECT_EQ(0x7A, iree_math_f32_to_f8e4m3(336.0f));
+  EXPECT_EQ(0x7C, iree_math_f32_to_f8e4m3(368.0f));
+  // Important case to test: overflow due to rounding to nearest-even of 465
+  // to 512, while 464 gets rounded to nearest-even 448, not overflowing.
+  EXPECT_EQ(0x7E, iree_math_f32_to_f8e4m3(464.f));
+  EXPECT_EQ(0xFE, iree_math_f32_to_f8e4m3(-464.f));
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e4m3(465.f));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e4m3(-465.f));
+  // Largest float value in the same exponent bucket, a tricky case.
+  EXPECT_EQ(0x7F, iree_math_f32_to_f8e4m3(511.f));
+  EXPECT_EQ(0xFF, iree_math_f32_to_f8e4m3(-511.f));
+  // Underflow
+  EXPECT_EQ(0, iree_math_f32_to_f8e4m3(FLT_MIN));
+  EXPECT_EQ(0x80, iree_math_f32_to_f8e4m3(-FLT_MIN));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  uint8_t positive_denormal = iree_math_f32_to_f8e4m3(kF8E4M3Min / 2);
+  EXPECT_TRUE(positive_denormal == 0 || positive_denormal == 0x04);
+  uint8_t negative_denormal = iree_math_f32_to_f8e4m3(-kF8E4M3Min / 2);
+  EXPECT_TRUE(negative_denormal == 0x80 || negative_denormal == 0x84);
+}
+
+TEST(F8E4M3ConversionTest, F32ToF8E4M3ToF32) {
+  // See https://arxiv.org/pdf/2209.05433.pdf, Table 1.
+  // The F8E4M3 format is special: it has no infinities, and has some larger
+  // finite values instead.
+  constexpr float kF8E4M3Max = 448.f;
+  constexpr float kF8E4M3Min = 1.f / 64.f;
+  // Within range, should just round.
+  EXPECT_EQ(0.25f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(0.25f)));
+  EXPECT_EQ(-0.25f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-0.25f)));
+  EXPECT_EQ(104.f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(100.375f)));
+  EXPECT_EQ(-104.f,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-100.375f)));
+  EXPECT_EQ(104.f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(100.4f)));
+  EXPECT_EQ(-104.f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-100.4f)));
+  EXPECT_EQ(kF8E4M3Max,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(kF8E4M3Max)));
+  EXPECT_EQ(-kF8E4M3Max,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-kF8E4M3Max)));
+  EXPECT_EQ(kF8E4M3Min,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(kF8E4M3Min)));
+  EXPECT_EQ(-kF8E4M3Min,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-kF8E4M3Min)));
+  // Powers of two should always be exactly representable across the
+  // exponent range.
+  EXPECT_EQ(256.f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(256.f)));
+  EXPECT_EQ(-256.f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-256.f)));
+  // Overflow
+  EXPECT_TRUE(
+      std::isnan(iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(FLT_MAX))));
+  EXPECT_TRUE(
+      std::isnan(iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-FLT_MAX))));
+  EXPECT_GT(kF8E4M3Max + 1.f,
+            iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(kF8E4M3Max + 1.f)));
+  // Underflow
+  EXPECT_EQ(0.0f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(FLT_MIN)));
+  EXPECT_EQ(0.0f, iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-FLT_MIN)));
+  // Denormals may or may not get flushed to zero. Accept both ways.
+  float positive_denormal =
+      iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(kF8E4M3Min / 2));
+  EXPECT_TRUE(positive_denormal == 0.0f ||
+              positive_denormal == 3.05175781e-05f);
+  // Inf and Nan
+  EXPECT_TRUE(
+      std::isnan(iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(INFINITY))));
+  EXPECT_TRUE(
+      std::isnan(iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(-INFINITY))));
+  // Check that the result is a Nan with nan != nan.
+  float nan = iree_math_f8e4m3_to_f32(iree_math_f32_to_f8e4m3(NAN));
   EXPECT_NE(nan, nan);
 }
 

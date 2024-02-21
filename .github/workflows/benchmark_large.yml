@@ -59,9 +59,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
     needs: [setup, build_all]
@@ -70,9 +70,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      build-dir: ${{ needs.build_all.outputs.build-dir }}
-      build-dir-archive: ${{ needs.build_all.outputs.build-dir-archive }}
-      build-dir-gcs-artifact: ${{ needs.build_all.outputs.build-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
       benchmark-presets: cuda-large,comp-stats-large,x86_64-large
       build-default-benchmark-suites: 0
       # Please keep the shard count default value in sync with on.workflow_dispatch.shard-count.default

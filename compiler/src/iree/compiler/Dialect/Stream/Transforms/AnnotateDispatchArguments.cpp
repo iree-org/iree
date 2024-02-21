@@ -16,13 +16,13 @@
 #include "llvm/Support/Alignment.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-annotate-dispatch-arguments"
@@ -332,8 +332,8 @@ public:
   explicit ArgumentAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
-    explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+        TraversalAction::RECURSE);
     explorer.setDialectAction<IREE::Stream::StreamDialect>(
         TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).

@@ -5,7 +5,7 @@
 // expects us to clean up.
 
 // CHECK-LABEL: @multiUseTiedOperand
-func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+util.func public @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -22,8 +22,8 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
   %clone1 = stream.async.clone %splat : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c789_i32, %[[SPLAT]]
   %fill1 = stream.async.fill %c789_i32, %clone1[%c128 to %c256 for %c128] : i32 -> %3 as !stream.resource<*>{%size}
-  // CHECK: return %[[FILL0]], %[[FILL1]]
-  return %fill0, %fill1 : !stream.resource<*>, !stream.resource<*>
+  // CHECK: util.return %[[FILL0]], %[[FILL1]]
+  util.return %fill0, %fill1 : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----
@@ -34,7 +34,7 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
 
 // CHECK-LABEL: @argMoveCallee
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>
-func.func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+util.func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -42,16 +42,16 @@ func.func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !st
   %clone = stream.async.clone %arg : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[ARG0]]
   %fill = stream.async.fill %c123_i32, %clone[%c0 to %c128 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  // CHECK: return %[[FILL]]
-  return %fill : !stream.resource<*>
+  // CHECK: util.return %[[FILL]]
+  util.return %fill : !stream.resource<*>
 }
 // CHECK: @argMoveCaller
-func.func @argMoveCaller(%size: index) -> !stream.resource<*> {
+util.func public @argMoveCaller(%size: index) -> !stream.resource<*> {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
-  %result = call @argMoveCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
-  return %result : !stream.resource<*>
+  %result = util.call @argMoveCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %result : !stream.resource<*>
 }
 
 // -----
@@ -60,7 +60,7 @@ func.func @argMoveCaller(%size: index) -> !stream.resource<*> {
 // call and passed by const-reference.
 
 // CHECK-LABEL: @argCopyCallee
-func.func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+util.func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -68,15 +68,15 @@ func.func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !st
   %clone = stream.async.clone %arg : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: stream.async.fill
   %fill = stream.async.fill %c123_i32, %clone[%c0 to %c128 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  return %fill : !stream.resource<*>
+  util.return %fill : !stream.resource<*>
 }
 // CHECK: @argCopyCaller
-func.func @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+util.func public @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
-  %result = call @argCopyCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
-  return %splat, %result : !stream.resource<*>, !stream.resource<*>
+  %result = util.call @argCopyCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  util.return %splat, %result : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----
@@ -90,7 +90,7 @@ func.func @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource
 
 // CHECK-LABEL: @blockArgMove
 // CHECK-SAME: (%[[COND:.+]]: i1
-func.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+util.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -118,5 +118,5 @@ func.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>
   cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
-  return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
+  util.return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
 }

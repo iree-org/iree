@@ -10,22 +10,6 @@
 
 iree_add_all_subdirs()
 
-iree_lit_test_suite(
-  NAME
-    lit
-  SRCS
-    "tensor_cast.mlir"
-  TOOLS
-    FileCheck
-    iree-benchmark-module
-    iree-compile
-    iree-run-mlir
-  LABELS
-    "driver=local-task"
-    "driver=vulkan"
-    "hostonly"
-)
-
 iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
@@ -33,6 +17,8 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
+    "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -48,6 +34,8 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
+    "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
   TARGET_BACKEND
@@ -96,6 +84,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "extract_slice.mlir"
+    "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
   TARGET_BACKEND
     "vulkan-spirv"

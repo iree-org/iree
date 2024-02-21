@@ -84,7 +84,7 @@ struct InstrumentMemoryAccessesPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInstrumentMemoryAccessesPass() {
   return std::make_unique<InstrumentMemoryAccessesPass>();
 }

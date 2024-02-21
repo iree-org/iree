@@ -14,13 +14,17 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "amdgpu_chained_matmul.mlir"
+    "amdgpu_contraction_distribution.mlir"
     "attention.mlir"
+    "attention_mfma.mlir"
     "cast_address_space_function.mlir"
     "config_matvec.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
     "create_async_groups.mlir"
+    "create_tile_sizes.mlir"
     "distribute_to_thread.mlir"
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"
@@ -51,10 +55,14 @@ iree_lit_test_suite(
     "transform_dialect_pack_shared_memory_alloc.mlir"
     "transform_dialect_promote_operands.mlir"
     "transform_dialect_vector_distribution.mlir"
+    "transform_dialect_vector_to_nvgpu_mma.mlir"
     "transform_distribute_forall.mlir"
     "transform_gpu_pipelining.mlir"
     "transform_vector_to_mma.mlir"
     "transpose_pipeline_test.mlir"
+    "ukernel_pipeline_transform.mlir"
+    "vector_distribute_conversion.mlir"
+    "vector_distribute_layout.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
     "workgroup_specialization_pipeline_test.mlir"
@@ -62,6 +70,7 @@ iree_lit_test_suite(
     FileCheck
     iree-opt
   DATA
+    attention_mfma_transform_spec.mlir
     attention_transform_spec.mlir
     transform_dialect_codegen_bufferize_spec.mlir
     transform_dialect_codegen_foreach_to_gpu_spec.mlir

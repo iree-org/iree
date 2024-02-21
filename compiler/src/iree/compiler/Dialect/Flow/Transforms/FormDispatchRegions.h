@@ -25,7 +25,7 @@ public:
 
 protected:
   void notifyOperationRemoved(Operation *op) override;
-  void notifyOperationInserted(Operation *op) override;
+  void notifyOperationInserted(Operation *op, InsertPoint previous) override;
 
 private:
   SmallPtrSet<Operation *, 16> dimOps;
@@ -33,7 +33,7 @@ private:
 
 } // namespace mlir
 
-namespace mlir ::iree_compiler::IREE::Flow {
+namespace mlir::iree_compiler::IREE::Flow {
 
 /// Computes the workload and provides a workload region builder for the given
 /// root op.

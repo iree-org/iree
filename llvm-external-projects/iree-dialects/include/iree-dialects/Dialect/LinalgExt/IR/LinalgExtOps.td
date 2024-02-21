@@ -552,7 +552,8 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs
+                       Variadic<AnyShaped>:$outputs,
+                       DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
   );
 
   let builders = [
@@ -611,7 +612,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     std::optional<ShapedType> getSumType() {
       if (!getSum().has_value())
         return std::nullopt;
-      return (*getSum()).getType().cast<ShapedType>();      
+      return (*getSum()).getType().cast<ShapedType>();
     }
     int64_t getQueryRank() {
       return getQueryType().getRank();

@@ -11,7 +11,6 @@ set -xeuo pipefail
 ROOT_DIR="${ROOT_DIR:-$(git rev-parse --show-toplevel)}"
 cd "${ROOT_DIR}"
 
-BUILD_DIR="$1"
 IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
 IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 
@@ -19,14 +18,15 @@ IREE_LLVM_CPU_DISABLE="${IREE_LLVM_CPU_DISABLE:-0}"
 # Disable the tests by default to reduce the test time.
 IREE_VMVX_DISABLE="${IREE_VMVX_DISABLE:-1}"
 
-source "${BUILD_DIR}/.env" && export PYTHONPATH
-source build_tools/cmake/setup_tf_python.sh
+python3 -m pip install lit
+LIT_SCRIPT="$(which lit)"
+
+source build_tools/scripts/setup_tf_python.sh
 
 echo "***** Running TensorFlow integration tests *****"
+
 # TODO: Use "--timeout 900" instead of --max-time below. Requires that
 # `psutil` python package be installed in the VM for per test timeout.
-LIT_SCRIPT="${ROOT_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py"
-
 CMD=(
   python3
   "${LIT_SCRIPT}"

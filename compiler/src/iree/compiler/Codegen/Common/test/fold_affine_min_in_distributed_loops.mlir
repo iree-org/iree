@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-fold-affinemin-in-distributed-loops --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-fold-affinemin-in-distributed-loops))" --mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: func.func @loop_distributed_to_workgroup_x
 func.func @loop_distributed_to_workgroup_x() -> index {

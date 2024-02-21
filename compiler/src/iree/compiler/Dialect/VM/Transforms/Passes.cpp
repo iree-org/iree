@@ -24,7 +24,8 @@
 
 namespace mlir::iree_compiler::IREE::VM {
 
-using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest =
+    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 //===----------------------------------------------------------------------===//
 // Utilities
@@ -73,12 +74,15 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   // rem/div ops that we can never safely remove inside of the hot inner loop
   // and that sucks. We still have this here for now as the cost of the rem/div
   // are less than the cost of an additional loop that this could remove.
-  passManager.addNestedPass<mlir::func::FuncOp>(
-      affine::createLoopCoalescingPass());
+  passManager.addNestedPass<func::FuncOp>(affine::createLoopCoalescingPass());
 
   FunctionLikeNest(passManager)
       .addPass(mlir::createLoopInvariantCodeMotionPass)
       .addPass(mlir::createConvertSCFToCFPass)
+      // TODO: Maybe this should be a part of Affine lowering pass.
+      // Remove if it is added there.
+      // https://github.com/llvm/llvm-project/issues/78458
+      .addPass(affine::createAffineExpandIndexOpsPass)
       .addPass(mlir::createLowerAffinePass)
       .addPass(mlir::arith::createArithUnsignedWhenEquivalentPass);
 

@@ -11,7 +11,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -144,7 +143,7 @@ struct FoldBufferViewCreateSubspan
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
     });
@@ -232,7 +231,7 @@ struct FoldCommandBufferFillBufferSubspans
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getTargetBufferMutable().assign(newTargetBuffer);
       op.getTargetOffsetMutable().assign(newTargetOffset);
     });
@@ -282,7 +281,7 @@ struct FoldCommandBufferCopyBufferSubspans
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getSourceBufferMutable().assign(newSourceBuffer);
       op.getSourceOffsetMutable().assign(newSourceOffset);
       op.getTargetBufferMutable().assign(newTargetBuffer);
@@ -328,7 +327,7 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
     rewriter.restoreInsertionPoint(ip);
     if (!needsUpdate)
       return failure();
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       auto mutableBindingBuffers = op.getBindingBuffersMutable();
       mutableBindingBuffers.clear();
       mutableBindingBuffers.append(bindingBuffers);
@@ -531,24 +530,24 @@ struct ElideDeviceQueueBarrierOp
       return rewriter.notifyMatchFailure(barrierOp, "signaling op not found");
     }
 
-    rewriter.startRootUpdate(signalingOp);
+    rewriter.startOpModification(signalingOp);
 
     // Try to move the fence producer before the signaling op. This will fail if
     // the op creating the fence has dependencies with hazards.
     if (!IREE::Util::tryMoveProducerBefore(newFence, signalingOp)) {
-      rewriter.cancelRootUpdate(signalingOp);
+      rewriter.cancelOpModification(signalingOp);
       return rewriter.notifyMatchFailure(barrierOp,
                                          "fence is not usable by signaling op");
     }
 
     // Rewrite the signaling op to signal the barrier fence.
     if (failed(updateOpToSignalFence(signalingOp, newFence))) {
-      rewriter.cancelRootUpdate(signalingOp);
+      rewriter.cancelOpModification(signalingOp);
       return rewriter.notifyMatchFailure(barrierOp,
                                          "unrecognized signaling op");
     }
 
-    rewriter.finalizeRootUpdate(signalingOp);
+    rewriter.finalizeOpModification(signalingOp);
 
     // Elide the barrier. The fence should be cleaned up as part of DCE.
     rewriter.eraseOp(barrierOp);
@@ -669,7 +668,7 @@ struct MergeExecutableConstantBlocks
                                          "not enough blocks to merge");
     }
 
-    rewriter.startRootUpdate(variantOp);
+    rewriter.startOpModification(variantOp);
 
     // Gather all constants initialized by the blocks.
     SmallVector<Location> blockLocs;
@@ -750,7 +749,7 @@ struct MergeExecutableConstantBlocks
                targetRegion.getOps<IREE::HAL::ReturnOp>())) {
         llvm::append_range(resultValues, returnOp.getOperands());
         OpBuilder(returnOp).create<cf::BranchOp>(returnOp.getLoc(), nextBlock);
-        returnOp.erase();
+        rewriter.eraseOp(returnOp);
       }
     }
 
@@ -758,7 +757,7 @@ struct MergeExecutableConstantBlocks
     OpBuilder::atBlockBegin(postBlock).create<IREE::HAL::ReturnOp>(
         fusedLoc, resultValues);
 
-    rewriter.finalizeRootUpdate(variantOp);
+    rewriter.finalizeOpModification(variantOp);
 
     // Erase all the old blocks.
     for (auto blockOp : blockOps) {
@@ -802,7 +801,7 @@ struct DropUnusedExecutableConstantBlockDeviceArg
     auto deviceArg = blockOp.getArgument(0);
     if (!deviceArg.use_empty())
       return failure();
-    rewriter.updateRootInPlace(blockOp, [&]() {
+    rewriter.modifyOpInPlace(blockOp, [&]() {
       blockOp.eraseArgument(0);
       blockOp.setFunctionTypeAttr(TypeAttr::get(
           rewriter.getFunctionType(/*inputs=*/{}, blockOp.getResultTypes())));
@@ -839,7 +838,7 @@ struct DeduplicateExecutableConstantBlockKeys
     }
 
     // Update function in-place.
-    rewriter.updateRootInPlace(blockOp, [&]() {
+    rewriter.modifyOpInPlace(blockOp, [&]() {
       // Update metadata.
       blockOp.setFunctionTypeAttr(TypeAttr::get(
           rewriter.getFunctionType(blockOp.getArgumentTypes(), resultTypes)));

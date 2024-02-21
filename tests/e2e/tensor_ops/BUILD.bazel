@@ -5,31 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
-)
-
-iree_lit_test_suite(
-    name = "lit",
-    srcs = [
-        "tensor_cast.mlir",
-    ],
-    cfg = "//tests:lit.cfg.py",
-    tags = [
-        "driver=local-task",
-        "driver=vulkan",
-        "hostonly",
-    ],
-    tools = [
-        "//tools:iree-benchmark-module",
-        "//tools:iree-compile",
-        "//tools:iree-run-mlir",
-        "@llvm-project//llvm:FileCheck",
-    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -40,13 +20,13 @@ iree_check_single_backend_test_suite(
             "extract_slice.mlir",
             "pack.mlir",
             "pack_dynamic_inner_tiles.mlir",
+            "pack_i8.mlir",
+            "tensor_cast.mlir",
             "tensor_insert_slice.mlir",
             "unpack.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "tensor_cast.mlir",
-        ],
+        exclude = [],
     ),
     driver = "local-task",
     target_backend = "llvm-cpu",
@@ -60,13 +40,13 @@ iree_check_single_backend_test_suite(
             "extract_slice.mlir",
             "pack.mlir",
             "pack_dynamic_inner_tiles.mlir",
+            "pack_i8.mlir",
+            "tensor_cast.mlir",
             "tensor_insert_slice.mlir",
             "unpack.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "tensor_cast.mlir",
-        ],
+        exclude = [],
     ),
     driver = "local-task",
     target_backend = "vmvx",
@@ -105,6 +85,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "pack_dynamic_inner_tiles.mlir",
+            "pack_i8.mlir",
             "tensor_cast.mlir",
             "unpack.mlir",
         ],
@@ -126,13 +107,14 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "extract_slice.mlir",
+            "tensor_cast.mlir",
             "tensor_insert_slice.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "pack.mlir",
             "pack_dynamic_inner_tiles.mlir",
-            "tensor_cast.mlir",
+            "pack_i8.mlir",
             "unpack.mlir",
         ],
     ),

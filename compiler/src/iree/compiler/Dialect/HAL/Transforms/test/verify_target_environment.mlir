@@ -2,28 +2,28 @@
 
 // expected-error@+1 {{no HAL target devices specified}}
 module @module {
-  func.func private @func() -> ()
+  util.func private @func() -> ()
 }
 
 // -----
 
 // expected-error@+1 {{no HAL target devices specified}}
 module @module attributes {hal.device.targets = []} {
-  func.func private @func() -> ()
+  util.func private @func() -> ()
 }
 
 // -----
 
 // expected-error@+1 {{invalid target attr type}}
 module @module attributes {hal.device.targets = ["wrong_type"]} {
-  func.func private @func() -> ()
+  util.func private @func() -> ()
 }
 
 // -----
 
 // expected-error@+1 {{unregistered target backend "foo"}}
 module @module attributes {hal.device.targets = [#hal.device.target<"foo">]} {
-  func.func private @func() -> ()
+  util.func private @func() -> ()
 }
 
 // -----
@@ -35,7 +35,7 @@ module @module attributes {hal.device.targets = [#hal.device.target<"foo">]} {
 
 // CHECK: module @module attributes {hal.device.targets = [#device_target_vmvx]}
 module @module attributes {hal.device.targets = [#device_target_vmvx]} {
-  func.func private @func() -> ()
+  util.func private @func() -> ()
 }
 
 // -----

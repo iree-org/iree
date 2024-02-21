@@ -1,155 +1,38 @@
-IREE Microkernels Library: `libukernel`
-=======================================
+# Microkernels library
 
-This library provides builtin microkernels to both the IREE VMVX module for
-runtime linkage and the IREE compiler for ahead-of-time compilation. Each
-deployment approach has tradeoffs and the intent with this library is to share
-the same compiler passes/infrastructure for emitting the microkernel ops and
-the same microkernel implementations.
+## Walk-through presentation
 
-## Runtime Linkage
+Here is a walk-through of how ukernels are built and used in IREE:
+https://gist.github.com/bjacob/2c160c102cee33562826c730945b49f2
 
-For deployments targeting the IREE VM the compiler will produce .vmfb modules
-that use the VMVX module (`iree/modules/vmvx/module.c`). The code in this
-library is linked into the runtime VMVX module and called via the VM FFI:
-```
-                     +------------+      +---------+      +================+
-                     | input.mlir | ---> | codegen | ---> |  iree-compile  |
-                     +------------+      +---------+      +================+
-                                                                  |
-                                                                  v
-+-----------+      +------------+      +--------------+    +--------------+
-| mmt4d_*.c | ---> | C compiler | ---> | libukernel.a |    | .vmfb module |
-+-----------+      +------------+      +--------------+    +--------------+
-                                             |                    |
-                                             v                    v
-                                 +-------------------+      +============+
-                                 | iree/modules/vmvx | ---> | VM context |
-                                 +-------------------+      +============+
-```
+## What is a microkernel?
 
-As the definition of the VMVX ops in the compiler have to match the ones in the
-runtime the interface is difficult to change without breaking binary
-compatibility. Because of this the exported VMVX methods are intended to be
-generic, stable, and consistent across platforms. The microkernels in this
-library are insulated by the VMVX module layer which can perform versioning and
-provide fallbacks as needed.
+A microkernel (abbreviated as "ukernel") is a function that can be used as a lowering for a MLIR arithmetic operation. Specifically, in the IREE Codegen dialect we define a `ukernel.generic` operation which takes a "ukernel function name" attribute and gets lowered to a `func.call` op calling the specified function. This directory is where we build the functions that can be used for that purpose.
 
-## Ahead-of-time Linkage
+## What can ukernels do?
 
-For deployments using ahead-of-time compilation the library is compiled to
-bitcode files that are loaded and linked while producing the generated code:
-```
-+-----------+      +-------+      +-------------------------------+
-| mmt4d_*.c | ---> | clang | ---> |+--------------------------------+
-+-----------+      +-------+      +| libukernel_[arch]_[variant].bc |
-                                   +--------------------------------+
-                                                  |||
-                                                  vvv
-      +------------+      +---------+      +================+
-      | input.mlir | ---> | codegen | ---> |  iree-compile  |
-      +------------+      +---------+      +================+
-                                                   |
-                      +----------------------------+
-                      v                            v
-         +------------------------+   +----------------------------+
-         | static library (.o/.a) |   | dynamic library (.so/.dll) |
-         +------------------------+   +----------------------------+
-```
+Ukernels can:
+* Perform arithmetic, and access (read and write) memory buffers passed to them as pointer and strides arguments.
 
-By linking the generated code together with the library bitcode the compiler can
-perform intra-procedural optimization to efficiently cull unused code paths and
-propagate known-constant values. The compiler outputs are hermetic and avoid
-version skew between the compiler and the runtime.
+Ukernels cannot:
+* Use any library, not even the C standard library.
+  * In particular, ukernels can't allocate memory. Any buffer needs to be passed to it by the caller.
+  * Ukernels can't even #include C standard library headers. Depending on the toolchain/platform, even stdint.h can bring in OS dependencies.
+* Specialize for or interface with the operating system in any way.
+  * If a ukernel needs information that would typically come from the OS, such as CPU identification details, that information needs to be passed to them as an argument, moving the problem to the caller.
+  * Ukernels are built once for each target architecture, not for each target platform. Different platforms (e.g. Windows vs Linux) need to be able to share the exact same ukernel code.
+* Have side effects, besides writing to destination buffers.
+* Have state, such as accessing globals.
+* Be non-reentrant. Ukernels will be called concurrently on multiple threads.
 
-## Bitcode Files
+## How are ukernels compiled?
 
-The IREE compiler embeds bitcode files and when producing executable libraries
-will select one for linkage based on the specified target machine. As these
-bitcode files can only be produced by a cross-compilation-enabled Clang they are
-built offline and checked into the repository. Future improvements to the
-compiler could also allow for external files to be specified to avoid the need
-to rebuild the compiler however for now this keeps things simple and hermetic.
+Ukernels are typically built in two different ways:
+1. Ukernels are compiled to LLVM bitcode using the `iree_bitcode_library` function for CPU ukernels, and analogous functions for GPU ukernels. The resulting `.bc` bitcode files are then embedded as static data in the IREE compiler. This works in exactly the same way in the CMake and Bazel builds.
+    * The IREE compiler also allows passing external ukernel bitcode files, allowing to use externally built ukernels.
+2. Ukernels are also built as a normal library using the native toolchain. This is mostly used for local development, testing and benchmarking. This part is only fully implemented with CMake with all the architecture-specific code paths, while the Bazel build only has a minimal stub with architecture-specific code paths left out.
+    * There is only one way in which this native-toolchain build of ukernels is actually used in IREE: with the VMVX back-end, ukernels are supported by linking this native ukernel code into the VMVX module, which is part of the IREE runtime.
 
-Usage is currently not wired up in the compiler but will look very similar to
-the `iree/builtins/device/` approach.
+## Unit-tests and microbenchmarks
 
-## Engineering Requirements
-
-As this library is directly merged into the compiler-generated code there are
-specific restrictions as to what can be used inherited from the IREE executable
-requirements:
-
-* No mutable globals/static variables or thread-local storage
-* No syscalls
-* No libc calls outside of builtins (like memset/memcpy) - _no mallocs_!
-
-Though precompiled bitcode files only need to work with Clang the library may
-also be built on other toolchains such as GCC and MSVC (or older version of
-Clang). When standard intrinsics are used this will generally not be a problem
-however inline assembly may need compiler-specific variants or at least
-exclusions that fall back to generic paths.
-
-### Compile-time Configuration
-
-Preprocessor statements used to control behavior must only use information known
-when the bitcode files are being compiled. This means that if the bitcode file
-being produced is for AArch64 it is safe to use the `__aarch64__` macro.
-Information that is only available after the bitcode file is produced - such as
-in the IREE compiler pipelines - must use link-time configuration.
-
-### Link-time Configuration
-
-As we are producing bitcode files we cannot rely on the C preprocessor for
-changing behavior based on some information only known during linking. In other
-cases we may want to specialize code paths based on knowledge about the context
-in which the kernels are used. To provide this link-time modification ability
-there is support for flags by way of `extern` globals. These globals are either
-specified by the IREE compiler when linking the bitcode or by the hosting
-application when linked statically.
-
-For example, this flag can be specified by either passing a define when
-compiling the library for standalone/VMVX use or using the
-`overridePlatformGlobal` helper when emitting LLVM IR in the IREE compiler:
-```c
-#if defined(IREE_UK_PLATFORM_EXAMPLE_FLAG)
-static const int iree_microkernels_platform_example_flag =
-    IREE_UK_PLATFORM_EXAMPLE_FLAG;
-#else
-extern int iree_microkernels_platform_example_flag;
-#endif  // IREE_UK_PLATFORM_EXAMPLE_FLAG
-```
-
-Any code may then use this flag to condition/control behavior:
-```c
-if (iree_microkernels_platform_example_flag >= 1) {
-  // Do something special.
-}
-```
-
-When linking libmicrokernels statically the flags can be provided by the hosting
-application via compiler defines:
-`-DIREE_UK_PLATFORM_EXAMPLE_FLAG=123`.
-
-When producing bitcode the flags are left symbolic and the IREE compiler
-provides their values:
-```c++
-overridePlatformGlobal(*bitcodeModule,
-                       "iree_microkernels_platform_example_flag", 123u);
-```
-
-What flags are useful and how to handle cases where flags are arch-dependent are
-still TBD.
-
-## Testing and Benchmarking
-
-[`tools/mmt4d_test.cc`](tools/mmt4d_test.cc) provides a gtest runner
-that compares the results of the optimized implementations for the target
-architecture against a reference implementation for correctness.
-
-[`tools/mmt4d_benchmark.c`](tools/mmt4d_benchmark.c) provides a
-benchmark suite for the optimized implementations of the target architecture.
-
-Both are compiled for the CMake target and can be used to develop
-implementations without the need to rebuild/run the compiler or produce full
-compiled artifacts that operate in the runtime.
+The `tools/` directory contains unit-tests and microbenchmarks for ukernels. It allows developing ukernels within this directory, as a self-contained C project.

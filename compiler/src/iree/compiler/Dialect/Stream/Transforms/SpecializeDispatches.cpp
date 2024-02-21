@@ -12,7 +12,6 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -20,6 +19,7 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-specialize-dispatches"
@@ -55,7 +55,7 @@ struct ConstantTable {
 // Each dispatch gets a row in the table that can be selected based on the
 // dispatch ordinal.
 static ConstantTable
-buildConstantTable(mlir::func::FuncOp funcOp,
+buildConstantTable(mlir::FunctionOpInterface funcOp,
                    SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto anyDispatchOp = dispatchOps.front();
   unsigned operandCount = anyDispatchOp.getUniformOperands().size();
@@ -163,7 +163,7 @@ static TypedAttr buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
 //
 // TODO(benvanik): maybe a dedicated lookup table op to make further combining
 // easier to do in a backend-generic way.
-static void insertConstantTableLookup(mlir::func::FuncOp funcOp,
+static void insertConstantTableLookup(mlir::FunctionOpInterface funcOp,
                                       ConstantTable &constantTable) {
   auto &entryBlock = funcOp.front();
   auto operandToArgMap =

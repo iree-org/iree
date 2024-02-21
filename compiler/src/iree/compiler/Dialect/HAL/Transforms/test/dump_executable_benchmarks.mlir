@@ -66,7 +66,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK: %[[BUFFER:.+]] = hal.allocator.allocate<%{{.+}} : !hal.allocator> affinity(%{{.+}}) type("DeviceVisible|DeviceLocal") usage("{{.+}}Dispatch{{.+}}") : !hal.buffer{%c768}
   // CHECK-NEXT: util.global.store %[[BUFFER]], @ex0_embedded_elf_x86_64_dispatch0_512_buffer : !hal.buffer
 
-  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch0_512(%arg0: i32)
+  // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch0_512(%arg0: i32)
   // CHECK-SAME: attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "dispatch"}} {
   // CHECK: %[[BATCH_SIZE:.+]] = arith.index_cast %arg0 : i32 to index
 
@@ -89,9 +89,13 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // CHECK-SAME:     target(@ex0::@embedded_elf_x86_64::@dispatch0)
   // CHECK-SAME:     workload([%c512])
 
+  // Get executable and target ordinal (outside of the loop).
+  // CHECK-DAG: %[[EXECUTABLE:.+]] = hal.executable.lookup device({{.+}}) executable(@ex0) : !hal.executable
+  // CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch0) : index
+
   // Dispatch up to batch size dispatches:
   // CHECK: scf.for %{{.+}} = %c0 to %[[BATCH_SIZE]] step %c1 {
-  // CHECK-NEXT: hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch0) workgroups([%[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]])
+  // CHECK-NEXT: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer> target(%[[EXECUTABLE:.+]] : !hal.executable)[%[[ORDINAL_0]]] workgroups([%[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]])
   // CHECK-NEXT: hal.command_buffer.execution_barrier
   // CHECK-NEXT: }
 
@@ -104,14 +108,16 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
   // ===========================================================================
 
   // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_512x1_buffer : !hal.buffer
-  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch1_512x1(%arg0: i32)
-  // CHECK:   hal.command_buffer.dispatch.symbol<%{{.+}} : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch1)
+  // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch1_512x1(%arg0: i32)
+  // CHECK:   %[[ORDINAL_1A:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch1) : index
+  // CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[ORDINAL_1A]]]
 
   // CHECK: util.global private mutable @ex0_embedded_elf_x86_64_dispatch1_128x32_buffer : !hal.buffer
-  // CHECK: func.func @ex0_embedded_elf_x86_64_dispatch1_128x32(%arg0: i32)
-  // CHECK:   hal.command_buffer.dispatch.symbol<%{{.+}} : !hal.command_buffer> target(@ex0::@embedded_elf_x86_64::@dispatch1)
+  // CHECK: util.func public @ex0_embedded_elf_x86_64_dispatch1_128x32(%arg0: i32)
+  // CHECK:   %[[ORDINAL_1B:.+]] = hal.executable.export.ordinal target(@ex0::@embedded_elf_x86_64::@dispatch1) : index
+  // CHECK:   hal.command_buffer.dispatch<%{{.+}} : !hal.command_buffer> target({{.+}})[%[[ORDINAL_1B]]]
 
-  func.func private @main(%dynamic_arg: i32) -> !stream.timepoint {
+  util.func public @main(%dynamic_arg: i32) -> !stream.timepoint {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %c32 = arith.constant 32 : index
@@ -170,6 +176,6 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       ]}
     } => !stream.timepoint
     %39 = stream.resource.dealloca await(%6) => %result : !stream.resource<transient>{%c128} => !stream.timepoint
-    return %39 : !stream.timepoint
+    util.return %39 : !stream.timepoint
   }
 }

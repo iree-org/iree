@@ -40,13 +40,13 @@ struct ReplaceSlowWithFastReductionMinMaxOpPattern final
   LogicalResult matchAndRewrite(SlowReductionOp slowReductionOp,
                                 PatternRewriter &rewriter) const override {
     if (slowReductionOp.getKind() == vector::CombiningKind::MINIMUMF) {
-      rewriter.updateRootInPlace(slowReductionOp, [&]() {
+      rewriter.modifyOpInPlace(slowReductionOp, [&]() {
         slowReductionOp.setKind(vector::CombiningKind::MINNUMF);
       });
       return success();
     }
     if (slowReductionOp.getKind() == vector::CombiningKind::MAXIMUMF) {
-      rewriter.updateRootInPlace(slowReductionOp, [&]() {
+      rewriter.modifyOpInPlace(slowReductionOp, [&]() {
         slowReductionOp.setKind(vector::CombiningKind::MAXNUMF);
       });
       return success();
@@ -84,7 +84,7 @@ void ReplaceSlowMinMaxOpsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 mlir::iree_compiler::createReplaceSlowMinMaxOpsPass() {
   return std::make_unique<ReplaceSlowMinMaxOpsPass>();
 }

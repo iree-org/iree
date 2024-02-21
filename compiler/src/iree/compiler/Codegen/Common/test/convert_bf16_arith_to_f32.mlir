@@ -76,10 +76,9 @@ func.func @truncf_vector(%arg0 : vector<4xbf16>) -> vector<4xbf16> {
 }
 
 // CHECK-LABEL: @truncf_vector
-// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xbf16>
+// CHECK: %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<4xf32>
 // CHECK: %[[VAL0:.+]] = arith.extf %arg0 : vector<4xbf16> to vector<4xf32>
-// CHECK: %[[VAL1:.+]] = arith.extf %[[CST]] : vector<4xbf16> to vector<4xf32>
-// CHECK: %[[VAL2:.+]] = arith.addf %[[VAL1]], %[[VAL0]] : vector<4xf32>
+// CHECK: %[[VAL2:.+]] = arith.addf %[[VAL0]], %[[CST]] : vector<4xf32>
 // CHECK: %[[VAL3:.+]] = arith.truncf %[[VAL2]] : vector<4xf32> to vector<4xbf16>
 // CHECK: return %[[VAL3]] : vector<4xbf16>
 

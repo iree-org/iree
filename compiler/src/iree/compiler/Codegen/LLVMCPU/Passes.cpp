@@ -12,6 +12,8 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ArithToArmSME/ArithToArmSME.h"
+#include "mlir/Conversion/ArmSMEToLLVM/ArmSMEToLLVM.h"
 #include "mlir/Conversion/ArmSMEToSCF/ArmSMEToSCF.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -20,6 +22,7 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVMPass.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmSME/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
@@ -79,6 +82,11 @@ static llvm::cl::opt<bool> clInstrumentMemoryAccesses{
                    "instrumentation is enabled."),
     llvm::cl::init(false)};
 
+static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
+    "iree-llvmcpu-use-decompose-softmax-fuse",
+    llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
+    llvm::cl::init(true));
+
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -92,8 +100,10 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConcretizePadResultShapePass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  // TODO(#16421) Decomposition is failing during bufferization.
+  // Disable till fixed
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //    IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
 }
@@ -281,6 +291,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &passManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   passManager.addNestedPass<func::FuncOp>(
+      createLLVMCPUDropVectorUnitDimsPass());
+  passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
@@ -292,6 +304,10 @@ void buildLLVMCPUVectorLoweringPipeline(
   passManager.addNestedPass<func::FuncOp>(
       createLLVMCPUVectorTransposeLoweringPass(
           options.lowerVectorTransposeToAVX2));
+
+  // Potentially removes shape_cast and broadcast on unit dims before shape_cast
+  // lowering.
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
   // 'vector.shape_cast' are very expensive operations that are even generated
   // by some of the lowerings above (e.g., transpose lowering). There are
@@ -473,10 +489,6 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
 
   addCPUBufferizePasses(nestedModulePM);
 
-  // Perform memref-based transfer_read/write optimizations.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/false));
-
   // Run IREE specific passes before vector lowering expert.
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
@@ -528,10 +540,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMCPUMmt4dVectorLoweringPass());
 
-  // Fold unit dims before vector lowering.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeVectorTransferPass(/*flatten=*/false));
-
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = lowerToAVX2;
@@ -564,9 +572,6 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
   addCPUBufferizePasses(nestedModulePM);
 
   {
-    // Fold unit dims before vector lowering.
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createOptimizeVectorTransferPass(/*flatten=*/false));
     LLVMCPUVectorLoweringPassOptions options;
     options.splitVectorTransfersTo = "linalg-copy";
     buildLLVMCPUVectorLoweringPipeline(nestedModulePM, options);
@@ -579,10 +584,11 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addCPUBufferizePasses(nestedModulePM);
 }
 
-void addTransformDialectPasses(OpPassManager &passManager) {
+void addTransformDialectPasses(OpPassManager &passManager,
+                               StringRef entryPoint) {
   // Give control to the transform dialect.
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass());
+      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
   //      schedule once applied.
@@ -634,7 +640,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   }
 
   if (enableAArch64SME) {
-    // Lower vector operations to Arm SME operations.
+    // (Arith, Vector) -> ArmSME
+    passManager.addNestedPass<func::FuncOp>(
+        mlir::createArithToArmSMEConversionPass());
     passManager.addNestedPass<func::FuncOp>(
         mlir::createConvertVectorToArmSMEPass());
     passManager.addNestedPass<func::FuncOp>(
@@ -674,6 +682,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
     passManager.addNestedPass<func::FuncOp>(
         createInstrumentMemoryAccessesPass());
   }
+  if (enableAArch64SME) {
+    passManager.addPass(createConvertArmSMEToLLVMPass());
+  }
   passManager.addPass(createConvertToLLVMPass(clEnableReassociateFpReductions));
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
@@ -688,7 +699,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(OpPassManager &passManager) {
   {
-    addCommonTargetExecutablePreprocessingPasses(passManager);
+    addCommonTargetExecutablePreprocessingPasses(passManager,
+                                                 clUseSoftmaxInterFusion);
     OpPassManager &modulePassManager = passManager.nest<ModuleOp>();
     modulePassManager.addNestedPass<func::FuncOp>(
         createRematerializeParallelOpsPass());

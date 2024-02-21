@@ -17,11 +17,11 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/ViewLikeInterfaceUtils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/Matchers.h"
@@ -623,7 +623,7 @@ bool dropUnusedDispatchRegionResults(RewriterBase &rewriter,
   for (const auto &it : llvm::enumerate(returnOp.getOperands()))
     if (!unusedResults.contains(it.index()))
       yieldedValues.push_back(it.value());
-  rewriter.updateRootInPlace(
+  rewriter.modifyOpInPlace(
       returnOp, [&]() { returnOp.getOperandsMutable().assign(yieldedValues); });
 
   // Replace all uses of the old op.
@@ -1510,8 +1510,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   state.addAttribute("function_type", TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
@@ -1538,8 +1540,10 @@ void CallOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(resultDims);
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
                      builder.getDenseI32ArrayAttr({
@@ -1946,6 +1950,16 @@ void ChannelCountOp::getAsmResultNames(
 void ChannelDefaultOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "default_channel");
+}
+
+void ChannelDefaultOp::build(OpBuilder &odsBuilder, OperationState &odsState,
+                             StringRef group) {
+  ChannelDefaultOp::build(odsBuilder, odsState,
+                          odsBuilder.getStringAttr(group));
+}
+
+void ChannelDefaultOp::build(OpBuilder &odsBuilder, OperationState &odsState) {
+  ChannelDefaultOp::build(odsBuilder, odsState, StringAttr());
 }
 
 //===----------------------------------------------------------------------===//

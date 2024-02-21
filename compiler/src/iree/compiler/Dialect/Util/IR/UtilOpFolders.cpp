@@ -12,7 +12,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
@@ -538,7 +537,7 @@ struct DropEmptyInitializerOp : public OpRewritePattern<InitializerOp> {
     if (op.getBody().getBlocks().size() != 1)
       return failure();
     auto &block = op.getBody().front();
-    if (block.empty() || isa<InitializerReturnOp>(block.front())) {
+    if (block.empty() || isa<IREE::Util::ReturnOp>(block.front())) {
       rewriter.eraseOp(op);
       return success();
     }
@@ -565,7 +564,7 @@ struct InlineConstantGlobalInitializer
       auto globalOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               storeOp->getParentOp(), storeOp.getGlobalAttr());
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
 
       deadOps.push_back(storeOp);
@@ -592,17 +591,16 @@ void GlobalOp::getCanonicalizationPatterns(RewritePatternSet &results,
 namespace {
 
 /// Turns util.global.address -> util.global.load.indirect into a direct load.
-class PropagateGlobalLoadAddress
-    : public OpRewritePattern<GlobalLoadIndirectOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-public:
-  LogicalResult matchAndRewrite(GlobalLoadIndirectOp op,
+template <typename IndirectOpT, typename DirectOpT>
+struct PropagateGlobalLoadAddress : public OpRewritePattern<IndirectOpT> {
+  using OpRewritePattern<IndirectOpT>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IndirectOpT op,
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<GlobalAddressOpInterface>(
             op.getGlobal().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<GlobalLoadOp>(op, op.getResult().getType(),
-                                                addressOp.getGlobalAttr());
+      rewriter.replaceOpWithNewOp<DirectOpT>(
+          op, op.getResult().getType(), addressOp.getGlobalAttr(),
+          addressOp.isGlobalImmutable() ? rewriter.getUnitAttr() : UnitAttr{});
       return success();
     }
     return failure();
@@ -613,7 +611,8 @@ public:
 
 void GlobalLoadIndirectOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
-  results.insert<PropagateGlobalLoadAddress>(context);
+  results.insert<PropagateGlobalLoadAddress<IREE::Util::GlobalLoadIndirectOp,
+                                            IREE::Util::GlobalLoadOp>>(context);
 }
 
 namespace {
@@ -744,7 +743,7 @@ struct FoldBufferSubspanOpsIntoConsumers
           fusedLoc, op.getSourceOffset(), oldRange.offset);
       auto newRange = SubrangeOperand{op.getSource(), op.getSourceSize(),
                                       newOffset, oldRange.length};
-      rewriter.updateRootInPlace(subrangeOp, [&]() {
+      rewriter.modifyOpInPlace(subrangeOp, [&]() {
         subrangeOp.setSubrangeOperand(use.getOperandNumber(), newRange);
       });
     }
@@ -893,7 +892,7 @@ struct FoldSubspansIntoStorageOp : public OpRewritePattern<BufferStorageOp> {
     rewriter.setInsertionPointAfter(op);
     auto newOffset = rewriter.createOrFold<arith::AddIOp>(
         fusedLoc, subspanOp.getSourceOffset(), op.getOffset());
-    rewriter.updateRootInPlace(op, [&]() {
+    rewriter.modifyOpInPlace(op, [&]() {
       op.getOperandMutable().assign(subspanOp.getSource());
       op.getOperandSizeMutable().assign(subspanOp.getSourceSize());
       SmallPtrSet<Operation *, 2> exceptions;

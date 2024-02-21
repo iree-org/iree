@@ -21,8 +21,8 @@
 // Demonstrates the full functionality of an extern dispatch op.
 // Note that some fields are optional.
 
-// CHECK-LABEL: func.func @dispatchExtern
-func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32) -> tensor<8xi32> {
+// CHECK-LABEL: util.func public @dispatchExtern
+util.func public @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32) -> tensor<8xi32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // Dispatch workgroups to the externally defined function "main" in the
@@ -60,6 +60,6 @@ func.func @dispatchExtern(%arg0: tensor<4xi32>, %arg1: tensor<8xi32>, %arg2: i32
         hal.return %ok : i1
       } ordinal(200) = [#hal.executable.object<{path = "b.o"}>]
     })
-  // CHECK: return %[[RESULT]]
-  return %result : tensor<8xi32>
+  // CHECK: util.return %[[RESULT]]
+  util.return %result : tensor<8xi32>
 }

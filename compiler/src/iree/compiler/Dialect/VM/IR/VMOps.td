@@ -121,7 +121,7 @@ def VM_FuncOp : VM_Op<"func", [
   let arguments = (ins
     TypeAttrOf<FunctionType>:$function_type,
     OptionalAttr<VM_Ordinal>:$ordinal,
-    OptionalAttr<UnitAttr>:$noinline,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<DictArrayAttr>:$arg_attrs,
     OptionalAttr<DictArrayAttr>:$res_attrs
   );
@@ -379,7 +379,10 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
       Symbol,
-      Util_GlobalOpInterface,
+      DeclareOpInterfaceMethods<Util_GlobalOpInterface, [
+        "createLoadOp",
+        "createStoreOp",
+      ]>
     ])> {
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
@@ -387,6 +390,7 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<attr_type>:$initial_value,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 
@@ -495,6 +499,7 @@ def VM_GlobalRefOp :
     SymbolNameAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
+    OptionalAttr<Util_InliningPolicyAttrInterface>:$inlining_policy,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 
@@ -543,13 +548,15 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address", [
   }];
 
   let arguments = (ins
-    VM_GlobalRefAttr:$global
+    VM_GlobalRefAttr:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     AnyTypeOf<[VM_Ptr, Util_AnyPtrType]>:$result
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($result)
   }];
 
@@ -569,13 +576,15 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
     ])> {
   let arguments = (ins
-    VM_GlobalRefAttr:$global
+    VM_GlobalRefAttr:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     type:$value
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($value)
   }];
 
@@ -643,13 +652,15 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
       Util_GlobalLoadIndirectOpInterface,
     ])> {
   let arguments = (ins
-    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global
+    AnyTypeOf<[VM_Ptr, Util_PtrOf<type>]>:$global,
+    UnitAttr:$is_immutable
   );
   let results = (outs
     type:$value
   );
 
   let assemblyFormat = [{
+    (`immutable` $is_immutable^)?
     $global attr-dict `:` type($global) `->` type($value)
   }];
 }

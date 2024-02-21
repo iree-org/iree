@@ -155,9 +155,6 @@ private:
 
 class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
 public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);

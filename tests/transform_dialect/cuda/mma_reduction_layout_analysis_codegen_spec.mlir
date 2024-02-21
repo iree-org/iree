@@ -7,8 +7,7 @@ module attributes { transform.with_named_sequence } {
     // Step 1. Find the fill, matmul and generic ops
     // ===========================================================================
     %fill = transform.structured.match ops{["linalg.fill"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %matmul = transform.structured.match ops{["linalg.generic"]}
-                attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
+    %matmul = transform.structured.match ops{["linalg.matmul_transpose_b"]}
                 in %variant_op : (!transform.any_op) -> !transform.any_op
     %reduce = transform.structured.match ops{["linalg.generic"]}
                 attributes{iterator_types = [#linalg.iterator_type<parallel>, #linalg.iterator_type<reduction>]}
@@ -47,7 +46,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.tensor.reassociative_reshape_folding
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %func_3 : !transform.any_op
+    transform.apply_cse to %func_3 : !transform.any_op
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
     transform.apply_patterns to %func_3 {
       transform.apply_patterns.linalg.erase_unnecessary_inputs
@@ -66,6 +65,10 @@ module attributes { transform.with_named_sequence } {
     %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
 
+    // Annotate the exported function as already translated.
+    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
     transform.yield
   }
 } // module

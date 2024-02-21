@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-erase-dead-alloc-and-stores %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-erase-dead-alloc-and-stores))" %s | FileCheck %s
 
 module {
   func.func @dead_alloc() {

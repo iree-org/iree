@@ -16,7 +16,7 @@
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -124,15 +124,19 @@ struct CmdDispatchOpPattern
       bindingLengths.push_back(adaptor.getResourceLengths()[i]);
     }
 
-    // Dispatch with a target-specific workgroup count.
-    auto exportSymRef =
+    auto entryPointAttr =
         SymbolRefAttr::get(builder.getContext(), executableOp.getName(),
                            {SymbolRefAttr::get(exportOp->getParentOp()),
                             SymbolRefAttr::get(exportOp)});
+    Value ordinal =
+        builder.create<IREE::HAL::Loader::ExecutableExportOrdinalOp>(
+            loc, builder.getIndexType(), entryPointAttr);
+
+    // Dispatch with a target-specific workgroup count.
     auto workgroupCount = exportOp.calculateWorkgroupCount(
         loc, /*device=*/nullptr, adaptor.getWorkload(), builder);
-    builder.create<IREE::HAL::Loader::ExecutableDispatchSymbolOp>(
-        loc, executable, exportSymRef, workgroupCount[0], workgroupCount[1],
+    builder.create<IREE::HAL::Loader::ExecutableDispatchOp>(
+        loc, executable, ordinal, workgroupCount[0], workgroupCount[1],
         workgroupCount[2], pushConstants, bindingBuffers, bindingOffsets,
         bindingLengths);
   }

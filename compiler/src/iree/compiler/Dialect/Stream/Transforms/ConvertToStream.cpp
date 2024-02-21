@@ -161,7 +161,7 @@ struct GenericResourcePattern : public ConversionPattern {
       newOperands.push_back(buildTensorExportOp(
           op->getLoc(), newOperand, tensorType, dynamicDims, rewriter));
     }
-    rewriter.updateRootInPlace(op, [&]() { op->setOperands(newOperands); });
+    rewriter.modifyOpInPlace(op, [&]() { op->setOperands(newOperands); });
 
     // Import into resources from tensor results produced by the op.
     rewriter.setInsertionPointAfter(op);

@@ -80,20 +80,25 @@ iree_status_t iree_hal_rocm_native_executable_create(
   iree_host_size_t total_size =
       sizeof(*executable) + entry_count * sizeof(executable->entry_points[0]) +
       total_entry_point_name_chars;
-  iree_status_t status = iree_allocator_malloc(context->host_allocator,
-                                               total_size, (void**)&executable);
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(context->host_allocator, total_size,
+                                (void**)&executable));
   IREE_TRACE(char* string_table_buffer =
                  (char*)((char*)executable + sizeof(*executable) +
                          entry_count * sizeof(executable->entry_points[0])));
+
+  iree_hal_resource_initialize(&iree_hal_rocm_native_executable_vtable,
+                               &executable->resource);
+
   executable->context = context;
-  if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_rocm_native_executable_vtable,
-                                 &executable->resource);
-    executable->context = context;
-    status = ROCM_RESULT_TO_STATUS(
-        context->syms,
-        hipModuleLoadDataEx(&executable->module, hsaco_image, 0, NULL, NULL),
-        "hipModuleLoadDataEx");
+  iree_status_t status = ROCM_RESULT_TO_STATUS(
+      context->syms,
+      hipModuleLoadDataEx(&executable->module, hsaco_image, 0, NULL, NULL),
+      "hipModuleLoadDataEx");
+  if (!iree_status_is_ok(status)) {
+    status = iree_status_annotate(
+        status,
+        IREE_SV("mismatched target chip? missing/wrong bitcode directory?"));
   }
 
   // Query allowed max shared memory.
@@ -125,11 +130,11 @@ iree_status_t iree_hal_rocm_native_executable_create(
           break;
         }
         if (shared_memory_sizes[i] > max_shared_mem) {
-          status =
-              iree_make_status(IREE_STATUS_INTERNAL,
-                               "ROCM driver error: Requested shared memory "
-                               "size of %d larger than allowed size of %d",
-                               shared_memory_sizes[i], max_shared_mem);
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                    "function '%s' requested shared memory "
+                                    "size of %d larger than allowed size of %d",
+                                    entry_name, shared_memory_sizes[i],
+                                    max_shared_mem);
         } else if (shared_memory_sizes[i] != 0) {
           status = ROCM_RESULT_TO_STATUS(
               context->syms,

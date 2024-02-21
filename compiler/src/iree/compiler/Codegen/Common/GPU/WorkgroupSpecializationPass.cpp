@@ -27,6 +27,7 @@
 //     original nested loops with dynamic shaped op
 //
 //===---------------------------------------------------------------------===//
+
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
@@ -35,7 +36,6 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
@@ -72,7 +72,7 @@ getConstantLowerBound(affine::AffineMinOp affineMinOp) {
 // 2. Move those at the top of the function
 // 3. Create a condition that ANDs all the affineMin == constant
 // 4. Splice the rest of the block and clone into a specialized if/else
-static void specializeFunction(func::FuncOp funcOp) {
+static void specializeFunction(mlir::FunctionOpInterface funcOp) {
   SmallVector<affine::AffineMinOp> minSizeOps;
   SmallVector<Operation *> ids;
   funcOp.walk([&minSizeOps, &ids](Operation *op) {
@@ -95,7 +95,7 @@ static void specializeFunction(func::FuncOp funcOp) {
   }
 
   auto loc = funcOp.getLoc();
-  Block *block = &(*funcOp.getRegion().getBlocks().begin());
+  Block *block = &(*funcOp.getBlocks().begin());
 
   OpBuilder builder(funcOp->getContext());
   OpBuilder::InsertionGuard guard(builder);
@@ -160,13 +160,13 @@ struct WorkgroupSpecializationPass
     if (!clEnableWorkgroupSpecialization)
       return;
 
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     specializeFunction(funcOp);
   }
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkgroupSpecializationPass() {
   return std::make_unique<WorkgroupSpecializationPass>();
 }

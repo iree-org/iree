@@ -19,6 +19,7 @@
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler {
 
@@ -28,28 +29,34 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp);
 /// Returns the attribute name carrying information about distribution.
 const char *getSPIRVDistributeAttrName();
 
+/// Given an operation, returns the HAL target config attribute.
+DictionaryAttr getTargetConfigAttr(Operation *op);
+
 /// Given an operation, returns the `spirv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
+
+/// Given an operation, returns the `hal.bindings.indirect` attribute.
+UnitAttr getIndirectBindingsAttr(Operation *op);
 
 /// Given a FuncOp, returns the subgroup size to use for CodeGen, by first
 /// querying the hal.executable.export op, and then the SPIR-V target
 /// environment. Returns std::nullopt on failures.
-std::optional<int> getSPIRVSubgroupSize(func::FuncOp funcOp);
+std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp);
 
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.
-FailureOr<SmallVector<int64_t>> getSPIRVTileSize(func::FuncOp funcOp,
-                                                 int tilingLevel);
+FailureOr<SmallVector<int64_t>>
+getSPIRVTileSize(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
 /// Returns the functor to compute tile sizes at the given `tilingLevel` for
 /// compute ops in `funcOp`.
 FailureOr<linalg::TileSizeComputationFunction>
-getSPIRVTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
+getSPIRVTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
 /// Returns the functor to compute tile sizes at the given `tilingLevel` for
 /// compute ops in `funcOp`.
 FailureOr<scf::SCFTileSizeComputationFunction>
-getSPIRVScfTileSizeComputeFn(func::FuncOp funcOp, int tilingLevel);
+getSPIRVScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
 /// Generate the operations that compute the processor ID and number of
 /// processors. Used as the callback needed for LinalgDistributionOptions.

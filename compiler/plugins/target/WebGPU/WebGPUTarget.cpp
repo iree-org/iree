@@ -17,6 +17,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
@@ -73,10 +74,6 @@ public:
   getDefaultDeviceTarget(MLIRContext *context) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
-
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
 
     configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));

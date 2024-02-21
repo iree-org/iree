@@ -55,6 +55,7 @@ iree_cc_library(
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
+    "LLVMCPUDropVectorUnitDims.cpp"
     "LLVMCPUEmitVectorizationRemarks.cpp"
     "LLVMCPULinkExecutables.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
@@ -91,6 +92,7 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithDialect
+    MLIRArithToArmSME
     MLIRArithToLLVM
     MLIRArithTransforms
     MLIRArmNeon2dToIntr
@@ -106,6 +108,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFuncToLLVM
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMDialect

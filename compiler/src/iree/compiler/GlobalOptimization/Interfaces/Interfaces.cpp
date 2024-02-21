@@ -5,12 +5,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
+#include "iree/compiler/GlobalOptimization/Interfaces/HoistableOpInterface.h"
 #include "iree/compiler/GlobalOptimization/Interfaces/HoistableTypeInterface.h"
 
 namespace mlir::iree_compiler {
 
 void registerGlobalOptimizationInterfaces(DialectRegistry &registry) {
   registerHoistableTypeInterfaces(registry);
+  registerHoistableOpInterfaces(registry);
 }
 
 } // namespace mlir::iree_compiler

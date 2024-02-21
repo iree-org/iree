@@ -185,6 +185,7 @@ cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:MathDialect",
@@ -358,6 +359,7 @@ cc_library(
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:LinalgDialect",
@@ -452,6 +454,7 @@ cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",
@@ -527,6 +530,7 @@ cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:PDLDialect",
@@ -592,6 +596,7 @@ cc_library(
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LinalgDialect",
@@ -643,22 +648,6 @@ gentbl_cc_library(
             "include/iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.cpp.inc",
         ),
         (
-            ["--gen-attrdef-decls"],
-            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.h.inc",
-        ),
-        (
-            ["--gen-attrdef-defs"],
-            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc",
-        ),
-        (
-            ["--gen-enum-decls"],
-            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.h.inc",
-        ),
-        (
-            ["--gen-enum-defs"],
-            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.cpp.inc",
-        ),
-        (
             ["--gen-op-decls"],
             "include/iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h.inc",
         ),
@@ -677,6 +666,34 @@ gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "include/iree-dialects/Dialect/VectorExt/IR/VectorExtOps.td",
+    deps = [
+        ":TdFiles",
+    ],
+)
+
+gentbl_cc_library(
+    name = "IREEVectorExtAttrsIncGen",
+    strip_include_prefix = "include",
+    tbl_outs = [
+        (
+            ["--gen-attrdef-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.h.inc",
+        ),
+        (
+            ["--gen-attrdef-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.cpp.inc",
+        ),
+        (
+            ["--gen-enum-decls"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "include/iree-dialects/Dialect/VectorExt/IR/VectorExtEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "include/iree-dialects/Dialect/VectorExt/IR/VectorExtAttrs.td",
     deps = [
         ":TdFiles",
     ],
@@ -712,9 +729,12 @@ cc_library(
     ]),
     includes = ["include"],
     deps = [
+        ":IREEVectorExtAttrsIncGen",
         ":IREEVectorExtIncGen",
         ":IREEVectorExtInterfacesIncGen",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
     ],
 )
@@ -792,6 +812,7 @@ cc_binary(
         "@llvm-project//mlir:ControlFlowDialect",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:FuncExtensions",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgTransformOps",

@@ -6,11 +6,11 @@
 
 // Implements logic for lowering StableHLO dialect ops to the SCF dialect.
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo-iree/Conversion/Passes.h"
 #include "stablehlo-iree/Conversion/Rewriters.h"
@@ -256,7 +256,7 @@ struct LegalizeControlFlow final
   }
 
   void runOnOperation() override {
-    func::FuncOp f = getOperation();
+    auto f = getOperation();
     MLIRContext *ctx = f.getContext();
 
     RewritePatternSet patterns(ctx);

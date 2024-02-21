@@ -33,7 +33,7 @@ bool hasZve32fFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if the 'targetAttr' contains '+sve' or '+sve2' in its cpu
-/// features.
+/// features or any other feature flag that includes them.
 bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.

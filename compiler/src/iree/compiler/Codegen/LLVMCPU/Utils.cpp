@@ -46,7 +46,8 @@ bool hasZve64xFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
 }
 
 bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2");
+  return hasFeature(targetAttr, "+sve") || hasFeature(targetAttr, "+sve2") ||
+         hasFeature(targetAttr, "+v9a");
 }
 
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {

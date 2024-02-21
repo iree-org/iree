@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::iree_compiler::IREE::Util {
 

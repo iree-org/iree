@@ -54,10 +54,6 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
 
   RewritePatternSet patterns(ctx);
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  // TODO(hanchung): Maybe we should move drop unit dims patterns to a separate
-  // pass. We are abusing OptimizeVectorTransferPass with `flatten=true` in some
-  // CPU pipelines.
-  vector::populateVectorTransferDropUnitDimsPatterns(patterns);
   vector::populateVectorGatherLoweringPatterns(patterns);
   vector::populateVectorContractLoweringPatterns(
       patterns, vectorTransformOptions,
@@ -76,7 +72,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
 }
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo) {
   return std::make_unique<LLVMCPUVirtualVectorLoweringPass>(
       splitVectorTransfersTo);

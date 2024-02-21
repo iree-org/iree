@@ -51,7 +51,8 @@ std::unique_ptr<Pass> createBubbleUpOrdinalOpsPass();
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
-std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCleanupBufferAllocViewPass();
 /// Pass to bufferize dispatches that are copying from one interface to
 /// another. This will create a `linalg.generic` op which is a copy that can
 /// then be used by backends to handle appropriately.
@@ -60,11 +61,12 @@ createBufferizeCopyOnlyDispatchesPass();
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
-std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createCleanupBufferAllocViewPass();
 
 /// Concretizes tensor.pad op's result shape if its source op implements
 /// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConcretizePadResultShapePass();
 
 /// Convert BF16 buffer ops and conversions to simulated behavior with uint16.
@@ -76,7 +78,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertBf16ArithToF32Pass();
 /// Converts entry point function within dispatch regions to use
 /// destination-passing style, which is better suited for the upstream
 /// comprehensive bufferization pass.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertToDestinationPassingStylePass(
     bool useWARForCooperativeMatrixCodegen = false);
 
@@ -85,7 +87,8 @@ createConvertToDestinationPassingStylePass(
 std::unique_ptr<Pass> createDecomposeAffineOpsPass();
 
 // Decomposes batch mmt4d op into mmt4d by tiling the batch dim to 1.
-std::unique_ptr<OperationPass<func::FuncOp>> createDecomposeBatchMmt4DOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDecomposeBatchMmt4DOpsPass();
 
 // Decomposes high-D convolution ops into low-D ones.
 std::unique_ptr<Pass> createDecomposeConvolutionToLowerDimOpsPass();
@@ -96,7 +99,7 @@ std::unique_ptr<Pass> createDecomposeLinalgGenericPass();
 
 /// Creates a pass to decompose tensor.pack and tensor.unpack ops. The pass does
 /// tiling and generalization. See implementation for more details.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposePackUnPackOpsPass(bool tileOuterToOne = false);
 
 /// Creates a pass to convert the softmax op into a sequence of linalg generic
@@ -112,7 +115,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass();
 std::unique_ptr<OperationPass<ModuleOp>> createEmulateNarrowTypePass();
 
 /// Creates a pass to erase dead alloc ops where all uses are just store ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createEraseDeadAllocAndStoresPass();
 
 std::unique_ptr<Pass> createEraseHALDescriptorTypeFromMemRefPass();
@@ -132,7 +135,7 @@ std::unique_ptr<Pass> createExtractAddressComputationGPUPass();
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
 /// Creates a pass to fold `affine.min` ops in tiled and distributed loops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFoldAffineMinInDistributedLoopsPass();
 
 /// After running the upstream TensorConstantBufferize pass, remove
@@ -143,13 +146,14 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
 /// An ad-hoc pass to canonicalize selected loop carried dependencies on
 /// scf.for.
-std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createForOpCanonicalizationPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMaterializeEncodingIntoNopPass();
 
 /// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseTensorPadWithConsumerPass();
 
 struct GenericVectorizationPassOptions {
@@ -171,17 +175,18 @@ struct GenericVectorizationPassOptions {
   int64_t maxVectorSize = std::numeric_limits<int64_t>::max();
 };
 /// Creates a pass to perform vectorization on LinAlg and tensor ops.
-std::unique_ptr<OperationPass<func::FuncOp>> createGenericVectorizationPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGenericVectorizationPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGenericVectorizationPass(const GenericVectorizationPassOptions &options);
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createOptimizeTensorInsertExtractSlicesPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createHoistStaticallyBoundAllocationsPass();
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createHoistUnrolledVectorExtractInsertSlicePass();
 
 /// Pass to perform linalg on tensor bufferization. The function passed into
@@ -201,46 +206,49 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
 std::unique_ptr<Pass> createIREEExpandStridedMetadataPass();
 
 /// Instruments memory reads and writes for address tracking.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInstrumentMemoryAccessesPass();
 
 /// Pass to lower ukernel operations into their defined function calls.
 std::unique_ptr<OperationPass<ModuleOp>> createLowerUKernelOpsToCallsPass();
 
 /// Creates a pass to convert memref.copy to linalg op.
-std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createMemrefCopyToLinalgPass();
 
 /// Extracts lowering configs and translation info from user configs.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createMaterializeUserConfigsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createOptimizeVectorTransferPass(bool flatten = false,
                                  bool dropUnitDims = true);
 
 /// Pad dynamic alloc op to convert them into static one.
-std::unique_ptr<OperationPass<func::FuncOp>> createPadDynamicAlloc();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createPadDynamicAlloc();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 
 /// Pass to fuse parallel linalg operations.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRematerializeParallelOpsPass();
 
 /// Creates a pass to remove single iteration distributed loops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveSingleIterationLoopPass();
 
 /// Create a pass that replaces maximumf/minimumf with minumf/maxnumf ops.
-std::unique_ptr<OperationPass<func::FuncOp>> createReplaceSlowMinMaxOpsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createReplaceSlowMinMaxOpsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write. See Passes.td for
 /// `option` details.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSplitFullPartialTransferPass();
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSplitFullPartialTransferPass(StringRef option);
 
 /// Tests iree-hal-preprocess-executables-with behavior.
@@ -259,14 +267,17 @@ createTileAndDistributeToWorkgroupsPass(
 
 /// Create an IREE-specific Transform dialect interpreter pass with all
 /// registrations necessary for IREE.
-std::unique_ptr<Pass> createTransformDialectInterpreterPass();
+std::unique_ptr<Pass>
+createTransformDialectInterpreterPass(StringRef transformSequenceName = "");
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
-std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createTypePropagationPass();
 
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
-std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createVectorizePadPass();
 
 /// Populates patterns with patterns to concretize tensor.pad op's result
 /// shape. `numWorkgroups`, if not empty, will be used as bounds for simplifying

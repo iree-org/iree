@@ -250,10 +250,19 @@ static bool updateGlobalImmutability(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     if (!global.storeOps.empty())
       return GlobalAction::PRESERVE;
-    if (!global.op.isGlobalMutable())
-      return GlobalAction::PRESERVE;
+    bool didChangeAny = global.op.isGlobalMutable() != false;
     global.op.setGlobalMutable(false);
-    return GlobalAction::UPDATE;
+    for (auto loadOp : global.loadOps) {
+      // NOTE: we don't set immutable on loads in initializers today.
+      // We should be able to, though, with a bit better analysis.
+      if (!loadOp->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+        if (!loadOp.isGlobalImmutable()) {
+          loadOp.setGlobalImmutable(true);
+          didChangeAny = true;
+        }
+      }
+    }
+    return didChangeAny ? GlobalAction::UPDATE : GlobalAction::PRESERVE;
   });
 }
 
@@ -284,8 +293,6 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
       return GlobalAction::PRESERVE;
     if (global.op.isGlobalMutable())
       return GlobalAction::PRESERVE;
-    if (global.op->hasAttr("noinline"))
-      return GlobalAction::PRESERVE;
     if (!global.op.getGlobalInitialValue())
       return GlobalAction::PRESERVE;
 
@@ -296,23 +303,34 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
     }
 
     // Inline initial value into all loads.
-    for (auto loadOp : global.loadOps) {
+    auto inliningPolicy = global.op.getGlobalInliningPolicy();
+    SmallVector<IREE::Util::GlobalLoadOpInterface> loadOps = global.loadOps;
+    global.loadOps.clear();
+    for (auto loadOp : loadOps) {
+      if (inliningPolicy &&
+          !inliningPolicy.isLegalToInline(loadOp, global.op)) {
+        // Global not allowed to be inlined at this site so preserve the load.
+        global.loadOps.push_back(loadOp);
+        continue;
+      }
+
       OpBuilder builder(loadOp);
       auto loadedValue = loadOp.getLoadedGlobalValue();
       auto constantValue =
           tryMaterializeConstant(loadOp.getLoc(), loadedValue.getType(),
                                  global.op.getGlobalInitialValue(), builder);
       if (!constantValue) {
-        // Failed to materialize the constant. This is going to fail for all the
-        // others as well so we bail here. This may be intentional for example
-        // if some value-type has no default value (similar to a deleted default
-        // constructor in C++) - in which case the global is preserved as-is.
-        return GlobalAction::PRESERVE;
+        // Failed to materialize the constant at this site so preserve the load.
+        global.loadOps.push_back(loadOp);
+        continue;
       }
       loadedValue.replaceAllUsesWith(constantValue);
       loadOp.erase();
     }
-    global.loadOps.clear();
+
+    // If not all loads could be removed we need to preserve the global.
+    if (!global.loadOps.empty())
+      return GlobalAction::PRESERVE;
 
     // Only delete if private.
     return global.op.isGlobalPrivate() ? GlobalAction::DELETE

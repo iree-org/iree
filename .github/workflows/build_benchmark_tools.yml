@@ -19,13 +19,13 @@ on:
       runner-env:
         required: true
         type: string
-      build-dir:
+      install-dir:
         required: true
         type: string
-      build-dir-archive:
+      install-dir-archive:
         required: true
         type: string
-      build-dir-gcs-artifact:
+      install-dir-gcs-artifact:
         required: true
         type: string
     outputs:
@@ -83,18 +83,18 @@ jobs:
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       BUILD_SCRIPT: ${{ matrix.target.build_script }}
       BUILD_TOOLS_DIR: ${{ matrix.target.platform }}-${{ matrix.target.arch }}-benchmark-tools-dir
-      BUILD_DIR: ${{ inputs.build-dir }}
-      BUILD_DIR_ARCHIVE: ${{ inputs.build-dir-archive }}
-      BUILD_DIR_GCS_ARTIFACT: ${{ inputs.build-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ inputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ inputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ inputs.install-dir-gcs-artifact }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Downloading build dir archive"
-        run: gcloud storage cp "${BUILD_DIR_GCS_ARTIFACT}" "${BUILD_DIR_ARCHIVE}"
-      - name: "Extracting host binaries"
-        run: tar -xf "${BUILD_DIR_ARCHIVE}" "${BUILD_DIR}/install"
+      - name: "Downloading install dir archive"
+        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Compiling the benchmark tools"
         id: build
         run: |
@@ -102,7 +102,7 @@ jobs:
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark" \
-            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build"
       - name: "Compiling the benchmark tools with tracing"
         id: build-with-tracing
@@ -111,7 +111,7 @@ jobs:
             --env "IREE_TARGET_PLATFORM=${PLATFORM}" \
             --env "IREE_TARGET_ARCH=${ARCH}" \
             --env "BUILD_PRESET=benchmark-with-tracing" \
-            --env "IREE_HOST_BIN_DIR=${BUILD_DIR}/install/bin" \
+            --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
       - name: "Downloading pre-built tracy capture tool"
         id: download-tracy-capture

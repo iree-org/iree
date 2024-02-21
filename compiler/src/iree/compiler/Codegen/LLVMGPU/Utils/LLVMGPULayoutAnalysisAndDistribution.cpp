@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -1268,7 +1267,9 @@ static void collectOperations(Operation *rootOp,
 static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
   // Set up the parallel/reduction structure in right form.
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  auto infer = [&](MapList m) {
+    return AffineMap::inferFromExprList(m, contractOp.getContext());
+  };
   AffineExpr m, n, k;
   bindDims(contractOp.getContext(), m, n, k);
   auto iteratorTypes = contractOp.getIteratorTypes().getValue();
@@ -1281,7 +1282,7 @@ static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
 }
 
 void doLayoutAnalysisAndDistribution(RewriterBase &rewriter,
-                                     func::FuncOp funcOp) {
+                                     mlir::FunctionOpInterface funcOp) {
   // First walk through all the MMA ops and set their layouts
   DenseMap<Value, Layout> layoutMap;
   funcOp.walk([&](Operation *op) {

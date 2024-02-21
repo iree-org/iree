@@ -27,6 +27,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRVPass.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -182,13 +183,13 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createPadDynamicAlloc());
 
   // Check to make sure we are not exceeding shared memory usage limit.
-  auto getSharedMemoryLimit = [](func::FuncOp func) {
+  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface func) {
     auto moduleOp = func->getParentOfType<ModuleOp>();
     spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
     return target.getResourceLimits().getMaxComputeSharedMemorySize();
   };
   // TODO: query this from the target.
-  auto getIndexBitwidth = [](func::FuncOp) { return 32; };
+  auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 32; };
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
 
@@ -263,9 +264,10 @@ static void addSPIRVLoweringPasses(OpPassManager &pm, bool enableFastMath) {
   spirvPM.addPass(spirv::createSPIRVUpdateVCEPass());
 }
 
-void addSPIRVTransformDialectPasses(OpPassManager &passManager) {
+void addSPIRVTransformDialectPasses(OpPassManager &passManager,
+                                    StringRef entryPoint) {
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass());
+      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -503,6 +505,7 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &topPM,
 
   // Promote to workgroups and tile to threads.
   auto &nestedPM = topPM.nest<ModuleOp>();
+  nestedPM.addNestedPass<func::FuncOp>(createGPUTensorTileToSerialLoops());
   nestedPM.addNestedPass<func::FuncOp>(createGPUTensorAlloc());
   nestedPM.addNestedPass<func::FuncOp>(
       createGPUTensorTile(/*distributeToWarp=*/false));
@@ -594,7 +597,6 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
-    options.maxVectorSize = 32768;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -628,7 +630,7 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
 
-  auto getWarpSize = [](func::FuncOp func) {
+  auto getWarpSize = [](mlir::FunctionOpInterface func) {
     auto moduleOp = func->getParentOfType<ModuleOp>();
     spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(moduleOp);
     return target.getResourceLimits().getSubgroupSize();
@@ -645,8 +647,9 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
-void addSPIRVTransformDialectPassPipeline(OpPassManager &pm) {
-  addSPIRVTransformDialectPasses(pm);
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm,
+                                          StringRef entryPoint) {
+  addSPIRVTransformDialectPasses(pm, entryPoint);
 
   // Run GenericVectorization pass additionally to convert vectors into forms
   // needed for SPIR-V.

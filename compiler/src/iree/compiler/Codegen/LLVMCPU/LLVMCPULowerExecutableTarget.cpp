@@ -7,8 +7,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -63,22 +61,6 @@ public:
 };
 } // namespace
 
-/// The pipeline parser doesnt like strings that have `'` or `"` in them. But it
-/// is needed for demarcating the option value. So just drop them before sending
-/// it one.
-static StringRef sanitizePipelineString(StringRef input) {
-  if (input.empty())
-    return input;
-  // If first/last character is ' or ", drop them.
-  if (input.front() == '\'' || input.front() == '"') {
-    input = input.drop_front();
-  }
-  if (input.back() == '\'' || input.back() == '"') {
-    input = input.drop_back();
-  }
-  return input;
-}
-
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
@@ -111,7 +93,7 @@ static FailureOr<LoweringConfigAttr> getRootLoweringConfig(ModuleOp moduleOp) {
     }
   }
 
-  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     getAllEntryPoints(moduleOp);
     SmallVector<Operation *> computeOps = getComputeOps(funcOp);
     // Check for self first.
@@ -172,7 +154,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig,
                                      /*enablePeeling=*/false,
-                                     enableVectorMasking, lowerToAVX2);
+                                     enableVectorMasking, lowerToAVX2,
+                                     enableAArch64SSVE);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
@@ -203,9 +186,12 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     break;
   }
   // Transform-dialect pipelines.
-  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen:
-    addTransformDialectPasses(pipeline);
+  case IREE::Codegen::DispatchLoweringPassPipeline::TransformDialectCodegen: {
+    SymbolRefAttr codegenSpec = translationInfo.value().getCodegenSpec();
+    addTransformDialectPasses(
+        pipeline, codegenSpec ? codegenSpec.getLeafReference() : StringRef(""));
     break;
+  }
   default:
     moduleOp.emitOpError("Unsupported pipeline on CPU target.");
     return signalPassFailure();

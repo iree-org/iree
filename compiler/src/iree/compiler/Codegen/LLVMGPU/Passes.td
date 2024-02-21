@@ -13,6 +13,12 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUPrepareForChainedMatmul :
+    InterfacePass<"iree-amdgpu-prepare-chained-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to swap operands and transpose accumulator and result";
+  let constructor = "mlir::iree_compiler::createAMDGPUPrepareForChainedMatmulPass()";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVM :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {
@@ -54,7 +60,7 @@ def LLVMGPULowerExecutableTarget :
 }
 
 def LLVMGPUPackSharedMemoryAlloc :
-    Pass<"iree-llvmgpu-pack-shared-memory-alloc", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-pack-shared-memory-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
@@ -66,31 +72,42 @@ def LLVMGPUSelectLoweringStrategy :
 }
 
 def LLVMGPUTensorCoreVectorization :
-    Pass<"iree-llvmgpu-tensorcore-vectorization", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-tensorcore-vectorization", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
 def LLVMGPUTensorPad :
-    Pass<"iree-llvmgpu-tensor-pad", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
   let summary = "Pass to pad out tensors up to static dimensions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorPadPass()";
 }
 
 def LLVMGPUTileAndDistribute :
-    Pass<"iree-llvmgpu-tile-and-distribute", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-tile-and-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile and distribute linalg ops within a workgroup.";
   let constructor = "mlir::iree_compiler::createLLVMGPUTileAndDistribute()";
 }
 
+def LLVMGPUVectorDistribute :
+    InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to distribute vectorized functions.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorDistribute()";
+  let options = [
+    Option<"testLayout", "test-layout", "bool", /*default=*/"false",
+           "Annotate vector ops with deduced layouts without real conversion "
+           "for testing purposes">
+  ];
+}
+
 def LLVMGPUVectorLowering :
-    Pass<"iree-llvmgpu-vector-lowering", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to lower Vector ops before conversion to LLVM.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
 def LLVMGPUVectorToGPU :
-    Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
+    InterfacePass<"iree-llvmgpu-vector-to-gpu", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert vector to gpu.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
 }

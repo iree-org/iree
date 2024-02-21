@@ -8,7 +8,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-util.global private @"__transpose_10_input" {noinline} = dense<1.0> : tensor<512x1024xf32>
+util.global private @"__transpose_10_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<512x1024xf32>
 
 func.func @transpose_10() -> tensor<1024x512xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -26,7 +26,7 @@ func.func @transpose_10() -> tensor<1024x512xf32> {
   return %6: tensor<1024x512xf32>
 }
 
-util.global private @"__transpose_021_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
+util.global private @"__transpose_021_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<64x96x128xf32>
 
 func.func @transpose_021() -> tensor<64x128x96xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -44,7 +44,7 @@ func.func @transpose_021() -> tensor<64x128x96xf32> {
   return %6: tensor<64x128x96xf32>
 }
 
-util.global private @"__transpose_201_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
+util.global private @"__transpose_201_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<64x96x128xf32>
 
 func.func @transpose_201() -> tensor<128x64x96xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -62,7 +62,7 @@ func.func @transpose_201() -> tensor<128x64x96xf32> {
   return %6: tensor<128x64x96xf32>
 }
 
-util.global private @"__transpose_210_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
+util.global private @"__transpose_210_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<64x96x128xf32>
 
 func.func @transpose_210() -> tensor<128x96x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -80,7 +80,7 @@ func.func @transpose_210() -> tensor<128x96x64xf32> {
   return %6: tensor<128x96x64xf32>
 }
 
-util.global private @"__transpose_120_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
+util.global private @"__transpose_120_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<64x96x128xf32>
 
 func.func @transpose_120() -> tensor<96x128x64xf32> {
   %cst = arith.constant 0.000000e+00 : f32
@@ -98,7 +98,7 @@ func.func @transpose_120() -> tensor<96x128x64xf32> {
   return %6: tensor<96x128x64xf32>
 }
 
-util.global private @"__transpose_102_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
+util.global private @"__transpose_102_input" {inlining_policy = #util.inline.never} = dense<1.0> : tensor<64x96x128xf32>
 
 func.func @transpose_102() -> tensor<96x64x128xf32> {
   %cst = arith.constant 0.000000e+00 : f32

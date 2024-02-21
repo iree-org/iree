@@ -46,7 +46,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
 
     // Step 2. Second level of tiling + fusion parallelizes to threads.
@@ -87,7 +87,7 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op : !transform.any_op
-    transform.iree.apply_cse %func_op : !transform.any_op
+    transform.apply_cse to %func_op : !transform.any_op
 
     // Step 3. Rank-reduce and vectorize.
     // ==================================
@@ -136,7 +136,12 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.iree.apply_licm %func_op_3 : !transform.any_op
-    transform.iree.apply_cse %func_op_3 : !transform.any_op
+    transform.apply_cse to %func_op_3 : !transform.any_op
+
+    // Annotate the exported function as already translated.
+    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
 
     transform.yield
   }

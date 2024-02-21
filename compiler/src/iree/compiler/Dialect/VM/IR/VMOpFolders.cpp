@@ -96,7 +96,7 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
       auto globalOp =
           SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOpInterface>(
               op, globalRefAttr);
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           globalOp, [&]() { globalOp.setGlobalInitialValue(valueAttr); });
       deadOps.push_back(op);
     });
@@ -202,8 +202,9 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
                                 PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<IREE::Util::GlobalAddressOpInterface>(
             op.getGlobal().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<DIRECT>(op, op.getValue().getType(),
-                                          addressOp.getGlobalAttr());
+      rewriter.replaceOpWithNewOp<DIRECT>(
+          op, op.getValue().getType(), addressOp.getGlobalAttr(),
+          addressOp.isGlobalImmutable() ? rewriter.getUnitAttr() : UnitAttr{});
       return success();
     }
     return failure();

@@ -15,6 +15,9 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
+IREE_FLAG(bool, hip_use_streams, true,
+          "Use HIP streams (instead of graphs) for executing command buffers.");
+
 IREE_FLAG(
     bool, hip_async_allocations, true,
     "Enables HIP asynchronous stream-ordered allocations when supported.");
@@ -58,6 +61,9 @@ static iree_status_t iree_hal_hip_driver_factory_try_create(
 
   iree_hal_hip_device_params_t device_params;
   iree_hal_hip_device_params_initialize(&device_params);
+  if (FLAG_hip_use_streams) {
+    device_params.command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
+  }
   device_params.async_allocations = FLAG_hip_async_allocations;
 
   driver_options.default_device_index = FLAG_hip_default_index;

@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"
@@ -45,7 +44,8 @@ createPrimitiveDefaultGlobalOp(std::string name, Location loc, Type type,
       loc, name,
       /*isMutable=*/false, type, initialValue);
   globalOp.setPrivate();
-  globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+  globalOp.setGlobalInliningPolicy(
+      moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
   symbolTable.insert(globalOp);
   return globalOp;
 }
@@ -61,7 +61,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
       loc, name,
       /*isMutable=*/false, globalType);
   globalOp.setPrivate();
-  globalOp->setAttr("noinline", moduleBuilder.getUnitAttr());
+  globalOp.setGlobalInliningPolicy(
+      moduleBuilder.getAttr<IREE::Util::InlineNeverAttr>());
   symbolTable.insert(globalOp);
 
   // Create an initializer that allocates the buffer storage.
@@ -83,9 +84,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());
   // util.global.store
-  initializerBuilder.create<IREE::Util::GlobalStoreOp>(
-      loc, barrierOp.getResult(0), globalOp.getName());
-  initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+  globalOp.createStoreOp(loc, barrierOp.getResult(0), initializerBuilder);
+  initializerBuilder.create<IREE::Util::ReturnOp>(loc);
 
   return globalOp;
 }
@@ -193,7 +193,7 @@ static IREE::Util::GlobalOp createDummyInput(const std::string &namePrefix,
 
 static LogicalResult
 createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
-                              mlir::func::FuncOp entryFuncOp,
+                              IREE::Util::FuncOp entryFuncOp,
                               Explorer &explorer) {
   auto symbolTable = explorer.getSymbolTables().getSymbolTable(moduleOp);
   OpBuilder moduleBuilder(moduleOp.getContext());
@@ -215,7 +215,7 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
 
   // Create a `() -> ()` entry point op the benchmark tool can run.
   Location loc = entryFuncOp.getLoc();
-  auto funcOp = moduleBuilder.create<mlir::func::FuncOp>(
+  auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
       loc, funcName, moduleBuilder.getFunctionType({}, {}));
   funcOp.setPublic();
   funcOp->setAttr("iree.abi.stub", moduleBuilder.getUnitAttr());
@@ -231,17 +231,18 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
   auto blockBuilder = OpBuilder::atBlockBegin(block);
   SmallVector<Value> args;
   for (int i = 0, e = entryFuncOp.getNumArguments(); i < e; ++i) {
-    args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-        loc, dummyInputVariableOps[i]));
+    args.push_back(dummyInputVariableOps[i]
+                       .createLoadOp(loc, blockBuilder)
+                       .getLoadedGlobalValue());
   }
-  auto callOp = blockBuilder.create<mlir::func::CallOp>(loc, entryFuncOp, args);
+  auto callOp = blockBuilder.create<IREE::Util::CallOp>(loc, entryFuncOp, args);
 
   // Sink all results with a barrier to ensure that DCE does not remove the
   // call.
   for (auto result : callOp.getResults()) {
     blockBuilder.create<IREE::Util::OptimizationBarrierOp>(loc, result);
   }
-  blockBuilder.create<mlir::func::ReturnOp>(loc);
+  blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
   // Ensure the original function is not exported and not inlined.
   entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());
@@ -272,8 +273,8 @@ public:
     // Gather the functions we want to wrap for benchmarking and wrap them.
     // Since we are inserting new functions as part of this pass we must perform
     // the wrapping for only the inputs.
-    SmallVector<mlir::func::FuncOp> entryFuncOps;
-    for (auto entryFuncOp : moduleOp.getOps<mlir::func::FuncOp>()) {
+    SmallVector<IREE::Util::FuncOp> entryFuncOps;
+    for (auto entryFuncOp : moduleOp.getOps<IREE::Util::FuncOp>()) {
       if (entryFuncOp.isPublic()) {
         entryFuncOps.push_back(entryFuncOp);
       }

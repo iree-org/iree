@@ -39,7 +39,7 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*description=*/"Get the distributed shape for the given vector type.",
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getDistributedShape",
-      /*args=*/(ins "VectorType":$type)
+      /*args=*/(ins)
     >
   ];
 }

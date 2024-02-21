@@ -5,12 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-vector-distribution"
 
@@ -33,7 +38,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorOperand));
       continue;
     }
-    operands.push_back(VectorLayoutInterface());
+    operands.push_back(UnitAttr::get(op->getContext()));
   }
 
   for (Value result : op->getResults()) {
@@ -42,7 +47,7 @@ static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
           analysis.getLayout<VectorLayoutInterface>(vectorResult));
       continue;
     }
-    results.push_back(VectorLayoutInterface());
+    results.push_back(UnitAttr::get(op->getContext()));
   }
 
   ArrayAttr operandsAttr = ArrayAttr::get(op->getContext(), operands);
@@ -65,31 +70,37 @@ static DistributionSignature getOpSignature(Operation *op) {
   ArrayAttr operandsAttr = dyn_cast<ArrayAttr>(signatureAttr[0]);
   ArrayAttr resultsAttr = dyn_cast<ArrayAttr>(signatureAttr[1]);
   assert(operandsAttr && resultsAttr && "Malformed signature attribute.");
+  assert(operandsAttr.size() == op->getNumOperands() &&
+         "Malformed signature attribute.");
+  assert(resultsAttr.size() == op->getNumResults() &&
+         "Malformed signature attribute.");
 
   DistributionSignature signature;
-  for (Attribute operandAttr : operandsAttr) {
+
+  auto addLayoutToSignature([&](Value value, Attribute layout) {
     // Ignore null attributes.
-    if (!operandAttr) {
-      signature.operands.push_back(VectorLayoutInterface());
-      continue;
+    if (isa<UnitAttr>(layout)) {
+      assert(!isa<VectorValue>(value) &&
+             "Malformed signature attribute: unit attribute for vector value.");
+      return;
     }
 
-    auto operandLayout = cast<VectorLayoutInterface>(operandAttr);
-    assert(operandLayout && "Malformed signature attribute.");
-    signature.operands.push_back(operandLayout);
+    assert(isa<VectorValue>(value) &&
+           "Malformed signature attribute: non-unit attribute for non-vector "
+           "value.");
+    auto vector = cast<VectorValue>(value);
+
+    auto vectorLayout = cast<VectorLayoutInterface>(layout);
+    assert(vectorLayout && "Malformed signature attribute.");
+    signature[vector] = vectorLayout;
+  });
+
+  for (auto [value, layout] :
+       llvm::zip_equal(op->getOperands(), operandsAttr)) {
+    addLayoutToSignature(value, layout);
   }
-
-  for (Attribute resultAttr : resultsAttr) {
-    // Ignore null attributes.
-    if (!resultAttr) {
-      signature.results.push_back(VectorLayoutInterface());
-      continue;
-    }
-
-    VectorLayoutInterface resultLayout =
-        cast<VectorLayoutInterface>(resultAttr);
-    assert(resultLayout && "Malformed signature attribute.");
-    signature.results.push_back(resultLayout);
+  for (auto [value, layout] : llvm::zip_equal(op->getResults(), resultsAttr)) {
+    addLayoutToSignature(value, layout);
   }
 
   return signature;
@@ -103,8 +114,7 @@ DistributionPattern::getDistributed(RewriterBase &rewriter, VectorValue value,
     return cast<VectorValue>(toSIMD.getInput());
   }
   // Create a "to_simt" op to convert the value to the distributed layout.
-  SmallVector<int64_t> distributedShape =
-      layout.getDistributedShape(value.getType());
+  SmallVector<int64_t> distributedShape = layout.getDistributedShape();
   VectorType distributedType =
       VectorType::get(distributedShape, value.getType().getElementType());
   auto toSIMT = rewriter.create<IREE::VectorExt::ToSIMTOp>(
@@ -215,15 +225,15 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
-void distributeVectorOps(Operation *root,
-                         RewritePatternSet &distributionPatterns,
-                         VectorLayoutOptions &options) {
+LogicalResult distributeVectorOps(Operation *root,
+                                  RewritePatternSet &distributionPatterns,
+                                  VectorLayoutOptions &options) {
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
   options.setAnchorOps(analysis);
   if (failed(analysis.run()))
-    return;
+    return failure();
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
@@ -240,7 +250,38 @@ void distributeVectorOps(Operation *root,
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
-  return applyVectorDistribution(root, frozenPatterns);
+  applyVectorDistribution(root, frozenPatterns);
+
+  RewritePatternSet patterns(root->getContext());
+  IREE::VectorExt::ToSIMDOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  IREE::VectorExt::ToSIMTOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  if (failed(applyPatternsAndFoldGreedily(root, std::move(patterns)))) {
+    return failure();
+  }
+
+  if (options.verifyConversion()) {
+    WalkResult hasConversionOp = root->walk([](Operation *op) {
+      if (isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(op)) {
+        for (auto user : op->getUsers()) {
+          if (!isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(
+                  user)) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "Found live cast op: " << *op << "\n";
+              llvm::dbgs() << "With live user: " << *user << "\n";
+            });
+            return WalkResult::interrupt();
+          }
+        }
+      }
+      return WalkResult::advance();
+    });
+    if (hasConversionOp.wasInterrupted()) {
+      return failure();
+    }
+  }
+  return success();
 }
 
 } // namespace mlir::iree_compiler

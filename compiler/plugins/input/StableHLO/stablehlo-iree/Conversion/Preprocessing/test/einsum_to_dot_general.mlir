@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-preprocessing-einsum-to-dot-general %s \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-preprocessing-einsum-to-dot-general))" %s \
 // RUN:   | FileCheck %s
 
 // NOTE: 2-operand diagonal not supported as a dot_general lowering.

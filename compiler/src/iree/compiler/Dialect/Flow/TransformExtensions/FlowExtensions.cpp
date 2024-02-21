@@ -215,7 +215,7 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
         uses.push_back(&use);
     for (OpOperand *use : uses) {
       unsigned resultNum = llvm::cast<OpResult>(use->get()).getResultNumber();
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           use->getOwner(), [&]() { use->set(cloned->getOpResult(resultNum)); });
     }
   }
@@ -728,7 +728,7 @@ moveSucceedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
     if (operand.get().getDefiningOp() == regionOp) {
       unsigned resultNumber =
           llvm::cast<OpResult>(operand.get()).getResultNumber();
-      rewriter.updateRootInPlace(
+      rewriter.modifyOpInPlace(
           target, [&]() { operand.set(returnOp->getOperand(resultNumber)); });
     }
   }
@@ -749,7 +749,7 @@ moveSucceedingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
 
   // Replace uses of `target` after the dispatch region.
   for (OpOperand *use : usesOutsideOfRegion) {
-    rewriter.updateRootInPlace(use->getOwner(), [&]() {
+    rewriter.modifyOpInPlace(use->getOwner(), [&]() {
       use->set(regionOp->getResult(
           previousNumResults +
           llvm::cast<OpResult>(use->get()).getResultNumber()));

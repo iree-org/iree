@@ -171,7 +171,7 @@ struct GenericTypeConversionPattern : public ConversionPattern {
                                            "argument type conversion failed");
       }
 
-      rewriter.applySignatureConversion(newRegion, result);
+      rewriter.applySignatureConversion(newRegion, result, typeConverter);
     }
 
     Operation *newOp = rewriter.create(state);
@@ -265,6 +265,7 @@ struct ConvertBf16ToUInt16BuffersPass final
                                                      Operation *op) {
         return typeConverter.isLegal(cast<func::FuncOp>(op).getFunctionType());
       });
+      target.addLegalOp<arith::TruncFOp, arith::ExtFOp, ModuleOp>();
       target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
                                         IREE::HAL::HALDialect,
                                         memref::MemRefDialect, scf::SCFDialect>(
@@ -296,7 +297,6 @@ struct ConvertBf16ToUInt16BuffersPass final
       });
 
       RewritePatternSet patterns(ctx);
-      arith::populateExpandBFloat16Patterns(patterns);
       populateIreeBf16EmulationPatterns(patterns, typeConverter);
 
       if (failed(applyPartialConversion(op, target, std::move(patterns))))

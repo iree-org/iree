@@ -11,7 +11,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 import e2e_test_framework.models.utils as model_utils
 
-GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.14_1691969180j"
+GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085"
 
 ID_FORMAT = string.Template("${model_id}-batch${batch_size}")
 NAME_FORMAT = string.Template("${name}_BATCH${batch_size}")
@@ -79,6 +79,8 @@ T5_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
     ),
     entry_function="main",
     input_type_templates=[
+        string.Template("${batch_size}x512xi32"),
+        string.Template("${batch_size}x512xi32"),
         string.Template("${batch_size}x512xi32"),
         string.Template("${batch_size}x512xi32"),
     ],

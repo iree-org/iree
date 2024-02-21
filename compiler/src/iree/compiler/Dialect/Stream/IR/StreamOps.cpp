@@ -13,7 +13,6 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -2868,10 +2867,9 @@ CmdDispatchOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     TypeRange uniformTypes = getUniformOperands().getTypes();
     int64_t numResources = getResources().size();
 
-    auto entryPointType = funcOp.getFunctionType();
     SmallVector<Type> uniformEntryPointTypes;
     int64_t bindingCounts = 0;
-    for (auto entryPointArg : entryPointType.getInputs()) {
+    for (auto entryPointArg : funcOp.getArgumentTypes()) {
       if (isa<IREE::Stream::BindingType>(entryPointArg)) {
         bindingCounts++;
       } else {
@@ -2991,7 +2989,7 @@ printDispatchResources(OpAsmPrinter &p, Operation *op, ValueRange resources,
 // if we had our own op we could just reuse the map we have for operands.
 // static
 SmallVector<unsigned>
-CmdDispatchOp::makeOperandToArgMap(mlir::func::FuncOp funcOp) {
+CmdDispatchOp::makeOperandToArgMap(mlir::FunctionOpInterface funcOp) {
   unsigned operandCount =
       llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
         return !llvm::isa<IREE::Stream::BindingType>(type);
@@ -3010,7 +3008,7 @@ CmdDispatchOp::makeOperandToArgMap(mlir::func::FuncOp funcOp) {
 
 // static
 SmallVector<unsigned>
-CmdDispatchOp::makeResourceToArgMap(mlir::func::FuncOp funcOp) {
+CmdDispatchOp::makeResourceToArgMap(mlir::FunctionOpInterface funcOp) {
   unsigned operandCount =
       llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
         return llvm::isa<IREE::Stream::BindingType>(type);
@@ -3727,7 +3725,7 @@ LogicalResult ExecutableExportOp::verify() {
   return success();
 }
 
-::mlir::func::FuncOp ExecutableExportOp::lookupFunctionRef() {
+mlir::FunctionOpInterface ExecutableExportOp::lookupFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
   if (!executableOp)
@@ -3735,7 +3733,8 @@ LogicalResult ExecutableExportOp::verify() {
   auto innerModuleOp = executableOp.getInnerModule();
   if (!innerModuleOp)
     return {};
-  return innerModuleOp.lookupSymbol<::mlir::func::FuncOp>(getFunctionRef());
+  return innerModuleOp.lookupSymbol<mlir::FunctionOpInterface>(
+      getFunctionRef());
 }
 
 //===----------------------------------------------------------------------===//

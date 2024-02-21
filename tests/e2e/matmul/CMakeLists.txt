@@ -10,16 +10,16 @@
 
 iree_add_all_subdirs()
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_arm_sme_nondt_f32_small
+    e2e_matmul_cpu_arm_sme_nondt_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -27,20 +27,21 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_arm_sme_nondt_f32_large
+    e2e_matmul_cpu_arm_sme_nondt_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -48,20 +49,21 @@ iree_generated_trace_runner_test(
     "local-task"
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_i8_i32_small
+    e2e_matmul_cpu_dt_i8_i32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -79,16 +81,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_i8_i32_large
+    e2e_matmul_cpu_dt_i8_i32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -107,16 +109,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f32_f32_small
+    e2e_matmul_cpu_dt_f32_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -133,16 +135,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f32_f32_large
+    e2e_matmul_cpu_dt_f32_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -160,16 +162,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f16_f16_small
+    e2e_matmul_cpu_dt_f16_f16_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f16"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -188,16 +190,16 @@ iree_generated_trace_runner_test(
     "arm_64:fullfp16:+fullfp16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f16_f16_large
+    e2e_matmul_cpu_dt_f16_f16_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f16"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -218,16 +220,16 @@ iree_generated_trace_runner_test(
     "arm_64:fullfp16:+fullfp16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f16_f32_small
+    e2e_matmul_cpu_dt_f16_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -246,16 +248,16 @@ iree_generated_trace_runner_test(
     "arm_64:fp16fml:+fp16fml"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_f16_f32_large
+    e2e_matmul_cpu_dt_f16_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -276,16 +278,16 @@ iree_generated_trace_runner_test(
     "arm_64:fp16fml:+fp16fml"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_bf16_bf16_small
+    e2e_matmul_cpu_dt_bf16_bf16_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=bf16"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -305,16 +307,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_bf16_bf16_large
+    e2e_matmul_cpu_dt_bf16_bf16_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=bf16"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -336,16 +338,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_bf16_f32_small
+    e2e_matmul_cpu_dt_bf16_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -365,16 +367,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_bf16_f32_large
+    e2e_matmul_cpu_dt_bf16_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -396,16 +398,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_i8_i32_small
+    e2e_matmul_cpu_dt_uk_i8_i32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -423,16 +425,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_i8_i32_large
+    e2e_matmul_cpu_dt_uk_i8_i32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--acc_type=i32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -451,16 +453,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512vnni:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq,+avx512vnni"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f32_f32_small
+    e2e_matmul_cpu_dt_uk_f32_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -477,16 +479,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f32_f32_large
+    e2e_matmul_cpu_dt_uk_f32_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -504,16 +506,16 @@ iree_generated_trace_runner_test(
     "x86_64:avx512:+avx,+avx2,+fma,+f16c,+avx512f,+avx512vl,+avx512cd,+avx512bw,+avx512dq"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f16_f16_small
+    e2e_matmul_cpu_dt_uk_f16_f16_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f16"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -532,16 +534,16 @@ iree_generated_trace_runner_test(
     "arm_64:fullfp16:+fullfp16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f16_f16_large
+    e2e_matmul_cpu_dt_uk_f16_f16_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f16"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -562,16 +564,16 @@ iree_generated_trace_runner_test(
     "arm_64:fullfp16:+fullfp16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f16_f32_small
+    e2e_matmul_cpu_dt_uk_f16_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -590,16 +592,16 @@ iree_generated_trace_runner_test(
     "arm_64:fp16fml:+fp16fml"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f16_f32_large
+    e2e_matmul_cpu_dt_uk_f16_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -620,16 +622,16 @@ iree_generated_trace_runner_test(
     "arm_64:fp16fml:+fp16fml"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_bf16_bf16_small
+    e2e_matmul_cpu_dt_uk_bf16_bf16_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=bf16"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -649,16 +651,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_bf16_bf16_large
+    e2e_matmul_cpu_dt_uk_bf16_bf16_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=bf16"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -680,16 +682,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_bf16_f32_small
+    e2e_matmul_cpu_dt_uk_bf16_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -709,16 +711,16 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_bf16_f32_large
+    e2e_matmul_cpu_dt_uk_bf16_f32_large
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=bf16"
     "--acc_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "llvm-cpu"
@@ -740,15 +742,15 @@ iree_generated_trace_runner_test(
     "arm_64:bf16:+bf16"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_i8_small
+    e2e_matmul_vmvx_dt_uk_i8_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vmvx"
@@ -759,15 +761,15 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_dt_uk_f32_small
+    e2e_matmul_vmvx_dt_uk_f32_small
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=small"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vmvx"
@@ -778,16 +780,16 @@ iree_generated_trace_runner_test(
     "--iree-opt-data-tiling"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt
+    e2e_matmul_cuda_f32_large_simt
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulSimt"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -801,16 +803,16 @@ iree_generated_trace_runner_test(
     "requires-gpu-nvidia"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore
+    e2e_matmul_cuda_f32_large_tensorcore
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCore"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -826,15 +828,15 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_unaligned
+    e2e_matmul_cuda_f32_large_unaligned
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -850,15 +852,15 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_unaligned
+    e2e_matmul_cuda_f16_large_unaligned
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -874,16 +876,16 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync
+    e2e_matmul_cuda_f32_large_mma_sync
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -899,16 +901,16 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_LLVMGPUMatmulTensorCore
+    e2e_matmul_cuda_f16_large_tensorcore
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCore"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -924,16 +926,16 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync
+    e2e_matmul_cuda_f16_large_mma_sync
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulTensorCoreMmaSync"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -949,15 +951,15 @@ iree_generated_trace_runner_test(
     "requires-gpu-sm80"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_large_split_k
+    e2e_matmul_cuda_f32_large_splitk
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=large"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "cuda"
@@ -974,16 +976,16 @@ iree_generated_trace_runner_test(
     "noriscv"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_i8_gpu_large_valhall
+    e2e_matmul_vulkan_i8_large_valhall
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -996,16 +998,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_valhall
+    e2e_matmul_vulkan_f16_large_valhall
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -1018,16 +1020,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_valhall
+    e2e_matmul_vulkan_f32_large_valhall
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeMali"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -1040,16 +1042,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_i8_gpu_large_ampere
+    e2e_matmul_vulkan_i8_large_ampere
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=i8"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -1062,16 +1064,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_ampere
+    e2e_matmul_vulkan_f16_large_ampere
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -1084,16 +1086,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f32_gpu_large_ampere
+    e2e_matmul_vulkan_f32_large_ampere
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVVectorizeNVIDIA"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"
@@ -1106,16 +1108,16 @@ iree_generated_trace_runner_test(
     "vulkan_uses_vk_khr_shader_float16_int8"
 )
 
-iree_generated_trace_runner_test(
+iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_direct_f16_gpu_large_rdna3
+    e2e_matmul_vulkan_f16_large_rdna3
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--shapes=gpu_large_aligned"
     "--compilation_info=SPIRVCooperativeMatrixVectorize"
-  TRACE_RUNNER
+  TEST_RUNNER
     iree-e2e-matmul-test
   TARGET_BACKENDS
     "vulkan-spirv"

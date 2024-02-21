@@ -1,24 +1,7 @@
-
-// RUN: iree-opt %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-abi-transformation-pipeline \
-// RUN:     --iree-flow-transformation-pipeline  \
-// RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
-// RUN:     --iree-stream-transformation-pipeline \
-// RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmgpu-lower-executable-target)))' \
-// RUN:     --iree-codegen-transform-dialect-library=%p/softmax_codegen_spec.mlir \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false | \
-// RUN: FileCheck %s --check-prefix=CHECK-SHUFFLE
-
-/// Constant JIT'ing must be disabled because the transform-dialect debug
-/// flags leak to the JIT session, which doesn't know what to do with them.
 // RUN: iree-compile %s --iree-hal-target-backends=cuda \
-// RUN:     --iree-opt-const-expr-hoisting=false --iree-opt-const-eval=false \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-flow-dispatch-use-transform-dialect=%p/softmax_dispatch_spec.mlir \
-// RUN:     --iree-codegen-transform-dialect-library=%p/softmax_codegen_spec.mlir \
-// RUN:     --iree-codegen-use-transform-dialect-strategy=codegen | \
+// RUN:     --iree-codegen-transform-dialect-library=%p/softmax_codegen_spec.mlir@codegen | \
 // RUN: iree-run-module --module=- --function=softmax --device=cuda | \
 // RUN: FileCheck %s
 
@@ -26,12 +9,6 @@
 !tmp_tensor_t = tensor<16x128xf32>
 !in_tensor_t = tensor<16x128x128xf32>
 !out_tensor_t = tensor<16x128x128xf32>
-
-// Compilation checks that shuffles are produced.
-// CHECK-SHUFFLE: vector.reduction <maximumf>
-// CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
-// CHECK-SHUFFLE: vector.reduction <add>
-// CHECK-SHUFFLE-COUNT-5: gpu.shuffle  xor
 
 // Execution only checks that @softmax runs.
 //      CHECK: EXEC @softmax

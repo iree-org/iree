@@ -43,13 +43,13 @@ util.initializer {
   %did_map, %result = stream.resource.try_map %1[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c192}
   util.global.store %result, @_constant : !stream.resource<constant>
   util.global.store %0, @_constant__timepoint : !stream.timepoint
-  util.initializer.return
+  util.return
 }
 
 stream.executable private @func_a_ex_0 {
   stream.executable.export public @dispatch_0
   builtin.module {
-    func.func @dispatch_0(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
+     util.func public @dispatch_0(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c4 = arith.constant 4 : index
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<4xi32>>
@@ -72,7 +72,7 @@ stream.executable private @func_a_ex_0 {
         } -> tensor<?xi32>
         flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<4xi32>>
       }
-      return
+      util.return
     }
   }
 }
@@ -80,7 +80,7 @@ stream.executable private @func_a_ex_0 {
 stream.executable private @func_a_ex_1 {
   stream.executable.export public @dispatch_1
   builtin.module {
-    func.func @dispatch_1(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
+     util.func public @dispatch_1(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c3 = arith.constant 3 : index
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<3xi32>>
@@ -103,12 +103,12 @@ stream.executable private @func_a_ex_1 {
         } -> tensor<?xi32>
         flow.dispatch.tensor.store %9, %2, offsets = [%arg3], sizes = [%5], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<3xi32>>
       }
-      return
+      util.return
     }
   }
 }
 
-func.func public @func_a() -> (tensor<4xi32>, tensor<4xi32>) {
+util.func public @func_a() -> (tensor<4xi32>, tensor<4xi32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -144,5 +144,5 @@ func.func public @func_a() -> (tensor<4xi32>, tensor<4xi32>) {
   %5 = stream.tensor.export %4 : tensor<4xi32> in !stream.resource<external>{%c16} -> tensor<4xi32>
   %6 = stream.timepoint.await %1 => %0 : !stream.resource<external>{%c16}
   %7 = stream.tensor.export %6 : tensor<4xi32> in !stream.resource<external>{%c16} -> tensor<4xi32>
-  return %5, %7 : tensor<4xi32>, tensor<4xi32>
+  util.return %5, %7 : tensor<4xi32>, tensor<4xi32>
 }

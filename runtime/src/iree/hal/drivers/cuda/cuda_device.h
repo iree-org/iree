@@ -1,4 +1,4 @@
-// Copyright 2021 The IREE Authors
+// Copyright 2023 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -10,7 +10,8 @@
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/cuda/api.h"
-#include "iree/hal/drivers/cuda/dynamic_symbols.h"
+#include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
+#include "iree/hal/drivers/cuda/nccl_dynamic_symbols.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,10 +21,19 @@ extern "C" {
 iree_status_t iree_hal_cuda_device_create(
     iree_hal_driver_t* driver, iree_string_view_t identifier,
     const iree_hal_cuda_device_params_t* params,
-    iree_hal_cuda_dynamic_symbols_t* syms, CUdevice device,
+    const iree_hal_cuda_dynamic_symbols_t* symbols,
+    const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols, CUdevice device,
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-// Returns a CUDA context bound to the given |device| if it is a CUDA device
+// Creates a CUDA stream-backed command buffer using resources from the the
+// given |base_device|.
+iree_status_t iree_hal_cuda_device_create_stream_command_buffer(
+    iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_host_size_t binding_capacity,
+    iree_hal_command_buffer_t** out_command_buffer);
+
+// Returns the CUDA context bound to the given |device| if it is a CUDA device
 // and otherwise returns NULL.
 //
 // WARNING: this API is unsafe and unstable. HAL devices may have any number of
@@ -38,7 +48,7 @@ CUcontext iree_hal_cuda_device_context(iree_hal_device_t* device);
 // themselves or maintain their own dynamic linking support: the IREE runtime
 // only provides the symbols required by the HAL driver and not the entirety of
 // the API.
-iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
+const iree_hal_cuda_dynamic_symbols_t* iree_hal_cuda_device_dynamic_symbols(
     iree_hal_device_t* device);
 
 #ifdef __cplusplus

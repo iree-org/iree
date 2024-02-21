@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Tests for end-to-end IREE support of entire models or their close derivatives.
-
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
@@ -16,7 +14,11 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT IREE_HAL_DRIVER_CUDA OR NOT IREE_TARGET_BACKEND_CUDA)
+if(NOT IREE_HAL_DRIVER_CUDA)
+  return()
+endif()
+
+if(NOT IREE_HOST_BIN_DIR AND NOT IREE_TARGET_BACKEND_CUDA)
   return()
 endif()
 """,
@@ -26,7 +28,6 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        "mma.mlir",
         # TODO(#15892): reductions have flakes and need to be triaged.
         # "reduction.mlir",
         # "reduction_eltwise.mlir",

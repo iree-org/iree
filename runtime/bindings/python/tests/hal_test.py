@@ -8,11 +8,13 @@ import iree.runtime
 
 import gc
 import numpy as np
+import threading
+import time
 import unittest
 
 
 class NonDeviceHalTest(unittest.TestCase):
-    def testEnums(self):
+    def testMemoryEnums(self):
         print("MemoryType:", iree.runtime.MemoryType)
         print("HOST_VISIBLE:", int(iree.runtime.MemoryType.HOST_VISIBLE))
 
@@ -60,6 +62,13 @@ class NonDeviceHalTest(unittest.TestCase):
             iree.runtime.MemoryType.OPTIMAL & iree.runtime.MemoryType.OPTIMAL,
             int(iree.runtime.MemoryType.OPTIMAL),
         )
+
+    def testElementTypeEnums(self):
+        i8 = iree.runtime.HalElementType.INT_8
+        i4 = iree.runtime.HalElementType.INT_4
+        self.assertTrue(iree.runtime.HalElementType.is_byte_aligned(i8))
+        self.assertFalse(iree.runtime.HalElementType.is_byte_aligned(i4))
+        self.assertEqual(1, iree.runtime.HalElementType.dense_byte_count(i8))
 
 
 class DeviceHalTest(unittest.TestCase):
@@ -143,6 +152,7 @@ class DeviceHalTest(unittest.TestCase):
             repr(bv),
             "<HalBufferView (1, 2), element_type=0x10000010, 13 bytes (at offset 0 into 13), memory_type=DEVICE_LOCAL|HOST_VISIBLE, allowed_access=ALL, allowed_usage=TRANSFER|DISPATCH_STORAGE|MAPPING|MAPPING_PERSISTENT>",
         )
+        self.assertEqual(4, bv.byte_length)
 
     def testBufferMap(self):
         buffer = self.allocator.allocate_buffer(
@@ -200,6 +210,52 @@ class DeviceHalTest(unittest.TestCase):
         sem1.signal(2)
         self.assertEqual(sem1.query(), 2)
 
+    def testSemaphoreSignal(self):
+        sem = self.device.create_semaphore(0)
+        self.assertFalse(sem.wait(1, deadline=0))
+        sem.signal(1)
+        self.assertTrue(sem.wait(1, deadline=0))
+
+    def testSynchronousSemaphoreFailed(self):
+        sem = self.device.create_semaphore(0)
+        sem.fail("TEST FAILURE")
+        with self.assertRaisesRegex(
+            RuntimeError, "^synchronous semaphore failure.*TEST FAILURE"
+        ):
+            sem.wait(1, deadline=0)
+
+    def testAsynchronousSemaphoreFailed(self):
+        sem = self.device.create_semaphore(0)
+        exceptions = []
+
+        def run():
+            print("SIGNALLING ASYNC FAILURE")
+            time.sleep(0.2)
+            sem.fail("TEST FAILURE")
+            print("SIGNALLED")
+
+        def wait():
+            print("WAITING")
+            try:
+                sem.wait(1)
+            except RuntimeError as e:
+                exceptions.append(e)
+
+        runner = threading.Thread(target=run)
+        waiter = threading.Thread(target=wait)
+        waiter.start()
+        runner.start()
+        waiter.join()
+        runner.join()
+        self.assertTrue(exceptions)
+        print(exceptions)
+        # Note: It is impossible to 100% guarantee that this sequences such as to
+        # report an asynchronous vs synchronous failure, although we tip the odds in
+        # this favor with the sleep in the signalling thread. Therefore, we do not
+        # check the "asynchronous" vs "synchronous" message prefix to avoid flaky
+        # test races.
+        self.assertIn("TEST FAILURE", str(exceptions[0]))
+
     def testTrivialQueueAlloc(self):
         sem = self.device.create_semaphore(0)
         buf = self.device.queue_alloca(
@@ -226,16 +282,64 @@ class DeviceHalTest(unittest.TestCase):
         self.device.queue_dealloca(
             buf, wait_semaphores=fence1, signal_semaphores=fence2
         )
-        fence2.wait()
+        self.assertTrue(fence2.wait())
         self.assertEqual(sem.query(), 2)
 
     def testFenceCreateAt(self):
         sem = self.device.create_semaphore(0)
         fence = iree.runtime.HalFence.create_at(sem, 1)
-        with self.assertRaisesRegex(RuntimeError, "DEADLINE_EXCEEDED"):
-            fence.wait(deadline=0)
+        self.assertFalse(fence.wait(deadline=0))
         sem.signal(1)
-        fence.wait(deadline=0)
+        self.assertTrue(fence.wait(deadline=0))
+
+    def testFenceSignal(self):
+        sem = self.device.create_semaphore(0)
+        fence = iree.runtime.HalFence.create_at(sem, 1)
+        self.assertFalse(fence.wait(deadline=0))
+        fence.signal()
+        self.assertTrue(fence.wait(deadline=0))
+
+    def testSynchronousFenceFailed(self):
+        sem = self.device.create_semaphore(0)
+        fence = iree.runtime.HalFence.create_at(sem, 1)
+        fence.fail("TEST FAILURE")
+        with self.assertRaisesRegex(
+            RuntimeError, "^synchronous fence failure.*TEST FAILURE"
+        ):
+            fence.wait(deadline=0)
+
+    def testAsynchronousFenceFailed(self):
+        sem = self.device.create_semaphore(0)
+        fence = iree.runtime.HalFence.create_at(sem, 1)
+        exceptions = []
+
+        def run():
+            print("SIGNALLING ASYNC FAILURE")
+            time.sleep(0.2)
+            fence.fail("TEST FAILURE")
+            print("SIGNALLED")
+
+        def wait():
+            print("WAITING")
+            try:
+                fence.wait()
+            except RuntimeError as e:
+                exceptions.append(e)
+
+        runner = threading.Thread(target=run)
+        waiter = threading.Thread(target=wait)
+        waiter.start()
+        runner.start()
+        waiter.join()
+        runner.join()
+        self.assertTrue(exceptions)
+        print(exceptions)
+        # Note: It is impossible to 100% guarantee that this sequences such as to
+        # report an asynchronous vs synchronous failure, although we tip the odds in
+        # this favor with the sleep in the signalling thread. Therefore, we do not
+        # check the "asynchronous" vs "synchronous" message prefix to avoid flaky
+        # test races.
+        self.assertIn("TEST FAILURE", str(exceptions[0]))
 
     def testFenceJoin(self):
         sem1 = self.device.create_semaphore(0)

@@ -344,7 +344,8 @@ void ExFileFromMemoryOp::getAsmResultNames(
 LogicalResult ReturnOp::verify() {
   ReturnOp op = *this;
 
-  auto parentFuncOp = dyn_cast_or_null<FunctionOpInterface>(op->getParentOp());
+  auto parentFuncOp =
+      dyn_cast_or_null<mlir::FunctionOpInterface>(op->getParentOp());
   if (parentFuncOp) {
     auto expectedTypes = parentFuncOp.getResultTypes();
     if (op.getNumOperands() != expectedTypes.size()) {
@@ -716,7 +717,116 @@ Value BufferSubspanOp::getResultSize(unsigned idx) { return getLength(); }
 
 void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "len");
+  setNameFn(getResult(), "length");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.element_type
+//===----------------------------------------------------------------------===//
+
+// Keep these in sync with iree/hal/buffer_view.h
+enum class NumericalType : uint32_t {
+  kUnknown = 0x00,
+  kInteger = 0x10,
+  kIntegerSigned = kInteger | 0x01,
+  kIntegerUnsigned = kInteger | 0x02,
+  kBoolean = kInteger | 0x03,
+  kFloat = 0x20,
+  kFloatIEEE = kFloat | 0x01,
+  kFloatBrain = kFloat | 0x02,
+  kFloatComplex = kFloat | 0x03,
+};
+
+constexpr inline int32_t makeElementTypeValue(NumericalType numericalType,
+                                              int32_t bitCount) {
+  return (static_cast<uint32_t>(numericalType) << 24) | bitCount;
+}
+
+// static
+std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
+  if (auto intType = llvm::dyn_cast_if_present<IntegerType>(type)) {
+    NumericalType numericalType;
+    if (intType.isInteger(1)) {
+      return makeElementTypeValue(NumericalType::kBoolean, 8);
+    } else if (intType.isSigned()) {
+      numericalType = NumericalType::kIntegerSigned;
+    } else if (intType.isUnsigned()) {
+      numericalType = NumericalType::kIntegerUnsigned;
+    } else {
+      // There's no such thing as a signless integer in machine types but we
+      // need to be able to round-trip the format through the ABI. Exact
+      // numerical type equality comparisons may fail if the frontend assumes
+      // signed/unsigned but the compiler is propagating signless.
+      numericalType = NumericalType::kInteger;
+    }
+    return makeElementTypeValue(numericalType, intType.getWidth());
+  } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
+    switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
+    case APFloat::S_IEEEhalf:
+    case APFloat::S_IEEEsingle:
+    case APFloat::S_IEEEdouble:
+    case APFloat::S_IEEEquad:
+      return makeElementTypeValue(NumericalType::kFloatIEEE,
+                                  floatType.getWidth());
+    case APFloat::S_BFloat:
+      return makeElementTypeValue(NumericalType::kFloatBrain,
+                                  floatType.getWidth());
+    default:
+      return std::nullopt;
+    }
+  } else if (auto complexType = llvm::dyn_cast_if_present<ComplexType>(type)) {
+    return makeElementTypeValue(
+        NumericalType::kFloatComplex,
+        complexType.getElementType().getIntOrFloatBitWidth() * 2);
+  }
+  return std::nullopt;
+}
+
+void ElementTypeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // We could make this match the C names.
+  std::string name;
+  llvm::raw_string_ostream os(name);
+  os << "element_type_";
+  os << getTypeAttr();
+  setNameFn(getResult(), name);
+}
+
+LogicalResult ElementTypeOp::verify() {
+  ElementTypeOp op = *this;
+  auto value = getTypeValue(getTypeAttr().getValue());
+  if (!value.has_value()) {
+    return op.emitOpError("unsupported element type");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.encoding_type
+//===----------------------------------------------------------------------===//
+
+// static
+std::optional<int32_t> EncodingTypeOp::getTypeValue(Attribute attr) {
+  // TODO(#6762): encoding attribute handling/mapping to enums.
+  if (attr)
+    return std::nullopt;
+  // Default to IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR for now.
+  return 1;
+}
+
+void EncodingTypeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  if (!getEncodingAttr())
+    setNameFn(getResult(), "dense_row_major");
+}
+
+LogicalResult EncodingTypeOp::verify() {
+  EncodingTypeOp op = *this;
+  auto value = getTypeValue(getEncodingAttr());
+  if (!value.has_value()) {
+    return op.emitOpError("unsupported encoding type");
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -840,15 +950,6 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.lookup
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutLookupOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set_layout");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.device.allocator
 //===----------------------------------------------------------------------===//
 
@@ -870,6 +971,17 @@ LogicalResult DeviceQueryOp::verify() {
     }
   }
   return success();
+}
+
+// static
+Value DeviceQueryOp::createI1(Location loc, Value device, StringRef category,
+                              StringRef key, OpBuilder &builder) {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device, builder.getStringAttr(category),
+          builder.getStringAttr(key), builder.getIntegerAttr(i1Type, 0))
+      .getValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1409,7 +1521,7 @@ void ExecutableConstantBlockOp::print(OpAsmPrinter &p) {
   ArrayRef<Type> argTypes = getArgumentTypes();
   ArrayRef<Type> resultTypes = getResultTypes();
   mlir::function_interface_impl::printFunctionSignature(
-      p, cast<FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
+      p, cast<mlir::FunctionOpInterface>(op), argTypes, /*isVariadic=*/false,
       resultTypes);
   p << " as ";
   if (resultTypes.size() != 1)
@@ -1485,6 +1597,7 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), StringRef("exe"));
 }
 
@@ -1494,7 +1607,18 @@ void ExecutableCreateOp::getAsmResultNames(
 
 void ExecutableLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), "exe");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.export.ordinal
+//===----------------------------------------------------------------------===//
+
+void ExecutableExportOrdinalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
+  setNameFn(getResult(), "ordinal");
 }
 
 //===----------------------------------------------------------------------===//

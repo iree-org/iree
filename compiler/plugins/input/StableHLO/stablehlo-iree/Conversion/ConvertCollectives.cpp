@@ -45,55 +45,6 @@ namespace {
 // mode combinations for cross-replica and cross partition communication. See
 // the stablehlo specification for more details about the different modes.
 
-static std::optional<IREE::Flow::CollectiveElementType>
-convertToFlowCollectiveElementType(Type type) {
-  if (type.isF32()) {
-    return IREE::Flow::CollectiveElementType::Float32;
-  }
-
-  if (type.isInteger(32)) {
-    if (type.isSignedInteger()) {
-      return IREE::Flow::CollectiveElementType::Sint32;
-    }
-    return IREE::Flow::CollectiveElementType::Uint32;
-  }
-
-  if (type.isF16()) {
-    return IREE::Flow::CollectiveElementType::Float16;
-  }
-
-  if (type.isInteger(8)) {
-    if (type.isSignedInteger()) {
-      return IREE::Flow::CollectiveElementType::Sint8;
-    }
-    return IREE::Flow::CollectiveElementType::Uint8;
-  }
-
-  if (type.isInteger(16)) {
-    if (type.isSignedInteger()) {
-      return IREE::Flow::CollectiveElementType::Sint16;
-    }
-    return IREE::Flow::CollectiveElementType::Uint16;
-  }
-
-  if (type.isBF16()) {
-    return IREE::Flow::CollectiveElementType::BFloat16;
-  }
-
-  if (type.isF64()) {
-    return IREE::Flow::CollectiveElementType::Float64;
-  }
-
-  if (type.isInteger(64)) {
-    if (type.isSignedInteger()) {
-      return IREE::Flow::CollectiveElementType::Sint64;
-    }
-    return IREE::Flow::CollectiveElementType::Uint64;
-  }
-
-  return std::nullopt;
-}
-
 static std::optional<IREE::Flow::CollectiveReductionOp>
 convertToFlowCollectiveReductionOp(const Operation &op) {
   if (isa<mlir::stablehlo::AddOp>(op)) {
@@ -111,17 +62,6 @@ convertToFlowCollectiveReductionOp(const Operation &op) {
   // TODO: we may be able to detect an average operation and convert it
   // into IREE::Flow::CollectiveReductionOp::ReductionAverage.
   return std::nullopt;
-}
-
-static IREE::Flow::CollectiveElementTypeAttr
-getCollectiveElementTypeAttr(MLIRContext *context, RankedTensorType type) {
-  std::optional<IREE::Flow::CollectiveElementType> collectiveElemType =
-      convertToFlowCollectiveElementType(type.getElementType());
-  if (!collectiveElemType) {
-    return IREE::Flow::CollectiveElementTypeAttr();
-  }
-  return IREE::Flow::CollectiveElementTypeAttr::get(context,
-                                                    *collectiveElemType);
 }
 
 template <typename T>
@@ -553,7 +493,7 @@ struct AllGatherOpConversion final
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
-        getCollectiveElementTypeAttr(op.getContext(), resultType);
+        IREE::Flow::getCollectiveElementTypeAttr(resultType);
     if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(
           op, "unsupported element type for collective op");
@@ -649,7 +589,7 @@ struct AllReduceOpConversion final
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
-        getCollectiveElementTypeAttr(op.getContext(), inputType);
+        IREE::Flow::getCollectiveElementTypeAttr(inputType);
     if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(op, "unsupported input type");
     }
@@ -738,7 +678,7 @@ struct AllToAllOpConversion final
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
-        getCollectiveElementTypeAttr(op.getContext(), resultType);
+        IREE::Flow::getCollectiveElementTypeAttr(resultType);
     if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(
           op, "unsupported element type for collective op");
@@ -842,7 +782,7 @@ struct ReduceScatterOpConversion final
     // Get the collective element type attribute.
     auto resultType = cast<RankedTensorType>(op.getResult().getType());
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
-        getCollectiveElementTypeAttr(op.getContext(), resultType);
+        IREE::Flow::getCollectiveElementTypeAttr(resultType);
     if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(op, "unsupported input type");
     }
@@ -932,7 +872,7 @@ struct CollectivePermuteOpConversion
 
     // Get the collective element type attribute.
     IREE::Flow::CollectiveElementTypeAttr elementTypeAttr =
-        getCollectiveElementTypeAttr(op.getContext(), inputType);
+        IREE::Flow::getCollectiveElementTypeAttr(inputType);
     if (!elementTypeAttr) {
       return rewriter.notifyMatchFailure(op, "unsupported input type");
     }

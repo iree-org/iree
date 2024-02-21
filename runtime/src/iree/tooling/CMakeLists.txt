@@ -48,7 +48,6 @@ iree_cc_library(
     "comparison.cc"
   DEPS
     ::buffer_view_matchers
-    ::vm_util
     iree::base
     iree::base::internal::flags
     iree::base::internal::span
@@ -65,7 +64,7 @@ iree_cc_test(
     "comparison_test.cc"
   DEPS
     ::comparison
-    ::vm_util
+    ::function_io
     iree::base
     iree::base::internal::span
     iree::hal
@@ -122,6 +121,56 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    function_io
+  HDRS
+    "function_io.h"
+  SRCS
+    "function_io.c"
+  DEPS
+    ::numpy_io
+    iree::base
+    iree::hal
+    iree::io::stdio_stream
+    iree::io::stream
+    iree::io::vec_stream
+    iree::modules::hal
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    function_io_test
+  SRCS
+    "function_io_test.cc"
+  DEPS
+    ::function_io
+    iree::base
+    iree::hal
+    iree::io::vec_stream
+    iree::modules::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+    iree::vm
+)
+
+iree_cc_library(
+  NAME
+    function_util
+  HDRS
+    "function_util.h"
+  SRCS
+    "function_util.c"
+  DEPS
+    iree::base
+    iree::hal
+    iree::modules::hal
+    iree::vm
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     instrument_util
   HDRS
     "instrument_util.h"
@@ -147,6 +196,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::hal
+    iree::io::stream
   PUBLIC
 )
 
@@ -158,7 +208,8 @@ iree_cc_test(
   DEPS
     ::device_util
     ::numpy_io
-    iree::base::internal::file_io
+    iree::io::memory_stream
+    iree::io::vec_stream
     iree::testing::gtest
     iree::testing::gtest_main
     iree::tooling::testdata::npy
@@ -202,92 +253,18 @@ iree_cc_library(
     ::comparison
     ::context_util
     ::device_util
+    ::function_io
+    ::function_util
     ::instrument_util
-    ::vm_util
     iree::base
     iree::base::internal::flags
     iree::hal
+    iree::io::stdio_stream
     iree::modules::hal::types
     iree::vm
     iree::vm::bytecode::module
   PUBLIC
 )
-
-iree_cc_library(
-  NAME
-    vm_util
-  HDRS
-    "vm_util.h"
-  SRCS
-    "vm_util.c"
-  DEPS
-    ::numpy_io
-    iree::base
-    iree::base::internal::file_io
-    iree::hal
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode::module
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    vm_util_test
-  SRCS
-    "vm_util_test.cc"
-  DEPS
-    ::device_util
-    ::vm_util
-    iree::base
-    iree::base::internal::span
-    iree::hal
-    iree::modules::hal
-    iree::testing::gtest
-    iree::testing::gtest_main
-    iree::vm
-)
-
-# libyaml does not build cleanly on bare-metal systems
-if(IREE_ENABLE_THREADING)
-
-iree_cc_library(
-  NAME
-    trace_replay
-  HDRS
-    "trace_replay.h"
-  SRCS
-    "trace_replay.c"
-  DEPS
-    ::device_util
-    ::numpy_io
-    ::yaml_util
-    iree::base
-    iree::base::internal
-    iree::base::internal::file_io
-    iree::base::internal::path
-    iree::hal
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode::module
-    yaml
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    yaml_util
-  HDRS
-    "yaml_util.h"
-  SRCS
-    "yaml_util.c"
-  DEPS
-    iree::base
-    yaml
-  PUBLIC
-)
-
-endif()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 

@@ -8,16 +8,14 @@
 #define IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASS_DETAIL_H_
 
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-namespace Inline {
+namespace mlir::iree_compiler::IREE::HAL::Inline {
 
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Modules/HAL/Inline/Transforms/Passes.h.inc"
 
-} // namespace Inline
-} // namespace mlir::iree_compiler::IREE::HAL
+} // namespace mlir::iree_compiler::IREE::HAL::Inline
 
 #endif // IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASS_DETAIL_H_

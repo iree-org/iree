@@ -807,6 +807,7 @@ class BuildFileFunctions(object):
         srcs,
         target_backends_and_drivers=None,
         compiler_flags=None,
+        input_type=None,
         runner_args=None,
         tags=None,
         target_cpu_features_variants=None,
@@ -830,6 +831,7 @@ class BuildFileFunctions(object):
         compiler_flags_block = self._convert_string_list_block(
             "COMPILER_FLAGS", compiler_flags
         )
+        input_type_block = self._convert_string_arg_block("INPUT_TYPE", input_type)
         runner_args_block = self._convert_string_list_block("RUNNER_ARGS", runner_args)
         labels_block = self._convert_string_list_block("LABELS", tags)
         target_cpu_features_variants_block = self._convert_string_list_block(
@@ -844,6 +846,7 @@ class BuildFileFunctions(object):
             f"{target_backends_block}"
             f"{drivers_block}"
             f"{compiler_flags_block}"
+            f"{input_type_block}"
             f"{runner_args_block}"
             f"{labels_block}"
             f"{target_cpu_features_variants_block}"
@@ -851,12 +854,12 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def iree_generated_trace_runner_test(
+    def iree_generated_e2e_matmul_test(
         self,
         name,
         generator,
         generator_args=None,
-        trace_runner=None,
+        test_runner=None,
         target_backends_and_drivers=None,
         compiler_flags=None,
         runner_args=None,
@@ -882,7 +885,7 @@ class BuildFileFunctions(object):
         generator_args_block = self._convert_string_list_block(
             "GENERATOR_ARGS", generator_args
         )
-        trace_runner_block = self._convert_target_block("TRACE_RUNNER", trace_runner)
+        test_runner_block = self._convert_target_block("TEST_RUNNER", test_runner)
         target_backends_block = self._convert_string_list_block(
             "TARGET_BACKENDS", target_backends
         )
@@ -897,11 +900,11 @@ class BuildFileFunctions(object):
         )
 
         self._converter.body += (
-            f"iree_generated_trace_runner_test(\n"
+            f"iree_generated_e2e_matmul_test(\n"
             f"{name_block}"
             f"{generator_block}"
             f"{generator_args_block}"
-            f"{trace_runner_block}"
+            f"{test_runner_block}"
             f"{target_backends_block}"
             f"{drivers_block}"
             f"{compiler_flags_block}"

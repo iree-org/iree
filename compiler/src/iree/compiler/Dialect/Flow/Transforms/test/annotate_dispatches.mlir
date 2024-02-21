@@ -31,14 +31,14 @@ flow.executable private @ex1 {
     }
   }
 }
-func.func @main() -> (tensor<4x8xf32>, tensor<8x4xf32>) {
+util.func public @main() -> (tensor<4x8xf32>, tensor<8x4xf32>) {
   %c100 = arith.constant 100 : index
   %c50 = arith.constant 50 : index
   // CHECK: flow.dispatch @ex0::@dispatch0_fill_4x8_f32
   %0 = flow.dispatch @ex0::@dispatch0[%c100, %c50]() : () -> tensor<4x8xf32>
   // CHECK: flow.dispatch @ex1::@dispatch1_fill_8x4_f32
   %1 = flow.dispatch @ex1::@dispatch1[%c100, %c50]() : () -> tensor<8x4xf32>
-  return %0, %1 : tensor<4x8xf32>, tensor<8x4xf32>
+  util.return %0, %1 : tensor<4x8xf32>, tensor<8x4xf32>
 }
 
 // -----
@@ -115,32 +115,32 @@ flow.executable private @ex0 {
   // CHECK: flow.executable.export public @dispatch0_map_DxD_f32
   flow.executable.export public @dispatch0
   builtin.module {
-    func.func @dispatch0(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>) {
+    func.func @dispatch0(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg1: !flow.dispatch.tensor<readonly:tensor<?x?xf32>>, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>) {
       %0 = flow.dispatch.workload.ordinal %arg2, 0 : index
       %1 = flow.dispatch.workload.ordinal %arg3, 1 : index
       %2 = flow.dispatch.workload.ordinal %arg4, 2 : index
       %3 = flow.dispatch.workload.ordinal %arg5, 3 : index
       %4 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1}
       %5 = flow.dispatch.tie_shape %arg1 : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %3}
-      %6 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%2, %3}
+      %6 = flow.dispatch.tie_shape %arg6 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%2, %3}
       %7 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%0, %1} -> tensor<?x?xf32>
       %8 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32>>{%2, %3} -> tensor<?x?xf32>
       %mapped = linalg.map { math.absf } ins(%7 : tensor<?x?xf32>) outs(%8 : tensor<?x?xf32>)
-      %9 = iree_linalg_ext.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
-      flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%arg4, %arg5}
+      %9 = iree_linalg_ext.set_encoding %mapped : tensor<?x?xf32> -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>
+      flow.dispatch.tensor.store %9, %6, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg4, %arg5}
       return
     }
   }
 }
 flow.executable private @ex1 {
-  // CHECK: flow.executable.export public @dispatch1_unset_encoding_MATMUL_LHS_DxD
+  // CHECK: flow.executable.export public @dispatch1_unset_encoding_LHS_DxD
   flow.executable.export public @dispatch1
   builtin.module {
-    func.func @dispatch1(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>, %arg1: index, %arg2: index, %arg3: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
-      %0 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2}
+    func.func @dispatch1(%arg0: !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>, %arg1: index, %arg2: index, %arg3: !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
+      %0 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2}
       %1 = flow.dispatch.tie_shape %arg3 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2} -> tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>>
-      %3 = iree_linalg_ext.unset_encoding %2 : tensor<?x?xf32, #iree_linalg_ext.encoding<user = MATMUL, role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>>{%arg1, %arg2} -> tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>>
+      %3 = iree_linalg_ext.unset_encoding %2 : tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
       flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [%arg1, %arg2], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%arg1, %arg2}
       return
     }

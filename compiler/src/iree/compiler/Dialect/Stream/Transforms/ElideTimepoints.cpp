@@ -515,8 +515,8 @@ public:
   explicit TimepointCoverageAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
-    explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+        TraversalAction::RECURSE);
     explorer.setOpAction<mlir::scf::IfOp>(TraversalAction::RECURSE);
     explorer.setDialectAction<IREE::Stream::StreamDialect>(
         TraversalAction::RECURSE);
@@ -869,7 +869,7 @@ static bool tryElideTimepointsInRegion(Region &region,
         })
         .Case<cf::BranchOp, cf::CondBranchOp>(
             [&](Operation *op) { elideTimepointOperands(op); })
-        .Case<func::ReturnOp, scf::YieldOp>(
+        .Case<IREE::Util::ReturnOp, scf::YieldOp>(
             [&](Operation *op) { elideTimepointOperands(op); });
   });
 

@@ -126,7 +126,8 @@ class BitCastQuantTensorPass
 };
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createBitCastQuantTensorPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createBitCastQuantTensorPass() {
   return std::make_unique<BitCastQuantTensorPass>();
 }
 

@@ -20,6 +20,11 @@
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
+#include "mlir/Interfaces/CallInterfaces.h"
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Util/IR/UtilEnums.h.inc" // IWYU pragma: keep
+// clang-format on
 
 namespace mlir::iree_compiler::IREE::Util {
 
@@ -100,6 +105,11 @@ bool isValueUsableForOp(Value value, Operation *op);
 // Returns true if the move was successful.
 bool tryMoveProducerBefore(Value value, Operation *consumerOp);
 
+// Returns true if the given callable op is public or external (no body).
+// Such callables cannot have their signature changed without (potentially)
+// breaking linking.
+bool isPublicOrExternal(CallableOpInterface callableOp);
+
 //===----------------------------------------------------------------------===//
 // Global and structural interface utilities
 //===----------------------------------------------------------------------===//
@@ -126,6 +136,7 @@ lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
 
 namespace detail {
 
+void getAllTiedOperands(Operation *op, SmallVectorImpl<int64_t> &indices);
 std::optional<unsigned> getTiedResultOperandIndex(Operation *op,
                                                   unsigned resultIndex);
 void setTiedResultOperandIndex(Operation *op, unsigned resultIndex,

@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRMathDialect
     MLIRMathTransforms

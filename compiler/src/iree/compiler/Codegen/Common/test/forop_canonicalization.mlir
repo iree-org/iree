@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --split-input-file --iree-codegen-canonicalize-scf-for --canonicalize | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-canonicalize-scf-for),canonicalize)" | FileCheck %s
 
 func.func @loop_carried_vector_shape_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
   %c0 = arith.constant 0 : index

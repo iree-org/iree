@@ -33,7 +33,6 @@
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
 /experimental/cpu_ukernel/ @bjacob
-/experimental/cuda2/ @antiagainst
 /experimental/dispatch_profiler/ @manishucsd
 /experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
@@ -79,6 +78,6 @@
 # Runtime
 /runtime/src/iree/ @benvanik
 /runtime/src/iree/hal/cts/ @ScottTodd
-/runtime/src/iree/hal/drivers/cuda2/ @antiagainst
+/runtime/src/iree/hal/drivers/cuda/ @antiagainst
 /runtime/src/iree/hal/drivers/metal/ @antiagainst
 /runtime/src/iree/hal/drivers/vulkan/ @antiagainst @ScottTodd

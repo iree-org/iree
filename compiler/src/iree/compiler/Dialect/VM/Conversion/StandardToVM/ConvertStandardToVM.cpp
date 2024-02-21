@@ -46,6 +46,10 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     if (auto version = srcOp->getAttrOfType<IntegerAttr>("vm.version")) {
       newModuleOp.setVersionAttr(version);
     }
+    if (auto reflectionAttr =
+            srcOp->getAttrOfType<DictionaryAttr>("iree.reflection")) {
+      newModuleOp->setAttr("iree.reflection", reflectionAttr);
+    }
     Block *firstCreatedBlock = &newModuleOp.getBodyRegion().front();
     rewriter.inlineRegionBefore(srcOp.getBodyRegion(), firstCreatedBlock);
     auto blockRange = llvm::make_range(Region::iterator(firstCreatedBlock),
@@ -90,7 +94,6 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
   constexpr const char *kRetainedAttributes[] = {
       "iree.reflection",
       "sym_visibility",
-      "noinline",
       "nosideeffects",
   };
   auto retainedAttributes = ArrayRef<const char *>(
@@ -102,6 +105,10 @@ static void copyFuncAttrs(func::FuncOp srcOp, Operation *dstOp) {
     if (attr) {
       dstOp->setAttr(attrName, attr);
     }
+  }
+  if (srcOp->hasAttr("noinline")) {
+    dstOp->setAttr("inlining_policy",
+                   IREE::Util::InlineNeverAttr::get(dstOp->getContext()));
   }
 }
 
@@ -164,9 +171,9 @@ class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
 // override behavior during conversion and don't want to propagate them.
 static void copyImportAttrs(func::FuncOp srcOp, IREE::VM::ImportOp dstOp) {
   constexpr const char *kRetainedAttributes[] = {
-      "noinline",
       "nosideeffects",
       "vm.fallback",
+      "vm.signature",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,
@@ -277,7 +284,7 @@ class CallOpConversion : public OpConversionPattern<func::CallOp> {
     // (Slow) lookup of the target function, which may be an import that we need
     // to perform type conversion for.
     auto calleeOp = SymbolTable::lookupSymbolIn(rootOp, calleeName);
-    if (auto funcOp = dyn_cast_or_null<func::FuncOp>(calleeOp)) {
+    if (auto funcOp = dyn_cast_or_null<FunctionOpInterface>(calleeOp)) {
       if (funcOp.isExternal()) {
         // Import that may require conversion.
         // This case handles when funcs are declared after the call.

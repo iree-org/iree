@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-cleanup-buffer-alloc-view %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-cleanup-buffer-alloc-view))" %s | FileCheck %s
 
 // CHECK-LABEL: func.func @fold_reshape_load()
 func.func @fold_reshape_load() {

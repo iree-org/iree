@@ -711,7 +711,7 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 /// true  : Peel epilogue (no additional checks required)
 /// false : Try and use unpeeled epilogue (check if predication is supported
 /// is avialable)
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUPipeliningPass(bool epiloguePeeling, unsigned depth,
                         PipeliningSchedulingStrategy schedule) {
   return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth, schedule);

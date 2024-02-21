@@ -17,7 +17,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -35,11 +35,12 @@ using IREE::HAL::ExecutableTargetAttr;
 // targeted. For narrow-{M,N} cases, this only enumerates on narrow M. The
 // narrow-N cases are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
+enumerateMatmulTilesVMVX(linalg::ContractionDimensions cDims,
+                         ExecutableTargetAttr target) {
   // TODO(hanchung): The ukernel path does not support 3d
   // codegen.query_tile_sizes op, so we disable dynamic tile shapes for
   // batch_matmul.
-  if (hasUkernel(target) && user != EncodingUser::BATCH_MATMUL) {
+  if (hasUkernel(target) && cDims.batch.empty()) {
     // VMVX+ukernel uses dynamic tile shapes.
     return {TileMxNxK{ShapedType::kDynamic, ShapedType::kDynamic,
                       ShapedType::kDynamic}};
@@ -57,7 +58,7 @@ enumerateMatmulTilesVMVX(EncodingUser user, ExecutableTargetAttr target) {
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileRiscv32(EncodingUser user, ExecutableTargetAttr target) {
+enumerateMatmulTileRiscv32(ExecutableTargetAttr target) {
   if (hasUkernel(target)) {
     return {
         TileMxNxK{8, 8, 4}, // Some reasonable tile shape.
@@ -74,12 +75,7 @@ enumerateMatmulTileRiscv32(EncodingUser user, ExecutableTargetAttr target) {
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
-                         ExecutableTargetAttr target) {
-  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    return {};
-  }
-
+enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
   // Data-tiling for SVE is not implemented yet.
   if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
     return {};
@@ -157,12 +153,7 @@ enumerateMatmulTileArm64(EncodingUser user, TypeRange elementTypes,
 // For narrow-{M,N} cases, this only enumerates on narrow M. The narrow-N cases
 // are handled by transposition in chooseMatmulTile.
 static SmallVector<TileMxNxK>
-enumerateMatmulTileX86_64(EncodingUser user, TypeRange elementTypes,
-                          ExecutableTargetAttr target) {
-  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
-    return {};
-  }
-
+enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
   assert(elementTypes.size() == 3);
   Type lhs = elementTypes[0];
   Type rhs = elementTypes[1];
@@ -353,20 +344,20 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   return bestRatedTile;
 }
 
-SmallVector<TileMxNxK> enumerateMatmulTileMxNxK(EncodingUser user,
-                                                TypeRange elementTypes,
-                                                ExecutableTargetAttr target) {
+SmallVector<TileMxNxK>
+enumerateMatmulTileMxNxK(linalg::ContractionDimensions cDims,
+                         TypeRange elementTypes, ExecutableTargetAttr target) {
   if (isVMVXBackend(target)) {
-    return enumerateMatmulTilesVMVX(user, target);
+    return enumerateMatmulTilesVMVX(cDims, target);
   }
   if (isAArch64(target)) {
-    return enumerateMatmulTileArm64(user, elementTypes, target);
+    return enumerateMatmulTileArm64(elementTypes, target);
   }
   if (isX86_64(target)) {
-    return enumerateMatmulTileX86_64(user, elementTypes, target);
+    return enumerateMatmulTileX86_64(elementTypes, target);
   }
   if (isRISCV32(target)) {
-    return enumerateMatmulTileRiscv32(user, target);
+    return enumerateMatmulTileRiscv32(target);
   }
   return {};
 }
@@ -412,9 +403,10 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (!encoding) {
     return failure();
   }
-  // We only know about matmuls at the moment.
-  auto user = encoding.getUser().getValue();
-  if (user != EncodingUser::MATMUL && user != EncodingUser::BATCH_MATMUL) {
+  // We only know about contractions with {Batch, M, N, K} <= 1 at the moment.
+  auto cDims = getEncodingContractionDims(encoding);
+  if (failed(cDims) || cDims->batch.size() > 1 || cDims->m.size() > 1 ||
+      cDims->n.size() > 1 || cDims->k.size() > 1) {
     return failure();
   }
   // Enumerate available tile shapes for the given encoding and target.
@@ -423,7 +415,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
         return a.cast<TypeAttr>().getValue();
       }));
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
-      enumerateMatmulTileMxNxK(user, elementTypes, targetAttr);
+      enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
@@ -437,9 +429,6 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // used. Generally it would be best to deal with narrow-N cases by transposing
   // the whole matmul and swapping LHS<->RHS, reducing the narrow-N case to
   // narrow-M.
-  auto getIntOrZero = [](IntegerAttr a) {
-    return a == IntegerAttr() ? 0 : a.getInt();
-  };
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
   int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
                               ? 0
@@ -589,7 +578,7 @@ void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeEncodingPass(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return std::make_unique<CPUMaterializeEncodingPass>(targetAttr);
 }

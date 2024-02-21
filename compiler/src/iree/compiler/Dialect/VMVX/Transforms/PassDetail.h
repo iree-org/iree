@@ -8,7 +8,7 @@
 #define IREE_COMPILER_DIALECT_VMVX_TRANSFORMS_PASS_DETAIL_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::VMVX {

@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-optimize-vector-transfer | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-vector-transfer))" | FileCheck %s
 
 // CHECK-LABEL: func.func @transpose
 //  CHECK-NEXT:   vector.shape_cast %{{.*}} : vector<1x1x4xf32> to vector<1x4x1xf32>

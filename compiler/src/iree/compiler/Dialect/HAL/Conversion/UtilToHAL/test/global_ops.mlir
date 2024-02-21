@@ -9,11 +9,11 @@ util.global private mutable @resource : !stream.resource<variable>
 
 // CHECK-LABEL: @resourceGlobals
 // CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer) -> !hal.buffer
-func.func private @resourceGlobals(%arg0: !stream.resource<variable>) -> !stream.resource<variable> {
+util.func private @resourceGlobals(%arg0: !stream.resource<variable>) -> !stream.resource<variable> {
   // CHECK: util.global.store %[[ARG0]], @resource : !hal.buffer
   util.global.store %arg0, @resource : !stream.resource<variable>
   // CHECK: %[[VALUE:.+]] = util.global.load @resource : !hal.buffer
   %value = util.global.load @resource : !stream.resource<variable>
-  // CHECK: return %[[VALUE]]
-  return %value : !stream.resource<variable>
+  // CHECK: util.return %[[VALUE]]
+  util.return %value : !stream.resource<variable>
 }

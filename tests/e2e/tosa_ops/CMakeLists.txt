@@ -224,7 +224,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda2_graph
+    check_cuda_graph
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -269,14 +269,13 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda2"
+    "cuda"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
-    "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE
     "tosa"
   RUNNER_ARGS
-    "--cuda2_use_streams=false"
+    "--cuda_use_streams=false"
   LABELS
     "noasan"
     "nomsan"
@@ -287,7 +286,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda2_stream
+    check_cuda_stream
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -332,13 +331,11 @@ iree_check_single_backend_test_suite(
   TARGET_BACKEND
     "cuda"
   DRIVER
-    "cuda2"
-  COMPILER_FLAGS
-    "--iree-hal-cuda-enable-legacy-sync=false"
+    "cuda"
   INPUT_TYPE
     "tosa"
   RUNNER_ARGS
-    "--cuda2_use_streams=true"
+    "--cuda_use_streams=true"
   LABELS
     "noasan"
     "nomsan"

@@ -1532,6 +1532,7 @@ struct DotGeneralIsMul final : OpRewritePattern<mlir::stablehlo::DotGeneralOp> {
   }
 };
 
+// TODO(suderman): Move this to solve code.
 struct CustomCallIsTopK final
     : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -1751,6 +1752,7 @@ struct IotaSortSliceIsTopK final : OpRewritePattern<mlir::stablehlo::SortOp> {
   }
 };
 
+// TODO(suderman): Move this to solve code.
 struct ApproxTopK final : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
   using OpRewritePattern::OpRewritePattern;
 

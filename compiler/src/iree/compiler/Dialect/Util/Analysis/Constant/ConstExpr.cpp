@@ -67,12 +67,12 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     if (!isLegalConstExprRootType(info->op.getGlobalType()))
       return;
     for (auto *use : info->uses) {
-      auto loadOp = llvm::dyn_cast<GlobalLoadOp>(use);
+      auto loadOp = llvm::dyn_cast<GlobalLoadOpInterface>(use);
       if (!loadOp)
         continue;
       if (!isHoistableToRootOp(rootOp, loadOp))
         continue;
-      constantRoots[loadOp.getResult()] = loadOp;
+      constantRoots[loadOp.getLoadedGlobalValue()] = loadOp;
     }
   });
 
@@ -104,9 +104,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
     for (auto &use : constOp->getUses()) {
       Operation *useOp = use.getOwner();
       // For now ignore operations that are not in the same scope.
-      if (constOp->getParentOp() != useOp->getParentOp()) {
+      if (constOp->getParentOp() != useOp->getParentOp())
         continue;
-      }
       expandToOp(useOp);
     }
   }
@@ -161,9 +160,8 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
         for (auto &use : definingOp->getUses()) {
           Operation *useOp = use.getOwner();
           // Skip expanding of ops within dispatch or nested regions.
-          if (definingOp->getParentOp() != useOp->getParentOp()) {
+          if (definingOp->getParentOp() != useOp->getParentOp())
             continue;
-          }
           expandToOp(useOp);
         }
       }
@@ -188,6 +186,15 @@ ConstExprAnalysis::addInfo(Value constValue) {
 }
 
 void ConstExprAnalysis::expandToOp(Operation *op) {
+  SmallVector<Operation *> expandWorklist;
+  expandWorklist.push_back(op);
+  do {
+    expandToOpStep(expandWorklist.pop_back_val(), expandWorklist);
+  } while (!expandWorklist.empty());
+}
+
+void ConstExprAnalysis::expandToOpStep(
+    Operation *op, SmallVectorImpl<Operation *> &expandWorklist) {
   ConstExprOpInfo opInfo = ConstExprOpInfo::getForOp(op);
   for (auto result : op->getResults()) {
     auto *valueInfo = constInfoMap.lookup(result);
@@ -229,7 +236,7 @@ void ConstExprAnalysis::expandToOp(Operation *op) {
         valueInfo->state = ConstValueInfo::NON_CONSTANT;
         break;
       }
-      expandToOp(definingOp);
+      expandWorklist.push_back(definingOp);
     }
   }
 }

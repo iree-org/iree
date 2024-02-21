@@ -68,6 +68,8 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "io.cc"
   "hal.h"
   "hal.cc"
+  "loop.h"
+  "loop.cc"
   "numpy_interop.h"
   "numpy_interop.cc"
   "py_module.h"
@@ -136,18 +138,15 @@ iree_py_library(
     "iree/runtime/io.py"
     "iree/runtime/system_api.py"
     "iree/runtime/system_setup.py"
-    "iree/runtime/tracing.py"
     "iree/runtime/version.py"
     "iree/_runtime/__init__.py"
     "iree/_runtime/libs.py"
-    "iree/_runtime/scripts/iree_benchmark_trace/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
     "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
     "iree/_runtime/scripts/iree_convert_parameters/__main__.py"
     "iree/_runtime/scripts/iree_create_parameters/__main__.py"
     "iree/_runtime/scripts/iree_dump_module/__main__.py"
     "iree/_runtime/scripts/iree_dump_parameters/__main__.py"
-    "iree/_runtime/scripts/iree_run_trace/__main__.py"
     "iree/_runtime/scripts/iree_run_module/__main__.py"
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
@@ -158,12 +157,6 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-benchmark-module
   TO_EXE_NAME iree/_runtime_libs/iree-benchmark-module
-)
-
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-benchmark-trace
-  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-trace
 )
 
 iree_symlink_tool(
@@ -194,12 +187,6 @@ iree_symlink_tool(
   TARGET runtime
   FROM_TOOL_TARGET iree-dump-parameters
   TO_EXE_NAME iree/_runtime_libs/iree-dump-parameters
-)
-
-iree_symlink_tool(
-  TARGET runtime
-  FROM_TOOL_TARGET iree-run-trace
-  TO_EXE_NAME iree/_runtime_libs/iree-run-trace
 )
 
 iree_symlink_tool(
@@ -331,13 +318,11 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   TARGETS
     iree-cpuinfo
     iree-benchmark-module
-    iree-benchmark-trace
     iree-convert-parameters
     iree-create-parameters
     iree-dump-module
     iree-dump-parameters
     iree-run-module
-    iree-run-trace
     ${_EXTRA_INSTALL_TOOL_TARGETS}
   DESTINATION \"${_INSTALL_DIR}/iree/_runtime_libs\"
   COMPONENT \"${_INSTALL_COMPONENT}\"

@@ -18,7 +18,6 @@
 #include "iree/schemas/instruments/dispatch.h"
 #include "iree/schemas/instruments/dispatch_def_builder.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -150,9 +149,8 @@ struct MaterializeDispatchInstrumentationPass
       Value buffer = initializerBuilder.create<IREE::Stream::ResourceAllocOp>(
           loc, globalOp.getType(), bufferSize,
           /*uninitialized=*/true, /*affinity=*/nullptr);
-      initializerBuilder.create<IREE::Util::GlobalStoreOp>(loc, buffer,
-                                                           globalOp);
-      initializerBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+      globalOp.createStoreOp(loc, buffer, initializerBuilder);
+      initializerBuilder.create<IREE::Util::ReturnOp>(loc);
     }
 
     FlatbufferBuilder metadataBuilder;
@@ -183,22 +181,17 @@ struct MaterializeDispatchInstrumentationPass
             instrumentedExports.size();
 
         // Update function signature to add the ringbuffer and dispatch ID.
-        auto funcType = funcOp.getFunctionType();
-        SmallVector<Type> argTypes(funcType.getInputs());
+        SmallVector<Type> argTypes(funcOp.getArgumentTypes());
         argTypes.push_back(bindingType);
         argTypes.push_back(i32Type);
-        funcOp.setFunctionType(
-            FunctionType::get(&getContext(), argTypes, funcType.getResults()));
+        funcOp.setType(FunctionType::get(&getContext(), argTypes,
+                                         funcOp.getResultTypes()));
         auto bindingArg = funcOp.front().addArgument(bindingType, loc);
         auto dispatchIdArg = funcOp.front().addArgument(i32Type, loc);
-
-        // Fix up arg attrs (yuck).
-        SmallVector<DictionaryAttr> argAttrs;
-        funcOp.getAllArgAttrs(argAttrs);
-        argAttrs.push_back(DictionaryAttr::get(
-            &getContext(), {NamedAttribute(alignmentKey, alignment64)}));
-        argAttrs.push_back(DictionaryAttr::get(&getContext(), {}));
-        funcOp.setAllArgAttrs(argAttrs);
+        funcOp.setArgAttrs(
+            bindingArg.getArgNumber(),
+            DictionaryAttr::get(&getContext(),
+                                {NamedAttribute(alignmentKey, alignment64)}));
 
         // Insert the workgroup instrumentation. Note that this happens before
         // codegen would do tile-and-distribute, but that's ok as it should just
@@ -232,19 +225,20 @@ struct MaterializeDispatchInstrumentationPass
     // instrumentation buffer.
     SmallVector<iree_instruments_DispatchSiteDef_ref_t> dispatchSiteRefs;
     uint32_t dispatchSiteCount = 0;
-    for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
-      funcLikeOp.walk([&](IREE::Stream::CmdExecuteOp executeOp) {
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+      funcOp.walk([&](IREE::Stream::CmdExecuteOp executeOp) {
         auto parentBuilder = OpBuilder(executeOp);
 
         // Load the ringbuffer and capture it for use within the execute region.
-        auto loadOp =
-            parentBuilder.create<IREE::Util::GlobalLoadOp>(loc, globalOp);
+        auto loadedValue =
+            globalOp.createLoadOp(loc, parentBuilder).getLoadedGlobalValue();
         Value zero = parentBuilder.create<arith::ConstantIndexOp>(loc, 0);
         Value bufferSize =
             parentBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
-        executeOp.getResourceOperandsMutable().append(loadOp.getResult());
+        executeOp.getResourceOperandsMutable().append(loadedValue);
         executeOp.getResourceOperandSizesMutable().append(bufferSize);
-        auto bufferArg = executeOp.getBody().addArgument(loadOp.getType(), loc);
+        auto bufferArg =
+            executeOp.getBody().addArgument(loadedValue.getType(), loc);
 
         // Walk dispatches and pass them the ringbuffer and their unique ID.
         executeOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
@@ -315,7 +309,7 @@ struct MaterializeDispatchInstrumentationPass
     // Create query function for getting the instrumentation data.
     auto listType = moduleBuilder.getType<IREE::Util::ListType>(
         moduleBuilder.getType<IREE::Util::VariantType>());
-    auto queryOp = moduleBuilder.create<func::FuncOp>(
+    auto queryOp = moduleBuilder.create<IREE::Util::FuncOp>(
         loc, "__query_instruments",
         moduleBuilder.getFunctionType({listType}, {}));
     {
@@ -347,7 +341,7 @@ struct MaterializeDispatchInstrumentationPass
 
       // Export the device buffer containing the instrument data.
       Value buffer =
-          queryBuilder.create<IREE::Util::GlobalLoadOp>(loc, globalOp);
+          globalOp.createLoadOp(loc, queryBuilder).getLoadedGlobalValue();
       Value bufferSize =
           queryBuilder.create<arith::ConstantOp>(loc, bufferSizeAttr);
       auto bufferViewType = moduleBuilder.getType<IREE::HAL::BufferViewType>();
@@ -364,7 +358,7 @@ struct MaterializeDispatchInstrumentationPass
       }
 
       appendListItems(loc, listArg, iovecs, queryBuilder);
-      queryBuilder.create<func::ReturnOp>(loc);
+      queryBuilder.create<IREE::Util::ReturnOp>(loc);
     }
   }
 };

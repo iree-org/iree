@@ -902,9 +902,18 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
   coop_matrix_features.pNext = physical_device_features.pNext;
   physical_device_features.pNext = &coop_matrix_features;
 
+  // + Physical storage buffer features.
+  VkPhysicalDeviceBufferDeviceAddressFeatures address_features;
+  memset(&address_features, 0, sizeof(address_features));
+  address_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  address_features.pNext = physical_device_features.pNext;
+  physical_device_features.pNext = &address_features;
+
   instance_syms->vkGetPhysicalDeviceFeatures2(physical_device,
                                               &physical_device_features);
 
+  // + Coop matrix properties.
   VkPhysicalDeviceProperties2 physical_device_properties;
   memset(&physical_device_properties, 0, sizeof(physical_device_properties));
   physical_device_properties.sType =
@@ -990,6 +999,10 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
         }
       }
     }
+  }
+
+  if (address_features.bufferDeviceAddress) {
+    device_properties->address |= 0x1u;
   }
 
   return iree_ok_status();
@@ -1407,6 +1420,12 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
   *out_value = 0;
 
+  if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
+    *out_value =
+        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+    return iree_ok_status();
+  }
+
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     if (iree_string_view_equal(key, IREE_SV("vulkan-spirv-fb"))) {
       // Base SPIR-V always supported.
@@ -1451,6 +1470,10 @@ static iree_status_t iree_hal_vulkan_device_query_i64(
     if (iree_string_view_equal(key, IREE_SV("coopmatrix.ops"))) {
       *out_value =
           device->logical_device->supported_properties().cooperative_matrix;
+      return iree_ok_status();
+    }
+    if (iree_string_view_equal(key, IREE_SV("address.mode"))) {
+      *out_value = device->logical_device->supported_properties().address;
       return iree_ok_status();
     }
   }

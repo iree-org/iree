@@ -1,8 +1,8 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --canonicalize --cse %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
-// CHECK-LABEL: func.func @dontInlineReadWrite
+// CHECK-LABEL: util.func public @dontInlineReadWrite
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
-func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
+util.func public @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
   // CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8xf32>
   %cst = arith.constant dense<0.0> : tensor<4x8xf32>
   %x = arith.constant 100 : index
@@ -19,13 +19,13 @@ func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
     flow.dispatch.tensor.store %0, %arg1_capture, offsets=[0, 0], sizes=[4, 8], strides=[1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<readwrite:tensor<4x8xf32>>
     flow.return
   }
-  return %0 : tensor<4x8xf32>
+  util.return %0 : tensor<4x8xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @remove_unused_result
-func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+// CHECK-LABEL: util.func public @remove_unused_result
+util.func public @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
@@ -44,13 +44,13 @@ func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) ->
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:tensor<i32>>
     flow.return
   }
-  return %0#0 : tensor<i32>
+  util.return %0#0 : tensor<i32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @remove_unused_dynamic_result
-func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
+// CHECK-LABEL: util.func public @remove_unused_dynamic_result
+util.func public @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
@@ -73,13 +73,13 @@ func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
     flow.dispatch.tensor.store %ret1_value, %ret1_shaped, offsets = [0], sizes = [%dim], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:tensor<?xi32>>{%dim}
     flow.return
   }
-  return %0#0 : tensor<i32>
+  util.return %0#0 : tensor<i32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @remove_unused_read_write_result
-func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+// CHECK-LABEL: util.func public @remove_unused_read_write_result
+util.func public @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>)
@@ -98,13 +98,13 @@ func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:tensor<i32>>
     flow.return
   }
-  return %0#0 : tensor<i32>
+  util.return %0#0 : tensor<i32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @keep_used_read_write_result
-func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+// CHECK-LABEL: util.func public @keep_used_read_write_result
+util.func public @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1]() : () -> (tensor<i32>, tensor<i32>) =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:tensor<i32>>, %{{.+}}: !flow.dispatch.tensor<readwrite:tensor<i32>>)
@@ -121,13 +121,13 @@ func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi
     flow.dispatch.tensor.store %4, %arg3, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<readwrite:tensor<i32>>
     flow.return
   }
-  return %0#0 : tensor<i32>
+  util.return %0#0 : tensor<i32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @drop_unused_dispatch_region_result
-func.func @drop_unused_dispatch_region_result(
+// CHECK-LABEL: util.func public @drop_unused_dispatch_region_result
+util.func public @drop_unused_dispatch_region_result(
     %arg0: tensor<?x?xf32>, %arg1: tensor<5x10xf32>, %arg2: tensor<7x11xf32>)
   -> tensor<?x?xf32>
 {
@@ -144,14 +144,14 @@ func.func @drop_unused_dispatch_region_result(
     %1 = tensor.insert_slice %arg2 into %0[9, 10][7, 11][1, 1] : tensor<7x11xf32> into tensor<?x?xf32>
     flow.return %0, %1 : tensor<?x?xf32>, tensor<?x?xf32>
   }
-  // CHECK: return %[[r]]
-  return %r#0 : tensor<?x?xf32>
+  // CHECK: util.return %[[r]]
+  util.return %r#0 : tensor<?x?xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func @bubble_up_ordinal_ops(
-func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
+// CHECK-LABEL: util.func public @bubble_up_ordinal_ops(
+util.func public @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
   %result = flow.dispatch.workgroups[%arg0, %arg1](%arg0, %arg1) : (index, index) -> (tensor<?x?xf32>{%arg0, %arg1}) =
       (%b0 : index, %b1 : index, %b2 : !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>) {
     //      CHECK: flow.dispatch.workgroups
@@ -174,13 +174,13 @@ func.func @bubble_up_ordinal_ops(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
         : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?xf32>>{%wl0, %wl1}
     flow.return
   }
-  return %result : tensor<?x?xf32>
+  util.return %result : tensor<?x?xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func @dedup_workgroup_count_from_slice_operands(
-func.func @dedup_workgroup_count_from_slice_operands(
+// CHECK-LABEL: util.func public @dedup_workgroup_count_from_slice_operands(
+util.func public @dedup_workgroup_count_from_slice_operands(
   %arg0 : index, %arg1 : index, %arg2 : index) -> tensor<?x?x?x?x?xf32> {
   %result = flow.dispatch.workgroups [%arg0, %arg1, %arg2](%arg0, %arg1, %arg2)
       : (index, index, index) -> tensor<?x?x?x?x?xf32>{%arg0, %arg1, %arg2, %arg2, %arg0} =
@@ -211,16 +211,16 @@ func.func @dedup_workgroup_count_from_slice_operands(
     %x, %y, %z = flow.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b2, %b0
     flow.return %x, %y, %z : index, index, index
   }
-  return %result :tensor<?x?x?x?x?xf32>
+  util.return %result :tensor<?x?x?x?x?xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func @dedup_workload(
+// CHECK-LABEL: util.func public @dedup_workload(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: index)
-func.func @dedup_workload(
+util.func public @dedup_workload(
   %arg0 : index, %arg1 : index, %arg2 : index) -> tensor<?x?x?x?x?xf32> {
   %result = flow.dispatch.workgroups [%arg0, %arg1, %arg2, %arg2, %arg0](%arg0, %arg1, %arg2)
       : (index, index, index) -> tensor<?x?x?x?x?xf32>{%arg0, %arg1, %arg2, %arg2, %arg0} =
@@ -251,5 +251,5 @@ func.func @dedup_workload(
     %x, %y, %z = flow.dispatch.workgroup_count_from_slice %b0, %b1, %b2, %b3, %b4
     flow.return %x, %y, %z : index, index, index
   }
-  return %result :tensor<?x?x?x?x?xf32>
+  util.return %result :tensor<?x?x?x?x?xf32>
 }

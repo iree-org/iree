@@ -87,9 +87,15 @@ func.func @basic_linking() -> () attributes {
     testing.op.c = @dispatch_0::@spirv::@dispatch_0
   }
   %c1 = arith.constant 1 : index
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@spirv::@dispatch_2) workgroups([%c1, %c1, %c1])
+  %dispatch_0_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_0) : !hal.executable
+  %dispatch_1_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_1) : !hal.executable
+  %dispatch_2_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_2) : !hal.executable
+  %dispatch_0_ordinal = hal.executable.export.ordinal target(@dispatch_0::@spirv::@dispatch_0) : index
+  %dispatch_1_ordinal = hal.executable.export.ordinal target(@dispatch_1::@spirv::@dispatch_1) : index
+  %dispatch_2_ordinal = hal.executable.export.ordinal target(@dispatch_2::@spirv::@dispatch_2) : index
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_0_exe : !hal.executable)[%dispatch_0_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_1_exe : !hal.executable)[%dispatch_1_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_2_exe : !hal.executable)[%dispatch_2_ordinal] workgroups([%c1, %c1, %c1])
   return
 }
 util.initializer {
@@ -97,10 +103,16 @@ util.initializer {
   %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@spirv::@dispatch_2) workgroups([%c1, %c1, %c1])
-  util.initializer.return
+  %dispatch_0_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_0) : !hal.executable
+  %dispatch_1_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_1) : !hal.executable
+  %dispatch_2_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_2) : !hal.executable
+  %dispatch_0_ordinal = hal.executable.export.ordinal target(@dispatch_0::@spirv::@dispatch_0) : index
+  %dispatch_1_ordinal = hal.executable.export.ordinal target(@dispatch_1::@spirv::@dispatch_1) : index
+  %dispatch_2_ordinal = hal.executable.export.ordinal target(@dispatch_2::@spirv::@dispatch_2) : index
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_0_exe : !hal.executable)[%dispatch_0_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_1_exe : !hal.executable)[%dispatch_1_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_2_exe : !hal.executable)[%dispatch_2_ordinal] workgroups([%c1, %c1, %c1])
+  util.return
 }
 
 //  CHECK-NOT: hal.executable private @dispatch_0
@@ -144,14 +156,26 @@ util.initializer {
 // CHECK:           testing.op.a = @link_executables_linked_spirv
 // CHECK-SAME:      testing.op.b = @link_executables_linked_spirv::@vulkan_spirv_fb
 // CHECK-SAME:      testing.op.c = @link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_0
-// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
+// CHECK-DAG:     %[[DISPATCH_0_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_1_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_2_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_0_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_0)
+// CHECK-DAG:     %[[DISPATCH_1_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_1)
+// CHECK-DAG:     %[[DISPATCH_2_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_2)
+// CHECK:         hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_0_EXE]] : !hal.executable)[%[[DISPATCH_0_ORDINAL]]] workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_1_EXE]] : !hal.executable)[%[[DISPATCH_1_ORDINAL]]] workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_2_EXE]] : !hal.executable)[%[[DISPATCH_2_ORDINAL]]] workgroups([%c1, %c1, %c1])
 //
 // CHECK:       util.initializer
-// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
-// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
+// CHECK-DAG:     %[[DISPATCH_0_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_1_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_2_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv) : !hal.executable
+// CHECK-DAG:     %[[DISPATCH_0_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_0)
+// CHECK-DAG:     %[[DISPATCH_1_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_1)
+// CHECK-DAG:     %[[DISPATCH_2_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv::@vulkan_spirv_fb::@dispatch_2)
+// CHECK:         hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_0_EXE]] : !hal.executable)[%[[DISPATCH_0_ORDINAL]]] workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_1_EXE]] : !hal.executable)[%[[DISPATCH_1_ORDINAL]]] workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%[[DISPATCH_2_EXE]] : !hal.executable)[%[[DISPATCH_2_ORDINAL]]] workgroups([%c1, %c1, %c1])
 
 // -----
 
@@ -269,10 +293,18 @@ func.func @two_target_environments() -> () {
   %device = hal.devices.get %c0 : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@spirv::@dispatch_0) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@spirv::@dispatch_1) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@spirv::@dispatch_2) workgroups([%c1, %c1, %c1])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_3::@spirv::@dispatch_3) workgroups([%c1, %c1, %c1])
+  %dispatch_0_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_0) : !hal.executable
+  %dispatch_1_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_1) : !hal.executable
+  %dispatch_2_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_2) : !hal.executable
+  %dispatch_3_exe = hal.executable.lookup device(%device : !hal.device) executable(@dispatch_3) : !hal.executable
+  %dispatch_0_ordinal = hal.executable.export.ordinal target(@dispatch_0::@spirv::@dispatch_0) : index
+  %dispatch_1_ordinal = hal.executable.export.ordinal target(@dispatch_1::@spirv::@dispatch_1) : index
+  %dispatch_2_ordinal = hal.executable.export.ordinal target(@dispatch_2::@spirv::@dispatch_2) : index
+  %dispatch_3_ordinal = hal.executable.export.ordinal target(@dispatch_3::@spirv::@dispatch_3) : index
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_0_exe : !hal.executable)[%dispatch_0_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_1_exe : !hal.executable)[%dispatch_1_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_2_exe : !hal.executable)[%dispatch_2_ordinal] workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer> target(%dispatch_3_exe : !hal.executable)[%dispatch_3_ordinal] workgroups([%c1, %c1, %c1])
   return
 }
 
@@ -323,10 +355,18 @@ func.func @two_target_environments() -> () {
 //      CHECK: }
 
 //      CHECK: func.func @two_target_environments()
-//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv_0::@vulkan_spirv_fb::@dispatch_0)
-//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv_1::@vulkan_spirv_fb::@dispatch_1)
-//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv_0::@vulkan_spirv_fb::@dispatch_2)
-//      CHECK:   hal.command_buffer.dispatch.symbol{{.+}} target(@link_executables_linked_spirv_1::@vulkan_spirv_fb::@dispatch_3)
+//  CHECK-DAG:   %[[DISPATCH_0_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv_0) : !hal.executable
+//  CHECK-DAG:   %[[DISPATCH_1_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv_1) : !hal.executable
+//  CHECK-DAG:   %[[DISPATCH_2_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv_0) : !hal.executable
+//  CHECK-DAG:   %[[DISPATCH_3_EXE:.+]] = hal.executable.lookup device(%{{.+}}) executable(@link_executables_linked_spirv_1) : !hal.executable
+//  CHECK-DAG:   %[[DISPATCH_0_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv_0::@vulkan_spirv_fb::@dispatch_0)
+//  CHECK-DAG:   %[[DISPATCH_1_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv_1::@vulkan_spirv_fb::@dispatch_1)
+//  CHECK-DAG:   %[[DISPATCH_2_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv_0::@vulkan_spirv_fb::@dispatch_2)
+//  CHECK-DAG:   %[[DISPATCH_3_ORDINAL:.+]] = hal.executable.export.ordinal target(@link_executables_linked_spirv_1::@vulkan_spirv_fb::@dispatch_3)
+//      CHECK:   hal.command_buffer.dispatch{{.+}} target(%[[DISPATCH_0_EXE]] : !hal.executable)[%[[DISPATCH_0_ORDINAL]]]
+//      CHECK:   hal.command_buffer.dispatch{{.+}} target(%[[DISPATCH_1_EXE]] : !hal.executable)[%[[DISPATCH_1_ORDINAL]]]
+//      CHECK:   hal.command_buffer.dispatch{{.+}} target(%[[DISPATCH_2_EXE]] : !hal.executable)[%[[DISPATCH_2_ORDINAL]]]
+//      CHECK:   hal.command_buffer.dispatch{{.+}} target(%[[DISPATCH_3_EXE]] : !hal.executable)[%[[DISPATCH_3_ORDINAL]]]
 
 // -----
 

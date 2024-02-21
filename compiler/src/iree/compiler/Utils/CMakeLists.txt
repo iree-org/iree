@@ -18,11 +18,16 @@ iree_cc_library(
     "ElementPackingUtils.h"
     "EquivalenceUtils.h"
     "FlatbufferUtils.h"
+    "Folding.h"
     "IndexSet.h"
+    "Indexing.h"
     "ModuleUtils.h"
+    "OpVisitor.h"
     "OptionUtils.h"
     "PassUtils.h"
     "PatternUtils.h"
+    "Permutation.h"
+    "SmallVectorDenseMapInfo.h"
     "StringUtils.h"
     "ToolUtils.h"
     "TracingUtils.h"
@@ -41,6 +46,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRParser
     MLIRPass

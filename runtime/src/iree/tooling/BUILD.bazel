@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library", "iree_runtime_cc_test")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_runtime_cc_library", "iree_runtime_cc_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -43,7 +43,6 @@ iree_runtime_cc_library(
     hdrs = ["comparison.h"],
     deps = [
         ":buffer_view_matchers",
-        ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/base/internal:span",
@@ -58,7 +57,7 @@ iree_runtime_cc_test(
     srcs = ["comparison_test.cc"],
     deps = [
         ":comparison",
-        ":vm_util",
+        ":function_io",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:span",
         "//runtime/src/iree/hal",
@@ -109,6 +108,49 @@ iree_runtime_cc_library(
 )
 
 iree_runtime_cc_library(
+    name = "function_io",
+    srcs = ["function_io.c"],
+    hdrs = ["function_io.h"],
+    deps = [
+        ":numpy_io",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:stdio_stream",
+        "//runtime/src/iree/io:stream",
+        "//runtime/src/iree/io:vec_stream",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_test(
+    name = "function_io_test",
+    srcs = ["function_io_test.cc"],
+    deps = [
+        ":function_io",
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:vec_stream",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/testing:gtest",
+        "//runtime/src/iree/testing:gtest_main",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_library(
+    name = "function_util",
+    srcs = ["function_util.c"],
+    hdrs = ["function_util.h"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "instrument_util",
     srcs = ["instrument_util.c"],
     hdrs = ["instrument_util.h"],
@@ -129,6 +171,7 @@ iree_runtime_cc_library(
     deps = [
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:stream",
     ],
 )
 
@@ -139,7 +182,8 @@ iree_runtime_cc_test(
     deps = [
         ":device_util",
         ":numpy_io",
-        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/io:memory_stream",
+        "//runtime/src/iree/io:vec_stream",
         "//runtime/src/iree/testing:gtest",
         "//runtime/src/iree/testing:gtest_main",
         "//runtime/src/iree/tooling/testdata/npy",
@@ -176,90 +220,15 @@ iree_runtime_cc_library(
         ":comparison",
         ":context_util",
         ":device_util",
+        ":function_io",
+        ":function_util",
         ":instrument_util",
-        ":vm_util",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/io:stdio_stream",
         "//runtime/src/iree/modules/hal:types",
         "//runtime/src/iree/vm",
         "//runtime/src/iree/vm/bytecode:module",
     ],
-)
-
-# TODO(benvanik): fold these into iree/runtime and use that instead.
-iree_runtime_cc_library(
-    name = "vm_util",
-    srcs = ["vm_util.c"],
-    hdrs = ["vm_util.h"],
-    deps = [
-        ":numpy_io",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:file_io",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm/bytecode:module",
-    ],
-)
-
-iree_runtime_cc_test(
-    name = "vm_util_test",
-    srcs = ["vm_util_test.cc"],
-    deps = [
-        ":device_util",
-        ":vm_util",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal:span",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/testing:gtest",
-        "//runtime/src/iree/testing:gtest_main",
-        "//runtime/src/iree/vm",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-# libyaml does not build cleanly on bare-metal systems
-if(IREE_ENABLE_THREADING)
-""",
-    inline = True,
-)
-
-iree_runtime_cc_library(
-    name = "trace_replay",
-    srcs = ["trace_replay.c"],
-    hdrs = ["trace_replay.h"],
-    deps = [
-        ":device_util",
-        ":numpy_io",
-        ":yaml_util",
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:file_io",
-        "//runtime/src/iree/base/internal:path",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm/bytecode:module",
-        "@com_github_yaml_libyaml//:yaml",
-    ],
-)
-
-iree_runtime_cc_library(
-    name = "yaml_util",
-    srcs = ["yaml_util.c"],
-    hdrs = ["yaml_util.h"],
-    deps = [
-        "//runtime/src/iree/base",
-        "@com_github_yaml_libyaml//:yaml",
-    ],
-)
-
-iree_cmake_extra_content(
-    content = """
-endif()
-""",
-    inline = True,
 )

@@ -40,7 +40,7 @@ void addGPUPackUnPackPasses(OpPassManager &pm);
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm);
 
 /// Transform dialect-based path.
-void addGPUTransformDialectPasses(OpPassManager &pm);
+void addGPUTransformDialectPasses(OpPassManager &pm, StringRef entryPoint);
 
 /// Lowering transpose using shared memory.
 void addGPUTransposePassPipeline(OpPassManager &pm);
@@ -49,11 +49,14 @@ void addGPUTransposePassPipeline(OpPassManager &pm);
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
+/// Lowering based on vector distribution patterns.
+void addGPUVectorDistributePassPipeline(OpPassManager &pm);
+
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
 
 /// Default pass pipeline on GPU, currently used only for the ukernel path.
-void addGPUDefaultPassPipeline(OpPassManager &pm);
+void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels);
 
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm);
@@ -73,7 +76,8 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCastAddressSpaceFunction();
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUDistribute();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUDistribute();
 
 /// Create pass selecting the lowering strategy for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
@@ -85,7 +89,7 @@ createLLVMGPULowerExecutableTargetPass();
 
 // Pass to pack shared memory allocations in order to reduce shared memory
 // usage.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPackSharedMemoryAlloc();
 
 enum class GPUTensorCoreType {
@@ -94,22 +98,29 @@ enum class GPUTensorCoreType {
 };
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 //. Pass to pad out tensors up to static dimensions.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTensorPadPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUTensorPadPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTileAndDistribute(bool distributeToWarp = false);
 
+// Pass to distribute vectorized functions.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorDistribute();
+
 /// Lower vector ops before convertion to LLVM.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorLoweringPass();
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU(
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
 /// Lowering calling vectorization patterns.
@@ -118,6 +129,30 @@ verifyGPUMatmulPipeline(Operation *op,
                         IREE::Codegen::LoweringConfigAttr loweringConfig,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize);
+
+/// Given a chain of matmuls with some or no operations
+/// in between, like
+///
+/// d = matmul_transpose_b(a, b) + c
+/// ...
+/// e = matmul_transpose_b(d, f) + g
+///
+/// this pattern transforms the above IR to
+///
+/// c.t = transpose c
+/// d = matmul_transpose_b(b, a) + c.t
+/// d.t = transpose d
+/// ...
+/// g.t = transpose g
+/// e = matmul_transpose_b(f, d.t) + g.t
+/// e.t = transpose e
+///
+/// On CDNA architectures, where the layouts of the RHS and result
+/// are the same and transposed from the LHS layout, this type
+/// of transformation can avoid trips to shared memory/shuffle instructions
+/// on operators like Flash Attention.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createAMDGPUPrepareForChainedMatmulPass();
 
 //----------------------------------------------------------------------------//
 // Register LLVMGPU Passes

@@ -17,9 +17,7 @@ iree_lit_test_suite(
     "attention.mlir"
     "contraction-packing-and-dispatch.mlir"
     "contraction-packing.mlir"
-    "eltwise_reduction_eltwise.mlir"
     "fold_tensor_slice_into_transfer.mlir"
-    "matmul.mlir"
     "matmul_library_call.mlir"
   TOOLS
     ${IREE_LLD_TARGET}
@@ -33,6 +31,7 @@ iree_lit_test_suite(
     matmul_codegen_default_spec.mlir
     transform_library.mlir
   LABELS
+    "hostonly"
     "noasan"
     "nomsan"
     "notsan"

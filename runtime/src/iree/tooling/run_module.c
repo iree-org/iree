@@ -9,12 +9,14 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/hal/api.h"
+#include "iree/io/stdio_stream.h"
 #include "iree/modules/hal/types.h"
 #include "iree/tooling/comparison.h"
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
+#include "iree/tooling/function_io.h"
+#include "iree/tooling/function_util.h"
 #include "iree/tooling/instrument_util.h"
-#include "iree/tooling/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode/module.h"
 
@@ -49,10 +51,14 @@ IREE_FLAG_LIST(
     "     e.g.: --output=\n"
     "  `-`: print textual form to stdout\n"
     "     e.g.: --output=-\n"
-    "  `@file.npy`: create/overwrite a numpy npy file and write buffer view\n"
+    "  `@file.npy`: create/overwrite a numpy npy file and write an ndarray\n"
     "     e.g.: --output=@file.npy\n"
-    "  `+file.npy`: create/append a numpy npy file and write buffer view\n"
+    "  `+file.npy`: create/append a numpy npy file and write an ndarray\n"
     "     e.g.: --output=+file.npy\n"
+    "  `@file.bin`: create/overwrite a binary file and write value contents\n"
+    "     e.g.: --output=@file.bin\n"
+    "  `+file.bin`: create/append a binary file and write value contents\n"
+    "     e.g.: --output=+file.bin\n"
     "\n"
     "Numpy npy files can be read in Python using numpy.load, for example an\n"
     "invocation producing two outputs can be concatenated as:\n"
@@ -61,6 +67,11 @@ IREE_FLAG_LIST(
     "  with open('file.npy', 'rb') as f:\n"
     "    print(numpy.load(f))\n"
     "    print(numpy.load(f))\n"
+    "Primitive values are written as shape=() ndarrays and buffers are\n"
+    "written as i8 arrays with the length of the buffer.\n"
+    "\n"
+    "Binary files contain only the contents of the values/buffers provided\n"
+    "without metadata; users must know the shape/type of the output.\n"
     "\n"
     "Each occurrence of the flag indicates an output in the order they were\n"
     "specified on the command line.");
@@ -80,8 +91,9 @@ IREE_FLAG(
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
-static iree_status_t iree_tooling_process_outputs(
-    iree_hal_device_t* device, iree_vm_list_t* outputs,
+static iree_status_t iree_tooling_process_results(
+    iree_hal_device_t* device, iree_string_view_t results_cconv,
+    iree_vm_list_t* results, iree_io_stream_t* stream,
     iree_allocator_t host_allocator, int* out_exit_code);
 
 static iree_status_t iree_tooling_create_run_context(
@@ -191,20 +203,27 @@ static iree_status_t iree_tooling_run_function(
   iree_string_view_t function_name = iree_vm_function_name(&function);
   (void)function_name;
 
+  iree_vm_function_signature_t signature =
+      iree_vm_function_signature(&function);
+  iree_string_view_t arguments_cconv, results_cconv;
+  iree_status_t status = iree_vm_function_call_get_cconv_fragments(
+      &signature, &arguments_cconv, &results_cconv);
+
   // Parse --input= values into device buffers.
   iree_vm_list_t* inputs = NULL;
-  iree_status_t status = iree_status_annotate_f(
-      iree_tooling_parse_to_variant_list(
-          device, device_allocator, FLAG_input_list().values,
-          FLAG_input_list().count, host_allocator, &inputs),
-      "parsing function inputs");
+  if (iree_status_is_ok(status)) {
+    status = iree_status_annotate_f(
+        iree_tooling_parse_variants(arguments_cconv, FLAG_input_list(), device,
+                                    device_allocator, host_allocator, &inputs),
+        "parsing function inputs");
+  }
 
   // If the function is async add fences so we can invoke it synchronously.
   iree_hal_fence_t* finish_fence = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
-        iree_tooling_append_async_fence_inputs(
-            inputs, &function, device, /*wait_fence=*/NULL, &finish_fence),
+        iree_tooling_append_async_fences(inputs, function, device,
+                                         /*wait_fence=*/NULL, &finish_fence),
         "setting up async-external fence inputs");
   }
 
@@ -219,6 +238,7 @@ static iree_status_t iree_tooling_run_function(
   if (iree_status_is_ok(status)) {
     fprintf(stdout, "EXEC @%.*s\n", (int)function_name.size,
             function_name.data);
+    fflush(stdout);
   }
 
   // Begin profiling immediate prior to invocation.
@@ -269,28 +289,41 @@ static iree_status_t iree_tooling_run_function(
         .queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY,
         .min_alignment = 0,
     };
-    status = iree_tooling_transfer_variant_list(
-        device, outputs, device_allocator, target_params,
+    status = iree_tooling_transfer_variants(
+        outputs, device, device_allocator, target_params,
         /*wait_fence=*/NULL, /*signal_fence=*/NULL);
+  }
+
+  // Wrap stdout for printing results.
+  iree_io_stream_t* stdout_stream = NULL;
+  if (iree_status_is_ok(status)) {
+    status = iree_status_annotate_f(
+        iree_io_stdio_stream_wrap(IREE_IO_STREAM_MODE_WRITABLE, stdout,
+                                  /*owns_handle=*/false, host_allocator,
+                                  &stdout_stream),
+        "opening stdout stream");
   }
 
   // Handle either printing/writing the outputs or checking them against
   // expected values (basic pass/fail testing).
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
-        iree_tooling_process_outputs(device, outputs, host_allocator,
+        iree_tooling_process_results(device, results_cconv, outputs,
+                                     stdout_stream, host_allocator,
                                      out_exit_code),
         "processing function outputs");
   }
   iree_vm_list_release(outputs);
 
+  iree_io_stream_release(stdout_stream);
   fflush(stdout);
 
   return status;
 }
 
-static iree_status_t iree_tooling_process_outputs(
-    iree_hal_device_t* device, iree_vm_list_t* outputs,
+static iree_status_t iree_tooling_process_results(
+    iree_hal_device_t* device, iree_string_view_t results_cconv,
+    iree_vm_list_t* results, iree_io_stream_t* stream,
     iree_allocator_t host_allocator, int* out_exit_code) {
   *out_exit_code = EXIT_SUCCESS;
 
@@ -299,16 +332,18 @@ static iree_status_t iree_tooling_process_outputs(
     if (FLAG_output_list().count == 0) {
       // Print all outputs.
       return iree_status_annotate_f(
-          iree_tooling_variant_list_fprint(
-              IREE_SV("result"), outputs,
-              (iree_host_size_t)FLAG_output_max_element_count, stdout),
+          iree_tooling_print_variants(
+              IREE_SV("result"), results,
+              (iree_host_size_t)FLAG_output_max_element_count, stream,
+              host_allocator),
           "printing results");
     } else {
       // Write (or ignore) all outputs.
       return iree_status_annotate_f(
-          iree_tooling_output_variant_list(
-              outputs, FLAG_output_list().values, FLAG_output_list().count,
-              (iree_host_size_t)FLAG_output_max_element_count, stdout),
+          iree_tooling_write_variants(
+              results, FLAG_output_list(),
+              (iree_host_size_t)FLAG_output_max_element_count, stream,
+              host_allocator),
           "outputting results");
     }
   }
@@ -322,14 +357,14 @@ static iree_status_t iree_tooling_process_outputs(
   // Parse expected list into host-local memory that we can easily access.
   iree_vm_list_t* expected_list = NULL;
   iree_status_t status = iree_status_annotate_f(
-      iree_tooling_parse_to_variant_list(
-          device, heap_allocator, FLAG_expected_output_list().values,
-          FLAG_expected_output_list().count, host_allocator, &expected_list),
+      iree_tooling_parse_variants(results_cconv, FLAG_expected_output_list(),
+                                  device, heap_allocator, host_allocator,
+                                  &expected_list),
       "parsing expected function outputs");
 
   // Compare expected vs actual lists and output diffs.
   if (iree_status_is_ok(status)) {
-    bool did_match = iree_tooling_compare_variant_lists(expected_list, outputs,
+    bool did_match = iree_tooling_compare_variant_lists(expected_list, results,
                                                         host_allocator, stdout);
     if (did_match) {
       fprintf(

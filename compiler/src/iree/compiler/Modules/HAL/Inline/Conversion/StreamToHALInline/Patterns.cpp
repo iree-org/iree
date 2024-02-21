@@ -15,7 +15,6 @@
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -339,12 +338,10 @@ struct TensorExportBufferViewOpPattern
 
     // NOTE: we should have verified supported encodings/types at entry into the
     // HAL pipeline.
-    auto encodingType =
-        IREE::HAL::getEncodingTypeValue(tensorType.getEncoding());
-    assert(encodingType.has_value() && "invalid tensor encoding");
-    auto elementType =
-        IREE::HAL::getElementTypeValue(tensorType.getElementType());
-    assert(elementType.has_value() && "invalid tensor element type");
+    auto encodingType = rewriter.create<IREE::HAL::EncodingTypeOp>(
+        loc, tensorType.getEncoding());
+    auto elementType = rewriter.create<IREE::HAL::ElementTypeOp>(
+        loc, tensorType.getElementType());
 
     // Flatten static + dynamic shape dimensions.
     SmallVector<Value> dims;
@@ -361,8 +358,7 @@ struct TensorExportBufferViewOpPattern
     rewriter.replaceOpWithNewOp<IREE::HAL::Inline::BufferViewCreateOp>(
         exportOp, adaptor.getSource(),
         rewriter.create<arith::ConstantIndexOp>(loc, 0),
-        adaptor.getSourceSize(), elementType.value(), encodingType.value(),
-        dims);
+        adaptor.getSourceSize(), elementType, encodingType, dims);
     return success();
   }
 };
@@ -500,8 +496,9 @@ struct CmdDispatchOpPattern
     llvm::append_range(callArgs, bindingBuffers);
     llvm::append_range(callArgs, bindingOffsets);
     llvm::append_range(callArgs, adaptor.getResourceLengths());
-    rewriter.replaceOpWithNewOp<func::CallOp>(dispatchOp, callee, TypeRange{},
-                                              callArgs);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        dispatchOp, TypeRange{}, callee.getLeafReference(), callArgs,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };
@@ -519,11 +516,12 @@ struct CmdFuncOpPattern : public OpConversionPattern<IREE::Stream::CmdFuncOp> {
                                                 newResultTypes))) {
       return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
     }
-    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::FuncOp>(
         funcOp, funcOp.getName(),
         rewriter.getFunctionType(newArgTypes, newResultTypes),
-        funcOp.getSymVisibilityAttr(), funcOp.getAllArgAttrs(),
-        funcOp.getAllResultAttrs());
+        /*tied_operands=*/ArrayAttr{}, funcOp.getSymVisibilityAttr(),
+        funcOp.getAllArgAttrs(), funcOp.getAllResultAttrs(),
+        IREE::Util::InliningPolicyAttrInterface{});
     newOp->setDialectAttrs(funcOp->getDialectAttrs());
     return success();
   }
@@ -564,8 +562,9 @@ struct CmdCallOpPattern : public OpConversionPattern<IREE::Stream::CmdCallOp> {
       llvm::append_range(resultTypes, convertedTypes);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
-                                              resultTypes, operands);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        callOp, resultTypes, callOp.getCallee(), operands,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };
@@ -627,7 +626,7 @@ struct GlobalTimepointConversionPattern
       return failure();
     if (!llvm::isa<IREE::Stream::TimepointAttr>(*initialValue))
       return failure();
-    rewriter.updateRootInPlace(
+    rewriter.modifyOpInPlace(
         op, [&]() { op.setInitialValueAttr(rewriter.getI64IntegerAttr(0)); });
     return success();
   }

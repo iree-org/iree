@@ -8,9 +8,34 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 
 namespace mlir::iree_compiler {
+
+void expandResourceOperand(Location loc, Value operand,
+                           SmallVectorImpl<Value> &newOperands,
+                           OpBuilder &builder) {
+  if (llvm::isa<TensorType>(operand.getType())) {
+    auto value = consumeTensorOperand(loc, operand, builder);
+    newOperands.push_back(value.resource);
+    newOperands.push_back(value.resourceSize);
+  } else if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
+    newOperands.push_back(operand);
+    newOperands.push_back(
+        builder.createOrFold<IREE::Stream::ResourceSizeOp>(loc, operand));
+  } else {
+    newOperands.push_back(operand);
+  }
+}
+
+SmallVector<Value> expandResourceOperands(Location loc, ValueRange operands,
+                                          ConversionPatternRewriter &rewriter) {
+  SmallVector<Value> expandedOperands;
+  expandedOperands.reserve(operands.size());
+  for (auto operand : operands) {
+    expandResourceOperand(loc, operand, expandedOperands, rewriter);
+  }
+  return expandedOperands;
+}
 
 ConvertedTensor consumeTensorOperand(Location loc, Value operand,
                                      OpBuilder &builder) {

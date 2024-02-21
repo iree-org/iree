@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -49,6 +50,7 @@ struct TorchSession
     registry.insert<torch::TorchConversion::TorchConversionDialect>();
     registry.insert<mlir::torch::TMTensor::TMTensorDialect>();
     registry.insert<mlir::ml_program::MLProgramDialect>();
+    registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   bool extendCustomInputConversionPassPipeline(
@@ -93,16 +95,40 @@ struct TorchSession
     const Dialect *torchConversionDialect = ctx->getLoadedDialect("torch_c");
     const Dialect *tmTensorDialect = ctx->getLoadedDialect("tm_tensor");
 
+    bool hasTorch = false;
+    bool hasOnnx = false;
+    // TODO: Retire the tm_tensor input pipeline
+    bool hasTmTensor = false;
+
     module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
       if (d == torchDialect || d == torchConversionDialect) {
-        typeMnemonics.insert("torch");
+        hasTorch = true;
       } else if (d == tmTensorDialect) {
-        // TODO: Retire the tm_tensor input pipeline
-        typeMnemonics.insert("tm_tensor");
+        hasTmTensor = true;
       }
       return WalkResult::advance();
     });
+
+    for (auto funcOp : module.getOps<func::FuncOp>()) {
+      if (funcOp->getAttrOfType<mlir::IntegerAttr>(
+              "torch.onnx_meta.opset_version")) {
+        hasOnnx = true;
+        break;
+      }
+    }
+
+    // ONNX is considered a superset of Torch. It runs all of the Torch
+    // pipelines with an extra ONNX-specific preprocessing step.
+    if (hasOnnx) {
+      typeMnemonics.insert("onnx");
+    } else if (hasTorch) {
+      typeMnemonics.insert("torch");
+    }
+
+    if (hasTmTensor) {
+      typeMnemonics.insert("tm_tensor");
+    }
   }
 };
 

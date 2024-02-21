@@ -32,7 +32,7 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-void debugPrint(func::FuncOp funcOp, const char *message) {
+void debugPrint(mlir::FunctionOpInterface funcOp, const char *message) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- " << message << " ---//\n";
     funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
@@ -50,7 +50,7 @@ public:
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
 
     // Lower vector transfer permutation map.
     {
@@ -108,7 +108,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVFinalVectorLoweringPass() {
   return std::make_unique<SPIRVFinalVectorLoweringPass>();
 }

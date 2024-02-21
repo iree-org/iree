@@ -48,6 +48,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
@@ -63,5 +64,21 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "VectorOpUtils",
+    srcs = [
+        "VectorOpUtils.cpp",
+    ],
+    hdrs = [
+        "VectorOpUtils.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )

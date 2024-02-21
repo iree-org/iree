@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -82,7 +83,7 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   return procInfo;
 }
 
-std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
+std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp) {
   std::array<int64_t, 3> workgroupSize;
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       mlir::iree_compiler::getEntryPoint(funcOp);
@@ -94,6 +95,18 @@ std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp) {
         llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
   }
   return workgroupSize;
+}
+
+std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp) {
+  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+      mlir::iree_compiler::getEntryPoint(funcOp);
+  if (failed(exportOp)) {
+    return std::nullopt;
+  }
+  if (IntegerAttr attr = exportOp->getSubgroupSizeAttr()) {
+    return attr.getValue().getSExtValue();
+  }
+  return std::nullopt;
 }
 
 //===----------------------------------------------------------------------===//
@@ -172,7 +185,8 @@ std::optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
                                              DataLayout &) {
   OpBuilder::InsertionGuard guard(builder);
 
-  func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
+  mlir::FunctionOpInterface funcOp =
+      subview->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp)
     return std::nullopt;
 
@@ -284,7 +298,7 @@ propagateCopySourceIntoConsumerGeneric(memref::CopyOp copyOp,
 /// This is needed because we are doing promotion to shared memory on buffers.
 /// This is a fragile and temporary solution until we move to be able to do this
 /// kind of transformations on tensors.
-void propagateSharedMemoryCopy(func::FuncOp funcOp) {
+void propagateSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   SmallVector<Operation *> toDelete;
   funcOp.walk([&toDelete](memref::CopyOp copyOp) {
     if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
@@ -297,7 +311,7 @@ void propagateSharedMemoryCopy(func::FuncOp funcOp) {
     op->erase();
 }
 
-void insertBarriersAroundSharedMemoryCopy(func::FuncOp funcOp) {
+void insertBarriersAroundSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   OpBuilder builder(funcOp.getContext());
   // Insert barriers before and after copies to workgroup memory and skip
   // insert barriers between back to back copy to workgroup memory.
@@ -879,6 +893,69 @@ bool sharedMemTransposeFilter(AffineMap indexMap) {
     }
   }
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU UKernel Utils
+//===----------------------------------------------------------------------===//
+
+// TODO: Add more popular kernels into this list and the ukernel cmake.
+//       No real technical reason to only allow these aside from compile
+//       time and diskspace.
+bool hasUkernelSupportedRocmArch(StringRef targetChip) {
+  const char *kSupportedTargetChip[] = {"gfx90a", "gfx940", "gfx1030",
+                                        "gfx1100"};
+  size_t arraySize =
+      sizeof(kSupportedTargetChip) / sizeof(kSupportedTargetChip[0]);
+  for (int i = 0; i < arraySize; i++) {
+    // return true if targetChip is found inside kSupportedTargetChip.
+    if (targetChip.compare(kSupportedTargetChip[i]) == 0)
+      return true;
+  }
+  return false;
+}
+
+bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
+  if (!targetArch) {
+    return false;
+  }
+  StringRef targetArchStr = targetArch->getValue();
+  return hasUkernelSupportedRocmArch(targetArchStr);
+}
+
+/// Checks if target GPU has UKernel support.
+bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isROCMBackend(targetAttr) && hasUkernelSupportedRocmArch(targetAttr)) {
+    return true;
+  }
+  // TODO: Once plumbed, add a CUDA backend and supported cuda arch check.
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Target Information
+//===----------------------------------------------------------------------===//
+
+static constexpr char mmaTypeListName[] = "mma_intrinsics";
+static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+  if (!config) {
+    return failure();
+  }
+  ArrayAttr types = dyn_cast_or_null<ArrayAttr>(config.get(mmaTypeListName));
+  if (!types) {
+    return failure();
+  }
+  return types;
+}
+
+FailureOr<ArrayAttr>
+getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
+  if (!targetAttr) {
+    return failure();
+  }
+  return getSupportedMmaTypes(targetAttr.getConfiguration());
 }
 
 } // namespace mlir::iree_compiler

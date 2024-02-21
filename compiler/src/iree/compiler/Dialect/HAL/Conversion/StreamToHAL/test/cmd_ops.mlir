@@ -4,7 +4,7 @@
 // the normal sequential execution barriers.
 
 // CHECK-LABEL: @cmdMemoryControl
-func.func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+util.func public @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -17,13 +17,13 @@ func.func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) ->
     stream.cmd.discard %arg2[%c0 for %c128] : !stream.resource<transient>{%arg1}
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @cmdFill
-func.func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+util.func public @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
@@ -36,13 +36,13 @@ func.func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @cmdCopy
-func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index) -> !stream.timepoint {
+util.func public @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -55,13 +55,13 @@ func.func @cmdCopy(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !str
     // CHECK-NEXT: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @cmdCollective
-func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index, %arg4: !stream.channel) -> !stream.timepoint {
+util.func public @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<transient>, %arg3: index, %arg4: !stream.channel) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -117,7 +117,7 @@ func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2
 
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }
 
 // -----
@@ -128,7 +128,7 @@ func.func @cmdCollective(%arg0: !stream.resource<transient>, %arg1: index, %arg2
 // to.
 
 // CHECK-LABEL: @cmdExecute
-func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: !stream.timepoint) -> !stream.timepoint {
+util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: !stream.timepoint) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -158,8 +158,8 @@ func.func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !
   // CHECK-SAME: wait(%arg4)
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: commands([%[[CMD]]])
-  // CHECK: return %[[SIGNAL_FENCE]]
-  return %0 : !stream.timepoint
+  // CHECK: util.return %[[SIGNAL_FENCE]]
+  util.return %0 : !stream.timepoint
 }
 
 // -----
@@ -211,7 +211,7 @@ hal.executable private @ex {
 }
 
 // CHECK-LABEL: @cmdDispatch
-func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<external>, %arg3: index) -> !stream.timepoint {
+util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<external>, %arg3: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -256,15 +256,23 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     // CHECK: %[[YZ:.+]] = arith.constant 1 : index
     // CHECK-NEXT: %[[X:.+]] = affine.apply #map()[%c1]
 
+    // Target executable/export:
+    //  CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup
+    // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+    // CHECK-SAME:     executable(@ex) : !hal.executable
+    //  CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal
+    // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
+
     // Dispatch:
-    // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
-    // CHECK-SAME: target(@ex::@aarch64::@dispatch)
+    // CHECK: hal.command_buffer.dispatch<%[[CMD]]
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
     // CHECK-SAME: workgroups([%[[X]], %[[YZ]], %[[YZ]]])
 
     // Other variant, when selected:
     // CHECK: case 1 {
-    // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
-    // CHECK-SAME: target(@ex::@x86_64::@dispatch)
+    // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@x86_64::@dispatch)
+    // CHECK: hal.command_buffer.dispatch<%[[CMD]]
+    // CHECK-SAME: target({{.+}})[%[[ORDINAL_1]]]
     stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
@@ -277,7 +285,7 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint
   // CHECK-NEXT: hal.command_buffer.finalize<%[[CMD]]
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }
 
 // -----
@@ -285,11 +293,11 @@ func.func @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, %arg2: 
 // Tests conversion of streamable calls and function declarations.
 // Expect a command buffer and a buffer + offset + length for each resource.
 
-// CHECK: func.func private @cmdFunc(!hal.command_buffer, !hal.buffer, index, index, i32, !hal.buffer, index, index, !custom.type, !hal.buffer, index, index)
+// CHECK: util.func private @cmdFunc(%arg0: !hal.command_buffer, %arg1: !hal.buffer, %arg2: index, %arg3: index, %arg4: i32, %arg5: !hal.buffer, %arg6: index, %arg7: index, %arg8: !custom.type, %arg9: !hal.buffer, %arg10: index, %arg11: index)
 stream.cmd.func private @cmdFunc(%arg0[%arg1 for %arg2]: !stream.resource<*>, %arg3: i32, %arg4[%arg5 for %arg6]: !stream.resource<*>, %arg7: !custom.type, %arg8[%arg9 for %arg10]: !stream.resource<*>)
 
 // CHECK-LABEL: @cmdCall
-func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream.resource<external>, %arg3: !custom.type, %arg4: !stream.resource<external>) -> !stream.timepoint {
+util.func public @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream.resource<external>, %arg3: !custom.type, %arg4: !stream.resource<external>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100
   %size0 = arith.constant 100 : index
@@ -299,11 +307,11 @@ func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream
   %size2 = arith.constant 102 : index
   // CHECK: %[[COMMAND_BUFFER:.+]] = hal.command_buffer.create
   %timepoint = stream.cmd.execute with(%arg0 as %stream0: !stream.resource<external>{%size0}, %arg2 as %stream1: !stream.resource<external>{%size1}, %arg4 as %stream2: !stream.resource<external>{%size2}) {
-    // CHECK: call @cmdFunc(%[[COMMAND_BUFFER]], %arg0, %c0, %[[SIZE0]], %arg1, %arg2, %c0, %[[SIZE1]], %arg3, %arg4, %c0, %[[SIZE2]]) :
+    // CHECK: util.call @cmdFunc(%[[COMMAND_BUFFER]], %arg0, %c0, %[[SIZE0]], %arg1, %arg2, %c0, %[[SIZE1]], %arg3, %arg4, %c0, %[[SIZE2]]) :
     // CHECK-SAME: (!hal.command_buffer, !hal.buffer, index, index, i32, !hal.buffer, index, index, !custom.type, !hal.buffer, index, index) -> ()
     stream.cmd.call @cmdFunc(ro %stream0[%c0 for %size0], %arg1, rw %stream1[%c0 for %size1], %arg3, wo %stream2[%c0 for %size2]) : (!stream.resource<external>{%size0}, i32, !stream.resource<external>{%size1}, !custom.type, !stream.resource<external>{%size2}) -> ()
   } => !stream.timepoint
-  return %timepoint : !stream.timepoint
+  util.return %timepoint : !stream.timepoint
 }
 
 // -----
@@ -313,7 +321,7 @@ func.func @cmdCall(%arg0: !stream.resource<external>, %arg1: i32, %arg2: !stream
 // the target affinities (0b01 | 0b10 = 0b11 = 3).
 
 // CHECK-LABEL: @cmdExecuteAffinities
-func.func @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: !stream.timepoint) -> !stream.timepoint {
+util.func public @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: !stream.timepoint) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: %[[CMD:.+]] = hal.command_buffer.create
@@ -323,5 +331,5 @@ func.func @cmdExecuteAffinities(%arg0: !stream.resource<transient>, %arg1: index
   // CHECK: hal.device.queue.execute
   // CHECK-SAME: affinity(%c3_i64)
   // CHECK-SAME: commands([%[[CMD]]])
-  return %0 : !stream.timepoint
+  util.return %0 : !stream.timepoint
 }

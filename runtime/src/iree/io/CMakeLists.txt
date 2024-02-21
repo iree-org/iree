@@ -18,10 +18,37 @@ iree_cc_library(
   SRCS
     "file_handle.c"
   DEPS
+    ::memory_stream
     ::stream
     iree::base
     iree::base::internal
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    memory_stream
+  HDRS
+    "memory_stream.h"
+  SRCS
+    "memory_stream.c"
+  DEPS
+    ::stream
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    memory_stream_test
+  SRCS
+    "memory_stream_test.cc"
+  DEPS
+    ::memory_stream
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -84,6 +111,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    stdio_stream
+  HDRS
+    "stdio_stream.h"
+  SRCS
+    "stdio_stream.c"
+  DEPS
+    ::stream
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     stream
   HDRS
     "stream.h"
@@ -95,13 +136,27 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_library(
   NAME
-    stream_test
+    vec_stream
+  HDRS
+    "vec_stream.h"
   SRCS
-    "stream_test.cc"
+    "vec_stream.c"
   DEPS
     ::stream
+    iree::base
+    iree::base::internal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    vec_stream_test
+  SRCS
+    "vec_stream_test.cc"
+  DEPS
+    ::vec_stream
     iree::base
     iree::testing::gtest
     iree::testing::gtest_main

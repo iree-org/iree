@@ -14,8 +14,6 @@ components and use different tooling depending on the needs of that component.
 |                 | iree_native_test                                | Bazel/CMake  | Host/Device         |
 |                 | iree_hal_cts_test_suite                         | CMake        | Host/Device         |
 | Core E2E tests  | iree_check_test                                 | Bazel/CMake  | Host/Device         |
-|                 | iree_trace_runner_test                          | Bazel/CMake  | Host/Device         |
-|                 | iree_generated_trace_runner_test                | Bazel/CMake  | Host/Device         |
 |                 | iree_static_linker_test                         | CMake        | Host/Device         |
 
 There are also more `*_test_suite` targets that groups test targets with the

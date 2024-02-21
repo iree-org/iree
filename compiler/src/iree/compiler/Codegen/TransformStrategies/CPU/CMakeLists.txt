@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRBufferizationTransforms
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLLVMDialect

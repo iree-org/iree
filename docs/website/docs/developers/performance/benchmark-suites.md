@@ -113,7 +113,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
   --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
-  --target_device_name="<target_device_name, e.g. c2-standard-16>" \
+  --target_device_name="<target_device_name, e.g. c2-standard-60>" \
   --output="${E2E_TEST_ARTIFACTS_DIR?}/benchmark_results.json" \
   --verbose \
   --cpu_uarch="<host CPU uarch, e.g. CascadeLake>"
@@ -127,7 +127,7 @@ Note that:
 
 - `<target_device_name>` selects a benchmark group targets a specific device:
     - Common options:
-        - `c2-standard-16` for x86_64 CPU benchmarks.
+        - `c2-standard-60` for x86_64 CPU benchmarks.
         - `a2-highgpu-1g` for NVIDIA GPU benchmarks.
     - All device names are defined under
         [build_tools/python/e2e_test_framework/device_specs](https://github.com/openxla/iree/tree/main/build_tools/python/e2e_test_framework/device_specs).
@@ -143,7 +143,7 @@ build_tools/benchmarks/run_benchmarks_on_linux.py \
   --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
-  --target_device_name="c2-standard-16" \
+  --target_device_name="c2-standard-60" \
   --output="${E2E_TEST_ARTIFACTS_DIR?}/benchmark_results.json" \
   --verbose \
   --cpu_uarch="CascadeLake" \

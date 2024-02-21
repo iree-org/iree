@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-erase-storage-buffer-static-shape %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-erase-storage-buffer-static-shape))" %s | FileCheck %s
 
 func.func @storage_buffer_load_store(%offset: index, %i0: index, %i1: index) {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%offset) flags(ReadOnly) : memref<256xf32, #hal.descriptor_type<storage_buffer>>

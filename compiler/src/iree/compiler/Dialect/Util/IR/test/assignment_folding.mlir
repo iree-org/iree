@@ -1,29 +1,29 @@
 // RUN: iree-opt --split-input-file --canonicalize %s | iree-opt --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @foldSwitchI32Nop
-func.func @foldSwitchI32Nop(%arg0 : index) -> i32 {
+util.func public @foldSwitchI32Nop(%arg0 : index) -> i32 {
   // CHECK: %[[DEFAULT:.+]] = arith.constant 5
   %c5 = arith.constant 5 : i32
   %0 = util.switch i32 from [] at %arg0 else %c5 : i32
-  // CHECK: return %[[DEFAULT]] : i32
-  return %0 : i32
+  // CHECK: util.return %[[DEFAULT]] : i32
+  util.return %0 : i32
 }
 
 // -----
 
 // CHECK-LABEL: @foldSwitchI32Identical
-func.func @foldSwitchI32Identical(%arg0 : index) -> i32 {
+util.func public @foldSwitchI32Identical(%arg0 : index) -> i32 {
   // CHECK: %[[C100:.+]] = arith.constant 100
   %c100 = arith.constant 100 : i32
   %0 = util.switch i32 from [%c100, %c100, %c100] at %arg0 else %c100 : i32
-  // CHECK: return %[[C100]] : i32
-  return %0 : i32
+  // CHECK: util.return %[[C100]] : i32
+  util.return %0 : i32
 }
 
 // -----
 
 // CHECK-LABEL: @foldSwitchI32ConstantIndex
-func.func @foldSwitchI32ConstantIndex() -> (i32, i32, i32, i32) {
+util.func public @foldSwitchI32ConstantIndex() -> (i32, i32, i32, i32) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -40,42 +40,42 @@ func.func @foldSwitchI32ConstantIndex() -> (i32, i32, i32, i32) {
   %1 = util.switch i32 from [%c100, %c200, %c300] at %c1 else %c400 : i32
   %2 = util.switch i32 from [%c100, %c200, %c300] at %c2 else %c400 : i32
   %3 = util.switch i32 from [%c100, %c200, %c300] at %c3 else %c400 : i32
-  // CHECK: return %[[C100]], %[[C200]], %[[C300]], %[[C400]] : i32, i32, i32, i32
-  return %0, %1, %2, %3 : i32, i32, i32, i32
+  // CHECK: util.return %[[C100]], %[[C200]], %[[C300]], %[[C400]] : i32, i32, i32, i32
+  util.return %0, %1, %2, %3 : i32, i32, i32, i32
 }
 
 // -----
 
 // CHECK-LABEL: @foldCastSameType
 // CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
-func.func @foldCastSameType(%source: !util.buffer) -> !util.buffer {
+util.func public @foldCastSameType(%source: !util.buffer) -> !util.buffer {
   // CHECK-NOT: util.cast
   %0 = util.cast %source : !util.buffer to !util.buffer
-  // CHECK: return %[[SOURCE]]
-  return %0 : !util.buffer
+  // CHECK: util.return %[[SOURCE]]
+  util.return %0 : !util.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @foldChainedCast
 // CHECK-SAME: (%[[SOURCE:.+]]: !util.buffer)
-func.func @foldChainedCast(%source: !util.buffer) -> !util.buffer {
+util.func public @foldChainedCast(%source: !util.buffer) -> !util.buffer {
   // CHECK-NOT: util.cast
   %0 = util.cast %source : !util.buffer to !util.object
   // CHECK-NOT: util.cast
   %1 = util.cast %0 : !util.object to !util.buffer
-  // CHECK: return %[[SOURCE]]
-  return %1 : !util.buffer
+  // CHECK: util.return %[[SOURCE]]
+  util.return %1 : !util.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @foldCastIntoNullOp
-func.func @foldCastIntoNullOp() -> !util.buffer {
+util.func public @foldCastIntoNullOp() -> !util.buffer {
   // CHECK: %[[NULL:.+]] = util.null : !util.buffer
   %0 = util.null : !util.object
   // CHECK-NOT: util.cast
   %1 = util.cast %0 : !util.object to !util.buffer
-  // CHECK: return %[[NULL]]
-  return %1 : !util.buffer
+  // CHECK: util.return %[[NULL]]
+  util.return %1 : !util.buffer
 }

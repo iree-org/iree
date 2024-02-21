@@ -83,12 +83,6 @@ def InferNumericNarrowing :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createInferNumericNarrowingPass()";
 }
 
-def LiftGenericToTransposeBatchMatmul:
-    Pass<"iree-global-opt-lift-generic-to-tranpose-batch-matmul", ""> {
-  let summary = "Converts linalg.generic ops to linalg.batch_matmul, possibly with transposes on operands/result.";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createLiftGenericToTransposeBatchMatmulPass()";
-}
-
 def MaterializeHomogeneousEncodings :
   Pass<"iree-global-opt-materialize-homogeneous-encodings", "mlir::ModuleOp"> {
   let summary = "Materializes logical encodings to physical encodings if there is a single device target.";
@@ -132,6 +126,11 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
 def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
   let summary = "Simplifies tensor pack and unpack ops";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSimplifyPackUnpackPass()";
+}
+
+def GlobalLoopInvariantCodeMotion : InterfacePass<"iree-global-opt-loop-invariant-code-motion", "mlir::FunctionOpInterface"> {
+  let summary = "Hoist loop invariants out of loops with zero-trip-check";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createGlobalLoopInvariantCodeMotionPass()";
 }
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

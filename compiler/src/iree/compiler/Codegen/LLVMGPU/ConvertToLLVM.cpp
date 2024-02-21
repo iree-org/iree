@@ -160,7 +160,7 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
     }
     // In CUDA workgroup memory is represented by a global variable.
     MemRefType allocType = allocOp.getType();
-    auto funcOp = allocOp->getParentOfType<func::FuncOp>();
+    auto funcOp = allocOp->getParentOfType<mlir::FunctionOpInterface>();
     auto moduleOp = funcOp->getParentOfType<ModuleOp>();
     SymbolTable symbolTable(moduleOp);
     OpBuilder::InsertionGuard guard(rewriter);
@@ -519,13 +519,13 @@ void populateScalarizeMathOps(RewritePatternSet &patterns) {
   patterns.add<ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::AbsFOp>,
                ScalarizeMathOp<math::AtanOp>, ScalarizeMathOp<math::Atan2Op>,
                ScalarizeMathOp<math::CeilOp>, ScalarizeMathOp<math::CosOp>,
-               ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::ExpM1Op>,
-               ScalarizeMathOp<math::FloorOp>, ScalarizeMathOp<math::LogOp>,
-               ScalarizeMathOp<math::Log1pOp>, ScalarizeMathOp<math::Log10Op>,
-               ScalarizeMathOp<math::Log2Op>, ScalarizeMathOp<math::PowFOp>,
-               ScalarizeMathOp<math::RsqrtOp>, ScalarizeMathOp<math::SinOp>,
-               ScalarizeMathOp<math::SqrtOp>, ScalarizeMathOp<math::TanhOp>>(
-      patterns.getContext());
+               ScalarizeMathOp<math::ExpOp>, ScalarizeMathOp<math::Exp2Op>,
+               ScalarizeMathOp<math::ExpM1Op>, ScalarizeMathOp<math::FloorOp>,
+               ScalarizeMathOp<math::LogOp>, ScalarizeMathOp<math::Log1pOp>,
+               ScalarizeMathOp<math::Log10Op>, ScalarizeMathOp<math::Log2Op>,
+               ScalarizeMathOp<math::PowFOp>, ScalarizeMathOp<math::RsqrtOp>,
+               ScalarizeMathOp<math::SinOp>, ScalarizeMathOp<math::SqrtOp>,
+               ScalarizeMathOp<math::TanhOp>>(patterns.getContext());
 }
 
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns) {

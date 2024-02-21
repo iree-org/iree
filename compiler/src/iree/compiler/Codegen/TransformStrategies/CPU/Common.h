@@ -7,10 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
 #define IREE_COMPILER_CODEGEN_TRANSFORM_DIALECT_STRATEGIES_CPU_COMMON_H_
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::cpu {
 
@@ -19,7 +19,7 @@ namespace mlir::iree_compiler::cpu {
 //===----------------------------------------------------------------------===//
 /// Take care of the last common steps in a CPU strategy (i.e. vectorize,
 /// bufferize, maps to blocks/workgroups and lower vectors).
-/// Return the handles to the updated variant and the func::FuncOp ops under
+/// Return the handles to the updated variant and the function ops under
 /// the variant op.
 // TODO: pass control to LowerVectorsOp once the builder allows it.
 std::pair<Value, Value> buildCommonTrailingStrategy(
@@ -47,8 +47,8 @@ struct CPUModel {
 /// On a successful match, configure a reduction strategy based on a proxy model
 /// of the hardware and construct transform dialect IR that implements the
 /// reduction strategy. The transform dialect IR is added in a top-level
-/// ModuleOp after the `entryPoint` func::FuncOp.
-LogicalResult matchAndSetReductionStrategy(func::FuncOp entryPoint,
+/// ModuleOp after the `entryPoint` function.
+LogicalResult matchAndSetReductionStrategy(mlir::FunctionOpInterface entryPoint,
                                            linalg::LinalgOp op,
                                            const CPUModel &cpuModel);
 

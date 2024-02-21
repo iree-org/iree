@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -65,7 +64,7 @@ struct RematerializeParallelOpsPattern
 struct RematerializeParallelOpsPass
     : public RematerializeParallelOpsBase<RematerializeParallelOpsPass> {
   void runOnOperation() override {
-    func::FuncOp funcOp = getOperation();
+    auto funcOp = getOperation();
     RewritePatternSet fusionPatterns(funcOp.getContext());
     fusionPatterns.insert<RematerializeParallelOpsPattern>(funcOp.getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(fusionPatterns);
@@ -78,7 +77,7 @@ struct RematerializeParallelOpsPass
 
 } // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRematerializeParallelOpsPass() {
   return std::make_unique<RematerializeParallelOpsPass>();
 }

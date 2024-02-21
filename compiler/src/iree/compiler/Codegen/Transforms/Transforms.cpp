@@ -19,7 +19,6 @@
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
@@ -101,22 +100,22 @@ cloneOffsetsSizesAndStrides(OpBuilder &builder,
 }
 
 template <typename AllocLikeOpType>
-std::optional<Value>
-hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
-                                  Location loc, MemRefType allocLikeType,
-                                  ValueRange dynamicSizes,
-                                  std::optional<uint64_t> alignment) {
+std::optional<Value> hoistOneStaticallyBoundAllocation(
+    mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
+    MemRefType allocLikeType, ValueRange dynamicSizes,
+    std::optional<uint64_t> alignment) {
   IntegerAttr alignmentAttr =
       alignment ? builder.getI64IntegerAttr(alignment.value()) : nullptr;
   // For static case just create a new allocation in the entry block of the same
   // size. No need to insert a subview.
   if (dynamicSizes.empty()) {
     OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(&funcOp.getBody().front());
+    builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
     Value allocation =
         builder.create<AllocLikeOpType>(loc, allocLikeType, alignmentAttr);
     if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
-      builder.setInsertionPoint(funcOp.getBody().front().getTerminator());
+      builder.setInsertionPoint(
+          funcOp.getFunctionBody().front().getTerminator());
       builder.create<memref::DeallocOp>(loc, allocation);
     }
     return allocation;
@@ -154,9 +153,8 @@ hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
   Value allocation;
   {
     OpBuilder::InsertionGuard g(builder);
-    builder.setInsertionPointToStart(&funcOp.getBody().front());
-    auto allocationType =
-        MemRefType::get(staticShape, allocLikeType.getElementType());
+    builder.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+    auto allocationType = allocLikeType.clone(staticShape);
     allocation =
         builder.create<AllocLikeOpType>(loc, allocationType, alignmentAttr);
   }
@@ -164,16 +162,24 @@ hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
   Value subviewOp = builder.create<memref::SubViewOp>(loc, allocation, offsets,
                                                       subviewSizes, strides);
 
+  // Cast it back to the original types to prevent consumer op's verification
+  // error. It could happen when the consumer op is a memref.subview op.
+  if (subviewOp.getType() != allocLikeType) {
+    subviewOp = builder.create<memref::CastOp>(loc, allocLikeType, subviewOp);
+  }
+
   if (std::is_same<AllocLikeOpType, memref::AllocOp>::value) {
-    builder.setInsertionPoint(funcOp.getBody().front().getTerminator());
+    builder.setInsertionPoint(funcOp.getFunctionBody().front().getTerminator());
     builder.create<memref::DeallocOp>(loc, allocation);
   }
+
   return subviewOp;
 }
 
 template <typename AllocLikeOpType>
 std::optional<Value>
-hoistOneStaticallyBoundAllocation(func::FuncOp funcOp, OpBuilder &builder,
+hoistOneStaticallyBoundAllocation(mlir::FunctionOpInterface funcOp,
+                                  OpBuilder &builder,
                                   AllocLikeOpType allocLikeOp) {
   OpBuilder::InsertionGuard guard(builder);
   builder.setInsertionPoint(allocLikeOp);
@@ -193,12 +199,12 @@ static bool isUseReplaceableWithSubview(OpOperand &use) {
 
 template <typename AllocLikeOpType>
 void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
-                                           func::FuncOp funcOp) {
+                                           mlir::FunctionOpInterface funcOp) {
   SmallVector<AllocLikeOpType> allocLikeOps;
 
   // Collect all allocLikes that are hoistable.
   funcOp.walk([&](AllocLikeOpType allocLikeOp) {
-    if (allocLikeOp->getBlock() == &funcOp.getBody().front())
+    if (allocLikeOp->getBlock() == &funcOp.getFunctionBody().front())
       return;
     if (allocLikeOp.getDynamicSizes().empty()) {
       allocLikeOps.push_back(allocLikeOp);
@@ -249,27 +255,26 @@ void hoistStaticallyBoundAllocationsInFunc(RewriterBase &rewriter,
 /// dependent functions.
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocOp>(
-    func::FuncOp funcOp, OpBuilder &builder, Location loc,
+    mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
     MemRefType allocLikeType, ValueRange dynamicSizes,
     std::optional<uint64_t> alignment);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
-    func::FuncOp funcOp, OpBuilder &builder, Location loc,
+    mlir::FunctionOpInterface funcOp, OpBuilder &builder, Location loc,
     MemRefType allocLikeType, ValueRange dynamicSizes,
     std::optional<uint64_t> alignment);
 template std::optional<Value>
-hoistOneStaticallyBoundAllocation<memref::AllocOp>(func::FuncOp funcOp,
-                                                   OpBuilder &builder,
-                                                   memref::AllocOp allocLikeOp);
+hoistOneStaticallyBoundAllocation<memref::AllocOp>(
+    mlir::FunctionOpInterface funcOp, OpBuilder &builder,
+    memref::AllocOp allocLikeOp);
 template std::optional<Value>
 hoistOneStaticallyBoundAllocation<memref::AllocaOp>(
-    func::FuncOp funcOp, OpBuilder &builder, memref::AllocaOp allocLikeOp);
-template void
-hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(RewriterBase &rewriter,
-                                                       func::FuncOp funcOp);
-template void
-hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(RewriterBase &rewriter,
-                                                        func::FuncOp funcOp);
+    mlir::FunctionOpInterface funcOp, OpBuilder &builder,
+    memref::AllocaOp allocLikeOp);
+template void hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(
+    RewriterBase &rewriter, mlir::FunctionOpInterface funcOp);
+template void hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(
+    RewriterBase &rewriter, mlir::FunctionOpInterface funcOp);
 
 //===---------------------------------------------------------------------===//
 // Lowering `flow.dispatch.workgroup_count_from_slice` operation.
@@ -278,8 +283,8 @@ hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(RewriterBase &rewriter,
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter,
     IREE::Flow::DispatchWorkgroupCountFromSliceOp workgroupCountOp,
-    func::FuncOp entryPointFn, ArrayRef<OpFoldResult> workgroupCount,
-    int maxWorkgroupParallelDims) {
+    mlir::FunctionOpInterface entryPointFn,
+    ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
   // Compute the backward slice of the workgroup count operations.
   BackwardSliceOptions options;
   options.filter = [](Operation *op) {
@@ -381,7 +386,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 }
 
 LogicalResult lowerWorkgroupCountFromSliceOp(
-    RewriterBase &rewriter, func::FuncOp entryPointFn,
+    RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
   FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
@@ -639,7 +644,8 @@ void populateRemoveDeadMemAllocPatterns(RewritePatternSet &patterns) {
   patterns.insert<RemoveDeadInterfaceBindings>(patterns.getContext());
 }
 
-void analyseAllocsForPacking(func::FuncOp funcOp, ArrayRef<Operation *> allocs,
+void analyseAllocsForPacking(mlir::FunctionOpInterface funcOp,
+                             ArrayRef<Operation *> allocs,
                              SmallVector<AliasGroup> &aliasGroups) {
   // Represent of a group of allocations with overlapping liverange and the
   // liveness of the overall group.
@@ -721,12 +727,12 @@ static int64_t getAllocSize(Operation *op, DataLayout &dataLayout) {
          8;
 }
 
-void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
+void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
                 ArrayRef<AliasGroup> aliasGroups) {
   if (aliasGroups.empty())
     return;
   DataLayout dataLayout = DataLayout::closest(funcOp);
-  builder.setInsertionPointToStart(&(*funcOp.getBody().begin()));
+  builder.setInsertionPointToStart(&(*funcOp.getFunctionBody().begin()));
   int64_t maxAlloc = 0;
   for (size_t i = 0; i < aliasGroups.size(); i++) {
     int64_t allocSize = 0;
@@ -759,7 +765,8 @@ void packAllocs(OpBuilder &builder, func::FuncOp funcOp,
 }
 
 LogicalResult
-tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
+tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
+                        scf::SCFTilingOptions options,
                         IREE::LinalgExt::LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> candidates;
@@ -780,7 +787,7 @@ tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
     }
 
     FailureOr<scf::SCFTilingResult> tiledResults =
-        scf::tileUsingSCFForOp(rewriter, target, options);
+        scf::tileUsingSCF(rewriter, target, options);
     if (failed(tiledResults)) {
       return failure();
     }
@@ -794,7 +801,7 @@ tileLinalgOpsWithFilter(func::FuncOp funcOp, scf::SCFTilingOptions options,
 }
 
 LogicalResult distributeLinalgOpsWithFilter(
-    func::FuncOp funcOp, linalg::LinalgTilingOptions tilingOptions,
+    mlir::FunctionOpInterface funcOp, linalg::LinalgTilingOptions tilingOptions,
     IREE::LinalgExt::LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<linalg::LinalgOp> candidates;

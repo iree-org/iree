@@ -92,7 +92,7 @@ EFFICIENTNET_B7_FP32_TORCH = common_definitions.Model(
 ID_FORMAT = string.Template("${model_id}-batch-${batch_size}")
 NAME_FORMAT = string.Template("${name}Batch${batch_size}")
 BERT_LARGE_FP32_URL = string.Template(
-    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20231010.987_1696982151/BERT_LARGE_FP32_PT_384XI32_BATCH${batch_size}/linalg.mlirbc"
+    "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20240124.1093_1706139741/BERT_LARGE_FP32_PT_384XI32_BATCH${batch_size}/linalg.mlirbc"
 )
 BERT_LARGE_FP16_URL = string.Template(
     "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20230816.932_1692245822/BERT_LARGE_FP16_PT_384XI32_BATCH${batch_size}/linalg.mlirbc"

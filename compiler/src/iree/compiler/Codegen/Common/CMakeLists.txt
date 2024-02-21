@@ -133,6 +133,7 @@ iree_cc_library(
     MLIRBufferizationTransforms
     MLIRFuncDialect
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLLVMCommonConversion
@@ -207,6 +208,7 @@ iree_cc_library(
     MLIRBufferizationTransformOps
     MLIRBufferizationTransforms
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRGPUTransformOps
     MLIRIR
@@ -236,6 +238,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies

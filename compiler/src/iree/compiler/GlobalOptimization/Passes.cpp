@@ -7,15 +7,16 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest =
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
@@ -137,16 +138,21 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
-    mainPassManager.addPass(createLiftGenericToTransposeBatchMatmulPass());
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());
   }
-  // Generalize transposes and any other remaining named linalg ops that can now
-  // be represented as generics.
+  // Generalize transposes and any other remaining named linalg ops that can
+  // now be represented as generics.
   FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
+
+  // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
+  FunctionLikeNest(mainPassManager)
+      .addPass(createGlobalLoopInvariantCodeMotionPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)
@@ -168,6 +174,35 @@ void buildGlobalOptimizationPassPipeline(
 
   if (transformOptions.buildConstEvalPassPipeline) {
     transformOptions.buildConstEvalPassPipeline(pipeline);
+  }
+
+  // Export after const-eval. If the user wants to keep the input constants
+  // as is in the final parameter archive, they will probably want to disable
+  // const-eval, or could run this pass as preprocessing. There might be a
+  // configuration in the future where users want to limit const-eval to smaller
+  // constants that aren't exported and skip it for larger parameters, but this
+  // is a sensible place for the common case of wanting const-eval in the final
+  // artifact + archive.
+  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
+    exportParametersOptions.archivePath =
+        transformOptions.options.parameterArchiveExportPath;
+    exportParametersOptions.parameterScope =
+        transformOptions.options.parameterExportScope;
+    exportParametersOptions.minimumSize =
+        transformOptions.options.minimumParameterExportSize;
+    pipeline.addPass(IREE::IO::Parameters::createExportParametersPass(
+        exportParametersOptions));
+  }
+
+  if (!transformOptions.options.splatParameterArchiveExportPath.empty()) {
+    IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
+        generateSplatOptions;
+    generateSplatOptions.archivePath =
+        transformOptions.options.splatParameterArchiveExportPath;
+    pipeline.addPass(
+        IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
+            generateSplatOptions));
   }
 
   if (transformOptions.options.numericPrecisionReduction) {

@@ -13,12 +13,51 @@ def ConvertConv2DToImg2Col :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
   let constructor = "mlir::iree_compiler::Preprocessing::createConvertConv2DToImg2ColPass()";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
+def ConvertConvToChannelsLast :
+    Pass<"iree-preprocessing-convert-conv-to-channels-last", ""> {
+  let summary = "Convert linalg convolutions to channels last.";
+  let constructor =
+      "mlir::iree_compiler::Preprocessing::createConvertConvToChannelsLastPass()";
+  let options = [
+    Option<"tileSize", "tile-size", "int",
+           /*default=*/"0",
+           "Tiling factor for the channel dimension of NCHW-like convolutions. "
+           "Defaults to fully transposing all channel-like dimensions">,
+  ];
+}
+
+def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
+  let summary = "transform dialect interpreter";
+  let description = [{
+    This pass runs the transform dialect interpreter and applies the named
+    sequence transformation named `__transform_main`.
+
+    TODO: Drop this pass in favor of the one upstream. The one upstream requires
+    separate loading of the module and thus isn't suited for single-use
+    transform scripts.
+  }];
+  let dependentDialects = ["::mlir::transform::TransformDialect"];
+  let options = [
+    Option<"disableExpensiveChecks", "disable-expensive-checks", "bool",
+           "false",
+           "Disable expensive checks in the interpreter for a faster run.">,
+    Option<"transformSpecPath", "transform-spec-path", "std::string",
+           /*default=*/"", "File path to the transform spec to use.">,
+  ];
 }
 
 def MakeSingleDispatchForFunction :
-    Pass<"iree-preprocessing-make-single-dispatch-for-function", "func::FuncOp"> {
+    InterfacePass<"iree-preprocessing-make-single-dispatch-for-function", "mlir::FunctionOpInterface"> {
   let summary = "Convert entire function into a single dispatch";
   let constructor = "mlir::iree_compiler::Preprocessing::createMakeSingleDispatchForFunctionPass()";
+  let dependentDialects = [
+    "IREE::Flow::FlowDialect",
+  ];
 }
 
 def PadLinalgOps :
@@ -29,6 +68,9 @@ def PadLinalgOps :
     Option<"paddingSize", "pad-size", "int",
            /*default=*/"4",
            "Specify the padding size">,
+  ];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
   ];
 }
 

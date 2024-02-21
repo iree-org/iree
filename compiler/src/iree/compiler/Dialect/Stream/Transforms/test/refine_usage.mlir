@@ -7,25 +7,25 @@
 
 // CHECK-LABEL: @propagateFuncCallee
 // CHECK-SAME: (%[[ARG:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index) -> !stream.resource<external>
-func.func private @propagateFuncCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+util.func private @propagateFuncCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.fill {{.+}} !stream.resource<external>
   %fill = stream.async.fill %c123_i32, %arg[%c0 to %c128 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  // CHECK: return {{.+}} : !stream.resource<external>
-  return %fill : !stream.resource<*>
+  // CHECK: util.return {{.+}} : !stream.resource<external>
+  util.return %fill : !stream.resource<*>
 }
 // CHECK: @propagateFuncCaller
 // CHECK-SAME: -> !stream.resource<external>
-func.func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
+util.func public @propagateFuncCaller(%size: index) -> !stream.resource<*> {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat {{.+}} -> !stream.resource<external>
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // CHECK: call @propagateFuncCallee({{.+}}) : (!stream.resource<external>, index) -> !stream.resource<external>
-  %result = call @propagateFuncCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
-  // CHECK: return {{.+}} : !stream.resource<external>
-  return %result : !stream.resource<*>
+  %result = util.call @propagateFuncCallee(%splat, %size) : (!stream.resource<*>, index) -> !stream.resource<*>
+  // CHECK: util.return {{.+}} : !stream.resource<external>
+  util.return %result : !stream.resource<*>
 }
 
 // -----
@@ -34,7 +34,7 @@ func.func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
 // and the type changes we don't explode.
 
 // CHECK-LABEL: @transitionTypesAcrossTies
-func.func @transitionTypesAcrossTies() -> !hal.buffer_view {
+util.func public @transitionTypesAcrossTies() -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[SPLAT:.+]] = stream.async.splat {{.+}} -> !stream.resource<external>
@@ -43,7 +43,7 @@ func.func @transitionTypesAcrossTies() -> !hal.buffer_view {
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
   // CHECK: stream.tensor.export %[[SPLAT]] : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view
-  return %2 : !hal.buffer_view
+  util.return %2 : !hal.buffer_view
 }
 
 // -----
@@ -58,7 +58,7 @@ func.func @transitionTypesAcrossTies() -> !hal.buffer_view {
 
 // CHECK-LABEL: @propagateBlocks
 // CHECK-SAME: (%[[COND:.+]]: i1, {{.+}}) -> (!stream.resource<transient>, !stream.resource<external>)
-func.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<external>) {
+util.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -89,8 +89,8 @@ func.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   // CHECK-NOT: stream.async.transfer
   %external_transfer = stream.async.transfer %bb2_1 : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
-  // CHECK: return %[[BB2_ARG0]], %[[BB2_ARG1]] : !stream.resource<transient>, !stream.resource<external>
-  return %bb2_0, %external_transfer : !stream.resource<*>, !stream.resource<external>
+  // CHECK: util.return %[[BB2_ARG0]], %[[BB2_ARG1]] : !stream.resource<transient>, !stream.resource<external>
+  util.return %bb2_0, %external_transfer : !stream.resource<*>, !stream.resource<external>
 }
 
 // -----
@@ -101,15 +101,15 @@ func.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource
 // CHECK-LABEL: @conflictResolution
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
 // CHECK-SAME: -> !stream.resource<external>
-func.func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+util.func public @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !stream.resource<external>, %size: index) -> !stream.resource<*> {
   // CHECK: %[[ARG0_EXT:.+]] = stream.async.transfer %[[ARG0]]
   %arg0_any = stream.async.transfer %arg0 : !stream.resource<transient>{%size} -> !stream.resource<*>{%size}
   // CHECK-NOT: stream.async.transfer %[[ARG1]]
   %arg1_any = stream.async.transfer %arg1 : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[RET:.+]] = arith.select %[[COND]], %[[ARG0_EXT]], %[[ARG1]] : !stream.resource<external>
   %0 = arith.select %cond, %arg0_any, %arg1_any : !stream.resource<*>
-  // CHECK: return %[[RET]] : !stream.resource<external>
-  return %0 : !stream.resource<*>
+  // CHECK: util.return %[[RET]] : !stream.resource<external>
+  util.return %0 : !stream.resource<*>
 }
 
 // -----
@@ -122,7 +122,7 @@ func.func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %ar
 // CHECK-LABEL: @transferResolution
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
 // CHECK-SAME: -> !stream.resource<external>
-func.func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
+util.func public @transferResolution(%arg0: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: %[[ARG0_EXT:.+]] = stream.async.transfer %[[ARG0]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
@@ -130,7 +130,7 @@ func.func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -
   // CHECK: %[[RET0:.+]] = stream.async.dispatch @ex::@dispatch[%c1, %c1, %c1](%[[ARG0_EXT]][%c0 to %[[SIZE]] for %[[SIZE]]]) : (!stream.resource<external>{%[[SIZE]]}) -> %[[ARG0_EXT]]{%[[SIZE]]}
   %ret0_any = stream.async.dispatch @ex::@dispatch[%c1, %c1, %c1](%arg0_any[%c0 to %size for %size]) : (!stream.resource<*>{%size}) -> %arg0_any{%size}
   // return %[[RET0]] : !stream.resource<external>
-  return %ret0_any : !stream.resource<*>
+  util.return %ret0_any : !stream.resource<*>
 }
 
 // -----
@@ -139,14 +139,14 @@ func.func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -
 
 // CHECK-LABEL: @transferElision
 // CHECK-SAME: (%[[SIZE:.+]]: index) -> !stream.resource<external>
-func.func @transferElision(%size: index) -> !stream.resource<external> {
+util.func public @transferElision(%size: index) -> !stream.resource<external> {
   // CHECK: %[[ALLOCA:.+]] = stream.async.alloca
   %alloca = stream.async.alloca : !stream.resource<constant>{%size}
   %transfer_any = stream.async.transfer %alloca : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[TRANSFER_EXTERNAL:.+]] = stream.async.transfer %[[ALLOCA]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   %transfer_external = stream.async.transfer %transfer_any : !stream.resource<*>{%size} -> !stream.resource<external>{%size}
-  // CHECK: return %[[TRANSFER_EXTERNAL]]
-  return %transfer_external : !stream.resource<external>
+  // CHECK: util.return %[[TRANSFER_EXTERNAL]]
+  util.return %transfer_external : !stream.resource<external>
 }
 
 // -----
@@ -158,25 +158,25 @@ util.global private mutable @variable__size : index
 
 // CHECK-LABEL: @globalLoad()
 // CHECK-SAME: -> !stream.resource<variable>
-func.func private @globalLoad() -> !stream.resource<*> {
+util.func private @globalLoad() -> !stream.resource<*> {
   // CHECK: %[[VALUE:.+]] = util.global.load @variable : !stream.resource<variable>
   %value = util.global.load @variable : !stream.resource<variable>
   %size = util.global.load @variable__size : index
   // CHECK-NOT: stream.async.transfer
   %0 = stream.async.transfer %value : !stream.resource<variable>{%size} -> !stream.resource<*>{%size}
-  // CHECK: return %[[VALUE]]
-  return %0 : !stream.resource<*>
+  // CHECK: util.return %[[VALUE]]
+  util.return %0 : !stream.resource<*>
 }
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[VALUE:.+]]: !stream.resource<variable>, %[[SIZE:.+]]: index)
-func.func private @globalStore(%value: !stream.resource<*>, %size: index) {
+util.func private @globalStore(%value: !stream.resource<*>, %size: index) {
   // CHECK-NOT: stream.async.transfer
   %0 = stream.async.transfer %value : !stream.resource<*>{%size} -> !stream.resource<variable>{%size}
   // CHECK: util.global.store %[[VALUE]], @variable : !stream.resource<variable>
   util.global.store %0, @variable : !stream.resource<variable>
   util.global.store %size, @variable__size : index
-  return
+  util.return
 }
 
 // -----
@@ -184,7 +184,7 @@ func.func private @globalStore(%value: !stream.resource<*>, %size: index) {
 // Tests that explicit resource allocations are refined.
 
 // CHECK-LABEL: @explicitAlloc
-func.func @explicitAlloc() -> !hal.buffer_view {
+util.func public @explicitAlloc() -> !hal.buffer_view {
   %c0 = arith.constant 0 : index
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%c0}
   %0 = stream.resource.alloc : !stream.resource<*>{%c0}
@@ -192,7 +192,7 @@ func.func @explicitAlloc() -> !hal.buffer_view {
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c0} -> !stream.resource<external>{%c0}
   // CHECK: stream.tensor.export %[[ALLOC]] : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
-  return %2 : !hal.buffer_view
+  util.return %2 : !hal.buffer_view
 }
 
 // -----
@@ -200,7 +200,7 @@ func.func @explicitAlloc() -> !hal.buffer_view {
 // Tests that async allocations that escape are turned into non-transient allocs.
 
 // CHECK-LABEL: @escapingAlloca
-func.func @escapingAlloca() -> !hal.buffer_view {
+util.func public @escapingAlloca() -> !hal.buffer_view {
   %c123 = arith.constant 123 : index
   // CHECK: %[[ALLOCA:.+]] = stream.async.alloca : !stream.resource<external>{%c123}
   %0 = stream.async.alloca : !stream.resource<*>{%c123}
@@ -208,13 +208,13 @@ func.func @escapingAlloca() -> !hal.buffer_view {
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c123} -> !stream.resource<external>{%c123}
   // CHECK: stream.tensor.export %[[ALLOCA]] : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
   %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c123} -> !hal.buffer_view
-  return %2 : !hal.buffer_view
+  util.return %2 : !hal.buffer_view
 }
 
 // -----
 
 // CHECK-LABEL: @testIf
-func.func @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource<*>) -> !stream.resource<*> {
+util.func public @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource<*>) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   // CHECK: %[[IF:.+]] = scf.if
@@ -233,13 +233,13 @@ func.func @testIf(%arg0: i1, %arg1: !stream.resource<*>, %arg2: !stream.resource
     // CHECK-SAME: !stream.resource<external>
     scf.yield %arg1 : !stream.resource<*>
   }
-  return %if : !stream.resource<*>
+  util.return %if : !stream.resource<*>
 }
 
 // -----
 
 // CHECK: @testWhile
-func.func @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.resource<*>) {
+util.func public @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : i32
   %c4 = arith.constant 4 : index
@@ -260,8 +260,8 @@ func.func @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.re
     // CHECK-SAME: !stream.resource<external>
     scf.yield %add, %disp : i32, !stream.resource<*>
   }
-  // CHECK: return %[[IF]]#0, %[[IF]]#1 : i32, !stream.resource<external>
-  return %while#0, %while#1 : i32, !stream.resource<*>
+  // CHECK: util.return %[[IF]]#0, %[[IF]]#1 : i32, !stream.resource<external>
+  util.return %while#0, %while#1 : i32, !stream.resource<*>
 }
 
 // -----
@@ -269,7 +269,7 @@ func.func @testWhile(%arg0: i32, %arg1: !stream.resource<*>) -> (i32, !stream.re
 // CHECK-LABEL: @testWhileRecurse
 // CHECK-SAME: %[[ARG0:.+]]: !stream.resource<external>
 // CHECK-SAME: -> !stream.resource<external>
-func.func @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<external> {
+util.func public @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<external> {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4
@@ -304,8 +304,8 @@ func.func @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<ext
   }
   %transfer = stream.async.transfer %while#0 : !stream.resource<*>{%while#1} -> !stream.resource<external>{%while#1}
 
-  // CHECK: return %[[WHILE]]#0
-  return %transfer : !stream.resource<external>
+  // CHECK: util.return %[[WHILE]]#0
+  util.return %transfer : !stream.resource<external>
 }
 
 // -----
@@ -313,19 +313,19 @@ func.func @testWhileRecurse(%arg0 : !stream.resource<*>) -> !stream.resource<ext
 // CHECK-LABEL: @testForOp
 // CHECK-SAME: %[[ARG0:.+]]: index
 // CHECK-SAME: %[[ARG1:.+]]: !stream.resource<external>
-func.func @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.resource<external> {
+util.func public @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.resource<external> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
 
-// CHECK: %[[C0:.+]] = arith.constant 0 : index
-// CHECK: %[[C1:.+]] = arith.constant 1 : index
-// CHECK: %[[C4:.+]] = arith.constant 4 : index
-// CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%arg1[%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
+  // CHECK: %[[C0:.+]] = arith.constant 0 : index
+  // CHECK: %[[C1:.+]] = arith.constant 1 : index
+  // CHECK: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK: %[[DISP0:.+]] = stream.async.dispatch @dispatch0(%arg1[%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<external>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
   %dispatch6 = stream.async.dispatch @dispatch0(%arg1[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
+
   // CHECK: %[[FOR:.+]] = scf.for %[[ARG2:.+]] = %[[C0]] to %[[ARG0]] step %[[C1]] iter_args(%[[ARG3:.+]] = %[[DISP0]]) -> (!stream.resource<transient>) {
   %for = scf.for %i = %c0 to %arg0 step %c1 iter_args(%arg3 = %dispatch6) -> (!stream.resource<*>) {
-
     // CHECK:   %[[DISP1:.+]] = stream.async.dispatch @dispatch1(%[[ARG3]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
     // CHECK:   %[[DISP2:.+]] = stream.async.dispatch @dispatch2(%[[DISP1]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
     // CHECK:   %[[DISP3:.+]] = stream.async.dispatch @dispatch3(%[[DISP2]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<transient>{%[[C4]]}
@@ -335,10 +335,11 @@ func.func @testForOp(%arg0 : index, %arg1 : !stream.resource<*>) -> !stream.reso
     // CHECK:   scf.yield %[[DISP3]] : !stream.resource<transient>
     scf.yield %dispatch3 : !stream.resource<*>
   }
+
   // CHECK: %[[DISP4:.+]] = stream.async.dispatch @dispatch4(%[[FOR]][%[[C0]] to %[[ARG0]] for %[[ARG0]]]) : (!stream.resource<transient>{%[[C4]]}) -> !stream.resource<external>{%[[C4]]}
   %dispatch5 = stream.async.dispatch @dispatch4(%for[%c0 to %arg0 for %arg0]) : (!stream.resource<*>{%c4}) -> !stream.resource<*>{%c4}
   %transfer = stream.async.transfer %dispatch5 : !stream.resource<*>{%arg0} -> !stream.resource<external>{%arg0}
 
-  // CHECK: return %[[DISP4]] : !stream.resource<external>
-  return %transfer : !stream.resource<external>
+  // CHECK: util.return %[[DISP4]] : !stream.resource<external>
+  util.return %transfer : !stream.resource<external>
 }

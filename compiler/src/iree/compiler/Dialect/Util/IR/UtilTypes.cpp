@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -24,6 +23,10 @@
 #include "mlir/Interfaces/CastInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Parser/Parser.h"
+
+// clang-format off: must be included after all LLVM/MLIR headers.
+#include "iree/compiler/Dialect/Util/IR/UtilEnums.cpp.inc" // IWYU pragma: keep
+// clang-format on
 
 namespace mlir::iree_compiler::IREE::Util {
 
@@ -173,7 +176,8 @@ bool isValueUsableForOp(Value value, Block *block,
       return true;
     }
   } else if (definingBlock->isEntryBlock() &&
-             llvm::isa<FunctionOpInterface>(definingBlock->getParentOp())) {
+             llvm::isa<mlir::FunctionOpInterface>(
+                 definingBlock->getParentOp())) {
     // Function entry block always dominates - fast path for constants.
     return true;
   } else {
@@ -221,6 +225,17 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
   // Could support more cases of satisfaction checks or movement. Ops that exist
   // in ancestors (like those implicitly captured by nested scf.if/scf.for ops)
   // are good candidates to check for.
+  return false;
+}
+
+bool isPublicOrExternal(CallableOpInterface callableOp) {
+  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
+    if (symbolOp.isPublic())
+      return true;
+  }
+  auto *region = callableOp.getCallableRegion();
+  if (!region || region->empty())
+    return true;
   return false;
 }
 
@@ -283,6 +298,10 @@ detail::verifyGlobalAddressOp(GlobalAddressOpInterface addressOp,
   }
   // TODO(benvanik): allow type conversion here? probably better on the indirect
   // access ops instead as it's then easier to fold the conversion.
+  if (addressOp.isGlobalImmutable() && globalOp.isGlobalMutable()) {
+    return addressOp->emitOpError()
+           << "is marked as immutable but the global is mutable";
+  }
   return success();
 }
 
@@ -298,6 +317,10 @@ LogicalResult detail::verifyGlobalLoadOp(GlobalLoadOpInterface loadOp,
     return loadOp->emitOpError()
            << "global type mismatch; global " << globalOp.getGlobalName()
            << " is " << globalOp.getGlobalType() << " but load is " << loadType;
+  }
+  if (loadOp.isGlobalImmutable() && globalOp.isGlobalMutable()) {
+    return loadOp->emitOpError()
+           << "is marked as immutable but the global is mutable";
   }
   return success();
 }
@@ -337,6 +360,22 @@ lookupGlobalOp(Operation *accessorOp, SymbolRefAttr globalRefAttr,
 //===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
+
+void detail::getAllTiedOperands(Operation *op,
+                                SmallVectorImpl<int64_t> &indices) {
+  if (auto tiedOperandsAttr = op->getAttrOfType<ArrayAttr>(
+          IREE::Util::TiedOpInterface::getStorageAttrName())) {
+    for (auto indexAttr : tiedOperandsAttr.getAsRange<IntegerAttr>()) {
+      indices.push_back(indexAttr.getInt());
+    }
+  } else if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(op)) {
+    indices.assign(op->getNumResults(),
+                   IREE::Util::TiedOpInterface::kUntiedIndex);
+  } else if (auto callableOp = dyn_cast<CallableOpInterface>(op)) {
+    indices.assign(callableOp.getResultTypes().size(),
+                   IREE::Util::TiedOpInterface::kUntiedIndex);
+  }
+}
 
 std::optional<unsigned>
 detail::getTiedResultOperandIndex(Operation *op, unsigned resultIndex) {

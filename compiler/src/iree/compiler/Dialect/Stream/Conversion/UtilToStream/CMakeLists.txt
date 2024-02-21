@@ -18,11 +18,12 @@ iree_cc_library(
   SRCS
     "Patterns.cpp"
   DEPS
-    MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRTransforms
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

@@ -15,11 +15,16 @@ iree_lit_test_suite(
     lit
   SRCS
     "conv2d_to_img2col.mlir"
+    "conv_to_channels_last.mlir"
     "make_single_dispatch_for_function.mlir"
     "pad_linalg_ops.mlir"
+    "preprocessing_match_ops.mlir"
+    "transform_symbol_importing.mlir"
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    external_function_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

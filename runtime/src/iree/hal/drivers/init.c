@@ -10,10 +10,6 @@
 #include "iree/hal/drivers/cuda/registration/driver_module.h"
 #endif  // IREE_HAVE_HAL_CUDA_DRIVER_MODULE
 
-#if defined(IREE_HAVE_HAL_CUDA2_DRIVER_MODULE)
-#include "iree/hal/drivers/cuda2/registration/driver_module.h"
-#endif  // IREE_HAVE_HAL_CUDA2_DRIVER_MODULE
-
 #if defined(IREE_HAVE_HAL_LOCAL_SYNC_DRIVER_MODULE)
 #include "iree/hal/drivers/local_sync/registration/driver_module.h"
 #endif  // IREE_HAVE_HAL_LOCAL_SYNC_DRIVER_MODULE
@@ -49,11 +45,6 @@ iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_cuda_driver_module_register(registry));
 #endif  // IREE_HAVE_HAL_CUDA_DRIVER_MODULE
-
-#if defined(IREE_HAVE_HAL_CUDA2_DRIVER_MODULE)
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_cuda2_driver_module_register(registry));
-#endif  // IREE_HAVE_HAL_CUDA2_DRIVER_MODULE
 
 #if defined(IREE_HAVE_HAL_LOCAL_SYNC_DRIVER_MODULE)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

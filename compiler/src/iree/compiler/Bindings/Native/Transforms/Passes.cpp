@@ -8,12 +8,16 @@
 
 #include <memory>
 
-#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler::IREE::ABI {
+
+using FunctionLikeNest =
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 void buildTransformPassPipeline(OpPassManager &passManager,
                                 const InvocationOptions &invocationOptions) {
@@ -27,8 +31,8 @@ void buildTransformPassPipeline(OpPassManager &passManager,
 
   // Cleanup the IR after manipulating it.
   passManager.addPass(createInlinerPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  FunctionLikeNest(passManager).addPass(createCanonicalizerPass);
+  FunctionLikeNest(passManager).addPass(createCSEPass);
   passManager.addPass(createSymbolDCEPass());
 }
 

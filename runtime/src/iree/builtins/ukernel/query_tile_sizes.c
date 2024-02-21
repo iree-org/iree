@@ -58,8 +58,7 @@ static void iree_uk_query_tile_sizes_2d_matmul(
     out_params->tile_size0 = matmul_tile_sizes.M;
     out_params->tile_size1 = matmul_tile_sizes.N;
   } else {
-    // Can't happen, validated earlier.
-    IREE_UK_ASSUME_UNREACHABLE;
+    // Shouldn't happen, validated earlier.
   }
 }
 
@@ -71,8 +70,7 @@ IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(
   if (iree_uk_query_tile_sizes_operation_is_matmul(params->flags)) {
     iree_uk_query_tile_sizes_2d_matmul(params, out_params);
   } else {
-    // Can't happen, validated earlier.
-    IREE_UK_ASSUME_UNREACHABLE;
+    // Shouldn't happen, validated earlier.
   }
   return 0;
 }

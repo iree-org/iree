@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_HAL_OPS
 #define IREE_DIALECT_HAL_OPS
 
+include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
@@ -38,8 +39,8 @@ def OpGroupExperimentalOps : OpDocGroup {
 let opDocGroup = OpGroupExperimentalOps in {
 
 def HAL_ExFileFromMemoryOp : HAL_Op<"ex.file.from_memory", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{creates a file mapped into a byte range of a host buffer}];
   let description = [{
     Returns a file handle that is backed by the given `buffer` contents.
@@ -448,9 +449,9 @@ def OpGroupAllocatorOps : OpDocGroup {
 let opDocGroup = OpGroupAllocatorOps in {
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+]> {
   let summary = [{empty buffer allocation operation}];
   let description = [{
     Allocates a buffer of the given size from the allocator.
@@ -481,9 +482,9 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
 }
 
 def HAL_AllocatorImportOp : HAL_Op<"allocator.import", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+]> {
   let summary = [{allocator-supported host buffer import operation}];
   let description = [{
     Tries importing host memory backed by the given byte buffer into a
@@ -572,9 +573,9 @@ def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
 }
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+]> {
   let summary = [{buffer subspan operation}];
   let description = [{
     Returns a reference to a subspan of the buffer.
@@ -598,8 +599,8 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
 }
 
 def HAL_BufferLengthOp : HAL_PureOp<"buffer.length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{buffer byte length accessor}];
   let description = [{
     Returns the allocated size of a buffer in bytes.
@@ -676,9 +677,83 @@ def OpGroupBufferViewOps : OpDocGroup {
 
 let opDocGroup = OpGroupBufferViewOps in {
 
+def HAL_ElementTypeOp : HAL_PureOp<"element_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_element_type_t for the given MLIR type}];
+  let description = [{
+    Maps an MLIR type to a runtime `iree_hal_element_type_t` value for all types
+    that are convertable.
+  }];
+
+  let arguments = (ins
+    TypeAttr:$type
+  );
+  let results = (outs
+    HAL_ElementType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` $type `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$type), [{
+      build($_builder, $_state, $_builder.getI32Type(), TypeAttr::get(type));
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR element type or nullopt if the
+    // type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Type type);
+  }];
+
+  let hasVerifier = 1;
+}
+
+def HAL_EncodingTypeOp : HAL_PureOp<"encoding_type", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{an iree_hal_encoding_type_t for the given MLIR encoding}];
+  let description = [{
+    Maps an MLIR encoding to a runtime `iree_hal_encoding_type_t` value for all
+    encodings that are convertable.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<AnyAttr>:$encoding
+  );
+  let results = (outs
+    HAL_EncodingType:$result
+  );
+
+  let assemblyFormat = [{
+    `<` ($encoding^):( `` `dense_row_major`)? `>`
+    attr-dict
+    `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins "Attribute":$encoding), [{
+      build($_builder, $_state, $_builder.getI32Type(), encoding);
+    }]>
+  ];
+
+  let extraClassDeclaration = [{
+    // Returns a stable identifier for the MLIR encoding type or 0 (opaque) if
+    // the type is unsupported in the ABI.
+    static std::optional<int32_t> getTypeValue(Attribute attr);
+  }];
+
+  let hasVerifier = 1;
+}
+
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{buffer view reference initializer}];
   let description = [{
     Creates a reference to a buffer with a particular shape and element type.
@@ -732,7 +807,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let hasCanonicalizer = 1;
 }
 
-def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert", []> {
+def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert"> {
   let summary = [{buffer view contents assertion}];
   let description = [{
     Asserts that the buffer view contains a data compatible tensor with the
@@ -763,8 +838,8 @@ def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert", []> {
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{buffer view buffer accessor}];
   let description = [{
     Returns the buffer backing this view's contents.
@@ -900,8 +975,8 @@ def OpGroupChannelOps : OpDocGroup {
 let opDocGroup = OpGroupChannelOps in {
 
 def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{creates a new channel for collective communication}];
   let description = [{
     Returns a new channel with the given rank associated with the given device
@@ -942,8 +1017,8 @@ def HAL_ChannelCreateOp : HAL_Op<"channel.create", [
 }
 
 def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{splits a collective communication channel}];
   let description = [{
     Partitions the group associated with the given channel into disjoint
@@ -978,8 +1053,8 @@ def HAL_ChannelSplitOp : HAL_Op<"channel.split", [
 }
 
 def HAL_ChannelRankAndCountOp : HAL_PureOp<"channel.rank_and_count", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{returns the rank of the local participant in the group}];
   let description = [{
     Returns the rank the channel represents as a participant in a collective
@@ -1015,8 +1090,8 @@ def OpGroupCommandBufferOps : OpDocGroup {
 let opDocGroup = OpGroupCommandBufferOps in {
 
 def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{command buffer allocation operation}];
   let description = [{
     Returns a command buffer from the device pool ready to begin recording.
@@ -1199,10 +1274,9 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let hasCanonicalizer = 1;
 }
 
-def HAL_CommandBufferCollectiveOp :
-  HAL_Op<"command_buffer.collective", [
-    AttrSizedOperandSegments,
-  ]> {
+def HAL_CommandBufferCollectiveOp : HAL_Op<"command_buffer.collective", [
+  AttrSizedOperandSegments,
+]> {
   let summary = [{command buffer collective dispatch recording operation}];
   let description = [{
     Dispatches a collective operation defined by op using the given buffers.
@@ -1238,8 +1312,7 @@ def HAL_CommandBufferCollectiveOp :
   }];
 }
 
-def HAL_CommandBufferPushConstantsOp :
-    HAL_Op<"command_buffer.push_constants"> {
+def HAL_CommandBufferPushConstantsOp : HAL_Op<"command_buffer.push_constants"> {
   let summary = [{command buffer push constants operation}];
   let description = [{
     Pushes an inline set of constants that can be accessed by subsequent
@@ -1266,10 +1339,9 @@ def HAL_CommandBufferPushConstantsOp :
   }];
 }
 
-def HAL_CommandBufferPushDescriptorSetOp :
-    HAL_Op<"command_buffer.push_descriptor_set", [
-      SameVariadicOperandSize,
-    ]> {
+def HAL_CommandBufferPushDescriptorSetOp : HAL_Op<"command_buffer.push_descriptor_set", [
+  SameVariadicOperandSize,
+]> {
   let summary = [{command buffer descriptor set push binding operation}];
   let description = [{
     Pushes an inline-defined descriptor set to the command buffer.
@@ -1312,32 +1384,6 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let hasCanonicalizer = 1;
 }
 
-def HAL_CommandBufferDispatchSymbolOp : HAL_Op<"command_buffer.dispatch.symbol"> {
-  let summary = [{command buffer dispatch recording operation, using symbolref}];
-  let description = [{
-    Dispatches an execution request, using a nested symbol reference to the entry point.
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    SymbolRefAttr:$entry_point,
-    HAL_Dim:$workgroup_x,
-    HAL_Dim:$workgroup_y,
-    HAL_Dim:$workgroup_z
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `target` `(` $entry_point `)`
-    `workgroups` `(` `[`
-        $workgroup_x `,`
-        $workgroup_y `,`
-        $workgroup_z
-    `]` `)`
-    attr-dict-with-keyword
-  }];
-}
-
 def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let summary = [{command buffer dispatch recording operation}];
   let description = [{
@@ -1347,7 +1393,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_OrdinalAttr:$entry_point,
+    HAL_Ordinal:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z
@@ -1366,34 +1412,6 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   }];
 }
 
-def HAL_CommandBufferDispatchIndirectSymbolOp : HAL_Op<"command_buffer.dispatch.indirect.symbol"> {
-  let summary = [{command buffer indirect dispatch recording operation, using symbolref}];
-  let description = [{
-    Dispatches an execution request with the dispatch parameters loaded from the
-    given buffer, using using a nested symbol reference to the entry point.
-
-    ```mlir
-    hal.command_buffer.dispatch.indirect.symbol %cmd, @executable::@target::@entry,
-                                                workgroups = %buffer[%offset]
-    ```
-  }];
-
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    SymbolRefAttr:$entry_point,
-    HAL_BufferType:$workgroups_buffer,
-    HAL_DeviceSize:$workgroups_offset
-  );
-
-  let assemblyFormat = [{
-    `<` $command_buffer `:` type($command_buffer) `>`
-    `target` `(` $entry_point `)`
-    `workgroups` `(` $workgroups_buffer `:` type($workgroups_buffer) `)`
-    `` `[` $workgroups_offset `]`
-    attr-dict-with-keyword
-  }];
-}
-
 def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
   let summary = [{command buffer indirect dispatch recording operation}];
   let description = [{
@@ -1404,7 +1422,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   let arguments = (ins
     HAL_CommandBuffer:$command_buffer,
     HAL_Executable:$executable,
-    HAL_OrdinalAttr:$entry_point,
+    HAL_Ordinal:$entry_point,
     HAL_BufferType:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );
@@ -1434,43 +1452,15 @@ def OpGroupDescriptorSetLayoutOps : OpDocGroup {
 
 let opDocGroup = OpGroupDescriptorSetLayoutOps in {
 
-def HAL_DescriptorSetLayoutCreateOp :
-  HAL_PureOp<"descriptor_set_layout.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+def HAL_DescriptorSetLayoutCreateOp : HAL_PureOp<"descriptor_set_layout.create", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{creates a descriptor set layout}];
   let description = [{
     Creates a descriptor set layout that defines the bindings used within a set.
     The same descriptor set layout may be shared with many different executable
     layouts and by doing so some runtime binding overhead when switching between
     executables that use the same set layouts can be reduced.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_DescriptorSetLayoutFlagsAttr:$flags,
-    HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
-  );
-  let results = (outs
-    HAL_DescriptorSetLayout:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `flags` `(` $flags `)`
-    `bindings` `(` $bindings `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
-def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{descriptor set layout cache lookup pseudo-op}];
-  let description = [{
-    Used during conversion to provide a placeholder for a globally cached and
-    possibly lazy-initialized descriptor set layout.
   }];
 
   let arguments = (ins
@@ -1505,8 +1495,8 @@ def OpGroupDeviceOps : OpDocGroup {
 let opDocGroup = OpGroupDeviceOps in {
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{device allocator accessor operation}];
   let description = [{
     Returns the allocator that can be used to allocate buffers compatible with
@@ -1534,7 +1524,9 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   ];
 }
 
-def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
+def HAL_ReturnOp : HAL_Op<"return", [
+  Terminator,
+]> {
   let summary = [{return from a hal.* region}];
   let description = [{
     Returns the given values from the region and back to the host code.
@@ -1558,8 +1550,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
   let hasVerifier = 1;
 }
 
-def HAL_DeviceQueryOp :
-    HAL_PureOp<"device.query", []> {
+def HAL_DeviceQueryOp : HAL_PureOp<"device.query"> {
   let summary = [{returns a runtime configuration parameter from the device}];
   let description = [{
     Queries a device configuration parameter with the given key.
@@ -1581,7 +1572,10 @@ def HAL_DeviceQueryOp :
 
     Well-known keys:
 
-    * hal.executable.format :: {some format}
+    * hal.device.id :: {some id pattern}
+      Returns 1 if the device identifier matches the given pattern string.
+
+    * hal.executable.format :: {some format pattern}
       Returns 1 if the given format is supported by the device loader.
 
     * hal.device :: concurrency
@@ -1614,13 +1608,21 @@ def HAL_DeviceQueryOp :
     attr-dict-with-keyword
   }];
 
+  let extraClassDeclaration = [{
+    // Returns a true i1 if the given query returns a non-zero value.
+    // Returns false if the query fails or returns a zero value.
+    static Value createI1(Location loc, Value device,
+                          StringRef category, StringRef key,
+                          OpBuilder &builder);
+  }];
+
   let hasVerifier = 1;
 }
 
 def HAL_DeviceQueueAllocaOp : HAL_Op<"device.queue.alloca", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    DeclareOpInterfaceMethods<Util_SizeAwareOp>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_SizeAwareOp>,
+]> {
   let summary = [{allocates a queue-ordered transient buffer}];
   let description = [{
     Returns a queue-ordered transient buffer that will be available for use when
@@ -1904,11 +1906,11 @@ def OpGroupExecutableOps : OpDocGroup {
 let opDocGroup = OpGroupExecutableOps in {
 
 def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
-    IsolatedFromAbove,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
-    Symbol,
-    SymbolTable,
-  ]> {
+  IsolatedFromAbove,
+  SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+  Symbol,
+  SymbolTable,
+]> {
   let summary = [{generic source contents of an executable op}];
   let description = [{
     This is an unspecialized source representation of an executable
@@ -1965,20 +1967,20 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
 }
 
 def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
-    HasParent<"IREE::HAL::ExecutableSourceOp">,
-    Terminator,
-  ]> {
+  HasParent<"IREE::HAL::ExecutableSourceOp">,
+  Terminator,
+]> {
   let summary = [{terminator pseudo-op for the executable source op}];
   let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableOp : HAL_Op<"executable", [
-    IsolatedFromAbove,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
-    Symbol,
-    SymbolTable,
-    Util_ObjectLike,
-  ]> {
+  IsolatedFromAbove,
+  SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
+  Symbol,
+  SymbolTable,
+  Util_ObjectLike,
+]> {
   let summary = [{target-specific executable module}];
   let description = [{
     An executable module representing a target-specific compiled
@@ -2013,21 +2015,21 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 }
 
 def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
-    HasParent<"IREE::HAL::ExecutableOp">,
-    Terminator,
-  ]> {
+  HasParent<"IREE::HAL::ExecutableOp">,
+  Terminator,
+]> {
   let summary = [{terminator pseudo-op for the executable op}];
   let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
-    Symbol,
-    ParentOneOf<[
-      "IREE::HAL::ExecutableSourceOp",
-      "IREE::HAL::ExecutableVariantOp",
-    ]>,
-    IsolatedFromAbove,
-  ]> {
+  Symbol,
+  ParentOneOf<[
+    "IREE::HAL::ExecutableSourceOp",
+    "IREE::HAL::ExecutableVariantOp",
+  ]>,
+  IsolatedFromAbove,
+]> {
   let summary = [{executable entry point declaration}];
   let description = [{
     An entry point exported by the executable with statically-available
@@ -2089,12 +2091,12 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
 }
 
 def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
-    IsolatedFromAbove,
-    HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
-    Symbol,
-    SymbolTable,
-  ]> {
+  IsolatedFromAbove,
+  HasParent<"IREE::HAL::ExecutableOp">,
+  SingleBlockImplicitTerminator<"IREE::HAL::ExecutableVariantEndOp">,
+  Symbol,
+  SymbolTable,
+]> {
   let summary = [{target-specific variant of an executable op}];
   let description = [{
     The target IR for the executable. This can be preserved for debugging but
@@ -2176,18 +2178,18 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
 }
 
 def HAL_ExecutableVariantEndOp : HAL_Op<"executable.variant_end", [
-    HasParent<"IREE::HAL::ExecutableVariantOp">,
-    Terminator,
-  ]> {
+  HasParent<"IREE::HAL::ExecutableVariantOp">,
+  Terminator,
+]> {
   let summary = [{terminator pseudo-op for the executable variant op}];
   let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
-    IsolatedFromAbove,
-    FunctionOpInterface,
-    CallableOpInterface,
-  ]> {
+  IsolatedFromAbove,
+  FunctionOpInterface,
+  CallableOpInterface,
+]> {
   let summary = [{host code to determine if the executable is enabled}];
   let description = [{
     Variants are selected based on their target and this optional condition
@@ -2236,16 +2238,15 @@ def HAL_ExecutableConditionOp : HAL_Op<"executable.condition", [
   let hasVerifier = 1;
 }
 
-def HAL_ExecutableConstantBlockOp :
-  HAL_Op<"executable.constant.block", [
-    ParentOneOf<[
-      "IREE::HAL::ExecutableSourceOp",
-      "IREE::HAL::ExecutableVariantOp",
-    ]>,
-    IsolatedFromAbove,
-    CallableOpInterface,
-    FunctionOpInterface,
-  ]> {
+def HAL_ExecutableConstantBlockOp : HAL_Op<"executable.constant.block", [
+  ParentOneOf<[
+    "IREE::HAL::ExecutableSourceOp",
+    "IREE::HAL::ExecutableVariantOp",
+  ]>,
+  IsolatedFromAbove,
+  CallableOpInterface,
+  FunctionOpInterface,
+]> {
   let summary = [{executable constant block initializer}];
   let description = [{
     Initializes one or more constants in the executable constant block by
@@ -2363,9 +2364,9 @@ def HAL_ExecutableConstantLoadOp : HAL_PureOp<"executable.constant.load"> {
 }
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
-    HasParent<"IREE::HAL::ExecutableOp">,
-    Symbol,
-  ]> {
+  HasParent<"IREE::HAL::ExecutableOp">,
+  Symbol,
+]> {
   let summary = [{compiled executable binary data}];
   let description = [{
     A compiled executable binary with an optional nested module containing the
@@ -2403,9 +2404,9 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 }
 
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    AttrSizedOperandSegments,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  AttrSizedOperandSegments,
+]> {
   let summary = [{creates an executable}];
   let description = [{
     Creates a target-dependent executable cached on the provided device. Entry
@@ -2442,8 +2443,8 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
 }
 
 def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{executable cache lookup pseudo-op}];
   let description = [{
     Used during conversion to provide a placeholder for a globally cached and
@@ -2464,16 +2465,29 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
     `:` type($result)
     attr-dict-with-keyword
   }];
+}
 
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Value":$device, "StringRef":$executable),
-    [{
-      $_state.addOperands({device});
-      $_state.addAttribute("executable", mlir::SymbolRefAttr::get($_builder.getContext(), executable));
-      $_state.addTypes({ExecutableType::get($_builder.getContext())});
-    }]>,
-  ];
+def HAL_ExecutableExportOrdinalOp : HAL_PureOp<"executable.export.ordinal", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{executable export ordinal lookup pseudo-op}];
+  let description = [{
+    Resolves an executable export ordinal to a value once ordinals have been
+    assigned.
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$entry_point
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{
+    `target` `(` $entry_point `)`
+    `:` type($result)
+    attr-dict-with-keyword
+  }];
 }
 
 def HAL_ExecutableCalculateWorkgroupsOp : HAL_PureOp<"executable.calculate_workgroups"> {
@@ -2924,8 +2938,8 @@ def HAL_PipelineLayoutCreateOp : HAL_PureOp<"pipeline_layout.create", [
 }
 
 def HAL_PipelineLayoutLookupOp : HAL_PureOp<"pipeline_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{pipeline layout cache lookup pseudo-op}];
   let description = [{
     Used during conversion to provide a placeholder for a globally cached and
@@ -2962,9 +2976,9 @@ def OpGroupFenceOps : OpDocGroup {
 let opDocGroup = OpGroupFenceOps in {
 
 def HAL_FenceCreateOp : HAL_Op<"fence.create", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    MemoryEffects<[MemAlloc]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  MemoryEffects<[MemAlloc]>,
+]> {
   let summary = [{creates an unsignaled fence}];
   let description = [{
     Returns a fence that defines a point in time. By default fences will remain
@@ -2992,8 +3006,8 @@ def HAL_FenceCreateOp : HAL_Op<"fence.create", [
 }
 
 def HAL_FenceJoinOp : HAL_Op<"fence.join", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{creates a fence from the given timepoints}];
   let description = [{
     Returns a fence that joins the input fences as a wait-all operation.
@@ -3078,9 +3092,9 @@ def HAL_FenceFailOp : HAL_Op<"fence.fail"> {
 }
 
 def HAL_FenceAwaitOp : HAL_Op<"fence.await", [
-    Util_YieldPoint,
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
+  Util_YieldPoint,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = [{asynchronous fence wait operation}];
   let description = [{
     Yields the caller until all fences is reached. Returns the `status` of the

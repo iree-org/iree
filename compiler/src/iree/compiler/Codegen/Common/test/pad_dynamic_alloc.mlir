@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-pad-dynamic-alloc %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-pad-dynamic-alloc))" %s | FileCheck %s
 
 // CHECK-LABEL: dynamic_alloc
 func.func @dynamic_alloc(%id : index) {

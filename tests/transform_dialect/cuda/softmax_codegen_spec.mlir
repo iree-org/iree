@@ -40,7 +40,7 @@ module attributes { transform.with_named_sequence } {
     transform.apply_patterns to %variant_op {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_cse %variant_op : !transform.any_op
+    transform.apply_cse to %variant_op : !transform.any_op
 
     // Step 2. Second level of tiling + fusion parallelizes to threads.
     // ================================================================
@@ -108,6 +108,11 @@ module attributes { transform.with_named_sequence } {
     %if_op = transform.structured.match ops{["scf.if"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
     transform.iree.vector.warp_distribute %end_func : (!transform.any_op) -> ()
+
+    // Annotate the exported function as already translated.
+    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
 
     transform.yield
   }

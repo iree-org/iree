@@ -44,6 +44,8 @@ def LLVMGPU_PackUnPack
     : I32EnumAttrCase<"LLVMGPUPackUnPack", 107>;
 def LLVMGPU_MatmulTensorCoreMmaSync
     : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 108>;
+def LLVMGPU_VectorDistribute
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 109>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -82,8 +84,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     // LLVMGPU CodeGen pipelines
     LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
     LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
-    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction,
-    LLVMGPU_PackUnPack, LLVMGPU_MatmulTensorCoreMmaSync,
+    LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
+    LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
@@ -129,26 +131,22 @@ def IREECodegen_TranslationInfoAttr :
 
   let assemblyFormat = [{
     `<` `` $passPipeline
-    (`pipeline_depth` `=` $softwarePipelineDepth^)?
-    (`store_stage` `=` $softwarePipelineStoreStage^)?
-    (`codegen_spec` `=` $codegenSpec^)? `>`
+    (`codegen_spec` `=` $codegenSpec^)?
+    (`,` $configuration^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
-    OptionalParameter<"unsigned",
-        "The software pipeline depth to be used">:$softwarePipelineDepth,
-    DefaultValuedParameter<"unsigned", "1",
-        "The software pipeline stage to place stores">:$softwarePipelineStoreStage,
     OptionalParameter<"SymbolRefAttr",
-        "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec
+        "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec,
+    OptionalParameter<"DictionaryAttr",
+        "Pipeline specific configuration">:$configuration
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
-        CArg<"unsigned", "0">:$softwarePipelineDepth,
-        CArg<"unsigned", "1">:$softwarePipelineStoreStage,
-        CArg<"SymbolRefAttr", "{}">:$codegenSpec)>
+        CArg<"SymbolRefAttr", "{}">:$codegenSpec,
+        CArg<"DictionaryAttr", "{}">:$configuration)>
   ];
   let extraClassDeclaration = [{
     // Returns the lowering pass pipeline set.

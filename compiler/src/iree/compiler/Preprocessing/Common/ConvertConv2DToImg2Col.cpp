@@ -46,7 +46,7 @@ namespace {
 // and linalg.matmul.
 //
 // A convolution operaton can be written as a matrix-matrix multiplication by
-// unfolding the cross corrolation between input and filter and explicitly copy
+// unfolding the cross correlation between input and filter and explicitly copy
 // overlapped sliding window inputs.
 //
 // Consider 2D input X with single channel input and output and 2x2 filter W:
@@ -87,12 +87,19 @@ public:
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
+      });
     }
 
     // TODO: Support dilation.
-    if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+    if (!hasAllOneValues(convOp.getDilations())) {
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
+      });
+    }
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -224,8 +231,8 @@ public:
 };
 
 // Similar to the conv pattern above except there is no reduction among the
-// input channles so each convolution can be a matrix-vector product and
-// by transposing both input filter so channles are outer most the computation
+// input channels so each convolution can be a matrix-vector product and
+// by transposing both input filter so channels are outer most the computation
 // is a batched matrix-vector product.
 class ConvertDepthwiseConv2DNhwcHwc final
     : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
@@ -242,12 +249,18 @@ public:
         llvm::cast<RankedTensorType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
+      });
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
+      });
 
     auto loc = convOp.getLoc();
 
@@ -396,12 +409,18 @@ public:
     auto outputType = llvm::cast<ShapedType>(convOp.getOutputs()[0].getType());
 
     if (!filterType.hasStaticShape() || !inputType.hasStaticShape()) {
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected 'filterType' and 'inputType' to have static shapes.";
+      });
     }
 
     // TODO: Support dilation.
     if (!hasAllOneValues(convOp.getDilations()))
-      return failure();
+      return rewriter.notifyMatchFailure(convOp, [](Diagnostic &diag) {
+        diag << "[unimplemented] "
+             << "expected no dilations (expected dilations to all be one).";
+      });
 
     Value input = convOp.getInputs()[0];
     Value filter = convOp.getInputs()[1];
@@ -533,9 +552,6 @@ public:
 
 struct ConvertConv2DToImg2ColPass
     : ConvertConv2DToImg2ColBase<ConvertConv2DToImg2ColPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());

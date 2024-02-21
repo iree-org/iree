@@ -2,7 +2,7 @@
 
 // Test case reduced by running the pass --iree-util-hoist-into-globals on the
 // following (and then chang the check to a return):
-// func.func @i1_inline_constant() {
+// util.func public @i1_inline_constant() {
 //   %control = arith.constant dense<[true, false, true, false]> : tensor<4xi1>
 //   %a = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
 //   %b = arith.constant dense<[5, 6, 7, 8]> : tensor<4xi32>
@@ -18,7 +18,7 @@
 //       linalg.yield %0 : i32
 //     } -> tensor<4xi32>
 //   check.expect_eq_const(%c, dense<[1, 6, 3, 8]> : tensor<4xi32>) : tensor<4xi32>
-//   return
+//   util.return
 // }
 
 // CHECK-LABEL: module @hoisted_tensor_i1_input
@@ -27,9 +27,9 @@
 #map = affine_map<(d0) -> (d0)>
 module @hoisted_tensor_i1_input {
   util.global private @hoisted : tensor<4xi32>
-  func.func @i1_inline_constant() -> tensor<4xi32> {
+  util.func public @i1_inline_constant() -> tensor<4xi32> {
     %hoisted = util.global.load @hoisted : tensor<4xi32>
-    return %hoisted : tensor<4xi32>
+    util.return %hoisted : tensor<4xi32>
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant dense<[true, false, true, false]> : tensor<4xi1>
@@ -42,7 +42,7 @@ module @hoisted_tensor_i1_input {
       linalg.yield %2 : i32
     } -> tensor<4xi32>
     util.global.store %1, @hoisted : tensor<4xi32>
-    util.initializer.return
+    util.return
   }
 }
 

@@ -34,6 +34,7 @@ iree_cc_library(
     IREELinalgExtDialect
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRLinalgDialect
     MLIRPass
     MLIRTensorDialect
@@ -70,6 +71,7 @@ iree_cc_library(
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTosaToLinalg
+    MLIRTosaToMLProgram
     MLIRTosaToSCF
     MLIRTosaToTensor
     MLIRTransforms

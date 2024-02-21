@@ -56,22 +56,7 @@ lit -v $(find test -name '*softplus*')
 CI uses Tensorflow importers to run integration tests and benchmarks. They might
 need an update in CI if you want new features or bugfixes from the frontends.
 
-Tensorflow importers are wrappers which call Tensorflow Python API to do
-conversion. CI installs a pinned version of Tensorflow in the docker images. To
-bump the Tensorflow version, you need to:
-
-1.  Update the pinned version of Tensorflow in
-    [integrations/tensorflow/test/requirements.txt](/integrations/tensorflow/test/requirements.txt).
-2.  Follow
-    [Adding or Updating an Image](/build_tools/docker/README.md#adding-or-updating-an-image)
-    to rebuild the `frontends` docker image and its descendants.
-
-Here is the command to rebuild and update the docker images:
-
-```sh
-python3 build_tools/docker/manage_images.py --image frontends
-```
-
-To modify the import tools themselves, you can directly change their code in
-[integrations/tensorflow/python_projects](/integrations/tensorflow/python_projects)
-without updating the dockers.
+Tensorflow importers are wrappers which call Tensorflow Python APIs to perform
+conversions. To bump the Tensorflow version, you need to update the
+pinned version of Tensorflow that CI jobs install in
+[integrations/tensorflow/test/requirements.txt](/integrations/tensorflow/test/requirements.txt).

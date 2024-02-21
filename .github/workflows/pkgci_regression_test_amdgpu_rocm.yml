@@ -48,5 +48,5 @@ jobs:
           source $VENV_DIR/bin/activate
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
           pytest \
-            -s -m "plat_rdna3_rocm and presubmit" \
+            -rA -s -m "plat_rdna3_rocm and presubmit" \
             experimental/regression_suite

@@ -11,13 +11,13 @@ import sys
 import iree.runtime
 from iree.runtime.array_interop import DeviceArray
 import os
-from typing import List, Tuple, TypeVar
+from typing import List, Tuple
 import numpy as np
 import tempfile
 import subprocess
 import test_utils
 
-ArrayLike = TypeVar("ArrayLike")
+ArrayLike = object
 
 
 def parse_args():
@@ -92,7 +92,10 @@ def run_ranks(
 
 
 def run_test(
-    mlir: str, inputs: List[List[ArrayLike]], expected_outputs: List[List[ArrayLike]]
+    mlir: str,
+    inputs: List[List[ArrayLike]],
+    expected_outputs: List[List[ArrayLike]],
+    mlir_input_type: iree.compiler.InputType | str = iree.compiler.InputType.AUTO,
 ):
     with tempfile.TemporaryDirectory() as tmp_dir:
         module_filepath = os.path.join(tmp_dir, "module.vmfb")
@@ -100,14 +103,15 @@ def run_test(
             input_str=mlir,
             output_file=module_filepath,
             target_backends=[args.target_backend],
-            input_type="stablehlo",
+            input_type=mlir_input_type,
+            extra_args=["--iree-hal-cuda-llvm-target-arch", "sm_53"],
         )
 
         num_ranks = len(inputs)
         # Ranks on the 0th axis.
         outputs = run_ranks(
             num_ranks=num_ranks,
-            function="all_reduce_sum",
+            function="main",
             driver=args.driver,
             module_filepath=module_filepath,
             inputs=inputs,
@@ -125,7 +129,7 @@ class SingleRank(unittest.TestCase):
         all_reduce([1, 2, 3, 4]) == [1, 2, 3, 4].
         """
         stablehlo_mlir = """
-            func.func @all_reduce_sum(%input : tensor<4xf32>) -> tensor<4xf32> {
+            func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
             %out = "stablehlo.all_reduce"(%input) ({
                 ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
                 %sum = stablehlo.add %arg0, %arg1 : tensor<f32>
@@ -138,7 +142,60 @@ class SingleRank(unittest.TestCase):
         """
         inputs = [[np.array([1, 2, 3, 4], dtype=np.float32)]]
         expected_outputs = [[np.array([1, 2, 3, 4], dtype=np.float32)]]
-        run_test(mlir=stablehlo_mlir, inputs=inputs, expected_outputs=expected_outputs)
+        run_test(
+            mlir=stablehlo_mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+            mlir_input_type=iree.compiler.InputType.STABLEHLO,
+        )
+
+    def test_mesh_all_reduce(self):
+        """
+        Test trivial case of all_reduce with one rank.
+        all_reduce([1, 2, 3, 4]) == [1, 2, 3, 4].
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 1)
+
+            func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
+            return %out : tensor<4xf32>
+            }
+        """
+        inputs = [[np.array([1, 2, 3, 4], dtype=np.float32)]]
+        expected_outputs = [[np.array([1, 2, 3, 4], dtype=np.float32)]]
+        run_test(mlir=mlir, inputs=inputs, expected_outputs=expected_outputs)
+
+    def test_mesh_all_to_all(self):
+        """
+        Test on a 1D device mesh, grouping along mesh dimension 0.
+
+        Device contents before operation:
+        [[1, 2], [3, 4]]
+
+        Device contents after operation:
+        [[1, 2], [3, 4]]
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 1)
+
+            func.func @main(%input : tensor<2x2xf32>) -> tensor<2x2xf32> {
+            %out = mesh.all_to_all %input on @mesh mesh_axes = [0]
+              split_axis = 0 concat_axis = 1 : tensor<2x2xf32> -> tensor<2x2xf32>
+            return %out : tensor<2x2xf32>
+            }
+        """
+        inputs = [
+            [np.array([[1, 2], [3, 4]], dtype=np.float32)],
+        ]
+        expected_outputs = [
+            [np.array([[1, 2], [3, 4]], dtype=np.float32)],
+        ]
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
 
 
 class TwoRanks(unittest.TestCase):
@@ -147,7 +204,7 @@ class TwoRanks(unittest.TestCase):
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
         """
         stablehlo_mlir = """
-            func.func @all_reduce_sum(%input : tensor<4xf32>) -> tensor<4xf32> {
+            func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
             %out = "stablehlo.all_reduce"(%input) ({
                 ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):
                 %sum = stablehlo.add %arg0, %arg1 : tensor<f32>
@@ -162,8 +219,234 @@ class TwoRanks(unittest.TestCase):
             [np.array([1, 2, 3, 4], dtype=np.float32)],
             [np.array([5, 6, 7, 8], dtype=np.float32)],
         ]
-        expected_outputs = [[np.array([6, 8, 10, 12], dtype=np.float32)]]
-        run_test(mlir=stablehlo_mlir, inputs=inputs, expected_outputs=expected_outputs)
+        expected_outputs = [[np.array([6, 8, 10, 12], dtype=np.float32)]] * 2
+        run_test(
+            mlir=stablehlo_mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+            mlir_input_type=iree.compiler.InputType.STABLEHLO,
+        )
+
+    def test_mesh_all_reduce_1d_mesh(self):
+        """
+        Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 2)
+
+            func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<4xf32> -> tensor<4xf32>
+            return %out : tensor<4xf32>
+            }
+        """
+        inputs = [
+            [np.array([1, 2, 3, 4], dtype=np.float32)],
+            [np.array([5, 6, 7, 8], dtype=np.float32)],
+        ]
+        expected_outputs = [[np.array([6, 8, 10, 12], dtype=np.float32)]] * 2
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
+
+    def test_mesh_all_reduce_3d_mesh(self):
+        """
+        Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 1x2x1)
+
+            func.func @main(%input : tensor<4xf32>) -> tensor<4xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<4xf32> -> tensor<4xf32>
+            return %out : tensor<4xf32>
+            }
+        """
+        inputs = [
+            [np.array([1, 2, 3, 4], dtype=np.float32)],
+            [np.array([5, 6, 7, 8], dtype=np.float32)],
+        ]
+        expected_outputs = [[np.array([6, 8, 10, 12], dtype=np.float32)]] * 2
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
+
+
+class FourRanks(unittest.TestCase):
+    def test_mesh_all_reduce_on_2d_mesh_along_axis_1(self):
+        """
+        Test on a 2x2 device mesh reduction along dimension 1.
+        Mesh devices:
+        axis 1
+        ------>
+        0 1
+        2 3
+
+        Device contents before operation:
+        [1, 2] [3, 4]
+        [5, 6] [7, 8]
+
+        Device contents after operation:
+        [ 4,  6] [ 4,  6]
+        [12, 14] [12, 14]
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 2x2)
+
+            func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
+            return %out : tensor<2xf32>
+            }
+        """
+        inputs = [
+            [np.array([1, 2], dtype=np.float32)],
+            [np.array([3, 4], dtype=np.float32)],
+            [np.array([5, 6], dtype=np.float32)],
+            [np.array([7, 8], dtype=np.float32)],
+        ]
+        expected_outputs = [
+            [np.array([4, 6], dtype=np.float32)],
+            [np.array([4, 6], dtype=np.float32)],
+            [np.array([12, 14], dtype=np.float32)],
+            [np.array([12, 14], dtype=np.float32)],
+        ]
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
+
+    def test_mesh_all_reduce_on_2d_mesh_along_axis_0(self):
+        """
+        Test on a 2x2 device mesh reduction along dimension 0.
+        Mesh devices:
+        axis 1
+        ------>
+        0 1
+        2 3
+
+        Device contents before operation:
+        [1, 2] [3, 4]
+        [5, 6] [7, 8]
+
+        Device contents after operation:
+        [6, 8] [10, 12]
+        [6, 8] [10, 12]
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 2x2)
+
+            func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [0] : tensor<2xf32> -> tensor<2xf32>
+            return %out : tensor<2xf32>
+            }
+        """
+        inputs = [
+            [np.array([1, 2], dtype=np.float32)],
+            [np.array([3, 4], dtype=np.float32)],
+            [np.array([5, 6], dtype=np.float32)],
+            [np.array([7, 8], dtype=np.float32)],
+        ]
+        expected_outputs = [
+            [np.array([6, 8], dtype=np.float32)],
+            [np.array([10, 12], dtype=np.float32)],
+            [np.array([6, 8], dtype=np.float32)],
+            [np.array([10, 12], dtype=np.float32)],
+        ]
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
+
+    def test_mesh_all_reduce_on_4d_mesh_along_1_axis(self):
+        """
+        Test on a 1x2x1x2 device mesh reduction along mesh dimension 1.
+        Mesh devices:
+        axis 3
+        ------>
+        0 1     | axis 1
+        2 3     ↓
+
+        Device contents before operation:
+        [1, 2] [3, 4]
+        [5, 6] [7, 8]
+
+        Device contents after operation:
+        [6, 8] [10, 12]
+        [6, 8] [10, 12]
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 1x2x1x2)
+
+            func.func @main(%input : tensor<2xf32>) -> tensor<2xf32> {
+            %out = mesh.all_reduce %input on @mesh mesh_axes = [1] : tensor<2xf32> -> tensor<2xf32>
+            return %out : tensor<2xf32>
+            }
+        """
+        inputs = [
+            [np.array([1, 2], dtype=np.float32)],
+            [np.array([3, 4], dtype=np.float32)],
+            [np.array([5, 6], dtype=np.float32)],
+            [np.array([7, 8], dtype=np.float32)],
+        ]
+        expected_outputs = [
+            [np.array([6, 8], dtype=np.float32)],
+            [np.array([10, 12], dtype=np.float32)],
+            [np.array([6, 8], dtype=np.float32)],
+            [np.array([10, 12], dtype=np.float32)],
+        ]
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
+
+    def test_mesh_all_to_all_on_4d_mesh_along_1_axis(self):
+        """
+        Test on a 1x2x1x2 device mesh, grouping along mesh dimension 1.
+        Mesh devices:
+        axis 3
+        ------>
+        0 1     | axis 1
+        2 3     ↓
+
+        Device contents before operation:
+        [[1], [2]]  [[3], [4]]
+        [[5], [6]]  [[7], [8]]
+
+        Device contents after operation:
+        [[1, 5]]  [[3, 7]]
+        [[2, 6]]  [[4, 8]]
+        """
+        mlir = """
+            mesh.mesh @mesh(shape = 1x2x1x2)
+
+            func.func @main(%input : tensor<2x1xf32>) -> tensor<1x2xf32> {
+            %out = mesh.all_to_all %input on @mesh mesh_axes = [1]
+              split_axis = 0 concat_axis = 1 : tensor<2x1xf32> -> tensor<1x2xf32>
+            return %out : tensor<1x2xf32>
+            }
+        """
+        inputs = [
+            [np.array([[1], [2]], dtype=np.float32)],
+            [np.array([[3], [4]], dtype=np.float32)],
+            [np.array([[5], [6]], dtype=np.float32)],
+            [np.array([[7], [8]], dtype=np.float32)],
+        ]
+        expected_outputs = [
+            [np.array([[1, 5]], dtype=np.float32)],
+            [np.array([[3, 7]], dtype=np.float32)],
+            [np.array([[2, 6]], dtype=np.float32)],
+            [np.array([[4, 8]], dtype=np.float32)],
+        ]
+        run_test(
+            mlir=mlir,
+            inputs=inputs,
+            expected_outputs=expected_outputs,
+        )
 
 
 if __name__ == "__main__":

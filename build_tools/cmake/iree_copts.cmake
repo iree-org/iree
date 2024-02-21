@@ -135,11 +135,12 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # https://docs.microsoft.com/en-us/cpp/build/reference/bigobj-increase-number-of-sections-in-dot-obj-file
     "/bigobj"
 
-    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
-    "/Zc:preprocessor"
-
     # Enable C11 standards conforming mode.
     "$<$<COMPILE_LANGUAGE:C>:/std:c11>"
+
+  MSVC
+    # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
+    "/Zc:preprocessor"
 )
 
 # Compiler diagnostics.
@@ -151,7 +152,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
   # internally is very useful when importing. If you feel that some of these
   # should be different (especially more strict), please raise an issue!
   CLANG
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wall"
 
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
@@ -217,7 +218,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
   GCC
     "-Wall"
-    "-Werror"
+    "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
 
     "-Wno-address"  # https://github.com/openxla/iree/issues/16016

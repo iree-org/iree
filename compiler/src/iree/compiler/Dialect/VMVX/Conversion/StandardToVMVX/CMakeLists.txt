@@ -20,6 +20,7 @@ iree_cc_library(
   DEPS
     MLIRAffineDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRMathDialect

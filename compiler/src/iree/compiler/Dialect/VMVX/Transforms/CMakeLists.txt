@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRFuncTransforms
+    MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms

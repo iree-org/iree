@@ -2,42 +2,42 @@
 
 // CHECK-LABEL: @FoldChannelRankOp
 //  CHECK-SAME: (%[[RANK:.+]]: index)
-func.func @FoldChannelRankOp(%rank: index) -> index {
+util.func private @FoldChannelRankOp(%rank: index) -> index {
   %channel = stream.channel.create rank(%rank) : !stream.channel
   %queried_rank = stream.channel.rank %channel : index
-  // CHECK: return %[[RANK]]
-  return %queried_rank : index
+  // CHECK: util.return %[[RANK]]
+  util.return %queried_rank : index
 }
 
 // -----
 
 // CHECK-LABEL: @NoFoldChannelRankOp
-func.func @NoFoldChannelRankOp() -> index {
+util.func private @NoFoldChannelRankOp() -> index {
   %channel = stream.channel.create : !stream.channel
   // CHECK: %[[RANK:.+]] = stream.channel.rank
   %queried_rank = stream.channel.rank %channel : index
-  // CHECK: return %[[RANK]]
-  return %queried_rank : index
+  // CHECK: util.return %[[RANK]]
+  util.return %queried_rank : index
 }
 
 // -----
 
 // CHECK-LABEL: @FoldChannelCountOp
 //  CHECK-SAME: (%[[COUNT:.+]]: index)
-func.func @FoldChannelCountOp(%count: index) -> index {
+util.func private @FoldChannelCountOp(%count: index) -> index {
   %channel = stream.channel.create count(%count) : !stream.channel
   %queried_count = stream.channel.count %channel : index
-  // CHECK: return %[[COUNT]]
-  return %queried_count : index
+  // CHECK: util.return %[[COUNT]]
+  util.return %queried_count : index
 }
 
 // -----
 
 // CHECK-LABEL: @NoFoldChannelCountOp
-func.func @NoFoldChannelCountOp() -> index {
+util.func private @NoFoldChannelCountOp() -> index {
   %channel = stream.channel.create : !stream.channel
   // CHECK: %[[COUNT:.+]] = stream.channel.count
   %queried_count = stream.channel.count %channel : index
-  // CHECK: return %[[COUNT]]
-  return %queried_count : index
+  // CHECK: util.return %[[COUNT]]
+  util.return %queried_count : index
 }

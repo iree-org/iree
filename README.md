@@ -10,6 +10,7 @@ See [our website](https://iree.dev/) for project details, user
 guides, and instructions on building from source.
 
 [![CI Status](https://github.com/openxla/iree/actions/workflows/ci.yml/badge.svg?query=branch%3Amain+event%3Apush)](https://github.com/openxla/iree/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+[![IREE Discord Status](https://discordapp.com/api/guilds/689900678990135345/widget.png?style=shield)](https://discord.gg/26P4xW4)
 
 #### Project Status
 

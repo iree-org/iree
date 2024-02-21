@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -42,19 +41,12 @@ struct MaterializeResourceCachesPass
     // likely it's already been run. We could fix the pass to better support
     // partial materialization but there's no use cases for that today.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
-    SmallVector<IREE::HAL::DescriptorSetLayoutLookupOp>
-        descriptorSetLayoutLookupOps;
     SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
-    for (Operation &funcLikeOp : moduleOp.getOps()) {
-      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
-      if (!funcOp)
-        continue;
+    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
-          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
-            descriptorSetLayoutLookupOps.push_back(lookupOp);
-          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+          if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
             pipelineLayoutLookupOps.push_back(lookupOp);
           } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
             executableLookupOps.push_back(lookupOp);
@@ -62,8 +54,7 @@ struct MaterializeResourceCachesPass
         });
       }
     }
-    if (descriptorSetLayoutLookupOps.empty() &&
-        pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
+    if (pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
       return;
     }
 
@@ -89,9 +80,6 @@ struct MaterializeResourceCachesPass
 
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
-    for (auto lookupOp : descriptorSetLayoutLookupOps) {
-      replaceDescriptorSetLayoutLookupOp(lookupOp);
-    }
     for (auto lookupOp : pipelineLayoutLookupOps) {
       replacePipelineLayoutLookupOp(lookupOp);
     }
@@ -129,9 +117,8 @@ private:
     Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
     Value layout = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
         loc, layoutType, device, flags, bindingAttrs);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
-                                                   globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    globalOp.createStoreOp(loc, layout, blockBuilder);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
   }
@@ -173,10 +160,9 @@ private:
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     SmallVector<Value> setLayoutValues;
     for (auto setLayoutGlobalOp : setLayoutGlobalOps) {
-      auto setLayoutValue = blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-          loc, DescriptorSetLayoutType::get(loc.getContext()),
-          setLayoutGlobalOp.getSymName());
-      setLayoutValues.push_back(setLayoutValue);
+      setLayoutValues.push_back(
+          setLayoutGlobalOp.createLoadOp(loc, blockBuilder)
+              .getLoadedGlobalValue());
     }
     // TODO(multi-device): pass in resolve info to the call and reuse.
     Value device = IREE::HAL::DeviceType::resolveAny(loc, blockBuilder);
@@ -184,9 +170,8 @@ private:
         loc, layoutType, device,
         blockBuilder.getIndexAttr(layoutAttr.getPushConstants()),
         setLayoutValues);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layout,
-                                                   globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    globalOp.createStoreOp(loc, layout, blockBuilder);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
 
     return globalOp;
   }
@@ -242,9 +227,8 @@ private:
         auto pipelineLayoutGlobalOp =
             definePipelineLayoutOp(executableOp.getLoc(), exportOp.getLayout());
         pipelineLayoutValues.push_back(
-            caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
-                loc, PipelineLayoutType::get(loc.getContext()),
-                pipelineLayoutGlobalOp.getSymName()));
+            pipelineLayoutGlobalOp.createLoadOp(loc, caseBuilder)
+                .getLoadedGlobalValue());
       }
 
       // Inline constant initializer from the variant.
@@ -281,9 +265,8 @@ private:
     defaultBuilder.create<scf::YieldOp>(loc, nullValue);
 
     auto executableValue = switchOp.getResult(0);
-    blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, executableValue,
-                                                   globalOp.getName());
-    blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
+    globalOp.createStoreOp(loc, executableValue, blockBuilder);
+    blockBuilder.create<IREE::Util::ReturnOp>(loc);
   }
 
   // Inlines a constant block as a function in |moduleBuilder| and then inserts
@@ -296,16 +279,16 @@ private:
     auto funcName = (StringRef("__constant_block_") +
                      std::to_string(nextUniqueConstantBlockId++))
                         .str();
-    auto funcOp = moduleBuilder.create<func::FuncOp>(blockOp.getLoc(), funcName,
-                                                     blockOp.getFunctionType());
+    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
+        blockOp.getLoc(), funcName, blockOp.getFunctionType());
     funcOp.setPrivate();
     funcOp.getRegion().takeBody(blockOp.getRegion());
 
     // Replace the hal.return with a func.return.
     for (auto returnOp :
          llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
-      OpBuilder(returnOp).create<func::ReturnOp>(returnOp.getLoc(),
-                                                 returnOp.getOperands());
+      OpBuilder(returnOp).create<IREE::Util::ReturnOp>(returnOp.getLoc(),
+                                                       returnOp.getOperands());
       returnOp.erase();
     }
 
@@ -314,33 +297,20 @@ private:
     if (funcOp.getNumArguments() > 0) {
       callOperands.push_back(device);
     }
-    auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
-                                                     callOperands);
+    auto callOp = callerBuilder.create<IREE::Util::CallOp>(
+        blockOp.getLoc(), funcOp, callOperands);
 
     return llvm::map_to_vector(callOp.getResults(),
                                [](OpResult result) -> Value { return result; });
-  }
-
-  void
-  replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
-    OpBuilder builder(lookupOp);
-    auto globalOp = defineDescriptorSetLayoutOp(
-        lookupOp.getLoc(), lookupOp.getBindings(), lookupOp.getFlags());
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), DescriptorSetLayoutType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
-    lookupOp.erase();
   }
 
   void replacePipelineLayoutLookupOp(PipelineLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
         definePipelineLayoutOp(lookupOp.getLoc(), lookupOp.getLayout());
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), PipelineLayoutType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
+    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                           .getLoadedGlobalValue();
+    lookupOp.replaceAllUsesWith(loadedValue);
     lookupOp.erase();
   }
 
@@ -350,10 +320,9 @@ private:
     assert(executableIt != executableCache_.end() &&
            "executable must have been cached");
     auto globalOp = executableIt->second;
-    auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
-        lookupOp.getLoc(), ExecutableType::get(lookupOp.getContext()),
-        globalOp.getSymName());
-    lookupOp.replaceAllUsesWith(loadOp.getOperation());
+    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
+                           .getLoadedGlobalValue();
+    lookupOp.replaceAllUsesWith(loadedValue);
     lookupOp.erase();
   }
 

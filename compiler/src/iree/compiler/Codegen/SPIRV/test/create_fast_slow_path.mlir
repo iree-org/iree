@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-spirv-create-fast-slow-path --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-create-fast-slow-path))" --mlir-print-local-scope %s | FileCheck %s
 
 func.func @padded_conv() {
   %cst = arith.constant 0.000000e+00 : f32

@@ -13,13 +13,13 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-stream-fuse-dispatch-bindings"
@@ -173,7 +173,7 @@ findCorrelatedBindings(unsigned bindingCount,
 // Updates an executable function to use the new bindings.
 static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
                                       IREE::Stream::ExecutableExportOp exportOp,
-                                      mlir::func::FuncOp funcOp,
+                                      mlir::FunctionOpInterface funcOp,
                                       ArrayRef<Binding> bindings) {
   auto &entryBlock = funcOp.front();
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-stablehlo-canonicalize --allow-unregistered-dialect --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-stablehlo-canonicalize))" --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func.func @add
 // CHECK-SAME:   ([[ARG0:%.+]]: tensor<2xi32>, [[ARG1:%.+]]: tensor<f32>)

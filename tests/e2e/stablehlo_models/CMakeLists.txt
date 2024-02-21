@@ -1,4 +1,4 @@
-if(NOT IREE_INPUT_STABLEHLO)
+if(NOT IREE_INPUT_STABLEHLO AND NOT IREE_HOST_BIN_DIR)
   return()
 endif()
 
@@ -31,10 +31,7 @@ iree_lit_test_suite(
     iree-run-mlir
   LABELS
     "driver=local-task"
-    "driver=metal"
-    "driver=vulkan"
     "hostonly"
-    "optonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
