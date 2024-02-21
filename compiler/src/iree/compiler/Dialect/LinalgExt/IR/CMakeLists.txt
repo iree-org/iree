@@ -109,4 +109,13 @@ iree_tablegen_library(
     --gen-typedef-defs --typedefs-dialect=iree_linalg_ext LinalgExtTypes.cpp.inc
 )
 
+iree_tablegen_doc(
+  NAME
+    LinalgExtDialectDocGen
+  TD_FILE
+    "LinalgExtOps.td"
+  OUTS
+    --gen-dialect-doc -dialect=iree_linalg_ext LinalgExtDialect.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
