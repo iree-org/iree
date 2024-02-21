@@ -282,7 +282,10 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
 
     ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
-    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis
+    ArrayRefParameter<"bool", "subgroup_active_ids">:$subgroupActiveIds,
+
+    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis,
+    ArrayRefParameter<"bool", "thread_active_ids">:$threadActiveIds
   );
 
   // By default, identity orderings are elided when parsing/printing.
@@ -300,8 +303,8 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         custom<Permutation>("\"thread_order\"", ref($threadsPerOuter), "true", $threadOrder) ``
         custom<Permutation>("\"element_order\"", ref($elementsPerThread), "true", $elementOrder) ``
 
-        `subgroup_basis`          `=` `[` $subgroupBasis `]` `,`
-        `thread_basis`            `=` `[` $threadBasis `]`
+        custom<Basis>("\"subgroup_basis\"", "\"subgroup_active_ids\"", "true", $subgroupBasis, $subgroupActiveIds) ``
+        custom<Basis>("\"thread_basis\"", "\"thread_active_ids\"", "false", $threadBasis, $threadActiveIds) ``
     `>`
   }];
 

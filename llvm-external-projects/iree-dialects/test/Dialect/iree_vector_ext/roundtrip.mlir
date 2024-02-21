@@ -54,19 +54,63 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   thread_basis   = [2, 4]
 >
 
+#nested_3 = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup = [4, 2],
+  outers_per_batch = [1, 4],
+  threads_per_outer = [2, 4],
+  elements_per_thread = [4, 1],
+
+  subgroup_order = [1, 0],
+  batch_order = [1, 0],
+  thread_order = [1, 0],
+  element_order = [1, 0],
+
+  subgroup_basis = [2, 4, 8],
+  subgroup_active_ids = [true, true, false],
+  thread_basis   = [2, 4]
+>
+
+#nested_4 = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup = [4, 2],
+  outers_per_batch = [1, 4],
+  threads_per_outer = [2, 4],
+  elements_per_thread = [4, 1],
+
+  subgroup_order = [1, 0],
+  batch_order = [1, 0],
+  thread_order = [1, 0],
+  element_order = [1, 0],
+
+  subgroup_basis = [2, 4, 8],
+  subgroup_active_ids = [true, true, false],
+  thread_basis   = [2, 4, 2],
+  thread_active_ids = [false, true, true]
+>
+
 func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   %cst_0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
   %result = vector.transfer_read %lhs[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<32x32xf16>, vector<32x32xf16>
-  %2 = iree_vector_ext.layout_conflict_resolution %result {sourceLayout = #nested_1, desiredLayout = #nested_2} : vector<32x32xf16> -> vector<32x32xf16>
+  %2 = iree_vector_ext.layout_conflict_resolution %result {
+    sourceLayout = #nested_1,
+    desiredLayout = #nested_2,
+    otherLayout0 = #nested_3,
+    otherLayout1 = #nested_4
+  } : vector<32x32xf16> -> vector<32x32xf16>
   return %2 : vector<32x32xf16>
 }
 
 // CHECK-DAG: #[[LAYOUT0:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [1, 1], thread_basis = [2, 4]>
 // CHECK-DAG: #[[LAYOUT1:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [4, 1], threads_per_outer = [4, 2], elements_per_thread = [1, 4], outer_order = [1, 0], subgroup_basis = [1, 1], thread_basis = [4, 2]>
+// CHECK-DAG: #[[LAYOUT2:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [2, 4, 8], subgroup_active_ids= [true, true, false], thread_basis = [2, 4]>
+// CHECK-DAG: #[[LAYOUT3:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [2, 4, 8], subgroup_active_ids= [true, true, false], thread_basis = [2, 4, 2], thread_active_ids= [false, true, true]>
 // CHECK-LABEL: func.func @specify_nested
 // CHECK:      iree_vector_ext.layout_conflict_resolution
 // CHECK-SAME:         desiredLayout = #[[LAYOUT0]]
+// CHECK-SAME:         otherLayout0 = #[[LAYOUT2]]
+// CHECK-SAME:         otherLayout1 = #[[LAYOUT3]]
 // CHECK-SAME:         sourceLayout = #[[LAYOUT1]]
 
 // -----

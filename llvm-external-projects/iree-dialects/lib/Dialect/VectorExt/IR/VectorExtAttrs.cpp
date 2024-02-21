@@ -10,10 +10,14 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -217,9 +221,87 @@ bool LayoutAttr::hasLaneConflictWith(const LayoutAttr &other) {
   return false;
 }
 
+// Project the nested layout. This take a mask on the dimensions of the vector
+// associated with this layout and projects out those dimensions. This reduces
+// the rank of the layout in the process.
 VectorLayoutInterface
 NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
-  llvm_unreachable("Not yet implemented");
+  assert(projectedDims.size() == getBatchesPerSubgroup().size() &&
+         "projectedDims size must match layout rank");
+
+  // Projection for this layout simply means the sizes along the projected
+  // are dropped.
+  SmallVector<int64_t> subgroupCount;
+  SmallVector<int64_t> batchCount;
+  SmallVector<int64_t> outerCount;
+  SmallVector<int64_t> threadCount;
+  SmallVector<int64_t> elementCount;
+  int64_t count = 0;
+  // Map to track pre-projection -> post-projection indices. Used to update
+  // the dimension orders.
+  llvm::DenseMap<int64_t, int64_t> indexToRankReducedIndexMap;
+  for (auto [idx, isProjected] : llvm::enumerate(projectedDims)) {
+    if (!isProjected) {
+      subgroupCount.push_back(getSubgroupsPerWorkgroup()[idx]);
+      batchCount.push_back(getBatchesPerSubgroup()[idx]);
+      outerCount.push_back(getOutersPerBatch()[idx]);
+      threadCount.push_back(getThreadsPerOuter()[idx]);
+      elementCount.push_back(getElementsPerThread()[idx]);
+      indexToRankReducedIndexMap[idx] = count++;
+    }
+  }
+  // This layout is invalid for rank-0 vectors.
+  assert(count >= 0 && "unimplemented rank-0 vector");
+
+  auto getRankReducedPermutation =
+      [&](ArrayRef<int64_t> perm) -> SmallVector<int64_t> {
+    SmallVector<int64_t> newPerm;
+    for (auto i : perm) {
+      if (indexToRankReducedIndexMap.contains(i)) {
+        newPerm.push_back(indexToRankReducedIndexMap[i]);
+      }
+    }
+    return newPerm;
+  };
+
+  SmallVector<int64_t> subgroupOrder =
+      getRankReducedPermutation(getSubgroupOrder());
+  SmallVector<int64_t> batchOrder = getRankReducedPermutation(getBatchOrder());
+  SmallVector<int64_t> outerOrder = getRankReducedPermutation(getOuterOrder());
+  SmallVector<int64_t> threadOrder =
+      getRankReducedPermutation(getThreadOrder());
+  SmallVector<int64_t> elementOrder =
+      getRankReducedPermutation(getElementOrder());
+
+  // Compose the projected dims with the basis mask to get the new active
+  // ids. For example:
+  //
+  // (active ids indicates that we should use the ids marked as true)
+  // (projected dims drop the dims marked as true)
+  //
+  // subgroup_active_ids = [true,  true,  false, true]
+  // projected_dims =      [false, true,         false]
+  //
+  // new_active_ids =      [true,  false, false, true]
+  auto composeMasks = [&](SmallVector<bool> &newMask, ArrayRef<bool> mask) {
+    int64_t rankReducedIdx = 0;
+    for (auto [i, active] : llvm::enumerate(newMask)) {
+      if (active) {
+        newMask[i] = !mask[rankReducedIdx];
+        rankReducedIdx++;
+      }
+    }
+  };
+  SmallVector<bool> subgroupMask(getSubgroupActiveIds());
+  SmallVector<bool> threadMask(getThreadActiveIds());
+  composeMasks(subgroupMask, projectedDims);
+  composeMasks(threadMask, projectedDims);
+
+  return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
+                               batchCount, batchOrder, outerCount, outerOrder,
+                               threadCount, threadOrder, elementCount,
+                               elementOrder, getSubgroupBasis(), projectedDims,
+                               getThreadBasis(), projectedDims);
 }
 
 VectorLayoutInterface
@@ -260,7 +342,8 @@ LogicalResult NestedLayoutAttr::verify(
     ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
     ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
-    ArrayRef<int64_t> subgroupBasis, ArrayRef<int64_t> threadBasis) {
+    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds,
+    ArrayRef<int64_t> threadBasis, ArrayRef<bool> threadActiveIds) {
 
   size_t rank = subgroupsPerWorkgroup.size();
   auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
@@ -279,9 +362,23 @@ LogicalResult NestedLayoutAttr::verify(
       failed(checkTile(batchesPerSubgroup, batchOrder)) ||
       failed(checkTile(outersPerBatch, outerOrder)) ||
       failed(checkTile(threadsPerOuter, threadOrder)) ||
-      failed(checkTile(elementsPerThread, elementOrder)) ||
-      failed(checkTile(subgroupBasis, subgroupOrder)) ||
-      failed(checkTile(threadBasis, threadOrder))) {
+      failed(checkTile(elementsPerThread, elementOrder))) {
+    return failure();
+  }
+
+  auto checkBasis = [&](ArrayRef<int64_t> basis, ArrayRef<bool> mask) {
+    if (basis.size() != mask.size()) {
+      emitError() << "basis and active id mask must be the same length";
+      return failure();
+    }
+    if (llvm::count_if(mask, [](bool b) { return b; }) != rank) {
+      emitError()
+          << "number of active basis ids must be equal to the layout rank";
+    }
+    return success();
+  };
+  if (failed(checkBasis(subgroupBasis, subgroupActiveIds)) ||
+      failed(checkBasis(threadBasis, threadActiveIds))) {
     return failure();
   }
 
@@ -324,11 +421,21 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   auto tileSizes = llvm::concat<const int64_t>(
       applyPermutation(getSubgroupsPerWorkgroup(), getSubgroupOrder()),
       applyPermutation(getThreadsPerOuter(), getThreadOrder()));
+  auto tileSizesIterator = tileSizes.begin();
+
+  auto activeIdFilter =
+      llvm::concat<const bool>(getSubgroupActiveIds(), getThreadActiveIds());
 
   // Modulo the delinearized subgroup/thread ids by the number of unique
   // elements distributed to those ids.
-  for (auto [delinearized, basis, tile] :
-       llvm::zip(delinearized, basisSizes, tileSizes)) {
+  int64_t tileIdx = 0;
+  for (auto [delinearized, basis, isActive] :
+       llvm::zip_equal(delinearized, basisSizes, activeIdFilter)) {
+    if (!isActive) {
+      continue;
+    }
+    int64_t tile = *tileSizesIterator;
+    tileSizesIterator++;
     if (basis == tile) {
       continue;
     }
@@ -394,6 +501,103 @@ static void printPermutation(AsmPrinter &p, StringRef baseName,
   p << '[';
   llvm::interleaveComma(permutation, p);
   p << ']';
+  if (printComma) {
+    p << ',' << ' ';
+  }
+}
+
+// Custom parser/printer for a basis (array of i64 values) and a mask (array
+// of boolean values).
+static ParseResult parseBasis(AsmParser &parser, StringRef basisName,
+                              StringRef maskName, bool parseComma,
+                              SmallVector<int64_t> &basis,
+                              SmallVector<bool> &mask) {
+  if (failed(parser.parseKeyword(basisName))) {
+    return failure();
+  }
+  if (failed(parser.parseEqual())) {
+    return failure();
+  }
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  auto arrayParser = FieldParser<SmallVector<int64_t>>::parse(parser);
+  if (failed(arrayParser)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "failed to parse basis parameter '")
+        << basisName << "' which is to be a `::llvm::ArrayRef<int64_t>`";
+  }
+  basis = *arrayParser;
+  if (parser.parseRSquare()) {
+    return failure();
+  }
+  // Optionally parse a comma between the basis and mask.
+  if (parser.parseOptionalComma()) {
+    // If we were supposed to find a comma, fail parsing.
+    if (parseComma) {
+      return failure();
+    }
+    // If it was fine not to find a comma, set the mask. If the comma was
+    // missing this will fail to parse the closing angle bracket.
+    mask = SmallVector<bool>(basis.size(), true);
+    return success();
+  }
+  // There is a comma, meaning we either must find the mask, or we shouldn't
+  // have expected a comma.
+  if (failed(parser.parseOptionalKeyword(maskName))) {
+    if (!parseComma) {
+      return failure();
+    }
+    mask = SmallVector<bool>(basis.size(), true);
+    return success();
+  }
+
+  if (failed(parser.parseEqual())) {
+    return failure();
+  }
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  auto maskParser = FieldParser<SmallVector<bool>>::parse(parser);
+  if (failed(maskParser)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "failed to parse mask parameter '")
+        << maskName << "' which is to be a `::llvm::ArrayRef<bool>`";
+  }
+  if (parser.parseRSquare()) {
+    return failure();
+  }
+  if (parseComma) {
+    if (failed(parser.parseComma())) {
+      return failure();
+    }
+  }
+  mask = *maskParser;
+
+  return success();
+}
+
+static void printBasis(AsmPrinter &p, StringRef basisName, StringRef maskName,
+                       bool printComma, ArrayRef<int64_t> basis,
+                       ArrayRef<bool> mask) {
+  p << basisName;
+  // This is called without whitespace inserted by default for optionality.
+  // Insert it explicitly instead.
+  p << ' ';
+  p << '=';
+  p << ' ';
+  p << '[';
+  llvm::interleaveComma(basis, p);
+  p << ']';
+  if (llvm::any_of(mask, [](bool b) { return !b; })) {
+    p << ',' << ' ';
+    p << maskName;
+    p << '=';
+    p << ' ';
+    p << '[';
+    llvm::interleaveComma(mask, p);
+    p << ']';
+  }
   if (printComma) {
     p << ',' << ' ';
   }

@@ -19,7 +19,7 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
 
@@ -45,7 +45,7 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
 
@@ -74,7 +74,7 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
 
@@ -107,7 +107,7 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
 
@@ -142,7 +142,7 @@ builtin.module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
-    transform.yield 
+    transform.yield
   }
 }
 
@@ -213,6 +213,82 @@ builtin.module attributes { transform.with_named_sequence } {
     }
 
     func.return %out : vector<16xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup = [1, 1],
+  outers_per_batch = [1, 1],
+  threads_per_outer = [4, 16],
+  elements_per_thread = [4, 1],
+
+  subgroup_basis = [1, 1],
+  thread_basis   = [4, 16]
+>
+
+// Propagate and enforce through reduction along dim 0.
+// The printing of this layout is too long for a remark. Just verify that
+// the subgroup/thread bases are what we expect.
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst_0 = arith.constant 0.0 : f16
+    %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [true, false], thread_basis = [4, 16], thread_active_ids= [true, false]}}
+    %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<16x16xf16>, vector<16x16xf16>
+    // expected-remark @above {{thread_basis = [4, 16]}}
+    %root_red = vector.multi_reduction<add>, %root, %cst0_1 [0]  : vector<16x16xf16> to vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [true, false], thread_basis = [4, 16], thread_active_ids= [true, false]}}
+    %c = arith.mulf %root_red, %a : vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [true, false], thread_basis = [4, 16], thread_active_ids= [true, false]}}
+    func.return %c : vector<16xf16>
+  }
+
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_vector_layout_analysis %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup = [1, 1],
+  outers_per_batch = [1, 1],
+  threads_per_outer = [4, 16],
+  elements_per_thread = [4, 1],
+
+  subgroup_basis = [1, 1],
+  thread_basis   = [4, 16]
+>
+
+// Propagate and enforce through reduction along dim 1.
+// The printing of this layout is too long for a remark. Just verify that
+// the subgroup/thread bases are what we expect.
+builtin.module attributes { transform.with_named_sequence } {
+  func.func @reduction(%arr: memref<16x16xf16>, %arr2: memref<16xf16>, %a: vector<16xf16>, %b: vector<16xf16>) -> vector<16xf16> {
+    %c0 = arith.constant 0 : index
+    %cst_0 = arith.constant 0.0 : f16
+    %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [false, true], thread_basis = [4, 16], thread_active_ids= [false, true]}}
+    %root = vector.transfer_read %arr[%c0, %c0], %cst_0 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<16x16xf16>, vector<16x16xf16>
+    // expected-remark @above {{thread_basis = [4, 16]}}
+    %root_red = vector.multi_reduction<add>, %root, %cst0_1 [1]  : vector<16x16xf16> to vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [false, true], thread_basis = [4, 16], thread_active_ids= [false, true]}}
+    %c = arith.mulf %root_red, %a : vector<16xf16>
+    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [false, true], thread_basis = [4, 16], thread_active_ids= [false, true]}}
+    func.return %c : vector<16xf16>
   }
 
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
