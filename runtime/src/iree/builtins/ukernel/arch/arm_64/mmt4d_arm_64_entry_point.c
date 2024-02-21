@@ -266,6 +266,8 @@ iree_uk_mmt4d_select_tile_func_arm_64_i8i4i32_M0x8x8(
         return iree_uk_mmt4d_tile_s8s4s32_2x8x8_arm_64_dotprod;
       case 4:
         return iree_uk_mmt4d_tile_s8s4s32_4x8x8_arm_64_dotprod;
+      case 8:
+        return iree_uk_mmt4d_tile_s8s4s32_8x8x8_arm_64_dotprod;
     }
   }
 #endif

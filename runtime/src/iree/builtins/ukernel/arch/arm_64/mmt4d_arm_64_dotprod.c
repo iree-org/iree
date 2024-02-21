@@ -76,7 +76,7 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
     iree_uk_mmt4d_tile_s8s8s32_4x8x4_arm_64_dotprod,
     iree_uk_mmt4d_tile_s8s8s32_8x8x4_arm_64_dotprod)
 
-static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_4x8x8_arm_64_dotprod(
+static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -88,32 +88,67 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_4x8x8_arm_64_dotprod(
   const int8x16_t vmask = vmovq_n_s8(0xF0);
   const int8x8_t vzero = vmov_n_s8(0);
 
-  int32x4_t acc[8];
-  for (int i = 0; i < 8; i++) {
+  int32x4_t acc[16];
+  for (int i = 0; i < 16; i++) {
     // We start with zero accumulators and add the value of *out_ptr later.
     // This is required for the int4 left shift described later.
     acc[i] = vdupq_n_s32(0);
   }
 
   for (int k = 0; k < params->K; ++k) {
-    int8x16_t r1 = vld1q_s8(rhs_ptr);
-    rhs_ptr += 16;
-    int8x16_t r2 = vld1q_s8(rhs_ptr);
-    rhs_ptr += 16;
-
-    // We unpack int4s into individual int8s. To preserve signedness,
-    // int4s are moved to the upper 4-bits of each byte. This has the effect of
-    // multiplying each int4 by 2^4 = 16. To compensate, we divide the
-    // accumulator values by 16 before storing to memory.
-    // This int4 conversion trick is borrowed from the `qd8-f32-qc4w-gemm*`
-    // kernels in https://github.com/google/XNNPACK.
     int8x16_t rhs[4];
-    rhs[0] = vshlq_n_s8(r1, 4);
-    rhs[1] = vshlq_n_s8(r2, 4);
-    rhs[2] = vandq_s8(r1, vmask);
-    rhs[3] = vandq_s8(r2, vmask);
+    for (int i = 0; i < 2; i++) {
+      int8x16_t r = vld1q_s8(rhs_ptr);
+      rhs_ptr += 16;
+      // We unpack int4s into individual int8s. To preserve signedness,
+      // int4s are moved to the upper 4-bits of each byte. This has the effect
+      // of multiplying each int4 by 2^4 = 16. To compensate, we divide the
+      // accumulator values by 16 before storing to memory.
+      // This int4 conversion trick is borrowed from the `qd8-f32-qc4w-gemm*`
+      // kernels in https://github.com/google/XNNPACK.
+      rhs[i + 0] = vshlq_n_s8(r, 4);
+      rhs[i + 2] = vandq_s8(r, vmask);
+    }
 
-    if (M0 == 4) {
+    if (M0 == 8) {
+      // 8x2 * 2x8 -> 8x8.
+      int8x16x2_t lhs_uzp_0 = vld2q_s8(lhs_ptr);
+      lhs_ptr += 32;
+      int8x16x2_t lhs_uzp_1 = vld2q_s8(lhs_ptr);
+      lhs_ptr += 32;
+
+      int8x8_t lhs[8];
+      lhs[0] = vget_low_s8(lhs_uzp_0.val[0]);
+      lhs[1] = vget_high_s8(lhs_uzp_0.val[0]);
+      lhs[2] = vget_low_s8(lhs_uzp_1.val[0]);
+      lhs[3] = vget_high_s8(lhs_uzp_1.val[0]);
+      lhs[4] = vget_low_s8(lhs_uzp_0.val[1]);
+      lhs[5] = vget_high_s8(lhs_uzp_0.val[1]);
+      lhs[6] = vget_low_s8(lhs_uzp_1.val[1]);
+      lhs[7] = vget_high_s8(lhs_uzp_1.val[1]);
+
+      for (int i = 0; i < 2; i++) {
+        acc[0] = vdotq_lane_s32(acc[0], rhs[2 * i + 0], lhs[4 * i + 0], 0);
+        acc[1] = vdotq_lane_s32(acc[1], rhs[2 * i + 1], lhs[4 * i + 0], 0);
+        acc[2] = vdotq_lane_s32(acc[2], rhs[2 * i + 0], lhs[4 * i + 0], 1);
+        acc[3] = vdotq_lane_s32(acc[3], rhs[2 * i + 1], lhs[4 * i + 0], 1);
+
+        acc[4] = vdotq_lane_s32(acc[4], rhs[2 * i + 0], lhs[4 * i + 1], 0);
+        acc[5] = vdotq_lane_s32(acc[5], rhs[2 * i + 1], lhs[4 * i + 1], 0);
+        acc[6] = vdotq_lane_s32(acc[6], rhs[2 * i + 0], lhs[4 * i + 1], 1);
+        acc[7] = vdotq_lane_s32(acc[7], rhs[2 * i + 1], lhs[4 * i + 1], 1);
+
+        acc[8] = vdotq_lane_s32(acc[8], rhs[2 * i + 0], lhs[4 * i + 2], 0);
+        acc[9] = vdotq_lane_s32(acc[9], rhs[2 * i + 1], lhs[4 * i + 2], 0);
+        acc[10] = vdotq_lane_s32(acc[10], rhs[2 * i + 0], lhs[4 * i + 2], 1);
+        acc[11] = vdotq_lane_s32(acc[11], rhs[2 * i + 1], lhs[4 * i + 2], 1);
+
+        acc[12] = vdotq_lane_s32(acc[12], rhs[2 * i + 0], lhs[4 * i + 3], 0);
+        acc[13] = vdotq_lane_s32(acc[13], rhs[2 * i + 1], lhs[4 * i + 3], 0);
+        acc[14] = vdotq_lane_s32(acc[14], rhs[2 * i + 0], lhs[4 * i + 3], 1);
+        acc[15] = vdotq_lane_s32(acc[15], rhs[2 * i + 1], lhs[4 * i + 3], 1);
+      }
+    } else if (M0 == 4) {
       // 4x2 * 2x8 -> 4x8.
       int8x16x2_t lhs_uzp = vld2q_s8(lhs_ptr);
       lhs_ptr += 32;
@@ -149,7 +184,6 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_4x8x8_arm_64_dotprod(
     } else if (M0 == 1) {
       // 1x2 * 2x8 -> 1x8.
       int8x8_t lhs = vld1_s8(lhs_ptr);
-
       lhs_ptr += 8;
       int8x8x2_t lhs_uzp = vuzp_s8(lhs, vzero);
 
@@ -176,8 +210,9 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_4x8x8_arm_64_dotprod(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4(
-    iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_4x8x8_arm_64_dotprod,
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod,
     iree_uk_mmt4d_tile_s8s4s32_1x8x8_arm_64_dotprod,
     iree_uk_mmt4d_tile_s8s4s32_2x8x8_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s4s32_4x8x8_arm_64_dotprod)
+    iree_uk_mmt4d_tile_s8s4s32_4x8x8_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s4s32_8x8x8_arm_64_dotprod)
