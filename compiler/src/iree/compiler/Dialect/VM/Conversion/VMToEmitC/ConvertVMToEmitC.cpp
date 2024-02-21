@@ -1205,7 +1205,7 @@ createModuleStructure(IREE::VM::ModuleOp moduleOp,
 
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::IFDEF,
                                           "__cplusplus");
-    builder.create<emitc::VerbatimOp>(loc, "}  // extern \"C\" {");
+    builder.create<emitc::VerbatimOp>(loc, "}  // extern \"C\"");
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
                                           "//  __cplusplus");
     emitc_builders::preprocessorDirective(builder, loc, emitc_builders::ENDIF,
