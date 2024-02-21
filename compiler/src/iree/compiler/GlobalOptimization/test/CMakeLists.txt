@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "fuse_dequantization_matmul.mlir"
     "fuse_silu_horizontal_matmul.mlir"
     "generalize_named_ops.mlir"
+    "global_loop_invariant_code_motion.mlir"
     "hoist_into_globals_linalg.mlir"
     "infer_numeric_narrowing.mlir"
     "materialize_homogeneous_encodings.mlir"
