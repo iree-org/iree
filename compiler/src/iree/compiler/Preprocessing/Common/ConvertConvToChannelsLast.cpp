@@ -28,7 +28,6 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-using InnerDimsIndices = SmallVector<int64_t>;
 using ConvBuilderFn = std::function<Value(
     OpBuilder &b, Location loc, linalg::LinalgOp srcConv, Value input,
     Value filter, Value output, AffineMap inputMap, AffineMap filterMap,
@@ -90,9 +89,10 @@ namedConvBuilderFn(OpBuilder &b, Location loc, linalg::LinalgOp srcConv,
 
 // Normalizes the given permutation vector. Expects the input permutation is
 // shifted by a constant, for example, [4, 6, 5] -> [0, 2, 1].
-static InnerDimsIndices getNormalizedIndices(InnerDimsIndices targetIndices) {
+static SmallVector<int64_t>
+getNormalizedIndices(SmallVector<int64_t> targetIndices) {
   int startDim = *std::min_element(targetIndices.begin(), targetIndices.end());
-  InnerDimsIndices normalized(targetIndices.size());
+  SmallVector<int64_t> normalized(targetIndices.size());
   for (auto i : llvm::enumerate(targetIndices)) {
     normalized[i.index()] = i.value() - startDim;
   }
@@ -102,9 +102,9 @@ static InnerDimsIndices getNormalizedIndices(InnerDimsIndices targetIndices) {
 // Inverts the given shifted permutation vector. For example,
 // [2, 0, 1] + 4 -> [1, 2, 0] + 4
 // [6, 4, 5] -> [5, 6, 4]
-static InnerDimsIndices invertIndices(InnerDimsIndices targetIndices) {
+static SmallVector<int64_t> invertIndices(SmallVector<int64_t> targetIndices) {
   int startDim = *std::min_element(targetIndices.begin(), targetIndices.end());
-  InnerDimsIndices inverted(targetIndices.size());
+  SmallVector<int64_t> inverted(targetIndices.size());
   for (auto i : llvm::enumerate(targetIndices)) {
     inverted[i.value() - startDim] = i.index() + startDim;
   }
@@ -113,7 +113,7 @@ static InnerDimsIndices invertIndices(InnerDimsIndices targetIndices) {
 
 // Indicates whether the given permutation vector is a minor identity
 // for a permutation of the given |rank|.
-static bool isInnerIdentityIndices(InnerDimsIndices indices, int64_t rank) {
+static bool isInnerIdentityIndices(SmallVector<int64_t> indices, int64_t rank) {
   if (indices.empty()) {
     return true;
   }
@@ -127,7 +127,7 @@ static bool isInnerIdentityIndices(InnerDimsIndices indices, int64_t rank) {
 // Helper to shuffle vectors according to the transpose indices.
 template <typename T>
 static SmallVector<T> shuffleFromIndices(SmallVector<T> unshuffled,
-                                         InnerDimsIndices targetIndices) {
+                                         SmallVector<int64_t> targetIndices) {
   int startDim = *std::min_element(targetIndices.begin(), targetIndices.end());
   SmallVector<T> shuffled(unshuffled);
   for (auto i : llvm::enumerate(targetIndices)) {
@@ -143,7 +143,7 @@ static SmallVector<T> shuffleFromIndices(SmallVector<T> unshuffled,
 // ret = [d1 | d2, d0]
 template <typename T>
 static SmallVector<T> getPackedVector(SmallVector<T> vec,
-                                      InnerDimsIndices targetIndices) {
+                                      SmallVector<int64_t> targetIndices) {
   SmallVector<T> packedShape;
   for (auto [i, val] : llvm::enumerate(vec)) {
     if (!llvm::is_contained(targetIndices, i)) {
@@ -159,7 +159,7 @@ static SmallVector<T> getPackedVector(SmallVector<T> vec,
 // Helper to construct a reassociation map for a collapse shape assuming all
 // outer dimensions are tiled to `1`.
 static SmallVector<ReassociationIndices, 4>
-getUnitOuterDimPackReassociationMap(InnerDimsIndices targetIndices,
+getUnitOuterDimPackReassociationMap(SmallVector<int64_t> targetIndices,
                                     int64_t rank) {
   int startDim = *std::min_element(targetIndices.begin(), targetIndices.end());
   int dimCount = targetIndices.size();
@@ -182,7 +182,7 @@ getUnitOuterDimPackReassociationMap(InnerDimsIndices targetIndices,
 static std::tuple<Value, std::optional<tensor::PackOp>, AffineMap>
 createTransposeAsTensorPack(
     PatternRewriter &rewriter, Location loc, Value input, AffineMap inputMap,
-    InnerDimsIndices targetIndices, int tilingFactor,
+    SmallVector<int64_t> targetIndices, int tilingFactor,
     llvm::DenseMap<int64_t, int64_t> innerDimToDomainDim) {
   if (isInnerIdentityIndices(targetIndices, inputMap.getNumResults())) {
     return std::make_tuple(input, std::nullopt, inputMap);
@@ -261,7 +261,7 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
     auto elementType = outType.getElementType();
     auto outputShape(outType.getShape());
     int64_t rank = outType.getRank();
-    InnerDimsIndices targetIndices(packOp.getInnerDimsPos());
+    SmallVector<int64_t> targetIndices(packOp.getInnerDimsPos());
 
     int startDim =
         *std::min_element(targetIndices.begin(), targetIndices.end());
@@ -296,35 +296,26 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
   return unpackedOutput.getResult();
 }
 
-// Given a list of categorized dimensions and an affine map, returns a
-// permutation on the map results such that all dimensions in one of the
-// categories is accounted for and in the order given by the categories.
-// For example
+// Returns a list of indices of results in the affine |map| that are dim
+// expressions in |transposeDimTargets|.
 //
-// map = ... (d0, d1, d2, d3)
-// transposeDimTargets = [[d2], [d1]]
-// ret = [2, 1]
-static InnerDimsIndices collectChannelInnerDimsIndices(
-    AffineMap map, SmallVector<SmallVector<unsigned, 2>> transposeDimTargets) {
-  SmallVector<InnerDimsIndices> channelIndices(transposeDimTargets.size());
+// map = ... (d0, d3, d1, d2)
+// transposeDimTargets = [d1, d2]
+// ret = [2, 3]
+static SmallVector<int64_t>
+collectChannelInnerDimsIndices(AffineMap map,
+                               SmallVector<unsigned, 2> transposeDimTargets) {
+  SmallVector<int64_t> channelVec;
   for (auto [index, result] : llvm::enumerate(map.getResults())) {
     if (isa<AffineDimExpr>(result)) {
-      for (auto [channelVec, dimCategory] :
-           llvm::zip_equal(channelIndices, transposeDimTargets)) {
-        if (llvm::is_contained(dimCategory,
-                               cast<AffineDimExpr>(result).getPosition())) {
-          channelVec.push_back(index);
-          break;
-        }
+      if (llvm::is_contained(transposeDimTargets,
+                             cast<AffineDimExpr>(result).getPosition())) {
+        channelVec.push_back(index);
+        break;
       }
     }
   }
-
-  InnerDimsIndices indices;
-  for (auto channelVec : channelIndices) {
-    indices.append(channelVec);
-  }
-  return indices;
+  return channelVec;
 }
 
 // Helper to transpose the input and output channel dimensions to be inner
@@ -354,7 +345,6 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
     return failure();
   }
 
-  // TODO: Support depthwise convolutions
   if (!convDims.depth.empty()) {
     return failure();
   }
@@ -367,12 +357,14 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   auto filterMap = convOp.getIndexingMapsArray()[1];
   auto outputMap = convOp.getIndexingMapsArray()[2];
 
-  InnerDimsIndices inputIndices =
-      collectChannelInnerDimsIndices(inputMap, {convDims.inputChannel});
-  InnerDimsIndices filterIndices = collectChannelInnerDimsIndices(
-      filterMap, {convDims.inputChannel, convDims.outputChannel});
-  InnerDimsIndices outputIndices =
-      collectChannelInnerDimsIndices(outputMap, {convDims.outputChannel});
+  SmallVector<int64_t> inputIndices =
+      collectChannelInnerDimsIndices(inputMap, convDims.inputChannel);
+  SmallVector<int64_t> filterIndices =
+      collectChannelInnerDimsIndices(filterMap, convDims.inputChannel);
+  filterIndices.append(
+      collectChannelInnerDimsIndices(filterMap, convDims.outputChannel));
+  SmallVector<int64_t> outputIndices =
+      collectChannelInnerDimsIndices(outputMap, convDims.outputChannel);
 
   // If the dimensions to transpose/pack are already in the correct order and
   // inner most, nothing to do.
