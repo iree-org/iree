@@ -349,6 +349,9 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds);
+  if (!schedule) {
+    return failure();
+  }
 
   std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
                                        schedule->mWarpCount, 1};
