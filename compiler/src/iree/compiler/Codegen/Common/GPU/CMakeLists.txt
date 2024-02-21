@@ -47,6 +47,7 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPUDistributeContract.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
@@ -73,6 +74,7 @@ iree_cc_library(
     ::PassesIncGen
     IREEVectorExtDialect
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
@@ -106,11 +108,27 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Transforms
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    GPUHeuristics
+  HDRS
+    "GPUHeuristics.h"
+  SRCS
+    "GPUHeuristics.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
   PUBLIC
 )
 

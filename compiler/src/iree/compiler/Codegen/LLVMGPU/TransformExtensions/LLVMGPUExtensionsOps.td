@@ -36,7 +36,7 @@ def MapNestedForallToGpuThreadsOp :
     If necessary, scf.forall that do not use the whole thread range
     result in predicated computations.
 
-    Barriers are inserted after each scf.forall op 
+    Barriers are inserted after each scf.forall op
     if `sync_after_distribution` is true.
 
     Return modes:
@@ -706,10 +706,14 @@ def AMDGPUDistributeVectorsOp :
     This transform does not consume the target handle and always return success.
     }];
 
-    let arguments = (ins TransformHandleTypeInterface:$target);
+    let arguments = (ins TransformHandleTypeInterface:$target,
+                         UnitAttr:$test_conversion);
     let results = (outs);
 
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let assemblyFormat = [{
+      $target (`test_conversion` $test_conversion^)?
+      attr-dict `:` type($target)
+    }];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
     let extraClassDeclaration = [{
@@ -720,7 +724,6 @@ def AMDGPUDistributeVectorsOp :
           ::mlir::transform::TransformState &state);
     }];
 }
-
 
 def CreateMatmulMfmaTileSizesOp :
   Op<Transform_Dialect, "iree.create_matmul_mfma_tile_sizes",
@@ -738,6 +741,22 @@ def CreateMatmulMfmaTileSizesOp :
                       TransformParamTypeInterface:$problem_specific_sizes);
 
   let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
+def SetContractionLayoutAttributes :
+  Op<Transform_Dialect, "iree.set_contraction_layout_attributes",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>]> {
+  let description = [{
+    Infers and sets the layout of the target contraction op based on the given
+    MFMA attribute.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target,
+                       TransformParamTypeInterface:$mma_type);
+
+  let assemblyFormat = "$target `,` $mma_type attr-dict `:` type($target) `,` type($mma_type)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 

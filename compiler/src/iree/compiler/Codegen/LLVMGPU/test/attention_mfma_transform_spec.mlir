@@ -1,36 +1,4 @@
-// First Matmul
-// A: 64x128
-// B: 32x128 MMT
-// C: 64x32
-#layout_a1 = #iree_vector_ext.layout<
-  <[BATCHX, LANEX], [4, 16]>,
-  <[BATCHY, LANEY, VECTORX], [8, 4, 4]>
->
-#layout_b1 = #iree_vector_ext.layout<
-  <[BATCHX, LANEX], [2, 16]>,
-  <[BATCHY, LANEY, VECTORX], [8, 4, 4]>
->
-#layout_c1 = #iree_vector_ext.layout<
-  <[BATCHX, LANEY, VECTORX], [4, 4, 4]>,
-  <[BATCHY, LANEX], [2, 16]>
->
- 
-// Second Matmul
-// A: 128x64
-// B: 64x32  MM
-// C: 128x32
-#layout_a2 = #iree_vector_ext.layout<
-  <[BATCHX, LANEX], [8, 16]>,
-  <[BATCHY, LANEY, VECTORX], [4, 4, 4]>
->
-#layout_b2 = #iree_vector_ext.layout<
-  <[BATCHX, LANEY, VECTORX], [4, 4, 4]>,
-  <[BATCHY, LANEX], [2, 16]>
->
-#layout_c2 = #iree_vector_ext.layout<
-  <[BATCHX, LANEY, VECTORX], [8, 4, 4]>,
-  <[BATCHY, LANEX], [2, 16]>
->
+#layout = #iree_gpu.mfma_layout<F16_16x16x16_F32>
 
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {
@@ -185,26 +153,12 @@ module attributes { transform.with_named_sequence } {
 
     // Get the vector.contract ops.
     %contracts = transform.structured.match ops{["vector.contract"]} in %variant_op_3 :  (!transform.any_op) -> !transform.any_op
-    %contract1, %contract2 = transform.split_handle %contracts : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
-    %layoutA1 = transform.param.constant #layout_a1 -> !transform.any_param
-    %layoutB1 = transform.param.constant #layout_b1 -> !transform.any_param
-    %layoutC1 = transform.param.constant #layout_c1 -> !transform.any_param
-
-    %layoutA2 = transform.param.constant #layout_a2 -> !transform.any_param
-    %layoutB2 = transform.param.constant #layout_b2 -> !transform.any_param
-    %layoutC2 = transform.param.constant #layout_c2 -> !transform.any_param
-
-    transform.annotate %contract1 "__vector_layout_test_anchor_operand_0" = %layoutA1 : !transform.any_op, !transform.any_param
-    transform.annotate %contract1 "__vector_layout_test_anchor_operand_1" = %layoutB1 : !transform.any_op, !transform.any_param
-    transform.annotate %contract1 "__vector_layout_test_anchor_operand_2" = %layoutC1 : !transform.any_op, !transform.any_param
-
-    transform.annotate %contract2 "__vector_layout_test_anchor_operand_0" = %layoutA2 : !transform.any_op, !transform.any_param
-    transform.annotate %contract2 "__vector_layout_test_anchor_operand_1" = %layoutB2 : !transform.any_op, !transform.any_param
-    transform.annotate %contract2 "__vector_layout_test_anchor_operand_2" = %layoutC2 : !transform.any_op, !transform.any_param
+    %layout16x16x16 = transform.param.constant #layout -> !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contracts, %layout16x16x16 : !transform.any_op, !transform.any_param
 
     %distribute_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %distribute_func : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %distribute_func test_conversion : !transform.any_op
 
     transform.apply_patterns to %distribute_func {
       transform.apply_patterns.canonicalization

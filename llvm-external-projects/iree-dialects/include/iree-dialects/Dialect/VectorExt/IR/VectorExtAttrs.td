@@ -136,7 +136,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     1. Subgroups per Workgroup
 
     This level of tiling is also known as "subgroup/warp distribution". It
-    represents how subgroups are distributed in a workgroup. 
+    represents how subgroups are distributed in a workgroup.
 
     The subgroups are placed contiguously with their shape and ordering
     determined by:
@@ -154,7 +154,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     The total number of subgroups used (computed by multiplying each dim in
     subgroups_per_workgroup) should be a multiple of number of subgroups in the
     harware. If the total number of subgroups used exceeds the number of
-    subgroups of the hardware, then the subgroup used (say x) is 
+    subgroups of the hardware, then the subgroup used (say x) is
     x mod num_subgroups:
 
     num_subgroups = 4
@@ -189,7 +189,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     0 1 2 3 4
     5 6 7 8 9
-    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5 
+    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5
     0 1 2 3 4     outers_per_batch=[2, 1]
     5 6 7 8 9     threads_per_outer=[2, 5]
 
@@ -219,7 +219,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     {
       [0 2]|[0 2]      0,1,2,3 --> thread ids
-      [1 3]|[1 3]      
+      [1 3]|[1 3]
       ------------     [x z]   --> a single outer tile
       [0 2]|[0 2]      [y w]
       [1 3]|[1 3]
@@ -279,7 +279,10 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
 
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
-    ArrayRefParameter<"int64_t", "element_order">:$elementOrder
+    ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
+
+    ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
+    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis
   );
 
   // TODO: add custom parser/printer and builder to elide default value array
@@ -295,14 +298,17 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `batch_order`             `=` `[` $batchOrder `]` `,`
         `outer_order`             `=` `[` $outerOrder `]` `,`
         `thread_order`            `=` `[` $threadOrder `]` `,`
-        `element_order`           `=` `[` $elementOrder `]` 
+        `element_order`           `=` `[` $elementOrder `]` `,`
+
+        `subgroup_basis`          `=` `[` $subgroupBasis `]` `,`
+        `thread_basis`            `=` `[` $threadBasis `]`
     `>`
   }];
 
   let extraClassDeclaration = [{
     // Returns the subgroup/lane ids delinearized from a single linearized
     // thread ID.
-    ValueRange computeThreadIds(Value threadId, RewriterBase &rewriter) const;
+    SmallVector<Value> computeThreadIds(Value threadId, RewriterBase &rewriter) const;
   }];
 
   let genVerifyDecl = 1;

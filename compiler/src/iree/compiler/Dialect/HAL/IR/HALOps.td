@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECT_HAL_OPS
 #define IREE_DIALECT_HAL_OPS
 
+include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
@@ -1538,33 +1539,6 @@ def HAL_DescriptorSetLayoutCreateOp :
   }];
 }
 
-def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{descriptor set layout cache lookup pseudo-op}];
-  let description = [{
-    Used during conversion to provide a placeholder for a globally cached and
-    possibly lazy-initialized descriptor set layout.
-  }];
-
-  let arguments = (ins
-    HAL_Device:$device,
-    HAL_DescriptorSetLayoutFlagsAttr:$flags,
-    HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
-  );
-  let results = (outs
-    HAL_DescriptorSetLayout:$result
-  );
-
-  let assemblyFormat = [{
-    `device` `(` $device `:` type($device) `)`
-    `flags` `(` $flags `)`
-    `bindings` `(` $bindings `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-}
-
 } // OpGroupDescriptorSetLayoutOps
 
 //===----------------------------------------------------------------------===//
@@ -1655,7 +1629,10 @@ def HAL_DeviceQueryOp :
 
     Well-known keys:
 
-    * hal.executable.format :: {some format}
+    * hal.device.id :: {some id pattern}
+      Returns 1 if the device identifier matches the given pattern string.
+
+    * hal.executable.format :: {some format pattern}
       Returns 1 if the given format is supported by the device loader.
 
     * hal.device :: concurrency
@@ -1686,6 +1663,14 @@ def HAL_DeviceQueryOp :
     `:` type($ok) `,` type($value)
     (`=` $default_value^)?
     attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns a true i1 if the given query returns a non-zero value.
+    // Returns false if the query fails or returns a zero value.
+    static Value createI1(Location loc, Value device,
+                          StringRef category, StringRef key,
+                          OpBuilder &builder);
   }];
 
   let hasVerifier = 1;

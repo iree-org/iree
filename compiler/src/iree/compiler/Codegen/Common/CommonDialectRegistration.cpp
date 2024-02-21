@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/TransformExtensions/LLVMCPUExtensions.h"
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -65,6 +66,7 @@ void registerTransformDialectTranslationDependentDialects(
                   mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
                   mlir::iree_compiler::IREE::Flow::FlowDialect,
                   mlir::iree_compiler::IREE::Codegen::IREECodegenDialect,
+                  mlir::iree_compiler::IREE::GPU::IREEGPUDialect,
                   arith::ArithDialect,
                   affine::AffineDialect,
                   bufferization::BufferizationDialect,

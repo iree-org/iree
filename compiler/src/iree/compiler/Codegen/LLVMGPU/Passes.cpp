@@ -22,6 +22,7 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -46,6 +47,12 @@ constexpr int64_t kDefaultSubgroupSize = 32;
 static llvm::cl::opt<unsigned>
     logSwizzleTile("iree-codegen-log-swizzle-tile",
                    llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
+
+llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
+    "iree-llvmgpu-shared-memory-limit",
+    llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
+                   "allocated for the given target"),
+    llvm::cl::init(163 * 1024));
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
@@ -127,7 +134,6 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
-  options.maxVectorSize = 4096;
   pm.addNestedPass<func::FuncOp>(createGenericVectorizationPass(options));
   pm.addNestedPass<func::FuncOp>(createOptimizeTensorInsertExtractSlicesPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -539,7 +545,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
-    options.maxVectorSize = 16384;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -694,8 +699,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface) {
-    return 163 * 1024;
+  int64_t limit = clLLVMGPUSharedMemoryLimit;
+  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
+    return limit;
   };
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
@@ -720,6 +726,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createEmulateNarrowTypePass());
+  pm.addPass(affine::createAffineExpandIndexOpsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

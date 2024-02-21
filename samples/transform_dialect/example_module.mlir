@@ -5,7 +5,7 @@
 // !B_size = tensor<5x16xf32>
 // !C_size = tensor<16x16xf32>
 // !O_size = tensor<16xf32>
-// 
+//
 // module {
 //   func.func @example_module(%A : !A_size, %B : !B_size, %C : !C_size) -> !O_size {
 //     %0 = linalg.add ins(%A, %A : !A_size, !A_size)
@@ -16,10 +16,10 @@
 //     %2 = linalg.reduce
 //       ins(%1 : !C_size)
 //       outs(%empty : !O_size)
-//       dimensions = [1] 
+//       dimensions = [1]
 //       (%in: f32, %out: f32) {
-//         %3 = arith.addf %out, %in: f32 
-//         linalg.yield %3: f32 
+//         %3 = arith.addf %out, %in: f32
+//         linalg.yield %3: f32
 //       }
 //     return %2 : !O_size
 //   }
@@ -27,13 +27,13 @@
 
 #target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_khr = []>>
 
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executable_targets = [#hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_khr = []>>}>], legacy_sync}>]} {
+module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executable_targets = [#hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_khr = []>>}>]}>]} {
   hal.executable private @example_module_dispatch_0 {
     hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
       hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -59,7 +59,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executabl
       hal.executable.export public @example_module_dispatch_1_matmul_16x16x5_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {
@@ -83,7 +83,7 @@ module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executabl
       hal.executable.export public @example_module_dispatch_2_generic_16x16_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
-        %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+        %x, %y, %z = flow.dispatch.workgroup_count_from_slice
         hal.return %x, %y, %z : index, index, index
       }
       builtin.module {

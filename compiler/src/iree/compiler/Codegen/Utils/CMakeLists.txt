@@ -62,4 +62,19 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    VectorOpUtils
+  HDRS
+    "VectorOpUtils.h"
+  SRCS
+    "VectorOpUtils.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    MLIRVectorDialect
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

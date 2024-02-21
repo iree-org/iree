@@ -4,13 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-unset(COMPILER_FLAGS)
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
 if(IREE_ROCM_LINK_BC)
-  list(APPEND COMPILER_FLAGS "--iree-rocm-link-bc=true")
+  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=true")
 else()
-  list(APPEND COMPILER_FLAGS "--iree-rocm-link-bc=false")
+  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=false")
 endif()
-list(APPEND COMPILER_FLAGS
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
   "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}"
   "--iree-rocm-bc-dir=${IREE_ROCM_BC_DIR}")
 
@@ -28,7 +28,7 @@ iree_hal_cts_test_suite(
   EXECUTABLE_FORMAT
     "\"HSACO\""
   COMPILER_FLAGS
-    ${COMPILER_FLAGS}
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
   ARGS
     "--hip_use_streams=true"
   DEPS

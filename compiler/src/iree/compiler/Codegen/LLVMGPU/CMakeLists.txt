@@ -108,6 +108,7 @@ iree_cc_library(
     MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithToAMDGPU
@@ -163,6 +164,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
