@@ -104,17 +104,24 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
     // CHECK:     %c1 = (%[[ARG1_BUFFER]] : !hal.buffer)[%c0, %c16],
     // CHECK:     %c2 = (%[[RESULT_BUFFER]] : !hal.buffer)[%c0, %c16]
     // CHECK:   ])
-    // CHECK:   hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: target(@ex::@embedded_elf_aarch64::@dispatch)
+    // CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup device(%[[DEVICE]] : !hal.device) executable(@ex) : !hal.executable
+    // CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal target(@ex::@embedded_elf_aarch64::@dispatch) : index
+    // CHECK:   hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
     // CHECK-SAME: workgroups([%c1, %c1, %c1])
     // CHECK:   scf.yield
     // CHECK: }
     // CHECK: case 1 {
-    // CHECK:   hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: target(@ex::@embedded_elf_x86_64::@dispatch)
+    // CHECK-DAG: %[[EXECUTABLE_1:.+]] = hal.executable.lookup device(%[[DEVICE]] : !hal.device) executable(@ex) : !hal.executable
+    // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@embedded_elf_x86_64::@dispatch) : index
+    // CHECK:   hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: target(%[[EXECUTABLE_1]] : !hal.executable)[%[[ORDINAL_1]]]
     // CHECK:   scf.yield
     // CHECK: }
-    stream.cmd.dispatch {@ex::@embedded_elf_aarch64::@dispatch, @ex::@embedded_elf_x86_64::@dispatch}[%c4, %c1, %c1] {
+    stream.cmd.dispatch {
+      @ex::@embedded_elf_aarch64::@dispatch,
+      @ex::@embedded_elf_x86_64::@dispatch
+    }[%c4, %c1, %c1] {
       ro %arg0_capture[%c0 for %c16] : !stream.resource<external>{%c16},
       ro %arg1_capture[%c0 for %c16] : !stream.resource<external>{%c16},
       wo %result_capture[%c0 for %c16] : !stream.resource<external>{%c16}
