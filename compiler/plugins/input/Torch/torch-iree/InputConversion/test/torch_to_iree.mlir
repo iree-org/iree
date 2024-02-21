@@ -4,7 +4,7 @@
 
 // Verify that we can have IREE ops in the input and the types convert
 // properly.
-// CHECK: func @forward(%arg0: tensor<128x20xf32>) -> tensor<128x30xf32>
+// CHECK-LABEL: util.func public @forward$async(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> !hal.buffer_view
 // CHECK: linalg.matmul
 module {
   func.func @forward(%arg0: !torch.vtensor<[128,20],f32>) -> !torch.vtensor<[128,30],f32> {
@@ -31,7 +31,7 @@ module {
 // -----
 
 // Verify we can decompose complex ops
-// CHECK: func @main(%arg0: tensor<2x3x4xf32>) -> (tensor<2x3x4xf32>, tensor<2x3x4xf32>)
+// CHECK-LABEL: util.func public @main$async(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> (!hal.buffer_view, !hal.buffer_view)
 // CHECK: tensor.empty
 module {
   func.func @main(%arg0: !torch.vtensor<[2,3,4],f32>) -> (!torch.vtensor<[2,3,4],f32>, !torch.vtensor<[2,3,4],f32>) {
@@ -44,7 +44,8 @@ module {
     %int1 = torch.constant.int 1
     %1 = torch.prim.ListConstruct %int12, %int4_0, %int1 : (!torch.int, !torch.int, !torch.int) -> !torch.list<int>
     %none = torch.constant.none
-    %none_1 = torch.constant.none    %cpu = torch.constant.device "cpu"
+    %none_1 = torch.constant.none    
+    %cpu = torch.constant.device "cpu"
     %false = torch.constant.bool false
     %2 = torch.aten.empty_strided %0, %1, %none, %none_1, %cpu, %false : !torch.list<int>, !torch.list<int>, !torch.none, !torch.none, !torch.Device, !torch.bool -> !torch.vtensor<[2,3,4],f32>
     %false_2 = torch.constant.bool false

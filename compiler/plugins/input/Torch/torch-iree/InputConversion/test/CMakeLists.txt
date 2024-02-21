@@ -6,6 +6,7 @@ iree_lit_test_suite(
     "auto_input_conversion.mlir"
     "attention.mlir"
     "bitcast_quant_tensor.mlir"
+    "func_conversion.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"

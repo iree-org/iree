@@ -263,6 +263,7 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
     // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
     // could always say device 0 for now but could instead look for an
     // iree.abi.affinity/iree.abi.device/etc.
+    Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
     Value device = IREE::HAL::DeviceType::resolveAny(loc, rewriter);
     Value waitFence = rewriter.create<IREE::Util::NullOp>(
         loc, rewriter.getType<IREE::HAL::FenceType>());
@@ -278,7 +279,6 @@ class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
             .getResults();
 
     // Wait forever for signal.
-    auto timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
     rewriter.create<IREE::HAL::FenceAwaitOp>(loc, rewriter.getI32Type(),
                                              timeoutMillis, signalFence);
 
