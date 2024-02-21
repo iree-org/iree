@@ -4,7 +4,7 @@ func.func @matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, 
     mma_schedule = #iree_gpu.mma_schedule<
       intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -31,7 +31,7 @@ func.func @matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>,
     mma_schedule = #iree_gpu.mma_schedule<
       intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
       indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (n, k)>, affine_map<(m, n, d2) -> (m, n)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -58,7 +58,7 @@ func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: ve
     mma_schedule = #iree_gpu.mma_schedule<
       intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
       subgroup_m_count = 2, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 2, 1]} {
+    workgroup_size = [64, 2, 1]} {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -78,7 +78,7 @@ func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offs
   attributes {
     mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -137,7 +137,7 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
   attributes {
     mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16

@@ -6,7 +6,7 @@ func.func @matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset:
   attributes {
     mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -60,7 +60,7 @@ func.func @matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset:
   attributes {
     mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    subgroup_size = 64, workgroup_size = [64, 1, 1]} {
+    workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -91,17 +91,23 @@ func.func @matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset:
   return
 }
 
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1) -> (d1, d0)>
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 64 + s2 * 64)>
+// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d1, d0)>
 
 // CHECK-LABEL: func.func @matmul_256x256x256
+//       CHECK:   %[[TIDX:.+]] = gpu.thread_id  x
+//       CHECK:   %[[TIDY:.+]] = gpu.thread_id  y
+//       CHECK:   %[[TIDZ:.+]] = gpu.thread_id  z
+//       CHECK:   %[[LIN_ID:.+]] = affine.apply #[[$MAP]]()[%[[TIDX]], %[[TIDY]], %[[TIDZ]]]
 //       CHECK:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
+//       CHECK:   affine.delinearize_index %[[LIN_ID]]
 //       CHECK:   %[[INIT_READ:.+]] = vector.transfer_read %{{.*}} memref<16x16xf32, {{.*}}>, vector<4x1xf32>
 //       CHECK:   %[[INIT_TRANSP:.+]] = vector.transpose %[[INIT_READ]], [1, 0]
 //       CHECK:   %[[INIT:.+]] = vector.insert_strided_slice %[[INIT_TRANSP]]
 //       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}} = %[[INIT]]) -> (vector<1x1x1x1x1x4xf32>)
 //       CHECK:     %[[LLOAD:.+]] = vector.transfer_read {{.*}} : memref<16x256xf16, {{.*}}>, vector<1x8xf16>
-//       CHECK:     %[[RLOAD:.+]] = vector.transfer_read {{.*}} permutation_map = #[[$MAP]]} : memref<16x256xf16, {{.*}}>, vector<8x1xf16>
+//       CHECK:     %[[RLOAD:.+]] = vector.transfer_read {{.*}} permutation_map = #[[$MAP1]]} : memref<16x256xf16, {{.*}}>, vector<8x1xf16>
 //       CHECK:     vector.transfer_write %[[LLOAD]], %[[LHS_ALLOC]]{{.*}} : vector<1x8xf16>, memref<16x32xf16, #gpu.address_space<workgroup>>
 //       CHECK:     vector.transfer_write %[[RLOAD]], %[[RHS_ALLOC]]{{.*}} : vector<8x1xf16>, memref<32x16xf16, #gpu.address_space<workgroup>>
 //       CHECK:     gpu.barrier
