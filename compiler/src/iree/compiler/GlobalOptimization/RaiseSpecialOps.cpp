@@ -762,10 +762,7 @@ public:
       didChangeOperand = replaceOperandWithTypeCast(namedOp->getOpOperand(0));
       didChangeOperand |= replaceOperandWithTypeCast(namedOp->getOpOperand(1));
     }
-    if (didChangeOperand) {
-      return success();
-    }
-    return failure();
+    return success(didChangeOperand);
   }
 };
 
