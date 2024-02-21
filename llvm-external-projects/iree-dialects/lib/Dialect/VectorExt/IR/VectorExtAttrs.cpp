@@ -13,6 +13,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -339,6 +340,63 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   }
 
   return delinearized;
+}
+
+//===----------------------------------------------------------------------===//
+// Custom Parsers/Printers
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to construct the permutation based on the rank of the
+// sizes corresponding to this order.
+static ParseResult parsePermutation(AsmParser &parser, StringRef baseName,
+                                    ArrayRef<int64_t> sizes, bool parseComma,
+                                    SmallVector<int64_t> &permutation) {
+  if (failed(parser.parseOptionalKeyword(baseName))) {
+    permutation = llvm::to_vector(llvm::seq<int64_t>(0, sizes.size()));
+    return success();
+  }
+  if (failed(parser.parseEqual())) {
+    return failure();
+  }
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  auto arrayParser = FieldParser<SmallVector<int64_t>>::parse(parser);
+  if (failed(arrayParser)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "failed to parse permutation parameter '")
+        << baseName << "' which is to be a `::llvm::ArrayRef<int64_t>`";
+  }
+  if (parser.parseRSquare()) {
+    return failure();
+  }
+  if (parseComma) {
+    if (parser.parseComma()) {
+      return failure();
+    }
+  }
+  permutation = *arrayParser;
+  return success();
+}
+
+static void printPermutation(AsmPrinter &p, StringRef baseName,
+                             ArrayRef<int64_t> sizes, bool printComma,
+                             ArrayRef<int64_t> permutation) {
+  if (isIdentityPermutation(permutation)) {
+    return;
+  }
+  p << baseName;
+  // This is called without whitespace inserted by default for optionality.
+  // Insert it explicitly instead.
+  p << ' ';
+  p << '=';
+  p << ' ';
+  p << '[';
+  llvm::interleaveComma(permutation, p);
+  p << ']';
+  if (printComma) {
+    p << ',' << ' ';
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt
