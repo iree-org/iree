@@ -720,8 +720,8 @@ struct CmdDispatchOpPattern
       auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, affinityAttr, device, commandBuffer, dispatchOp,
-                       adaptor, exportOp.getLayout(), caseBuilder);
+      recordParameters(loc, affinityAttr, device, commandBuffer, exportOp,
+                       dispatchOp, adaptor, caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
@@ -749,10 +749,10 @@ struct CmdDispatchOpPattern
 
   void recordParameters(Location loc, IREE::Stream::AffinityAttr affinityAttr,
                         Value device, Value commandBuffer,
+                        IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Stream::CmdDispatchOp dispatchOp,
-                        OpAdaptor adaptor,
-                        IREE::HAL::PipelineLayoutAttr layoutAttr,
-                        OpBuilder &builder) const {
+                        OpAdaptor adaptor, OpBuilder &builder) const {
+    auto layoutAttr = exportOp.getLayout();
     auto pipelineLayout =
         builder
             .create<IREE::HAL::PipelineLayoutLookupOp>(
@@ -777,12 +777,6 @@ struct CmdDispatchOpPattern
           builder.getIndexAttr(pushConstantBase), pushConstants);
     }
 
-    // TODO(benvanik): typed accessors for bindings.
-    auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
-        dispatchOp->getAttr("hal.interface.bindings"));
-    assert(bindingAttrs &&
-           "interface materialization must annotate dispatch sites");
-
     // Push descriptor bindings.
     int64_t currentSet = -1;
     SmallVector<IREE::HAL::DescriptorSetBindingValue> bindings;
@@ -791,9 +785,9 @@ struct CmdDispatchOpPattern
           loc, commandBuffer, pipelineLayout, currentSet, bindings);
       bindings.clear();
     };
-    for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {
-      auto bindingAttr =
-          llvm::cast<IREE::HAL::InterfaceBindingAttr>(bindingAttrs[i]);
+    auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
+        exportOp, dispatchOp.getResources().size());
+    for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
       int64_t set = bindingAttr.getSet();
       if (currentSet != -1 && currentSet != set)
         flushSet();

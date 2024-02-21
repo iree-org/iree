@@ -87,6 +87,30 @@ Value DeviceType::resolveAny(Location loc, OpBuilder &builder) {
 }
 
 //===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+SmallVector<IREE::HAL::InterfaceBindingAttr>
+getInterfaceBindingAttrs(Operation *op, size_t resourceCount) {
+  // It'd be nice if we had something typed here but this is just used for
+  // spooky action at a distance or user overrides. If the attribute is not
+  // found (not set by MaterializeInterfaces or the user) we construct one by
+  // convention (dense set 0 bindings for each resource).
+  auto bindingAttrs = op->getAttrOfType<ArrayAttr>("hal.interface.bindings");
+  if (bindingAttrs) {
+    return llvm::to_vector(
+        bindingAttrs.getAsRange<IREE::HAL::InterfaceBindingAttr>());
+  }
+  SmallVector<IREE::HAL::InterfaceBindingAttr> bindings;
+  for (size_t i = 0; i < resourceCount; ++i) {
+    bindings.push_back(IREE::HAL::InterfaceBindingAttr::get(op->getContext(),
+                                                            /*set=*/0,
+                                                            /*binding=*/i));
+  }
+  return bindings;
+}
+
+//===----------------------------------------------------------------------===//
 // Dialect registration
 //===----------------------------------------------------------------------===//
 
