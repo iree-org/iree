@@ -315,28 +315,8 @@ public:
   void runOnOperation() override {
     auto func = getOperation();
 
-    std::optional<int64_t> maybeSubgroupSize = std::nullopt;
-    if (func->hasAttr("subgroup_size")) {
-      maybeSubgroupSize =
-          llvm::cast<IntegerAttr>(func->getAttr("subgroup_size")).getInt();
-    } else {
-      maybeSubgroupSize = getSubgroupSize(func);
-    }
-    if (!maybeSubgroupSize) {
-      func.emitError() << "subgroup size required for vector distribution";
-      return signalPassFailure();
-    }
-
-    OpBuilder builder(func);
-    builder.setInsertionPointToStart(&func.getFunctionBody().front());
-    SmallVector<OpFoldResult> threadGrid = {
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                              gpu::Dimension::z)};
-
     std::array<int64_t, 3> workgroupSize;
-    if (func->hasAttr("subgroup_size")) {
+    if (func->hasAttr("workgroup_size")) {
       auto tmpSizes =
           llvm::cast<ArrayAttr>(func->getAttr("workgroup_size")).getValue();
       for (auto [i, size] : llvm::enumerate(tmpSizes)) {
@@ -361,36 +341,20 @@ public:
     // Construct the expression for linearizing the thread indices.
     AffineExpr linearId =
         x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-    AffineExpr laneId = linearId % *maybeSubgroupSize;
 
-    // This all needs some kind of simplification; the arithmetic it produces
-    // doest not get folded away as nicely as it could.
-    AffineMap idMap = AffineMap::getMultiDimIdentityMap(2, func.getContext());
+    OpBuilder builder(func);
+    builder.setInsertionPointToStart(&func.getFunctionBody().front());
+    SmallVector<OpFoldResult> threadGrid = {
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                              gpu::Dimension::z)};
 
-    // Clamp the thread indices to the workgroup sizes.
-    OpFoldResult c0 =
-        builder.createOrFold<arith::ConstantIndexOp>(func.getLoc(), 0);
-    threadGrid[0] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[0], c0});
-    threadGrid[1] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[1], c0});
-    threadGrid[2] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[2], c0});
-
-    OpFoldResult dimX = builder.getIndexAttr(workgroupSize[0] - 1);
-    OpFoldResult dimY = builder.getIndexAttr(workgroupSize[1] - 1);
-    OpFoldResult dimZ = builder.getIndexAttr(workgroupSize[2] - 1);
-    threadGrid[0] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[0], dimX});
-    threadGrid[1] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[1], dimY});
-    threadGrid[2] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[2], dimZ});
-    Value laneVal = affine::makeComposedAffineApply(builder, func.getLoc(),
-                                                    laneId, threadGrid);
+    Value linearThreadIdVal = affine::makeComposedAffineApply(
+        builder, func.getLoc(), linearId, threadGrid);
 
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           laneVal, testLayout);
+                                           linearThreadIdVal, testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();
