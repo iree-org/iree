@@ -717,3 +717,85 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[M:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
 // CHECK-DAG: %[[N:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#2]
 // CHECK: transfer_read %{{.*}}[%[[N]], %[[M]]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2, 2],
+  batches_per_subgroup = [2, 4],
+  outers_per_batch = [1, 1],
+  threads_per_outer = [4, 16],
+  elements_per_thread = [4, 1],
+  element_order = [1, 0],
+  subgroup_basis = [2, 2],
+  thread_basis = [4, 16]
+>
+
+func.func @broadcast(%src: vector<128xf16>) -> (vector<64x128xf16>) {
+  %bcast = vector.broadcast %src {"__vector_layout_test_anchor_result_0" = #layout}
+    : vector<128xf16> to vector<64x128xf16>
+  return %bcast : vector<64x128xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: vector.extract {{.*}}[0, 0] : vector<1xf16> from vector<4x1x1xf16>
+// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<1x4xf16>
+// CHECK: vector.insert {{.*}} [0, 0, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.extract {{.*}}[1, 0] : vector<1xf16> from vector<4x1x1xf16>
+// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<1x4xf16>
+// CHECK: vector.insert {{.*}} [0, 1, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.extract {{.*}}[2, 0] : vector<1xf16> from vector<4x1x1xf16>
+// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<1x4xf16>
+// CHECK: vector.insert {{.*}} [0, 2, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.extract {{.*}}[3, 0] : vector<1xf16> from vector<4x1x1xf16>
+// CHECK: vector.broadcast {{.*}} : vector<1xf16> to vector<1x4xf16>
+
+// CHECK: vector.insert {{.*}} [1, 0, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.insert {{.*}} [1, 1, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.insert {{.*}} [1, 2, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+// CHECK: vector.insert {{.*}} [1, 3, 0, 0] : vector<1x4xf16> into vector<2x4x1x1x1x4xf16>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2, 2, 2],
+  batches_per_subgroup = [2, 2, 1],
+  outers_per_batch = [2, 1, 1],
+  threads_per_outer = [4, 16, 8],
+  elements_per_thread = [1, 4, 4],
+  batch_order = [2, 1, 0],
+  subgroup_basis = [2, 2, 2],
+  thread_basis = [4, 16, 8]
+>
+
+func.func @broadcast(%src: vector<64xf16>) -> (vector<32x256x64xf16>) {
+  %bcast = vector.broadcast %src {"__vector_layout_test_anchor_result_0" = #layout}
+    : vector<64xf16> to vector<32x256x64xf16>
+  return %bcast : vector<32x256x64xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: %[[EXTRACT:.+]] = vector.extract %{{.*}}[0, 0] : vector<4xf16> from vector<1x1x4xf16>
+// CHECK: %[[BCAST:.+]] = vector.broadcast %[[EXTRACT]] : vector<4xf16> to vector<1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 0, 0, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 0, 1, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 1, 0, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 0, 1, 1, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 1, 0, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>
+// CHECK: vector.insert %[[BCAST]], %{{.*}} [0, 1, 1, 1, 0, 0] : vector<1x4x4xf16> into vector<1x2x2x2x1x1x1x4x4xf16>

@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <cstdint>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
@@ -20,6 +21,7 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -318,6 +320,104 @@ struct DistributeTransferWriteNestedLayoutAttr final
   Value threadId;
 };
 
+struct DistributeBroadcastNestedLayoutAttr final
+    : OpDistributionPattern<vector::BroadcastOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    VectorValue source = dyn_cast<VectorValue>(broadcastOp.getSource());
+    if (!source) {
+      // TODO: Add support for scalar broadcasting.
+      return failure();
+    }
+    NestedLayoutAttr sourceLayout =
+        dyn_cast<NestedLayoutAttr>(signature[source]);
+    if (!sourceLayout) {
+      return failure();
+    }
+
+    VectorValue vector = broadcastOp.getVector();
+    NestedLayoutAttr vectorLayout =
+        dyn_cast<NestedLayoutAttr>(signature[vector]);
+    if (!vectorLayout) {
+      return failure();
+    }
+
+    SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
+    Type elementType =
+        llvm::cast<ShapedType>(vector.getType()).getElementType();
+    auto vectorType = VectorType::get(distShape, elementType);
+    Location loc = broadcastOp.getLoc();
+    Value accumulator = rewriter.create<arith::ConstantOp>(
+        loc, vectorType, rewriter.getZeroAttr(vectorType));
+
+    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t sourceRank = sourceLayout.getBatchOrder().size();
+    // We unroll along the outer dimensions as well for a similar reason to the
+    // transfer ops. `vector.broadcast` can only broadcast along outer dims, so
+    // mixing broadcasted and un-broadcasted element/outer dims can't be
+    // represented with a broadcast.
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
+    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
+
+    Value distributedSource = getDistributed(rewriter, source, sourceLayout);
+
+    VectorType tileType =
+        VectorType::get(applyPermutation(vectorLayout.getElementsPerThread(),
+                                         vectorLayout.getElementOrder()),
+                        elementType);
+    for (SmallVector<int64_t> offsets :
+         StaticTileOffsetRange(distShape, tileShape, loopOrder)) {
+      ArrayRef<int64_t> offsetsRef(offsets);
+      // Invert the permutations on the batch/outer offsets to get the offsets
+      // in the order of the vector dimensions.
+      SmallVector<int64_t> permutedBatchOffsets = applyPermutation(
+          offsetsRef.slice(0, rank),
+          invertPermutationVector(vectorLayout.getBatchOrder()));
+      SmallVector<int64_t> permutedOuterOffsets = applyPermutation(
+          offsetsRef.slice(rank, rank),
+          invertPermutationVector(vectorLayout.getOuterOrder()));
+
+      // Slice out the last |sourceRank| dimensions which is the inner
+      // broadcasted shape.
+      ArrayRef<int64_t> batchSourceOffsets =
+          ArrayRef<int64_t>(permutedBatchOffsets)
+              .slice(rank - sourceRank, sourceRank);
+      ArrayRef<int64_t> outerSourceOffsets =
+          ArrayRef<int64_t>(permutedOuterOffsets)
+              .slice(rank - sourceRank, sourceRank);
+
+      // Construct the list of source offsets based on the batch order of the
+      // broadcasted vector.
+      SmallVector<int64_t> sourceOffsets;
+      sourceOffsets.append(
+          applyPermutation(batchSourceOffsets, sourceLayout.getBatchOrder()));
+      sourceOffsets.append(
+          applyPermutation(outerSourceOffsets, sourceLayout.getOuterOrder()));
+
+      // Extract a slice of the input to be broadcasted.
+      Value slice = rewriter.create<vector::ExtractOp>(loc, distributedSource,
+                                                       sourceOffsets);
+      // TODO: Support non-trivial element orders.
+      if (vector::isBroadcastableTo(slice.getType(), tileType) !=
+          vector::BroadcastableToResult::Success) {
+        return failure();
+      }
+      Value broadcastedSlice =
+          rewriter.create<vector::BroadcastOp>(loc, tileType, slice);
+      // Insert into the broadcasted destination vector.
+      accumulator = rewriter.create<vector::InsertOp>(
+          loc, broadcastedSlice, accumulator, offsetsRef.take_front(rank * 2));
+    }
+
+    replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
@@ -325,6 +425,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
   patterns.add<DistributeTransferReadNestedLayoutAttr,
                DistributeTransferWriteNestedLayoutAttr>(patterns.getContext(),
                                                         threadId);
+  patterns.add<DistributeBroadcastNestedLayoutAttr>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
