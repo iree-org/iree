@@ -768,6 +768,11 @@ void registerCodegenLLVMCPUPasses() {
         buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
       });
 
+  static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
+      "iree-codegen-llvmcpu-bufferization-pipeline",
+      "Runs the bufferization pipeline for CPU",
+      [](OpPassManager &passManager) { addCPUBufferizePasses(passManager); });
+
   static PassPipelineRegistration<> LLVMCPUVectorLoweringPipeline(
       "iree-codegen-llvmcpu-vector-lowering-pipeline",
       "Runs the translation strategy configuration pipeline on Linalg for CPU",
