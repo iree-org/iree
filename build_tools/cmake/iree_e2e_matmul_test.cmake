@@ -28,6 +28,9 @@ include(CMakeParseArguments)
 #   TEST_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
+#   TEST_DEFINED: Whether to define a test target.
+#   TEST_DISABLED: The test target will be skipped and its status will be
+#       'Not Run'.
 function(iree_e2e_matmul_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -41,7 +44,7 @@ function(iree_e2e_matmul_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER"
+    "NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -97,23 +100,27 @@ function(iree_e2e_matmul_test)
 
   add_dependencies(iree-test-deps "${_NAME}")
 
-  iree_native_test(
-    NAME
-      "${_RULE_NAME}"
-    DRIVER
-      "${_RULE_DRIVER}"
-    SRC
-      "${_RULE_TEST_RUNNER}"
-    DATA
-      ${_MATMULS_VMFB}
-      ${_CALLS_VMFB}
-    ARGS
-      "--module={{${_MATMULS_VMFB}}}"
-      "--module={{${_CALLS_VMFB}}}"
-      ${_RULE_RUNNER_ARGS}
-    LABELS
-      ${_RULE_LABELS}
-  )
+  if(_RULE_TEST_DEFINED)
+    iree_native_test(
+      NAME
+        "${_RULE_NAME}"
+      DRIVER
+        "${_RULE_DRIVER}"
+      SRC
+        "${_RULE_TEST_RUNNER}"
+      DATA
+        ${_MATMULS_VMFB}
+        ${_CALLS_VMFB}
+      ARGS
+        "--module={{${_MATMULS_VMFB}}}"
+        "--module={{${_CALLS_VMFB}}}"
+        ${_RULE_RUNNER_ARGS}
+      LABELS
+        ${_RULE_LABELS}
+      DISABLED
+        ${_RULE_TEST_DISABLED}
+    )
+  endif()
 endfunction()
 
 # iree_single_backend_e2e_matmul_test()
@@ -157,37 +164,80 @@ function(iree_single_backend_e2e_matmul_test)
     ${ARGN}
   )
 
-  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
-  if(_EXCLUDED_BY_LABELS)
-    return()
+  # ---------------------------------------------------------------------------
+  # Bytecode module builds require
+  #   1. the compiler, either in the same build or provided in IREE_HOST_BIN_DIR
+  #   2. compiler support for _RULE_INPUT_TYPE
+  #   3. compiler support for _RULE_TARGET_BACKEND
+  set(_BYTECODE_MODULE_BUILD_ENABLED TRUE)
+
+  # 1. Check for the compiler.
+  if(NOT IREE_BUILD_COMPILER AND NOT IREE_HOST_BIN_DIR)
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
   endif()
 
-  # Omit tests for which the specified driver or target backend is not enabled.
-  # This overlaps with directory exclusions and other filtering mechanisms.
-  string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
-  endif()
-  string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
-  string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
-  if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
-    message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
-  endif()
-  if(IREE_HOST_BIN_DIR)
-    # If we're not building the host tools from source under this configuration,
-    # such as when cross compiling, then we can't easily check for which
-    # compiler target backends are enabled. Just assume all are enabled and only
-    # rely on the runtime HAL driver check above for filtering.
-  else()
-    # We are building the host tools, so check enabled compiler target backends.
+  # 2. Check target backend availability.
+  # Note: we can only reliably check for this when building the compiler host
+  # tools from source. If the tools are already built, we assume that all target
+  # backends are enabled. We could query the tools in the binary directory for
+  # support dynamically if optionality would be useful.
+  if(NOT IREE_HOST_BIN_DIR)
+    string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
+    string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
+    # TODO(scotttodd): allow plugins to provide external backends here
+    if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
+      message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
+    endif()
     if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
-      return()
+      set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
     endif()
   endif()
+  # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # Tests are defined if _RULE_DRIVER is defined.
+  set(_TEST_DEFINED TRUE)
+  if(NOT DEFINED _RULE_DRIVER)
+    set(_TEST_DEFINED FALSE)
+  endif()
+
+  # Test execution requires
+  #   1. the bytecode module build to be enabled
+  #   2. _RULE_DRIVER is defined and runtime support is enabled
+  #   3. no other label exclusions (e.g. 'optonly' test with 'debug' config)
+  set(_TEST_DISABLED FALSE)
+
+  # 1. Check bytecode module build.
+  if(NOT _BYTECODE_MODULE_BUILD_ENABLED)
+    set(_TEST_DISABLED TRUE)
+  endif()
+
+  # 2. Check driver availability.
+  if(DEFINED _RULE_DRIVER)
+    string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
+    string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
+    string(TOUPPER "${IREE_EXTERNAL_HAL_DRIVERS}" _UPPERCASE_EXTERNAL_DRIVERS)
+    string(REPLACE "-" "_" _NORMALIZED_EXTERNAL_DRIVERS "${_UPPERCASE_EXTERNAL_DRIVERS}")
+    if((NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND
+       (NOT ${_NORMALIZED_DRIVER} IN_LIST _NORMALIZED_EXTERNAL_DRIVERS))
+      message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_*/IREE_EXTERNAL_HAL_DRIVERS options.")
+    endif()
+    if((NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER}) AND
+       (NOT IREE_EXTERNAL_${_NORMALIZED_DRIVER}_HAL_DRIVER_FOUND))
+      set(_TEST_DISABLED TRUE)
+    endif()
+  endif()
+
+  # 3. Check label exclusions.
+  iree_is_bytecode_module_test_excluded_by_labels(_EXCLUDED_BY_LABELS "${_RULE_LABELS}")
+  if(_EXCLUDED_BY_LABELS)
+    set(_TEST_DISABLED TRUE)
+  endif()
+
+  if((_TEST_DISABLED OR NOT _TEST_DEFINED) AND NOT IREE_BUILD_ALL_CHECK_TEST_MODULES)
+    set(_BYTECODE_MODULE_BUILD_ENABLED FALSE)
+  endif()
+  # ---------------------------------------------------------------------------
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -201,6 +251,10 @@ function(iree_single_backend_e2e_matmul_test)
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_calls_mlir=${_CALLS_SRC}")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
+
+  if(NOT _BYTECODE_MODULE_BUILD_ENABLED)
+    return()
   endif()
 
   add_custom_command(
@@ -248,6 +302,10 @@ function(iree_single_backend_e2e_matmul_test)
       ${_RULE_LABELS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
+    TEST_DEFINED
+      ${_TEST_DEFINED}
+    TEST_DISABLED
+      ${_TEST_DISABLED}
   )
 
   # Note we are relying on the fact that the target created by
