@@ -93,6 +93,11 @@ def LLVMGPUVectorDistribute :
     InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute vectorized functions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorDistribute()";
+  let options = [
+    Option<"testLayout", "test-layout", "bool", /*default=*/"false",
+           "Annotate vector ops with deduced layouts without real conversion "
+           "for testing purposes">
+  ];
 }
 
 def LLVMGPUVectorLowering :

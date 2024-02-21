@@ -19,6 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -55,9 +56,10 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId)
-      : VectorLayoutOptions(root), workgroupSize(workgroupSize),
-        schedule(schedule), patterns(root->getContext()) {
+                                 Value laneId, bool printLayout)
+      : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
+        workgroupSize(workgroupSize), schedule(schedule),
+        printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
     populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
@@ -89,7 +91,7 @@ private:
     assert(schedule && "incompatible contraction op");
 
     auto layouts = schedule.getContractionLayout(contract);
-    assert(layouts && "mma layout type must not be opaque");
+    assert(layouts && "cannot get concrete layout for contraction");
 
     auto [aLayout, bLayout, cLayout] = *layouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
@@ -97,6 +99,11 @@ private:
     analysis.setAnchor(contract.getAcc(), cLayout);
     analysis.setAnchor(contract.getResult(), cLayout);
     contract->setAttr("iree.amdgpu.mfma", schedule.getIntrinsic());
+    if (printLayout) {
+      llvm::outs() << "contract A vector layout: " << aLayout << "\n";
+      llvm::outs() << "contract B vector layout: " << bLayout << "\n";
+      llvm::outs() << "contract C vector layout: " << cLayout << "\n";
+    }
     LLVM_DEBUG({
       llvm::dbgs() << "chosen a layout: " << aLayout << "\n";
       llvm::dbgs() << "chosen b layout: " << bLayout << "\n";
@@ -280,10 +287,16 @@ private:
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
         threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
     analysis.setAnchor(transfer.getResult(), layout);
+    if (printLayout) {
+      llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
+                   << "\n";
+    }
   }
 
   SmallVector<int64_t, 3> workgroupSize;
   IREE::GPU::MMAScheduleAttr schedule;
+  // Whether to print the chosen layout for testing purposes
+  bool printLayout;
 
   bool populatedMfma = false;
   RewritePatternSet patterns;
@@ -377,7 +390,7 @@ public:
                                                     laneId, threadGrid);
 
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           laneVal);
+                                           laneVal, testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();
