@@ -1,6 +1,10 @@
 // RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
 
+// TODO: This test is still using the legacy LLVMGPU kernel config. This needs
+// to be migrated to the rocdl heuristics, but for now is just physically
+// located here.
+
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
