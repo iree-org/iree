@@ -18,6 +18,19 @@ def ConvertConv2DToImg2Col :
   ];
 }
 
+def ConvertConvToChannelsLast :
+    Pass<"iree-preprocessing-convert-conv-to-channels-last", ""> {
+  let summary = "Convert linalg convolutions to channels last.";
+  let constructor =
+      "mlir::iree_compiler::Preprocessing::createConvertConvToChannelsLastPass()";
+  let options = [
+    Option<"tileSize", "tile-size", "int",
+           /*default=*/"0",
+           "Tiling factor for the channel dimension of NCHW-like convolutions. "
+           "Defaults to fully transposing all channel-like dimensions">,
+  ];
+}
+
 def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
   let summary = "transform dialect interpreter";
   let description = [{
