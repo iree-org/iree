@@ -74,13 +74,8 @@ void createTorchToIREEPipeline(
 
   // Finish the type conversion from `torch` types to the types of the
   // linalg-on-tensors backend contract.
-  //   pm.addPass(torch::TorchConversion::createFuncBackendTypeConversionPass());
-  //   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<IREE::Util::FuncOp>(
       torch::TorchConversion::createFinalizingBackendTypeConversionPass());
-
-  // TODO: Add validation pass.
-  // pm.addPass(createSymbolDCEPass());
 }
 
 void registerTMTensorConversionPasses() {
