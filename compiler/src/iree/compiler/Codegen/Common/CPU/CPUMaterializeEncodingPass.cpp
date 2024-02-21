@@ -124,7 +124,7 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
           TileMxNxK{1, 8, 8}, // Truncation of the above.
       };
     }
-    if (hasUkernel(target) && hasFeature(target, "+dotprod")) {
+    if (hasFeature(target, "+dotprod")) {
       return {
           TileMxNxK{8, 8, 4}, // Aim to use SDOT.
           TileMxNxK{4, 8, 4}, // Truncation of the above.
