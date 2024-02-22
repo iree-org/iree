@@ -717,7 +717,7 @@ Value BufferSubspanOp::getResultSize(unsigned idx) { return getLength(); }
 
 void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "len");
+  setNameFn(getResult(), "length");
 }
 
 //===----------------------------------------------------------------------===//
@@ -1597,6 +1597,7 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), StringRef("exe"));
 }
 
@@ -1606,7 +1607,18 @@ void ExecutableCreateOp::getAsmResultNames(
 
 void ExecutableLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), "exe");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.export.ordinal
+//===----------------------------------------------------------------------===//
+
+void ExecutableExportOrdinalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
+  setNameFn(getResult(), "ordinal");
 }
 
 //===----------------------------------------------------------------------===//

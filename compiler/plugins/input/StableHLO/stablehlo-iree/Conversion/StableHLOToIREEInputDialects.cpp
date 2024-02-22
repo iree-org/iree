@@ -536,7 +536,8 @@ struct ConvertStableHloToIreeInputDialects final
         GenericTypeConvert<tensor::FromElementsOp>,
         GenericTypeConvert<tensor::CollapseShapeOp>,
         GenericTypeConvert<tensor::ExpandShapeOp>,
-        GenericTypeConvert<arith::IndexCastUIOp>>(*typeConverter, context);
+        GenericTypeConvert<arith::IndexCastUIOp>,
+        GenericTypeConvert<arith::SelectOp>>(*typeConverter, context);
 
     ConversionTarget target(*context);
     auto isIllegalType = [&](Type t) { return !typeConverter->isLegal(t); };

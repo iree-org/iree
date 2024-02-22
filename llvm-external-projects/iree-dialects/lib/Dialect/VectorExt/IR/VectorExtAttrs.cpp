@@ -13,6 +13,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -292,9 +293,17 @@ LogicalResult NestedLayoutAttr::verify(
 SmallVector<Value>
 NestedLayoutAttr::computeThreadIds(Value threadId,
                                    RewriterBase &rewriter) const {
-  auto basisSizes = llvm::concat<const int64_t>(
-      applyPermutation(getSubgroupBasis(), getSubgroupOrder()),
-      applyPermutation(getThreadBasis(), getThreadOrder()));
+  // The subgroup/thread bases tell us the ranges of the corresponding id from
+  // slowest varying to fastest varying. Thus to get the correct basis ids, we
+  // simply concatenate the sizes and delinearize the single thread id to those
+  // sizes. For example:
+  //
+  // subgroup_basis = [3, 5]
+  // thread_basis = [7, 9]
+  //
+  // subgroup_id(Y, X), thread_id(Y, X) = affine.delinearize_index(3, 5, 7, 9)
+  auto basisSizes =
+      llvm::concat<const int64_t>(getSubgroupBasis(), getThreadBasis());
 
   SmallVector<OpFoldResult> basisIndexAttr;
   for (int64_t basisIndex : basisSizes) {
@@ -307,11 +316,17 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
               threadId.getLoc(), threadId, basisIndexAttr)
           .getResults();
 
-  // Modulo the delinearized index by the actual tile sizes.
+  // The subgroups_per_workgroup and threads_per_outer fields represent the
+  // number of subgroups/threads along each vector dimension. To get the sizes
+  // in the order of slowest varying to fastest varying (to match with the ids
+  // delinearized based on the basis), we need to apply the subgroup/thread
+  // permutation orders.
   auto tileSizes = llvm::concat<const int64_t>(
       applyPermutation(getSubgroupsPerWorkgroup(), getSubgroupOrder()),
       applyPermutation(getThreadsPerOuter(), getThreadOrder()));
 
+  // Modulo the delinearized subgroup/thread ids by the number of unique
+  // elements distributed to those ids.
   for (auto [delinearized, basis, tile] :
        llvm::zip(delinearized, basisSizes, tileSizes)) {
     if (basis == tile) {
@@ -325,6 +340,63 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   }
 
   return delinearized;
+}
+
+//===----------------------------------------------------------------------===//
+// Custom Parsers/Printers
+//===----------------------------------------------------------------------===//
+
+// Custom parser/printer to construct the permutation based on the rank of the
+// sizes corresponding to this order.
+static ParseResult parsePermutation(AsmParser &parser, StringRef baseName,
+                                    ArrayRef<int64_t> sizes, bool parseComma,
+                                    SmallVector<int64_t> &permutation) {
+  if (failed(parser.parseOptionalKeyword(baseName))) {
+    permutation = llvm::to_vector(llvm::seq<int64_t>(0, sizes.size()));
+    return success();
+  }
+  if (failed(parser.parseEqual())) {
+    return failure();
+  }
+  if (parser.parseLSquare()) {
+    return failure();
+  }
+  auto arrayParser = FieldParser<SmallVector<int64_t>>::parse(parser);
+  if (failed(arrayParser)) {
+    parser.emitError(parser.getCurrentLocation(),
+                     "failed to parse permutation parameter '")
+        << baseName << "' which is to be a `::llvm::ArrayRef<int64_t>`";
+  }
+  if (parser.parseRSquare()) {
+    return failure();
+  }
+  if (parseComma) {
+    if (parser.parseComma()) {
+      return failure();
+    }
+  }
+  permutation = *arrayParser;
+  return success();
+}
+
+static void printPermutation(AsmPrinter &p, StringRef baseName,
+                             ArrayRef<int64_t> sizes, bool printComma,
+                             ArrayRef<int64_t> permutation) {
+  if (isIdentityPermutation(permutation)) {
+    return;
+  }
+  p << baseName;
+  // This is called without whitespace inserted by default for optionality.
+  // Insert it explicitly instead.
+  p << ' ';
+  p << '=';
+  p << ' ';
+  p << '[';
+  llvm::interleaveComma(permutation, p);
+  p << ']';
+  if (printComma) {
+    p << ',' << ' ';
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

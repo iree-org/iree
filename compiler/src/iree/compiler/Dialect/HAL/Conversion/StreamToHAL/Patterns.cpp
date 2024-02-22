@@ -671,6 +671,12 @@ struct CmdDispatchOpPattern
     auto loc = dispatchOp.getLoc();
     auto commandBuffer = mapping->lookupCommandBufferFor(dispatchOp);
 
+    // TODO(multi-device): reusable command buffers done at the stream level may
+    // make this difficult. For now we assume each stream region being lowered
+    // has a singular affinity that may itself reference multiple devices in the
+    // future but currently uniquely identifies a device.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(dispatchOp);
+
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
@@ -714,14 +720,19 @@ struct CmdDispatchOpPattern
       auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
-                       exportOp.getLayout(), caseBuilder);
+      recordParameters(loc, affinityAttr, device, commandBuffer, dispatchOp,
+                       adaptor, exportOp.getLayout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
           loc, device, adaptor.getWorkload(), caseBuilder);
-      caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-          loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
+      Value executable = caseBuilder.create<IREE::HAL::ExecutableLookupOp>(
+          loc, caseBuilder.getType<IREE::HAL::ExecutableType>(), device,
+          entryPointAttr.getRootReference().getValue());
+      Value ordinal = caseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+          loc, caseBuilder.getIndexType(), entryPointAttr);
+      caseBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
+          loc, commandBuffer, executable, ordinal, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
       caseBuilder.create<scf::YieldOp>(loc);
@@ -736,7 +747,8 @@ struct CmdDispatchOpPattern
     return success();
   }
 
-  void recordParameters(Location loc, Value device, Value commandBuffer,
+  void recordParameters(Location loc, IREE::Stream::AffinityAttr affinityAttr,
+                        Value device, Value commandBuffer,
                         IREE::Stream::CmdDispatchOp dispatchOp,
                         OpAdaptor adaptor,
                         IREE::HAL::PipelineLayoutAttr layoutAttr,

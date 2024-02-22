@@ -20,10 +20,15 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithDialect
+    MLIRLinalgTransforms
     MLIRPass
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::GlobalOptimization
     iree::compiler::Pipelines::Options
     iree::compiler::PluginAPI
     iree::compiler::Preprocessing::Common::Transforms
+    iree::compiler::Utils
   PUBLIC
 )
 

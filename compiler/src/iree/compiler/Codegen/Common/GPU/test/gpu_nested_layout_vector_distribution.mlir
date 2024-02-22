@@ -7,11 +7,7 @@
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -60,10 +56,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 8],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -112,11 +105,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -165,10 +154,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 8],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -213,11 +199,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -268,12 +250,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 8],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
-
   subgroup_basis          = [1, 1],
   thread_basis            = [4, 8]
 >
@@ -316,7 +292,6 @@ builtin.module attributes { transform.with_named_sequence } {
   batch_order             = [1, 2, 3, 0],
   outer_order             = [0, 3, 1, 2],
   thread_order            = [0, 1, 3, 2],
-  element_order           = [0, 1, 2, 3],
 
   subgroup_basis          = [7, 3, 1, 1],
   thread_basis            = [1, 1, 2, 2]
@@ -356,11 +331,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -406,10 +377,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 8],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -456,11 +424,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -514,11 +478,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [8, 1],
   elements_per_thread     = [1, 8],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [8, 1]
@@ -569,14 +529,10 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [4, 2],
-  thread_basis            = [32, 2]
+  thread_basis            = [2, 32]
 >
 
 // B: shape = 8x64, layout = layoutB
@@ -587,10 +543,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [4, 2],
@@ -605,10 +557,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [4, 2],
@@ -676,3 +624,57 @@ builtin.module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2, 1],
+  batches_per_subgroup    = [1, 1],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [32, 2],
+  elements_per_thread     = [1, 4],
+
+  subgroup_order          = [1, 0],
+  batch_order             = [1, 0],
+  outer_order             = [1, 0],
+  thread_order            = [1, 0],
+  element_order           = [0, 1],
+
+  subgroup_basis          = [4, 2],
+  thread_basis            = [2, 32]
+>
+
+func.func @transposed_read_64x8(%mem: memref<8x64xf16>)
+                -> (vector<64x8xf16>) {
+
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+
+  %read = vector.transfer_read %mem[%c0, %c0], %cst
+          {in_bounds = [true, true], permutation_map = affine_map<(d0, d1) -> (d1, d0)>,
+           "__vector_layout_test_anchor_result_0" = #layout}
+  : memref<8x64xf16>, vector<64x8xf16>
+
+  return %read : vector<64x8xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 32 + s1)>
+// CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 * 4)>
+
+// CHECK-LABEL: @transposed_read_64x8
+
+// CHECK: %[[IDX:.+]] = gpu.thread_id  x
+// Delinearization basis comes directly from the
+// CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %[[IDX]] into (%c4, %c2, %c2, %c32) : index, index, index, index
+
+// CHECK-DAG: %[[M:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
+// CHECK-DAG: %[[N:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#2]
+// CHECK: transfer_read %{{.*}}[%[[N]], %[[M]]

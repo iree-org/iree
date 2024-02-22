@@ -19,6 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -55,9 +56,10 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId)
-      : VectorLayoutOptions(root), workgroupSize(workgroupSize),
-        schedule(schedule), patterns(root->getContext()) {
+                                 Value laneId, bool printLayout)
+      : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
+        workgroupSize(workgroupSize), schedule(schedule),
+        printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
     populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
@@ -89,7 +91,7 @@ private:
     assert(schedule && "incompatible contraction op");
 
     auto layouts = schedule.getContractionLayout(contract);
-    assert(layouts && "mma layout type must not be opaque");
+    assert(layouts && "cannot get concrete layout for contraction");
 
     auto [aLayout, bLayout, cLayout] = *layouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
@@ -97,6 +99,11 @@ private:
     analysis.setAnchor(contract.getAcc(), cLayout);
     analysis.setAnchor(contract.getResult(), cLayout);
     contract->setAttr("iree.amdgpu.mfma", schedule.getIntrinsic());
+    if (printLayout) {
+      llvm::outs() << "contract A vector layout: " << aLayout << "\n";
+      llvm::outs() << "contract B vector layout: " << bLayout << "\n";
+      llvm::outs() << "contract C vector layout: " << cLayout << "\n";
+    }
     LLVM_DEBUG({
       llvm::dbgs() << "chosen a layout: " << aLayout << "\n";
       llvm::dbgs() << "chosen b layout: " << bLayout << "\n";
@@ -280,10 +287,16 @@ private:
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
         threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
     analysis.setAnchor(transfer.getResult(), layout);
+    if (printLayout) {
+      llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
+                   << "\n";
+    }
   }
 
   SmallVector<int64_t, 3> workgroupSize;
   IREE::GPU::MMAScheduleAttr schedule;
+  // Whether to print the chosen layout for testing purposes
+  bool printLayout;
 
   bool populatedMfma = false;
   RewritePatternSet patterns;
@@ -302,28 +315,8 @@ public:
   void runOnOperation() override {
     auto func = getOperation();
 
-    std::optional<int64_t> maybeSubgroupSize = std::nullopt;
-    if (func->hasAttr("subgroup_size")) {
-      maybeSubgroupSize =
-          llvm::cast<IntegerAttr>(func->getAttr("subgroup_size")).getInt();
-    } else {
-      maybeSubgroupSize = getSubgroupSize(func);
-    }
-    if (!maybeSubgroupSize) {
-      func.emitError() << "subgroup size required for vector distribution";
-      return signalPassFailure();
-    }
-
-    OpBuilder builder(func);
-    builder.setInsertionPointToStart(&func.getFunctionBody().front());
-    SmallVector<OpFoldResult> threadGrid = {
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                              gpu::Dimension::z)};
-
     std::array<int64_t, 3> workgroupSize;
-    if (func->hasAttr("subgroup_size")) {
+    if (func->hasAttr("workgroup_size")) {
       auto tmpSizes =
           llvm::cast<ArrayAttr>(func->getAttr("workgroup_size")).getValue();
       for (auto [i, size] : llvm::enumerate(tmpSizes)) {
@@ -348,36 +341,20 @@ public:
     // Construct the expression for linearizing the thread indices.
     AffineExpr linearId =
         x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-    AffineExpr laneId = linearId % *maybeSubgroupSize;
 
-    // This all needs some kind of simplification; the arithmetic it produces
-    // doest not get folded away as nicely as it could.
-    AffineMap idMap = AffineMap::getMultiDimIdentityMap(2, func.getContext());
+    OpBuilder builder(func);
+    builder.setInsertionPointToStart(&func.getFunctionBody().front());
+    SmallVector<OpFoldResult> threadGrid = {
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                              gpu::Dimension::z)};
 
-    // Clamp the thread indices to the workgroup sizes.
-    OpFoldResult c0 =
-        builder.createOrFold<arith::ConstantIndexOp>(func.getLoc(), 0);
-    threadGrid[0] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[0], c0});
-    threadGrid[1] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[1], c0});
-    threadGrid[2] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[2], c0});
-
-    OpFoldResult dimX = builder.getIndexAttr(workgroupSize[0] - 1);
-    OpFoldResult dimY = builder.getIndexAttr(workgroupSize[1] - 1);
-    OpFoldResult dimZ = builder.getIndexAttr(workgroupSize[2] - 1);
-    threadGrid[0] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[0], dimX});
-    threadGrid[1] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[1], dimY});
-    threadGrid[2] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[2], dimZ});
-    Value laneVal = affine::makeComposedAffineApply(builder, func.getLoc(),
-                                                    laneId, threadGrid);
+    Value linearThreadIdVal = affine::makeComposedAffineApply(
+        builder, func.getLoc(), linearId, threadGrid);
 
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           laneVal);
+                                           linearThreadIdVal, testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();

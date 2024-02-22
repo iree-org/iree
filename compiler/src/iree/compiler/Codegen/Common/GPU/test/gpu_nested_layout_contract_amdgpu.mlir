@@ -14,11 +14,7 @@
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -32,10 +28,6 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -50,10 +42,6 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -118,11 +106,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [16, 4],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [16, 4]
@@ -136,10 +120,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 16],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -206,11 +186,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -224,10 +200,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -242,10 +214,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -311,11 +279,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -329,10 +293,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -347,10 +307,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -413,11 +369,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -431,10 +383,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -449,10 +397,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -520,11 +465,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -538,11 +479,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -556,10 +493,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
