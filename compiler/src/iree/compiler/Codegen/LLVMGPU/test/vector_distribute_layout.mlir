@@ -188,3 +188,40 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 // CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 
+// -----
+
+func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
+                                  %rhs: memref<32x16xf16>,
+                                  %bias: memref<16x16xf32>,
+                                  %out: memref<16x16xf32>)
+  attributes {
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
+    workgroup_size = [64, 1, 1]} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_f32 = arith.constant 0.000000e+00 : f32
+  %c32 = arith.constant 32 : index
+  %c256 = arith.constant 256 : index
+  %c0 = arith.constant 0 : index
+  %acc = vector.transfer_read %out[%c0, %c0], %cst_f32 {in_bounds = [true, true]} : memref<16x16xf32>, vector<16x16xf32>
+  %8 = vector.transfer_read %lhs[%c0, %c0], %cst {in_bounds = [true, true]} : memref<16x32xf16>, vector<16x32xf16>
+  %9 = vector.transfer_read %rhs[%c0, %c0], %cst {in_bounds = [true, true]} : memref<32x16xf16>, vector<32x16xf16>
+  %10 = vector.contract {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+    %8, %9, %acc : vector<16x32xf16>, vector<32x16xf16> into vector<16x16xf32>
+  %11 = vector.transfer_read %bias[%c0, %c0], %cst_f32 {in_bounds = [true, true]} : memref<16x16xf32>, vector<16x16xf32>
+  %12 = arith.addf %10, %11 : vector<16x16xf32>
+  vector.transfer_write %12, %out[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf32>, memref<16x16xf32>
+  return
+}
+
+// We don't really care what layout we assign here, just that the only anchor
+// we set is on the contraction.
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract A vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract B vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract C vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout
