@@ -227,7 +227,7 @@ func.func @pack_gemm_fill_dynamic(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf3
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_f32f32f32_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
@@ -344,7 +344,7 @@ func.func @matvec_lowering_f32f32f32_aarch64() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_f16f16f16_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
@@ -979,7 +979,7 @@ func.func @matmul_lowering_bf16bf16bf16_x86_64_avx512bf16() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_f32f16f16_aarch64() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
@@ -1148,12 +1148,12 @@ func.func @matmul_lowering_i8i8i32_aarch64() attributes {
 //   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
 //   CHECK-DAG:   %[[TILED_M:.+]] = affine.apply #[[$MAP0]]()[%[[M]]]
-//       CHECK:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[LHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x8x1xi8>>{%[[TILED_M]], %[[K]]}
-//       CHECK:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
-//       CHECK:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//   CHECK-DAG:   %[[TILED_N:.+]] = affine.apply #[[$MAP0]]()[%[[N]]]
+//   CHECK-DAG:   %[[RHS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //  CHECK-SAME:       !flow.dispatch.tensor<readonly:tensor<?x?x8x1xi8>>{%[[TILED_N]], %[[K]]}
-//       CHECK:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
+//   CHECK-DAG:   %[[OUTS_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //  CHECK-SAME:       !flow.dispatch.tensor<readwrite:tensor<?x?x8x8xi32>>{%[[TILED_M]], %[[TILED_N]]}
 //       CHECK:   %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_BINDING]]
 //  CHECK-SAME:       offsets = [0, 0, 0, 0], sizes = [%[[TILED_M]], %[[K]], 8, 1], strides = [1, 1, 1, 1]
@@ -1173,7 +1173,7 @@ func.func @matmul_lowering_i8i8i32_aarch64() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod", ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
@@ -1238,7 +1238,7 @@ func.func @matmul_lowering_i8i8i32_aarch64_dotprod() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_i8i8i32_aarch64_i8mm() attributes {
-  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod,+i8mm"}>
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="aarch64-xyz-xyz", cpu_features="+dotprod,+i8mm", ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
