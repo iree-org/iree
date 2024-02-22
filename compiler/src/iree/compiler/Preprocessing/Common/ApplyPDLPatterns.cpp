@@ -69,17 +69,11 @@ static FunctionType getExternalFunctionCallType(MLIRContext *context,
     return;
   };
 
-  for (auto inputType : inputTypes) {
-    convertInputTypeToCallArgTypes(inputType);
-  }
-
-  for (auto resultType : resultTypes) {
-    auto tensorType = resultType.cast<RankedTensorType>();
-    convertTensorTypeToCallArgTypes(tensorType);
-  }
-  for (auto type : otherOperandTypes) {
-    convertInputTypeToCallArgTypes(type);
-  }
+  llvm::for_each(inputTypes, convertInputTypeToCallArgTypes);
+  llvm::for_each(resultTypes, [&](Type t) {
+    convertTensorTypeToCallArgTypes(t.cast<RankedTensorType>());
+  });
+  llvm::for_each(otherOperandTypes, convertInputTypeToCallArgTypes);
 
   return FunctionType::get(context, externalCallArgTypes,
                            /*results=*/TypeRange{});
@@ -134,15 +128,11 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
     processTensorType(tensorType);
   };
 
-  for (auto type : inputTypes) {
-    processInputType(type);
-  }
-  for (auto type : resultTypes) {
-    processTensorType(type.cast<RankedTensorType>());
-  }
-  for (auto type : otherOperandTypes) {
-    processInputType(type);
-  }
+  llvm::for_each(inputTypes, processInputType);
+  llvm::for_each(resultTypes, [&](Type t) {
+    processTensorType(t.cast<RankedTensorType>());
+  });
+  llvm::for_each(otherOperandTypes, processInputType);
 
   int64_t numTensorOperands = (int64_t)entryPointInputTypes.size();
   int64_t numScalarOperands = (int64_t)entryPointScalarInputTypes.size();
@@ -185,15 +175,11 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
     marshalTensorTypes(type.cast<RankedTensorType>());
   };
 
-  for (auto type : inputTypes) {
-    marshalInputTypes(type);
-  }
-  for (auto type : resultTypes) {
-    marshalTensorTypes(type.cast<RankedTensorType>());
-  }
-  for (auto type : otherOperandTypes) {
-    marshalInputTypes(type);
-  }
+  llvm::for_each(inputTypes, marshalInputTypes);
+  llvm::for_each(resultTypes, [&](Type t) {
+    marshalTensorTypes(t.cast<RankedTensorType>());
+  });
+  llvm::for_each(otherOperandTypes, marshalInputTypes);
 
   rewriter.create<func::CallOp>(loc, externalFn, callOperands);
   rewriter.create<func::ReturnOp>(loc, /*operands=*/ValueRange{});
