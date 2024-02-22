@@ -15,7 +15,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "config_vector_distribute.mlir"
-    "lowering_scalar_dispatch.mlir"
     "pipeline_vector_distribute.mlir"
     "pipeline_warp_reduction.mlir"
   TOOLS

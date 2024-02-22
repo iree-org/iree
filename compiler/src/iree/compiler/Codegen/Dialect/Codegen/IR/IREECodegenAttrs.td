@@ -28,26 +28,24 @@ def CPU_DataTiling
 
 def LLVMGPU_Default
     : I32EnumAttrCase<"LLVMGPUDefault", 100>;
-def LLVMGPU_BaseLowering
-    : I32EnumAttrCase<"LLVMGPUBaseLowering", 101>;
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 102>;
+    : I32EnumAttrCase<"LLVMGPUDistribute", 101>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 103>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 102>;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 104>;
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 103>;
 def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 105>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 104>;
 def LLVMGPU_TransposeSharedMem
-    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 106>;
+    : I32EnumAttrCase<"LLVMGPUTransposeSharedMem", 105>;
 def LLVMGPU_WarpReduction
-    : I32EnumAttrCase<"LLVMGPUWarpReduction", 107>;
+    : I32EnumAttrCase<"LLVMGPUWarpReduction", 106>;
 def LLVMGPU_PackUnPack
-    : I32EnumAttrCase<"LLVMGPUPackUnPack", 108>;
+    : I32EnumAttrCase<"LLVMGPUPackUnPack", 107>;
 def LLVMGPU_MatmulTensorCoreMmaSync
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 109>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 108>;
 def LLVMGPU_VectorDistribute
-    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 110>;
+    : I32EnumAttrCase<"LLVMGPUVectorDistribute", 109>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -84,8 +82,8 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_DataTiling,
 
     // LLVMGPU CodeGen pipelines
-    LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
-    LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+    LLVMGPU_Default, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+    LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
     LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
 
