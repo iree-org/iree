@@ -347,8 +347,14 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
+  // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds);
+  if (!schedule) {
+    // Then try again by allowing upcasting accumulator.
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, /*canUpcastAcc=*/true);
+  }
   if (!schedule) {
     return failure();
   }

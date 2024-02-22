@@ -79,6 +79,11 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUCastAddressSpaceFunction();
 
+/// Perform type extension/truncation over vector.contract types to target GPU
+/// MMA intrinsics.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUCastTypeToFitMMAPass();
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUDistribute();
 
