@@ -66,14 +66,14 @@ bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
 
 // Project out the layout for the specified dimensions
 // resulting in the layout for a lower dimensional vector.
-VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> projectedDims) const {
-  assert(projectedDims.size() == getLayouts().size() &&
-         "projectedDims size must match layout size");
+VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
+  assert(droppedDims.size() == getLayouts().size() &&
+         "droppedDims size must match layout size");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-  assert(projectedDims.size() == layouts.size());
+  assert(droppedDims.size() == layouts.size());
   SmallVector<PerDimLayoutAttr> newLayouts;
-  for (auto pair : llvm::zip(projectedDims, layouts)) {
+  for (auto pair : llvm::zip(droppedDims, layouts)) {
     if (!std::get<0>(pair))
       newLayouts.push_back(std::get<1>(pair));
   }
@@ -224,9 +224,9 @@ bool LayoutAttr::hasLaneConflictWith(const LayoutAttr &other) {
 // associated with this layout and projects out those dimensions. This reduces
 // the rank of the layout in the process.
 VectorLayoutInterface
-NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
-  assert(projectedDims.size() == getBatchesPerSubgroup().size() &&
-         "projectedDims size must match layout rank");
+NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
+  assert(droppedDims.size() == getBatchesPerSubgroup().size() &&
+         "droppedDims size must match layout rank");
 
   // Projection for this layout simply means the sizes along the projected
   // are dropped.
@@ -239,7 +239,7 @@ NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
   // Map to track pre-projection -> post-projection indices. Used to update
   // the dimension orders.
   llvm::DenseMap<int64_t, int64_t> indexToRankReducedIndexMap;
-  for (auto [idx, isProjected] : llvm::enumerate(projectedDims)) {
+  for (auto [idx, isProjected] : llvm::enumerate(droppedDims)) {
     if (!isProjected) {
       subgroupCount.push_back(getSubgroupsPerWorkgroup()[idx]);
       batchCount.push_back(getBatchesPerSubgroup()[idx]);
@@ -273,10 +273,9 @@ NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
       getRankReducedPermutation(getElementOrder());
 
   // Compose the projected dims with the basis mask to get the new active
-  // ids. For example:
-  //
-  // (active ids indicates that we should use the ids marked as true)
-  // (projected dims drop the dims marked as true)
+  // ids. Active ids indicates that we should use the ids marked as true, and
+  // projected dims drop the dims marked as true. So to get the new mask, we
+  // turn off all of the currently `true` ids marked as projected. For example:
   //
   // subgroup_active_ids = [true,  true,  false, true]
   // projected_dims =      [false, true,         false]
@@ -293,8 +292,8 @@ NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
   };
   SmallVector<bool> subgroupMask(getSubgroupActiveIds());
   SmallVector<bool> threadMask(getThreadActiveIds());
-  composeMasks(subgroupMask, projectedDims);
-  composeMasks(threadMask, projectedDims);
+  composeMasks(subgroupMask, droppedDims);
+  composeMasks(threadMask, droppedDims);
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
                                batchCount, batchOrder, outerCount, outerOrder,
@@ -370,7 +369,7 @@ LogicalResult NestedLayoutAttr::verify(
       emitError() << "basis and active id mask must be the same length";
       return failure();
     }
-    if (llvm::count_if(mask, [](bool b) { return b; }) != rank) {
+    if (llvm::count(mask, true) != rank) {
       emitError()
           << "number of active basis ids must be equal to the layout rank";
     }
@@ -385,7 +384,11 @@ LogicalResult NestedLayoutAttr::verify(
 }
 
 /// Given a single flat thread ID, compute the indices of the distributed
-/// dimensions (subgroup and thread ids).
+/// dimensions (subgroup and thread ids). The only difference between subgroup
+/// and thread dimensions is the order in which they are "divided out" of the
+/// underlying vector (i.e. vector_shape /= subgroups -> batches -> orders ->
+/// threads -> elements). There is no requirement that a subgroup id only
+/// spans subgroups.
 SmallVector<Value>
 NestedLayoutAttr::computeThreadIds(Value threadId,
                                    RewriterBase &rewriter) const {
@@ -425,8 +428,73 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   auto activeIdFilter =
       llvm::concat<const bool>(getSubgroupActiveIds(), getThreadActiveIds());
 
-  // Modulo the delinearized subgroup/thread ids by the number of unique
-  // elements distributed to those ids.
+  // Modulo the active delinearized subgroup/thread ids by the number of unique
+  // elements distributed to those ids. The only difference between subgroup
+  // and thread dimensions is the order in which they are "divided out" of the
+  // underlying vector (i.e. vector_shape /= subgroups -> batches -> orders ->
+  // threads -> elements). There is no requirement that a subgroup id only
+  // spans subgroups.
+  //
+  // thread_basis = [8, 4, 2]
+  // active_thread_ids = [true, false, true]
+  // threads_per_outer = [4, 2]
+  //
+  // To obtain the thread ids, we just delinearize based on the basis.
+  //
+  // i0, i1, i2 = affine.delinearize_inds %threadId (8, 4, 2)
+  //
+  // And then to get the thread id for the layout, we only consider the active
+  // ids:
+  //
+  // layout_id0 = i0 % 4
+  // layout_id1 = i2 % 2
+  //
+  // The typical way this is used it to implicitly broadcast data across
+  // threads. For example, take a simpler case of the following:
+  //
+  // vector_shape = vector<2>
+  // thread_basis = [2, 2]
+  // active_thread_ids = [true, false]
+  // threads_per_outer = [2]
+  //
+  // If we give the two elements in the vector labels, say s0 and s1, we can
+  // see what this layout assigns as ids when doing a read of those two values
+  // across 4 threads.
+  //
+  // %id = gpu.flat_thread_id   // In range [0, 4)
+  // i0, i1 = affine.delinearize_index %id (2, 2)
+  // %id = 0, 1, 2, 3
+  // ----------------
+  // i0  = 0, 0, 1, 1
+  // i1  = 0, 1, 0, 1
+  //
+  // %0 = vector.load mem[i0]
+  //
+  // %id = 0, 1, 2, 3
+  // ----------------
+  // %0  = s0 s0 s1 s1
+  //
+  // If we instead had this layout:
+  //
+  // thread_basis = [4]
+  // active_thread_ids = [true]
+  // threads_per_outer = [2]
+  //
+  // With the modulus, we would get:
+  //
+  // %id = gpu.flat_thread_id   // In range [0, 4)
+  // i0 = %id = affine.delinearize_index %id (4)
+  // layout_i0 = i0 % 2
+  //
+  // %id        = 0, 1, 2, 3
+  // ----------------
+  // layout_i0  = 0, 1, 0, 1
+  //
+  // %0 = vector.load mem[layout_i0]
+  //
+  // %id = 0, 1, 2, 3
+  // ----------------
+  // %0  = s0 s1 s0 s1
   for (auto [delinearized, basis, isActive] :
        llvm::zip_equal(delinearized, basisSizes, activeIdFilter)) {
     if (!isActive) {
@@ -510,13 +578,8 @@ static ParseResult parseBasis(AsmParser &parser, StringRef basisName,
                               StringRef maskName, bool parseComma,
                               SmallVector<int64_t> &basis,
                               SmallVector<bool> &mask) {
-  if (failed(parser.parseKeyword(basisName))) {
-    return failure();
-  }
-  if (failed(parser.parseEqual())) {
-    return failure();
-  }
-  if (parser.parseLSquare()) {
+  if (failed(parser.parseKeyword(basisName)) || failed(parser.parseEqual()) ||
+      failed(parser.parseLSquare())) {
     return failure();
   }
   auto arrayParser = FieldParser<SmallVector<int64_t>>::parse(parser);
@@ -550,10 +613,7 @@ static ParseResult parseBasis(AsmParser &parser, StringRef basisName,
     return success();
   }
 
-  if (failed(parser.parseEqual())) {
-    return failure();
-  }
-  if (parser.parseLSquare()) {
+  if (failed(parser.parseEqual()) || failed(parser.parseLSquare())) {
     return failure();
   }
   auto maskParser = FieldParser<SmallVector<bool>>::parse(parser);
@@ -562,13 +622,9 @@ static ParseResult parseBasis(AsmParser &parser, StringRef basisName,
                      "failed to parse mask parameter '")
         << maskName << "' which is to be a `::llvm::ArrayRef<bool>`";
   }
-  if (parser.parseRSquare()) {
+  if (failed(parser.parseRSquare()) ||
+      (parseComma && failed(parser.parseComma()))) {
     return failure();
-  }
-  if (parseComma) {
-    if (failed(parser.parseComma())) {
-      return failure();
-    }
   }
   mask = *maskParser;
 
