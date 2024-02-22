@@ -44,20 +44,28 @@ pdl.pattern @mlp : benefit(1) {
   // %result = func.call @mlp_external(%lhs : tensor<...xf32>,
   //     %rhs : tensor<..xf32>, %M : i32, %N : i32, %K : i32) -> tensor<..xf32>
   // ```
-  %lhs = pdl.operand
-  %rhs = pdl.operand
-  %matmul_type = pdl.types
+  %lhs_type = pdl.type
+  %lhs = pdl.operand : %lhs_type
+  %rhs_type = pdl.type
+  %rhs = pdl.operand : %rhs_type
+  %matmul_type = pdl.type
   %min_int = pdl.attribute = 0 : i64
   %max_int = pdl.attribute
   %min_fp = pdl.attribute = 0.0 : f32
   %max_fp = pdl.attribute
   %matmul = pdl.operation "tosa.matmul"(%lhs, %rhs : !pdl.value, !pdl.value)
-      -> (%matmul_type : !pdl.range<type>)
+      -> (%matmul_type : !pdl.type)
+  %element_type = pdl.type : f32
+  pdl.apply_native_constraint "checkTensorElementType"(%lhs_type, %element_type : !pdl.type, !pdl.type)
+  pdl.apply_native_constraint "checkTensorElementType"(%rhs_type, %element_type : !pdl.type, !pdl.type)
+  pdl.apply_native_constraint "checkTensorElementType"(%matmul_type, %element_type : !pdl.type, !pdl.type)
+
   %matmul_result = pdl.result 0 of %matmul
+  %relu_type = pdl.type
   %relu = pdl.operation "tosa.clamp"(%matmul_result : !pdl.value) {
       "min_int" = %min_int, "max_int" = %max_int,
       "min_fp" = %min_fp, "max_fp" = %max_fp}
-      -> (%matmul_type : !pdl.range<type>)
+      -> (%relu_type : !pdl.type)
   
   pdl.rewrite %matmul {
     // The pattern above matched `%result`, `%lhs`, `%rhs` needed for the

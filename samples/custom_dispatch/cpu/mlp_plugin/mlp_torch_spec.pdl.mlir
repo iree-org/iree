@@ -46,13 +46,13 @@ pdl.pattern @mlp : benefit(1) {
   // ```
   %lhs = pdl.operand
   %rhs = pdl.operand
-  %lhs_type = pdl.type
-  %rhs_type = pdl.type
+  %lhs_type = pdl.type : !torch.vtensor<[?,?],f32>
+  %rhs_type = pdl.type : !torch.vtensor<[?,?],f32>
   %lhs_torch = pdl.operation "torch_c.from_builtin_tensor"(%lhs : !pdl.value) -> (%lhs_type : !pdl.type)
   %lhs_val = pdl.result 0 of %lhs_torch
   %rhs_torch = pdl.operation "torch_c.from_builtin_tensor"(%rhs : !pdl.value) -> (%rhs_type : !pdl.type)
   %rhs_val = pdl.result 0 of %rhs_torch
-  %matmul_type = pdl.type
+  %matmul_type = pdl.type : !torch.vtensor<[?,?],f32>
   %matmul = pdl.operation "torch.aten.mm"(%lhs_val, %rhs_val : !pdl.value, !pdl.value) -> (%matmul_type : !pdl.type)
   %matmul_result = pdl.result 0 of %matmul
   %relu = pdl.operation "torch.aten.relu"(%matmul_result : !pdl.value) -> (%matmul_type : !pdl.type)

@@ -71,13 +71,14 @@ static int mlp_external(void* params_ptr, void* context, void* reserved) {
     for (int32_t j = 0; j < params->N; j++) {
       float curr_result = 0.0;
       for (int32_t k = 0; k < params->K; k++) {
-        size_t lhs_index = get_index(i, k, params->lhs_offset, (size_t)params->K);
-        size_t rhs_index = get_index(k, j, params->rhs_offset, (size_t)params->N);
+        size_t lhs_index =
+            get_index(i, k, params->lhs_offset, (size_t)params->K);
+        size_t rhs_index =
+            get_index(k, j, params->rhs_offset, (size_t)params->N);
         curr_result += params->lhs[lhs_index] * params->rhs[rhs_index];
       }
       curr_result = curr_result < 0.0 ? 0.0 : curr_result;
-      size_t result_index =
-          get_index(i, j, params->result_offset, params->N);
+      size_t result_index = get_index(i, j, params->result_offset, params->N);
       params->result[result_index] = curr_result;
     }
   }

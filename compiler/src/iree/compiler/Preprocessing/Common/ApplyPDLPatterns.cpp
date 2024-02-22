@@ -341,6 +341,14 @@ static LogicalResult checkOperandAndResultTypes(Operation *rootOp,
   return success();
 }
 
+// Constraint function to check that a tensor has a given element type
+static LogicalResult checkTensorElementType(PatternRewriter &rewriter,
+                                            Type operandType,
+                                            Type elementType) {
+  auto tensorType = operandType.dyn_cast<RankedTensorType>();
+  return success(tensorType && tensorType.getElementType() == elementType);
+}
+
 // Rewrite function to rewrite a matched DAG into a flow.dispatch. Conceptually,
 // the matched DAG at the tensor level gets replaced by a function
 //
@@ -448,6 +456,8 @@ populatePDLModuleFromFileName(MLIRContext *context, RewritePatternSet &patterns,
       OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, context));
   pdlModule.registerRewriteFunction("rewriteAsFlowDispatch",
                                     rewriteAsFlowDispatch);
+  pdlModule.registerConstraintFunction("checkTensorElementType",
+                                       checkTensorElementType);
   patterns.insert(std::move(pdlModule));
   return success();
 }

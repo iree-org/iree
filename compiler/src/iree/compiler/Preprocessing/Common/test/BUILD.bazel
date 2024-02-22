@@ -28,6 +28,8 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "external_function_spec.mlir",
+            "torch.pdl.mlir",
+            "tosa.pdl.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
