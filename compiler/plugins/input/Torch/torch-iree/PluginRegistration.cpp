@@ -65,8 +65,6 @@ struct TorchSession
       TorchInput::TorchToIREELoweringPipelineOptions torchOptions;
       torchOptions.strictSymbolicShapes = options.strictSymbolicShapes;
       TorchInput::createTorchToIREEPipeline(passManager, torchOptions);
-      passManager.addNestedPass<func::FuncOp>(
-          TorchInput::createConvertTMTensorToLinalgExtPass());
       return true;
     }
 

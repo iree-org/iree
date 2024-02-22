@@ -474,10 +474,18 @@ LogicalResult TensorImportOp::verify() {
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
                            TypeAttr sourceEncoding, StringAttr name) {
+  build(builder, result, resultType, source, sourceEncoding,
+        /*targetStorage=*/nullptr, name);
+}
+
+void TensorExportOp::build(OpBuilder &builder, OperationState &result,
+                           Type resultType, Value source,
+                           TypeAttr sourceEncoding, Value targetStorage,
+                           StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   build(builder, result, resultType, source, sourceEncoding, dynamicDims,
-        /*target_storage=*/nullptr, name);
+        targetStorage, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {

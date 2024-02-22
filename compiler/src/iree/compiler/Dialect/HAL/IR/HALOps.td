@@ -221,6 +221,13 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
       "TypeAttr":$sourceEncoding,
       "StringAttr":$name
     )>,
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "TypeAttr":$sourceEncoding,
+      "Value":$targetStorage,
+      "StringAttr":$name
+    )>,
   ];
 
   let extraClassDeclaration = [{
