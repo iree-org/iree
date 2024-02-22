@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -435,10 +436,11 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     applyPermutationToVector(elementOrder, permute);
   }
 
-  return NestedLayoutAttr::get(context, subgroupCount, subgroupOrder,
-                               batchCount, batchOrder, outerCount, outerOrder,
-                               threadCount, threadOrder, elementCount,
-                               elementOrder, subgroupBasis, threadBasis);
+  return NestedLayoutAttr::get(
+      context, subgroupCount, subgroupOrder, batchCount, batchOrder, outerCount,
+      outerOrder, threadCount, threadOrder, elementCount, elementOrder,
+      subgroupBasis, SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
+      SmallVector<bool>(threadBasis.size(), true));
 }
 
 std::optional<std::tuple<VectorExt::VectorLayoutInterface,
