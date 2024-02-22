@@ -29,7 +29,6 @@ iree_cc_library(
   SRCS
     "ConvertConv2DToWinograd.cpp"
     "ConvertToLoops.cpp"
-    "ForeachThreadToAsync.cpp"
     "PadContractionToBlockSize.cpp"
     "PassDetail.h"
     "Passes.cpp"
@@ -44,7 +43,6 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRArithDialect
     MLIRArithUtils
-    MLIRAsyncDialect
     MLIRBufferizationDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
@@ -68,8 +66,6 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
-    MLIRVectorDialect
-    MLIRVectorTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC

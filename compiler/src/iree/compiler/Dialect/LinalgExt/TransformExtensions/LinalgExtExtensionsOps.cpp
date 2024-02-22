@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -24,26 +23,6 @@ LinalgExt::LinalgExtTransformOpsExtension::LinalgExtTransformOpsExtension() {
 }
 
 void LinalgExt::LinalgExtTransformOpsExtension::init() {
-  declareGeneratedDialect<async::AsyncDialect>();
-}
-
-//===---------------------------------------------------------------------===//
-// Utility functions
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure LinalgExt::RewriteForallToAsyncOp::applyToOne(
-    transform::TransformRewriter &rewriter, scf::ForallOp target,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  LinalgExt::ForallOpToAsyncRewriter pattern(this->getContext());
-  SimplePatternRewriter patternRewriter(target);
-  FailureOr<Operation *> result =
-      pattern.returningMatchAndRewrite(target, patternRewriter);
-  if (failed(result)) {
-    return emitDefaultDefiniteFailure(target);
-  }
-  results.push_back(*result);
-  return DiagnosedSilenceableFailure::success();
 }
 
 //===---------------------------------------------------------------------===//
