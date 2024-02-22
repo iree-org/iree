@@ -351,12 +351,12 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/reference/mlir-dialects/IREELinalgExt/</loc>
+         <loc>https://iree.dev/reference/mlir-dialects/IREEVectorExt/</loc>
          <lastmod>2024-02-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/reference/mlir-dialects/IREEVectorExt/</loc>
+         <loc>https://iree.dev/reference/mlir-dialects/LinalgExt/</loc>
          <lastmod>2024-02-22</lastmod>
          <changefreq>daily</changefreq>
     </url>
