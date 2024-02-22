@@ -14,7 +14,6 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/LogicalResult.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -300,8 +299,8 @@ NestedLayoutAttr::project(ArrayRef<bool> projectedDims) const {
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
                                batchCount, batchOrder, outerCount, outerOrder,
                                threadCount, threadOrder, elementCount,
-                               elementOrder, getSubgroupBasis(), projectedDims,
-                               getThreadBasis(), projectedDims);
+                               elementOrder, getSubgroupBasis(), subgroupMask,
+                               getThreadBasis(), threadMask);
 }
 
 VectorLayoutInterface
@@ -428,7 +427,6 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
 
   // Modulo the delinearized subgroup/thread ids by the number of unique
   // elements distributed to those ids.
-  int64_t tileIdx = 0;
   for (auto [delinearized, basis, isActive] :
        llvm::zip_equal(delinearized, basisSizes, activeIdFilter)) {
     if (!isActive) {
