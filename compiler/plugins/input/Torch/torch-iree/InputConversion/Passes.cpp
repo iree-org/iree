@@ -68,6 +68,11 @@ void createTorchToIREEPipeline(
   // The resolution of `dim` ops tends to create identical ops. CSE them.
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
+  // Regular function calls in torch have to be inlined presently. In the
+  // future, we would like to support async invocation, which will operate
+  // differently and would not be subject to inlining.
+  pm.addPass(mlir::createInlinerPass());
+
   pm.addPass(createFuncConversionPass());
   pm.addNestedPass<IREE::Util::FuncOp>(createCanonicalizerPass());
   pm.addPass(createSymbolDCEPass());

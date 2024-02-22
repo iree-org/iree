@@ -44,7 +44,7 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.vtensor<[5,4],f
 // -----
 // CHECK-LABEL: @return_immutable_arg
 // CHECK: util.func public @main$async
-// CHECK: hal.tensor.barrier join( : ) => %arg2
+// CHECK: hal.fence.signal<%arg2 : !hal.fence>
 // CHECK: util.return %arg0
 builtin.module @return_immutable_arg {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>  {
