@@ -32,7 +32,6 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
-/experimental/cpu_ukernel/ @bjacob
 /experimental/dispatch_profiler/ @manishucsd
 /experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
