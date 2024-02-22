@@ -86,7 +86,7 @@ func.func @do_not_tile_ukernel(%arg0: tensor<?x?x16x1xf32>, %arg1: tensor<?x?x16
     ins(%arg0, %arg1 : tensor<?x?x16x1xf32>, tensor<?x?x16x1xf32>)
     outs(%arg2 : tensor<?x?x16x16xf32>)
     (%dim, %dim_0, %dim_1, %c16_i32, %c16_i32, %c1_i32, %c1025_i32 : index, index, index, i32, i32, i32, i32)
-    fn_def_attrs {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"]}
+    fn_def_attrs {hal.import.bitcode = true, hal.import.fields = ["processor_data"]}
     strided_outer_dims(1) -> tensor<?x?x16x16xf32>
   return %0 : tensor<?x?x16x16xf32>
 }
