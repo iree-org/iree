@@ -290,6 +290,77 @@ function(iree_check_single_backend_test_suite)
   endforeach()
 endfunction()
 
+function(iree_check_cpu_test_suite)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;TARGET_BACKEND;DRIVER;INPUT_TYPE"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES;DEPENDS;TIMEOUT"
+    ${ARGN}
+  )
+
+  # TODO(scotttodd): could add `CONDITION` options to
+  #   iree_check_single_backend_test_suite that would allow for
+  #   tests being defined but marked DISABLED, rather than wrap these with
+  #   all-or-nothing CMake `if(...)` code...?
+
+  set(_BASE_LABELS ${_RULE_LABELS})
+  list(APPEND _BASE_LABELS "notsan")
+  iree_check_single_backend_test_suite(
+    NAME ${_RULE_NAME}
+    TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+    DRIVER ${_RULE_DRIVER}
+    INPUT_TYPE ${_RULE_INPUT_TYPE}
+    SRCS ${_RULE_SRCS}
+    COMPILER_FLAGS ${_RULE_COMPILER_FLAGS}
+    RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+    LABELS ${_BASE_LABELS}
+    TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+    DEPENDS ${_RULE_DEPENDS}
+    TIMEOUT ${_RULE_TIMEOUT}
+  )
+
+  if(IREE_ENABLE_ASAN)
+    set(_ASAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
+    list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
+    list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=address")
+    set(_ASAN_LABELS ${_RULE_LABELS})
+    list(APPEND _ASAN_LABELS "notsan")
+    iree_check_single_backend_test_suite(
+      NAME "${_RULE_NAME}_asan"
+      TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+      DRIVER ${_RULE_DRIVER}
+      INPUT_TYPE ${_RULE_INPUT_TYPE}
+      SRCS ${_RULE_SRCS}
+      COMPILER_FLAGS ${_ASAN_COMPILER_FLAGS}
+      RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+      LABELS ${_ASAN_LABELS}
+      TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+      DEPENDS ${_RULE_DEPENDS}
+      TIMEOUT ${_RULE_TIMEOUT}
+    )
+  endif()
+
+  if(IREE_ENABLE_TSAN)
+    set(_TSAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
+    list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
+    list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=thread")
+    iree_check_single_backend_test_suite(
+      NAME "${_RULE_NAME}_tsan"
+      TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+      DRIVER ${_RULE_DRIVER}
+      INPUT_TYPE ${_RULE_INPUT_TYPE}
+      SRCS ${_RULE_SRCS}
+      COMPILER_FLAGS ${_TSAN_COMPILER_FLAGS}
+      RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+      LABELS ${_RULE_LABELS}
+      TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+      DEPENDS ${_RULE_DEPENDS}
+      TIMEOUT ${_RULE_TIMEOUT}
+    )
+  endif()
+endfunction()
+
 # Helper function parsing a string occurring as an entry in TARGET_CPU_FEATURES_VARIANTS.
 #
 # This function has 3 output-params: variables that it sets with PARENT_SCOPE:
