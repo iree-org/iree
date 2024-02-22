@@ -157,7 +157,7 @@ nav:
               - HAL/Inline: "reference/mlir-dialects/HALInline.md"
               - HAL/Loader: "reference/mlir-dialects/HALLoader.md"
               - IO/Parameters: "reference/mlir-dialects/IOParameters.md"
-              - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
+              - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
