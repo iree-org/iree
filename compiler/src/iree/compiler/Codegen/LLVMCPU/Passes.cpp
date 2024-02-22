@@ -100,10 +100,8 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConcretizePadResultShapePass());
-  // TODO(#16421) Decomposition is failing during bufferization.
-  // Disable till fixed
-  // nestedModulePM.addNestedPass<func::FuncOp>(
-  //    IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
 }
@@ -767,6 +765,11 @@ void registerCodegenLLVMCPUPasses() {
       [](OpPassManager &passManager) {
         buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
       });
+
+  static PassPipelineRegistration<> LLVMCPUBufferizationPipeline(
+      "iree-codegen-llvmcpu-bufferization-pipeline",
+      "Runs the bufferization pipeline for CPU",
+      [](OpPassManager &passManager) { addCPUBufferizePasses(passManager); });
 
   static PassPipelineRegistration<> LLVMCPUVectorLoweringPipeline(
       "iree-codegen-llvmcpu-vector-lowering-pipeline",
