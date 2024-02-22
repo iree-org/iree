@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
 #define IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/Support/raw_ostream.h"
@@ -56,26 +57,39 @@ struct PipelineLayout {
 // NOTE: erasing dispatch ops will invalidate this analysis.
 class BindingLayoutAnalysis {
 public:
-  using ExportDispatchMap =
-      DenseMap<Operation *, SmallVector<IREE::Stream::CmdDispatchOp>>;
-  using ExportLayoutMap = DenseMap<Operation *, PipelineLayout>;
-
-  explicit BindingLayoutAnalysis(Operation *rootOp);
+  explicit BindingLayoutAnalysis(Operation *rootOp, SymbolTable &symbolTable);
 
   // Returns all of the dispatches to the given executable export.
-  SmallVector<IREE::Stream::CmdDispatchOp>
-  getExportDispatches(IREE::Stream::ExecutableExportOp exportOp) const;
+  ArrayRef<IREE::Stream::CmdDispatchOp>
+  getExportDispatches(IREE::Stream::ExecutableExportOp exportOp) const {
+    return getExportDispatches(exportOp.getOperation());
+  }
+  ArrayRef<IREE::Stream::CmdDispatchOp>
+  getExportDispatches(IREE::HAL::ExecutableExportOp exportOp) const {
+    return getExportDispatches(exportOp.getOperation());
+  }
 
   // Returns a layout used for the given executable export op.
   const PipelineLayout &
-  getPipelineLayout(IREE::Stream::ExecutableExportOp exportOp) const;
+  getPipelineLayout(IREE::Stream::ExecutableExportOp exportOp) const {
+    return getPipelineLayout(exportOp.getOperation());
+  }
+  const PipelineLayout &
+  getPipelineLayout(IREE::HAL::ExecutableExportOp exportOp) const {
+    return getPipelineLayout(exportOp.getOperation());
+  }
 
 private:
-  // All dispatches to a particular executable IREE::Stream::ExecutableExportOp.
-  ExportDispatchMap exportDispatches;
-  // Pipeline layout for each IREE::Stream::ExecutableExportOp.
-  // Many of these may be duplicates.
-  ExportLayoutMap exportLayouts;
+  ArrayRef<IREE::Stream::CmdDispatchOp>
+  getExportDispatches(Operation *exportOp) const;
+  const PipelineLayout &getPipelineLayout(Operation *exportOp) const;
+
+  struct ExportInfo {
+    SmallVector<IREE::Stream::CmdDispatchOp> dispatchOps;
+    PipelineLayout pipelineLayout;
+  };
+  using ExportInfoMap = DenseMap<Operation *, std::unique_ptr<ExportInfo>>;
+  ExportInfoMap exportInfos;
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL
