@@ -75,7 +75,7 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
 //   CHECK-DAG: %[[EXPORT_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0 into(%arg1 : !hal.buffer_view)
 //   CHECK-DAG: %[[UNUSED:.+]] = util.optimization_barrier %[[EXPORT_RESULT1]]
 //   CHECK-DAG: %[[EXPORT_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1 :
-// util.return %[[EXPORT_RESULT0]]
+//       CHECK: util.return %[[EXPORT_RESULT0]]
 builtin.module @mutable_input_overwrite_no_return {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.tensor<[5,4],f32>) 
     -> (!torch.vtensor<[4,5],si32>) {
@@ -88,6 +88,10 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.tensor<[5,4],f3
 }
 
 // -----
+// This isn't a great program to write but is legal. It verifies that if the
+// function returns an intermediate vtensor just before it was noted as mutated
+// that we export it properly. This would be a hard program to write in PyTorch
+// but possible to end up this way so testing the corner.
 // Not a good idea to do but legal. This verifies that if returning a mutated
 // tensor's intermediate value, you will get two exports, indicating a copy.
 // CHECK-LABEL: @mutable_input_overwrite_return_alias_copies
