@@ -26,12 +26,11 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       continue; // Cannot use this intrinsic for mismatched types
     }
     if (problem.cType != intrinsic.cType) {
-      auto isSameKind =
-          isa<FloatType>(problem.cType) == isa<FloatType>(intrinsic.cType) ||
-          isa<IntegerType>(problem.cType) == isa<IntegerType>(intrinsic.cType);
+      auto isFpCase =
+          isa<FloatType>(problem.cType) && isa<FloatType>(intrinsic.cType);
       auto isUpcast = problem.cType.getIntOrFloatBitWidth() <
                       intrinsic.cType.getIntOrFloatBitWidth();
-      if (!(canUpcastAcc && isSameKind && isUpcast)) {
+      if (!(canUpcastAcc && isFpCase && isUpcast)) {
         continue; // Cannot use this intrinsic if not upcasting
       }
     }

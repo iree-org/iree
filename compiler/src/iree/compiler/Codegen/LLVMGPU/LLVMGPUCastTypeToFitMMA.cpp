@@ -50,7 +50,8 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
     auto dstCElemFType = dyn_cast<FloatType>(dstCElemType);
     if (!srcCElemFType || !dstCElemFType ||
         srcCElemFType.getWidth() >= dstCElemFType.getWidth()) {
-      return rewriter.notifyMatchFailure(contractOp, "not upcast case");
+      return rewriter.notifyMatchFailure(
+          contractOp, "unhandled non-floating point or non-upcasting case");
     }
 
     if (srcAType.getElementType() != dstAElemType ||
@@ -105,7 +106,7 @@ public:
           configDict.get(scheduleAttrName));
     }
     if (!scheduleAttr) {
-      func.emitError() << "mising mma_schedule\n";
+      func.emitError() << "missing mma_schedule\n";
       return signalPassFailure();
     }
 
