@@ -426,7 +426,7 @@ static void iree_uk_test_mmt4d_for_shape_params(
                                   << iree_uk_type_bit_count_log2(out_type));
 
   iree_mmt4d_reference(&reference_params);
-  iree_uk_mmt4d(&actual_params);
+  iree_uk_mmt4d_p(&actual_params);
 
   // For now we use exact comparisons, even for float, even though the reference
   // code accumulates in a different order compared to the actual code. This

@@ -119,11 +119,6 @@ getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
         rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
     result.defAttrs.emplace_back(rewriter.getStringAttr("hal.import.bitcode"),
                                  rewriter.getBoolAttr(true));
-    result.defAttrs.emplace_back(
-        rewriter.getStringAttr("hal.import.cconv"),
-        IREE::HAL::CallingConventionAttr::get(
-            rewriter.getContext(),
-            IREE::HAL::CallingConvention::ParameterStruct));
   }
   return result;
 }
@@ -244,8 +239,15 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes{outType};
+  if (!isVMVXBackend(targetAttr)) {
+    // Hack to avoid issues with void-returning functions in llvm-cpu.
+    // Note that the first return value, of tensor type, disappears in
+    // bufferization.
+    returnTypes.push_back(rewriter.getI32Type());
+  }
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, ValueRange{lhs, rhs}, out,
+      loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
@@ -573,7 +575,9 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
     }
-    rewriter.replaceOp(op, ukernelOp.value()->getResults());
+    SmallVector<Value> results = ukernelOp.value()->getResults();
+    results.truncate(op->getNumResults());
+    rewriter.replaceOp(op, results);
     return success();
   }
 
