@@ -55,12 +55,9 @@ namespace {
 // Immutable tensor types
 // ----------------------
 //
-// Immutable tensor arguments are mostly handled by the type converter:
-//   * Materializing a `hal.tensor.import` on a source use.
-//   * Generating an
-//     `unrealized_conversion_cast {torch.export.immutable_tensor}` on a target
-//     use (i.e. consuming as part of return, etc). These will be fixed up
-//     in the post-processing phase.
+// Immutable tensor types are mapped to a buffer_view and subject to
+// `hal.tensor.import` on use. On return, they will be placed behind a
+// synchronization barrier and exported.
 //
 // Mutable types
 // -------------
@@ -79,247 +76,6 @@ namespace {
 // and they are only created as a result of structural conversions. Therefore,
 // we can rely on these invariants and assume that usage outside of this is an
 // invalid program.
-//
-// Mutable tensor arguments are handled as:
-//   * `torch.copy.to_vtensor` is handled directly as a conversion pattern
-//     because it is pure (with the only constraint that it has to happen after
-//     the function level wait fence). It must source from the mutable entry arg
-//     and generates a `hal.tensor.import`.
-//   * The mutation ops are not handled during conversion, but the type
-//     converter will emit a materialization of
-//     `unrealized_conversion_cast {torch.coarse_signal_mutation}` from the
-//     block-arg !hal.buffer_view to unhandled ops. These will be fixed up
-//     in post-processing.
-//
-// Post Processing:
-// ----------------
-// At the function level, all mutable argument mutations must be coalesced
-// into a single barrier to signal the signal fence (as a default, this is
-// conservatively safe, but for more complicated programs, we may want to
-// enable explicit tieing of the mutation to a signal fence in order to
-// enable more pipelining).
-//
-// We structurally have a very narrow definition of how such mutable arguments
-// can be used:
-//   * Consumed by a `torch.overwrite.tensor.contents`.
-//   * Returned from the function.
-//
-// This results in a small number of subgraphs that can exist for users of
-// a mutable argument. We detect all such subgraphs by walking the module for
-// unrealized_conversion_cast operators with the
-// `torch.coarse_signal_mutation` attribute, added during type
-// materialization for any unrecognized (presumed mutation) ops operating on
-// the argument. If no such casts are present, then the function does not
-// actually mutate its argument and no action is needed.
-//
-// Immutable return values are also handled and coalesced into the barrier
-// prior to export.
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Func dialect -> Util patterns
-//===----------------------------------------------------------------------===//
-
-class FuncFuncOpPattern : public OpConversionPattern<func::FuncOp> {
-  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(func::FuncOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Determine whether to build pure async or async + sync wrapper.
-    bool generateSyncWrapper = true;
-    StringRef originalName = srcOp.getName();
-    std::string asyncFunctionName = originalName.str();
-    if (generateSyncWrapper) {
-      asyncFunctionName.append("$async");
-    }
-
-    FunctionType srcFuncType = srcOp.getFunctionType();
-    TypeConverter::SignatureConversion signatureConversion(
-        srcOp.getNumArguments());
-
-    // Convert function arguments.
-    for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
-      if (failed(getTypeConverter()->convertSignatureArg(
-              i, srcFuncType.getInput(i), signatureConversion))) {
-        return rewriter.notifyMatchFailure(srcOp, "argument failed to convert");
-      }
-    }
-
-    // To support async, we add two fences (wait and signal) to the converted
-    // function arguments. Conversion patterns in this file access them with
-    // helper functions that know this.
-    Type fenceType = rewriter.getType<IREE::HAL::FenceType>();
-    signatureConversion.addInputs(ArrayRef<Type>{fenceType, fenceType});
-
-    // Convert function results.
-    SmallVector<Type, 1> convertedResultTypes;
-    if (failed(getTypeConverter()->convertTypes(srcFuncType.getResults(),
-                                                convertedResultTypes))) {
-      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
-    }
-
-    // Build tied operands index mapping results back to operands.
-    SmallVector<int64_t> tiedOperands;
-    bool anyTiedOperands = false;
-    for (unsigned i = 0; i < srcFuncType.getNumResults(); ++i) {
-      auto tiedAttr =
-          srcOp.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
-      if (tiedAttr) {
-        tiedOperands.push_back(tiedAttr.getInt());
-        anyTiedOperands = true;
-      } else {
-        tiedOperands.push_back(-1);
-      }
-    }
-    auto tiedOperandsAttr = anyTiedOperands
-                                ? rewriter.getIndexArrayAttr(tiedOperands)
-                                : ArrayAttr{};
-
-    // Create new function with converted argument and result types.
-    // Note that attributes are dropped and restored explicitly if supported.
-    auto asyncFuncType = mlir::FunctionType::get(
-        srcOp.getContext(), signatureConversion.getConvertedTypes(),
-        convertedResultTypes);
-    auto asyncFuncOp = rewriter.create<IREE::Util::FuncOp>(
-        srcOp.getLoc(), asyncFunctionName, asyncFuncType, tiedOperandsAttr);
-    asyncFuncOp.setSymVisibilityAttr(srcOp.getSymVisibilityAttr());
-    // Handle defacto attrs to specialized ones.
-    if (srcOp->hasAttr("noinline")) {
-      asyncFuncOp.setInliningPolicyAttr(
-          rewriter.getAttr<IREE::Util::InlineNeverAttr>());
-    }
-    retainFunctionAttributes(srcOp, asyncFuncOp);
-    asyncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
-    asyncFuncOp->setAttr("iree.abi.model",
-                         rewriter.getStringAttr("coarse-fences"));
-    asyncFuncOp->setAttr("torch.func.abi.postprocess", rewriter.getUnitAttr());
-    rewriter.inlineRegionBefore(srcOp.getBody(), asyncFuncOp.getFunctionBody(),
-                                asyncFuncOp.end());
-
-    // Tell the rewriter to convert the region signature.
-    const TypeConverter &typeConverter = *getTypeConverter();
-    if (failed(rewriter.convertRegionTypes(&asyncFuncOp.getFunctionBody(),
-                                           typeConverter,
-                                           &signatureConversion))) {
-      return failure();
-    }
-
-    rewriter.eraseOp(srcOp);
-
-    if (generateSyncWrapper) {
-      createCoarseFencesSyncWrapper(originalName, asyncFuncOp, rewriter);
-    }
-    return success();
-  }
-
-  void retainFunctionAttributes(Operation *srcOp,
-                                IREE::Util::FuncOp destOp) const {
-    // Allowlist of function attributes to retain when importing funcs.
-    constexpr const char *kRetainedAttributes[] = {
-        "iree.reflection",
-    };
-    auto retainedAttributes = ArrayRef<const char *>(
-        kRetainedAttributes,
-        sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
-    for (auto retainAttrName : retainedAttributes) {
-      StringRef attrName(retainAttrName);
-      Attribute attr = srcOp->getAttr(attrName);
-      if (attr)
-        destOp->setAttr(attrName, attr);
-    }
-  }
-
-  void
-  createCoarseFencesSyncWrapper(StringRef syncFunctionName,
-                                IREE::Util::FuncOp asyncFuncOp,
-                                ConversionPatternRewriter &rewriter) const {
-    Location loc = asyncFuncOp.getLoc();
-    // The coarse fences wrapper has the same signature as the async variant
-    // but with the last two inputs (wait, signal fence) sliced off.
-    FunctionType asyncFuncType = asyncFuncOp.getFunctionType();
-    SmallVector<Type> inputTypes(asyncFuncType.getInputs().begin(),
-                                 asyncFuncType.getInputs().end() - 2);
-
-    // Create the function.
-    auto syncFuncType = rewriter.getType<mlir::FunctionType>(
-        inputTypes, asyncFuncType.getResults());
-    auto syncFuncOp =
-        rewriter.create<IREE::Util::FuncOp>(loc, syncFunctionName, syncFuncType,
-                                            /*tiedOperandsAttr=*/nullptr);
-    syncFuncOp.setSymVisibilityAttr(asyncFuncOp.getSymVisibilityAttr());
-    retainFunctionAttributes(asyncFuncOp, syncFuncOp);
-    syncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
-
-    Block *entryBlock = syncFuncOp.addEntryBlock();
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToEnd(entryBlock);
-
-    // HACK: this is relying on the fact that there's only one HAL device.
-    // We should instead have a way of creating fences on the device that
-    // is used to produce the tensors we're wrapping.
-    //
-    // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
-    // could always say device 0 for now but could instead look for an
-    // iree.abi.affinity/iree.abi.device/etc.
-    Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
-    Value device = IREE::HAL::DeviceType::resolveAny(loc, rewriter);
-    Value waitFence = rewriter.create<IREE::Util::NullOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>());
-    Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
-        loc, rewriter.getType<IREE::HAL::FenceType>(), device,
-        IREE::HAL::FenceFlagBitfield::None);
-
-    SmallVector<Value> callOperands(entryBlock->getArguments());
-    callOperands.push_back(waitFence);
-    callOperands.push_back(signalFence);
-    std::optional<ArrayAttr> targetTiedOperands = asyncFuncOp.getTiedOperands();
-    auto callResults =
-        rewriter
-            .create<IREE::Util::CallOp>(loc, asyncFuncOp, callOperands,
-                                        targetTiedOperands ? *targetTiedOperands
-                                                           : ArrayAttr{})
-            .getResults();
-
-    // Wait forever for signal.
-    rewriter.create<IREE::HAL::FenceAwaitOp>(loc, rewriter.getI32Type(),
-                                             timeoutMillis, signalFence);
-
-    rewriter.create<IREE::Util::ReturnOp>(loc, callResults);
-  }
-};
-
-class FuncCallOpPattern : public OpConversionPattern<func::CallOp> {
-  using OpConversionPattern<func::CallOp>::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(func::CallOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type, 1> resultTypes;
-    if (failed(getTypeConverter()->convertTypes(srcOp.getResultTypes(),
-                                                resultTypes))) {
-      return rewriter.notifyMatchFailure(srcOp, "results failed to convert");
-    }
-    auto tiedOperandsAttr =
-        srcOp->getAttrOfType<ArrayAttr>("iree.abi.tied_operands");
-    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
-        srcOp, resultTypes, srcOp.getCallee(), adaptor.getOperands(),
-        tiedOperandsAttr);
-    return success();
-  }
-};
-
-class FuncReturnOpPattern : public OpConversionPattern<func::ReturnOp> {
-  using OpConversionPattern<func::ReturnOp>::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(func::ReturnOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(srcOp,
-                                                      adaptor.getOperands());
-    return success();
-  }
-};
-
-//===----------------------------------------------------------------------===//
-// Immutable tensor type conversion.
 //===----------------------------------------------------------------------===//
 
 std::optional<std::pair<Value, Value>> getParentWaitSignalFences(Value value) {
@@ -335,86 +91,6 @@ std::optional<std::pair<Value, Value>> getParentWaitSignalFences(Value value) {
   return std::make_pair(coarseWaitFence, coarseSignalFence);
 }
 
-void setupImmutableTensorConversion(ConversionTarget &target,
-                                    RewritePatternSet &patterns,
-                                    TypeConverter &typeConverter) {
-  typeConverter.addConversion(
-      [](Torch::ValueTensorType type) -> std::optional<Type> {
-        return IREE::HAL::BufferViewType::get(type.getContext());
-      });
-  auto sourceMaterialization = [](OpBuilder &builder,
-                                  Torch::ValueTensorType type,
-                                  ValueRange inputs, Location loc) -> Value {
-    Value source = inputs.front();
-    auto waitSignalFences = getParentWaitSignalFences(source);
-    if (!waitSignalFences)
-      return {};
-    Value waitFence = waitSignalFences->first;
-
-    TensorType builtinTensorType = type.toBuiltinTensor();
-    Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
-        loc, builtinTensorType, source, TypeAttr::get(builtinTensorType),
-        waitFence,
-        /*name=*/StringAttr());
-    return builder.create<TorchConversion::FromBuiltinTensorOp>(loc, type,
-                                                                importedTensor);
-  };
-  auto targetMaterialization = [](OpBuilder &builder,
-                                  IREE::HAL::BufferViewType type,
-                                  ValueRange inputs, Location loc) -> Value {
-    auto castOp = builder.create<UnrealizedConversionCastOp>(loc, type, inputs);
-    castOp->setAttr("torch.export.immutable_tensor", builder.getUnitAttr());
-    return castOp.getResult(0);
-  };
-  typeConverter.addArgumentMaterialization(sourceMaterialization);
-  typeConverter.addSourceMaterialization(sourceMaterialization);
-  typeConverter.addTargetMaterialization(targetMaterialization);
-}
-
-//===----------------------------------------------------------------------===//
-// Mutable tensor type conversion.
-//===----------------------------------------------------------------------===//
-
-class CopyEntryArgToValueTensorPattern
-    : public OpConversionPattern<Torch::CopyToValueTensorOp> {
-  using OpConversionPattern<Torch::CopyToValueTensorOp>::OpConversionPattern;
-  LogicalResult
-  matchAndRewrite(Torch::CopyToValueTensorOp srcOp, OpAdaptor adaptor,
-                  ConversionPatternRewriter &rewriter) const override {
-    // Access the type converted buffer view.
-    auto bufferView = dyn_cast<BlockArgument>(adaptor.getOperand());
-    if (!bufferView) {
-      return rewriter.notifyMatchFailure(srcOp,
-                                         "not produced by a BlockArgument");
-    }
-    Block *producerBlock = bufferView.getOwner();
-    if (!isa<IREE::Util::FuncOp>(producerBlock->getParentOp())) {
-      return rewriter.notifyMatchFailure(
-          srcOp, "not produced directly by parent function");
-    }
-    if (!producerBlock->isEntryBlock()) {
-      return rewriter.notifyMatchFailure(srcOp, "not produced by entry block");
-    }
-
-    auto resultVTensorType =
-        cast<Torch::ValueTensorType>(srcOp.getResult().getType());
-    auto ireeTensorType = resultVTensorType.toBuiltinTensor();
-
-    // The producer block will always end in {wait_fence, signal_fence}.
-    Value waitFence =
-        producerBlock->getArgument(producerBlock->getNumArguments() - 2);
-    Value imported = rewriter.create<IREE::HAL::TensorImportOp>(
-        srcOp.getLoc(), ireeTensorType, bufferView,
-        /*target_encoding=*/TypeAttr::get(ireeTensorType),
-        /*wait_fence*/ waitFence,
-        /*name=*/StringAttr());
-
-    rewriter.replaceOpWithNewOp<TorchConversion::FromBuiltinTensorOp>(
-        srcOp, resultVTensorType, imported);
-    return success();
-  }
-};
-
 Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
   Type ty = possibleTorchTensor.getType();
   if (isa<TensorType>(ty))
@@ -426,161 +102,292 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
       possibleTorchTensor.getLoc(), builtinTy, possibleTorchTensor);
 }
 
-void setupMutableTensorConversion(ConversionTarget &target,
-                                  RewritePatternSet &patterns,
-                                  TypeConverter &typeConverter) {
-  target.addIllegalOp<Torch::CopyToValueTensorOp>();
-  patterns.insert<CopyEntryArgToValueTensorPattern>(typeConverter,
-                                                    patterns.getContext());
+enum class TypeDisposition {
+  IMMUTABLE_TENSOR,
+  MUTABLE_TENSOR,
+  PRIMITIVE,
+  FENCE,
+};
 
-  typeConverter.addConversion(
-      [](Torch::NonValueTensorType type) -> std::optional<Type> {
-        return IREE::HAL::BufferViewType::get(type.getContext());
-      });
-  auto materialization = [](OpBuilder &builder, Torch::NonValueTensorType type,
-                            ValueRange inputs, Location loc) -> Value {
-    auto castOp = builder.create<UnrealizedConversionCastOp>(loc, type, inputs);
-    castOp->setAttr("torch.coarse_signal_mutation", builder.getUnitAttr());
-    return castOp.getResult(0);
-  };
-  typeConverter.addSourceMaterialization(materialization);
-  typeConverter.addArgumentMaterialization(materialization);
-}
-
-//===----------------------------------------------------------------------===//
-// Post processing.
-//===----------------------------------------------------------------------===//
-
-LogicalResult postProcessFunction(IREE::Util::FuncOp funcOp) {
-  // Walk to find arguments subject to some mutation.
-  SmallPtrSet<Value, 4> coarseSignalArgs;
-  SmallPtrSet<Value, 4> coarseSignalExportTensors;
+struct ConvertedAsyncFunctionInfo {
+  IREE::Util::FuncOp funcOp;
   SmallVector<IREE::Util::ReturnOp> returnOps;
-  funcOp.walk([&](Operation *op) {
-    OpBuilder builder(op);
-    if (auto castOp = dyn_cast<UnrealizedConversionCastOp>(op)) {
-      if (castOp->hasAttr("torch.coarse_signal_mutation")) {
-        Value source = castOp.getOperand(0);
-        Value target = castOp.getResult(0);
-        coarseSignalArgs.insert(source);
+  SmallVector<Type> torchInputTypes;
+  SmallVector<Type> torchResultTypes;
+  SmallVector<TypeDisposition> inputDispositions;
+  SmallVector<TypeDisposition> resultDispositions;
 
-        // Makes the IR invalid for any consumers, but that is fine. If we do
-        // not transform the consumers, we will fail anyway, and eliminating the
-        // cast here makes everything simpler.
-        target.replaceAllUsesWith(source);
-        castOp->erase();
-      } else if (castOp->hasAttr("torch.export.immutable_tensor")) {
-        // This cast is placed when going from an immutable vtensor to a
-        // BufferView. We do this by exporting and including in the coarse
-        // barrier.
-        Value source = castOp.getOperand(0);
-        Value target = castOp.getResult(0);
+  // Post processing state.
+  // Values that must be captured in the coarse barrier.
+  SmallVector<Value> barrierInputs;
+  // Meta data per barrier input: storage, torchType, returnIndex (or -1)
+  SmallVector<std::tuple<Value, Type, int>> barrierResultMeta;
 
-        source = convertToBuiltinTensor(builder, source);
-        coarseSignalExportTensors.insert(source);
+  LogicalResult postProcess();
+  LogicalResult convertImmutableTensorArg(BlockArgument argValue,
+                                          Type torchType, OpBuilder &builder);
+  LogicalResult convertMutableTensorArg(BlockArgument argValue, Type torchType,
+                                        OpBuilder &builder);
 
-        // Makes the IR invalid for any consumers, but that is fine. If we do
-        // not transform the consumers, we will fail anyway, and eliminating the
-        // cast here makes everything simpler.
-        target.replaceAllUsesWith(source);
-        castOp->erase();
-      }
-    } else if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
-      returnOps.push_back(returnOp);
+  void addBarrierInput(Value inputTensor, Value storage, Type torchType,
+                       int returnIndex) {
+    barrierInputs.push_back(inputTensor);
+    barrierResultMeta.emplace_back(storage, torchType, returnIndex);
+  }
+};
+
+LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
+  if (funcOp.isExternal())
+    return success();
+
+  if (returnOps.size() != 1) {
+    // Multi-exit/CFG could be supported but requires more complicated dominance
+    // analysis with respect to where the exit happens relative to mutated
+    // buffers.
+    return emitError(funcOp.getLoc())
+           << "currently only single exit torch funcs are supported";
+  }
+
+  Block *entryBlock = &funcOp.getBlocks().front();
+
+  // Materialize argument conversions.
+  OpBuilder preambleBuilder = OpBuilder::atBlockBegin(entryBlock);
+  auto entryArgs = entryBlock->getArguments();
+  for (auto [disp, argValue, torchType] :
+       llvm::zip_equal(inputDispositions, entryArgs, torchInputTypes)) {
+    switch (disp) {
+    case TypeDisposition::IMMUTABLE_TENSOR: {
+      if (failed(
+              convertImmutableTensorArg(argValue, torchType, preambleBuilder)))
+        return failure();
+      break;
     }
-  });
+    case TypeDisposition::MUTABLE_TENSOR: {
+      if (failed(convertMutableTensorArg(argValue, torchType, preambleBuilder)))
+        return failure();
+      break;
+    }
+    default: {
+      // Do nothing.
+    }
+    }
+  }
 
-  bool hasCoarseSignalMutation = !coarseSignalArgs.empty();
-  Block *entryBlock = &funcOp.front();
+  // Materialize synchronization postamble and conversions.
+  IREE::Util::ReturnOp returnOp = returnOps.front();
+  SmallVector<Value> newReturnOperands;
+  OpBuilder postambleBuilder(returnOp);
+  for (auto [disp, returnValue, torchType] : llvm::zip_equal(
+           resultDispositions, returnOp.getOperands(), torchResultTypes)) {
+    size_t returnIndex = newReturnOperands.size();
+    newReturnOperands.emplace_back(returnValue);
+    switch (disp) {
+    case TypeDisposition::IMMUTABLE_TENSOR: {
+      bool needsBarrier = true;
+      if (auto blockArg = dyn_cast<BlockArgument>(returnValue)) {
+        // Trivial return of input. Just pass it through.
+        needsBarrier = blockArg.getOwner() != entryBlock;
+      }
+      if (needsBarrier) {
+        Value source = convertToBuiltinTensor(postambleBuilder, returnValue);
+        addBarrierInput(source, /*storage=*/Value{}, torchType, returnIndex);
+      }
+      break;
+    }
+    default: {
+      // Non-tensor/converting. Just preserve.
+    }
+    }
+  }
+
+  // Emit the barrier and exports.
   Value coarseSignalFence =
       entryBlock->getArgument(entryBlock->getNumArguments() - 1);
-
-  // Enforce some structural conditions. We presently have no way to generate
-  // programs that violate these, but maybe someday. Then a more advanced
-  // algorithm will be needed.
-  if (hasCoarseSignalMutation && returnOps.size() > 1) {
-    auto diag =
-        emitError(funcOp.getLoc())
-        << "functions with coarse signal mutation must only have a single exit";
-    for (auto returnOp : returnOps) {
-      diag.attachNote(returnOp.getLoc()) << "illegal multiple return";
-    }
-    return diag;
-  }
-
-  // Assemble the postamble, consisting of a signaling barrier and mutating
-  // exports.
-  IREE::Util::ReturnOp returnOp = returnOps.front();
-  OpBuilder builder(returnOp);
-  IRMapping returnMapping;
-  SmallVector<Operation *> eraseOps;
-  // Tensors that need to be joined in a barrier on the coarse signal fence
-  // and exported.
-  SmallVector<Value> barrierSources;
-  SmallVector<Value> tiedTargetStorages;
-
-  // Process each function arg that participates in coarse mutation signaling.
-  for (Value bufferArg : coarseSignalArgs) {
-    Value overwriteTensor;
-    for (OpOperand &use : bufferArg.getUses()) {
-      Operation *useOp = use.getOwner();
-
-      // Legal uses that require no further action.
-      if (isa<IREE::HAL::TensorImportOp>(useOp))
-        continue;
-
-      // Other uses.
-      if (auto overwrite = dyn_cast<Torch::OverwriteTensorContentsOp>(useOp)) {
-        if (overwriteTensor) {
-          return emitError(useOp->getLoc())
-                 << "unsupported multiple updates on coarse signaling mutable "
-                    "tensor";
-        }
-        overwriteTensor = convertToBuiltinTensor(builder, overwrite.getValue());
-        barrierSources.push_back(overwriteTensor);
-        tiedTargetStorages.push_back(bufferArg);
-        eraseOps.push_back(overwrite);
-      } else {
-        return emitError(useOp->getLoc())
-               << "unsupported operation on coarse signaling mutable tensor";
-      }
+  auto barrierOp = postambleBuilder.create<IREE::HAL::TensorBarrierOp>(
+      funcOp.getLoc(), barrierInputs, coarseSignalFence);
+  for (auto [barrierResult, meta] :
+       llvm::zip_equal(barrierOp.getResults(), barrierResultMeta)) {
+    Value exportStorage;
+    Type torchType;
+    int returnIndex;
+    std::tie(exportStorage, torchType, returnIndex) = meta;
+    Value exportedValue = postambleBuilder.create<IREE::HAL::TensorExportOp>(
+        funcOp.getLoc(), postambleBuilder.getType<IREE::HAL::BufferViewType>(),
+        barrierResult, TypeAttr::get(torchType), exportStorage, StringAttr());
+    if (returnIndex >= 0) {
+      newReturnOperands[returnIndex] = exportedValue;
+    } else {
+      // Don't drop it.
+      postambleBuilder.create<IREE::Util::OptimizationBarrierOp>(
+          funcOp.getLoc(), exportedValue);
     }
   }
 
-  // Process each unbacked tensor that must be exported and synchronized.
-  for (Value unbackedTensor : coarseSignalExportTensors) {
-    barrierSources.push_back(unbackedTensor);
-    tiedTargetStorages.push_back(nullptr);
+  // New return operands are all collected.
+  returnOp->setOperands(newReturnOperands);
+  return success();
+}
+
+LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
+    BlockArgument argValue, Type torchType, OpBuilder &builder) {
+  Location loc = argValue.getLoc();
+
+  // If the arg is just directly returned, then don't do anything special with
+  // it.
+  bool hasNonTrivialUse = false;
+  for (auto *userOp : argValue.getUsers()) {
+    if (isa<IREE::Util::ReturnOp>(userOp))
+      continue;
+    hasNonTrivialUse = true;
+  }
+  if (!hasNonTrivialUse)
+    return success();
+
+  // The type can either be a builtin TensorType or a Torch::ValueTensorType.
+  // OpBuilder
+  TensorType builtinTensorType;
+  if (auto tType = dyn_cast<TensorType>(torchType)) {
+    builtinTensorType = tType;
+  } else if (auto vtType = dyn_cast<Torch::ValueTensorType>(torchType)) {
+    builtinTensorType = vtType.toBuiltinTensor();
+  } else {
+    return emitError(loc) << "unsupported immutable tensor argument: "
+                          << torchType;
   }
 
-  // Generate barriers and exports.
-  auto barrierOp = builder.create<IREE::HAL::TensorBarrierOp>(
-      funcOp.getLoc(), barrierSources, coarseSignalFence);
-  for (auto [sourceTensor, tiedTargetStorage, barrierTensor] : llvm::zip_equal(
-           barrierSources, tiedTargetStorages, barrierOp.getResults())) {
-    Value exportedValue = builder.create<IREE::HAL::TensorExportOp>(
-        sourceTensor.getLoc(), builder.getType<IREE::HAL::BufferViewType>(),
-        barrierTensor, TypeAttr::get(sourceTensor.getType()), tiedTargetStorage,
-        StringAttr());
-    if (tiedTargetStorage) {
-      // We must not drop exports of mutation, so hold on to it.
-      builder.create<IREE::Util::OptimizationBarrierOp>(sourceTensor.getLoc(),
-                                                        exportedValue);
+  auto waitSignalFences = getParentWaitSignalFences(argValue);
+  assert(waitSignalFences && "async function missing fences");
+  Value waitFence = waitSignalFences->first;
+  auto importOp = builder.create<IREE::HAL::TensorImportOp>(
+      loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
+      waitFence,
+      /*name=*/StringAttr());
+  Value importedTensor = importOp;
+  if (builtinTensorType != torchType) {
+    importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
+        loc, torchType, importedTensor);
+  }
+
+  argValue.replaceAllUsesExcept(importedTensor, importOp);
+  return success();
+}
+
+LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
+    BlockArgument argValue, Type torchType, OpBuilder &builder) {
+  Location loc = argValue.getLoc();
+  auto fences = getParentWaitSignalFences(argValue);
+  assert(fences && "could not find async fences on func");
+  TensorType builtinTensorType;
+  if (auto t = dyn_cast<TensorType>(torchType)) {
+    builtinTensorType = t;
+  } else {
+    builtinTensorType = cast<Torch::NonValueTensorType>(torchType)
+                            .getWithValueSemantics()
+                            .toBuiltinTensor();
+  }
+
+  // There are only a small set of possible users of a mutable tensor.
+  // Handle them by operation here.
+  SmallVector<Operation *> users(argValue.getUsers());
+  for (auto *userOp : users) {
+    IRRewriter rewriter(loc.getContext());
+    rewriter.setInsertionPoint(userOp);
+    if (auto copyToVtOp = dyn_cast<Torch::CopyToValueTensorOp>(userOp)) {
+      Value imported = rewriter.create<IREE::HAL::TensorImportOp>(
+          loc, builtinTensorType, argValue,
+          /*target_encoding=*/TypeAttr::get(builtinTensorType),
+          /*wait_fence*/ fences->first,
+          /*name=*/StringAttr());
+      rewriter.replaceOpWithNewOp<TorchConversion::FromBuiltinTensorOp>(
+          userOp, copyToVtOp.getResult().getType(), imported);
+    } else if (auto overwriteOp =
+                   dyn_cast<Torch::OverwriteTensorContentsOp>(userOp)) {
+      Value overwriteValue =
+          convertToBuiltinTensor(rewriter, overwriteOp.getValue());
+      addBarrierInput(overwriteValue, /*storage=*/argValue, torchType,
+                      /*returnIndex=*/-1);
+      rewriter.eraseOp(overwriteOp);
+    } else {
+      return emitError(userOp->getLoc())
+             << "unsupported operation on coarse signaling mutable tensor: "
+             << *userOp;
     }
-    returnMapping.map(sourceTensor, exportedValue);
-  }
-
-  // Update the return op with mapped values.
-  for (OpOperand &operand : returnOp->getOpOperands()) {
-    operand.assign(returnMapping.lookupOrDefault(operand.get()));
-  }
-
-  // Clean up.
-  for (Operation *op : eraseOps) {
-    op->erase();
   }
 
   return success();
+}
+
+void retainFunctionAttributes(Operation *srcOp, IREE::Util::FuncOp destOp) {
+  // Allowlist of function attributes to retain when importing funcs.
+  constexpr const char *kRetainedAttributes[] = {
+      "iree.reflection",
+  };
+  auto retainedAttributes = ArrayRef<const char *>(
+      kRetainedAttributes,
+      sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
+  for (auto retainAttrName : retainedAttributes) {
+    StringRef attrName(retainAttrName);
+    Attribute attr = srcOp->getAttr(attrName);
+    if (attr)
+      destOp->setAttr(attrName, attr);
+  }
+}
+
+void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
+                                   IREE::Util::FuncOp asyncFuncOp,
+                                   IRRewriter &rewriter) {
+  Location loc = asyncFuncOp.getLoc();
+  // The coarse fences wrapper has the same signature as the async variant
+  // but with the last two inputs (wait, signal fence) sliced off.
+  FunctionType asyncFuncType = asyncFuncOp.getFunctionType();
+  SmallVector<Type> inputTypes(asyncFuncType.getInputs().begin(),
+                               asyncFuncType.getInputs().end() - 2);
+
+  // Create the function.
+  auto syncFuncType = rewriter.getType<mlir::FunctionType>(
+      inputTypes, asyncFuncType.getResults());
+  auto syncFuncOp =
+      rewriter.create<IREE::Util::FuncOp>(loc, syncFunctionName, syncFuncType,
+                                          /*tiedOperandsAttr=*/nullptr);
+  syncFuncOp.setSymVisibilityAttr(asyncFuncOp.getSymVisibilityAttr());
+  retainFunctionAttributes(asyncFuncOp, syncFuncOp);
+  syncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
+
+  Block *entryBlock = syncFuncOp.addEntryBlock();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPointToEnd(entryBlock);
+
+  // HACK: this is relying on the fact that there's only one HAL device.
+  // We should instead have a way of creating fences on the device that
+  // is used to produce the tensors we're wrapping.
+  //
+  // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
+  // could always say device 0 for now but could instead look for an
+  // iree.abi.affinity/iree.abi.device/etc.
+  Value timeoutMillis = rewriter.create<arith::ConstantIntOp>(loc, -1, 32);
+  Value device = IREE::HAL::DeviceType::resolveAny(loc, rewriter);
+  Value waitFence = rewriter.create<IREE::Util::NullOp>(
+      loc, rewriter.getType<IREE::HAL::FenceType>());
+  Value signalFence = rewriter.create<IREE::HAL::FenceCreateOp>(
+      loc, rewriter.getType<IREE::HAL::FenceType>(), device,
+      IREE::HAL::FenceFlagBitfield::None);
+
+  SmallVector<Value> callOperands(entryBlock->getArguments());
+  callOperands.push_back(waitFence);
+  callOperands.push_back(signalFence);
+  std::optional<ArrayAttr> targetTiedOperands = asyncFuncOp.getTiedOperands();
+  auto callResults =
+      rewriter
+          .create<IREE::Util::CallOp>(loc, asyncFuncOp, callOperands,
+                                      targetTiedOperands ? *targetTiedOperands
+                                                         : ArrayAttr{})
+          .getResults();
+
+  // Wait forever for signal.
+  rewriter.create<IREE::HAL::FenceAwaitOp>(loc, rewriter.getI32Type(),
+                                           timeoutMillis, signalFence);
+
+  rewriter.create<IREE::Util::ReturnOp>(loc, callResults);
 }
 
 } // namespace
@@ -593,56 +400,178 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
   }
 
   void runOnOperation() override {
-    auto module = getOperation();
+    auto moduleOp = getOperation();
     auto *context = &getContext();
 
-    ConversionTarget target(*context);
-    target.addLegalOp<ModuleOp>();
-    target.addLegalOp<UnrealizedConversionCastOp>();
-    target.addLegalDialect<IREE::Util::UtilDialect>();
-    target.markUnknownOpDynamicallyLegal([&](Operation *op) { return true; });
-
+    // We use the torch TypeConverter directly for handling some non-tensor
+    // types.
     TypeConverter typeConverter;
+    ConversionTarget target(*context);
     typeConverter.addConversion([](Type type) { return type; });
     TorchConversion::setupBackendTypeConversion(target, typeConverter);
 
-    RewritePatternSet patterns(context);
-
-    // Func conversion.
-    target.addDynamicallyLegalDialect<func::FuncDialect>(
-        [&](Operation *op) -> std::optional<bool> {
-          // Allow the func dialect within nested modules but not in the
-          // top-level one that represents the host program.
-          return op->getParentOfType<mlir::ModuleOp>() != getOperation();
-        });
-
-    patterns.insert<FuncFuncOpPattern>(typeConverter, context);
-    patterns.insert<FuncCallOpPattern>(typeConverter, context);
-    patterns.insert<FuncReturnOpPattern>(typeConverter, context);
-
-    // Mutable tensor at the graph edges conversion.
-    setupImmutableTensorConversion(target, patterns, typeConverter);
-    setupMutableTensorConversion(target, patterns, typeConverter);
-
-    if (failed(applyFullConversion(module, target, std::move(patterns)))) {
-      signalPassFailure();
-    }
-
-    // Post-process functions.
-    for (auto funcOp : module.getOps<IREE::Util::FuncOp>()) {
+    // Convert all functions in the module to IREE funcs. In this stage,
+    // we convert contained return ops and argument/result types, but we have
+    // not yet converted anything "on the inside". Therefore, it is pretty
+    // likely the functions are still illegal.
+    SmallVector<Operation *> eraseFuncOps;
+    std::vector<ConvertedAsyncFunctionInfo> convertedFuncInfos;
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isExternal())
         continue;
-      if (!funcOp->hasAttr("torch.func.abi.postprocess"))
-        continue;
+      ConvertedAsyncFunctionInfo &convertedFuncInfo =
+          convertedFuncInfos.emplace_back();
+      if (failed(convertFuncOp(funcOp, convertedFuncInfo))) {
+        signalPassFailure();
+        return;
+      }
+      eraseFuncOps.push_back(funcOp);
+    }
+    for (auto op : eraseFuncOps) {
+      op->erase();
+    }
 
-      // Remove the post processing attribute so we don't touch it again.
-      funcOp->removeAttr("torch.func.abi.postprocess");
-
-      if (failed(postProcessFunction(funcOp))) {
+    // Now post-process async functions.
+    for (auto &info : convertedFuncInfos) {
+      if (failed(info.postProcess())) {
         signalPassFailure();
         return;
       }
     }
+  }
+
+  LogicalResult convertFuncOp(func::FuncOp torchFunc,
+                              ConvertedAsyncFunctionInfo &convertedFuncInfo) {
+    IRRewriter rewriter(torchFunc.getContext());
+    rewriter.setInsertionPoint(torchFunc);
+    Location loc = torchFunc.getLoc();
+    // Determine whether to build pure async or async + sync wrapper.
+    bool generateSyncWrapper = true;
+    StringRef originalName = torchFunc.getName();
+    std::string asyncFunctionName = originalName.str();
+    if (generateSyncWrapper) {
+      asyncFunctionName.append("$async");
+    }
+
+    // Convert function signature.
+    Type fenceType = rewriter.getType<IREE::HAL::FenceType>();
+    FunctionType torchFuncType = torchFunc.getFunctionType();
+    convertedFuncInfo.torchInputTypes.append(torchFuncType.getInputs().begin(),
+                                             torchFuncType.getInputs().end());
+    convertedFuncInfo.torchResultTypes.append(
+        torchFuncType.getResults().begin(), torchFuncType.getResults().end());
+    // For the coarse-fences ABI, we add two fences to the end. Treat these as
+    // original types so that the lists line up.
+    convertedFuncInfo.torchInputTypes.push_back(fenceType);
+    convertedFuncInfo.torchInputTypes.push_back(fenceType);
+    SmallVector<Type> ireeInputTypes(convertedFuncInfo.torchInputTypes);
+    SmallVector<Type> ireeResultTypes(convertedFuncInfo.torchResultTypes);
+    convertedFuncInfo.inputDispositions.resize(ireeInputTypes.size());
+    convertedFuncInfo.resultDispositions.resize(ireeResultTypes.size());
+
+    for (size_t i = 0; i < convertedFuncInfo.torchInputTypes.size(); ++i) {
+      if (failed(convertType(loc, convertedFuncInfo.torchInputTypes[i],
+                             ireeInputTypes[i],
+                             convertedFuncInfo.inputDispositions[i])))
+        return failure();
+    }
+    for (size_t i = 0; i < convertedFuncInfo.torchResultTypes.size(); ++i) {
+      if (failed(convertType(loc, convertedFuncInfo.torchResultTypes[i],
+                             ireeResultTypes[i],
+                             convertedFuncInfo.resultDispositions[i])))
+        return failure();
+    }
+
+    // Build tied operands index mapping results back to operands.
+    SmallVector<int64_t> tiedOperands;
+    bool anyTiedOperands = false;
+    for (unsigned i = 0; i < torchFuncType.getNumResults(); ++i) {
+      auto tiedAttr =
+          torchFunc.getResultAttrOfType<IntegerAttr>(i, "iree.abi.tied");
+      if (tiedAttr) {
+        tiedOperands.push_back(tiedAttr.getInt());
+        anyTiedOperands = true;
+      } else {
+        tiedOperands.push_back(-1);
+      }
+    }
+    auto tiedOperandsAttr = anyTiedOperands
+                                ? rewriter.getIndexArrayAttr(tiedOperands)
+                                : ArrayAttr{};
+
+    // Create new func.
+    FunctionType asyncFuncType =
+        FunctionType::get(loc.getContext(), ireeInputTypes, ireeResultTypes);
+    auto asyncFuncOp = rewriter.create<IREE::Util::FuncOp>(
+        torchFunc.getLoc(), asyncFunctionName, asyncFuncType, tiedOperandsAttr);
+    convertedFuncInfo.funcOp = asyncFuncOp;
+    asyncFuncOp.setSymVisibilityAttr(torchFunc.getSymVisibilityAttr());
+    // Handle defacto attrs to specialized ones.
+    if (torchFunc->hasAttr("noinline")) {
+      asyncFuncOp.setInliningPolicyAttr(
+          rewriter.getAttr<IREE::Util::InlineNeverAttr>());
+    }
+    retainFunctionAttributes(torchFunc, asyncFuncOp);
+    asyncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
+    asyncFuncOp->setAttr("iree.abi.model",
+                         rewriter.getStringAttr("coarse-fences"));
+    rewriter.inlineRegionBefore(
+        torchFunc.getBody(), asyncFuncOp.getFunctionBody(), asyncFuncOp.end());
+
+    // Nothing more to do on imported functions.
+    if (asyncFuncOp.isExternal()) {
+      return success();
+    }
+
+    // Convert block arguments.
+    Block *entryBlock = &asyncFuncOp.getBlocks().front();
+    for (size_t i = 0; i < ireeInputTypes.size(); ++i) {
+      // Add if we have extended the list.
+      if (i >= entryBlock->getNumArguments()) {
+        entryBlock->addArgument(ireeInputTypes[i], loc);
+        continue;
+      }
+      // Convert.
+      entryBlock->getArgument(i).setType(ireeInputTypes[i]);
+    }
+
+    // Replace return ops.
+    asyncFuncOp->walk([&](func::ReturnOp returnOp) {
+      rewriter.setInsertionPoint(returnOp);
+      auto ireeReturnOp = rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(
+          returnOp, returnOp.getOperands());
+      convertedFuncInfo.returnOps.push_back(ireeReturnOp);
+    });
+
+    // Create the sync variant.
+    rewriter.setInsertionPoint(torchFunc);
+    createCoarseFencesSyncWrapper(originalName, asyncFuncOp, rewriter);
+    return success();
+  }
+
+  LogicalResult convertType(Location loc, Type torchType, Type &ireeType,
+                            TypeDisposition &disp) {
+    if (isa<TensorType, Torch::ValueTensorType>(torchType)) {
+      ireeType = IREE::HAL::BufferViewType::get(torchType.getContext());
+      disp = TypeDisposition::IMMUTABLE_TENSOR;
+      return success();
+    }
+
+    if (isa<Torch::NonValueTensorType>(torchType)) {
+      ireeType = IREE::HAL::BufferViewType::get(torchType.getContext());
+      disp = TypeDisposition::MUTABLE_TENSOR;
+      return success();
+    }
+
+    if (isa<IREE::HAL::FenceType>(torchType)) {
+      ireeType = torchType;
+      disp = TypeDisposition::FENCE;
+      return success();
+    }
+
+    // TODO: Primitives, etc
+
+    return emitError(loc) << "unhandled torch type: " << torchType;
   }
 };
 
