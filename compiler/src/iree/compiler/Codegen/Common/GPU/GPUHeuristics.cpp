@@ -9,6 +9,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-heuristics"
 
@@ -19,11 +20,20 @@ namespace mlir::iree_compiler {
 std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds) {
+                  const GPUMMAHeuristicSeeds &seeds, bool canUpcastAcc) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
-    if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType ||
-        problem.cType != intrinsic.cType) {
+    if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
       continue; // Cannot use this intrinsic for mismatched types
+    }
+    if (problem.cType != intrinsic.cType) {
+      auto isSameKind =
+          isa<FloatType>(problem.cType) == isa<FloatType>(intrinsic.cType) ||
+          isa<IntegerType>(problem.cType) == isa<IntegerType>(intrinsic.cType);
+      auto isUpcast = problem.cType.getIntOrFloatBitWidth() <
+                      intrinsic.cType.getIntOrFloatBitWidth();
+      if (!(canUpcastAcc && isSameKind && isUpcast)) {
+        continue; // Cannot use this intrinsic if not upcasting
+      }
     }
 
     if (problem.mSize % intrinsic.mSize != 0 ||
