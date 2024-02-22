@@ -178,3 +178,92 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>) ->
   return %arg0 : !torch.vtensor<[4,5],si32>
 }
 }
+
+// -----
+// Verify that dynamic dimensions verify.
+// CHECK-LABEL: @immutable_import_export
+// CHECK: hal.buffer_view.dim<%arg0
+// CHECK: hal.buffer_view.dim<%arg1
+builtin.module @immutable_import_export {
+func.func @main(%arg0: !torch.vtensor<[4,?],si32>, %arg1: !torch.vtensor<[?,4],f32>) 
+    -> (!torch.vtensor<[4,?],si32>, !torch.vtensor<[?,4],f32>) {
+  %0 = torch.operator "foobar0"(%arg0) : (!torch.vtensor<[4,?],si32>) -> !torch.vtensor<[4,?],si32>
+  %1 = torch.operator "foobar1"(%arg1) : (!torch.vtensor<[?,4],f32>) -> !torch.vtensor<[?,4],f32>
+  return %0, %1 : !torch.vtensor<[4,?],si32>, !torch.vtensor<[?,4],f32>
+}
+}
+
+// -----
+// CHECK-LABEL: @torch_bool_return
+// CHECK: torch_c.to_i1
+// CHECK: util.return {{.*}} : i1
+module @torch_bool_return {
+  func.func @main() -> !torch.bool {
+    %0 = torch.operator "some.primitive"() : () -> !torch.bool
+    return %0 : !torch.bool
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_int_return
+// CHECK: torch_c.to_i64
+// CHECK: util.return {{.*}} : i64
+module @torch_int_return {
+  func.func @main() -> !torch.int {
+    %0 = torch.operator "some.primitive"() : () -> !torch.int
+    return %0 : !torch.int
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_float_return
+// CHECK: torch_c.to_f64
+// CHECK: util.return {{.*}} : f64
+module @torch_float_return {
+  func.func @main() -> !torch.float {
+    %0 = torch.operator "some.primitive"() : () -> !torch.float
+    return %0 : !torch.float
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_generator_return
+// CHECK: torch_c.generator_to_i64
+// CHECK: util.return {{.*}} : i64
+module @torch_generator_return {
+  func.func @main() -> !torch.Generator {
+    %0 = torch.operator "some.primitive"() : () -> !torch.Generator
+    return %0 : !torch.Generator
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_bool_arg
+// CHECK: torch_c.from_i1 %arg0
+module @torch_bool_arg {
+  func.func @main(%arg0 : !torch.bool) -> (!torch.vtensor<[1],f32>) {
+    %0 = torch.operator "some.primitive"(%arg0) : (!torch.bool) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_int_arg
+// CHECK: torch_c.from_i64 %arg0
+module @torch_int_arg {
+  func.func @main(%arg0 : !torch.int) -> (!torch.vtensor<[1],f32>) {
+    %0 = torch.operator "some.primitive"(%arg0) : (!torch.int) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+
+// -----
+// CHECK-LABEL: @torch_float_arg
+// CHECK: torch_c.from_f64 %arg0
+module @torch_float_arg {
+  func.func @main(%arg0 : !torch.float) -> (!torch.vtensor<[1],f32>) {
+    %0 = torch.operator "some.primitive"(%arg0) : (!torch.float) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+

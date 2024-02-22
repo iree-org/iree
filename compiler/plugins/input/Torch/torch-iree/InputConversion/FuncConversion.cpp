@@ -14,6 +14,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/FuncConversions.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "torch-iree/InputConversion/PassDetail.h"
@@ -112,7 +113,8 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
 enum class TypeDisposition {
   IMMUTABLE_TENSOR,
   MUTABLE_TENSOR,
-  PRIMITIVE,
+  TORCH_PRIMITIVE,
+  PASSTHROUGH,
   FENCE,
 };
 
@@ -174,9 +176,36 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
         return failure();
       break;
     }
-    default: {
-      // Do nothing.
+    case TypeDisposition::TORCH_PRIMITIVE: {
+      Location loc = argValue.getLoc();
+      Operation *convertUser = nullptr;
+      Value convertResult;
+      if (isa<Torch::BoolType>(torchType)) {
+        convertUser =
+            preambleBuilder.create<TorchConversion::FromI1Op>(loc, argValue);
+        convertResult = convertUser->getResult(0);
+      } else if (isa<Torch::FloatType>(torchType)) {
+        convertUser =
+            preambleBuilder.create<TorchConversion::FromF64Op>(loc, argValue);
+        convertResult = convertUser->getResult(0);
+      } else if (isa<Torch::IntType>(torchType)) {
+        convertUser =
+            preambleBuilder.create<TorchConversion::FromI64Op>(loc, argValue);
+        convertResult = convertUser->getResult(0);
+      } else {
+        emitError(loc) << "unhandled torch primitive materialization: "
+                       << torchType;
+        return failure();
+      }
+      argValue.replaceAllUsesExcept(convertResult, convertUser);
+      break;
     }
+    case TypeDisposition::PASSTHROUGH:
+      // Do nothing.
+      break;
+    case TypeDisposition::FENCE:
+      // Do nothing.
+      break;
     }
   }
 
@@ -198,6 +227,28 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       if (needsBarrier) {
         Value source = convertToBuiltinTensor(postambleBuilder, returnValue);
         addBarrierInput(source, /*storage=*/Value{}, torchType, returnIndex);
+      }
+      break;
+    }
+    case TypeDisposition::TORCH_PRIMITIVE: {
+      Location loc = returnValue.getLoc();
+      if (isa<Torch::BoolType>(torchType)) {
+        newReturnOperands.back() =
+            postambleBuilder.create<TorchConversion::ToI1Op>(loc, returnValue);
+      } else if (isa<Torch::FloatType>(torchType)) {
+        newReturnOperands.back() =
+            postambleBuilder.create<TorchConversion::ToF64Op>(loc, returnValue);
+      } else if (isa<Torch::IntType>(torchType)) {
+        newReturnOperands.back() =
+            postambleBuilder.create<TorchConversion::ToI64Op>(loc, returnValue);
+      } else if (isa<Torch::GeneratorType>(torchType)) {
+        newReturnOperands.back() =
+            postambleBuilder.create<TorchConversion::GeneratorToI64Op>(
+                loc, returnValue);
+      } else {
+        emitError(loc) << "unhandled torch primitive materialization: "
+                       << torchType;
+        return failure();
       }
       break;
     }
@@ -242,6 +293,24 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
   return success();
 }
 
+class OriginalUses {
+public:
+  OriginalUses(Value value) {
+    for (auto &use : value.getUses()) {
+      originalUses.push_back(&use);
+    }
+  }
+
+  void assign(Value newValue) {
+    for (OpOperand *originalUse : originalUses) {
+      originalUse->assign(newValue);
+    }
+  }
+
+private:
+  SmallVector<OpOperand *> originalUses;
+};
+
 LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
     BlockArgument argValue, Type torchType, OpBuilder &builder) {
   Location loc = argValue.getLoc();
@@ -256,6 +325,9 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   }
   if (!hasNonTrivialUse)
     return success();
+
+  // Remember original uses so we can redirect them.
+  OriginalUses originalUses(argValue);
 
   // The type can either be a builtin TensorType or a Torch::ValueTensorType.
   // OpBuilder
@@ -272,17 +344,16 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   auto waitSignalFences = getEnclosingWaitSignalFences(argValue);
   assert(waitSignalFences && "async function missing fences");
   Value waitFence = waitSignalFences->first;
-  auto importOp = builder.create<IREE::HAL::TensorImportOp>(
+  Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
       loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
       waitFence,
       /*name=*/StringAttr());
-  Value importedTensor = importOp;
   if (builtinTensorType != torchType) {
     importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
         loc, torchType, importedTensor);
   }
 
-  argValue.replaceAllUsesExcept(importedTensor, importOp);
+  originalUses.assign(importedTensor);
   return success();
 }
 
@@ -407,6 +478,7 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
 
 struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::HAL::HALDialect>();
     registry.insert<IREE::Util::UtilDialect>();
     registry.insert<TorchConversion::TorchConversionDialect>();
@@ -584,7 +656,29 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
       return success();
     }
 
-    // TODO: Primitives, etc
+    if (isa<Torch::BoolType>(torchType)) {
+      ireeType = IntegerType::get(torchType.getContext(), 1);
+      disp = TypeDisposition::TORCH_PRIMITIVE;
+      return success();
+    }
+
+    if (isa<Torch::IntType, Torch::GeneratorType>(torchType)) {
+      ireeType = IntegerType::get(torchType.getContext(), 64);
+      disp = TypeDisposition::TORCH_PRIMITIVE;
+      return success();
+    }
+
+    if (isa<Torch::FloatType>(torchType)) {
+      ireeType = Float64Type::get(torchType.getContext());
+      disp = TypeDisposition::TORCH_PRIMITIVE;
+      return success();
+    }
+
+    if (isa<IntegerType, FloatType>(torchType)) {
+      ireeType = torchType;
+      disp = TypeDisposition::PASSTHROUGH;
+      return success();
+    }
 
     return emitError(loc) << "unhandled torch type: " << torchType;
   }
