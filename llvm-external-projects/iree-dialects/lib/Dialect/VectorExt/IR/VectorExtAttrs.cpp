@@ -386,7 +386,7 @@ LogicalResult NestedLayoutAttr::verify(
 /// Given a single flat thread ID, compute the indices of the distributed
 /// dimensions (subgroup and thread ids). The only difference between subgroup
 /// and thread dimensions is the order in which they are "divided out" of the
-/// underlying vector (i.e. vector_shape /= subgroups -> batches -> orders ->
+/// underlying vector (i.e. vector_shape /= subgroups -> batches -> outers ->
 /// threads -> elements). There is no requirement that a subgroup id only
 /// spans subgroups.
 SmallVector<Value>
@@ -431,7 +431,7 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   // Modulo the active delinearized subgroup/thread ids by the number of unique
   // elements distributed to those ids. The only difference between subgroup
   // and thread dimensions is the order in which they are "divided out" of the
-  // underlying vector (i.e. vector_shape /= subgroups -> batches -> orders ->
+  // underlying vector (i.e. vector_shape /= subgroups -> batches -> outers ->
   // threads -> elements). There is no requirement that a subgroup id only
   // spans subgroups.
   //
