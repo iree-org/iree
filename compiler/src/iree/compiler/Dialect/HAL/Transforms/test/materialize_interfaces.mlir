@@ -21,7 +21,8 @@ module attributes {hal.device.targets = [
 
   // CHECK: hal.executable private @ex_workgroups
   // CHECK:   hal.executable.variant public @embedded_elf_arm_64 target(#executable_target_embedded_elf_arm_64
-  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
+  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
+  // CHECK-SAME:   hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]
   // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
   // CHECK-NEXT: }
@@ -29,7 +30,8 @@ module attributes {hal.device.targets = [
   // CHECK-NEXT:  func.func private @extern_func()
   // CHECK-NEXT:  func.func @entry
   // CHECK:   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64
-  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout) {
+  // CHECK:     hal.executable.export public @entry ordinal(0) layout(#pipeline_layout)
+  // CHECK-SAME:   hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]
   // CHECK-NEXT: ^bb0(%[[DEVICE:.+]]: !hal.device, %[[ARG0:.+]]: index, %[[ARG1:.+]]: index):
   // CHECK-NEXT:   hal.return %[[ARG0]], %[[ARG1]], %[[ARG0]] : index, index, index
   // CHECK-NEXT: }
@@ -55,11 +57,6 @@ module attributes {hal.device.targets = [
     %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg2}
     %1 = stream.cmd.execute with(%arg0 as %arg4: !stream.resource<constant>{%arg2}, %arg1 as %arg5: !stream.resource<transient>{%arg2}, %0 as %arg6: !stream.resource<transient>{%arg2}) {
       // CHECK: stream.cmd.dispatch {@ex_workgroups::@embedded_elf_arm_64::@entry, @ex_workgroups::@embedded_elf_x86_64::@entry}
-      // CHECK: attributes {
-      // CHECK-SAME: hal.interface.bindings = [
-      // CHECK-SAME:   #hal.interface.binding<0, 0>,
-      // CHECK-SAME:   #hal.interface.binding<0, 1>,
-      // CHECK-SAME:   #hal.interface.binding<0, 2>
       stream.cmd.dispatch @ex_workgroups::@entry[%c1, %c2](%arg3 : i32) {
         ro %arg4[%c0 for %arg2] : !stream.resource<constant>{%arg2},
         ro %arg5[%c0 for %arg2] : !stream.resource<transient>{%arg2},

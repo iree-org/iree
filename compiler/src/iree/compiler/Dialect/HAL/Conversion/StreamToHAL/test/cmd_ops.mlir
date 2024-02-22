@@ -184,6 +184,10 @@ hal.executable private @ex {
       hal.return %selected : i1
     }
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      hal.interface.bindings = [
+        #hal.interface.binding<0, 4>,
+        #hal.interface.binding<1, 5>
+      ],
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -197,6 +201,10 @@ hal.executable private @ex {
   }
   hal.executable.variant public @x86_64 target(#executable_target_x86_64) {
     hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+      hal.interface.bindings = [
+        #hal.interface.binding<0, 4>,
+        #hal.interface.binding<1, 5>
+      ],
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -276,11 +284,6 @@ util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, 
     stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
-    } attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 4>,
-        #hal.interface.binding<1, 5>
-      ]
     }
     // CHECK: hal.command_buffer.execution_barrier<%[[CMD]]
   } => !stream.timepoint

@@ -19,12 +19,12 @@ iree_cc_library(
     "UtilExternalModels.cpp"
   DEPS
     ::IR
-    IREELinalgExtDialect
     MLIRArithDialect
     MLIRLinalgDialect
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
     MLIRTensorDialect
+    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

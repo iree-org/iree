@@ -68,18 +68,13 @@ using DispatchParamsMap =
 // one entry for all dispatches with a given workgroup count.
 // Dispatches will be ignored if they have a dynamic workload or any dynamically
 // sized resources.
-static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
+static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
+                                              SymbolTable &symbolTable) {
   DispatchParamsMap map;
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
       auto affinityAttr = IREE::Stream::AffinityAttr::lookup(dispatchOp);
-
-      // TODO(benvanik): typed accessors for bindings.
-      auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
-          dispatchOp->getAttr("hal.interface.bindings"));
-      assert(bindingAttrs &&
-             "interface materialization must annotate dispatch sites");
 
       auto workloadValues = dispatchOp.getWorkload();
       SmallVector<unsigned> workload;
@@ -95,25 +90,6 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
           return;
         }
         workload.push_back(workloadConstValue.getSExtValue());
-      }
-
-      SmallVector<Binding> bindings;
-      for (auto [bindingAttr, resourceLength] : llvm::zip_equal(
-               bindingAttrs.getAsRange<IREE::HAL::InterfaceBindingAttr>(),
-               dispatchOp.getResourceLengths())) {
-        APInt resourceLengthInt;
-        if (!matchPattern(resourceLength, m_ConstantInt(&resourceLengthInt))) {
-          LLVM_DEBUG({
-            auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
-            llvm::dbgs() << "Skipping dispatch of entry point `"
-                         << firstEntryPoint
-                         << "` (non-constant resource length)\n";
-          });
-          return;
-        }
-        bindings.push_back({(unsigned)bindingAttr.getSet(),
-                            (unsigned)bindingAttr.getBinding(),
-                            resourceLengthInt.getSExtValue()});
       }
 
       SmallVector<TypedAttr> uniformOperands;
@@ -135,6 +111,28 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp) {
 
       // Work around needing a mutable key for the set; C++ was a mistake.
       dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+        auto exportOp =
+            symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
+                dispatchOp, entryPointAttr);
+        auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
+            exportOp, dispatchOp.getResources().size());
+
+        SmallVector<Binding> bindings;
+        for (auto [bindingAttr, resourceLength] :
+             llvm::zip_equal(bindingAttrs, dispatchOp.getResourceLengths())) {
+          APInt resourceLengthInt;
+          if (!matchPattern(resourceLength,
+                            m_ConstantInt(&resourceLengthInt))) {
+            LLVM_DEBUG(llvm::dbgs() << "Skipping dispatch of entry point `"
+                                    << entryPointAttr
+                                    << "` (non-constant resource length)\n";);
+            return;
+          }
+          bindings.push_back({(unsigned)bindingAttr.getSet(),
+                              (unsigned)bindingAttr.getBinding(),
+                              resourceLengthInt.getSExtValue()});
+        }
+
         auto &dispatchParamsSet = map[entryPointAttr];
         DispatchParams *dispatchParams = nullptr;
         for (auto &it : dispatchParamsSet) {
@@ -486,12 +484,13 @@ struct DumpExecutableBenchmarksPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto moduleName = moduleOp.getName().value_or("module");
+    SymbolTable symbolTable(moduleOp);
 
     // Analyze the module to find dispatch parameters.
     // This is a full walk of all stream.cmd.dispatch ops and will handle
     // filtering out dispatches that have dynamic parameters we don't
     // currently support.
-    auto dispatchParamsMap = gatherDispatchParams(moduleOp);
+    auto dispatchParamsMap = gatherDispatchParams(moduleOp, symbolTable);
     if (dispatchParamsMap.empty()) {
       mlir::emitRemark(moduleOp.getLoc())
           << "Executable benchmarks were requested but none were generated. "

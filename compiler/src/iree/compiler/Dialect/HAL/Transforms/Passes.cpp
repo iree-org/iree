@@ -223,6 +223,9 @@ void buildHALConfigurationPassPipeline(
   // device communicate across the ABI boundary.
   passManager.addPass(IREE::HAL::createMaterializeInterfacesPass());
 
+  // Prune unused executables and their contents.
+  passManager.addPass(IREE::HAL::createPruneExecutablesPass());
+
   // Dump a source listing of each hal.executable and update the source
   // locations in the IR. This will allow us to easily inspect each executable
   // and give downstream tools that can display source information something
@@ -355,6 +358,9 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // make all async operations blocking.
   passManager.addPass(IREE::HAL::createFixupLegacySyncPass());
 
+  // Prune unused executables and their contents.
+  passManager.addPass(IREE::HAL::createPruneExecutablesPass());
+
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
@@ -437,6 +443,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
     // NOTE: symbol DCE will destroy executable target contents, so only run
     // it if we serialized things.
+    passManager.addPass(IREE::HAL::createPruneExecutablesPass());
     passManager.addPass(mlir::createSymbolDCEPass());
   }
 

@@ -61,13 +61,7 @@ module attributes {transform.with_named_sequence} {
     %n_i32 = arith.index_cast %n : index to i32
     %k_i32 = arith.index_cast %k : index to i32
 
-    %mlp_result = flow.dispatch @executable::@x86_64::@mlp(%lhs, %rhs, %m_i32, %n_i32, %k_i32) {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
-    } : (tensor<?x?xf32>{%m, %k}, tensor<?x?xf32>{%k, %n}, i32, i32, i32) -> tensor<?x?xf32>{%m, %n}
+    %mlp_result = flow.dispatch @executable::@x86_64::@mlp(%lhs, %rhs, %m_i32, %n_i32, %k_i32) : (tensor<?x?xf32>{%m, %k}, tensor<?x?xf32>{%k, %n}, i32, i32, i32) -> tensor<?x?xf32>{%m, %n}
 
     util.return %mlp_result : tensor<?x?xf32>
   }

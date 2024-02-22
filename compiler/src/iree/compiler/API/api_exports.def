@@ -9,10 +9,12 @@ EXPORTS
   ireeCompilerGetRevision
   ireeCompilerGlobalInitialize
   ireeCompilerGlobalShutdown
+  ireeCompilerInitializeContext
   ireeCompilerInvocationCreate
   ireeCompilerInvocationDestroy
   ireeCompilerInvocationEnableCallbackDiagnostics
   ireeCompilerInvocationEnableConsoleDiagnostics
+  ireeCompilerInvocationExportStealModule
   ireeCompilerInvocationImportBorrowModule
   ireeCompilerInvocationImportStealModule
   ireeCompilerInvocationOutputHALExecutable
@@ -50,6 +52,7 @@ EXPORTS
   ireeCompilerSourceWrapBuffer
   ireeMlirLspServerRunMain
   ireeOptRunMain
+  ireeReduceRunMain
   ireeRegisterTransformExtensions
   mlirAffineAddExprGet
   mlirAffineBinaryOpExprGetLHS
@@ -118,6 +121,9 @@ EXPORTS
   mlirArrayAttrGetElement
   mlirArrayAttrGetNumElements
   mlirArrayAttrGetTypeID
+  mlirAsmStateCreateForOperation
+  mlirAsmStateCreateForValue
+  mlirAsmStateDestroy
   mlirAttributeDump
   mlirAttributeEqual
   mlirAttributeGetContext
@@ -138,6 +144,7 @@ EXPORTS
   mlirAttributeIsADenseI64Array
   mlirAttributeIsADenseI8Array
   mlirAttributeIsADenseIntElements
+  mlirAttributeIsADenseResourceElements
   mlirAttributeIsADictionary
   mlirAttributeIsAElements
   mlirAttributeIsAFlatSymbolRef
@@ -331,6 +338,7 @@ EXPORTS
   mlirFloatAttrGetTypeID
   mlirFloatAttrGetValueDouble
   mlirFloatTF32TypeGetTypeID
+  mlirFloatTypeGetWidth
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
   mlirFunctionTypeGetNumInputs
@@ -338,7 +346,6 @@ EXPORTS
   mlirFunctionTypeGetResult
   mlirFunctionTypeGetTypeID
   mlirGetDialectHandle__iree_input__
-  mlirGetDialectHandle__iree_linalg_ext__
   mlirGetDialectHandle__transform__
   mlirIREELinalgTransformRegisterPasses
   mlirIREETransformRegisterPasses
@@ -403,6 +410,7 @@ EXPORTS
   mlirMemRefTypeGetChecked
   mlirMemRefTypeGetLayout
   mlirMemRefTypeGetMemorySpace
+  mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
   mlirModuleCreateEmpty
   mlirModuleCreateParse
@@ -417,6 +425,7 @@ EXPORTS
   mlirOpOperandGetNextUse
   mlirOpOperandGetOperandNumber
   mlirOpOperandGetOwner
+  mlirOpOperandGetValue
   mlirOpOperandIsNull
   mlirOpPassManagerAddOwnedPass
   mlirOpPassManagerAddPipeline
@@ -448,11 +457,15 @@ EXPORTS
   mlirOperationGetAttributeByName
   mlirOperationGetBlock
   mlirOperationGetContext
+  mlirOperationGetDiscardableAttribute
+  mlirOperationGetDiscardableAttributeByName
   mlirOperationGetFirstRegion
+  mlirOperationGetInherentAttributeByName
   mlirOperationGetLocation
   mlirOperationGetName
   mlirOperationGetNextInBlock
   mlirOperationGetNumAttributes
+  mlirOperationGetNumDiscardableAttributes
   mlirOperationGetNumOperands
   mlirOperationGetNumRegions
   mlirOperationGetNumResults
@@ -463,17 +476,23 @@ EXPORTS
   mlirOperationGetResult
   mlirOperationGetSuccessor
   mlirOperationGetTypeID
+  mlirOperationHasInherentAttributeByName
   mlirOperationImplementsInterface
   mlirOperationImplementsInterfaceStatic
   mlirOperationMoveAfter
   mlirOperationMoveBefore
   mlirOperationPrint
   mlirOperationPrintWithFlags
+  mlirOperationPrintWithState
   mlirOperationRemoveAttributeByName
+  mlirOperationRemoveDiscardableAttributeByName
   mlirOperationRemoveFromParent
   mlirOperationSetAttributeByName
+  mlirOperationSetDiscardableAttributeByName
+  mlirOperationSetInherentAttributeByName
   mlirOperationSetOperand
   mlirOperationSetOperands
+  mlirOperationSetSuccessor
   mlirOperationStateAddAttributes
   mlirOperationStateAddOperands
   mlirOperationStateAddOwnedRegions
@@ -482,6 +501,7 @@ EXPORTS
   mlirOperationStateEnableResultTypeInference
   mlirOperationStateGet
   mlirOperationVerify
+  mlirOperationWalk
   mlirOperationWriteBytecode
   mlirOperationWriteBytecodeWithConfig
   mlirPDLAttributeTypeGet
@@ -558,9 +578,17 @@ EXPORTS
   mlirSymbolTableWalkSymbolTables
   mlirTF32TypeGet
   mlirTransformAnyOpTypeGet
+  mlirTransformAnyOpTypeGetTypeID
+  mlirTransformAnyParamTypeGet
+  mlirTransformAnyParamTypeGetTypeID
+  mlirTransformAnyValueTypeGet
+  mlirTransformAnyValueTypeGetTypeID
   mlirTransformOperationTypeGet
   mlirTransformOperationTypeGetOperationName
   mlirTransformOperationTypeGetTypeID
+  mlirTransformParamTypeGet
+  mlirTransformParamTypeGetType
+  mlirTransformParamTypeGetTypeID
   mlirTupleTypeGet
   mlirTupleTypeGetNumTypes
   mlirTupleTypeGetType
@@ -584,6 +612,7 @@ EXPORTS
   mlirTypeIsAF16
   mlirTypeIsAF32
   mlirTypeIsAF64
+  mlirTypeIsAFloat
   mlirTypeIsAFloat8E4M3B11FNUZ
   mlirTypeIsAFloat8E4M3FN
   mlirTypeIsAFloat8E4M3FNUZ
@@ -606,7 +635,10 @@ EXPORTS
   mlirTypeIsATF32
   mlirTypeIsATensor
   mlirTypeIsATransformAnyOpType
+  mlirTypeIsATransformAnyParamType
+  mlirTypeIsATransformAnyValueType
   mlirTypeIsATransformOperationType
+  mlirTypeIsATransformParamType
   mlirTypeIsATuple
   mlirTypeIsAUnrankedMemRef
   mlirTypeIsAUnrankedTensor
@@ -622,6 +654,7 @@ EXPORTS
   mlirUnmanagedDenseInt32ResourceElementsAttrGet
   mlirUnmanagedDenseInt64ResourceElementsAttrGet
   mlirUnmanagedDenseInt8ResourceElementsAttrGet
+  mlirUnmanagedDenseResourceElementsAttrGet
   mlirUnmanagedDenseUInt16ResourceElementsAttrGet
   mlirUnmanagedDenseUInt32ResourceElementsAttrGet
   mlirUnmanagedDenseUInt64ResourceElementsAttrGet
@@ -645,4 +678,8 @@ EXPORTS
   mlirValueSetType
   mlirVectorTypeGet
   mlirVectorTypeGetChecked
+  mlirVectorTypeGetScalable
+  mlirVectorTypeGetScalableChecked
   mlirVectorTypeGetTypeID
+  mlirVectorTypeIsDimScalable
+  mlirVectorTypeIsScalable
