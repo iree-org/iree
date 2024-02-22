@@ -274,7 +274,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
-    "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE
     "tosa"
   RUNNER_ARGS
@@ -335,8 +334,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  COMPILER_FLAGS
-    "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE
     "tosa"
   RUNNER_ARGS

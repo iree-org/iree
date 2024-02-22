@@ -62,11 +62,36 @@ struct OpDistributionPattern : DistributionPattern {
   }
 };
 
+template <template <typename> class TraitType>
+class OpTraitDistributionPattern : public DistributionPattern {
+public:
+  OpTraitDistributionPattern(MLIRContext *context, PatternBenefit benefit = 1)
+      : DistributionPattern(Pattern::MatchTraitOpTypeTag(),
+                            TypeID::get<TraitType>(), benefit, context) {}
+
+  virtual LogicalResult matchAndRewrite(Operation *op,
+                                        DistributionSignature &opSignature,
+                                        PatternRewriter &rewriter) const = 0;
+
+  LogicalResult matchAndRewrite(Operation *op,
+                                PatternRewriter &rewriter) const final {
+    std::optional<DistributionSignature> opSignature = getOpSignature(op);
+    if (!opSignature) {
+      return failure();
+    }
+    return matchAndRewrite(op, *opSignature, rewriter);
+  }
+};
+
 /// Options to control how the layout analysis is initialised for vector
 /// distribution.
 class VectorLayoutOptions {
 public:
-  VectorLayoutOptions(Operation *root) : root(root) {
+  VectorLayoutOptions(Operation *root) : root(root), fullConversion(true) {
+    assert(root && "root operation must be non-null");
+  }
+  VectorLayoutOptions(Operation *root, bool fullConversion)
+      : root(root), fullConversion(fullConversion) {
     assert(root && "root operation must be non-null");
   }
 
@@ -75,8 +100,11 @@ public:
   /// Set the anchor ops in the analysis rooted on the root operation.
   virtual void setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
 
+  bool verifyConversion() const { return fullConversion; }
+
 protected:
   Operation *root;
+  bool fullConversion = true;
 }; // namespace iree_compiler
 
 /// Distribute vector operations in the IR rooted at `root`.
@@ -91,9 +119,9 @@ protected:
 ///   - Run a global analysis to determine how to distribute rest of the vector
 ///     values keeping the initial anchors in mind.
 ///   - Use the analysis information to distribute each operation.
-void distributeVectorOps(Operation *root,
-                         RewritePatternSet &distributionPatterns,
-                         VectorLayoutOptions &options);
+LogicalResult distributeVectorOps(Operation *root,
+                                  RewritePatternSet &distributionPatterns,
+                                  VectorLayoutOptions &options);
 
 } // namespace mlir::iree_compiler
 

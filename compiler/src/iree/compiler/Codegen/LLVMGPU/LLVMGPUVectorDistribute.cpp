@@ -10,23 +10,28 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
+
+#define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
 using LayoutDimension = mlir::iree_compiler::IREE::VectorExt::LayoutDimension;
 using LayoutDimensionAttr =
@@ -40,36 +45,6 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-// Computes the per-dim layout from a list of dimension types and sizes,
-// including an outer most inferred dimension. For example,
-//
-// sizes = [-1, x, y, z]
-// problemSize = s
-//
-// sizes[0] = s / (x * y * z)
-//
-// Fails if s is not divisible by the list of known sizes.
-FailureOr<PerDimLayoutAttr>
-getPerDimLayout(MLIRContext *context, SmallVector<LayoutDimensionAttr> dimTypes,
-                SmallVector<int64_t> sizes, int64_t problemSize) {
-  assert(sizes.size() == dimTypes.size() && "dim types and sizes mismatch");
-  if (sizes.front() != -1) {
-    return failure();
-  }
-  int64_t residualElements = problemSize;
-  for (int i = sizes.size() - 1, e = 1; i >= e; --i) {
-    if (sizes[i] <= 0) {
-      return failure();
-    }
-    if (residualElements % sizes[i] != 0) {
-      return failure();
-    }
-    residualElements /= sizes[i];
-  }
-  sizes[0] = residualElements;
-  return PerDimLayoutAttr::get(context, dimTypes, sizes);
-}
-
 // Vector layout option setter aimed at contractions. Currently this only sets
 // anchors for two types of operations; vector.contract and vector.transfer_read
 // from non-shared memory. The assumption in this case is that all IR input to
@@ -78,12 +53,16 @@ getPerDimLayout(MLIRContext *context, SmallVector<LayoutDimensionAttr> dimTypes,
 // setting for other problems like reductions is TODO.
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  ContractionVectorLayoutOptions(Operation *root, ArrayAttr types,
-                                 ArrayRef<int64_t> workgroupSize, Value laneId)
-      : VectorLayoutOptions(root), mmaTypes(types),
-        workgroupSize(workgroupSize), patterns(root->getContext()) {
+  ContractionVectorLayoutOptions(Operation *root,
+                                 ArrayRef<int64_t> workgroupSize,
+                                 IREE::GPU::MMAScheduleAttr schedule,
+                                 Value laneId, bool printLayout)
+      : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
+        workgroupSize(workgroupSize), schedule(schedule),
+        printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
+    populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   }
 
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
@@ -108,24 +87,33 @@ private:
   void setContractionAnchor(MLIRContext *context,
                             VectorLayoutAnalysis &analysis,
                             vector::ContractionOp contract) {
-    std::optional<IREE::GPU::MmaAttr> maybeMmaType =
-        getCompatibleMmaAttr(mmaTypes, contract);
     // TODO: Add SIMT fallback.
-    assert(maybeMmaType && "incompatible contraction op");
+    assert(schedule && "incompatible contraction op");
 
-    auto mmaType = *maybeMmaType;
-    auto maybeLayouts = mmaType.getContractionLayout(contract);
-    assert(maybeMmaType && "mma layout type must not be opaque");
+    auto layouts = schedule.getContractionLayout(contract);
+    assert(layouts && "cannot get concrete layout for contraction");
 
-    auto [aLayout, bLayout, cLayout] = *maybeLayouts;
+    auto [aLayout, bLayout, cLayout] = *layouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
     analysis.setAnchor(contract.getRhs(), bLayout);
     analysis.setAnchor(contract.getAcc(), cLayout);
     analysis.setAnchor(contract.getResult(), cLayout);
+    contract->setAttr("iree.amdgpu.mfma", schedule.getIntrinsic());
+    if (printLayout) {
+      llvm::outs() << "contract A vector layout: " << aLayout << "\n";
+      llvm::outs() << "contract B vector layout: " << bLayout << "\n";
+      llvm::outs() << "contract C vector layout: " << cLayout << "\n";
+    }
+    LLVM_DEBUG({
+      llvm::dbgs() << "chosen a layout: " << aLayout << "\n";
+      llvm::dbgs() << "chosen b layout: " << bLayout << "\n";
+      llvm::dbgs() << "chosen c layout: " << cLayout << "\n";
+      llvm::dbgs() << "anchor set on contract: " << contract << "\n";
+    });
 
-    if (isa<IREE::GPU::MFMAAttr>(mmaType)) {
+    if (isa<IREE::GPU::MFMAAttr>(schedule.getIntrinsic())) {
       if (!populatedMfma) {
-        populateAMDGPUDistributionPatterns(patterns);
+        populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
         populatedMfma = true;
       }
     } else {
@@ -134,30 +122,56 @@ private:
   }
 
   // Sets a layout anchor for reads from global memory.
-  // NOTE: This is mostly ad-hoc trying to fit more general distribution of
-  // transfers into the layout attributes that currently don't support more
-  // than a few dimensions. This pattern needs to be reworked with the layout
-  // attributes.
-  //
   // The layout this generates is approximately the following:
   //
-  // #row_layout = #iree_vector_ext.per_dim_layout<
-  //   [BATCHX, LANEX,         VECTORX],
-  //   [-1,     subgroup_size, 128 / element_type_bitwidth]>
-  // #col_layout = #iree_vector_ext.per_dim_layout<
-  //   [VECTORY, LANEY],
-  //   [-1,      leftover threads from subgroup_size / LANEX]>
-  // #layout = #iree_vector_ext.layout<#row_layout, #col_layout>
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, ..., 1]
+  //    batches_per_subgroup =    [<remaining undistributed elements>]
+  //    outers_per_batch =        [1, ..., 1]
+  //    threads_per_outer =       [<greedy from innermost memref dim>]
+  //    elements_per_thread =     [1, ..., 128/element_bitwidth, ..., 1]
+  //            innermost_memref_dimension ^^^^^^
   //
-  // Where -1 indicates assign all remaining elements along that dimension
-  // to that dim type.
+  // (All orders are the same)
+  //    *_order = [<broadcasted_dims>, <transfer_permutation>]>
+  //
+  // So for the following transfer_read with 64 threads:
+  //  vector.transfer_read ... : memref<16x256xf16>, vector<16x32xf16>
+  //
+  // We use the following layout:
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, 1]
+  //    batches_per_subgroup =    [1, 1]
+  //    outers_per_batch =        [1, 1]
+  //    threads_per_outer =       [16, 4]
+  //    elements_per_thread =     [1, 8]
+  //
+  //    *_order = [0, 1]>
   void setTransferReadAnchor(MLIRContext *context,
                              VectorLayoutAnalysis &analysis,
                              vector::TransferReadOp transfer) {
+
+    // Get the forward slice of the transfer to approximate whether it will take
+    // the layout of a contraction instead. Transfer_read ops used directly by a
+    // contraction (i.e. without a copy to shared memory in between) should take
+    // the layout of the contraction op. This is common for cases where the
+    // initial values of the accumulator in a linalg.matmul is read from memory
+    // instead of just being a zerofill.
+    SetVector<Operation *> forwardSlice;
+    ForwardSliceOptions options;
+    getForwardSlice(transfer.getResult(), &forwardSlice, options);
+
+    if (llvm::any_of(forwardSlice, [](Operation *op) {
+          return llvm::isa<vector::ContractionOp>(op);
+        })) {
+      return;
+    }
+
     // TODO: Support masking.
     if (transfer.getMask()) {
       return;
     }
+    // Shared memory loads are expected to take the layout of the contraction.
     auto sourceMemRefType =
         dyn_cast<MemRefType>(transfer.getSource().getType());
     if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
@@ -179,76 +193,110 @@ private:
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
-    // TODO: Support > 2-d transfers.
-    int64_t transferRank = transfer.getVectorType().getRank();
-    if (transferRank > 2) {
-      return;
-    }
-
     AffineMap transferMap = transfer.getPermutationMap();
     if (transferMap.getNumDims() == 0) {
       return;
     }
 
-    // Select the inner most dim of the memref as the contiguous dim to load
+    // Select the innermost dim of the memref as the contiguous dim to load
     // from.
+    int64_t transferRank = transfer.getVectorType().getRank();
     std::optional<unsigned> maybeDim = transferMap.getResultPosition(
         getAffineDimExpr(transferMap.getNumDims() - 1, context));
     int64_t distXDim = maybeDim ? *maybeDim : transferRank - 1;
 
     ArrayRef<int64_t> vectorShape = transfer.getVectorType().getShape();
 
-    // In most cases, BATCHX is expected to get a size of 1. For cases with
-    // large linear loads or small thread counts this will have to distribute
-    // residual elements to the batch dimension.
-    SmallVector<LayoutDimensionAttr> xDimTypes = {
-        LayoutDimensionAttr::get(context, LayoutDimension::BATCHX),
-        LayoutDimensionAttr::get(context, LayoutDimension::LANEX),
-        LayoutDimensionAttr::get(context, LayoutDimension::VECTORX)};
-    // NOTE: this is cheating because subgroup size == workgroup size here.
-    int64_t xThreads = vectorShape[distXDim] / numElementsPerThread;
-    xThreads = std::min(flatNumThreads, xThreads);
-    int64_t residualThreads = flatNumThreads / xThreads;
-    SmallVector<int64_t> xDimSizes = {-1, xThreads, numElementsPerThread};
+    // Limit the maximum inner vector read width to the innermost contiguous
+    // dimension. We could try to be clever and extend this to adjacent
+    // dimensions in cases where the innermost read vector dimension is small,
+    // but that requires comparing memref strides and is uncommon. For now
+    // prioritize warp contiguity over 128-bit read granularity.
+    numElementsPerThread =
+        std::min(numElementsPerThread, vectorShape[distXDim]);
 
-    // Here, we only distribute the second dimension, if present, along the
-    // LANEY and VECTORY dimensions.
-    SmallVector<SmallVector<LayoutDimensionAttr>> dimTypes = {
-        {LayoutDimensionAttr::get(context, LayoutDimension::VECTORY),
-         LayoutDimensionAttr::get(context, LayoutDimension::LANEY)}};
-    SmallVector<SmallVector<int64_t>> dimSizes = {{-1, residualThreads}};
-
-    SmallVector<PerDimLayoutAttr> perDimAttrs;
-    int64_t idx = 0;
-    // Walk the transfer op in reverse to match the preferred processing
-    // order of the dimensions types.
-    for (int i = transferRank - 1, e = 0; i >= e; --i) {
-      int64_t problemSize = vectorShape[i];
-      if (i == distXDim) {
-        auto maybeLayout =
-            getPerDimLayout(context, xDimTypes, xDimSizes, problemSize);
-        if (failed(maybeLayout)) {
-          return;
-        }
-        perDimAttrs.push_back(*maybeLayout);
-        continue;
+    llvm::SetVector<unsigned> vectorDimDistributionOrder;
+    // Get the order in which to distribute vector dimensions to threads, going
+    // from innermost to outermost memref dimension. It's important to note
+    // that this heuristic only applies to matrix multiplication cases where
+    // we are promoting the operands of a contraction to shared memory and we
+    // have no producers fused with the matmul. In general there is no universal
+    // way to set an anchoring layout for reads without doing an analysis of how
+    // the read values are used.
+    for (int i = transferMap.getNumDims() - 1; i >= 0; --i) {
+      std::optional<unsigned> maybeDim =
+          transferMap.getResultPosition(getAffineDimExpr(i, context));
+      if (maybeDim) {
+        vectorDimDistributionOrder.insert(*maybeDim);
       }
-      auto maybeLayout =
-          getPerDimLayout(context, dimTypes[idx], dimSizes[idx], problemSize);
-      idx++;
-      if (failed(maybeLayout)) {
-        return;
-      }
-      perDimAttrs.push_back(*maybeLayout);
     }
-    SmallVector<PerDimLayoutAttr, 4> reversedLayout(llvm::reverse(perDimAttrs));
+    // Add all remaining (broadcasted) dimensions
+    for (auto dim : llvm::seq(static_cast<int64_t>(0), transferRank)) {
+      if (!vectorDimDistributionOrder.contains(dim))
+        vectorDimDistributionOrder.insert(dim);
+    }
 
-    auto layout = LayoutAttr::get(context, reversedLayout);
+    int64_t residualThreads = flatNumThreads;
+    int64_t residualElements = numElementsPerThread;
+
+    SmallVector<int64_t> order(vectorDimDistributionOrder.rbegin(),
+                               vectorDimDistributionOrder.rend());
+
+    // Distribute all threads in the workgroup to the "threads" dimension,
+    // meaning subgroup counts is unit here, even though the read is being
+    // distributed to multiple subgroups. This is in an attempt to do a
+    // workgroup contiguous load.
+    SmallVector<int64_t> subgroupCounts(transferRank, 1);
+    SmallVector<int64_t> batchSizes(transferRank, 1);
+    SmallVector<int64_t> outerSizes(transferRank, 1);
+    SmallVector<int64_t> threadCounts(transferRank, 1);
+    SmallVector<int64_t> elementSizes(transferRank, 1);
+
+    for (auto dim : llvm::reverse(order)) {
+      int64_t vectorSize = vectorShape[dim];
+      // Set the element count for the innermost vector dimension.
+      if (residualElements != 1) {
+        elementSizes[dim] = residualElements;
+        vectorSize /= residualElements;
+        residualElements = 1;
+      }
+
+      assert((residualThreads % vectorSize == 0 ||
+              vectorSize % residualThreads == 0) &&
+             "dividing threads to incompatible vector");
+      if (residualThreads <= vectorSize) {
+        vectorSize /= residualThreads;
+        threadCounts[dim] = residualThreads;
+        residualThreads = 1;
+      } else {
+        residualThreads /= vectorSize;
+        threadCounts[dim] = vectorSize;
+        vectorSize = 1;
+      }
+
+      batchSizes[dim] = vectorSize;
+    }
+
+    // Note that the layout setting logic here necessarily uses all threads in
+    // the workgroup to perform the read. As a result we can always directly
+    // use the counts as the basis for computing the subgroup/thread indices.
+    SmallVector<int64_t> subgroupBasis = subgroupCounts;
+    SmallVector<int64_t> threadBasis = threadCounts;
+
+    auto layout = IREE::VectorExt::NestedLayoutAttr::get(
+        context, subgroupCounts, order, batchSizes, order, outerSizes, order,
+        threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
     analysis.setAnchor(transfer.getResult(), layout);
+    if (printLayout) {
+      llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
+                   << "\n";
+    }
   }
 
-  ArrayAttr mmaTypes;
   SmallVector<int64_t, 3> workgroupSize;
+  IREE::GPU::MMAScheduleAttr schedule;
+  // Whether to print the chosen layout for testing purposes
+  bool printLayout;
 
   bool populatedMfma = false;
   RewritePatternSet patterns;
@@ -267,38 +315,8 @@ public:
   void runOnOperation() override {
     auto func = getOperation();
 
-    FailureOr<ArrayAttr> maybeSupportedTypes =
-        getSupportedMmaTypes(llvm::cast<func::FuncOp>(func));
-    // TODO: Support FMA fallback. Contractions always benefit from an anchoring
-    // layout because they do implicit shuffles, or broadcast when loading data.
-    if (failed(maybeSupportedTypes)) {
-      func->emitError() << "Failed to collect the set of supported mma types "
-                           "for vector distribution";
-      return signalPassFailure();
-    }
-
-    std::optional<int64_t> maybeSubgroupSize = std::nullopt;
-    if (func->hasAttr("subgroup_size")) {
-      maybeSubgroupSize =
-          llvm::cast<IntegerAttr>(func->getAttr("subgroup_size")).getInt();
-    } else {
-      maybeSubgroupSize = getSubgroupSize(func);
-    }
-
-    if (!maybeSubgroupSize) {
-      func.emitError() << "subgroup size required for vector distribution";
-      return signalPassFailure();
-    }
-
-    OpBuilder builder(func);
-    builder.setInsertionPointToStart(&func.getFunctionBody().front());
-    SmallVector<OpFoldResult> threadGrid = {
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
-        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
-                                              gpu::Dimension::z)};
     std::array<int64_t, 3> workgroupSize;
-    if (func->hasAttr("subgroup_size")) {
+    if (func->hasAttr("workgroup_size")) {
       auto tmpSizes =
           llvm::cast<ArrayAttr>(func->getAttr("workgroup_size")).getValue();
       for (auto [i, size] : llvm::enumerate(tmpSizes)) {
@@ -307,43 +325,40 @@ public:
     } else {
       workgroupSize = getWorkgroupSize(func);
     }
+
+    llvm::StringLiteral scheduleAttrName =
+        IREE::GPU::MMAScheduleAttr::getMnemonic();
+    auto scheduleAttr =
+        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
+    if (!scheduleAttr) {
+      DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
+      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+          configDict.get(scheduleAttrName));
+    }
+
     AffineExpr x, y, z;
     bindSymbols(func.getContext(), x, y, z);
     // Construct the expression for linearizing the thread indices.
     AffineExpr linearId =
         x + workgroupSize[0] * y + workgroupSize[1] * workgroupSize[0] * z;
-    AffineExpr laneId = linearId % *maybeSubgroupSize;
 
-    // This all needs some kind of simplification; the arithmetic it produces
-    // doest not get folded away as nicely as it could.
-    AffineMap idMap = AffineMap::getMultiDimIdentityMap(2, func.getContext());
+    OpBuilder builder(func);
+    builder.setInsertionPointToStart(&func.getFunctionBody().front());
+    SmallVector<OpFoldResult> threadGrid = {
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::x),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(), gpu::Dimension::y),
+        builder.createOrFold<gpu::ThreadIdOp>(func.getLoc(),
+                                              gpu::Dimension::z)};
 
-    // Clamp the thread indices to the workgroup sizes.
-    OpFoldResult c0 =
-        builder.createOrFold<arith::ConstantIndexOp>(func.getLoc(), 0);
-    threadGrid[0] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[0], c0});
-    threadGrid[1] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[1], c0});
-    threadGrid[2] = affine::makeComposedFoldedAffineMax(
-        builder, func.getLoc(), idMap, {threadGrid[2], c0});
+    Value linearThreadIdVal = affine::makeComposedAffineApply(
+        builder, func.getLoc(), linearId, threadGrid);
 
-    OpFoldResult dimX = builder.getIndexAttr(workgroupSize[0] - 1);
-    OpFoldResult dimY = builder.getIndexAttr(workgroupSize[1] - 1);
-    OpFoldResult dimZ = builder.getIndexAttr(workgroupSize[2] - 1);
-    threadGrid[0] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[0], dimX});
-    threadGrid[1] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[1], dimY});
-    threadGrid[2] = affine::makeComposedFoldedAffineMin(
-        builder, func.getLoc(), idMap, {threadGrid[2], dimZ});
-    Value laneVal = affine::makeComposedAffineApply(builder, func.getLoc(),
-                                                    laneId, threadGrid);
-
-    ContractionVectorLayoutOptions options(func, *maybeSupportedTypes,
-                                           workgroupSize, laneVal);
-    // TODO: This should return failure when distribution fails for any op.
-    distributeVectorOps(func, options.getPatterns(), options);
+    ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
+                                           linearThreadIdVal, testLayout);
+    if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
+      func->emitOpError() << "failed to distribute";
+      return signalPassFailure();
+    }
   }
 };
 } // namespace

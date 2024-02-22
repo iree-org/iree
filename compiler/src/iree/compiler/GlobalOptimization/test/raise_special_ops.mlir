@@ -415,3 +415,126 @@ util.func public @test_slice_negate_cat_peephole_dynamic(%arg0: tensor<32x?x128x
 //       CHECK:      tensor.extract
 //       CHECK:    %[[COL:.+]] = tensor.collapse_shape
 //       CHECK:    util.return %[[COL]]
+
+// -----
+
+util.func public @matmul_extf(%arg0 : tensor<10x20xf32>,
+                              %arg1 : tensor<20x40xf16>) -> tensor<10x40xf32> {
+  %0 = tensor.empty() : tensor<20x40xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<20x40xf16>) outs(%0 : tensor<20x40xf32>) {
+    ^bb0(%b0 : f16, %b1 : f32):
+      %e = arith.extf %b0 : f16 to f32
+      linalg.yield %e : f32
+  } -> tensor<20x40xf32>
+  %2 = tensor.empty() : tensor<10x40xf32>
+  %3 = arith.constant 0.0 : f32
+  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %5 = linalg.matmul ins(%arg0, %1 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  util.return %5 : tensor<10x40xf32>
+}
+// CHECK-LABEL: util.func public @matmul_extf
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xf16>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @matmul_extf_a(%arg0 : tensor<10x20xf16>,
+                                %arg1 : tensor<20x40xf32>) -> tensor<10x40xf32> {
+  %0 = tensor.empty() : tensor<10x20xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20xf16>) outs(%0 : tensor<10x20xf32>) {
+    ^bb0(%b0 : f16, %b1 : f32):
+      %e = arith.extf %b0 : f16 to f32
+      linalg.yield %e : f32
+  } -> tensor<10x20xf32>
+  %2 = tensor.empty() : tensor<10x40xf32>
+  %3 = arith.constant 0.0 : f32
+  %4 = linalg.fill ins(%3 : f32) outs(%2 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %5 = linalg.matmul ins(%1, %arg1 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  util.return %5 : tensor<10x40xf32>
+}
+// CHECK-LABEL: util.func public @matmul_extf_a
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xf32>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @matmul_extf_both(%arg0 : tensor<10x20xf16>,
+                                   %arg1 : tensor<20x40xf16>) -> tensor<10x40xf32> {
+  %0 = tensor.empty() : tensor<10x20xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20xf16>) outs(%0 : tensor<10x20xf32>) {
+    ^bb0(%b0 : f16, %b1 : f32):
+      %e = arith.extf %b0 : f16 to f32
+      linalg.yield %e : f32
+  } -> tensor<10x20xf32>
+  %2 = tensor.empty() : tensor<20x40xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<20x40xf16>) outs(%2 : tensor<20x40xf32>) {
+    ^bb0(%b2 : f16, %b3 : f32):
+      %e1 = arith.extf %b2 : f16 to f32
+      linalg.yield %e1 : f32
+  } -> tensor<20x40xf32>
+  %4 = tensor.empty() : tensor<10x40xf32>
+  %5 = arith.constant 0.0 : f32
+  %6 = linalg.fill ins(%5 : f32) outs(%4 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  %7 = linalg.matmul ins(%1, %3 : tensor<10x20xf32>, tensor<20x40xf32>)
+      outs(%6 : tensor<10x40xf32>) -> tensor<10x40xf32>
+  util.return %7 : tensor<10x40xf32>
+}
+// CHECK-LABEL: util.func public @matmul_extf_both
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xf16>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @conv_nchw_extf_both(%arg0 : tensor<1x5x10x10xf16>,
+                                      %arg1 : tensor<5x5x3x3xf16>) -> tensor<1x5x8x8xf32> {
+  %0 = tensor.empty() : tensor<1x5x10x10xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<1x5x10x10xf16>) outs(%0 : tensor<1x5x10x10xf32>) {
+    ^bb0(%b0 : f16, %b1 : f32):
+      %e = arith.extf %b0 : f16 to f32
+      linalg.yield %e : f32
+  } -> tensor<1x5x10x10xf32>
+  %2 = tensor.empty() : tensor<5x5x3x3xf32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<5x5x3x3xf16>) outs(%2 : tensor<5x5x3x3xf32>) {
+    ^bb0(%b2 : f16, %b3 : f32):
+      %e1 = arith.extf %b2 : f16 to f32
+      linalg.yield %e1 : f32
+  } -> tensor<5x5x3x3xf32>
+  %4 = tensor.empty() : tensor<1x5x8x8xf32>
+  %5 = arith.constant 0.0 : f32
+  %6 = linalg.fill ins(%5 : f32) outs(%4 : tensor<1x5x8x8xf32>) -> tensor<1x5x8x8xf32>
+  %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+      ins(%1, %3 : tensor<1x5x10x10xf32>, tensor<5x5x3x3xf32>)
+      outs(%6 : tensor<1x5x8x8xf32>) -> tensor<1x5x8x8xf32>
+  util.return %7 : tensor<1x5x8x8xf32>
+}
+// CHECK-LABEL: util.func public @conv_nchw_extf_both
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x5x10x10xf16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x5x3x3xf16>
+//       CHECK:   %[[RESULT:.+]] = linalg.conv_2d_nchw_fchw {{.*}} ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]

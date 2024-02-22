@@ -115,12 +115,18 @@ struct DistributeConstants final : OpDistributionPattern<arith::ConstantOp> {
   }
 };
 
-template <typename OpTy>
-struct DistributeElementwise final : OpDistributionPattern<OpTy> {
-  using OpDistributionPattern<OpTy>::OpDistributionPattern;
+struct DistributeElementwise final
+    : OpTraitDistributionPattern<OpTrait::Elementwise> {
+  using OpTraitDistributionPattern::OpTraitDistributionPattern;
 
-  LogicalResult matchAndRewrite(OpTy op, DistributionSignature &signature,
+  LogicalResult matchAndRewrite(Operation *op, DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
+    // Check if this operation has elementwise mappable traits. This is
+    // more restricted than only having elementwise trait.
+    if (!OpTrait::hasElementwiseMappableTraits(op)) {
+      return failure();
+    }
+
     // Get the distributed operands.
     SmallVector<Value> operands;
     for (Value operand : op->getOperands()) {
@@ -825,10 +831,7 @@ void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
 void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
-  patterns.add<DistributeElementwise<arith::MulIOp>,
-               DistributeElementwise<arith::MulFOp>,
-               DistributeElementwise<arith::AddIOp>,
-               DistributeElementwise<arith::AddFOp>>(patterns.getContext());
+  patterns.add<DistributeElementwise>(patterns.getContext());
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,

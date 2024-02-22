@@ -5,12 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
+#include "mlir/IR/Visitors.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-vector-distribution"
 
@@ -220,15 +225,15 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
-void distributeVectorOps(Operation *root,
-                         RewritePatternSet &distributionPatterns,
-                         VectorLayoutOptions &options) {
+LogicalResult distributeVectorOps(Operation *root,
+                                  RewritePatternSet &distributionPatterns,
+                                  VectorLayoutOptions &options) {
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
   options.setAnchorOps(analysis);
   if (failed(analysis.run()))
-    return;
+    return failure();
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
@@ -245,7 +250,38 @@ void distributeVectorOps(Operation *root,
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
 
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
-  return applyVectorDistribution(root, frozenPatterns);
+  applyVectorDistribution(root, frozenPatterns);
+
+  RewritePatternSet patterns(root->getContext());
+  IREE::VectorExt::ToSIMDOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  IREE::VectorExt::ToSIMTOp::getCanonicalizationPatterns(patterns,
+                                                         root->getContext());
+  if (failed(applyPatternsAndFoldGreedily(root, std::move(patterns)))) {
+    return failure();
+  }
+
+  if (options.verifyConversion()) {
+    WalkResult hasConversionOp = root->walk([](Operation *op) {
+      if (isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(op)) {
+        for (auto user : op->getUsers()) {
+          if (!isa<IREE::VectorExt::ToSIMDOp, IREE::VectorExt::ToSIMTOp>(
+                  user)) {
+            LLVM_DEBUG({
+              llvm::dbgs() << "Found live cast op: " << *op << "\n";
+              llvm::dbgs() << "With live user: " << *user << "\n";
+            });
+            return WalkResult::interrupt();
+          }
+        }
+      }
+      return WalkResult::advance();
+    });
+    if (hasConversionOp.wasInterrupted()) {
+      return failure();
+    }
+  }
+  return success();
 }
 
 } // namespace mlir::iree_compiler

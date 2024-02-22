@@ -717,7 +717,7 @@ Value BufferSubspanOp::getResultSize(unsigned idx) { return getLength(); }
 
 void BufferLengthOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "len");
+  setNameFn(getResult(), "length");
 }
 
 //===----------------------------------------------------------------------===//
@@ -950,15 +950,6 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.lookup
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutLookupOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(getResult(), "descriptor_set_layout");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.device.allocator
 //===----------------------------------------------------------------------===//
 
@@ -980,6 +971,17 @@ LogicalResult DeviceQueryOp::verify() {
     }
   }
   return success();
+}
+
+// static
+Value DeviceQueryOp::createI1(Location loc, Value device, StringRef category,
+                              StringRef key, OpBuilder &builder) {
+  auto i1Type = builder.getI1Type();
+  return builder
+      .create<IREE::HAL::DeviceQueryOp>(
+          loc, i1Type, i1Type, device, builder.getStringAttr(category),
+          builder.getStringAttr(key), builder.getIntegerAttr(i1Type, 0))
+      .getValue();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1595,6 +1597,7 @@ void ExecutableBinaryOp::build(OpBuilder &builder, OperationState &state,
 
 void ExecutableCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), StringRef("exe"));
 }
 
@@ -1604,7 +1607,18 @@ void ExecutableCreateOp::getAsmResultNames(
 
 void ExecutableLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
   setNameFn(getResult(), "exe");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable.export.ordinal
+//===----------------------------------------------------------------------===//
+
+void ExecutableExportOrdinalOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  // TODO(benvanik): name after sanitized symbol.
+  setNameFn(getResult(), "ordinal");
 }
 
 //===----------------------------------------------------------------------===//

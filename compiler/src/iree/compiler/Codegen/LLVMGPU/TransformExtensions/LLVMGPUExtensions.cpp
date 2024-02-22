@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1500,9 +1501,10 @@ void transform_dialect::PackSharedMemoryAllocOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
-class TestVectorLayoutOptions : public VectorLayoutOptions {
+class TransformVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+  TransformVectorLayoutOptions(Operation *root, bool fullConversion)
+      : VectorLayoutOptions(root, fullConversion) {}
 
   void setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
@@ -1510,18 +1512,29 @@ public:
 };
 
 DiagnosedSilenceableFailure
-transform_dialect::TestAMDGPUContractionDistribution::applyToOne(
+transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  TestVectorLayoutOptions options(target);
+  TransformVectorLayoutOptions options(target, !getTestConversion());
   RewritePatternSet patterns(target.getContext());
+
+  rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
+  Value laneId =
+      rewriter.create<gpu::ThreadIdOp>(target.getLoc(), gpu::Dimension::x);
+
+  populateGPUDistributionPatterns(patterns);
+  populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
+  populateGPUReductionDistributionPatterns(patterns);
+  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   populateAMDGPUDistributionPatterns(patterns);
-  distributeVectorOps(target, patterns, options);
+  if (failed(distributeVectorOps(target, patterns, options))) {
+    return emitDefaultSilenceableFailure(target);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 
-void transform_dialect::TestAMDGPUContractionDistribution::getEffects(
+void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
@@ -1575,6 +1588,56 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
   results.setParams(cast<OpResult>(getResult(0)), paramsArray0);
   results.setParams(cast<OpResult>(getResult(1)), paramsArray0);
   return DiagnosedSilenceableFailure::success();
+}
+
+//===----------------------------------------------------------------------===//
+// SetContractionLayoutAttributes
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::SetContractionLayoutAttributes::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto payloadList = state.getPayloadOps(getTarget());
+  auto typeList = state.getParams(getMmaType());
+  if (typeList.size() != 1) {
+    return emitDefiniteFailure()
+           << "invalid more than one attribute for contraction annotation";
+  }
+  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(typeList.front());
+  if (!mmaType) {
+    return emitDefiniteFailure()
+           << "invalid non-mma attribute for contraction annotation "
+           << typeList.front();
+  }
+
+  for (Operation *payload : payloadList) {
+    auto contract = llvm::dyn_cast<vector::ContractionOp>(payload);
+    if (!contract) {
+      return emitDefiniteFailure()
+             << "invalid non-contraction annotation " << payload;
+    }
+
+    auto maybeLayouts = mmaType.getContractionLayout(contract);
+    if (failed(maybeLayouts)) {
+      return emitDefiniteFailure()
+             << "invalid opaque mma layout for annotation " << mmaType;
+    }
+
+    auto [aLayout, bLayout, cLayout] = *maybeLayouts;
+    contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
+    contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);
+    contract->setAttr("__vector_layout_test_anchor_operand_2", cLayout);
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::SetContractionLayoutAttributes::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getMmaType(), effects);
+  transform::modifiesPayload(effects);
 }
 
 #define GET_OP_CLASSES

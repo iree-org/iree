@@ -463,25 +463,17 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
         command_buffer->push_constants[i];
   }
 
-  dim3 num_blocks = {
-      .x = workgroup_x,
-      .y = workgroup_y,
-      .z = workgroup_z,
-  };
-  dim3 block_size = {
-      .x = kernel_info.block_size[0],
-      .y = kernel_info.block_size[1],
-      .z = kernel_info.block_size[2],
-  };
-  IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, command_buffer->hip_symbols,
-      hipLaunchKernel(&kernel_info.function, num_blocks, block_size, params_ptr,
-                      kernel_info.shared_memory_size,
-                      command_buffer->hip_stream),
-      "hipLaunchKernel");
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      command_buffer->hip_symbols,
+      hipModuleLaunchKernel(
+          kernel_info.function, workgroup_x, workgroup_y, workgroup_z,
+          kernel_info.block_size[0], kernel_info.block_size[1],
+          kernel_info.block_size[2], kernel_info.shared_memory_size,
+          command_buffer->hip_stream, params_ptr, NULL),
+      "hipModuleLaunchKernel");
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_dispatch_indirect(

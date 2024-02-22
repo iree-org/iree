@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "smoketest.mlir"
+    "target_device_features.mlir"
   TOOLS
     FileCheck
     iree-opt

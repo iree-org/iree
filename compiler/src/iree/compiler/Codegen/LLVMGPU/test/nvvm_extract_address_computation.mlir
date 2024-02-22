@@ -74,7 +74,6 @@
 // CHECK: %[[IV_NEXT:.*]] = llvm.mul %[[IV]], %[[C8192]]  : i64
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
-#device_target_cuda = #hal.device.target<"cuda", {executable_targets = [#executable_target_cuda_nvptx_fb], legacy_sync}>
 hal.executable private @matmul_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
     hal.executable.export public @matmul_dispatch_0_matmul_2560x2560x2560 ordinal(0) layout(#pipeline_layout) {

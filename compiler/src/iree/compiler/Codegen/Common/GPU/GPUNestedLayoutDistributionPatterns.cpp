@@ -137,6 +137,9 @@ static SmallVector<int64_t>
 getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
   int64_t rank = vectorLayout.getBatchOrder().size();
   SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
+  // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
+  // the subvector only containing elements, we need indices in all BATCH and
+  // OUTER (rank * 2) dimensions to have tile size 1.
   for (int i = 0, e = rank * 2; i < e; ++i) {
     tileShape[i] = 1;
   }
@@ -152,7 +155,8 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
   int64_t rank = vectorLayout.getBatchOrder().size();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
-  ValueRange threadIds = vectorLayout.computeThreadIds(threadId, rewriter);
+  SmallVector<Value> threadIds =
+      vectorLayout.computeThreadIds(threadId, rewriter);
 
   // Subgroup and thread (lane) indices normalized to the order in which
   // they are used by each dimension.

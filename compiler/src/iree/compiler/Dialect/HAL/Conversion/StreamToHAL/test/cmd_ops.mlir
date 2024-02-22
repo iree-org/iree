@@ -256,15 +256,23 @@ util.func public @cmdDispatch(%arg0: !stream.resource<transient>, %arg1: index, 
     // CHECK: %[[YZ:.+]] = arith.constant 1 : index
     // CHECK-NEXT: %[[X:.+]] = affine.apply #map()[%c1]
 
+    // Target executable/export:
+    //  CHECK-DAG: %[[EXECUTABLE_0:.+]] = hal.executable.lookup
+    // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
+    // CHECK-SAME:     executable(@ex) : !hal.executable
+    //  CHECK-DAG: %[[ORDINAL_0:.+]] = hal.executable.export.ordinal
+    // CHECK-SAME:     target(@ex::@aarch64::@dispatch) : index
+
     // Dispatch:
-    // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
-    // CHECK-SAME: target(@ex::@aarch64::@dispatch)
+    // CHECK: hal.command_buffer.dispatch<%[[CMD]]
+    // CHECK-SAME: target(%[[EXECUTABLE_0]] : !hal.executable)[%[[ORDINAL_0]]]
     // CHECK-SAME: workgroups([%[[X]], %[[YZ]], %[[YZ]]])
 
     // Other variant, when selected:
     // CHECK: case 1 {
-    // CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]]
-    // CHECK-SAME: target(@ex::@x86_64::@dispatch)
+    // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@x86_64::@dispatch)
+    // CHECK: hal.command_buffer.dispatch<%[[CMD]]
+    // CHECK-SAME: target({{.+}})[%[[ORDINAL_1]]]
     stream.cmd.dispatch {@ex::@aarch64::@dispatch, @ex::@x86_64::@dispatch}[%c1, %c2, %c3](%c4_i32, %c5_i32 : i32, i32) {
       ro %arg4[%c0 for %c128] : !stream.resource<transient>{%arg1},
       wo %arg5[%c0 for %c128] : !stream.resource<external>{%arg3}
