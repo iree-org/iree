@@ -554,8 +554,7 @@ void CPUMaterializeUpperBoundTileSizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto operation = getOperation();
   if (targetAttrs.empty()) {
-    targetAttrs =
-        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(operation);
+    targetAttrs = {IREE::HAL::ExecutableTargetAttr::lookup(operation)};
   }
   RewritePatternSet patterns(context);
   MaterializeEncodingFn materializeEncodingFn =

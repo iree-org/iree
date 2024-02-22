@@ -88,6 +88,8 @@ static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
     llvm::cl::init(true));
 
 static void addTileAndDistributePasses(OpPassManager &pm) {
+  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(
+      createCPUMaterializeUpperBoundTileSizePass());
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(
