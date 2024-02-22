@@ -19,11 +19,11 @@ namespace {
 /// Apply dilation and padding to the input of a convolution.
 Value applyConvolutionPadding(Location loc, Value input,
                               DenseIntElementsAttr padding,
-                              DenseIntElementsAttr lhsDilation,
+                              const std::optional<::llvm::ArrayRef<int64_t>> &lhsDilation,
                               llvm::ArrayRef<int64_t> dimMappings,
                               OpBuilder &rewriter) {
   if ((!padding || isSplatValue(padding, 0)) &&
-      (!lhsDilation || isSplatValue(lhsDilation, 1))) {
+      (!lhsDilation || isSplatValue(*lhsDilation, 1))) {
     return input;
   }
 
@@ -48,10 +48,10 @@ Value applyConvolutionPadding(Location loc, Value input,
   // Translate input dilation into interior padding.
   SmallVector<int64_t, 8> padInterior(rank, 0);
   if (lhsDilation) {
-    assert(rank == lhsDilation.size() + 2);
-    for (int64_t i : llvm::seq<int64_t>(0, lhsDilation.size())) {
+    assert(rank == lhsDilation->size() + 2);
+    for (int64_t i : llvm::seq<int64_t>(0, lhsDilation->size())) {
       int64_t dim = dimMappings[i];
-      padInterior[dim] = lhsDilation.getValues<int64_t>()[i] - 1;
+      padInterior[dim] = lhsDilation.value()[i] - 1;
     }
   }
 
@@ -84,7 +84,7 @@ Value applyConvolutionReversal(Location loc, OpBuilder &b,
   }
   llvm::SmallVector<int64_t> reversedDims;
   for (auto [idx, reversed] :
-       llvm::enumerate(reversals.value().getValues<bool>())) {
+       llvm::enumerate(reversals.value())) {
     if (reversed) {
       reversedDims.push_back(
           op.getDimensionNumbers().getKernelSpatialDimensions()[idx]);
@@ -220,7 +220,7 @@ struct NormalConvolutionOpConversion final
     llvm::SmallVector<int64_t> spatialDimMapping(rank - 2);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilationAttr(), spatialDimMapping,
+                                    op.getLhsDilation(), spatialDimMapping,
                                     rewriter);
 
     switch (rank) {
@@ -341,10 +341,10 @@ struct ConvolutionOpGeneralConversion final
     // Decompose the convolution into an initial padding
     Value modifiedLhs = applyConvolutionPadding(
         op.getLoc(), adaptor.getLhs(), adaptor.getPaddingAttr(),
-        adaptor.getLhsDilationAttr(),
+        adaptor.getLhsDilation(),
         op.getDimensionNumbers().getInputSpatialDimensions(), rewriter);
     Value modifiedRhs = applyConvolutionPadding(
-        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilationAttr(),
+        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilation(),
         op.getDimensionNumbers().getKernelSpatialDimensions(), rewriter);
     modifiedRhs = applyConvolutionReversal(loc, rewriter, op, modifiedRhs);
 
@@ -507,7 +507,7 @@ struct ConvolutionOpGeneralConversion final
 
       AffineExpr stride = dim0;
       if (op.getWindowStrides().has_value())
-        stride = stride * op.getWindowStrides().value().getValues<int64_t>()[i];
+        stride = stride * op.getWindowStrides().value()[i];
       AffineExpr srcExpr = stride + dim1;
 
       srcExprs[lhsIndexMapping[inputSpatialDimensions[i]]] = srcExpr;
@@ -596,7 +596,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute windowStrides;
     if (op.getWindowStrides()) {
-      windowStrides = op.getWindowStrides().value();
+      windowStrides = op.getWindowStridesAttr();
     } else {
       windowStrides = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),
@@ -605,7 +605,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute rhsDilation;
     if (op.getRhsDilation()) {
-      rhsDilation = op.getRhsDilation().value();
+      rhsDilation = op.getRhsDilationAttr();
     } else {
       rhsDilation = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),
@@ -636,7 +636,7 @@ struct DepthwiseConvolutionOpConversion final
     llvm::SmallVector<int64_t> spatialDimMapping(spatialRank);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilationAttr(), spatialDimMapping,
+                                    op.getLhsDilation(), spatialDimMapping,
                                     rewriter);
 
     auto filterDims =

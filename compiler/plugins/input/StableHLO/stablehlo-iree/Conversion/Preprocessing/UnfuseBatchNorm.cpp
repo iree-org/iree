@@ -27,8 +27,7 @@ namespace {
 Value broadcastToFeatureDim(Location loc, RankedTensorType resultType,
                             Value value1d, Value shapeValue, int64_t featureDim,
                             PatternRewriter &rewriter) {
-  auto dimsType = RankedTensorType::get({1}, rewriter.getIntegerType(64));
-  auto dims = DenseIntElementsAttr::get(dimsType, {featureDim});
+  DenseI64ArrayAttr dims = rewriter.getDenseI64ArrayAttr({featureDim});
   if (shapeValue) {
     return rewriter.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
         loc, resultType, value1d, shapeValue, dims);
@@ -73,8 +72,7 @@ Value materializeEpsilon(Operation *op, FloatAttr epsilonAttr, FloatType fpType,
   auto epsilonTensorAttr =
       DenseElementsAttr::get(scalarType, {cast<Attribute>(epsilonAttr)});
   Value epsilon = b.create<mlir::stablehlo::ConstantOp>(epsilonTensorAttr);
-  auto dimsType = RankedTensorType::get({0}, b.getIntegerType(64));
-  auto dims = DenseIntElementsAttr::get(dimsType, SmallVector<int64_t, 1>{});
+  DenseI64ArrayAttr dims = rewriter.getDenseI64ArrayAttr({});
   if (broadcastToType.hasStaticShape()) {
     return b.create<mlir::stablehlo::BroadcastInDimOp>(broadcastToType, epsilon,
                                                        /*broadcast_dims=*/dims);
@@ -160,7 +158,7 @@ Value createReduce(Location loc, Value operand, Value zero,
       {operandType.getDimSize(featureIndex)}, operandType.getElementType());
   auto reduce = rewriter.create<mlir::stablehlo::ReduceOp>(
       loc, reduceResultType, operand, zero,
-      rewriter.getI64TensorAttr(reduceDims));
+      reduceDims);
 
   // setup "stablehlo.reduce"'s body
   Region &region = reduce.getBody();
@@ -207,7 +205,7 @@ Value calculateReduceSize(Operation *op, Value operand,
     reduceSize = b.create<mlir::stablehlo::ReshapeOp>(
         RankedTensorType::get({}, operandType.getElementType()), reduceSize);
     return b.createOrFold<mlir::stablehlo::DynamicBroadcastInDimOp>(
-        scaleType, reduceSize, scaleShape, b.getI64TensorAttr({}));
+        scaleType, reduceSize, scaleShape, b.getDenseI64ArrayAttr({}));
   }
 
   // the "operand" has static shape
