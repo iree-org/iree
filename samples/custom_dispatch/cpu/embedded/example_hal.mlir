@@ -90,7 +90,19 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
                 <1, storage_buffer, ReadOnly>,
                 <2, storage_buffer>
             ]>
-          ]>) {
+          ]>) attributes {
+            // Bindings are automatically inferred when possible as part of the
+            // ABI but can be overridden if the user wants to use features such
+            // as sparse bindings or multiple descriptor sets. To do so the
+            // `hal.interface.bindings` attribute can be added to a dispatch op
+            // as follows mapping tensor operands/results to the pipeline layout
+            // sets/bindings:
+            hal.interface.bindings = [
+              #hal.interface.binding<0, 0>,
+              #hal.interface.binding<0, 1>,
+              #hal.interface.binding<0, 2>
+            ]
+          } {
       ^bb0(%device: !hal.device, %workload: index):
         // This host function is used to compute the XYZ workgroup count
         // dispatched at runtime. It can query the %device for capabilities
@@ -245,17 +257,6 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
 
     // Dispatch a basic `ret = lhs * rhs` using an external function.
     %0 = flow.dispatch @executable::@x86_64::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
-      // Bindings are automatically inferred when possible as part of the ABI
-      // but can be overridden if the user wants to use features such as sparse
-      // bindings or multiple descriptor sets. To do so the
-      // `hal.interface.bindings` attribute can be added to a dispatch op as
-      // follows mapping tensor operands/results to the pipeline layout
-      // sets/bindings:
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ],
       // HACK: keep the executable live through DCE. Only required when
       // using the automatic variant selection.
       // TODO(benvanik): automatically add this when required.
