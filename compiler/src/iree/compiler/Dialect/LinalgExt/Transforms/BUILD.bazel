@@ -32,7 +32,6 @@ iree_compiler_cc_library(
     srcs = [
         "ConvertConv2DToWinograd.cpp",
         "ConvertToLoops.cpp",
-        "ForeachThreadToAsync.cpp",
         "PadContractionToBlockSize.cpp",
         "PassDetail.h",
         "Passes.cpp",
@@ -55,7 +54,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:ArithUtils",
-        "@llvm-project//mlir:AsyncDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
@@ -80,7 +78,5 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
-        "@llvm-project//mlir:VectorDialect",
-        "@llvm-project//mlir:VectorTransforms",
     ],
 )
