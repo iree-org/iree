@@ -33,7 +33,6 @@ iree_cc_library(
     "HoistableOpInterface.cpp"
     "HoistableTypeInterface.cpp"
   DEPS
-    IREELinalgExtDialect
     LLVMSupport
     MLIRIR
     MLIRLinalgDialect
@@ -42,6 +41,7 @@ iree_cc_library(
     MLIRTensorDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::IR::FlowOpsGen
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

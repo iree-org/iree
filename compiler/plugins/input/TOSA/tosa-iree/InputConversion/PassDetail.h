@@ -7,7 +7,7 @@
 #ifndef TOSA_IREE_INPUTCONVERSION_PASSDETAIL_H_
 #define TOSA_IREE_INPUTCONVERSION_PASSDETAIL_H_
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"

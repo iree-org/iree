@@ -7,8 +7,6 @@
 #include "iree-dialects-c/Dialects.h"
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "mlir/CAPI/IR.h"
@@ -30,14 +28,6 @@ using namespace mlir::iree_compiler::IREE;
 
 MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
     IREEInput, iree_input, mlir::iree_compiler::IREE::Input::IREEInputDialect)
-
-//===--------------------------------------------------------------------===//
-// IREELinalgExt
-//===--------------------------------------------------------------------===//
-
-MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(
-    IREELinalgExt, iree_linalg_ext,
-    mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect)
 
 //===--------------------------------------------------------------------===//
 // IREELinalgTransform

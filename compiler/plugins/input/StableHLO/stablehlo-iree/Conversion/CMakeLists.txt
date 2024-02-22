@@ -73,7 +73,6 @@ iree_cc_library(
     ::CHLODecompositionPatterns
     ::PassHeaders
     ChloOps
-    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
@@ -102,6 +101,7 @@ iree_cc_library(
     StablehloBroadcastUtils
     StablehloOps
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

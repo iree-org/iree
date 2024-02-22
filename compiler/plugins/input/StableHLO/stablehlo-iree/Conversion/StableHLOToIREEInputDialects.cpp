@@ -7,8 +7,8 @@
 // Implements IREE-specific logic for lowering StableHLO dialect to
 // IREE dialects: Linalg, Arith, Math, Tensor, Util, ML Program, etc.
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
