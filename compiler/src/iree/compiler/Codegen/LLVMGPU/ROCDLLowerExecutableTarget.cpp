@@ -48,9 +48,6 @@ public:
     OpPassManager pipeline(variantOp.getOperationName());
 
     switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    case CodeGenPipeline::LLVMGPUBaseLowering:
-      addGPUBaseLoweringPassPipeline(pipeline);
-      break;
     case CodeGenPipeline::LLVMGPUWarpReduction:
       addGPUWarpReductionPassPipeline(pipeline);
       break;
