@@ -8,7 +8,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/Support/FormatVariadic.h"
-#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/OpImplementation.h"
 
