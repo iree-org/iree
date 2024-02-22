@@ -101,7 +101,8 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b \
-            ./build_tools/cmake/run_arm_sme_tests.py
+            ./build_tools/cmake/run_arm_sme_tests.py \
+            "${BUILD_DIR}"
 
   build_test_all_windows:
     needs: setup

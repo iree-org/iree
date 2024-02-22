@@ -6,6 +6,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+import sys
 import json
 import subprocess
 import os
@@ -14,7 +15,7 @@ import os
 # This assumes the host is an aarch64 machine.
 
 if __name__ == "__main__":
-    build_dir = os.getenv("BUILD_DIR", ".")
+    build_dir = "." if len(sys.argv) < 2 else sys.argv[1]
     os.chdir(build_dir)
 
     print("*************** Running ArmSME Tests ***************")
@@ -28,7 +29,13 @@ if __name__ == "__main__":
         )
     )
 
-    for test in arm_sme_test_info["tests"]:
+    tests = arm_sme_test_info["tests"]
+
+    if len(tests) == 0:
+        print("No ArmSME tests found!", file=sys.stderr)
+        exit(1)
+
+    for test in tests:
         name = test["name"]
         test_command = [
             qemu_aarch64_executable,
