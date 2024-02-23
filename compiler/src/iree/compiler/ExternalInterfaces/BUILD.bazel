@@ -23,8 +23,8 @@ iree_compiler_cc_library(
         "UtilExternalModels.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgOpsIncGen",
