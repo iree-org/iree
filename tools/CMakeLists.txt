@@ -65,6 +65,23 @@ endif()
 
 iree_cc_binary(
   NAME
+    iree-benchmark-executable
+  SRCS
+    "iree-benchmark-executable-main.c"
+  DEPS
+    iree::base
+    iree::base::internal::flags
+    iree::hal
+    iree::modules::hal::types
+    iree::testing::benchmark
+    iree::tooling::device_util
+    iree::tooling::function_io
+    iree::vm
+  INSTALL_COMPONENT IREETools-Runtime
+)
+
+iree_cc_binary(
+  NAME
     iree-benchmark-module
   SRCS
     "iree-benchmark-module-main.cc"
