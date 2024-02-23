@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
+#include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -14,13 +14,19 @@
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir::iree_compiler::IREE::Util {
+using namespace mlir::iree_compiler::IREE;
+
+namespace mlir::iree_compiler {
 
 namespace {
 
+//===----------------------------------------------------------------------===//
+// GlobalOpInterface
+//===----------------------------------------------------------------------===//
+
 struct GlobalOpInterfaceExternalModel
-    : public GlobalOpInterface::ExternalModel<GlobalOpInterfaceExternalModel,
-                                              ml_program::GlobalOp> {
+    : public Util::GlobalOpInterface::ExternalModel<
+          GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
   }
@@ -78,14 +84,18 @@ struct GlobalOpInterfaceExternalModel
   }
 };
 
+//===----------------------------------------------------------------------===//
+// NumericCastOpInterface
+//===----------------------------------------------------------------------===//
+
 // Since all details of the interface are provided via default implementations,
 // we can just have one templated external model to apply per op, vs one
 // explicit model per op.
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
-                                                     OpTy> {};
+      : public Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                           OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -99,9 +109,13 @@ struct GenericNumericCastExternalModel {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// TiedOpInterface
+//===----------------------------------------------------------------------===//
+
 struct InsertSliceOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
-                                            tensor::InsertSliceOp> {
+    : public Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
+                                                  tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -120,8 +134,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
-                                            OpTy> {
+    : public Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
+                                                  OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -151,6 +165,98 @@ struct LinalgOpTiedOpInterfaceHelper {
         0,
         (Ops::template attachInterface<LinalgOpTiedOpInterface<Ops>>(*context),
          0)...};
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// HoistableOpInterface
+//===----------------------------------------------------------------------===//
+
+template <typename OpTy>
+struct UnhoistableOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          UnhoistableOpInterface<OpTy>, OpTy> {
+  bool isHoistableOp(Operation *) const { return false; }
+  bool isHoistableLeafOp(Operation *) const { return false; }
+};
+
+template <typename OpTy>
+struct HoistableNonLeafOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          HoistableNonLeafOpInterface<OpTy>, OpTy> {
+  bool isHoistableLeafOp(Operation *) const { return false; }
+};
+
+// The default interface is always hoistable. This acts as an override
+// for other default hoistability checks as the interface is checked
+// first.
+template <typename OpTy>
+struct AlwaysHoistableOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          AlwaysHoistableOpInterface<OpTy>, OpTy> {};
+
+template <typename OpTy>
+struct HoistableLinalgOpInterface
+    : public IREE::Util::HoistableOpInterface::ExternalModel<
+          HoistableLinalgOpInterface<OpTy>, OpTy> {
+  bool isHoistableOp(Operation *) const { return true; }
+  bool isHoistableLeafOp(Operation *op) const {
+    auto genericOp = llvm::dyn_cast<linalg::GenericOp>(op);
+    if (!genericOp)
+      return true;
+    // Generally, we prefer to not hoist broadcasts.
+    // Detect op that only broadcast input as fusing them makes the new
+    // op cheaper.
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
+        isa<linalg::YieldOp>(genericOp.getBody()->front())) {
+      for (OpOperand *opOperand : genericOp.getDpsInputOperands()) {
+        AffineMap indexingMap = genericOp.getMatchingIndexingMap(opOperand);
+        if (indexingMap.isProjectedPermutation() &&
+            indexingMap.getNumDims() != indexingMap.getNumResults()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  bool isAtomicallyHoistableOp(Operation *) const { return true; }
+  bool isOperandHoistable(Operation *op, OpOperand *operand) const {
+    linalg::LinalgOp linalgOp = llvm::cast<linalg::LinalgOp>(op);
+    // For linalg ops, we only want to hoist inputs.
+    return operand->getOperandNumber() < linalgOp.getNumDpsInputs();
+  }
+};
+
+/// Helper structures that iterates over all Op types in `OpTys` and registers
+/// the associated Hoistable___OpInterface.
+template <typename... Ops>
+struct UnhoistableOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<UnhoistableOpInterface<Ops>>(*context), ...);
+  }
+};
+
+template <typename... Ops>
+struct HoistableNonLeafOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<HoistableNonLeafOpInterface<Ops>>(*context),
+     ...);
+  }
+};
+
+template <typename... Ops>
+struct AlwaysHoistableOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<AlwaysHoistableOpInterface<Ops>>(*context),
+     ...);
+  }
+};
+
+template <typename... Ops>
+struct HoistableLinalgOpInterfaceHelper {
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<HoistableLinalgOpInterface<Ops>>(*context),
+     ...);
   }
 };
 
@@ -219,6 +325,52 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     LinalgExt::AttentionOp::attachInterface<
         LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*context);
   });
+
+  // Hoistable Op Interface registration.
+
+  // Register hoistable type interfaces for LinalgExt ops.
+  registry.addExtension(+[](MLIRContext *context,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    UnhoistableOpInterfaceHelper<
+        IREE::LinalgExt::SetEncodingOp,
+        IREE::LinalgExt::UpperBoundTileSizeOp>::registerOpInterface(context);
+  });
+  // Register hoistable type interfaces for linalg ops.
+  // We have a specific allow-list for Linalg ops because we want to consider
+  // new additions carefully.
+  registry.addExtension(
+      +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
+        // Structured op implementations and a handful of pure ops are included.
+        // Notably: IndexOp is not included because it establishes a hidden
+        // dependency to the iterator and is non-const.
+
+        // Register all LinalgOps ops. `LinalgOp` is an interface and it is
+        // not possible to attach an external interface to an existing
+        // interface. Therefore, attach the `HoistableLinalgOpInterface` to all
+        // ops one-by-one.
+        HoistableLinalgOpInterfaceHelper<
+#define GET_OP_LIST
+#include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
+            >::registerOpInterface(context);
+        UnhoistableOpInterfaceHelper<
+#define GET_OP_LIST
+#include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
+            >::registerOpInterface(context);
+      });
+  // Register hoistable type interfaces for tensor ops.
+  registry.addExtension(
+      +[](MLIRContext *context, tensor::TensorDialect *dialect) {
+        // Never hoist empty and other pure metadata ops as a leaf. It's fine to
+        // hoist them as a part of a larger constant tree that does actual work.
+        HoistableNonLeafOpInterfaceHelper<
+            tensor::EmptyOp, tensor::ExpandShapeOp,
+            tensor::CollapseShapeOp>::registerOpInterface(context);
+        // Cases of trivial pack/unpack should be handled as canonicalizations
+        // before we get here, thus we're safe to always hoist.
+        AlwaysHoistableOpInterfaceHelper<
+            tensor::PadOp, tensor::PackOp,
+            tensor::UnPackOp>::registerOpInterface(context);
+      });
 }
 
-} // namespace mlir::iree_compiler::IREE::Util
+} // namespace mlir::iree_compiler

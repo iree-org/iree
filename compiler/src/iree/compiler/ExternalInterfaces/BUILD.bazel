@@ -13,31 +13,24 @@ package(
 )
 
 iree_compiler_cc_library(
-    name = "Interfaces",
+    name = "ExternalModels",
     srcs = [
         "Interfaces.cpp",
+        "UtilExternalModels.cpp",
     ],
     hdrs = [
         "Interfaces.h",
+        "UtilExternalModels.h",
     ],
     deps = [
-        ":HoistableInterfaces",
-        "@llvm-project//mlir:IR",
-    ],
-)
-
-iree_compiler_cc_library(
-    name = "HoistableInterfaces",
-    srcs = [
-        "HoistableTypeInterface.cpp",
-    ],
-    hdrs = [
-        "HoistableTypeInterface.h",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
-        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgOpsIncGen",
+        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
+        "@llvm-project//mlir:MLProgramDialect",
+        "@llvm-project//mlir:TensorDialect",
     ],
 )
