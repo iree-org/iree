@@ -787,6 +787,7 @@ iree_generated_e2e_matmul_test(
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f32"
+    "--transpose=b"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUMatmulSimt"
   TEST_RUNNER
