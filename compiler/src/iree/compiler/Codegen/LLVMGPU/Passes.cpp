@@ -113,8 +113,9 @@ tileAndDistributeToWorkgroup(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass(
           useWARForCooperativeMatrixCodegen));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  // TODO(#16421): Disable decomposition due to failure in bufferization.
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
