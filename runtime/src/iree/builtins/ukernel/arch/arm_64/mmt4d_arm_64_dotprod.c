@@ -110,70 +110,77 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
       rhs[i + 2] = vandq_s8(r, vmask);
     }
 
-    int8x8_t lhs[8];
-    if (M0 == 8) {
-      int8x16x2_t lhs_uzp_0 = vld2q_s8(lhs_ptr);
-      lhs_ptr += 32;
-      int8x16x2_t lhs_uzp_1 = vld2q_s8(lhs_ptr);
-      lhs_ptr += 32;
-      lhs[0] = vget_low_s8(lhs_uzp_0.val[0]);
-      lhs[1] = vget_low_s8(lhs_uzp_0.val[1]);
-      lhs[2] = vget_high_s8(lhs_uzp_0.val[0]);
-      lhs[3] = vget_high_s8(lhs_uzp_0.val[1]);
-      lhs[4] = vget_low_s8(lhs_uzp_1.val[0]);
-      lhs[5] = vget_high_s8(lhs_uzp_1.val[0]);
-      lhs[6] = vget_low_s8(lhs_uzp_1.val[1]);
-      lhs[7] = vget_high_s8(lhs_uzp_1.val[1]);
-    } else if (M0 == 4) {
-      int8x16x2_t lhs_uzp = vld2q_s8(lhs_ptr);
-      lhs_ptr += 32;
-      lhs[0] = vget_low_s8(lhs_uzp.val[0]);
-      lhs[1] = vget_low_s8(lhs_uzp.val[1]);
-      lhs[2] = vget_high_s8(lhs_uzp.val[0]);
-      lhs[3] = vget_high_s8(lhs_uzp.val[1]);
-    } else if (M0 == 2) {
-      int8x8x2_t lhs_uzp = vld2_s8(lhs_ptr);
-      lhs_ptr += 16;
-      lhs[0] = lhs_uzp.val[0];
-      lhs[1] = lhs_uzp.val[1];
-    } else {  // M0 == 1.
-      int8x8_t r = vld1_s8(lhs_ptr);
-      lhs_ptr += 8;
-      int8x8x2_t lhs_uzp = vuzp_s8(r, vzero);
-      lhs[0] = lhs_uzp.val[0];
-      lhs[1] = lhs_uzp.val[1];
-    }
-
-    // 1x8 * 8x8 -> 1x8.
-    for (int i = 0; i < 2; ++i) {
-      for (int j = 0; j < 2; ++j) {
-        acc[j] = vdotq_lane_s32(acc[j], rhs[i * 2 + j], lhs[i], 0);
+    if (M0 >= 4) {
+      int8x8_t lhs[8];
+      if (M0 == 8) {
+        int8x16x2_t lhs_uzp_0 = vld2q_s8(lhs_ptr);
+        lhs_ptr += 32;
+        int8x16x2_t lhs_uzp_1 = vld2q_s8(lhs_ptr);
+        lhs_ptr += 32;
+        lhs[0] = vget_low_s8(lhs_uzp_0.val[0]);
+        lhs[1] = vget_low_s8(lhs_uzp_0.val[1]);
+        lhs[2] = vget_high_s8(lhs_uzp_0.val[0]);
+        lhs[3] = vget_high_s8(lhs_uzp_0.val[1]);
+        lhs[4] = vget_low_s8(lhs_uzp_1.val[0]);
+        lhs[5] = vget_high_s8(lhs_uzp_1.val[0]);
+        lhs[6] = vget_low_s8(lhs_uzp_1.val[1]);
+        lhs[7] = vget_high_s8(lhs_uzp_1.val[1]);
+      } else {  // M0 = 4.
+        int8x16x2_t lhs_uzp = vld2q_s8(lhs_ptr);
+        lhs_ptr += 32;
+        lhs[0] = vget_low_s8(lhs_uzp.val[0]);
+        lhs[1] = vget_low_s8(lhs_uzp.val[1]);
+        lhs[2] = vget_high_s8(lhs_uzp.val[0]);
+        lhs[3] = vget_high_s8(lhs_uzp.val[1]);
       }
-    }
-    if (M0 == 1) continue;
-    // 2x8 * 8x8 -> 2x8.
-    for (int i = 0; i < 2; ++i) {
-      for (int j = 0; j < 2; ++j) {
-        acc[2 + j] = vdotq_lane_s32(acc[2 + j], rhs[i * 2 + j], lhs[i], 1);
+      // 4x8 * 8x8 -> 4x8.
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+          for (int k = 0; k < 2; k++) {
+            acc[4 * k + j] = vdotq_lane_s32(acc[4 * k + j], rhs[2 * i + j],
+                                            lhs[2 * k + i], 0);
+            acc[4 * k + j + 2] = vdotq_lane_s32(
+                acc[4 * k + j + 2], rhs[2 * i + j], lhs[2 * k + i], 1);
+          }
+        }
       }
-    }
-    if (M0 == 2) continue;
-    // 4x8 * 8x8 -> 4x8.
-    for (int i = 0; i < 2; i++) {
-      for (int j = 0; j < 2; j++) {
-        acc[4 + j] = vdotq_lane_s32(acc[4 + j], rhs[2 * i + j], lhs[2 + i], 0);
-        acc[6 + j] = vdotq_lane_s32(acc[6 + j], rhs[2 * i + j], lhs[2 + i], 1);
+      if (M0 == 4) continue;
+      // 8x8 * 8x8 -> 8x8.
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 2; j++) {
+          for (int k = 0; k < 2; k++) {
+            acc[8 + 4 * k + j] = vdotq_lane_s32(
+                acc[8 + 4 * k + j], rhs[2 * i + j], lhs[4 + 2 * i + k], 0);
+            acc[10 + 4 * k + j] = vdotq_lane_s32(
+                acc[10 + 4 * k + j], rhs[2 * i + j], lhs[4 + 2 * i + k], 1);
+          }
+        }
       }
-    }
-    if (M0 == 4) continue;
-    // 8x8 * 8x8 -> 8x8.
-    for (int i = 0; i < 2; i++) {
-      for (int j = 0; j < 2; j++) {
-        for (int p = 0; p < 2; p++) {
-          acc[8 + 4 * p + j] = vdotq_lane_s32(
-              acc[8 + 4 * p + j], rhs[2 * i + j], lhs[4 + 2 * i + p], 0);
-          acc[10 + 4 * p + j] = vdotq_lane_s32(
-              acc[10 + 4 * p + j], rhs[2 * i + j], lhs[4 + 2 * i + p], 1);
+    } else {
+      int8x8_t lhs[2];
+      if (M0 == 2) {
+        int8x8x2_t lhs_uzp = vld2_s8(lhs_ptr);
+        lhs_ptr += 16;
+        lhs[0] = lhs_uzp.val[0];
+        lhs[1] = lhs_uzp.val[1];
+      } else {  // M0 == 1.
+        int8x8_t r = vld1_s8(lhs_ptr);
+        lhs_ptr += 8;
+        int8x8x2_t lhs_uzp = vuzp_s8(r, vzero);
+        lhs[0] = lhs_uzp.val[0];
+        lhs[1] = lhs_uzp.val[1];
+      }
+      // 1x8 * 8x8 -> 1x8.
+      for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+          acc[j] = vdotq_lane_s32(acc[j], rhs[i * 2 + j], lhs[i], 0);
+        }
+      }
+      if (M0 == 1) continue;
+      // 2x8 * 8x8 -> 2x8.
+      for (int i = 0; i < 2; ++i) {
+        for (int j = 0; j < 2; ++j) {
+          acc[2 + j] = vdotq_lane_s32(acc[2 + j], rhs[i * 2 + j], lhs[i], 1);
         }
       }
     }
