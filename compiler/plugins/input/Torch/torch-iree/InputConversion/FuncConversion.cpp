@@ -674,7 +674,7 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
       return success();
     }
 
-    if (isa<IntegerType, FloatType>(torchType)) {
+    if (isa<IntegerType, FloatType, IndexType>(torchType)) {
       ireeType = torchType;
       disp = TypeDisposition::PASSTHROUGH;
       return success();
