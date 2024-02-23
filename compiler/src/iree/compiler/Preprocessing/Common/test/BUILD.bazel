@@ -16,8 +16,6 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "apply_pdl_patterns_torch.mlir",
-            "apply_pdl_patterns_tosa.mlir",
             "conv2d_to_img2col.mlir",
             "conv_to_channels_last.mlir",
             "make_single_dispatch_for_function.mlir",
@@ -28,15 +26,11 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "external_function_spec.mlir",
-            "torch.pdl.mlir",
-            "tosa.pdl.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
         "external_function_spec.mlir",
-        "torch.pdl.mlir",
-        "tosa.pdl.mlir",
     ],
     tools = [
         "//tools:iree-opt",
