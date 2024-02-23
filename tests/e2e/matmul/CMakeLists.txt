@@ -978,12 +978,39 @@ iree_generated_e2e_matmul_test(
 
 iree_generated_e2e_matmul_test(
   NAME
-    e2e_matmul_rocm_f16_large_cdna3_matrixcore
+    e2e_matmul_rocm_f16_large_cdna3_mfma
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistribute"
+  TEST_RUNNER
+    iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "rocm"
+  COMPILER_FLAGS
+    "--iree-rocm-target-chip=gfx942"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_matmul_test(
+  NAME
+    e2e_matmul_rocm_f16_large_cdna3_mfma_tb
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--transpose=b"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUVectorDistribute"
   TEST_RUNNER
