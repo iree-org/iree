@@ -1939,7 +1939,6 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     $body
   }];
 

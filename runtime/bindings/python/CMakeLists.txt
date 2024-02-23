@@ -141,6 +141,7 @@ iree_py_library(
     "iree/runtime/version.py"
     "iree/_runtime/__init__.py"
     "iree/_runtime/libs.py"
+    "iree/_runtime/scripts/iree_benchmark_executable/__main__.py"
     "iree/_runtime/scripts/iree_benchmark_module/__main__.py"
     "iree/_runtime/scripts/iree_cpuinfo/__main__.py"
     "iree/_runtime/scripts/iree_convert_parameters/__main__.py"
@@ -151,6 +152,12 @@ iree_py_library(
     "iree/_runtime/scripts/iree_tracy_capture/__main__.py"
   PYEXT_DEPS
     iree_runtime_bindings_python_PyExtRt
+)
+
+iree_symlink_tool(
+  TARGET runtime
+  FROM_TOOL_TARGET iree-benchmark-executable
+  TO_EXE_NAME iree/_runtime_libs/iree-benchmark-executable
 )
 
 iree_symlink_tool(
@@ -317,6 +324,7 @@ cmake_language(DEFER DIRECTORY \"${IREE_SOURCE_DIR}\"
   CALL install
   TARGETS
     iree-cpuinfo
+    iree-benchmark-executable
     iree-benchmark-module
     iree-convert-parameters
     iree-create-parameters
