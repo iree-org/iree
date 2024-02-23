@@ -625,7 +625,7 @@ func.func @prefix(%arg0: tensor<7x5xi32>, %arg1: tensor<i32>) -> tensor<7x5xi32>
     ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
     %787 = "stablehlo.add"(%arg2, %arg3) : (tensor<i32>, tensor<i32>) -> tensor<i32>
     "stablehlo.return"(%787) : (tensor<i32>) -> ()
-  }) {base_dilations = dense<1> : tensor<2xi64>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = dense<1> : tensor<2xi64>, window_dimensions = dense<[1, 5]> : tensor<2xi64>, window_strides = dense<1> : tensor<2xi64>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
+  }) {base_dilations = array<i64: 1, 1>, padding = dense<[[0, 0], [4, 0]]> : tensor<2x2xi64>, window_dilations = array<i64: 1, 1>, window_dimensions = array<i64: 1, 5>, window_strides = array<i64: 1, 1>} : (tensor<7x5xi32>, tensor<i32>) -> tensor<7x5xi32>
   return %reduce : tensor<7x5xi32>
 }
 // CHECK:       %extracted = tensor.extract %[[ARG1]][] : tensor<i32>
