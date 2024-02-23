@@ -19,14 +19,16 @@ namespace {
 /// Apply dilation and padding to the input of a convolution.
 Value applyConvolutionPadding(Location loc, Value input,
                               DenseIntElementsAttr padding,
-                              const std::optional<::llvm::ArrayRef<int64_t>> &lhsDilation,
+                              DenseI64ArrayAttr lhsDilation,
                               llvm::ArrayRef<int64_t> dimMappings,
                               OpBuilder &rewriter) {
-  if ((!padding || isSplatValue(padding, 0)) &&
-      (!lhsDilation || isSplatValue(*lhsDilation, 1))) {
-    return input;
-  }
-
+  SmallVector<int64_t> lhsDilationValues;
+  if (lhsDilation)
+    lhsDilationValues = llvm::to_vector(lhsDilation.asArrayRef());
+  bool noPadding = !padding || isSplatValue(padding, 0);
+  bool noDilation = !lhsDilation || hlo::isSplatArray(lhsDilationValues, 1);
+  if (noPadding && noDilation) return input;
+  
   auto inputType = cast<ShapedType>(input.getType());
   int64_t rank = inputType.getRank();
 
@@ -48,10 +50,10 @@ Value applyConvolutionPadding(Location loc, Value input,
   // Translate input dilation into interior padding.
   SmallVector<int64_t, 8> padInterior(rank, 0);
   if (lhsDilation) {
-    assert(rank == lhsDilation->size() + 2);
-    for (int64_t i : llvm::seq<int64_t>(0, lhsDilation->size())) {
+    assert(rank == static_cast<int64_t>(lhsDilationValues.size()) + 2);
+    for (int64_t i : llvm::seq<int64_t>(0, lhsDilationValues.size())) {
       int64_t dim = dimMappings[i];
-      padInterior[dim] = lhsDilation.value()[i] - 1;
+      padInterior[dim] = lhsDilationValues[i] - 1;
     }
   }
 
@@ -68,10 +70,8 @@ Value applyConvolutionPadding(Location loc, Value input,
                  RankedTensorType::get({}, inputType.getElementType())));
   }
 
-  return rewriter.create<mlir::stablehlo::PadOp>(
-      loc, input, zero, rewriter.getDenseI64ArrayAttr(padLow),
-      rewriter.getDenseI64ArrayAttr(padHigh),
-      rewriter.getDenseI64ArrayAttr(padInterior));
+  return rewriter.create<mlir::stablehlo::PadOp>(loc, input, zero, padLow,
+                                                 padHigh, padInterior);
 }
 
 /// If the ConvolutionOp has a window reversal, applies it to the filter.
@@ -83,8 +83,7 @@ Value applyConvolutionReversal(Location loc, OpBuilder &b,
     return filter;
   }
   llvm::SmallVector<int64_t> reversedDims;
-  for (auto [idx, reversed] :
-       llvm::enumerate(reversals.value())) {
+  for (auto [idx, reversed] : llvm::enumerate(reversals.value())) {
     if (reversed) {
       reversedDims.push_back(
           op.getDimensionNumbers().getKernelSpatialDimensions()[idx]);
@@ -165,16 +164,14 @@ struct NormalConvolutionOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConvolutionOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+  LogicalResult matchAndRewrite(
+      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     if (!hasCanonicalDimensionNumbers(op.getDimensionNumbers())) {
       return failure();
     }
-    if (op.getFeatureGroupCount() != 1u)
-      return failure();
-    if (op.getBatchGroupCount() != 1u)
-      return failure();
+    if (op.getFeatureGroupCount() != 1u) return failure();
+    if (op.getBatchGroupCount() != 1u) return failure();
 
     Location loc = op.getLoc();
     Value input = adaptor.getLhs();
@@ -213,14 +210,16 @@ struct NormalConvolutionOpConversion final
         loc, resultType.getShape(), resultType.getElementType(), dynSizes);
     Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
     linalg::LinalgOp res;
-    Attribute strides = op.getWindowStridesAttr();
-    Attribute dilations = op.getRhsDilationAttr();
+    Attribute strides;
+    if (auto s = op.getWindowStrides()) strides = rewriter.getI64TensorAttr(*s);
+    Attribute dilations;
+    if (auto d = op.getRhsDilation()) dilations = rewriter.getI64TensorAttr(*d);
 
     // Apply padding and input dilation.
     llvm::SmallVector<int64_t> spatialDimMapping(rank - 2);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilation(), spatialDimMapping,
+                                    op.getLhsDilationAttr(), spatialDimMapping,
                                     rewriter);
 
     switch (rank) {
@@ -287,8 +286,8 @@ struct ConvolutionOpGeneralConversion final
   /// 7. Create the linalg.generic that computes the multiply-add
   /// 8. Reshape the output to the original shape if it was reshaped by the
   ///    feature or group count attributes.
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+  LogicalResult matchAndRewrite(
+      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     MLIRContext *ctx = op.getContext();
@@ -300,8 +299,7 @@ struct ConvolutionOpGeneralConversion final
     }
 
     auto reshapedResultShape = resultType.getShape().vec();
-    if (!resultType.hasStaticShape())
-      return failure();
+    if (!resultType.hasStaticShape()) return failure();
 
     // Immediately emit an EmptyOp for output tensors with zero dimension.
     if (llvm::is_contained(reshapedResultShape, 0)) {
@@ -341,10 +339,10 @@ struct ConvolutionOpGeneralConversion final
     // Decompose the convolution into an initial padding
     Value modifiedLhs = applyConvolutionPadding(
         op.getLoc(), adaptor.getLhs(), adaptor.getPaddingAttr(),
-        adaptor.getLhsDilation(),
+        adaptor.getLhsDilationAttr(),
         op.getDimensionNumbers().getInputSpatialDimensions(), rewriter);
     Value modifiedRhs = applyConvolutionPadding(
-        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilation(),
+        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilationAttr(),
         op.getDimensionNumbers().getKernelSpatialDimensions(), rewriter);
     modifiedRhs = applyConvolutionReversal(loc, rewriter, op, modifiedRhs);
 
@@ -429,8 +427,8 @@ struct ConvolutionOpGeneralConversion final
       {
         dstExprs.insert(dstExprs.begin() + outputFeatureDimension, parallelDim);
         updateDimMappingFromOffset(resultIndexMapping, outputFeatureDimension);
-        reshapedResultShape.insert(reshapedResultShape.begin() +
-                                       outputFeatureDimension,
+        reshapedResultShape.insert(
+            reshapedResultShape.begin() + outputFeatureDimension,
                                    featureGroupCount);
         reshapedResultShape[outputFeatureDimension + 1] /= featureGroupCount;
       }
@@ -564,14 +562,12 @@ struct DepthwiseConvolutionOpConversion final
     : OpConversionPattern<mlir::stablehlo::ConvolutionOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult
-  matchAndRewrite(mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
+  LogicalResult matchAndRewrite(
+      mlir::stablehlo::ConvolutionOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    if (op.getBatchGroupCount() != 1)
-      return failure();
+    if (op.getBatchGroupCount() != 1) return failure();
     // Fall into the normal convolution cases.
-    if (op.getFeatureGroupCount() == 1)
-      return failure();
+    if (op.getFeatureGroupCount() == 1) return failure();
 
     const mlir::stablehlo::ConvDimensionNumbersAttr &dimensionNumbers =
         op.getDimensionNumbers();
@@ -596,7 +592,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute windowStrides;
     if (op.getWindowStrides()) {
-      windowStrides = op.getWindowStridesAttr();
+      windowStrides = rewriter.getI64TensorAttr(op.getWindowStrides().value());
     } else {
       windowStrides = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),
@@ -605,7 +601,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute rhsDilation;
     if (op.getRhsDilation()) {
-      rhsDilation = op.getRhsDilationAttr();
+      rhsDilation = rewriter.getI64TensorAttr(op.getRhsDilation().value());
     } else {
       rhsDilation = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),
@@ -636,7 +632,7 @@ struct DepthwiseConvolutionOpConversion final
     llvm::SmallVector<int64_t> spatialDimMapping(spatialRank);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilation(), spatialDimMapping,
+                                    op.getLhsDilationAttr(), spatialDimMapping,
                                     rewriter);
 
     auto filterDims =
@@ -645,8 +641,7 @@ struct DepthwiseConvolutionOpConversion final
     auto getReassociationIndicesToCollapseLastTwoDims = [](Value v) {
       SmallVector<ReassociationIndices> reassociations;
       int64_t rank = cast<ShapedType>(v.getType()).getRank();
-      for (int64_t i = 0; i < rank - 1; ++i)
-        reassociations.emplace_back(1, i);
+      for (int64_t i = 0; i < rank - 1; ++i) reassociations.emplace_back(1, i);
       reassociations.back().push_back(rank - 1);
       return reassociations;
     };
@@ -697,30 +692,30 @@ struct DepthwiseConvolutionOpConversion final
       Value conv;
       switch (spatialRank) {
       case 1: {
-        conv =
-            rewriter
+        conv = rewriter
                 .create<linalg::DepthwiseConv1DNwcWcmOp>(
-                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    loc, reshapedOutputType,
+                         ValueRange{input, reshapedFilter},
                     ValueRange{zeroTensor}, windowStrides, rhsDilation,
                     linalg::getPrunedAttributeList(op))
                 .getResult(0);
         break;
       }
       case 2: {
-        conv =
-            rewriter
+        conv = rewriter
                 .create<linalg::DepthwiseConv2DNhwcHwcmOp>(
-                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    loc, reshapedOutputType,
+                         ValueRange{input, reshapedFilter},
                     ValueRange{zeroTensor}, windowStrides, rhsDilation,
                     linalg::getPrunedAttributeList(op))
                 .getResult(0);
         break;
       }
       case 3: {
-        conv =
-            rewriter
+        conv = rewriter
                 .create<linalg::DepthwiseConv3DNdhwcDhwcmOp>(
-                    loc, reshapedOutputType, ValueRange{input, reshapedFilter},
+                    loc, reshapedOutputType,
+                         ValueRange{input, reshapedFilter},
                     ValueRange{zeroTensor}, windowStrides, rhsDilation,
                     linalg::getPrunedAttributeList(op))
                 .getResult(0);

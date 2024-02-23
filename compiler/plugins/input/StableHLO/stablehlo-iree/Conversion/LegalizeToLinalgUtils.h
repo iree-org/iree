@@ -103,10 +103,10 @@ bool isInBodyOfLinalgOps(Operation *op);
 /// Extracts integer values from the attribute |elements|.
 SmallVector<int64_t> extract1DVector(DenseIntElementsAttr elements);
 
-/// Returns true if the given |values| is a splat of the given |value|.
-inline bool isSplatValue(const ArrayRef<int64_t> &values, int64_t targetValue) {
+/// Returns true if the given |values| is a splat of the given |queryValue|.
+inline bool isSplatValue(const ArrayRef<int64_t> &values, int64_t queryValue) {
   for (auto value : values) {
-    if (value != targetValue) {
+    if (value != queryValue) {
       return false;
     }
   }

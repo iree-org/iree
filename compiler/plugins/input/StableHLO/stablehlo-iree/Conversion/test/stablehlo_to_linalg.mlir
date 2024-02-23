@@ -605,9 +605,9 @@ func.func @iota_complexf32() -> tensor<7x10xcomplex<f32>> {
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: func @dynamic_iota_f32
-// CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
-func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
-  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xf32>)
+// CHECK-SAME: %[[SHAPE:.*]]: tensor<3xi32>
+func.func @dynamic_iota_f32(%shape: tensor<3xi32>) -> tensor<?x?x8xf32> {
+  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<3xi32>) -> (tensor<?x?x8xf32>)
   func.return %result : tensor<?x?x8xf32>
 }
 // CHECK: %[[V1:.*]] = tensor.extract %[[SHAPE]][%c0]
@@ -626,10 +626,10 @@ func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK: func @dyanmic_iota_ui32
-// CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
-func.func @dyanmic_iota_ui32(%shape: tensor<?xi32>) -> tensor<?x?x8xui32> {
-  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xui32>)
+// CHECK: func @dynamic_iota_ui32
+// CHECK-SAME: %[[SHAPE:.*]]: tensor<3xi32>
+func.func @dynamic_iota_ui32(%shape: tensor<3xi32>) -> tensor<?x?x8xui32> {
+  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<3xi32>) -> (tensor<?x?x8xui32>)
   func.return %result : tensor<?x?x8xui32>
 }
 // CHECK: %[[V1:.*]] = tensor.extract %[[SHAPE]][%c0]

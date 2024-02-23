@@ -332,8 +332,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
       return failure();
     auto numOperands = initValues.size();
 
-    llvm::SmallVector<int64_t> windowDimensions =
-        llvm::to_vector(op.getWindowDimensions());
+    llvm::SmallVector<int64_t> windowDimensions(op.getWindowDimensions());
 
     llvm::SmallVector<int64_t> padding;
     if (op.getPadding()) {
@@ -426,13 +425,9 @@ struct ReduceWindowOpOnTensorsGenericConversion final
         staticInteriors[idx] = dilation - 1;
       }
 
-      auto padLows = rewriter.getDenseI64ArrayAttr(staticLows);
-      auto padHighs = rewriter.getDenseI64ArrayAttr(staticHighs);
-      auto padInteriors = rewriter.getDenseI64ArrayAttr(staticInteriors);
-
       for (auto [input, initValue] : llvm::zip(inputs, initValues)) {
         input = rewriter.create<mlir::stablehlo::PadOp>(
-            loc, input, initValue, padLows, padHighs, padInteriors);
+            loc, input, initValue, staticLows, staticHighs, staticInteriors);
       }
     }
 
@@ -577,9 +572,8 @@ struct ReduceWindowOpConversion final
       return rewriter.notifyMatchFailure(
           op, "expected window_strides to be [1,x,y,(z),1]");
     }
-    if (op.getWindowDimensions().size() > 0 &&
-        (op.getWindowDimensions()[0] != 1 ||
-         op.getWindowDimensions()[lastDim] != 1)) {
+    if (op.getWindowDimensions()[0] != 1 ||
+         op.getWindowDimensions()[lastDim] != 1) {
       return rewriter.notifyMatchFailure(
           op, "expected window_dimensions to be [1,x,y,(z),1]");
     }
