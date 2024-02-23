@@ -78,6 +78,9 @@ def TileAndDecomposeAttention :
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
                     "createTileAndDecomposeAttentionPass()";
   let options = [
+    Option<"useSCFIterMax", "useSCFIterMax", "bool", /*default=*/"true",
+           "Choose whether to use SCF iterator to update max value in"
+           "decomposition">,
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
     Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
