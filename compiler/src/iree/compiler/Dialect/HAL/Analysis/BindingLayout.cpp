@@ -36,25 +36,9 @@ void PipelineLayout::print(llvm::raw_ostream &os) const {
   }
 }
 
-// Finds all dispatches within |rootOp| and groups them by executable export.
-static BindingLayoutAnalysis::ExportDispatchMap
-findAllDispatchSites(Operation *rootOp) {
-  SymbolTable symbolTable(rootOp);
-  BindingLayoutAnalysis::ExportDispatchMap dispatchMap;
-  rootOp->walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-    dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
-      auto exportOp =
-          symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
-      dispatchMap[exportOp].push_back(dispatchOp);
-    });
-  });
-  return dispatchMap;
-}
-
 // Assumes an explicit layout as specified on an export.
 static PipelineLayout
-assumeExportLayout(IREE::Stream::ExecutableExportOp exportOp,
-                   IREE::HAL::PipelineLayoutAttr layoutAttr) {
+assumeExportLayout(IREE::HAL::PipelineLayoutAttr layoutAttr) {
   PipelineLayout pipelineLayout;
   pipelineLayout.pushConstantCount = layoutAttr.getPushConstants();
 
@@ -86,23 +70,24 @@ assumeExportLayout(IREE::Stream::ExecutableExportOp exportOp,
     pipelineLayout.setLayouts[setLayout.ordinal] = setLayout;
   }
 
-  LLVM_DEBUG({
-    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
-    llvm::dbgs() << "assumeExportLayout(@" << executableOp.getSymName() << "::@"
-                 << exportOp.getSymName() << "):\n";
-    pipelineLayout.print(llvm::dbgs());
-  });
-
   return pipelineLayout;
 }
 
 // Derives an pipeline layout from all of the dispatches to |exportOp|.
 static PipelineLayout
-deriveExportLayout(IREE::Stream::ExecutableExportOp exportOp,
-                   SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
+deriveStreamExportLayout(IREE::Stream::ExecutableExportOp exportOp,
+                         ArrayRef<IREE::Stream::CmdDispatchOp> dispatchOps) {
   if (auto layoutAttr = exportOp->getAttrOfType<IREE::HAL::PipelineLayoutAttr>(
           "hal.interface.layout")) {
-    return assumeExportLayout(exportOp, layoutAttr);
+    auto assumedLayout = assumeExportLayout(layoutAttr);
+    LLVM_DEBUG({
+      auto executableOp =
+          exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
+      llvm::dbgs() << "assumeExportLayout(@" << executableOp.getSymName()
+                   << "::@" << exportOp.getSymName() << "):\n";
+      assumedLayout.print(llvm::dbgs());
+    });
+    return assumedLayout;
   }
 
   auto funcOp = exportOp.lookupFunctionRef();
@@ -184,36 +169,61 @@ deriveExportLayout(IREE::Stream::ExecutableExportOp exportOp,
   return pipelineLayout;
 }
 
-static BindingLayoutAnalysis::ExportLayoutMap
-deriveExportLayouts(Operation *rootOp,
-                    BindingLayoutAnalysis::ExportDispatchMap dispatchMap) {
-  BindingLayoutAnalysis::ExportLayoutMap layoutMap;
-  rootOp->walk([&](IREE::Stream::ExecutableExportOp exportOp) {
-    auto &dispatchOps = dispatchMap[exportOp];
-    layoutMap[exportOp] = deriveExportLayout(exportOp, dispatchOps);
+BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
+                                             SymbolTable &symbolTable) {
+  // Finds all exports and dispatches within rootOp and groups them by
+  // executable export. We need to complete gathering all of the information
+  // before we derive the layouts.
+  auto getExportInfo = [&](Operation *exportOp) -> ExportInfo & {
+    auto &exportInfo = exportInfos[exportOp];
+    if (!exportInfo)
+      exportInfo = std::make_unique<ExportInfo>();
+    return *exportInfo;
+  };
+  rootOp->walk([&](Operation *op) {
+    TypeSwitch<Operation *>(op)
+        .Case<IREE::Stream::ExecutableExportOp>(
+            [&](auto exportOp) { (void)getExportInfo(exportOp); })
+        .Case<IREE::HAL::ExecutableExportOp>([&](auto exportOp) {
+          auto &exportInfo = getExportInfo(exportOp);
+          exportInfo.pipelineLayout =
+              assumeExportLayout(exportOp.getLayoutAttr());
+        })
+        .Case<IREE::Stream::CmdDispatchOp>([&](auto dispatchOp) {
+          dispatchOp.forEachEntryPointAttr([&](SymbolRefAttr entryPointAttr) {
+            auto exportOp =
+                symbolTable.lookupNearestSymbolFrom(dispatchOp, entryPointAttr);
+            auto &exportInfo = getExportInfo(exportOp);
+            exportInfo.dispatchOps.push_back(dispatchOp);
+          });
+        })
+        .Default([](auto op) {});
   });
-  return layoutMap;
+
+  // Derive the layouts for each export op.
+  for (auto &it : exportInfos) {
+    TypeSwitch<Operation *>(it.first)
+        .Case<IREE::Stream::ExecutableExportOp>([&](auto exportOp) {
+          it.second->pipelineLayout =
+              deriveStreamExportLayout(exportOp, it.second->dispatchOps);
+        })
+        .Default([&](auto op) {});
+  }
 }
 
-BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp) {
-  exportDispatches = findAllDispatchSites(rootOp);
-  exportLayouts = deriveExportLayouts(rootOp, exportDispatches);
+ArrayRef<IREE::Stream::CmdDispatchOp>
+BindingLayoutAnalysis::getExportDispatches(Operation *exportOp) const {
+  auto it = exportInfos.find(exportOp);
+  if (it == exportInfos.end())
+    return {}; // not analyzed
+  return it->second.get()->dispatchOps;
 }
 
-SmallVector<IREE::Stream::CmdDispatchOp>
-BindingLayoutAnalysis::getExportDispatches(
-    IREE::Stream::ExecutableExportOp exportOp) const {
-  auto it = exportDispatches.find(exportOp);
-  if (it == exportDispatches.end())
-    return {}; // no dispatches
-  return it->second;
-}
-
-const PipelineLayout &BindingLayoutAnalysis::getPipelineLayout(
-    IREE::Stream::ExecutableExportOp exportOp) const {
-  auto it = exportLayouts.find(exportOp);
-  assert(it != exportLayouts.end() && "unanalyzed export");
-  return it->second;
+const PipelineLayout &
+BindingLayoutAnalysis::getPipelineLayout(Operation *exportOp) const {
+  auto it = exportInfos.find(exportOp);
+  assert(it != exportInfos.end() && "unanalyzed export");
+  return it->second.get()->pipelineLayout;
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL
