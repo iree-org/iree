@@ -19,6 +19,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
@@ -117,6 +118,9 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
     }
     if (!linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
              .isPermutation()) {
+      return false;
+    }
+    if (linalg::isaContractionOpInterface(linalgConsumerOp)) {
       return false;
     }
     return true;
