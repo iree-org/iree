@@ -172,6 +172,29 @@ struct LinalgOpTiedOpInterfaceHelper {
 // HoistableOpInterface
 //===----------------------------------------------------------------------===//
 
+struct ExtractSliceOpHoistableOpInterface
+    : public Util::HoistableOpInterface::ExternalModel<
+          ExtractSliceOpHoistableOpInterface, tensor::ExtractSliceOp> {
+  bool isHoistableOp(Operation *) const { return true; }
+  bool isHoistableLeafOp(Operation *op) const {
+    auto extractOp = llvm::cast<tensor::ExtractSliceOp>(op);
+    auto sourceType = llvm::cast<ShapedType>(extractOp.getSource().getType());
+    auto resultType = llvm::cast<ShapedType>(extractOp.getResult().getType());
+
+    // TODO: Use dynamic value/shape analysis to detect dynamically sized
+    // reshaping slices.
+    if (!sourceType.hasStaticShape() || !resultType.hasStaticShape()) {
+      return true;
+    }
+
+    // If the slice is just a reshape, do not hoist as a leaf.
+    if (sourceType.getNumElements() == resultType.getNumElements()) {
+      return false;
+    }
+    return true;
+  }
+};
+
 template <typename OpTy>
 struct UnhoistableOpInterface
     : public IREE::Util::HoistableOpInterface::ExternalModel<
@@ -370,6 +393,10 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         AlwaysHoistableOpInterfaceHelper<
             tensor::PadOp, tensor::PackOp,
             tensor::UnPackOp>::registerOpInterface(context);
+
+        // Avoid leaf hoisting of extract slice ops that are just reshapes.
+        tensor::ExtractSliceOp::attachInterface<
+            ExtractSliceOpHoistableOpInterface>(*context);
       });
 }
 
