@@ -68,9 +68,8 @@ void buildPreprocessingPassPipeline(
     const PreprocessingOptions &preprocessingOptions,
     PipelineExtensions *pipelineExtensions) {
   auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
-  if (!preprocessingOptions.preprocessingPassPipeline.empty()) {
-    extendWithTextPipeline(passManager,
-                           preprocessingOptions.preprocessingPassPipeline);
+  if (!pipelineStr.empty()) {
+    extendWithTextPipeline(passManager, pipelineStr);
   }
 
   if (pipelineExtensions) {

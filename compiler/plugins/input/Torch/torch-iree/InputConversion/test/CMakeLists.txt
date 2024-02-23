@@ -2,6 +2,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "apply_pdl_patterns_torch.mlir"
     "assume_strict_symbols.mlir"
     "auto_input_conversion.mlir"
     "attention.mlir"
@@ -12,6 +13,8 @@ iree_lit_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "torch_to_iree.mlir"
+  DATA
+    "torch.pdl.mlir"
   TOOLS
     FileCheck
     iree-compile

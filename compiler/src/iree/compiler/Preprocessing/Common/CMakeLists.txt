@@ -26,6 +26,7 @@ iree_cc_library(
     "Passes.h"
     "Passes.h.inc"
   SRCS
+    "ApplyPDLPatterns.cpp"
     "ConvertConv2DToImg2Col.cpp"
     "ConvertConvToChannelsLast.cpp"
     "InterpreterPass.cpp"
@@ -42,7 +43,12 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRMemRefDialect
+    MLIRPDLDialect
+    MLIRPDLInterpDialect
+    MLIRParser
     MLIRPass
+    MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformDialect
@@ -50,6 +56,8 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Util::IR
   PUBLIC
 )
 

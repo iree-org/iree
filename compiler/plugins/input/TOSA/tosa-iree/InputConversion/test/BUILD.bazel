@@ -16,6 +16,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "apply_pdl_patterns_tosa.mlir",
             "auto_input_conversion.mlir",
             "convert_i48_to_i64.mlir",
             "strip_signedness.mlir",
@@ -23,8 +24,14 @@ iree_lit_test_suite(
             "verify_compiler_tosa_input_legality.mlir",
         ],
         include = ["*.mlir"],
+        exclude = [
+            "tosa.pdl.mlir",
+        ],
     ),
     cfg = "//compiler:lit.cfg.py",
+    data = [
+        "tosa.pdl.mlir",
+    ],
     tools = [
         "//tools:iree-compile",
         "//tools:iree-opt",
