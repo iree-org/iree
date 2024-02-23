@@ -203,13 +203,15 @@ static iree_status_t get_matrix_shape(iree_hal_buffer_view_t* buffer_view,
   static void reference_matmul_##LHSTYPE##_##RHSTYPE##_##RESTYPE##_##ACCTYPE( \
       iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,    \
       iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,     \
-      iree_hal_element_type_t acc_type, const LHSTYPE* lhs_data,              \
-      const RHSTYPE* rhs_data, const ACCTYPE* acc_data, RESTYPE* result_data, \
-      iree_hal_dim_t m, iree_hal_dim_t n) {                                   \
+      iree_hal_element_type_t acc_type, bool transpose_b,                     \
+      const LHSTYPE* lhs_data, const RHSTYPE* rhs_data,                       \
+      const ACCTYPE* acc_data, RESTYPE* result_data, iree_hal_dim_t m,        \
+      iree_hal_dim_t n) {                                                     \
     ACCTYPE acc = acc_data ? acc_data[n + m * n_size] : 0;                    \
     for (iree_hal_dim_t k = 0; k < k_size; ++k) {                             \
       LHSTYPE lhs_value = lhs_data[k + m * k_size];                           \
-      RHSTYPE rhs_value = rhs_data[n + k * n_size];                           \
+      RHSTYPE rhs_value =                                                     \
+          transpose_b ? rhs_data[k + n * k_size] : rhs_data[n + k * n_size];  \
       acc += (ACCTYPE)lhs_value * (ACCTYPE)rhs_value;                         \
     }                                                                         \
     result_data[n + m * n_size] = acc;                                        \
@@ -235,13 +237,15 @@ REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
 static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
-    const uint16_t* rhs_data, const uint16_t* acc_data, uint16_t* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
+    iree_hal_element_type_t acc_type, bool transpose_b,
+    const uint16_t* lhs_data, const uint16_t* rhs_data,
+    const uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
   float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    int64_t rhs_index = transpose_b ? k + n * k_size : n + k * n_size;
     acc += iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_f16_to_f32(rhs_data[n + k * n_size]);
+           iree_math_f16_to_f32(rhs_data[rhs_index]);
   }
   result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
 }
@@ -251,13 +255,14 @@ static void reference_matmul_f16_f16_f16_f16(
 static void reference_matmul_f16_f16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
-    const uint16_t* rhs_data, const float* acc_data, float* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
+    iree_hal_element_type_t acc_type, bool transpose_b,
+    const uint16_t* lhs_data, const uint16_t* rhs_data, const float* acc_data,
+    float* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {
   float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    int64_t rhs_index = transpose_b ? k + n * k_size : n + k * n_size;
     acc += iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_f16_to_f32(rhs_data[n + k * n_size]);
+           iree_math_f16_to_f32(rhs_data[rhs_index]);
   }
   result_data[n + m * n_size] = acc;
 }
@@ -267,13 +272,15 @@ static void reference_matmul_f16_f16_f32_f32(
 static void reference_matmul_bf16_bf16_bf16_bf16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
-    const uint16_t* rhs_data, const uint16_t* acc_data, uint16_t* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
+    iree_hal_element_type_t acc_type, bool transpose_b,
+    const uint16_t* lhs_data, const uint16_t* rhs_data,
+    const uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
   float acc = acc_data ? iree_math_bf16_to_f32(acc_data[n + m * n_size]) : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    int64_t rhs_index = transpose_b ? k + n * k_size : n + k * n_size;
     acc += iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_bf16_to_f32(rhs_data[n + k * n_size]);
+           iree_math_bf16_to_f32(rhs_data[rhs_index]);
   }
   result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
 }
@@ -283,13 +290,14 @@ static void reference_matmul_bf16_bf16_bf16_bf16(
 static void reference_matmul_bf16_bf16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, const uint16_t* lhs_data,
-    const uint16_t* rhs_data, const float* acc_data, float* result_data,
-    iree_hal_dim_t m, iree_hal_dim_t n) {
+    iree_hal_element_type_t acc_type, bool transpose_b,
+    const uint16_t* lhs_data, const uint16_t* rhs_data, const float* acc_data,
+    float* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {
   float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
+    int64_t rhs_index = transpose_b ? k + n * k_size : n + k * n_size;
     acc += iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_bf16_to_f32(rhs_data[n + k * n_size]);
+           iree_math_bf16_to_f32(rhs_data[rhs_index]);
   }
   result_data[n + m * n_size] = acc;
 }
@@ -299,55 +307,56 @@ static void reference_matmul_bf16_bf16_f32_f32(
 static iree_status_t reference_matmul_element(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, void* lhs_data, void* rhs_data,
-    void* acc_data, void* result_data, iree_hal_dim_t m, iree_hal_dim_t n) {
+    iree_hal_element_type_t acc_type, bool transpose_b, void* lhs_data,
+    void* rhs_data, void* acc_data, void* result_data, iree_hal_dim_t m,
+    iree_hal_dim_t n) {
   if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32 &&
       acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_matmul_float_float_float_float(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const float*)lhs_data, (const float*)rhs_data, (const float*)acc_data,
         (float*)result_data, m, n);
   } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
              iree_hal_element_type_is_integer(rhs_type, 8) &&
              iree_hal_element_type_is_integer(acc_type, 32)) {
     reference_matmul_int8_t_int8_t_int32_t_int32_t(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const int8_t*)lhs_data, (const int8_t*)rhs_data,
         (const int32_t*)acc_data, (int32_t*)result_data, m, n);
   } else if (iree_hal_element_type_is_integer(lhs_type, 32) &&
              iree_hal_element_type_is_integer(rhs_type, 32) &&
              iree_hal_element_type_is_integer(acc_type, 32)) {
     reference_matmul_int32_t_int32_t_int32_t_int32_t(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const int32_t*)lhs_data, (const int32_t*)rhs_data,
         (const int32_t*)acc_data, (int32_t*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     reference_matmul_f16_f16_f16_f16(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
         (const uint16_t*)acc_data, (uint16_t*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_matmul_f16_f16_f32_f32(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
     reference_matmul_bf16_bf16_bf16_bf16(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
         (const uint16_t*)acc_data, (uint16_t*)result_data, m, n);
   } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
              rhs_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16 &&
              acc_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
     reference_matmul_bf16_bf16_f32_f32(
-        m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+        m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
         (const uint16_t*)lhs_data, (const uint16_t*)rhs_data,
         (const float*)acc_data, (float*)result_data, m, n);
   } else {
@@ -361,9 +370,10 @@ static iree_status_t reference_matmul_element(
 static iree_status_t reference_matmul(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
-    iree_hal_element_type_t acc_type, iree_byte_span_t lhs_contents,
-    iree_byte_span_t rhs_contents, iree_byte_span_t acc_contents,
-    iree_byte_span_t result_contents, int compute_every) {
+    iree_hal_element_type_t acc_type, bool transpose_b,
+    iree_byte_span_t lhs_contents, iree_byte_span_t rhs_contents,
+    iree_byte_span_t acc_contents, iree_byte_span_t result_contents,
+    int compute_every) {
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, m_size);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, k_size);
@@ -375,7 +385,7 @@ static iree_status_t reference_matmul(
       if (++count < compute_every) continue;
       count = 0;
       IREE_RETURN_IF_ERROR(reference_matmul_element(
-          m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+          m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_b,
           lhs_contents.data, rhs_contents.data, acc_contents.data,
           result_contents.data, m, n));
     }
@@ -398,6 +408,7 @@ typedef struct {
   iree_hal_element_type_t rhs_type;
   iree_hal_element_type_t acc_type;
   iree_hal_element_type_t result_type;
+  bool transpose_b;
   iree_byte_span_t lhs_contents;
   iree_byte_span_t rhs_contents;
   iree_byte_span_t acc_contents;
@@ -409,7 +420,7 @@ static void matmul_results_deinitialize(matmul_results_t* results);
 
 static iree_status_t matmul_results_initialize(
     iree_hal_device_t* device, iree_hal_dim_t m_size, iree_hal_dim_t k_size,
-    iree_hal_dim_t n_size, iree_hal_buffer_view_t* lhs,
+    iree_hal_dim_t n_size, uint32_t transpose_b, iree_hal_buffer_view_t* lhs,
     iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
     iree_hal_buffer_view_t* result, iree_allocator_t host_allocator,
     matmul_results_t* out_results) {
@@ -426,6 +437,8 @@ static iree_status_t matmul_results_initialize(
   out_results->rhs_type = iree_hal_buffer_view_element_type(rhs);
   out_results->acc_type = iree_hal_buffer_view_element_type(result);
   out_results->result_type = iree_hal_buffer_view_element_type(result);
+
+  out_results->transpose_b = transpose_b != 0;
 
   iree_hal_buffer_t* lhs_buffer = iree_hal_buffer_view_buffer(lhs);
   iree_hal_buffer_t* rhs_buffer = iree_hal_buffer_view_buffer(rhs);
@@ -776,11 +789,11 @@ static iree_status_t check_matmul_results_impl(FILE* file,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, reference_matmul(results->m, results->k, results->n,
-                           results->lhs_type, results->rhs_type,
-                           results->acc_type, results->lhs_contents,
-                           results->rhs_contents, results->acc_contents,
-                           results->expected_contents, check_every));
+      z0, reference_matmul(
+              results->m, results->k, results->n, results->lhs_type,
+              results->rhs_type, results->acc_type, results->transpose_b,
+              results->lhs_contents, results->rhs_contents,
+              results->acc_contents, results->expected_contents, check_every));
 
   int count = 0;
   for (iree_hal_dim_t m = 0; m < results->m; ++m) {
@@ -1009,15 +1022,15 @@ class MatmulTestModuleState final {
 
   Status CheckMatmulResults(
       const vm::ref<iree_hal_device_t> device, int64_t m, int64_t k, int64_t n,
-      const vm::ref<iree_hal_buffer_view_t> lhs,
+      int32_t transpose_b, const vm::ref<iree_hal_buffer_view_t> lhs,
       const vm::ref<iree_hal_buffer_view_t> rhs,
       const vm::ref<iree_hal_buffer_view_t> acc,
       const vm::ref<iree_hal_buffer_view_t> actual_result) {
     matmul_results_t results = {};
     IREE_RETURN_IF_ERROR(matmul_results_initialize(
         device.get(), (iree_hal_dim_t)m, (iree_hal_dim_t)k, (iree_hal_dim_t)n,
-        lhs.get(), rhs.get(), acc.get(), actual_result.get(), host_allocator_,
-        &results));
+        transpose_b, lhs.get(), rhs.get(), acc.get(), actual_result.get(),
+        host_allocator_, &results));
     iree_status_t status = check_matmul_results(stderr, &results);
     matmul_results_deinitialize(&results);
     return status;
