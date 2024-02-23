@@ -229,30 +229,32 @@ struct HoistableLinalgOpInterface
 /// the associated Hoistable___OpInterface.
 template <typename... Ops>
 struct UnhoistableOpInterfaceHelper {
-  static void registerOpInterface(MLIRContext *ctx) {
-    (Ops::template attachInterface<UnhoistableOpInterface<Ops>>(*ctx), ...);
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<UnhoistableOpInterface<Ops>>(*context), ...);
   }
 };
 
 template <typename... Ops>
 struct HoistableNonLeafOpInterfaceHelper {
-  static void registerOpInterface(MLIRContext *ctx) {
-    (Ops::template attachInterface<HoistableNonLeafOpInterface<Ops>>(*ctx),
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<HoistableNonLeafOpInterface<Ops>>(*context),
      ...);
   }
 };
 
 template <typename... Ops>
 struct AlwaysHoistableOpInterfaceHelper {
-  static void registerOpInterface(MLIRContext *ctx) {
-    (Ops::template attachInterface<AlwaysHoistableOpInterface<Ops>>(*ctx), ...);
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<AlwaysHoistableOpInterface<Ops>>(*context),
+     ...);
   }
 };
 
 template <typename... Ops>
 struct HoistableLinalgOpInterfaceHelper {
-  static void registerOpInterface(MLIRContext *ctx) {
-    (Ops::template attachInterface<HoistableLinalgOpInterface<Ops>>(*ctx), ...);
+  static void registerOpInterface(MLIRContext *context) {
+    (Ops::template attachInterface<HoistableLinalgOpInterface<Ops>>(*context),
+     ...);
   }
 };
 
@@ -325,45 +327,48 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   // Hoistable Op Interface registration.
 
   // Register hoistable type interfaces for LinalgExt ops.
-  registry.addExtension(
-      +[](MLIRContext *ctx, IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-        UnhoistableOpInterfaceHelper<
-            IREE::LinalgExt::SetEncodingOp,
-            IREE::LinalgExt::UpperBoundTileSizeOp>::registerOpInterface(ctx);
-      });
+  registry.addExtension(+[](MLIRContext *context,
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    UnhoistableOpInterfaceHelper<
+        IREE::LinalgExt::SetEncodingOp,
+        IREE::LinalgExt::UpperBoundTileSizeOp>::registerOpInterface(context);
+  });
   // Register hoistable type interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.
-  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
-    // Structured op implementations and a handful of pure ops are included.
-    // Notably: IndexOp is not included because it establishes a hidden
-    // dependency to the iterator and is non-const.
+  registry.addExtension(
+      +[](MLIRContext *context, linalg::LinalgDialect *dialect) {
+        // Structured op implementations and a handful of pure ops are included.
+        // Notably: IndexOp is not included because it establishes a hidden
+        // dependency to the iterator and is non-const.
 
-    // Register all LinalgOps ops. `LinalgOp` is an interface and it is
-    // not possible to attach an external interface to an existing interface.
-    // Therefore, attach the `HoistableLinalgOpInterface` to all ops one-by-one.
-    HoistableLinalgOpInterfaceHelper<
+        // Register all LinalgOps ops. `LinalgOp` is an interface and it is
+        // not possible to attach an external interface to an existing
+        // interface. Therefore, attach the `HoistableLinalgOpInterface` to all
+        // ops one-by-one.
+        HoistableLinalgOpInterfaceHelper<
 #define GET_OP_LIST
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
-        >::registerOpInterface(ctx);
-    UnhoistableOpInterfaceHelper<
+            >::registerOpInterface(context);
+        UnhoistableOpInterfaceHelper<
 #define GET_OP_LIST
 #include "mlir/Dialect/Linalg/IR/LinalgOps.cpp.inc"
-        >::registerOpInterface(ctx);
-  });
+            >::registerOpInterface(context);
+      });
   // Register hoistable type interfaces for tensor ops.
-  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
-    // Never hoist empty and other pure metadata ops as a leaf. It's fine to
-    // hoist them as a part of a larger constant tree that does actual work.
-    HoistableNonLeafOpInterfaceHelper<
-        tensor::EmptyOp, tensor::ExpandShapeOp,
-        tensor::CollapseShapeOp>::registerOpInterface(ctx);
-    // Cases of trivial pack/unpack should be handled as canonicalizations
-    // before we get here, thus we're safe to always hoist.
-    AlwaysHoistableOpInterfaceHelper<
-        tensor::PadOp, tensor::PackOp,
-        tensor::UnPackOp>::registerOpInterface(ctx);
-  });
+  registry.addExtension(
+      +[](MLIRContext *context, tensor::TensorDialect *dialect) {
+        // Never hoist empty and other pure metadata ops as a leaf. It's fine to
+        // hoist them as a part of a larger constant tree that does actual work.
+        HoistableNonLeafOpInterfaceHelper<
+            tensor::EmptyOp, tensor::ExpandShapeOp,
+            tensor::CollapseShapeOp>::registerOpInterface(context);
+        // Cases of trivial pack/unpack should be handled as canonicalizations
+        // before we get here, thus we're safe to always hoist.
+        AlwaysHoistableOpInterfaceHelper<
+            tensor::PadOp, tensor::PackOp,
+            tensor::UnPackOp>::registerOpInterface(context);
+      });
 }
 
 } // namespace mlir::iree_compiler::IREE::Util

@@ -21,6 +21,7 @@ iree_cc_library(
     ::IR
     MLIRArithDialect
     MLIRLinalgDialect
+    MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
     MLIRTensorDialect
