@@ -53,7 +53,7 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // TILESIZE:            linalg.yield %[[D19]] : f32
 // TILESIZE:          } -> tensor<1024x32xf32>
 // TILESIZE:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// TILESIZE-SAME:       ins(%[[D11]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// TILESIZE-SAME:       ins(%[[D11]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // TILESIZE:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // TILESIZE:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // TILESIZE:            %[[D19]] = math.exp2 %[[D18]] : f32
@@ -183,7 +183,7 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK:            linalg.yield %[[D19]] : f32
 // CHECK:          } -> tensor<1024x1024xf32>
 // CHECK:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// CHECK-SAME:       ins(%[[D11]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// CHECK-SAME:       ins(%[[D11]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18:.+]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
@@ -280,10 +280,8 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // TILESIZE:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
 // TILESIZE:            linalg.yield %[[D19]] : f32
 // TILESIZE:          } -> tensor<?x32xf32>
-// TILESIZE:          %[[DIM6:.+]] = tensor.dim %[[D11]], %[[C0]]
-// TILESIZE:          %[[INIT:.+]] = tensor.empty(%[[DIM6]])
 // TILESIZE:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// TILESIZE-SAME:       ins(%[[D11]] : tensor<?xf32>) outs(%[[INIT]] : tensor<?xf32>) {
+// TILESIZE-SAME:       ins(%[[D11]] : tensor<?xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
 // TILESIZE:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // TILESIZE:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // TILESIZE:            %[[D19]] = math.exp2 %[[D18]] : f32
@@ -415,10 +413,8 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 // CHECK:            %[[D19:.+]] = math.exp2 %[[D18]] : f32
 // CHECK:            linalg.yield %[[D19]] : f32
 // CHECK:          } -> tensor<?x?xf32>
-// CHECK:          %[[DIM6:.+]] = tensor.dim %[[D11]], %[[C0]]
-// CHECK:          %[[INIT:.+]] = tensor.empty(%[[DIM6]])
 // CHECK:          %[[D13:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// CHECK-SAME:       ins(%[[D10]] : tensor<?xf32>) outs(%[[INIT]] : tensor<?xf32>) {
+// CHECK-SAME:       ins(%[[D10]] : tensor<?xf32>) outs(%[[ARG8]] : tensor<?xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D18]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D19]] = math.exp2 %[[D18]] : f32
@@ -515,7 +511,7 @@ func.func @attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>,
 // TILESIZE:            linalg.yield %[[D22]] : f32
 // TILESIZE:          } -> tensor<1024x32xf32>
 // TILESIZE:          %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// TILESIZE-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// TILESIZE-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // TILESIZE:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // TILESIZE:            %[[D21]] = arith.subf %[[OUT]], %[[IN]] : f32
 // TILESIZE:            %[[D22]] = math.exp2 %[[D21]] : f32
@@ -667,7 +663,7 @@ func.func @attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>,
 // CHECK:            linalg.yield %[[D22]] : f32
 // CHECK:          } -> tensor<1024x1024xf32>
 // CHECK:          %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// CHECK-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// CHECK-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D21]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D22]] = math.exp2 %[[D21]] : f32
@@ -778,7 +774,7 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
 // TILESIZE:            linalg.yield %[[D22]] : f32
 // TILESIZE:          } -> tensor<1024x32xf32>
 // TILESIZE:          %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// TILESIZE-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// TILESIZE-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // TILESIZE:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // TILESIZE:            %[[D21]] = arith.subf %[[OUT]], %[[IN]] : f32
 // TILESIZE:            %[[D22]] = math.exp2 %[[D21]] : f32
@@ -930,7 +926,7 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
 // CHECK:            linalg.yield %[[D22]] : f32
 // CHECK:          } -> tensor<1024x1024xf32>
 // CHECK:          %[[D14:.+]] = linalg.generic {indexing_maps = [#[[MAP2]], #[[MAP2]]], iterator_types = ["parallel"]}
-// CHECK-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[D3]] : tensor<1024xf32>) {
+// CHECK-SAME:       ins(%[[D12]] : tensor<1024xf32>) outs(%[[ARG5]] : tensor<1024xf32>) {
 // CHECK:          ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK:            %[[D21]] = arith.subf %[[OUT]], %[[IN]] : f32
 // CHECK:            %[[D22]] = math.exp2 %[[D21]] : f32

@@ -79,20 +79,12 @@ static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
 static Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
                                 OpBuilder &builder,
                                 SmallVectorImpl<Operation *> &ops) {
-  // Create tensor.empty op. This is a workaround to avoid a failure in
-  // bufferization. For more details, please see
-  // https://github.com/openxla/iree/issues/16421
-  SmallVector<OpFoldResult> initShape =
-      tensor::getMixedSizes(builder, loc, newMax);
-  Value init = builder.create<tensor::EmptyOp>(
-      loc, initShape, getElementTypeOrSelf(oldMax.getType()));
-
   SmallVector<utils::IteratorType> iteratorTypes(1,
                                                  utils::IteratorType::parallel);
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
   SmallVector<AffineMap> indexingMaps(2, identityMap);
   auto genericOp = builder.create<linalg::GenericOp>(
-      loc, init.getType(), newMax, init, indexingMaps, iteratorTypes,
+      loc, oldMax.getType(), newMax, oldMax, indexingMaps, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         Value diff = b.create<arith::SubFOp>(loc, args[1], args[0]);
         Value weight = b.create<math::Exp2Op>(loc, diff);
