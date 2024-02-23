@@ -119,8 +119,8 @@ public:
       // HACK: Until proper barrier placement is handled later we have to
       // synchronize explicitly in this pass.
 
-      // Synchronize before the write to shared memory coming from the compute
-      // in the previous iteration.
+      // Synchronize before the write to shared memory to avoid stepping over
+      // reads in the previous iteration of a loop.
       builder.create<gpu::BarrierOp>(contractOp->getLoc());
 
       // Promote both of the input operands, excluding the accumulator.
@@ -138,8 +138,7 @@ public:
         return signalPassFailure();
       }
 
-      // Synchronize after the write to shared memory before we read and do
-      // computation.
+      // Synchronize after the write to shared memory before we read from it.
       builder.create<gpu::BarrierOp>(contractOp->getLoc());
 
       Value lhsVec =
