@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -38,12 +39,18 @@ void GPUGeneralizeNamedOpsPass::runOnOperation() {
 
   IRRewriter rewriter(&getContext());
   for (auto linalgOp : namedOpCandidates) {
+    // Pass down lowering configuration. It can exist due to user set
+    // configuration from the input.
+    auto config = getLoweringConfig(linalgOp);
     rewriter.setInsertionPoint(linalgOp);
     FailureOr<linalg::GenericOp> generalizedOp =
         linalg::generalizeNamedOp(rewriter, linalgOp);
     if (failed(generalizedOp)) {
       linalgOp->emitOpError("failed to generalize operation");
       return signalPassFailure();
+    }
+    if (config) {
+      setLoweringConfig(*generalizedOp, config);
     }
   }
 }
