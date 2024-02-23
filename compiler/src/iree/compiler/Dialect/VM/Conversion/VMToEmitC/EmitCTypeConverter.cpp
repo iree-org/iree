@@ -108,7 +108,6 @@ emitc::OpaqueType EmitCTypeConverter::convertTypeAsCType(Type type) const {
     }
     return emitc::OpaqueType::get(type.getContext(), typeLiteral);
   }
-
   return {};
 }
 

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_get_i64
+  // CHECK-LABEL: emitc.func private @my_module_list_get_i64
   vm.func @list_get_i64(%arg0: !vm.list<i64>, %arg1: i32) -> i64 {
     // CHECK-NEXT: %0 = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_value_t">
     // CHECK-NEXT: %1 = emitc.apply "&"(%0) : (!emitc.opaque<"iree_vm_value_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>
@@ -16,7 +16,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_list_set_i64
+  // CHECK-LABEL: emitc.func private @my_module_list_set_i64
   vm.func @list_set_i64(%arg0: !vm.list<i64>, %arg1: i32, %arg2: i64) {
     // CHECK-NEXT: %0 = emitc.call_opaque "iree_vm_value_make_i64"(%arg5) : (i64) -> !emitc.opaque<"iree_vm_value_t">
     // CHECK-NEXT: %1 = emitc.apply "&"(%0) : (!emitc.opaque<"iree_vm_value_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_value_t">>

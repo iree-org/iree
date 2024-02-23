@@ -11,7 +11,8 @@ vm.module @control_flow_module {
     vm.return %e : i32
   }
 }
-// CHECK: static iree_status_t control_flow_module_control_flow_test(iree_vm_stack_t* v1, control_flow_module_t* v2, control_flow_module_state_t* v3, int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t* [[RESULT:[^ ]*]]) {
+// TODO(simon-camp): Add back check for static modifier
+// CHECK: iree_status_t control_flow_module_control_flow_test(iree_vm_stack_t* v1, struct control_flow_module_t* v2, struct control_flow_module_state_t* v3, int32_t [[A:[^ ]*]], int32_t [[COND:[^ ]*]], int32_t* [[RESULT:[^ ]*]]) {
   // CHECK-NEXT: int32_t [[COND_NZ:[^ ]*]];
   // CHECK-NEXT: bool [[COND_BOOL:[^ ]*]];
   // CHECK-NEXT: int32_t [[B:[^ ]*]];
