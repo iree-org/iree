@@ -3,13 +3,14 @@
 This directory contains IREE's main [MLIR](https://mlir.llvm.org/)-based
 compiler.
 
-Paths of particular interest include:
+A few paths of interest include:
 
 ```
-└── compiler/
+└── compiler/src/iree/compiler/
     ├── API/         (C and Python APIs)
     ├── Bindings/    (used to generate different ABI bindings)
     ├── Codegen/     (device code generation for assorted APIs)
+    ├── ConstEval/   (JIT eval using the compiler+runtime to optimize constants)
     ├── Dialect/
     │   ├── Flow/    (tensor program modeling and compute workload partitioning)
     │   ├── HAL/     (Hardware Abstraction Layer for buffer and execution management)
@@ -29,13 +30,14 @@ Paths of particular interest include:
 Noteworthy compiler components _not_ included here include:
 
 ```
-├── integrations/
-│   └── tensorflow/
-│       └── iree_tf_compiler/  (passes and tools for importing TensorFlow programs)
+├── compiler/plugins/
+│   └── input/                 (Input dialect support plugins)
+│   └── target/                (HAL target backend plugins)
 └── llvm-external-projects/
-    ├── iree-compiler-api/     (C and Python APIs for the compiler)
-    └── iree-dialects/         (public IREE dialects for other projects to target)
+    └── iree-dialects/         (IREE dialects for other projects to target)
 ```
+
+Additional input/target/etc. plugins may also be defined out-of-tree.
 
 The general flow of data from a frontend framework down to a compiled program
 is:
@@ -67,14 +69,10 @@ architecture diagram for details on how the pieces fit together:
 
 ## Coding Style
 
-Like the rest of the project, the compiler/ directory uses clang-format with the
-`BasedOnStyle: Google` option. However, since the code in this directory makes
-heavy use of LLVM and MLIR, it also adheres to LLVM style for variable naming
-(use `int variableName` instead of `int variable_name` and pointer alignment
-(use `int *a` instead of `int* a`).
+The compiler/ directory uses clang-format with (mostly) the LLVM style, unlike
+the runtime/ directory which uses the Google style.
 
 Read more:
 
-* https://google.github.io/styleguide/cppguide.html
 * https://llvm.org/docs/CodingStandards.html
 * https://clang.llvm.org/docs/ClangFormatStyleOptions.html
