@@ -27,21 +27,13 @@ iree_cc_library(
   NAME
     HoistableInterfaces
   HDRS
-    "HoistableOpInterface.h"
     "HoistableTypeInterface.h"
   SRCS
-    "HoistableOpInterface.cpp"
     "HoistableTypeInterface.cpp"
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRLinalgDialect
-    MLIRLinalgOpsIncGenLib
-    MLIRLinalgStructuredOpsIncGenLib
-    MLIRTensorDialect
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::IR::FlowOpsGen
-    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
