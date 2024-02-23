@@ -129,11 +129,13 @@ tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
                              RewriterBase &rewriter,
-                             std::optional<uint64_t> tileSize = std::nullopt);
+                             std::optional<uint64_t> tileSize = std::nullopt,
+                             bool useSCFIterMax = true);
 
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
-std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+std::unique_ptr<Pass>
+createTileAndDecomposeAttentionPass(bool useSCFIterMax = true);
 
 // Marker used as attribute the depth of the split reduction transformations.
 const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";

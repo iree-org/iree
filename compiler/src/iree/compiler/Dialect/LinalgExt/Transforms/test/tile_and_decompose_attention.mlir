@@ -1,6 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-attention),cse)" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-attention{onlyTile}),cse)" %s | FileCheck %s --check-prefix=TILING
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-attention{tileSize=32}),cse)" %s | FileCheck %s --check-prefix=TILESIZE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-attention{useSCFIterMax=false tileSize=32}),cse)" %s | FileCheck %s --check-prefix=NOMAX
 
 func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>, %value: tensor<1x1024x64xf32>) -> tensor<1x1024x64xf32> {
   %0 = tensor.empty() : tensor<1x1024x64xf32>
@@ -137,6 +138,12 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // TILING-SAME:    tensor<1024x64xf32> into tensor<1x1024x64xf32>
 // TILING:        return %[[INSERTED_SLICE]] : tensor<1x1024x64xf32>
 // TILING:      }
+
+// NOMAX:      func.func @attention
+// NOMAX-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// NOMAX-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// NOMAX-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+// NOMAX:        %{{.+}}:2 = scf.for %[[ARG3:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C32]]
 
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0)>

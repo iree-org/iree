@@ -100,11 +100,13 @@ static void addTileAndDistributePasses(OpPassManager &pm) {
       createFuseTensorPadWithConsumerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConcretizePadResultShapePass());
-  // TODO(#16421): Disable decomposition due to failure in bufferization.
-  // nestedModulePM.addNestedPass<func::FuncOp>(
-  //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass(
+          /*useSCFIterMax=*/false));
   nestedModulePM.addNestedPass<func::FuncOp>(
       IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 }
 
 //===---------------------------------------------------------------------===//

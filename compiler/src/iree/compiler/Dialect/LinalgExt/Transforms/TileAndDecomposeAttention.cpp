@@ -483,7 +483,8 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
                              RewriterBase &rewriter,
-                             std::optional<uint64_t> tileSize) {
+                             std::optional<uint64_t> tileSize,
+                             bool useSCFMaxIter) {
   Location loc = tiledAttnOp.getLoc();
   Value keySlice = tiledAttnOp.getKey();
   Value valueSlice = tiledAttnOp.getValue();
@@ -491,6 +492,10 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   Value tiledResult = tiledAttnOp.getOutput();
   Value max = *tiledAttnOp.getMax();
   Value sum = *tiledAttnOp.getSum();
+
+  if (!useSCFMaxIter) {
+    max = ops[1]->getResult(0);
+  }
 
   assert(max && "expected max statistic operand to be present");
   assert(sum && "expected sum statistic operand to be present");
@@ -518,13 +523,15 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
                                SmallVectorImpl<Operation *> &ops,
                                RewriterBase &rewriter, bool onlyTile,
-                               std::optional<uint64_t> tileSize) {
+                               std::optional<uint64_t> tileSize,
+                               bool useSCFMaxIter) {
   IREE::LinalgExt::AttentionOp tiledAttentionOp =
       tileAttention(attnOp, ops, rewriter, tileSize);
   if (onlyTile) {
     return;
   }
-  decomposeTiledAttention(tiledAttentionOp, ops, rewriter, tileSize);
+  decomposeTiledAttention(tiledAttentionOp, ops, rewriter, tileSize,
+                          useSCFMaxIter);
 }
 
 namespace {
@@ -558,11 +565,13 @@ namespace {
 ///
 LogicalResult reifyAttentionTransform(mlir::FunctionOpInterface funcOp,
                                       bool onlyTile,
-                                      std::optional<uint64_t> tileSize) {
+                                      std::optional<uint64_t> tileSize,
+                                      bool useSCFIterMax) {
   IRRewriter rewriter(funcOp.getContext());
   funcOp.walk([&](IREE::LinalgExt::AttentionOp attnOp) {
     SmallVector<Operation *> ops;
-    tileAndDecomposeAttention(attnOp, ops, rewriter, onlyTile, tileSize);
+    tileAndDecomposeAttention(attnOp, ops, rewriter, onlyTile, tileSize,
+                              useSCFIterMax);
     return WalkResult::advance();
   });
   return success();
@@ -579,11 +588,17 @@ struct TileAndDecomposeAttentionPass
         linalg::LinalgDialect, scf::SCFDialect, tensor::TensorDialect>();
   }
   TileAndDecomposeAttentionPass() = default;
-  TileAndDecomposeAttentionPass(bool onlyTile, uint64_t tileSize) {
+  TileAndDecomposeAttentionPass(bool useSCFIterMax) {
+    this->useSCFIterMax = useSCFIterMax;
+  }
+  TileAndDecomposeAttentionPass(bool useSCFIterMax, bool onlyTile,
+                                uint64_t tileSize) {
+    this->useSCFIterMax = useSCFIterMax;
     this->onlyTile = onlyTile;
     this->tileSize = tileSize;
   }
   TileAndDecomposeAttentionPass(const TileAndDecomposeAttentionPass &pass) {
+    useSCFIterMax = pass.useSCFIterMax;
     onlyTile = pass.onlyTile;
     tileSize = pass.tileSize;
   }
@@ -598,14 +613,21 @@ void TileAndDecomposeAttentionPass::runOnOperation() {
   if (tileSize.hasValue()) {
     optionalTileSize = tileSize.getValue();
   }
-  if (failed(reifyAttentionTransform(getOperation(), onlyTile,
-                                     optionalTileSize))) {
+  if (failed(reifyAttentionTransform(getOperation(), onlyTile, optionalTileSize,
+                                     useSCFIterMax))) {
     return signalPassFailure();
+  }
+  // Run patterns to remove unused iter in scf::ForOp loop, if we intend to not
+  // use iterator for "max".
+  if (!useSCFIterMax) {
+    RewritePatternSet patterns(context);
+    scf::ForOp::getCanonicalizationPatterns(patterns, context);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 }
 
-std::unique_ptr<Pass> createTileAndDecomposeAttentionPass() {
-  return std::make_unique<TileAndDecomposeAttentionPass>();
+std::unique_ptr<Pass> createTileAndDecomposeAttentionPass(bool useSCFIterMax) {
+  return std::make_unique<TileAndDecomposeAttentionPass>(useSCFIterMax);
 }
 
 } // namespace LinalgExt
