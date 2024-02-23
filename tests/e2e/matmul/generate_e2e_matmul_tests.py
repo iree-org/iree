@@ -258,6 +258,10 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
         MMASchedule("F16_16x16x16_F32", 2, 2, 1, 1, 1),
         MMASchedule("F16_16x16x16_F32", 2, 4, 2, 1, 2),
         MMASchedule("F16_16x16x16_F32", 4, 2, 4, 2, 2),
+        MMASchedule("F16_32x32x8_F32", 1, 1, 1, 2, 2),
+        MMASchedule("F16_32x32x8_F32", 2, 2, 1, 1, 1),
+        MMASchedule("F16_32x32x8_F32", 1, 4, 2, 1, 2),
+        MMASchedule("F16_32x32x8_F32", 4, 2, 1, 2, 4),
     ]
 
     infos = []
