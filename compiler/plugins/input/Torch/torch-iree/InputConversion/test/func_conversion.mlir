@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(torch-iree-func-conversion)" %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(torch-iree-func-conversion)" --allow-unregistered-dialect --split-input-file %s | FileCheck %s
 
 // Canonical test of the immutable input->compute->return case. This is
 // exhaustively verified for both the async and sync wrapper function.
@@ -267,3 +267,56 @@ module @torch_float_arg {
   }
 }
 
+// -----
+// CHECK-LABEL: @builtin_index_arg
+module @builtin_index_arg {
+  func.func @main(%arg0 : index) -> (!torch.vtensor<[1],f32>) {
+    %0 = "torch_test.operator"(%arg0) : (index) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+
+// -----
+// CHECK-LABEL: @builtin_int_arg
+module @builtin_int_arg {
+  func.func @main(%arg0 : i32) -> (!torch.vtensor<[1],f32>) {
+    %0 = "torch_test.operator"(%arg0) : (i32) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+
+// -----
+// CHECK-LABEL: @builtin_float_arg
+module @builtin_float_arg {
+  func.func @main(%arg0 : f32) -> (!torch.vtensor<[1],f32>) {
+    %0 = "torch_test.operator"(%arg0) : (f32) ->  (!torch.vtensor<[1],f32>)
+    return %0 : !torch.vtensor<[1],f32>
+  }
+}
+
+// -----
+// CHECK-LABEL: @builtin_index_return
+module @builtin_index_return {
+  func.func @main() -> index {
+    %0 = "torch_test.operator"() : () -> index
+    return %0 : index
+  }
+}
+
+// -----
+// CHECK-LABEL: @builtin_int_return
+module @builtin_int_return {
+  func.func @main() -> i32 {
+    %0 = "torch_test.operator"() : () -> i32
+    return %0 : i32
+  }
+}
+
+// -----
+// CHECK-LABEL: @builtin_float_return
+module @builtin_float_return {
+  func.func @main() -> f32 {
+    %0 = "torch_test.operator"() : () -> f32
+    return %0 : f32
+  }
+}
