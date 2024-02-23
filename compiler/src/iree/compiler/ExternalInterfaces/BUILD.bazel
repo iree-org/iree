@@ -26,7 +26,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:ArithDialect",
-        "@llvm-project//mlir:Dialect",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:LinalgOpsIncGen",
         "@llvm-project//mlir:LinalgStructuredOpsIncGen",

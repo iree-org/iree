@@ -21,7 +21,7 @@ iree_cc_library(
     "UtilExternalModels.cpp"
   DEPS
     MLIRArithDialect
-    MLIRDialect
+    MLIRIR
     MLIRLinalgDialect
     MLIRLinalgOpsIncGenLib
     MLIRLinalgStructuredOpsIncGenLib
