@@ -24,11 +24,11 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
 #include "iree/compiler/Dialect/Util/TransformOps/UtilTransformOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
+#include "iree/compiler/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
@@ -59,7 +59,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   // External models.
-  IREE::Util::registerUtilExternalModels(registry);
+  registerExternalInterfaces(registry);
   registerCodegenInterfaces(registry);
   registerGlobalOptimizationInterfaces(registry);
   registerUKernelBufferizationInterface(registry);

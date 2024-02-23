@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/UtilExternalModels.h"
+#include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -14,7 +14,9 @@
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-namespace mlir::iree_compiler::IREE::Util {
+using namespace mlir::iree_compiler::IREE;
+
+namespace mlir::iree_compiler {
 
 namespace {
 
@@ -23,8 +25,8 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct GlobalOpInterfaceExternalModel
-    : public GlobalOpInterface::ExternalModel<GlobalOpInterfaceExternalModel,
-                                              ml_program::GlobalOp> {
+    : public Util::GlobalOpInterface::ExternalModel<
+          GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
   }
@@ -92,8 +94,8 @@ struct GlobalOpInterfaceExternalModel
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
-                                                     OpTy> {};
+      : public Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                           OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -112,8 +114,8 @@ struct GenericNumericCastExternalModel {
 //===----------------------------------------------------------------------===//
 
 struct InsertSliceOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
-                                            tensor::InsertSliceOp> {
+    : public Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
+                                                  tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -132,8 +134,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
-                                            OpTy> {
+    : public Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
+                                                  OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -371,4 +373,4 @@ void registerUtilExternalModels(DialectRegistry &registry) {
       });
 }
 
-} // namespace mlir::iree_compiler::IREE::Util
+} // namespace mlir::iree_compiler
