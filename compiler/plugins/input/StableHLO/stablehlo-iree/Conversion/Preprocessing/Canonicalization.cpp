@@ -907,8 +907,7 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
     if (!operandType || !operandType.hasStaticShape())
       return failure();
 
-    auto sliceEnd =
-        llvm::to_vector(gather.getSliceSizes());
+    auto sliceEnd = llvm::to_vector(gather.getSliceSizes());
     SmallVector<int64_t> sliceStart(sliceEnd.size(), 0);
     for (auto [mapIndex, value] :
          llvm::zip_equal(dnums.getStartIndexMap(), index.getValues<APInt>())) {

@@ -80,8 +80,7 @@ struct GatherIsTorchIndexSelectPattern final
       }
     }
 
-    for (auto [idx, value] :
-         llvm::enumerate(gather.getSliceSizes())) {
+    for (auto [idx, value] : llvm::enumerate(gather.getSliceSizes())) {
       // First shape value must be 1.
       if (idx == 0) {
         if (value != 1) {

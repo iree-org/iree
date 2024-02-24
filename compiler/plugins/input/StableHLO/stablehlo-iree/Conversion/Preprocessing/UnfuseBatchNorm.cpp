@@ -157,8 +157,7 @@ Value createReduce(Location loc, Value operand, Value zero,
   auto reduceResultType = RankedTensorType::get(
       {operandType.getDimSize(featureIndex)}, operandType.getElementType());
   auto reduce = rewriter.create<mlir::stablehlo::ReduceOp>(
-      loc, reduceResultType, operand, zero,
-      reduceDims);
+      loc, reduceResultType, operand, zero, reduceDims);
 
   // setup "stablehlo.reduce"'s body
   Region &region = reduce.getBody();

@@ -220,8 +220,7 @@ struct ReduceOpToReduceConverter final
                                          "unsupported reduce (noop or empty)");
     }
 
-    auto reductionDims =
-        llvm::to_vector(op.getDimensions());
+    auto reductionDims = llvm::to_vector(op.getDimensions());
     // stablehlo.reduce doesn't specify the order of the reduction dimensions.
     llvm::sort(reductionDims);
 
@@ -562,8 +561,7 @@ struct ReduceWindowOpConversion final
     int lastDim = rank - 1;
     SmallVector<int64_t, 2> fakeWindowShapes;
     for (int i = 1; i < lastDim; ++i) {
-      fakeWindowShapes.push_back(
-          op.getWindowDimensions()[i]);
+      fakeWindowShapes.push_back(op.getWindowDimensions()[i]);
     }
 
     if (op.getWindowStrides() &&
@@ -573,7 +571,7 @@ struct ReduceWindowOpConversion final
           op, "expected window_strides to be [1,x,y,(z),1]");
     }
     if (op.getWindowDimensions()[0] != 1 ||
-         op.getWindowDimensions()[lastDim] != 1) {
+        op.getWindowDimensions()[lastDim] != 1) {
       return rewriter.notifyMatchFailure(
           op, "expected window_dimensions to be [1,x,y,(z),1]");
     }
