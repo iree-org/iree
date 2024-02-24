@@ -19,6 +19,15 @@
 extern "C" {
 #endif  // __cplusplus
 
+enum iree_task_scope_flag_bits_e {
+  IREE_TASK_SCOPE_FLAG_NONE = 0u,
+  // Calls iree_status_abort on the first failure within the scope.
+  // Hosting applications should properly handle the errors by retrieving the
+  // failure status from the appropriate query or wait primitive.
+  IREE_TASK_SCOPE_FLAG_ABORT_ON_FAILURE = 1u << 0,
+};
+typedef uint32_t iree_task_scope_flags_t;
+
 // iree_task_scope_t is an atomic reference-counting helper posting a
 // notification when the reference count is decremended to 0.
 //
@@ -47,6 +56,9 @@ extern "C" {
 typedef struct iree_task_scope_t {
   // Name used for logging and tracing.
   char name[16];
+
+  // Flags controlling optional scope behavior.
+  iree_task_scope_flags_t flags;
 
   // Base color used for tasks in this scope.
   // The color will be modulated based on task type.
@@ -78,6 +90,7 @@ typedef struct iree_task_scope_t {
 // Callers must ensure the scope remains live for as long as there are any
 // tasks that may reference it.
 void iree_task_scope_initialize(iree_string_view_t name,
+                                iree_task_scope_flags_t flags,
                                 iree_task_scope_t* out_scope);
 
 // Deinitializes an task scope.
