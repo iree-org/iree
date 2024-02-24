@@ -36,7 +36,6 @@ py_binary(
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--acc_type=%s" % acc_type,
-        "--transpose=b",
         "--shapes=%s" % size,
     ],
     tags = [
@@ -226,7 +225,6 @@ iree_generated_e2e_matmul_test(
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
-        "--transpose=b",
         "--shapes=gpu_large_aligned",
         "--compilation_info=LLVMGPUMatmulSimt",
     ],
