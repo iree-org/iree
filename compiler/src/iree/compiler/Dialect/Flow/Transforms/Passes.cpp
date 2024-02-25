@@ -137,7 +137,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Elementwise fusion.
       .addPass(
           []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
-      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
+      .addPredicatedPass(clDetensoring,
+                         [&]() { return mlir::createLinalgDetensorizePass(); })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clCollapseReductionDims, createCollapseDimsPass)
