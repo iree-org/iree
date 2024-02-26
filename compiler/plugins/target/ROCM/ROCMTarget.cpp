@@ -285,7 +285,7 @@ public:
           getTranslationInfo(exportOp);
       if (auto translationConfig = translationInfo.getConfiguration()) {
         if (auto attr = dyn_cast_or_null<IntegerAttr>(
-                translationConfig.get("waves-per-eu"))) {
+                translationConfig.get("amdgpu-waves-per-eu"))) {
           wavesPerEu = attr.getValue().getSExtValue();
         }
       }
