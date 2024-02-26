@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -1500,6 +1501,27 @@ void transform_dialect::PackSharedMemoryAllocOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===----------------------------------------------------------------------===//
+// PrefetchSharedMemoryCopiesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::PrefetchSharedMemoryCopiesOp::applyToOne(
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  FailureOr<scf::ForOp> pipelinedFor =
+      iree_compiler::prefetchSharedMemoryCopy(rewriter, forOp);
+
+  if (failed(pipelinedFor)) {
+    results.push_back(forOp);
+    return DiagnosedSilenceableFailure::success();
+  }
+  results.push_back(pipelinedFor.value());
+  return DiagnosedSilenceableFailure::success();
+}
+
 class TransformVectorLayoutOptions : public VectorLayoutOptions {
 public:
   TransformVectorLayoutOptions(Operation *root, bool fullConversion)
@@ -1537,7 +1559,7 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
 }
 

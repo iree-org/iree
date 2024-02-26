@@ -685,6 +685,39 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   }];
 }
 
+def PrefetchSharedMemoryCopiesOp : Op<
+    Transform_Dialect, "iree.prefetch_shared_memory_copies", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    #### Return modes
+    This transform consumes the scf.for handle and produces a result handle
+    which points to a) the new scf.for loop generated (success case) or b) the
+    existing scf.for loop (failure case).
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$for_op);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let assemblyFormat = [{
+    $for_op
+    attr-dict
+    `:` functional-type(operands, results)}];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::scf::ForOp forOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def AMDGPUDistributeVectorsOp :
   Op<Transform_Dialect, "iree.amdgpu_distribute_vectors",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

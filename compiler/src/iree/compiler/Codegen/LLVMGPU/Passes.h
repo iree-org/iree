@@ -177,6 +177,9 @@ void registerCodegenLLVMGPUPasses();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
+FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+                                               scf::ForOp forOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
