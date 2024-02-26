@@ -280,6 +280,16 @@ public:
         subgroupSize = *setSubgroupSize;
       }
 
+      int64_t wavesPerEu = options.wavesPerEu;
+      IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(exportOp);
+      if (auto translationConfig = translationInfo.getConfiguration()) {
+        if (auto attr = dyn_cast_or_null<IntegerAttr>(
+                translationConfig.get("waves-per-eu"))) {
+          wavesPerEu = attr.getValue().getSExtValue();
+        }
+      }
+
       workgroupSizes.push_back(workgroupSize);
       uint32_t workgroupLocalMemory = 0;
       if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
@@ -294,9 +304,8 @@ public:
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
       std::string wgSizeRange = std::string("1, ") + std::to_string(flatWgSize);
       llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
-      if (options.wavesPerEu > 0)
-        llvmFunc->addFnAttr("amdgpu-waves-per-eu",
-                            std::to_string(options.wavesPerEu));
+      if (wavesPerEu > 0)
+        llvmFunc->addFnAttr("amdgpu-waves-per-eu", std::to_string(wavesPerEu));
       if (subTarget.starts_with(GFX9))
         addPreloadKernArgHint(llvmFunc);
     }
