@@ -14,6 +14,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
+    "attention.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
@@ -76,6 +77,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
   SRCS
+    "attention.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
