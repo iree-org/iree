@@ -60,6 +60,7 @@ MLIR_C_HEADER_FILES = [
     "Transforms.h",
     "Dialect/Linalg.h",
     "Dialect/Transform.h",
+    "Dialect/Transform/Interpreter.h",
     "Dialect/PDL.h",
 ]
 
