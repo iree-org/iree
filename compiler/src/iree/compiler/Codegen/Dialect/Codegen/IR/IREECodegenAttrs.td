@@ -25,6 +25,8 @@ def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
 def CPU_DataTiling
     : I32EnumAttrCase<"CPUDataTiling", 6>;
+def CPU_LinalgExtTileAndVectorize
+    : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 7>;
 
 def LLVMGPU_Default
     : I32EnumAttrCase<"LLVMGPUDefault", 100>;
@@ -81,7 +83,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     CPU_Default, CPU_DoubleTilingExpert,
     CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
     CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
-    CPU_DataTiling,
+    CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
 
     // LLVMGPU CodeGen pipelines
     LLVMGPU_Default, LLVMGPU_BaseLowering, LLVMGPU_SimpleDistribute,
