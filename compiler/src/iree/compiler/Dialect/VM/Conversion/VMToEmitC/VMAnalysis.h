@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "iree/compiler/Dialect/VM/Utils/TypeTable.h"
@@ -144,6 +145,17 @@ struct ModuleAnalysis {
     for (auto func : module.getOps<mlir::emitc::FuncOp>()) {
       functions[func.getOperation()] = FuncAnalysis(func);
     }
+
+    for (auto func : module.getOps<IREE::VM::FuncOp>()) {
+      for (auto &block : func.getBody()) {
+        for (Value blockArg : block.getArguments()) {
+          if (!isa<IREE::VM::RefType>(blockArg.getType())) {
+            continue;
+          }
+          blockArgMapping[blockArg] = func;
+        }
+      }
+    }
   }
 
   ModuleAnalysis(ModuleAnalysis &&) = default;
@@ -174,6 +186,7 @@ struct ModuleAnalysis {
 
     functions[newFunc.getOperation()] = std::move(analysis);
     functions.erase(oldFunc.getOperation());
+    functionMapping[oldFunc] = newFunc;
   }
 
   FuncAnalysis &lookupFunction(Operation *op) {
@@ -198,8 +211,8 @@ struct ModuleAnalysis {
     if (auto definingOp = ref.getDefiningOp()) {
       funcOp = definingOp->getParentOfType<mlir::emitc::FuncOp>();
     } else {
-      Operation *op = llvm::cast<BlockArgument>(ref).getOwner()->getParentOp();
-      funcOp = cast<mlir::emitc::FuncOp>(op);
+      assert(blockArgMapping.contains(ref) && "Mapping does not contain ref");
+      funcOp = functionMapping[blockArgMapping[ref]];
     }
 
     auto &analysis = lookupFunction(funcOp);
@@ -230,6 +243,8 @@ struct ModuleAnalysis {
 private:
   DenseMap<Operation *, FuncAnalysis> functions;
   llvm::DenseMap<Type, int> typeOrdinalMap;
+  llvm::DenseMap<Value, IREE::VM::FuncOp> blockArgMapping;
+  llvm::DenseMap<IREE::VM::FuncOp, emitc::FuncOp> functionMapping;
 };
 
 } // namespace mlir::iree_compiler::IREE::VM

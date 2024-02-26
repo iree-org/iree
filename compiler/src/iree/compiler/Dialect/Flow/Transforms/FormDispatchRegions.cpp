@@ -58,8 +58,8 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
     result.push_back(cast<tensor::DimOp>(op));
   return result;
 }
-void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::Listener::notifyOperationRemoved(op);
+void TensorDimTrackingRewriter::notifyOperationErased(Operation *op) {
+  IRRewriter::Listener::notifyOperationErased(op);
   if (isa<tensor::DimOp>(op))
     dimOps.erase(op);
 }
