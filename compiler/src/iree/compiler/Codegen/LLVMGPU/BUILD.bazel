@@ -104,6 +104,7 @@ iree_compiler_cc_library(
         "LLVMGPUVectorDistribute.cpp",
         "LLVMGPUVectorLowering.cpp",
         "LLVMGPUVectorToGPU.cpp",
+        "LLVMGPUPrefetching.cpp",
         "Passes.cpp",
         "ROCDLKernelConfig.cpp",
         "ROCDLLowerExecutableTarget.cpp",
