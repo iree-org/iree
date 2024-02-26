@@ -584,9 +584,16 @@ VER_0 {
     mlirTransformAnyParamTypeGetTypeID;
     mlirTransformAnyValueTypeGet;
     mlirTransformAnyValueTypeGetTypeID;
+    mlirTransformApplyNamedSequence;
     mlirTransformOperationTypeGet;
     mlirTransformOperationTypeGetOperationName;
     mlirTransformOperationTypeGetTypeID;
+    mlirTransformOptionsCreate;
+    mlirTransformOptionsDestroy;
+    mlirTransformOptionsEnableExpensiveChecks;
+    mlirTransformOptionsEnforceSingleTopLevelTransformOp;
+    mlirTransformOptionsGetEnforceSingleTopLevelTransformOp;
+    mlirTransformOptionsGetExpensiveChecksEnabled;
     mlirTransformParamTypeGet;
     mlirTransformParamTypeGetType;
     mlirTransformParamTypeGetTypeID;
