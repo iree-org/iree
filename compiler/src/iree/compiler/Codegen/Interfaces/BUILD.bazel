@@ -57,6 +57,8 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/Flow/TransformExtensions:FlowExtensions",
         "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineTransformOps",
+        "@llvm-project//mlir:AMDGPUDialect",
+        "@llvm-project//mlir:AMDGPUTransformOps",
         "@llvm-project//mlir:ArithValueBoundsOpInterfaceImpl",
         "@llvm-project//mlir:BufferizationTransformOps",
         "@llvm-project//mlir:GPUTransformOps",
