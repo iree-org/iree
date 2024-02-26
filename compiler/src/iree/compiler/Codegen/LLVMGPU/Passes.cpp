@@ -22,7 +22,6 @@
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
-#include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -521,7 +520,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      amdgpu::createOptimizeSharedMemory());
+      createGPUReduceSharedMemoryBankConflicts());
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCSEPass());
