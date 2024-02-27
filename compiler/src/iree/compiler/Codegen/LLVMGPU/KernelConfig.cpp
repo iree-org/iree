@@ -402,8 +402,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[batch] = 1;
   }
   // Tile all output image dimensions with unit size except the last one.
-  for (int64_t oi :
-       ArrayRef<unsigned int>(convolutionDims->outputImage).drop_back()) {
+  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
     workgroupTileSizes[oi] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
@@ -473,6 +472,12 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // except the inner most m, n, and k dimensions to 1.
   int64_t mDim = contractionDims->m.back();
   int64_t nDim = contractionDims->n.back();
+
+  // Bail out on matvec-like cases.
+  if (bounds[mDim] == 1 || bounds[nDim] == 1) {
+    return failure();
+  }
+
   int64_t kDim = contractionDims->k.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
@@ -523,15 +528,15 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[batch] = 1;
   }
 
-  // Tile all m, n, and k dimensions to 1 except the inner most. Unit dims
+  // Tile all m, n, and k dimensions to 1 except the innermost. Unit dims
   // from this tiling are folded before vectorization.
-  for (int64_t m : ArrayRef<unsigned int>(contractionDims->m).drop_back()) {
+  for (int64_t m : llvm::drop_end(contractionDims->m)) {
     workgroupTileSizes[m] = 1;
   }
-  for (int64_t n : ArrayRef<unsigned int>(contractionDims->n).drop_back()) {
+  for (int64_t n : llvm::drop_end(contractionDims->n)) {
     workgroupTileSizes[n] = 1;
   }
-  for (int64_t k : ArrayRef<unsigned int>(contractionDims->k).drop_back()) {
+  for (int64_t k : llvm::drop_end(contractionDims->k)) {
     workgroupTileSizes[k] = 1;
   }
 
