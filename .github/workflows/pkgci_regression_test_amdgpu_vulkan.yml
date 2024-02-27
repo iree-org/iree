@@ -26,7 +26,7 @@ jobs:
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
-      - name: Checking out repository
+      - name: Checking out IREE repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           submodules: false
@@ -40,12 +40,33 @@ jobs:
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
       - name: Setup venv
         run: |
-          ./build_tools/pkgci/setup_venv.py $VENV_DIR \
+          ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
-      - name: Run Tests
+
+      # In-tree tests
+      - name: Run experimental/regression_suite tests
         run: |
-          source $VENV_DIR/bin/activate
+          source ${VENV_DIR}/bin/activate
           pytest \
             -rA -s -m "plat_rdna3_vulkan and presubmit" \
             experimental/regression_suite
+
+      # Out of tree tests
+      - name: Checking out external TestSuite repository
+        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        with:
+          repository: ScottTodd/SHARK-TestSuite  # replace with `nod-ai/SHARK-TestSuite`
+          ref: testsuite-pytest  # replace with a pinned commit on `main`
+          path: SHARK-TestSuite
+          submodules: false
+      - name: Installing external TestSuite Python requirements
+        run: |
+          source ${VENV_DIR}/bin/activate
+          python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+      - name: Run external TestSuite tests
+        env:
+          IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_gpu_vulkan.json
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests -n auto -rpfE
