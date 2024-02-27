@@ -647,12 +647,12 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_cleanup(
   iree_allocator_t host_allocator = actions->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // First call user provided callback before releasing any resource.
+  // Call user provided callback before releasing any resource.
   if (action->cleanup_callback) {
     action->cleanup_callback(action->callback_user_data);
   }
 
-  // Then release all retained resources.
+  // Only release resources after callbacks have been issued.
   iree_hal_resource_set_free(action->resource_set);
   iree_hal_cuda_free_semaphore_list(host_allocator,
                                     &action->wait_semaphore_list);
