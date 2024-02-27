@@ -204,10 +204,26 @@ class IntrusiveListBase {
   size_t count_ = 0;
 };
 
+namespace impl {
+
+// std::iterator has been deprecated in C++17, therefore we create our own
+// definition of the required types for iterators.
+template<typename Category, typename T, typename Distance = std::ptrdiff_t,
+  typename Pointer = T*, typename Reference = T&>
+struct iterator {
+  using iterator_category = Category;
+  using value_type = T;
+  using difference_type = Distance;
+  using pointer = Pointer;
+  using reference = Reference;
+};
+
+}  // namespace impl
+
 // Basic iterator for an IntrusiveList.
 template <typename T, size_t kOffset, bool kForward>
 class IntrusiveListIterator
-    : public std::iterator<std::input_iterator_tag, int> {
+    : public impl::iterator<std::input_iterator_tag, int> {
  public:
   using self_type = IntrusiveListIterator<T, kOffset, kForward>;
 
