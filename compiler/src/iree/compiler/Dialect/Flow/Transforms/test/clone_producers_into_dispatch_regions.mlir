@@ -237,3 +237,34 @@ module {
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   flow.return %[[MMT4D]] :
 //       CHECK:   util.return %[[DISP]]
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0)>
+util.func public @dequant_like_extf_reduction(%arg0: tensor<11008x32x128xf16>) -> tensor<11008xf32> {
+  %0 = tensor.empty() : tensor<11008x32x128xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<11008x32x128xf16>) outs(%0 : tensor<11008x32x128xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %4 = arith.extf %in : f16 to f32
+    linalg.yield %4 : f32
+  } -> tensor<11008x32x128xf32>
+  %2 = tensor.empty() : tensor<11008xf32>
+  %3 = flow.dispatch.region -> (tensor<11008xf32>) {
+    %4 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction", "reduction"]} ins(%1 : tensor<11008x32x128xf32>) outs(%2 : tensor<11008xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %5 = arith.addf %in, %out : f32
+      linalg.yield %5 : f32
+    } -> tensor<11008xf32>
+    flow.return %4 : tensor<11008xf32>
+  }
+  util.return %3 : tensor<11008xf32>
+}
+//       CHECK: util.func public @dequant_like_extf_reduction
+//       CHECK:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<11008xf32>)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel"]
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "reduction", "reduction"]
+//       CHECK:   flow.return %[[GEN]] :
+//       CHECK:   util.return %[[DISP]]
