@@ -125,7 +125,7 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand,
       return false;
     }
     if (linalg::isaContractionOpInterface(linalgConsumerOp) ||
-        linalg::isaContractionOpInterface(linalgConsumerOp)) {
+        linalg::isaConvolutionOpInterface(linalgConsumerOp)) {
       return false;
     }
     return true;
