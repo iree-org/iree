@@ -229,7 +229,15 @@ public:
   TraversalResult walk(OperationWalkFn fn);
 
   // Walks all unique SSA values nested within the root op.
-  TraversalResult walkValues(ValueWalkFn fn);
+  TraversalResult walkValues(ValueWalkFn fn) {
+    return walkAllValues(fn, std::nullopt);
+  }
+  // Walks all unique SSA values nested within the root op that have the given
+  // type.
+  template <typename OpT>
+  TraversalResult walkValuesOfType(ValueWalkFn fn) {
+    return walkAllValues(fn, OpT::getTypeID());
+  }
 
   // Walks all unique SSA values used/defined by |op| and all nested regions.
   TraversalResult walkValues(Operation *op, ValueWalkFn fn);
@@ -341,10 +349,13 @@ private:
   void initializeGlobalInfos();
   void initializeInverseCallGraph();
 
+  TraversalResult walkAllValues(ValueWalkFn fn, std::optional<TypeID> typeID);
+
   WalkResult recursiveWalk(Operation *parentOp, const OperationWalkFn &fn);
   WalkResult recursiveWalkValues(Operation *parentOp,
                                  DenseSet<Value> &visitedValues,
-                                 const ValueWalkFn &fn);
+                                 const ValueWalkFn &fn,
+                                 std::optional<TypeID> typeID = std::nullopt);
 
   Operation *rootOp = nullptr;
   AsmState asmState;

@@ -11,9 +11,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Element.h"
-#include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
-#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -867,11 +865,8 @@ LogicalResult ResourceUsageAnalysis::run() {
   // });
 
   // Initialize all SSA values we can do just with trivial search.
-  explorer.walkValues([&](Value value) {
-    if (llvm::isa<IREE::Stream::ResourceType>(value.getType())) {
-      solver.getOrCreateElementFor<ValueResourceUsage>(
-          Position::forValue(value));
-    }
+  explorer.walkValuesOfType<IREE::Stream::ResourceType>([&](Value value) {
+    solver.getOrCreateElementFor<ValueResourceUsage>(Position::forValue(value));
     return WalkResult::advance();
   });
 
