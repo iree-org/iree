@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     Target
   HDRS
+    "LoweringStrategy.h"
     "TargetBackend.h"
     "TargetDevice.h"
     "TargetRegistry.h"

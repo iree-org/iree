@@ -20,6 +20,7 @@ iree_compiler_cc_library(
         "TargetRegistry.cpp",
     ],
     hdrs = [
+        "LoweringStrategy.h",
         "TargetBackend.h",
         "TargetDevice.h",
         "TargetRegistry.h",

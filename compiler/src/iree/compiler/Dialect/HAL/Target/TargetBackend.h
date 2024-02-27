@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Target/LoweringStrategy.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -147,6 +148,12 @@ public:
   // expected to register the dialects it will create entities for (Operations,
   // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
+
+  virtual LogicalResult
+  addLoweringStrategy(std::unique_ptr<IREE::HAL::LoweringStrategy> strategy) {
+    assert(false && "unimplemented addLoweringStrategy");
+    return failure();
+  };
 
   // Inserts passes used to configure the `hal.executable.variant` op contents
   // for translation. The pass manager will be nested on `hal.executable` such

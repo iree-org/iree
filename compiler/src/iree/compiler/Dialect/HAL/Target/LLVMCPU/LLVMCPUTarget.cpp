@@ -272,9 +272,16 @@ public:
     // clang-format on
   }
 
+  LogicalResult addLoweringStrategy(
+      std::unique_ptr<IREE::HAL::LoweringStrategy> strategy) override {
+    loweringStrategies.emplace_back(std::move(strategy));
+    return success();
+  }
+
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
                                       OpPassManager &passManager) override {
-    buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
+    buildLLVMCPUCodegenConfigurationPassPipeline(passManager,
+                                                 loweringStrategies);
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -840,6 +847,9 @@ private:
   // a static "cross compiling" config and would override more specific
   // settings.
   LLVMTargetOptions defaultOptions_;
+
+  // TODO
+  LoweringStrategyList loweringStrategies;
 };
 
 void registerLLVMCPUTargetBackends(

@@ -35,9 +35,12 @@ class LLVMCPUSelectLoweringStrategyPass
     : public LLVMCPUSelectLoweringStrategyBase<
           LLVMCPUSelectLoweringStrategyPass> {
 public:
-  LLVMCPUSelectLoweringStrategyPass() = default;
   LLVMCPUSelectLoweringStrategyPass(
-      const LLVMCPUSelectLoweringStrategyPass &pass) {}
+      const LoweringStrategyList &_loweringStrategies)
+      : loweringStrategies(_loweringStrategies) {}
+  LLVMCPUSelectLoweringStrategyPass(
+      const LLVMCPUSelectLoweringStrategyPass &pass)
+      : loweringStrategies(pass.loweringStrategies) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
     // unnecessary dialect registrations.
@@ -58,6 +61,9 @@ public:
   }
 
   void runOnOperation() override;
+
+private:
+  LoweringStrategyList loweringStrategies;
 };
 } // namespace
 
@@ -82,7 +88,23 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp moduleOp = variantOp.getInnerModule();
 
+  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
+      getAllEntryPoints(moduleOp);
+  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
+    auto exportOp = exportOps.lookup(funcOp.getName());
+    if (!exportOp)
+      continue;
+    if (getTranslationInfo(exportOp))
+      continue;
+
+    for (auto &loweringStrategy : loweringStrategies) {
+      if (succeeded(loweringStrategy->matchAndSetTranslationInfo(funcOp)))
+        break;
+    }
+  }
+
   // Set the strategy with default heuristics.
+  // TODO: initCPULaunchConfig should work on funcOp.
   if (failed(initCPULaunchConfig(moduleOp))) {
     return signalPassFailure();
   }
@@ -119,8 +141,10 @@ void LLVMCPUSelectLoweringStrategyPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPUSelectLoweringStrategyPass() {
-  return std::make_unique<LLVMCPUSelectLoweringStrategyPass>();
+createLLVMCPUSelectLoweringStrategyPass(
+    const LoweringStrategyList &loweringStrategies) {
+  return std::make_unique<LLVMCPUSelectLoweringStrategyPass>(
+      loweringStrategies);
 }
 
 } // namespace mlir::iree_compiler
