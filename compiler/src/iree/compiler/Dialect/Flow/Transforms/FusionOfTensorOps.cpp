@@ -62,7 +62,7 @@ static std::optional<OpOperand *> getFusableUse(Operation *op,
 }
 
 /// Check if the producer generic op is fusable with the consumer generic op.
-static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
+static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand, bool fuseMultiReduction) {
   Operation *producerOp = fusedOperand->get().getDefiningOp();
   Operation *consumerOp = fusedOperand->getOwner();
   if (!producerOp)
@@ -120,7 +120,11 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand) {
              .isPermutation()) {
       return false;
     }
-    if (linalg::isaContractionOpInterface(linalgConsumerOp)) {
+    if (!fuseMultiReduction && linalgConsumerOp.getNumReductionLoops() != 1) {
+      return false;
+    }
+    if (linalg::isaContractionOpInterface(linalgConsumerOp) ||
+        linalg::isaContractionOpInterface(linalgConsumerOp)) {
       return false;
     }
     return true;
@@ -307,12 +311,13 @@ struct FusionOfTensorOpsPass
     registry.insert<affine::AffineDialect, arith::ArithDialect,
                     linalg::LinalgDialect, math::MathDialect>();
   }
-  FusionOfTensorOpsPass(bool fuseMultiUse, unsigned multiUseFusionIteration) {
+  FusionOfTensorOpsPass(bool fuseMultiUse, bool fuseMultiReduction, unsigned multiUseFusionIteration) {
     this->fuseMultiUse = fuseMultiUse;
+    this->fuseMultiReduction = fuseMultiReduction;
     this->multiUseFusionIteration = multiUseFusionIteration;
   }
   FusionOfTensorOpsPass(const FusionOfTensorOpsPass &pass)
-      : FusionOfTensorOpsPass(pass.fuseMultiUse, pass.multiUseFusionIteration) {
+      : FusionOfTensorOpsPass(pass.fuseMultiUse, pass.fuseMultiReduction, pass.multiUseFusionIteration) {
   }
 
   void runOnOperation() override {
@@ -348,7 +353,7 @@ struct FusionOfTensorOpsPass
             if (operands.size() >= kIreeMaxOperandCount)
               return false;
 
-            return areFusableOps(context, fusedOperand);
+            return areFusableOps(context, fusedOperand, fuseMultiReduction);
           };
       linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
                                                    fuseElementwiseOpsControlFn);
@@ -505,8 +510,10 @@ struct FusionOfTensorOpsPass
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse,
+                            bool fuseMultiReduction,
                             unsigned multiUseFusionIteration) {
   return std::make_unique<FusionOfTensorOpsPass>(fuseMultiUse,
+                                                 fuseMultiReduction,
                                                  multiUseFusionIteration);
 }
 
