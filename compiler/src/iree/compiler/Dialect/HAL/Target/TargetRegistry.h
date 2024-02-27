@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetDevice.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -26,20 +27,33 @@ namespace mlir::iree_compiler::IREE::HAL {
 template <typename T>
 using TargetFactoryFn = std::function<std::shared_ptr<T>()>;
 
-// TODO(#15468): remove this when not used by LLVMCPU/VulkanSPIRV.
-// Registers an executable translation target backend creation function.
-class TargetBackendRegistration {
+template <typename T>
+class TargetRegistration {
 public:
-  // TODO: Remove the registerStaticGlobal mode once callers are migrated.
+  TargetRegistration(TargetFactoryFn<T> fn) : initFn(std::move(fn)) {}
+  std::shared_ptr<T> acquire() {
+    std::call_once(initFlag, [&]() { cachedValue = initFn(); });
+    return cachedValue;
+  }
+
+protected:
+  TargetFactoryFn<T> initFn;
+  std::once_flag initFlag;
+  std::shared_ptr<T> cachedValue;
+};
+class TargetBackendRegistration : public TargetRegistration<TargetBackend> {
+public:
+  // TODO(#15468): remove the registerStaticGlobal mode once callers are
+  // migrated and move the constructor to the template type.
   TargetBackendRegistration(StringRef name, TargetFactoryFn<TargetBackend> fn,
                             bool registerStaticGlobal = true);
-
-  std::shared_ptr<TargetBackend> acquire();
-
-private:
-  TargetFactoryFn<TargetBackend> initFn;
-  std::once_flag initFlag;
-  std::shared_ptr<TargetBackend> cachedValue;
+};
+class TargetDeviceRegistration : public TargetRegistration<TargetDevice> {
+public:
+  // TODO(#15468): remove the registerStaticGlobal mode once callers are
+  // migrated and move the constructor to the template type.
+  TargetDeviceRegistration(StringRef name, TargetFactoryFn<TargetDevice> fn,
+                           bool registerStaticGlobal = true);
 };
 
 template <typename T>
@@ -54,6 +68,7 @@ private:
   friend class TargetRegistry;
 };
 class TargetBackendList : public TargetFactoryList<TargetBackend> {};
+class TargetDeviceList : public TargetFactoryList<TargetDevice> {};
 
 //===----------------------------------------------------------------------===//
 // TargetRegistry
@@ -69,6 +84,10 @@ public:
   // Merge from a list of of target backends.
   // The receiving registry will own the registration entries.
   void mergeFrom(const TargetBackendList &targetBackends);
+  // Merge from a list of of target devices.
+  // The receiving registry will own the registration entries.
+  void mergeFrom(const TargetDeviceList &targetDevices);
+
   // Initialize from an existing registry. This registry will not own the
   // backing registration entries. The source registry must remain live for the
   // life of this.
@@ -77,20 +96,32 @@ public:
 
   // Returns a list of registered target backends.
   std::vector<std::string> getRegisteredTargetBackends() const;
+  // Returns a list of registered target devices.
+  std::vector<std::string> getRegisteredTargetDevices() const;
 
   // Returns the target backend with the given name.
   std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) const;
+  // Returns the target device with the given name.
+  std::shared_ptr<TargetDevice> getTargetDevice(StringRef targetName) const;
 
   // Returns one backend per entry in |targetNames|.
   SmallVector<std::shared_ptr<TargetBackend>>
   getTargetBackends(ArrayRef<std::string> targetNames) const;
+  // Returns one device per entry in |targetNames|.
+  SmallVector<std::shared_ptr<TargetDevice>>
+  getTargetDevices(ArrayRef<std::string> targetNames) const;
 
 private:
   llvm::StringMap<TargetBackendRegistration *> backendRegistrations;
   llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
       ownedBackendRegistrations;
+  llvm::StringMap<TargetDeviceRegistration *> deviceRegistrations;
+  llvm::SmallVector<std::unique_ptr<TargetDeviceRegistration>>
+      ownedDeviceRegistrations;
 
+  // TODO(#15468): remove this when not used by LLVMCPU/VulkanSPIRV.
   friend class TargetBackendRegistration;
+  friend class TargetDeviceRegistration;
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL

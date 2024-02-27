@@ -23,21 +23,32 @@ static TargetRegistry &getMutableTargetRegistry() {
 TargetBackendRegistration::TargetBackendRegistration(
     llvm::StringRef name, TargetFactoryFn<TargetBackend> fn,
     bool registerStaticGlobal)
-    : initFn(std::move(fn)) {
+    : TargetRegistration<TargetBackend>(std::move(fn)) {
   if (registerStaticGlobal) {
     auto &registry = getMutableTargetRegistry();
     if (registry.backendRegistrations.contains(name)) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
-    assert(initFn && "Attempting to register an empty translation function");
+    assert(initFn &&
+           "Attempting to register an empty backend factory function");
     registry.backendRegistrations[name] = this;
   }
 }
 
-std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
-  std::call_once(initFlag, [&]() { cachedValue = initFn(); });
-  return cachedValue;
+TargetDeviceRegistration::TargetDeviceRegistration(
+    llvm::StringRef name, TargetFactoryFn<TargetDevice> fn,
+    bool registerStaticGlobal)
+    : TargetRegistration<TargetDevice>(std::move(fn)) {
+  if (registerStaticGlobal) {
+    auto &registry = getMutableTargetRegistry();
+    if (registry.deviceRegistrations.contains(name)) {
+      llvm::report_fatal_error(
+          "Attempting to overwrite an existing target device");
+    }
+    assert(initFn && "Attempting to register an empty device factory function");
+    registry.deviceRegistrations[name] = this;
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -61,7 +72,25 @@ void TargetRegistry::mergeFrom(const TargetBackendList &targetBackends) {
   }
 }
 
+void TargetRegistry::mergeFrom(const TargetDeviceList &targetDevices) {
+  for (auto &it : targetDevices.entries) {
+    if (deviceRegistrations.contains(it.first)) {
+      llvm::report_fatal_error("Attempting to overwrite an existing device");
+    }
+    auto registration = std::make_unique<TargetDeviceRegistration>(
+        it.first, it.second, /*registerStaticGlobal=*/false);
+    deviceRegistrations[it.first] = registration.get();
+    ownedDeviceRegistrations.push_back(std::move(registration));
+  }
+}
+
 void TargetRegistry::mergeFrom(const TargetRegistry &registry) {
+  for (auto &it : registry.deviceRegistrations) {
+    if (deviceRegistrations.contains(it.first())) {
+      llvm::report_fatal_error("Attempting to overwrite an existing device");
+    }
+    deviceRegistrations[it.first()] = it.second;
+  }
   for (auto &it : registry.backendRegistrations) {
     if (backendRegistrations.contains(it.first())) {
       llvm::report_fatal_error(
@@ -81,9 +110,29 @@ std::vector<std::string> TargetRegistry::getRegisteredTargetBackends() const {
   return result;
 }
 
+std::vector<std::string> TargetRegistry::getRegisteredTargetDevices() const {
+  std::vector<std::string> result;
+  for (auto &entry : deviceRegistrations) {
+    result.push_back(entry.getKey().str());
+  }
+  std::sort(result.begin(), result.end(),
+            [](const auto &a, const auto &b) { return a < b; });
+  return result;
+}
+
 std::shared_ptr<TargetBackend>
 TargetRegistry::getTargetBackend(StringRef targetName) const {
   for (auto &entry : backendRegistrations) {
+    if (entry.getKey() == targetName) {
+      return entry.getValue()->acquire();
+    }
+  }
+  return {};
+}
+
+std::shared_ptr<TargetDevice>
+TargetRegistry::getTargetDevice(StringRef targetName) const {
+  for (auto &entry : deviceRegistrations) {
     if (entry.getKey() == targetName) {
       return entry.getValue()->acquire();
     }
@@ -96,6 +145,21 @@ TargetRegistry::getTargetBackends(ArrayRef<std::string> targetNames) const {
   SmallVector<std::shared_ptr<TargetBackend>> matches;
   for (auto targetName : targetNames) {
     auto targetBackend = getTargetBackend(targetName);
+    if (targetBackend) {
+      matches.push_back(std::move(targetBackend));
+    }
+  }
+  // To ensure deterministic builds we sort matches by name.
+  std::sort(matches.begin(), matches.end(),
+            [](const auto &a, const auto &b) { return a->name() < b->name(); });
+  return matches;
+}
+
+SmallVector<std::shared_ptr<TargetDevice>>
+TargetRegistry::getTargetDevices(ArrayRef<std::string> targetNames) const {
+  SmallVector<std::shared_ptr<TargetDevice>> matches;
+  for (auto targetName : targetNames) {
+    auto targetBackend = getTargetDevice(targetName);
     if (targetBackend) {
       matches.push_back(std::move(targetBackend));
     }

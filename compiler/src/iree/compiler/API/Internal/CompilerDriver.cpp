@@ -351,6 +351,9 @@ struct Session {
         IREE::HAL::TargetBackendList pluginTargetBackendList;
         pluginSession.populateHALTargetBackends(pluginTargetBackendList);
         targetRegistry.mergeFrom(pluginTargetBackendList);
+        IREE::HAL::TargetDeviceList pluginTargetDeviceList;
+        pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
+        targetRegistry.mergeFrom(pluginTargetDeviceList);
       }
     }
     return pluginActivationStatus;
