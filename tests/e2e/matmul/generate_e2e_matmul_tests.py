@@ -54,13 +54,6 @@ class CompilationInfoId(enum.Enum):
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
 
 
-# Enumerates of supported transposed cases.
-@enum.unique
-class TransposeCase(enum.Enum):
-    NONE = "none"  # No transpose--canonical (M, K) x (K, N) -> (M, N)
-    B = "b"  # Transepose B matrix--(M, K) x (N, K) -> (M, N)
-
-
 # Enumerates ways to construct MLIR tensor types.
 @enum.unique
 class Dynamicity(enum.Enum):
@@ -427,16 +420,15 @@ class TestInputMatricesShapes:
 # Helper for generate_function. Generates TestInputMatricesShapes, i.e.
 # converts from the runtime shape dimensions in TestShape and given dynamicity to
 # the set of shapes to be used in a test function's input tensors.
-def generate_shapes(shape: TestShape, transpose: TransposeCase, dynamicity: Dynamicity):
+def generate_shapes(shape: TestShape, transpose_rhs: bool, dynamicity: Dynamicity):
     lhs_rows = shape_dim(shape.m, dynamicity)
     lhs_cols = shape_dim(shape.k, dynamicity)
     acc_rows = shape_dim(shape.m, dynamicity)
     acc_cols = shape_dim(shape.n, dynamicity)
-    if transpose == TransposeCase.B:
+    if transpose_rhs:
         rhs_rows = shape_dim(shape.n, dynamicity)
         rhs_cols = shape_dim(shape.k, dynamicity)
     else:
-        assert transpose == TransposeCase.NONE
         rhs_rows = shape_dim(shape.k, dynamicity)
         rhs_cols = shape_dim(shape.n, dynamicity)
     shapes = TestInputMatricesShapes(
@@ -501,11 +493,11 @@ def generate_function(
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shape: TestShape,
-    transpose: TransposeCase,
+    transpose_rhs: bool,
     dynamicity: Dynamicity,
     compilation_info: typing.Optional[CompilationInfo] = None,
 ):
-    shapes = generate_shapes(shape, transpose, dynamicity)
+    shapes = generate_shapes(shape, transpose_rhs, dynamicity)
     func_name = generate_function_name(
         lhs_rhs_type, acc_type, shapes, shape.accumulate, compilation_info
     )
@@ -519,10 +511,9 @@ def generate_function(
     rhs_tensor_type = f"tensor<{rhs_r}x{rhs_c}x{lhs_rhs_type.value}>"
     acc_tensor_type = f"tensor<{acc_r}x{acc_c}x{acc_type.value}>"
 
-    if transpose == transpose.B:
+    if transpose_rhs:
         op_name = "linalg.matmul_transpose_b"
     else:
-        assert transpose == TransposeCase.NONE
         op_name = "linalg.matmul"
 
     # Compilation info is optional; prints empty string by default.
@@ -660,7 +651,7 @@ def generate_call(
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shape: TestShape,
-    transpose: TransposeCase,
+    transpose_rhs: bool,
 ):
     global call_id
     func_name = f"{function.name}_{shape.m}_{shape.k}_{shape.n}"
@@ -679,13 +670,12 @@ def generate_call(
     )
 
     lhs_shape = [shape.m, shape.k]
-    if transpose == TransposeCase.B:
+    if transpose_rhs:
         rhs_shape = [shape.n, shape.k]
-        transpose_b = 1
+        transpose_rhs = 1
     else:
-        assert transpose == TransposeCase.NONE
         rhs_shape = [shape.k, shape.n]
-        transpose_b = 0
+        transpose_rhs = 0
 
     op = op + generate_random_matrix("lhs", lhs_shape, lhs_rhs_type)
     op = op + generate_random_matrix("rhs", rhs_shape, lhs_rhs_type)
@@ -709,8 +699,8 @@ def generate_call(
         f"  %m = arith.constant {shape.m} : i64\n"
         f"  %k = arith.constant {shape.k} : i64\n"
         f"  %n = arith.constant {shape.n} : i64\n"
-        f"  %transpose_b = arith.constant {transpose_b} : i32\n"
-        f"  call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_b, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
+        f"  %transpose_rhs = arith.constant {transpose_rhs} : i32\n"
+        f"  call @matmul_test.check_matmul_results(%device, %m, %k, %n, %transpose_rhs, %lhs, %rhs, %acc, %result) : (!hal.device, i64, i64, i64, i32, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view, !hal.buffer_view) -> ()\n"
     )
 
     op = op + "  return\n"
@@ -724,7 +714,7 @@ def generate(
     lhs_rhs_type: MatrixElemTypeId,
     acc_type: MatrixElemTypeId,
     shapes_id: ShapesId,
-    transpose: TransposeCase,
+    transpose_rhs: bool,
     compilation_info_id: CompilationInfoId,
 ):
     functions = {}
@@ -739,7 +729,7 @@ def generate(
                     lhs_rhs_type,
                     acc_type,
                     shape,
-                    transpose,
+                    transpose_rhs,
                     dynamicity,
                     compilation_info,
                 )
@@ -751,7 +741,9 @@ def generate(
                 if function.name not in functions:
                     functions[function.name] = function
                 calls.append(
-                    generate_call(function, lhs_rhs_type, acc_type, shape, transpose)
+                    generate_call(
+                        function, lhs_rhs_type, acc_type, shape, transpose_rhs
+                    )
                 )
 
     return (functions, calls)
@@ -794,11 +786,10 @@ def parse_arguments():
         required=True,
     )
     parser.add_argument(
-        "--transpose",
-        type=str,
-        choices=["none", "b"],
-        help="Which matrix to transpose",
-        default="None",
+        "--transpose_rhs",
+        action="store_true",
+        help="Whether to transpose RHS",
+        default=False,
         required=False,
     )
     parser.add_argument(
@@ -842,7 +833,7 @@ def write_calls_file(functions, calls, filename, requirements):
     # Declare the custom module that generates arguments.
     module_definition = module_definition + (
         "func.func private @matmul_test.generate_random_matrix(%device: !hal.device, %dim0: i64, %dim1: i64, %element_type: i32, %seed: i32) -> !hal.buffer_view\n"
-        "func.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_b: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
+        "func.func private @matmul_test.check_matmul_results(%device: !hal.device, %m: i64, %k: i64, %n: i64, %transpose_rhs: i32, %lhs: !hal.buffer_view, %rhs: !hal.buffer_view, %acc: !hal.buffer_view, %actual_result: !hal.buffer_view)\n"
         "\n"
     )
 
@@ -879,15 +870,9 @@ def main(args):
     acc_type = infer_acc_type(lhs_rhs_type, acc_type)
     shapes_id = ShapesId(args.shapes)
     compilation_info_id = CompilationInfoId(args.compilation_info)
-    if args.transpose.lower() == "none":
-        transpose = TransposeCase.NONE
-    elif args.transpose.lower() == "b":
-        transpose = TransposeCase.B
-    else:
-        raise NotImplementedError("unhandled transpose case")
 
     (functions, calls) = generate(
-        lhs_rhs_type, acc_type, shapes_id, transpose, compilation_info_id
+        lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
     )
 
     write_code_file(functions, args.output_matmuls_mlir)

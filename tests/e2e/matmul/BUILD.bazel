@@ -464,7 +464,7 @@ iree_generated_e2e_matmul_test(
     generator_args = [
         "--lhs_rhs_type=f16",
         "--acc_type=f32",
-        "--transpose=b",
+        "--transpose_rhs",
         "--shapes=gpu_large_aligned",
         "--compilation_info=LLVMGPUVectorDistribute",
     ],

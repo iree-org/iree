@@ -1010,7 +1010,7 @@ iree_generated_e2e_matmul_test(
   GENERATOR_ARGS
     "--lhs_rhs_type=f16"
     "--acc_type=f32"
-    "--transpose=b"
+    "--transpose_rhs"
     "--shapes=gpu_large_aligned"
     "--compilation_info=LLVMGPUVectorDistribute"
   TEST_RUNNER
