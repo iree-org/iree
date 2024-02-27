@@ -69,4 +69,4 @@ jobs:
           IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_gpu_vulkan.json
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests -n auto -rpfE
+          pytest SHARK-TestSuite/iree_tests -n 4 -rpfE
