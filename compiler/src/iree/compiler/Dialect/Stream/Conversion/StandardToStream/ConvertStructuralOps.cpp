@@ -216,7 +216,7 @@ struct ScfForOpConversion : public OpConversionPattern<mlir::scf::ForOp> {
         adaptor.getStep(), expandedOperands);
 
     // Inline the block and update the block arguments.
-    forOp.getRegion().getBlocks().clear();
+    rewriter.eraseBlock(forOp.getBody());
     rewriter.inlineRegionBefore(op.getRegion(), forOp.getRegion(),
                                 forOp.getRegion().end());
     if (failed(rewriter.convertRegionTypes(&forOp.getRegion(), typeConverter,

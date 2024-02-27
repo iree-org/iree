@@ -103,7 +103,7 @@ struct TranslateExecutablesPass
     IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(INFO, executableOp.getSymName().str());
 
     if (failed(runPipeline(passManager, executableOp))) {
-      executableOp.emitError() << "failed to translate executables";
+      llvm::errs() << "failed to translate executables\n";
       return signalPassFailure();
     }
   }
