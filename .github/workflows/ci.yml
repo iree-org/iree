@@ -644,7 +644,7 @@ jobs:
             --env CC=/usr/bin/gcc-9 \
             --env CXX=/usr/bin/g++-9 \
             --env CMAKE_BUILD_TYPE=Release \
-            --env "IREE_TARGET_BACKEND_WEBGPU=OFF" \
+            --env "IREE_TARGET_BACKEND_WEBGPU_SPIRV=OFF" \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75" \
