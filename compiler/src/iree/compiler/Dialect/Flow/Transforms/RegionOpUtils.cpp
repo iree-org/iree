@@ -556,15 +556,6 @@ bool isDequantizationLikeOp(Operation *op) {
       outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
-
-  for (auto &bodyOp : genericOp.getBody()->getOperations()) {
-    if (!isa<arith::ExtUIOp, arith::ExtSIOp, arith::MulFOp, arith::MulIOp,
-             arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
-             arith::SIToFPOp, arith::UIToFPOp, linalg::YieldOp>(bodyOp)) {
-      return false;
-    }
-  }
-
   return true;
 }
 
