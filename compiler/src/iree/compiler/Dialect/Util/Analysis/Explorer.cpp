@@ -320,7 +320,8 @@ WalkResult Explorer::recursiveWalk(Operation *parentOp,
   return WalkResult::advance();
 }
 
-TraversalResult Explorer::walkValues(ValueWalkFn fn) {
+TraversalResult Explorer::walkAllValues(ValueWalkFn fn,
+                                        std::optional<TypeID> typeID) {
   LLVM_DEBUG(llvm::dbgs() << "[[ Explorer::walkValues ]]\n");
   TraversalResult result = TraversalResult::COMPLETE;
 
@@ -357,7 +358,8 @@ TraversalResult Explorer::walkValues(ValueWalkFn fn) {
 
       LLVM_DEBUG(llvm::dbgs() << "   + entering callable region @"
                               << getRegionName(callableRegion) << "\n");
-      auto emitResult = recursiveWalkValues(callableOp, visitedValues, fn);
+      auto emitResult =
+          recursiveWalkValues(callableOp, visitedValues, fn, typeID);
       if (emitResult.wasInterrupted())
         break;
       if (emitResult.wasSkipped())
@@ -384,7 +386,8 @@ TraversalResult Explorer::walkValues(Operation *op, ValueWalkFn fn) {
 
 WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
                                          DenseSet<Value> &visitedValues,
-                                         const ValueWalkFn &fn) {
+                                         const ValueWalkFn &fn,
+                                         std::optional<TypeID> typeID) {
   auto parentAction = getTraversalAction(parentOp);
   if (parentAction == TraversalAction::IGNORE) {
     LLVM_DEBUG(llvm::dbgs()
@@ -396,6 +399,8 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
     LLVM_DEBUG(llvm::dbgs()
                << "   + processing op results " << getOpName(parentOp) << "\n");
     for (auto result : parentOp->getResults()) {
+      if (typeID.has_value() && result.getType().getTypeID() != *typeID)
+        continue;
       if (visitedValues.insert(result).second) {
         LLVM_DEBUG({
           llvm::dbgs() << "  == emitting value ";
@@ -425,6 +430,8 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
           llvm::dbgs() << " arguments\n";
         });
         for (auto arg : block.getArguments()) {
+          if (typeID.has_value() && arg.getType().getTypeID() != *typeID)
+            continue;
           if (visitedValues.insert(arg).second) {
             LLVM_DEBUG({
               llvm::dbgs() << "  == emitting block arg ";
@@ -437,7 +444,7 @@ WalkResult Explorer::recursiveWalkValues(Operation *parentOp,
         }
       }
       for (auto &op : block) {
-        auto opResult = recursiveWalkValues(&op, visitedValues, fn);
+        auto opResult = recursiveWalkValues(&op, visitedValues, fn, typeID);
         if (opResult.wasInterrupted())
           return WalkResult::interrupt();
       }
