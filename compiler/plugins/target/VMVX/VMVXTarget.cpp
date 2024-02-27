@@ -67,12 +67,16 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   std::optional<IREE::HAL::DeviceTargetAttr>
@@ -164,14 +168,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   const VMVXOptions &options;
 };
 
@@ -191,12 +187,16 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -210,14 +210,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   const VMVXOptions &options;
 };
 

@@ -24,9 +24,7 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary.
-#vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target]
-}>
+#vulkan_target = #hal.device.target<"vulkan", [#spirv_target]>
 
 module @example attributes {hal.device.targets = [#vulkan_target]} {
 

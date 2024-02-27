@@ -2,13 +2,11 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"vulkan", {
-      executable_targets = [
-        #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-          spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
-        }>
-      ]
-    }>
+    #hal.device.target<"vulkan", [
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+        spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
+      }>
+    ]>
   ]
 } {
 
