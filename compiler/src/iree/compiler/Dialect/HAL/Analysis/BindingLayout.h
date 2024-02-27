@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
-#define IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
+#ifndef IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_H_
+#define IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -94,4 +94,4 @@ private:
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
-#endif // IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_
+#endif // IREE_COMPILER_DIALECT_HAL_ANALYSIS_BINDINGLAYOUT_H_
