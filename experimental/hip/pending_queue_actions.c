@@ -153,7 +153,7 @@ static void iree_hal_hip_queue_action_list_erase(
 static void iree_hal_hip_queue_action_list_take_all(
     iree_hal_hip_queue_action_list_t* available_list,
     iree_hal_hip_queue_action_list_t* ready_list) {
-  IREE_ASSERT(available_list != ready_list);
+  IREE_ASSERT_NE(available_list, ready_list);
   ready_list->head = available_list->head;
   ready_list->tail = available_list->tail;
   available_list->head = NULL;
@@ -533,8 +533,8 @@ static void iree_hal_hip_execution_device_signal_host_callback(
     void* user_data) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_hip_queue_action_t* action = (iree_hal_hip_queue_action_t*)user_data;
-  IREE_ASSERT(action->kind == IREE_HAL_HIP_QUEUE_ACTION_TYPE_EXECUTION);
-  IREE_ASSERT(action->state == IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE);
+  IREE_ASSERT_EQ(action->kind, IREE_HAL_HIP_QUEUE_ACTION_TYPE_EXECUTION);
+  IREE_ASSERT_EQ(action->state, IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE);
   iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
 
   // Flip the action state to zombie and enqueue it again so that we can let
@@ -557,8 +557,8 @@ static void iree_hal_hip_execution_device_signal_host_callback(
 // Issues the given kernel dispatch |action| to the GPU.
 static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
     iree_hal_hip_queue_action_t* action) {
-  IREE_ASSERT(action->kind == IREE_HAL_HIP_QUEUE_ACTION_TYPE_EXECUTION);
-  IREE_ASSERT(action->is_pending == false);
+  IREE_ASSERT_EQ(action->kind, IREE_HAL_HIP_QUEUE_ACTION_TYPE_EXECUTION);
+  IREE_ASSERT_EQ(action->is_pending, false);
   const iree_hal_hip_dynamic_symbols_t* symbols =
       action->owning_actions->symbols;
   IREE_TRACE_ZONE_BEGIN(z0);
