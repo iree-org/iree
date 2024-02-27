@@ -80,10 +80,10 @@ static llvm::cl::opt<bool>
                          llvm::cl::desc("Fuse multi-use ops."),
                          llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-    clEnableElementWiseFuseMultiReduction("iree-flow-element-wise-fuse-multi-reduction",
-                         llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
-                         llvm::cl::init(true));
+static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
+    "iree-flow-element-wise-fuse-multi-reduction",
+    llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
+    llvm::cl::init(true));
 
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
@@ -140,8 +140,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPass(
-          []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction); })
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(
+            clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction);
+      })
       .addPredicatedPass(clDetensoring,
                          [&]() { return mlir::createLinalgDetensorizePass(); })
       .addPass(mlir::createCanonicalizerPass)
