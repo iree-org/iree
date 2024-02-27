@@ -315,6 +315,17 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       mlir::linalg::inferConvolutionDims(op);
   assert(succeeded(convolutionDims) && "Could not infer contraction dims");
 
+  // This strategy turns non-strided/dilated convolution problems into matmul
+  // problems by tiling certain dimensions to 1:
+  //  - Batch dimensions (parallel shared by the image and output)
+  //  - Filter dimensions (reduction on the filter, and convolved on the image)
+  //  - All output image dimensions except the outermost one
+  //
+  // After this, the remaining non-unit dimensions are:
+  //  - One output image dimension corresponding to the M dimension of a matmul.
+  //  - The output channel dimension, corresponding to the N dimension.
+  //  - The input channel dimension, corresponding to the K dimension.
+
   // TODO: Relax this condition to strictly alignment requirements.
   if (convolutionDims->outputChannel.size() != 1 ||
       convolutionDims->inputChannel.size() != 1 ||
@@ -335,13 +346,13 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   }
 
   int64_t mDim = convolutionDims->outputImage.back();
-  int64_t nDim = convolutionDims->outputChannel[0];
+  int64_t nDim = convolutionDims->outputChannel.front();
   // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
   // the distribution patterns currently do not support that variant.
   if (mDim > nDim) {
     return failure();
   }
-  int64_t kDim = convolutionDims->inputChannel[0];
+  int64_t kDim = convolutionDims->inputChannel.front();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
