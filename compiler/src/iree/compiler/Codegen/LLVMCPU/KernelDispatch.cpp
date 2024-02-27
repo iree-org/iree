@@ -1447,6 +1447,21 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::AttentionOp attnOp) {
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      attnOp, DistributionHeuristicConfig{});
+  int64_t iterationDomainRank = attnOp.getIterationDomainRank();
+  // There are some dimensions are not tiled. Set vector tile sizes being ones
+  // to avoid huge vectors.
+  // TODO: We should be able to tile other dimensions.
+  SmallVector<int64_t> vecTileSizes(iterationDomainRank, 1);
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, attnOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2032,8 +2047,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
           return setRootConfig(entryPointFn, op, LinalgOpInfo(op),
                                targetMLTransInfo);
         })
-        .Case<IREE::LinalgExt::FftOp, tensor::PackOp, tensor::PadOp,
-              tensor::UnPackOp, linalg::Mmt4DOp, linalg::BatchMmt4DOp>(
+        .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
+              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
               linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,

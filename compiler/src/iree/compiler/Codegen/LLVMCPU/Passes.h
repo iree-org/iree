@@ -144,6 +144,9 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
                               TilingConfig &tilingConfig,
                               bool enableVectorMasking);
 
+void addCPULinalgExtTileAndVectorizePipeline(OpPassManager &passManager,
+                                             TilingConfig &tilingConfig);
+
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just
 /// converts to memrefs
