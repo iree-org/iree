@@ -149,13 +149,13 @@ iree-compile \
 
 !!! tip "Tip - CPU targets"
 
-    The `--iree-llvmcpu-target-triple` flag tells the compiler to generate code
+    The `--iree-llvm-target-triple` flag tells the compiler to generate code
     for a specific type of CPU. You can see the list of supported targets with
-    `iree-compile --iree-llvmcpu-list-targets`, or pass "host" to let LLVM
+    `iree-compile --iree-llvm-list-targets`, or pass "host" to let LLVM
     infer the triple from your host machine (e.g. `x86_64-linux-gnu`).
 
     ```console
-    $ iree-compile --iree-llvmcpu-list-targets
+    $ iree-compile --iree-llvm-list-targets
 
       Registered Targets:
         aarch64    - AArch64 (little endian)
@@ -175,7 +175,7 @@ iree-compile \
 
 !!! tip "Tip - CPU features"
 
-    The `--iree-llvmcpu-target-cpu-features` flag tells the compiler to generate
+    The `--iree-llvm-target-cpu-features` flag tells the compiler to generate
     code using certain CPU "features", like SIMD instruction sets. Like the
     target triple, you can pass "host" to this flag to let LLVM infer the
     features supported by your host machine.
