@@ -61,7 +61,7 @@ typedef struct iree_hal_cuda_queue_action_t {
   // will be alive and enqueued to wait for releasing to the GPU. After done
   // execution, it will be flipped into zombie state and enqueued again for
   // destruction.
-  iree_hal_cuda_queue_action_state_t status;
+  iree_hal_cuda_queue_action_state_t state;
   // The callback to run after completing this action and before freeing
   // all resources. Can be NULL.
   iree_hal_cuda_pending_action_cleanup_callback_t cleanup_callback;
@@ -444,7 +444,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
                                 (void**)&action));
 
   action->owning_actions = actions;
-  action->status = IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE;
+  action->state = IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE;
   action->cleanup_callback = cleanup_callback;
   action->callback_user_data = callback_user_data;
   action->kind = IREE_HAL_CUDA_QUEUE_ACTION_TYPE_EXECUTION;
@@ -535,14 +535,14 @@ static void iree_hal_cuda_execution_device_signal_host_callback(
   iree_hal_cuda_queue_action_t* action =
       (iree_hal_cuda_queue_action_t*)user_data;
   IREE_ASSERT(action->kind == IREE_HAL_CUDA_QUEUE_ACTION_TYPE_EXECUTION);
-  IREE_ASSERT(action->status == IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE);
+  IREE_ASSERT(action->state == IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE);
   iree_hal_cuda_pending_queue_actions_t* actions = action->owning_actions;
 
-  // Flip the action status to zombie and enqueue it again so that we can let
+  // Flip the action state to zombie and enqueue it again so that we can let
   // the worker thread to clean it up. Note that this is necessary because
   // cleanup may involve GPU API calls like buffer releasing or unregistering,
   // so we can not inline it here.
-  action->status = IREE_HAL_cuda_QUEUE_ACTION_STATE_ZOMBIE;
+  action->state = IREE_HAL_cuda_QUEUE_ACTION_STATE_ZOMBIE;
   iree_slim_mutex_lock(&actions->action_mutex);
   iree_hal_cuda_queue_action_list_push_back(&actions->action_list, action);
   iree_slim_mutex_unlock(&actions->action_mutex);
@@ -700,7 +700,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
     // Cleanup actions are immediately ready to release. Otherwise, look at all
     // wait semaphores to make sure that they are either already ready or we can
     // wait on a device event.
-    if (action->status == IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE) {
+    if (action->state == IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE) {
       for (iree_host_size_t i = 0; i < semaphore_count; ++i) {
         // If this semaphore has already signaled past the desired value, we can
         // just ignore it.
@@ -847,7 +847,7 @@ static iree_status_t iree_hal_cuda_worker_process_ready_list(
       iree_hal_cuda_queue_action_t* next_action = action->next;
       action->next = NULL;
 
-      switch (action->status) {
+      switch (action->state) {
         case IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE:
           status = iree_hal_cuda_pending_queue_actions_issue_execution(action);
           break;
