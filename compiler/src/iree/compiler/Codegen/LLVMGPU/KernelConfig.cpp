@@ -402,8 +402,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[batch] = 1;
   }
   // Tile all output image dimensions with unit size except the last one.
-  for (int64_t oi :
-       ArrayRef<unsigned int>(convolutionDims->outputImage).drop_back()) {
+  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
     workgroupTileSizes[oi] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
@@ -463,15 +462,23 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       mlir::linalg::inferContractionDims(op);
   assert(succeeded(contractionDims) && "Could not infer contraction dims");
 
-  // TODO: Relax this condition to strictly alignment requirements.
-  if (contractionDims->k.size() != 1 || contractionDims->m.size() != 1 ||
-      contractionDims->n.size() != 1) {
+  if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
+      contractionDims->n.size() < 1) {
     return failure();
   }
 
-  int64_t mDim = contractionDims->m[0];
-  int64_t nDim = contractionDims->n[0];
-  int64_t kDim = contractionDims->k[0];
+  // For now we are not being smart and trying to reshape dimensions to allow
+  // for better usage of intrinsics, and instead are tiling all dimensions
+  // except the inner most m, n, and k dimensions to 1.
+  int64_t mDim = contractionDims->m.back();
+  int64_t nDim = contractionDims->n.back();
+
+  // Bail out on matvec-like cases.
+  if (bounds[mDim] == 1 || bounds[nDim] == 1) {
+    return failure();
+  }
+
+  int64_t kDim = contractionDims->k.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -520,6 +527,19 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   for (int64_t batch : contractionDims->batch) {
     workgroupTileSizes[batch] = 1;
   }
+
+  // Tile all m, n, and k dimensions to 1 except the innermost. Unit dims
+  // from this tiling are folded before vectorization.
+  for (int64_t m : llvm::drop_end(contractionDims->m)) {
+    workgroupTileSizes[m] = 1;
+  }
+  for (int64_t n : llvm::drop_end(contractionDims->n)) {
+    workgroupTileSizes[n] = 1;
+  }
+  for (int64_t k : llvm::drop_end(contractionDims->k)) {
+    workgroupTileSizes[k] = 1;
+  }
+
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
       schedule->mWarpCount * schedule->mTileCount * schedule->mSize;
@@ -555,7 +575,7 @@ static LogicalResult
 setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                             linalg::LinalgOp linalgOp,
                             const TargetInfo &targetInfo) {
-  if (isMatmulOrBatchMatmul(linalgOp)) {
+  if (linalg::isaContractionOpInterface(linalgOp)) {
     return setMatmulVectorDistributionConfig(entryPoint, linalgOp, targetInfo);
   }
   if (isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
