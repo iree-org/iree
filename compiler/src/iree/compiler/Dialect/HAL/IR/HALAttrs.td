@@ -519,44 +519,11 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
     // configuration dictionary.
     bool hasConfigurationAttr(StringRef name);
 
-    // Returns a list of target devices that may be active for the given
-    // operation. This will recursively walk parent operations until one with
-    // the `hal.device.targets` attribute is found.
-    static SmallVector<DeviceTargetAttr, 4> lookup(Operation *op);
-
-    // Returns true if there is any UnitAttr with |name| in any device
-    // configuration for the given |op|.
-    static bool lookupConfigAttrAny(Operation *op, StringRef name);
-
-    // Returns true if all device configurations found for the given |op| have
-    // a UnitAttr with |name|.
-    static bool lookupConfigAttrAll(Operation *op, StringRef name);
-
-    // Returns the AND of boolean attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<bool>
-    lookupConfigAttrAnd(Operation *op, StringRef name);
-
-    // Returns the OR of boolean attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<bool>
-    lookupConfigAttrOr(Operation *op, StringRef name);
-
-    // Returns the range of integer attributes of |name| in all device
-    // configurations found for the given |op|.
-    // Returns nullopt if any config does not have the key defined indicating
-    // that it's not statically known/runtime dynamic.
-    static std::optional<StaticRange<APInt>>
-    lookupConfigAttrRange(Operation *op, StringRef name);
-
     // Returns zero or more executable targets that this device supports.
     void getExecutableTargets(
         SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
 
+    // DEPRECATED: analysis is required in order to query this information.
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
     static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>
