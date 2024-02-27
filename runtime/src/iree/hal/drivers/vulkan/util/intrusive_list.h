@@ -210,7 +210,7 @@ namespace impl {
 // definition of the required types for iterators.
 template <typename Category, typename T, typename Distance = std::ptrdiff_t,
           typename Pointer = T*, typename Reference = T&>
-struct iterator {
+struct Iterator {
   using iterator_category = Category;
   using value_type = T;
   using difference_type = Distance;
@@ -223,7 +223,7 @@ struct iterator {
 // Basic iterator for an IntrusiveList.
 template <typename T, size_t kOffset, bool kForward>
 class IntrusiveListIterator
-    : public impl::iterator<std::input_iterator_tag, int> {
+    : public impl::Iterator<std::input_iterator_tag, int> {
  public:
   using self_type = IntrusiveListIterator<T, kOffset, kForward>;
 
