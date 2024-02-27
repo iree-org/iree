@@ -538,9 +538,9 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
 
   // Flip the action state to zombie and enqueue it again so that we can let
-  // the worker thread to clean it up. Note that this is necessary because
-  // cleanup may involve GPU API calls like buffer releasing or unregistering,
-  // so we can not inline it here.
+  // the worker thread clean it up. Note that this is necessary because cleanup
+  // may involve GPU API calls like buffer releasing or unregistering, so we can
+  // not inline it here.
   action->state = IREE_HAL_HIP_QUEUE_ACTION_STATE_ZOMBIE;
   iree_slim_mutex_lock(&actions->action_mutex);
   iree_hal_hip_queue_action_list_push_back(&actions->action_list, action);
@@ -878,7 +878,7 @@ static int iree_hal_hip_worker_execute(
         (iree_condition_fn_t)iree_hal_hip_worker_has_incoming_request,
         working_area, iree_infinite_timeout());
 
-    // Immediately flip the state to idle waiting if and only if the preivous
+    // Immediately flip the state to idle waiting if and only if the previous
     // state is workload pending. We do it before processing ready list to make
     // sure that we don't accidentally ignore new workload pushed after done
     // ready list processing but before overwriting the state from this worker
