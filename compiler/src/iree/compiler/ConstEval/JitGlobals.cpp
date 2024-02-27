@@ -314,7 +314,7 @@ private:
 };
 
 struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
-  JitGlobalsPass(const IREE::HAL::TargetBackendRegistry &targetRegistry)
+  JitGlobalsPass(const IREE::HAL::TargetRegistry &targetRegistry)
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Detect backend.
@@ -349,7 +349,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
   }
 
   static std::string
-  resolveTargetBackend(const IREE::HAL::TargetBackendRegistry &targetRegistry) {
+  resolveTargetBackend(const IREE::HAL::TargetRegistry &targetRegistry) {
     if (clJitTargetBackend.empty()) {
       // Default - choose something we have.
       // First llvm-cpu then vmvx.
@@ -579,13 +579,13 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 } // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
-createJitGlobalsPass(const IREE::HAL::TargetBackendRegistry &targetRegistry) {
+createJitGlobalsPass(const IREE::HAL::TargetRegistry &targetRegistry) {
   return std::make_unique<JitGlobalsPass>(targetRegistry);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass() {
   return std::make_unique<JitGlobalsPass>(
-      IREE::HAL::TargetBackendRegistry::getGlobal());
+      IREE::HAL::TargetRegistry::getGlobal());
 }
 
 } // namespace mlir::iree_compiler::ConstEval

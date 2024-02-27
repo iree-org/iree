@@ -47,7 +47,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 void buildHALInlineStaticTransformPassPipeline(
-    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    OpPassManager &passManager, const TargetRegistry &targetRegistry,
     const TargetOptions &targetOptions) {
   //----------------------------------------------------------------------------
   // Device assignment and interface materialization
@@ -106,7 +106,7 @@ void registerHALInlinePasses() {
       "Runs the inline HAL dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildHALInlineStaticTransformPassPipeline(
-            passManager, TargetBackendRegistry::getGlobal(),
+            passManager, TargetRegistry::getGlobal(),
             TargetOptions::FromFlags::get());
       });
 }

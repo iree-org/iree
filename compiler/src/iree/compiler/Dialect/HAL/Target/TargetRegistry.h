@@ -19,56 +19,61 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-using CreateTargetBackendFn = std::function<std::shared_ptr<TargetBackend>()>;
+//===----------------------------------------------------------------------===//
+// TargetRegistration
+//===----------------------------------------------------------------------===//
 
+template <typename T>
+using TargetFactoryFn = std::function<std::shared_ptr<T>()>;
+
+// TODO(#15468): remove this when not used by LLVMCPU/VulkanSPIRV.
 // Registers an executable translation target backend creation function.
-//
-// For example:
-//   llvm-aot-x86_64
-//   llvm-aot-armv8-dotprod
-//   llvm-jit
-//   vulkan-v1.1-low
-//   vulkan-v1.1-high
 class TargetBackendRegistration {
 public:
   // TODO: Remove the registerStaticGlobal mode once callers are migrated.
-  TargetBackendRegistration(StringRef name, CreateTargetBackendFn fn,
+  TargetBackendRegistration(StringRef name, TargetFactoryFn<TargetBackend> fn,
                             bool registerStaticGlobal = true);
 
   std::shared_ptr<TargetBackend> acquire();
 
 private:
-  CreateTargetBackendFn initFn;
+  TargetFactoryFn<TargetBackend> initFn;
   std::once_flag initFlag;
   std::shared_ptr<TargetBackend> cachedValue;
 };
 
-// A registry of target
-class TargetBackendList {
+template <typename T>
+class TargetFactoryList {
 public:
-  void add(llvm::StringRef name, CreateTargetBackendFn fn) {
-    entries.push_back(std::make_pair(name, fn));
+  void add(llvm::StringRef name, TargetFactoryFn<T> fn) {
+    entries.push_back(std::make_pair(name.str(), fn));
   }
 
 private:
-  llvm::SmallVector<std::pair<llvm::StringRef, CreateTargetBackendFn>> entries;
-  friend class TargetBackendRegistry;
+  llvm::SmallVector<std::pair<std::string, TargetFactoryFn<T>>> entries;
+  friend class TargetRegistry;
 };
+class TargetBackendList : public TargetFactoryList<TargetBackend> {};
 
-// A concrete target backend registry.
-class TargetBackendRegistry {
+//===----------------------------------------------------------------------===//
+// TargetRegistry
+//===----------------------------------------------------------------------===//
+
+// A concrete target registry.
+class TargetRegistry {
 public:
-  // Merge from a list of of targets. The registry will own the registration
-  // entries.
-  void mergeFrom(const TargetBackendList &targets);
+  // Returns the read-only global registry.
+  // This is used by passes which depend on it from their default constructor.
+  static const TargetRegistry &getGlobal();
+
+  // Merge from a list of of target backends.
+  // The receiving registry will own the registration entries.
+  void mergeFrom(const TargetBackendList &targetBackends);
   // Initialize from an existing registry. This registry will not own the
   // backing registration entries. The source registry must remain live for the
   // life of this.
-  void mergeFrom(const TargetBackendRegistry &registry);
-
-  // Returns the read-only global registry. This is used by passes which depend
-  // on it from their default constructor.
-  static const TargetBackendRegistry &getGlobal();
+  // TODO(15468): remove the static registration and require only plugins.
+  void mergeFrom(const TargetRegistry &registry);
 
   // Returns a list of registered target backends.
   std::vector<std::string> getRegisteredTargetBackends() const;
@@ -81,56 +86,49 @@ public:
   getTargetBackends(ArrayRef<std::string> targetNames) const;
 
 private:
-  llvm::StringMap<TargetBackendRegistration *> registrations;
+  llvm::StringMap<TargetBackendRegistration *> backendRegistrations;
   llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
-      ownedRegistrations;
+      ownedBackendRegistrations;
 
   friend class TargetBackendRegistration;
 };
 
-// Returns a sorted uniqued set of target backends used in the executable.
-SmallVector<std::string>
-gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp);
-
-// Returns a sorted uniqued set of target backends used in the entire module.
-SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp);
-
 } // namespace mlir::iree_compiler::IREE::HAL
+
+//===----------------------------------------------------------------------===//
+// TargetRegistryRef
+//===----------------------------------------------------------------------===//
 
 namespace llvm::cl {
 
-struct TargetBackendRegistryRef {
-  const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *value =
-      &mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal();
-  TargetBackendRegistryRef() = default;
-  TargetBackendRegistryRef(
-      const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry &value)
+struct TargetRegistryRef {
+  const mlir::iree_compiler::IREE::HAL::TargetRegistry *value =
+      &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
+  TargetRegistryRef() = default;
+  TargetRegistryRef(const mlir::iree_compiler::IREE::HAL::TargetRegistry &value)
       : value(&value) {}
-  TargetBackendRegistryRef(
-      const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *value)
+  TargetRegistryRef(const mlir::iree_compiler::IREE::HAL::TargetRegistry *value)
       : value(value) {}
   operator bool() const noexcept {
     return value->getRegisteredTargetBackends() !=
-           mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal()
+           mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
                .getRegisteredTargetBackends();
   }
-  const mlir::iree_compiler::IREE::HAL::TargetBackendRegistry *
-  operator->() const {
+  const mlir::iree_compiler::IREE::HAL::TargetRegistry *operator->() const {
     return value;
   }
 };
 
-extern template class basic_parser<TargetBackendRegistryRef>;
+extern template class basic_parser<TargetRegistryRef>;
 
 template <>
-class parser<TargetBackendRegistryRef>
-    : public basic_parser<TargetBackendRegistryRef> {
+class parser<TargetRegistryRef> : public basic_parser<TargetRegistryRef> {
 public:
   parser(Option &O) : basic_parser(O) {}
   bool parse(Option &O, StringRef ArgName, StringRef Arg,
-             TargetBackendRegistryRef &Val);
-  StringRef getValueName() const override { return "target backend registry"; }
-  void printOptionDiff(const Option &O, TargetBackendRegistryRef V,
+             TargetRegistryRef &Val);
+  StringRef getValueName() const override { return "target registry"; }
+  void printOptionDiff(const Option &O, TargetRegistryRef V,
                        const OptVal &Default, size_t GlobalWidth) const;
   void anchor() override;
 };

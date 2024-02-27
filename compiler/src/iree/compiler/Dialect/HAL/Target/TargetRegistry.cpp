@@ -10,28 +10,28 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
+//===----------------------------------------------------------------------===//
+// TargetRegistration
+//===----------------------------------------------------------------------===//
+
 // Returns the static registry of translator names to translation functions.
-static TargetBackendRegistry &getMutableTargetRegistry() {
-  static TargetBackendRegistry global;
+static TargetRegistry &getMutableTargetRegistry() {
+  static TargetRegistry global;
   return global;
 }
 
-const TargetBackendRegistry &TargetBackendRegistry::getGlobal() {
-  return getMutableTargetRegistry();
-}
-
-TargetBackendRegistration::TargetBackendRegistration(llvm::StringRef name,
-                                                     CreateTargetBackendFn fn,
-                                                     bool registerStaticGlobal)
+TargetBackendRegistration::TargetBackendRegistration(
+    llvm::StringRef name, TargetFactoryFn<TargetBackend> fn,
+    bool registerStaticGlobal)
     : initFn(std::move(fn)) {
   if (registerStaticGlobal) {
     auto &registry = getMutableTargetRegistry();
-    if (registry.registrations.contains(name)) {
+    if (registry.backendRegistrations.contains(name)) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
     assert(initFn && "Attempting to register an empty translation function");
-    registry.registrations[name] = this;
+    registry.backendRegistrations[name] = this;
   }
 }
 
@@ -40,33 +40,40 @@ std::shared_ptr<TargetBackend> TargetBackendRegistration::acquire() {
   return cachedValue;
 }
 
-void TargetBackendRegistry::mergeFrom(const TargetBackendList &targets) {
-  for (auto &it : targets.entries) {
-    if (registrations.contains(it.first)) {
+//===----------------------------------------------------------------------===//
+// TargetRegistry
+//===----------------------------------------------------------------------===//
+
+const TargetRegistry &TargetRegistry::getGlobal() {
+  return getMutableTargetRegistry();
+}
+
+void TargetRegistry::mergeFrom(const TargetBackendList &targetBackends) {
+  for (auto &it : targetBackends.entries) {
+    if (backendRegistrations.contains(it.first)) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
     auto registration = std::make_unique<TargetBackendRegistration>(
         it.first, it.second, /*registerStaticGlobal=*/false);
-    registrations[it.first] = registration.get();
-    ownedRegistrations.push_back(std::move(registration));
+    backendRegistrations[it.first] = registration.get();
+    ownedBackendRegistrations.push_back(std::move(registration));
   }
 }
 
-void TargetBackendRegistry::mergeFrom(const TargetBackendRegistry &registry) {
-  for (auto &it : registry.registrations) {
-    if (registrations.contains(it.first())) {
+void TargetRegistry::mergeFrom(const TargetRegistry &registry) {
+  for (auto &it : registry.backendRegistrations) {
+    if (backendRegistrations.contains(it.first())) {
       llvm::report_fatal_error(
           "Attempting to overwrite an existing translation backend");
     }
-    registrations[it.first()] = it.second;
+    backendRegistrations[it.first()] = it.second;
   }
 }
 
-std::vector<std::string>
-TargetBackendRegistry::getRegisteredTargetBackends() const {
+std::vector<std::string> TargetRegistry::getRegisteredTargetBackends() const {
   std::vector<std::string> result;
-  for (auto &entry : registrations) {
+  for (auto &entry : backendRegistrations) {
     result.push_back(entry.getKey().str());
   }
   std::sort(result.begin(), result.end(),
@@ -75,8 +82,8 @@ TargetBackendRegistry::getRegisteredTargetBackends() const {
 }
 
 std::shared_ptr<TargetBackend>
-TargetBackendRegistry::getTargetBackend(StringRef targetName) const {
-  for (auto &entry : registrations) {
+TargetRegistry::getTargetBackend(StringRef targetName) const {
+  for (auto &entry : backendRegistrations) {
     if (entry.getKey() == targetName) {
       return entry.getValue()->acquire();
     }
@@ -85,8 +92,7 @@ TargetBackendRegistry::getTargetBackend(StringRef targetName) const {
 }
 
 SmallVector<std::shared_ptr<TargetBackend>>
-TargetBackendRegistry::getTargetBackends(
-    ArrayRef<std::string> targetNames) const {
+TargetRegistry::getTargetBackends(ArrayRef<std::string> targetNames) const {
   SmallVector<std::shared_ptr<TargetBackend>> matches;
   for (auto targetName : targetNames) {
     auto targetBackend = getTargetBackend(targetName);
@@ -100,59 +106,33 @@ TargetBackendRegistry::getTargetBackends(
   return matches;
 }
 
-SmallVector<std::string>
-gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp) {
-  SmallVector<std::string> targetNames;
-  llvm::SmallDenseSet<StringRef> targets;
-  executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
-    auto targetName = variantOp.getTarget().getBackend().getValue();
-    if (targets.insert(targetName).second) {
-      targetNames.push_back(targetName.str());
-    }
-  });
-  llvm::stable_sort(targetNames);
-  return targetNames;
-}
-
-SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
-  SmallVector<std::string> targetNames;
-  llvm::stable_sort(targetNames);
-  llvm::SmallDenseSet<StringRef> targets;
-  moduleOp.walk([&](IREE::HAL::ExecutableOp executableOp) {
-    executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
-      auto targetName = variantOp.getTarget().getBackend().getValue();
-      if (targets.insert(targetName).second) {
-        targetNames.push_back(targetName.str());
-      }
-    });
-  });
-  return targetNames;
-}
-
 } // namespace mlir::iree_compiler::IREE::HAL
 
+//===----------------------------------------------------------------------===//
+// TargetRegistryRef
+//===----------------------------------------------------------------------===//
+
 namespace llvm::cl {
-template class basic_parser<TargetBackendRegistryRef>;
+template class basic_parser<TargetRegistryRef>;
 } // namespace llvm::cl
 
-using TargetBackendRegistryRef = llvm::cl::TargetBackendRegistryRef;
+using TargetRegistryRef = llvm::cl::TargetRegistryRef;
 
 // Return true on error.
-bool llvm::cl::parser<TargetBackendRegistryRef>::parse(
-    Option &O, StringRef ArgName, StringRef Arg,
-    TargetBackendRegistryRef &Val) {
+bool llvm::cl::parser<TargetRegistryRef>::parse(Option &O, StringRef ArgName,
+                                                StringRef Arg,
+                                                TargetRegistryRef &Val) {
   // We ignore Arg here and just use the global registry. We could parse a list
   // of target backends and create a new registry with just that subset but
   // ownership gets tricky.
   if (Arg != "global")
     return true;
-  Val.value =
-      &mlir::iree_compiler::IREE::HAL::TargetBackendRegistry::getGlobal();
+  Val.value = &mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal();
   return false;
 }
 
-void llvm::cl::parser<TargetBackendRegistryRef>::printOptionDiff(
-    const Option &O, TargetBackendRegistryRef V, const OptVal &Default,
+void llvm::cl::parser<TargetRegistryRef>::printOptionDiff(
+    const Option &O, TargetRegistryRef V, const OptVal &Default,
     size_t GlobalWidth) const {
   printOptionName(O, GlobalWidth);
   std::string Str = "global";
@@ -160,4 +140,4 @@ void llvm::cl::parser<TargetBackendRegistryRef>::printOptionDiff(
   outs().indent(2) << " (default: global)\n";
 }
 
-void llvm::cl::parser<TargetBackendRegistryRef>::anchor() {}
+void llvm::cl::parser<TargetRegistryRef>::anchor() {}

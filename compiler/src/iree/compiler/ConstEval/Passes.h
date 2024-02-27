@@ -11,7 +11,7 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-class TargetBackendRegistry;
+class TargetRegistry;
 } // namespace mlir::iree_compiler::IREE::HAL
 
 namespace mlir::iree_compiler::ConstEval {
@@ -20,7 +20,7 @@ namespace mlir::iree_compiler::ConstEval {
 /// initializers eligible for optimization and uses the actual results to
 /// simplify the globals in the module.
 std::unique_ptr<OperationPass<ModuleOp>>
-createJitGlobalsPass(const IREE::HAL::TargetBackendRegistry &targetRegistry);
+createJitGlobalsPass(const IREE::HAL::TargetRegistry &targetRegistry);
 
 // Creates with the global target registry (for opt and such). This
 // may only have access to the VMVX backend.
