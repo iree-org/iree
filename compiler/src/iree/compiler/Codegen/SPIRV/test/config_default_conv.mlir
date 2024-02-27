@@ -19,7 +19,7 @@
   ]>
 ]>
 hal.executable private @nhwc_conv_pointwise_112x112x32 {
-  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 16384,
         max_compute_workgroup_invocations = 128,
@@ -82,7 +82,7 @@ hal.executable private @nhwc_conv_pointwise_112x112x32 {
 ]>
 
 hal.executable private @nchw_conv_2x1280x8x8 {
-  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 16384,
         max_compute_workgroup_invocations = 128,

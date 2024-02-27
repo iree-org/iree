@@ -142,32 +142,34 @@ TargetRegistry::getTargetDevice(StringRef targetName) const {
 
 SmallVector<std::shared_ptr<TargetBackend>>
 TargetRegistry::getTargetBackends(ArrayRef<std::string> targetNames) const {
-  SmallVector<std::shared_ptr<TargetBackend>> matches;
-  for (auto targetName : targetNames) {
+  SmallVector<std::pair<std::string, std::shared_ptr<TargetBackend>>> matches;
+  for (auto &targetName : targetNames) {
     auto targetBackend = getTargetBackend(targetName);
     if (targetBackend) {
-      matches.push_back(std::move(targetBackend));
+      matches.push_back(std::make_pair(targetName, std::move(targetBackend)));
     }
   }
   // To ensure deterministic builds we sort matches by name.
   std::sort(matches.begin(), matches.end(),
-            [](const auto &a, const auto &b) { return a->name() < b->name(); });
-  return matches;
+            [](const auto &a, const auto &b) { return a.first < b.first; });
+  return llvm::to_vector(llvm::map_range(
+      matches, [](auto match) { return std::move(match.second); }));
 }
 
 SmallVector<std::shared_ptr<TargetDevice>>
 TargetRegistry::getTargetDevices(ArrayRef<std::string> targetNames) const {
-  SmallVector<std::shared_ptr<TargetDevice>> matches;
-  for (auto targetName : targetNames) {
-    auto targetBackend = getTargetDevice(targetName);
-    if (targetBackend) {
-      matches.push_back(std::move(targetBackend));
+  SmallVector<std::pair<std::string, std::shared_ptr<TargetDevice>>> matches;
+  for (auto &targetName : targetNames) {
+    auto targetDevice = getTargetDevice(targetName);
+    if (targetDevice) {
+      matches.push_back(std::make_pair(targetName, std::move(targetDevice)));
     }
   }
   // To ensure deterministic builds we sort matches by name.
   std::sort(matches.begin(), matches.end(),
-            [](const auto &a, const auto &b) { return a->name() < b->name(); });
-  return matches;
+            [](const auto &a, const auto &b) { return a.first < b.first; });
+  return llvm::to_vector(llvm::map_range(
+      matches, [](auto match) { return std::move(match.second); }));
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

@@ -720,7 +720,7 @@ Invocation::Invocation(Session &session) : session(session) {
   auto &targetRegistry = session.targetRegistry;
   pipelineHooks.buildConstEvalPassPipelineCallback =
       [&targetRegistry](OpPassManager &pm) {
-        pm.addPass(ConstEval::createJitGlobalsPass(targetRegistry));
+        pm.addPass(ConstEval::createJitGlobalsPass({&targetRegistry}));
       };
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.

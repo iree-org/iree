@@ -73,9 +73,9 @@ def AssignTargetDevicesPass :
       "Target backend registry containing the list of available backends."
     >,
     ListOption<
-      "targets", "targets",
+      "targetBackends", "targetBackends",
       "std::string",
-      "List of devices to assign as targets."
+      "List of target backends to assign as device targets."
     >,
   ];
 }

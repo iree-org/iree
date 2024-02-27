@@ -91,7 +91,6 @@ public:
   // Initialize from an existing registry. This registry will not own the
   // backing registration entries. The source registry must remain live for the
   // life of this.
-  // TODO(15468): remove the static registration and require only plugins.
   void mergeFrom(const TargetRegistry &registry);
 
   // Returns a list of registered target backends.

@@ -123,33 +123,30 @@ class TargetBackend {
 public:
   virtual ~TargetBackend() = default;
 
-  // Returns a name for the backend used to differentiate between other targets.
-  virtual std::string name() const = 0;
+  // Returns the ID of a DeviceTarget that can execute files produced by this
+  // backend. This is used to support the `--iree-hal-target-backends=` flag
+  // and will be removed in the future.
+  virtual std::string getLegacyDefaultDeviceID() const = 0;
 
-  // Returns the name of the runtime device for this backend.
-  // TODO(benvanik): remove this once we can properly specify targets.
-  virtual std::string deviceID() const { return name(); }
+  // Appends zero or more executable targets for a device with the given
+  // ID and configuration using flags/options that control target defaults.
+  virtual void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const = 0;
+
+  // Appends zero or more executable targets for a device with the given
+  // ID and configuration that represents the hosting machine.
+  virtual void getHostExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const {}
 
   // Registers dependent dialects for the TargetBackend.
   // Mirrors the method on mlir::Pass of the same name. A TargetBackend is
   // expected to register the dialects it will create entities for (Operations,
   // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
-
-  // Returns the default device this backend targets. This may involve setting
-  // defaults from flags and other environmental sources, and it may be
-  // cross-targeting in a way that is not compatible with the host.
-  virtual IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const = 0;
-
-  // Similar to getDefaultDeviceTarget, but always returns a DeviceTargetAttr
-  // that is configured for the host, regardless of if flags/environment were
-  // configured to cross-target in some way.
-  //
-  virtual std::optional<IREE::HAL::DeviceTargetAttr>
-  getHostDeviceTarget(MLIRContext *context) const {
-    return {};
-  }
 
   // Inserts passes used to configure the `hal.executable.variant` op contents
   // for translation. The pass manager will be nested on `hal.executable` such

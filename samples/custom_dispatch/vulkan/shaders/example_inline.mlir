@@ -13,7 +13,7 @@
 // executable binaries produced and multiple variants with differing formats
 // and compilation options (architectures, etc) can be embedded for runtime
 // selection.
-#spirv_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#spirv_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<
     #spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
     #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64>

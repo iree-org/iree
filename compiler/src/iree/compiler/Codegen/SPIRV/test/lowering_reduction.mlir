@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax)), iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' \
 // RUN:   %s | FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
     #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_khr = []>>}>
@@ -98,7 +98,7 @@ hal.executable @warp_reduction_dispatch {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
     #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32>>}>
@@ -191,7 +191,7 @@ hal.executable @warp_reduction_dispatch {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
     [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:Unknown, #spirv.resource_limits<
       max_compute_shared_memory_size = 49152,
@@ -315,7 +315,7 @@ hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_
 ]>
 
 hal.executable private @dynamic_softmax {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
         [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniformShuffle],
         [SPV_KHR_16bit_storage]>, api=Vulkan, Unknown:DiscreteGPU, #spirv.resource_limits<
