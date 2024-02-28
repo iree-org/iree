@@ -390,8 +390,9 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   setSplitReductionDepth(reductionTopkOp, rewriter, splitReductionDepth + 1);
 
   // Recursively apply split reduction until reaching the target depth.
-  (void)splitReduction(rewriter, reductionTopkOp, splitReductionFn);
-  reductionTopkOp->removeAttr(LinalgExt::kSplitReductionDepthMarker);
+  if (failed(splitReduction(rewriter, reductionTopkOp, splitReductionFn))) {
+    reductionTopkOp->removeAttr(LinalgExt::kSplitReductionDepthMarker);
+  }
 
   return success();
 }
