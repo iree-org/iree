@@ -1,7 +1,9 @@
 {
-  "config_name": "gpu_rocm",
+  "config_name": "gpu_rocm_rdna3",
   "iree_compile_flags" : [
-    "--iree-hal-target-backends=rocm"
+    "--iree-hal-target-backends=rocm",
+    "--iree-rocm-target-chip=gfx1100",
+    "--iree-rocm-link-bc=true"
   ],
   "iree_run_module_flags": [
     "--device=rocm"

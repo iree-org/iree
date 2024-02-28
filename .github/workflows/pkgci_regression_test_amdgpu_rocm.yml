@@ -68,7 +68,7 @@ jobs:
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
       - name: Run external TestSuite tests
         env:
-          IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_gpu_rocm.json
+          IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_gpu_rocm_rdna3.json
         run: |
           source ${VENV_DIR}/bin/activate
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
