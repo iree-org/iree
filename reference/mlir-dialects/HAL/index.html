@@ -9398,11 +9398,11 @@ several target executable formats specified with <code>#hal.executable.target</c
 An optional configuration dictionary allows for overriding backend defaults.</p>
 <p>Example:
 <div class="highlight"><pre><span></span><code>#hal.device.target&lt;&quot;llvm-cpu&quot;, {
-  executable_targets = [
-    #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_32&quot;&gt;,
-    #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt;,
-  ]
-}&gt;
+  device_configuration = ...
+}, [
+  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_32&quot;&gt;,
+  #hal.executable.target&lt;&quot;llvm-cpu&quot;, &quot;embedded-elf-arm_64&quot;&gt;,
+]&gt;
 </code></pre></div></p>
 <h5 id="parameters_5">Parameters:<a class="headerlink" href="#parameters_5" title="Permanent link">link</a></h5>
 <table>
@@ -9422,6 +9422,11 @@ An optional configuration dictionary allows for overriding backend defaults.</p>
 <tr>
 <td style="text-align: center;">configuration</td>
 <td style="text-align: center;"><code>DictionaryAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">executable_targets</td>
+<td style="text-align: center;"><code>::llvm::ArrayRef&lt;ExecutableTargetAttr&gt;</code></td>
 <td></td>
 </tr>
 </tbody>
