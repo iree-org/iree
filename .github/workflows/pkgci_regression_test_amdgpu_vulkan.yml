@@ -56,8 +56,8 @@ jobs:
       - name: Checking out external TestSuite repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
-          repository: ScottTodd/SHARK-TestSuite  # replace with `nod-ai/SHARK-TestSuite`
-          ref: testsuite-pytest  # replace with a pinned commit on `main`
+          repository: nod-ai/SHARK-TestSuite
+          ref: c7560c460ae6f8c8c905a05ef73f8f0e5969a05b
           path: SHARK-TestSuite
           submodules: false
       - name: Installing external TestSuite Python requirements
