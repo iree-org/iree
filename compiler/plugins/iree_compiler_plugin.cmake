@@ -32,6 +32,6 @@ if(IREE_TARGET_BACKEND_VMVX)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/VMVX target/VMVX)
 endif()
 
-if(IREE_TARGET_BACKEND_WEBGPU)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPU target/WebGPU)
+if(IREE_TARGET_BACKEND_WEBGPU_SPIRV)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPUSPIRV target/WebGPUSPIRV)
 endif()

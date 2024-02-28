@@ -22,7 +22,7 @@ IREE_ENABLE_ASSERTIONS="${IREE_ENABLE_ASSERTIONS:-ON}"
 # Enable WebGPU compiler builds and tests by default. All deps get fetched as
 # needed, but some of the deps are too large to enable by default for all
 # developers.
-IREE_TARGET_BACKEND_WEBGPU="${IREE_TARGET_BACKEND_WEBGPU:-ON}"
+IREE_TARGET_BACKEND_WEBGPU_SPIRV="${IREE_TARGET_BACKEND_WEBGPU_SPIRV:-ON}"
 
 source build_tools/cmake/setup_build.sh
 source build_tools/cmake/setup_ccache.sh
@@ -50,7 +50,7 @@ declare -a CMAKE_ARGS=(
   "-DPython3_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
   "-DPYTHON_EXECUTABLE=${IREE_PYTHON3_EXECUTABLE}"
 
-  "-DIREE_TARGET_BACKEND_WEBGPU=${IREE_TARGET_BACKEND_WEBGPU}"
+  "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=${IREE_TARGET_BACKEND_WEBGPU_SPIRV}"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]}"

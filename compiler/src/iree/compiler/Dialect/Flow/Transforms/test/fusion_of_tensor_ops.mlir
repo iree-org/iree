@@ -366,10 +366,9 @@ util.func public @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<1
 
 // -----
 
-util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>) -> (tensor<11008xf16>) {
+util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>, %arg3 : tensor<1x1x32x128xf16>) -> (tensor<11008xf16>) {
   %cst_1 = arith.constant 0.000000e+00 : f16
   %0 = tensor.empty() : tensor<11008x32x128xf16>
-  %1 = arith.constant dense<0.000000e+00> : tensor<1x1x32x128xf16>
   %expanded = tensor.expand_shape %arg0 [[0], [1, 2]] : tensor<11008x4096xi4> into tensor<11008x32x128xi4>
   %collapsed = tensor.collapse_shape %arg2 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
   %collapsed_2 = tensor.collapse_shape %arg1 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
@@ -381,7 +380,7 @@ util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 
     %15 = arith.mulf %14, %in_8 : f16
     linalg.yield %15 : f16
   } -> tensor<11008x32x128xf16>
-  %collapsed_3 = tensor.collapse_shape %1 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
+  %collapsed_3 = tensor.collapse_shape %arg3 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
   %3 = tensor.empty() : tensor<11008xf16>
   %4 = linalg.fill ins(%cst_1 : f16) outs(%3 : tensor<11008xf16>) -> tensor<11008xf16>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%collapsed_3, %2 : tensor<32x128xf16>, tensor<11008x32x128xf16>) outs(%4 : tensor<11008xf16>) {
@@ -399,7 +398,7 @@ util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 
 //       CHECK-NOT:   tensor.collapse_shape %[[DEQUANT]]
 //           CHECK:     %[[MATVEC:.+]] = linalg.generic
 //      CHECK-SAME:         iterator_types = ["parallel", "reduction", "reduction"]
-//      CHECK-SAME:         ins(%[[DEQUANT]] : tensor<11008x32x128xf16>)
+//      CHECK-SAME:         ins({{.+}}%[[DEQUANT]]
 
 // -----
 
