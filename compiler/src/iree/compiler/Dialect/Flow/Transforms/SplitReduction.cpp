@@ -83,10 +83,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     IRRewriter rewriter(context);
     funcOp->walk([&](linalg::MatmulOp op) { matmulCandidates.push_back(op); });
     for (auto op : matmulCandidates) {
-      if (failed(splitReductionOnMatmul(rewriter, op,
-                                        matmulSplitReductionControlFn))) {
-        return signalPassFailure();
-      }
+      (void)splitReductionOnMatmul(rewriter, op, matmulSplitReductionControlFn);
     }
 
     LinalgExt::TopkSplitReductionControlFn topkSplitReductionControlFn =
