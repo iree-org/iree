@@ -44,16 +44,11 @@ module {
 //       CHECK:   flow.executable private @[[EXECUTABLE0:[a-zA-Z0-9_]+]]
 //       CHECK:     func.func @[[FUNC0:[a-zA-Z0-9_x]+]]
 //       CHECK:       linalg.generic
-//  CHECK-SAME:         ["parallel", "parallel"]
-//       CHECK:   flow.executable private @[[EXECUTABLE1:[a-zA-Z0-9_]+]]
-//       CHECK:     func.func @[[FUNC1:[a-zA-Z0-9_x]+]]
-//       CHECK:       linalg.generic
-//  CHECK-SAME:         ["reduction"]
+//  CHECK-SAME:         ["reduction", "reduction"]
+//   CHECK-NOT:       linalg.generic
 //       CHECK:   util.func public @main(
 //       CHECK:     %[[T0:.+]] = flow.dispatch @[[EXECUTABLE0]]::@[[FUNC0]]
-//       CHECK:     %[[T1:.+]] = flow.tensor.reshape %[[T0]] : tensor<833x833xf32> -> tensor<693889xf32>
-//       CHECK:     %[[T2:.+]] = flow.dispatch @[[EXECUTABLE1]]::@[[FUNC1]](%[[T1]])
-//       CHECK:     util.return %[[T2]]
+//       CHECK:     util.return %[[T0]]
 
 // -----
 

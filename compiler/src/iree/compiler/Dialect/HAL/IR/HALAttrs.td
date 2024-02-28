@@ -489,16 +489,17 @@ def HAL_DeviceTargetAttr :
     Example:
     ```mlir
     #hal.device.target<"llvm-cpu", {
-      executable_targets = [
-        #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
-        #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
-      ]
-    }>
+      device_configuration = ...
+    }, [
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
+      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
+    ]>
     ```
   }];
   let parameters = (ins
     AttrParameter<"StringAttr", "">:$deviceID,
-    AttrParameter<"DictionaryAttr", "">:$configuration
+    AttrParameter<"DictionaryAttr", "">:$configuration,
+    ArrayRefParameter<"ExecutableTargetAttr", "">:$executable_targets
   );
   let builders = [
     AttrBuilder<(ins "StringRef":$deviceID)>,
@@ -512,9 +513,6 @@ def HAL_DeviceTargetAttr :
     // Returns true if there's an attribute with the given name in the
     // configuration dictionary.
     bool hasConfigurationAttr(StringRef name);
-
-    // Returns zero or more executable targets that this device supports.
-    SmallVector<IREE::HAL::ExecutableTargetAttr, 4> getExecutableTargets();
 
     // Returns a list of target devices that may be active for the given
     // operation. This will recursively walk parent operations until one with

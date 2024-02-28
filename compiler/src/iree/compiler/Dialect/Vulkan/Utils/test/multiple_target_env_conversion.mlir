@@ -18,7 +18,7 @@
 
 // Verify that the order of target environments matches what the user specified.
 
-// CHECK: executable_targets = [#[[RDNA3]], #[[ENV]], #[[VALHALL]]]
+// CHECK: [#[[RDNA3]], #[[ENV]], #[[VALHALL]]]
 
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {

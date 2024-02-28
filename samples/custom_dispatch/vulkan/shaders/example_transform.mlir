@@ -31,9 +31,7 @@
 // hence we only support vulkan here. It is possible to hand author a custom
 // kernel that supports multiple targets by specifying an object per-target, but
 // that requires authoring the kernel for multiple targets.
-#vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target]
-}>
+#vulkan_target = #hal.device.target<"vulkan", [#spirv_target]>
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>

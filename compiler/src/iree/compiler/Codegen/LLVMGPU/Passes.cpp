@@ -496,6 +496,20 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUTensorTileToSerialLoops());
 
+  // Generalize convolutions and fold away unit extent dims. All convolutions
+  // are expected to have the kernel dimensions tiled to 1 by this point, so
+  // folding unit dims like this directly maps it to a matrix multiplication.
+  // After vectorization we expect to get a pure matmul (or a transposed
+  // variant) as a `vector.contract`.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUGeneralizeNamedConvolutionOpsPass());
+  LinalgFoldUnitExtentDimsPassOptions options;
+  options.useRankReducingSlices = true;
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      mlir::createLinalgFoldUnitExtentDimsPass(options));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeTensorInsertExtractSlicesPass());
 
@@ -640,6 +654,29 @@ void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+}
+
+void addGPUBaseLoweringPassPipeline(OpPassManager &pm) {
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass(
+          /*useWARForCooperativeMatrixCodegen=*/false));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  addBufferizePasses(nestedModulePM);
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createLinalgExtToLoopsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 }
 
 // Add passes to make the address computation more explicit and optimize them.

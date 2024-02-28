@@ -1689,20 +1689,22 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
                                         IREE::HAL::ExecutableExportOp exportOp,
                                         mlir::FunctionOpInterface funcOp) {
-  // First check whether we already have workgroup count set--it's a "contract"
-  // to indicate that we should bypass all tiling and distribution to go down
-  // just the most basic lowering flow.
-  if (Block *body = exportOp.getWorkgroupCountBody()) {
-    auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-    // For scalar dispatch cases--using just one thread of one workgroup.
-    auto isOne = [](Value value) { return matchPattern(value, m_One()); };
-    if (llvm::all_of(retOp.getOperands(), isOne)) {
-      std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-      if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
-        return failure();
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          funcOp.getContext(), CodeGenPipeline::SPIRVBaseLowering);
-      return setTranslationInfo(funcOp, translationInfo);
+  if (!getTranslationInfo(funcOp)) {
+    // If no translation info set, first check whether we already have workgroup
+    // count set--it's a "contract" to indicate that we should bypass all tiling
+    // and distribution to go down just the most basic lowering flow.
+    if (Block *body = exportOp.getWorkgroupCountBody()) {
+      auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+      // For scalar dispatch cases--using just one thread of one workgroup.
+      auto isOne = [](Value value) { return matchPattern(value, m_One()); };
+      if (llvm::all_of(retOp.getOperands(), isOne)) {
+        std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+        if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
+          return failure();
+        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+            funcOp.getContext(), CodeGenPipeline::SPIRVBaseLowering);
+        return setTranslationInfo(funcOp, translationInfo);
+      }
     }
   }
 

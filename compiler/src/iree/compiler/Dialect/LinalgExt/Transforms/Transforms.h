@@ -17,20 +17,6 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-/// Pattern to rewrite a scf::ForallOp to the async dialect.
-struct ForallOpToAsyncRewriter : public OpRewritePattern<scf::ForallOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  FailureOr<Operation *>
-  returningMatchAndRewrite(scf::ForallOp forallOp,
-                           PatternRewriter &rewriter) const;
-
-  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
-                                PatternRewriter &rewriter) const override {
-    return returningMatchAndRewrite(forallOp, rewriter);
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // Transformations exposed as patterns, moved from upstream MLIR as IREE still
 // heavily relies on patterns that compose through filters.

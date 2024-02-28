@@ -57,6 +57,7 @@ static iree_hal_task_device_t* iree_hal_task_device_cast(
 void iree_hal_task_device_params_initialize(
     iree_hal_task_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
+  out_params->queue_scope_flags = IREE_TASK_SCOPE_FLAG_NONE;
 }
 
 static iree_status_t iree_hal_task_device_check_params(
@@ -131,9 +132,9 @@ iree_status_t iree_hal_task_device_create(
     device->queue_count = queue_count;
     for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
       // TODO(benvanik): add a number to each queue ID.
-      iree_hal_task_queue_initialize(device->identifier, queue_executors[i],
-                                     &device->small_block_pool,
-                                     &device->queues[i]);
+      iree_hal_task_queue_initialize(
+          device->identifier, params->queue_scope_flags, queue_executors[i],
+          &device->small_block_pool, &device->queues[i]);
     }
   }
 

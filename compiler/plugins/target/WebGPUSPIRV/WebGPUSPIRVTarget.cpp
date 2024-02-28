@@ -30,7 +30,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-struct WebGPUOptions {
+struct WebGPUSPIRVOptions {
   bool debugSymbols = true;
 
   void bindOptions(OptionsBinder &binder) {
@@ -54,9 +54,10 @@ static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
       spirv::DeviceType::Unknown, spirv::TargetEnvAttr::kUnknownDeviceID);
 }
 
-class WebGPUTargetBackend : public TargetBackend {
+class WebGPUSPIRVTargetBackend : public TargetBackend {
 public:
-  WebGPUTargetBackend(const WebGPUOptions &options) : options(options) {}
+  WebGPUSPIRVTargetBackend(const WebGPUSPIRVOptions &options)
+      : options(options) {}
 
   // NOTE: we could vary this based on the options such as 'webgpu-v2'.
   std::string name() const override { return "webgpu"; }
@@ -75,12 +76,16 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
     auto configAttr = b.getDictionaryAttr(configItems);
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(
+        getExecutableTarget(context, getWebGPUTargetEnv(context)));
+
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
+                                            configAttr, targetAttrs);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -254,15 +259,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    targetAttrs.push_back(
-        getExecutableTarget(context, getWebGPUTargetEnv(context)));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context,
                       spirv::TargetEnvAttr targetEnv) const {
@@ -274,24 +270,24 @@ private:
 
     auto configAttr = b.getDictionaryAttr(configItems);
     return IREE::HAL::ExecutableTargetAttr::get(
-        context, b.getStringAttr("webgpu"), b.getStringAttr("webgpu-wgsl-fb"),
-        configAttr);
+        context, b.getStringAttr("webgpu-spirv"),
+        b.getStringAttr("webgpu-wgsl-fb"), configAttr);
   }
 
-  const WebGPUOptions &options;
+  const WebGPUSPIRVOptions &options;
 };
 
-struct WebGPUSession
-    : public PluginSession<WebGPUSession, WebGPUOptions,
+struct WebGPUSPIRVSession
+    : public PluginSession<WebGPUSPIRVSession, WebGPUSPIRVOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     auto backendFactory = [=]() {
-      return std::make_shared<WebGPUTargetBackend>(options);
+      return std::make_shared<WebGPUSPIRVTargetBackend>(options);
     };
     // #hal.device.target<"webgpu", ...
     targets.add("webgpu", backendFactory);
-    // #hal.executable.target<"webgpu-wgsl", ...
-    targets.add("webgpu-wgsl", backendFactory);
+    // #hal.executable.target<"webgpu-spirv", ...
+    targets.add("webgpu-spirv", backendFactory);
   }
 };
 
@@ -300,11 +296,11 @@ struct WebGPUSession
 } // namespace mlir::iree_compiler::IREE::HAL
 
 IREE_DEFINE_COMPILER_OPTION_FLAGS(
-    mlir::iree_compiler::IREE::HAL::WebGPUOptions);
+    mlir::iree_compiler::IREE::HAL::WebGPUSPIRVOptions);
 
-extern "C" bool iree_register_compiler_plugin_hal_target_webgpu(
+extern "C" bool iree_register_compiler_plugin_hal_target_webgpu_spirv(
     mlir::iree_compiler::PluginRegistrar *registrar) {
-  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::WebGPUSession>(
-      "hal_target_webgpu");
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::WebGPUSPIRVSession>(
+      "hal_target_webgpu_spirv");
   return true;
 }

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_PLUGINS_TARGET_WEBGPU_SPIRVTOWGSL_H_
-#define IREE_COMPILER_PLUGINS_TARGET_WEBGPU_SPIRVTOWGSL_H_
+#ifndef IREE_COMPILER_PLUGINS_TARGET_WEBGPUSPIRV_SPIRVTOWGSL_H_
+#define IREE_COMPILER_PLUGINS_TARGET_WEBGPUSPIRV_SPIRVTOWGSL_H_
 
 #include <optional>
 #include <string>
@@ -21,4 +21,4 @@ compileSPIRVToWGSL(llvm::ArrayRef<uint32_t> spvBinary);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
-#endif // IREE_COMPILER_PLUGINS_TARGET_WEBGPU_SPIRVTOWGSL_H_
+#endif // IREE_COMPILER_PLUGINS_TARGET_WEBGPUSPIRV_SPIRVTOWGSL_H_

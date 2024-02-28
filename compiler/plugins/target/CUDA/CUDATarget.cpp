@@ -384,12 +384,17 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
+    // TODO: device configuration attrs.
 
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getExecutableTarget(context));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -640,14 +645,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    targetAttrs.push_back(getExecutableTarget(context));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
