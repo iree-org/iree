@@ -1,10 +1,10 @@
 {
-  "config_name": "cpu",
+  "config_name": "cpu_llvm_sync",
   "iree_compile_flags" : [
     "--iree-hal-target-backends=llvm-cpu"
   ],
   "iree_run_module_flags": [
-    "--device=local-task"
+    "--device=local-sync"
   ],
   "skip_compile_tests": [],
   "skip_run_tests": [],
