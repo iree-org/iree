@@ -77,7 +77,34 @@ macro(iree_llvm_configure_bundled)
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
   set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
-  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/include/")
+
+  # Find the clang builtin headers path. It is always of the form
+  #   ${LLVM_BINARY_DIR}/lib/clang/${LLVM_VERSION_MAJOR}/include/
+  # so this task is equivalent to finding the value of ${LLVM_VERSION_MAJOR}.
+  # We can't simply read ${LLVM_VERSION_MAJOR} here, because:
+  # - The LLVM CMake setup only defines it for its own use, but does not export it.
+  # - Unlike the iree_llvm_configure_installed case below, we can't rely on `find_package` to set this
+  #   variable for us.
+  #
+  # Historically we had relied on the CLANG_EXECUTABLE_VERSION cached variable. As it is initialized
+  # with LLVM_VERSION_MAJOR (via CLANG_VERSION_MAJOR), unless modified it exposes the value that
+  # LLVM_VERSION_MAJOR had when LLVM was first configured. That was fragile, as it meant that we were
+  # compiling bitcode against stale Clang builtin headers from earlier versions.
+  #
+  # Until there's a better way, then, we just read LLVM_VERSION_MAJOR from the *source* directory CMakeLists.txt.
+  # We "grep" (using built-in CMake file/string commands) llvm/CMakeLists.txt for a line that looks like
+  #   set(LLVM_VERSION_MAJOR 19)
+  #
+  file(READ "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/CMakeLists.txt" _LLVM_CMAKELISTS)
+  string(REPLACE "\n" ";" _LLVM_CMAKELISTS_LINES "${_LLVM_CMAKELISTS}")
+  foreach(_LINE IN LISTS _LLVM_CMAKELISTS_LINES)
+    string(REGEX MATCH "^[ ]*(set|SET)[ ]*[(][ ]*LLVM_VERSION_MAJOR[ ]+[0-9]+[ ]*[)]" _MATCH "${_LINE}")
+    if (_MATCH)
+      string(REGEX REPLACE ".*[ ]([0-9]+)[ )].*" "\\1" _LLVM_VERSION_MAJOR "${_MATCH}")
+      break()
+    endif()
+  endforeach()
+  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${_LLVM_VERSION_MAJOR}/include")
 endmacro()
 
 macro(iree_llvm_configure_installed)
