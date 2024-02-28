@@ -22,28 +22,6 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 // heavily relies on patterns that compose through filters.
 // TODO: Deprecate all the code below.
 //===----------------------------------------------------------------------===//
-/// Wrap upstream linalg::splitReduction with a filter.
-inline FailureOr<linalg::LinalgOp>
-splitReduction(PatternRewriter &b, linalg::LinalgOp op,
-               const linalg::ControlSplitReductionFn &controlSplitReductionFn,
-               const LinalgTransformationFilter &filter,
-               bool useAlloc = false) {
-  if (failed(filter.checkAndNotify(b, op)) || !op.hasPureTensorSemantics() ||
-      op.getNumReductionLoops() != 1 || op.getNumDpsInits() != 1 ||
-      !op.hasOnlyProjectedPermutations())
-    return b.notifyMatchFailure(op, "precondition not met");
-
-  FailureOr<linalg::SplitReductionResult> res =
-      linalg::splitReduction(b, op, controlSplitReductionFn, useAlloc);
-  if (failed(res))
-    return failure();
-
-  filter.replaceLinalgTransformationFilter(b, res->splitLinalgOp);
-  filter.replaceLinalgTransformationFilter(b, res->resultCombiningLinalgOp);
-
-  return res->splitLinalgOp;
-}
-
 ///
 /// Linalg promotion patterns.
 ///

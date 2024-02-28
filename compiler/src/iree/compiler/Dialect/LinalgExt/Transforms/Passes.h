@@ -94,12 +94,9 @@ std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 using TopkSplitReductionControlFn =
     std::function<int64_t(int64_t splitReductionDepth)>;
 
-/// Patterns to apply `topk split reduction` pass.
-void populateTopkSplitReductionPattern(
-    RewritePatternSet &patterns,
-    const TopkSplitReductionControlFn &splitReductionFn,
-    const LinalgExt::LinalgTransformationFilter &f =
-        LinalgExt::LinalgTransformationFilter());
+LogicalResult
+splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
+               const TopkSplitReductionControlFn &splitReductionFn);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTopkSplitReductionPass();
@@ -134,9 +131,6 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
-
-// Marker used as attribute the depth of the split reduction transformations.
-const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
