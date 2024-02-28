@@ -12,6 +12,6 @@ util.func public @matmul(%arg0: tensor<100x200xf32>, %arg1: tensor<200x300xf32>,
 // CHECK-DAG:   #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0]]>
 // CHECK-DAG:   #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 // CHECK:       #[[INFO:.+]] = #iree_codegen.compilation_info<lowering_config = #[[CONFIG]], translation_info = #[[TRANSLATION]]>
-// CHECK:       util.func @matmul
+// CHECK:       util.func public @matmul
 // CHECK:         linalg.generic
 // CHECK-SAME:      {compilation_info = #[[INFO]]}
