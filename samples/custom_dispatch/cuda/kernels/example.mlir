@@ -24,12 +24,10 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary.
-#cuda_target = #hal.device.target<"cuda", {
-  executable_targets = [
-    #nvptx_sm_52_target,
-    #nvptx_sm_80_target
-  ]
-}>
+#cuda_target = #hal.device.target<"cuda", [
+  #nvptx_sm_52_target,
+  #nvptx_sm_80_target
+]>
 
 module @example attributes {hal.device.targets = [#cuda_target]} {
 

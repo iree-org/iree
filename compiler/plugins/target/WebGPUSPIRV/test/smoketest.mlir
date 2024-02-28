@@ -3,13 +3,11 @@
 #map = affine_map<(d0) -> (d0)>
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"webgpu", {
-      executable_targets = [
-        #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {
-          spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
-        }>
-      ]
-    }>
+    #hal.device.target<"webgpu", [
+      #hal.executable.target<"webgpu-spirv", "webgpu-wgsl-fb", {
+        spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
+      }>
+    ]>
   ]
 } {
 

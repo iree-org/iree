@@ -179,12 +179,15 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context, target, addlConfig));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getExecutableTarget(context, target, addlConfig));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   IREE::HAL::DeviceTargetAttr
@@ -765,15 +768,6 @@ public:
   }
 
 private:
-  ArrayAttr
-  getExecutableTargets(MLIRContext *context, const LLVMTarget &target,
-                       const AdditionalConfigurationValues &addlConfig) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getExecutableTarget(context, target, addlConfig));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context, const LLVMTarget &target,
                       const AdditionalConfigurationValues &addlConfig) const {
