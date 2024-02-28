@@ -104,9 +104,6 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
     ),
     driver = "local-task",
-    tags = [
-        "notsan",
-    ],
     target_backend = "llvm-cpu",
 )
 

@@ -29,9 +29,6 @@ iree_check_single_backend_test_suite(
         exclude = [],
     ),
     driver = "local-task",
-    tags = [
-        "notsan",
-    ],
     target_backend = "llvm-cpu",
 )
 

@@ -25,8 +25,6 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
-  LABELS
-    "notsan"
 )
 
 iree_check_single_backend_test_suite(
@@ -95,49 +93,3 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-if(IREE_ENABLE_ASAN)
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_asan
-  SRCS
-    "extract_slice.mlir"
-    "pack.mlir"
-    "pack_dynamic_inner_tiles.mlir"
-    "pack_i8.mlir"
-    "tensor_cast.mlir"
-    "tensor_insert_slice.mlir"
-    "unpack.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=address"
-  LABELS
-    "notsan"
-)
-endif(IREE_ENABLE_ASAN)
-
-if(IREE_ENABLE_TSAN)
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_tsan
-  SRCS
-    "extract_slice.mlir"
-    "pack.mlir"
-    "pack_dynamic_inner_tiles.mlir"
-    "pack_i8.mlir"
-    "tensor_cast.mlir"
-    "tensor_insert_slice.mlir"
-    "unpack.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=thread"
-)
-endif(IREE_ENABLE_TSAN)

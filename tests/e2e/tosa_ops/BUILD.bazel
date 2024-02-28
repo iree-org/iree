@@ -70,9 +70,6 @@ iree_check_single_backend_test_suite(
     srcs = LLVM_SRCS,
     driver = "local-task",
     input_type = "tosa",
-    tags = [
-        "notsan",
-    ],
     target_backend = "llvm-cpu",
 )
 

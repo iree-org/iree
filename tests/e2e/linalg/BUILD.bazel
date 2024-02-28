@@ -35,9 +35,6 @@ iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = LLVM_SRCS,
     driver = "local-task",
-    tags = [
-        "notsan",
-    ],
     target_backend = "llvm-cpu",
 )
 
@@ -90,9 +87,6 @@ iree_check_single_backend_test_suite(
         "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
     ],
     driver = "local-task",
-    tags = [
-        "notsan",
-    ],
     target_backend = "llvm-cpu",
 )
 

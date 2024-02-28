@@ -88,8 +88,6 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
-  LABELS
-    "notsan"
 )
 
 endif()
@@ -124,49 +122,3 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-if(NOT EMSCRIPTEN AND IREE_ENABLE_ASAN)
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_asan
-  SRCS
-    "reverse.mlir"
-    "scan.mlir"
-    "scatter.mlir"
-    "sort.mlir"
-    "top-k.mlir"
-    "winograd_input.mlir"
-    "winograd_output.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=address"
-  LABELS
-    "notsan"
-)
-endif()
-
-if(NOT EMSCRIPTEN AND IREE_ENABLE_TSAN)
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task_tsan
-  SRCS
-    "reverse.mlir"
-    "scan.mlir"
-    "scatter.mlir"
-    "sort.mlir"
-    "top-k.mlir"
-    "winograd_input.mlir"
-    "winograd_output.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=thread"
-)
-endif()
