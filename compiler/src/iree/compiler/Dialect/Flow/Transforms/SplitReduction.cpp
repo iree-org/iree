@@ -36,13 +36,8 @@ static LogicalResult splitReductionOnMatmul(
     linalg::ControlSplitReductionFn controlSplitReductionFn) {
   // Since user information about compilation are passed through attributes we
   // need to make sure to propagate those.
-  std::vector<std::pair<StringAttr, Attribute>> attributes;
-  ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
-  for (NamedAttribute kv : op->getAttrs()) {
-    if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
-      attributes.push_back(std::make_pair(kv.getName(), kv.getValue()));
-    }
-  }
+  SmallVector<NamedAttribute> prunedAttributeList =
+      linalg::getPrunedAttributeList(op);
 
   FailureOr<linalg::SplitReductionResult> result =
       linalg::splitReduction(rewriter, op, controlSplitReductionFn);
@@ -50,10 +45,7 @@ static LogicalResult splitReductionOnMatmul(
     return failure();
   }
 
-  // If any attributes needs to be propagated set it.
-  for (std::pair<StringAttr, Attribute> &attrib : attributes) {
-    result->splitLinalgOp->setAttr(attrib.first, attrib.second);
-  }
+  result->splitLinalgOp->setAttrs(prunedAttributeList);
   return result;
 }
 
