@@ -27,4 +27,14 @@ def SetStrictSymbolicShapesPass :
   let constructor = "mlir::iree_compiler::TorchInput::createSetStrictSymbolicShapesPass()";
 }
 
+def FuncConversion :
+    Pass<"torch-iree-func-conversion", "ModuleOp"> {
+  let summary = "Finalizes conversion from torch to IREE";
+  let constructor = "mlir::iree_compiler::TorchInput::createFuncConversionPass()";
+  let description = [{
+    Conversion pass for finalizing functions and ABI. Replaces the generic 
+    torch-func-backend-type-conversion pass.
+  }];
+}
+
 #endif // TORCH_IREE_INPUTCONVERSION_PASSES

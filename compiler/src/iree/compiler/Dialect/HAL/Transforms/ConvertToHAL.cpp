@@ -88,6 +88,17 @@ struct ConvertToHALPass
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Cleanup conversion attributes used for spooky action at a distance.
+    for (auto executableOp : getOperation().getOps<IREE::HAL::ExecutableOp>()) {
+      for (auto variantOp :
+           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        for (auto exportOp :
+             variantOp.getOps<IREE::HAL::ExecutableExportOp>()) {
+          exportOp->removeAttr("hal.interface.bindings");
+        }
+      }
+    }
   }
 };
 

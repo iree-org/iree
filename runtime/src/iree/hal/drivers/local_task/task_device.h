@@ -23,6 +23,8 @@ typedef struct iree_hal_task_device_params_t {
   // Larger sizes will lower overhead and ensure the heap isn't hit for
   // transient allocations while also increasing memory consumption.
   iree_host_size_t arena_block_size;
+  // Default flags for the iree_task_scope_t used for each queue.
+  iree_task_scope_flags_t queue_scope_flags;
 } iree_hal_task_device_params_t;
 
 // Initializes |out_params| to default values.

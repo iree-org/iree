@@ -34,7 +34,8 @@ using TaskScopePtr =
     std::unique_ptr<iree_task_scope_t, void (*)(iree_task_scope_t*)>;
 static inline TaskScopePtr AllocateScope(const char* name) {
   iree_task_scope_t* scope = new iree_task_scope_t();
-  iree_task_scope_initialize(iree_make_cstring_view(name), scope);
+  iree_task_scope_initialize(iree_make_cstring_view(name),
+                             IREE_TASK_SCOPE_FLAG_NONE, scope);
   return {scope, [](iree_task_scope_t* scope) {
             iree_task_scope_deinitialize(scope);
             delete scope;

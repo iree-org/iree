@@ -221,6 +221,13 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
       "TypeAttr":$sourceEncoding,
       "StringAttr":$name
     )>,
+    OpBuilder<(ins
+      "Type":$resultType,
+      "Value":$source,
+      "TypeAttr":$sourceEncoding,
+      "Value":$targetStorage,
+      "StringAttr":$name
+    )>,
   ];
 
   let extraClassDeclaration = [{
@@ -1932,7 +1939,6 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     $body
   }];
 

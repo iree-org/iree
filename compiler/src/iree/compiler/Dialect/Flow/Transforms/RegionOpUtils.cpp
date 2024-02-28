@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -556,15 +556,6 @@ bool isDequantizationLikeOp(Operation *op) {
       outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
-
-  for (auto &bodyOp : genericOp.getBody()->getOperations()) {
-    if (!isa<arith::ExtUIOp, arith::ExtSIOp, arith::MulFOp, arith::MulIOp,
-             arith::AddFOp, arith::AddIOp, arith::SubFOp, arith::SubIOp,
-             arith::SIToFPOp, arith::UIToFPOp, linalg::YieldOp>(bodyOp)) {
-      return false;
-    }
-  }
-
   return true;
 }
 

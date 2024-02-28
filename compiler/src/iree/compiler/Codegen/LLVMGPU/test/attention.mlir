@@ -132,10 +132,7 @@ hal.executable @_attention_dispatch_0 {
 // CHECK:          %[[D18:.+]] = vector.transpose %[[D17]], [1, 0] : vector<128x32xf32> to vector<32x128xf32>
 // CHECK:          %[[D19:.+]] = arith.subf %[[D15]], %[[D18]] : vector<32x128xf32>
 // CHECK:          %[[D20:.+]] = math.exp2 %[[D19]] : vector<32x128xf32>
-// CHECK:          %[[ALLOC_12:.+]] = memref.alloc() {alignment = 64 : i64} : memref<32xf32,
-// CHECK-SAME:       #[[GPU]].address_space<workgroup>>
-// CHECK:          %[[READ_ALLOC_12:.+]] = vector.transfer_read %[[ALLOC_12]]
-// CHECK:          %[[D21:.+]] = arith.subf %[[READ_ALLOC_12]], %[[D16]] : vector<32xf32>
+// CHECK:          %[[D21:.+]] = arith.subf %[[ARG1]], %[[D16]] : vector<32xf32>
 // CHECK:          %[[D22:.+]] = math.exp2 %[[D21]] : vector<32xf32>
 // CHECK:          %[[D23:.+]] = arith.mulf %[[D22]], %[[ARG2]] : vector<32xf32>
 // CHECK:          %[[D24:.+]] = vector.multi_reduction <add>, %[[D20]], %[[D23]] [1] : vector<32x128xf32> to

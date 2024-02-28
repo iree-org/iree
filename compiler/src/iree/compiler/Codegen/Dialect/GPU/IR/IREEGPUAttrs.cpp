@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -304,6 +305,10 @@ MFMAAttr MFMAAttr::get(MLIRContext *context, MFMAIntrinsic type) {
 
 std::tuple<VectorType, VectorType, VectorType>
 MFMAAttr::getABCVectorTypes() const {
+  // Check https://github.com/ROCm/amd_matrix_instruction_calculator for
+  // instruction details. Note here we are returning the number elements, while
+  // amd_matrix_instruction_calculator tells us about the number of 32-bit
+  // registers. So need to adjust accordingly. All vectors should be 1-D.
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::F16_16x16x16_F32: {
     auto aType = VectorType::get({4}, getAType());
@@ -314,7 +319,7 @@ MFMAAttr::getABCVectorTypes() const {
   case MFMAIntrinsic::F16_32x32x8_F32: {
     auto aType = VectorType::get({4}, getAType());
     auto bType = VectorType::get({4}, getBType());
-    auto cType = VectorType::get({4, 4}, getCType());
+    auto cType = VectorType::get({16}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
   }
@@ -435,10 +440,11 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     applyPermutationToVector(elementOrder, permute);
   }
 
-  return NestedLayoutAttr::get(context, subgroupCount, subgroupOrder,
-                               batchCount, batchOrder, outerCount, outerOrder,
-                               threadCount, threadOrder, elementCount,
-                               elementOrder, subgroupBasis, threadBasis);
+  return NestedLayoutAttr::get(
+      context, subgroupCount, subgroupOrder, batchCount, batchOrder, outerCount,
+      outerOrder, threadCount, threadOrder, elementCount, elementOrder,
+      subgroupBasis, SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
+      SmallVector<bool>(threadBasis.size(), true));
 }
 
 std::optional<std::tuple<VectorExt::VectorLayoutInterface,

@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc))" %s | FileCheck %s
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_branch_empty
+  // CHECK-LABEL: emitc.func private @my_module_branch_empty
   vm.func @branch_empty() {
     // CHECK: cf.br ^bb1
     vm.br ^bb1
@@ -15,7 +15,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_branch_int_args
+  // CHECK-LABEL: emitc.func private @my_module_branch_int_args
   vm.func @branch_int_args(%arg0 : i32, %arg1 : i32) -> i32 {
     // CHECK: cf.br ^bb1(%arg3, %arg4 : i32, i32)
     vm.br ^bb1(%arg0, %arg1 : i32, i32)
@@ -29,7 +29,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_branch_ref_args
+  // CHECK-LABEL: emitc.func private @my_module_branch_ref_args
   vm.func @branch_ref_args(%arg0 : !vm.ref<?>) -> !vm.ref<?> {
     // CHECK: cf.br ^bb1
     // CHECK: cf.br ^bb2
@@ -44,7 +44,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_branch_mixed_args
+  // CHECK-LABEL: emitc.func private @my_module_branch_mixed_args
   vm.func @branch_mixed_args(%arg0 : !vm.ref<?>, %arg1: i32, %arg2 : !vm.ref<?>, %arg3: i32) -> !vm.ref<?> {
     // CHECK: cf.br ^bb1
     // CHECK: cf.br ^bb2(%arg4, %arg6 : i32, i32)
@@ -60,15 +60,15 @@ vm.module @my_module {
 
 // Test vm.call conversion on an imported function.
 vm.module @my_module {
-  // CHECK: func.func @my_module_call_[[IMPORTFN:[^\(]+]]
+  // CHECK: emitc.func private @my_module_call_[[IMPORTFN:[^\(]+]]
   vm.import private @imported_fn(%arg0 : i32) -> i32
 
-  // CHECK: func.func @my_module_call_imported_fn
+  // CHECK: emitc.func private @my_module_call_imported_fn
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
 
     // Lookup import from module struct.
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
@@ -77,7 +77,7 @@ vm.module @my_module {
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
-    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[IMPORTFN]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
+    // CHECK-NEXT: %{{.+}} = emitc.call @my_module_call_[[IMPORTFN]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, i32, !emitc.ptr<i32>)
     // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
     %0 = vm.call @imported_fn(%arg0) : (i32) -> i32
@@ -89,12 +89,12 @@ vm.module @my_module {
 
 // Test that the order of imports and calls doesn't matter.
 vm.module @my_module {
-  // CHECK: func.func @my_module_call_imported_fn
+  // CHECK: emitc.func private @my_module_call_imported_fn
   vm.func @call_imported_fn(%arg0 : i32) -> i32 {
 
     // Lookup import from module struct.
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
@@ -103,14 +103,14 @@ vm.module @my_module {
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
-    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[IMPORTFN:[^\(]+]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
+    // CHECK-NEXT: %{{.+}} = emitc.call @my_module_call_[[IMPORTFN:[^\(]+]](%arg0, %[[IMPORT]], %arg3, %[[RESPTR]])
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>, i32, !emitc.ptr<i32>)
     // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
     %0 = vm.call @imported_fn(%arg0) : (i32) -> i32
     vm.return %0 : i32
   }
 
-  // CHECK: func.func @my_module_call_[[IMPORTFN]]
+  // CHECK: emitc.func private @my_module_call_[[IMPORTFN]]
   vm.import private @imported_fn(%arg0 : i32) -> i32
 }
 
@@ -122,7 +122,7 @@ vm.module @my_module {
     vm.return %arg0 : i32
   }
 
-  // CHECK-LABEL: @my_module_call_internal_fn
+  // CHECK-LABEL: emitc.func private @my_module_call_internal_fn
   vm.func @call_internal_fn(%arg0 : i32) -> i32 {
 
     // Create a variable for the result.
@@ -130,9 +130,9 @@ vm.module @my_module {
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
-    // CHECK-NEXT: %{{.+}} = call @my_module_internal_fn(%arg0, %arg1, %arg2, %arg3, %[[RESPTR]])
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"my_module_t">>,
-    // CHECK-SAME:        !emitc.ptr<!emitc.opaque<"my_module_state_t">>, i32, !emitc.ptr<i32>)
+    // CHECK-NEXT: %{{.+}} = emitc.call @my_module_internal_fn(%arg0, %arg1, %arg2, %arg3, %[[RESPTR]])
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"struct my_module_t">>,
+    // CHECK-SAME:        !emitc.ptr<!emitc.opaque<"struct my_module_state_t">>, i32, !emitc.ptr<i32>)
     // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
     %0 = vm.call @internal_fn(%arg0) : (i32) -> i32
     vm.return %0 : i32
@@ -143,15 +143,15 @@ vm.module @my_module {
 
 // Test vm.call.variadic conversion on an imported function.
 vm.module @my_module {
-  // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
+  // CHECK: emitc.func private @my_module_call_[[VARIADICFN:[^\(]+]]
   vm.import private @variadic_fn(%arg0 : i32 ...) -> i32
 
-  // CHECK: func.func @my_module_call_variadic
+  // CHECK: emitc.func private @my_module_call_variadic
   vm.func @call_variadic(%arg0 : i32, %arg1 : i32) -> i32 {
 
     // Lookup import from module struct.
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
@@ -163,7 +163,7 @@ vm.module @my_module {
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
-    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[VARIADICFN]](%arg0, %[[IMPORT]], %[[NARGS]], %arg3, %arg4, %[[RESPTR]])
+    // CHECK-NEXT: %{{.+}} = emitc.call @my_module_call_[[VARIADICFN]](%arg0, %[[IMPORT]], %[[NARGS]], %arg3, %arg4, %[[RESPTR]])
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
     // CHECK-SAME:        i32, i32, i32, !emitc.ptr<i32>)
     // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
@@ -176,15 +176,15 @@ vm.module @my_module {
 
 // Test vm.call.variadic with zero arguments.
 vm.module @my_module {
-  // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
+  // CHECK: emitc.func private @my_module_call_[[VARIADICFN:[^\(]+]]
   vm.import private @variadic_fn(%arg0 : i32 ...) -> i32
 
-  // CHECK: func.func @my_module_call_variadic
+  // CHECK: emitc.func private @my_module_call_variadic
   vm.func @call_variadic() -> i32 {
 
     // Lookup import from module struct.
     // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]}
-    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]}
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
 
@@ -196,7 +196,7 @@ vm.module @my_module {
     // CHECK-NEXT: %[[RESPTR:.+]] = emitc.apply "&"(%[[RESULT]]) : (i32) -> !emitc.ptr<i32>
 
     // Call the function created by the vm.import conversion.
-    // CHECK-NEXT: %{{.+}} = call @my_module_call_[[VARIADICFN]](%arg0, %[[IMPORT]], %[[NARGS]], %[[RESPTR]])
+    // CHECK-NEXT: %{{.+}} = emitc.call @my_module_call_[[VARIADICFN]](%arg0, %[[IMPORT]], %[[NARGS]], %[[RESPTR]])
     // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
     // CHECK-SAME:        i32, !emitc.ptr<i32>)
     // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
@@ -210,10 +210,10 @@ vm.module @my_module {
 // TODO(simon-camp): add check statements
 // Test vm.call.variadic with multiple variadic packs.
 vm.module @my_module {
-  // CHECK: func.func @my_module_call_[[VARIADICFN:[^\(]+]]
+  // CHECK: emitc.func private @my_module_call_[[VARIADICFN:[^\(]+]]
   vm.import private @variadic_fn(%is : i32 ..., %fs : f32 ...) -> i32
 
-  // CHECK: func.func @my_module_call_variadic
+  // CHECK: emitc.func private @my_module_call_variadic
   vm.func @call_variadic(%i : i32, %f : f32) -> i32 {
 
     %0 = vm.call.variadic @variadic_fn([%i, %i], [%f, %f, %f]) : (i32 ..., f32 ...) -> i32
@@ -224,7 +224,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_cond_branch_empty
+  // CHECK-LABEL: emitc.func private @my_module_cond_branch_empty
   vm.func @cond_branch_empty(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
     // CHECK: cf.cond_br %{{.}}, ^bb1, ^bb2
     vm.cond_br %arg0, ^bb1, ^bb2
@@ -242,7 +242,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_cond_branch_int_args
+  // CHECK-LABEL: emitc.func private @my_module_cond_branch_int_args
   vm.func @cond_branch_int_args(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
     // CHECK: cf.cond_br {{%.}}, ^bb1(%arg4 : i32), ^bb2(%arg5 : i32)
     vm.cond_br %arg0, ^bb1(%arg1 : i32), ^bb2(%arg2 : i32)
@@ -260,7 +260,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_cond_branch_ref_args
+  // CHECK-LABEL: emitc.func private @my_module_cond_branch_ref_args
   vm.func @cond_branch_ref_args(%arg0 : i32, %arg1 : !vm.ref<?>, %arg2 : !vm.ref<?>) -> !vm.ref<?> {
     // CHECK: cf.cond_br {{%.}}, ^bb1, ^bb4
     // CHECK: cf.br ^bb2
@@ -279,7 +279,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_br_table_empty
+// CHECK-LABEL: emitc.func private @my_module_br_table_empty
 vm.module @my_module {
   vm.func @br_table_empty(%arg0: i32, %arg1: i32) -> i32 {
     //  CHECK-NOT: vm.br_table
@@ -300,7 +300,7 @@ vm.module @my_module {
 
 // -----
 
-// CHECK-LABEL: @my_module_br_table
+// CHECK-LABEL: emitc.func private @my_module_br_table
 vm.module @my_module {
   vm.func @br_table(%arg0: i32, %arg1: i32, %arg2: i32) -> i32 {
     //  CHECK-NOT: vm.br_table
@@ -330,7 +330,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_fail
+  // CHECK-LABEL: emitc.func private @my_module_fail
   vm.func @fail(%arg0 : i32) {
 
     // Typecast the argument to fail and branch respectively.
@@ -364,8 +364,8 @@ vm.module @my_module {
 // Test vm.import conversion on a void function.
 vm.module @my_module {
 
-  // CHECK-LABEL: func.func @my_module_call_0v_v_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>)
-  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+  // CHECK-LABEL: emitc.func private @my_module_call_0v_v_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>)
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {specifiers = ["static"]} {
 
   // Calculate the size of the arguments. To avoid empty structs we insert a dummy value.
   // CHECK-NEXT: %[[ARGSIZE:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
@@ -426,9 +426,9 @@ vm.module @my_module {
 // Test vm.import conversion on a variadic function.
 vm.module @my_module {
 
-  // CHECK-LABEL: func.func @my_module_call_0iCiD_i_2_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-LABEL: emitc.func private @my_module_call_0iCiD_i_2_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
   // CHECK-SAME:                                             %arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32, %arg6: !emitc.ptr<i32>)
-  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {specifiers = ["static"]} {
 
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
@@ -529,9 +529,9 @@ vm.module @my_module {
 // Test vm.call.variadic with zero variadic arguments.
 vm.module @my_module {
 
-  // CHECK-LABEL: func.func @my_module_call_0iCiD_i_0_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-LABEL: emitc.func private @my_module_call_0iCiD_i_0_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
   // CHECK-SAME:                                             %arg2: i32, %arg3: i32, %arg4: !emitc.ptr<i32>)
-  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {specifiers = ["static"]} {
 
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
@@ -616,9 +616,9 @@ vm.module @my_module {
 // Test vm.import conversion on a function with vm.ref arguments.
 vm.module @my_module {
 
-  // CHECK-LABEL: func.func @my_module_call_0r_r_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
+  // CHECK-LABEL: emitc.func private @my_module_call_0r_r_import_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>,
   // CHECK-SAME:                                        %arg2: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>, %arg3: !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>)
-  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {emitc.static} {
+  // CHECK-SAME:      -> !emitc.opaque<"iree_status_t"> attributes {specifiers = ["static"]} {
 
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
@@ -690,39 +690,39 @@ vm.module @my_module {
 
 vm.module @my_module {
 
-  // Typedef structs for arguments and results
-  // CHECK: emitc.call_opaque "EMITC_TYPEDEF_STRUCT"() {args = [#emitc.opaque<"my_module_fn_args_t">, #emitc.opaque<"int32_t arg0;">]} : () -> ()
-  // CHECK: emitc.call_opaque "EMITC_TYPEDEF_STRUCT"() {args = [#emitc.opaque<"my_module_fn_result_t">, #emitc.opaque<"int32_t res0;">]} : () -> ()
-
+  // Define structs for arguments and results
+  //      CHECK: emitc.verbatim "struct my_module_fn_args_t {int32_t arg0;};"
+  // CHECK-NEXT: emitc.verbatim "struct my_module_fn_result_t {int32_t res0;};"
+  
   // Create a new function to export with the adapted signature.
-  //      CHECK: func.func @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
+  // CHECK:      emitc.func private @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
   // CHECK-SAME:                                %arg4: !emitc.ptr<!emitc.opaque<"void">>, %arg5: !emitc.ptr<!emitc.opaque<"void">>)
-  // CHECK-SAME:     -> !emitc.opaque<"iree_status_t"> attributes {emitc.static, vm.calling_convention = "0i_i", vm.export_name = "fn"}
+  // CHECK-SAME:     -> !emitc.opaque<"iree_status_t">
 
   // Cast module and module state structs.
-  // CHECK-NEXT: %[[MODULECASTED:.+]] = emitc.cast %arg4 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"my_module_t">>
-  // CHECK-NEXT: %[[MODSTATECASTED:.+]] = emitc.cast %arg5 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"my_module_state_t">>
+  // CHECK-NEXT: %[[MODULECASTED:.+]] = emitc.cast %arg4 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"struct my_module_t">>
+  // CHECK-NEXT: %[[MODSTATECASTED:.+]] = emitc.cast %arg5 : !emitc.ptr<!emitc.opaque<"void">> to !emitc.ptr<!emitc.opaque<"struct my_module_state_t">>
 
   // Cast argument and result structs.
   // CHECK-NEXT: %[[ARGDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"data">]}
   // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
-  // CHECK-NEXT: %[[ARGS:.+]] = emitc.cast %[[ARGDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"my_module_fn_args_t">>
+  // CHECK-NEXT: %[[ARGS:.+]] = emitc.cast %[[ARGDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>
   // CHECK-NEXT: %[[RESULTDATA:.+]] = emitc.call_opaque "EMITC_STRUCT_MEMBER"(%arg3) {args = [0 : index, #emitc.opaque<"data">]}
   // CHECK-SAME:     : (!emitc.opaque<"iree_byte_span_t">) -> !emitc.ptr<ui8>
-  // CHECK-NEXT: %[[RESULTS:.+]] = emitc.cast %[[RESULTDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"my_module_fn_result_t">>
+  // CHECK-NEXT: %[[RESULTS:.+]] = emitc.cast %[[RESULTDATA]] : !emitc.ptr<ui8> to !emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>
 
   // Unpack the argument from the struct.
   // CHECK-NEXT: %[[MARG:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%[[ARGS]]) {args = [0 : index, #emitc.opaque<"arg0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_fn_args_t">>) -> i32
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_args_t">>) -> i32
 
   // Unpack the result pointer from the struct.
   // CHECK-NEXT: %[[MRES:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER_ADDRESS"(%[[RESULTS]]) {args = [0 : index, #emitc.opaque<"res0">]}
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"my_module_fn_result_t">>) -> !emitc.ptr<i32>
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"struct my_module_fn_result_t">>) -> !emitc.ptr<i32>
 
   // Call the internal function.
-  // CHECK-NEXT: %{{.+}} = call @my_module_fn(%arg0, %[[MODULECASTED]], %[[MODSTATECASTED]], %[[MARG]], %[[MRES]])
-  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"my_module_t">>,
-  // CHECK-SAME:        !emitc.ptr<!emitc.opaque<"my_module_state_t">>, i32, !emitc.ptr<i32>) -> !emitc.opaque<"iree_status_t">
+  // CHECK-NEXT: %{{.+}} = emitc.call @my_module_fn(%arg0, %[[MODULECASTED]], %[[MODSTATECASTED]], %[[MARG]], %[[MRES]])
+  // CHECK-SAME:     : (!emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, !emitc.ptr<!emitc.opaque<"struct my_module_t">>,
+  // CHECK-SAME:        !emitc.ptr<!emitc.opaque<"struct my_module_state_t">>, i32, !emitc.ptr<i32>) -> !emitc.opaque<"iree_status_t">
 
   // Return ok status.
   // CHECK: %[[STATUS:.+]] = emitc.call_opaque "iree_ok_status"() : () -> !emitc.opaque<"iree_status_t">
@@ -738,7 +738,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_return
+  // CHECK-LABEL: emitc.func private @my_module_return
   vm.func @return(%arg0 : i32, %arg1 : !vm.ref<?>) -> (i32, !vm.ref<?>) {
 
     // Move the i32 value and ref into the result function arguments.
@@ -766,9 +766,9 @@ vm.module @my_module {
 
 vm.module @my_module {
   vm.import private optional @optional_import_fn(%arg0 : i32) -> i32
-  // CHECK-LABEL: @my_module_call_fn
+  // CHECK-LABEL: emitc.func private @my_module_call_fn
   vm.func @call_fn() -> i32 {
-    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]} : (!emitc.ptr<!emitc.opaque<"my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
+    // CHECK-NEXT: %[[IMPORTS:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg2) {args = [0 : index, #emitc.opaque<"imports">]} : (!emitc.ptr<!emitc.opaque<"struct my_module_state_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[IMPORT:.+]] = emitc.call_opaque "EMITC_ARRAY_ELEMENT_ADDRESS"(%[[IMPORTS]]) {args = [0 : index, 0 : ui32]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_function_t">>
     // CHECK-NEXT: %[[MODULE:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%[[IMPORT]]) {args = [0 : index, #emitc.opaque<"module">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_function_t">>) -> !emitc.ptr<!emitc.opaque<"iree_vm_module_t">>
     // CHECK-NEXT: %[[CONDITION0:.+]] = emitc.call_opaque "EMITC_UNARY"(%[[MODULE]]) {args = [#emitc.opaque<"!">, 0 : index]} : (!emitc.ptr<!emitc.opaque<"iree_vm_module_t">>) -> i1

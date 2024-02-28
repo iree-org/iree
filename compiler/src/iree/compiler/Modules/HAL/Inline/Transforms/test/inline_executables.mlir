@@ -178,12 +178,6 @@ util.func private @dispatch0(%resource0: !stream.resource<constant>, %resource1:
       ro %resource0_inner[%binding0_offset for %binding0_length] : !stream.resource<constant>{%resource_size},
       ro %resource1_inner[%binding1_offset for %binding1_length] : !stream.resource<transient>{%resource_size},
       wo %resource2_inner[%binding2_offset for %binding2_length] : !stream.resource<external>{%resource_size}
-    } attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
     }
   } => !stream.timepoint
   util.return

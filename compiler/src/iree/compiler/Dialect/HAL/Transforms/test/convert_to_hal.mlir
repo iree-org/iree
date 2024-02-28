@@ -4,18 +4,36 @@
 
 #executable_target_embedded_elf_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+
+// CHECK: #[[PIPELINE_LAYOUT_ATTR_0:.+]] = #hal.pipeline.layout
+#pipeline_layout_0 = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
+    // CHECK-SAME: <0, storage_buffer>
     #hal.descriptor_set.binding<0, storage_buffer>,
+    // CHECK-SAME: <1, storage_buffer>
     #hal.descriptor_set.binding<1, storage_buffer>,
+    // CHECK-SAME: <2, storage_buffer>
     #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+// CHECK: #[[PIPELINE_LAYOUT_ATTR_1:.+]] = #hal.pipeline.layout
+#pipeline_layout_1 = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    // CHECK-SAME: <4, storage_buffer>
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>,
+  #hal.descriptor_set.layout<1, bindings = [
+    // CHECK-SAME: <5, storage_buffer>
+    #hal.descriptor_set.binding<5, storage_buffer>,
+    // CHECK-SAME: <6, storage_buffer>
+    #hal.descriptor_set.binding<6, storage_buffer>
   ]>
 ]>
 
 // CHECK: hal.executable private @ex
 hal.executable private @ex {
   hal.executable.variant public @embedded_elf_aarch64 target(#executable_target_embedded_elf_aarch64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_0) attributes {
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -28,7 +46,14 @@ hal.executable private @ex {
     }
   }
   hal.executable.variant public @embedded_elf_x86_64 target(#executable_target_embedded_elf_x86_64) {
-    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout) attributes {
+    hal.executable.export public @dispatch ordinal(0) layout(#pipeline_layout_1) attributes {
+      // Override the bindings. The other variant uses the default ones.
+      // CHECK-NOT: hal.interface.bindings
+      hal.interface.bindings = [
+        #hal.interface.binding<0, 4>,
+        #hal.interface.binding<1, 5>,
+        #hal.interface.binding<1, 6>
+      ],
       translation_info = #iree_codegen.translation_info<CPUDefault>
     } {
     ^bb0(%device: !hal.device, %arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -42,8 +67,8 @@ hal.executable private @ex {
   }
 }
 
-// CHECK-LABEL: util.func public @simpleDispatch
-//  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view
+// CHECK: util.func public @simpleDispatch
+// CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view) -> !hal.buffer_view
 util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -94,11 +119,11 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
     // CHECK-DAG: %[[SWITCH0:.+]] = arith.select %[[FORMAT_AARCH64]], %c0, %[[SWITCH1]]
     // CHECK: scf.index_switch %[[SWITCH0]]
     // CHECK: case 0 {
-    // CHECK:   %[[PIPELINE_LAYOUT:.+]] = hal.pipeline_layout.lookup
+    // CHECK:   %[[PIPELINE_LAYOUT_0:.+]] = hal.pipeline_layout.lookup
     // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
-    // CHECK-SAME: layout(#pipeline_layout) : !hal.pipeline_layout
+    // CHECK-SAME: layout(#[[PIPELINE_LAYOUT_ATTR_0]]) : !hal.pipeline_layout
     // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
-    // CHECK-SAME: layout(%[[PIPELINE_LAYOUT]] : !hal.pipeline_layout)[%c0]
+    // CHECK-SAME: layout(%[[PIPELINE_LAYOUT_0]] : !hal.pipeline_layout)[%c0]
     // CHECK-SAME: bindings([
     // CHECK:     %c0 = (%[[ARG0_BUFFER]] : !hal.buffer)[%c0, %c16],
     // CHECK:     %c1 = (%[[ARG1_BUFFER]] : !hal.buffer)[%c0, %c16],
@@ -112,6 +137,20 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
     // CHECK:   scf.yield
     // CHECK: }
     // CHECK: case 1 {
+    // CHECK:   %[[PIPELINE_LAYOUT_1:.+]] = hal.pipeline_layout.lookup
+    // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
+    // CHECK-SAME: layout(#[[PIPELINE_LAYOUT_ATTR_1]]) : !hal.pipeline_layout
+    // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: layout(%[[PIPELINE_LAYOUT_1]] : !hal.pipeline_layout)[%c0]
+    // CHECK-SAME: bindings([
+    // CHECK:     %c4 = (%[[ARG0_BUFFER]] : !hal.buffer)[%c0, %c16]
+    // CHECK:   ])
+    // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
+    // CHECK-SAME: layout(%[[PIPELINE_LAYOUT_1]] : !hal.pipeline_layout)[%c1]
+    // CHECK-SAME: bindings([
+    // CHECK:     %c5 = (%[[ARG1_BUFFER]] : !hal.buffer)[%c0, %c16],
+    // CHECK:     %c6 = (%[[RESULT_BUFFER]] : !hal.buffer)[%c0, %c16]
+    // CHECK:   ])
     // CHECK-DAG: %[[EXECUTABLE_1:.+]] = hal.executable.lookup device(%[[DEVICE]] : !hal.device) executable(@ex) : !hal.executable
     // CHECK-DAG: %[[ORDINAL_1:.+]] = hal.executable.export.ordinal target(@ex::@embedded_elf_x86_64::@dispatch) : index
     // CHECK:   hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
@@ -125,12 +164,6 @@ util.func public @simpleDispatch(%arg0: !hal.buffer_view, %arg1: !hal.buffer_vie
       ro %arg0_capture[%c0 for %c16] : !stream.resource<external>{%c16},
       ro %arg1_capture[%c0 for %c16] : !stream.resource<external>{%c16},
       wo %result_capture[%c0 for %c16] : !stream.resource<external>{%c16}
-    } attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
     }
 
   // CHECK: hal.command_buffer.execution_barrier<%[[CMD]] : !hal.command_buffer>

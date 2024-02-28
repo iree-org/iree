@@ -24,12 +24,10 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary.
-#cuda_target = #hal.device.target<"cuda", {
-  executable_targets = [
-    #nvptx_sm_52_target,
-    #nvptx_sm_80_target
-  ]
-}>
+#cuda_target = #hal.device.target<"cuda", [
+  #nvptx_sm_52_target,
+  #nvptx_sm_80_target
+]>
 
 module @example attributes {hal.device.targets = [#cuda_target]} {
 
@@ -86,7 +84,18 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
         ]>) attributes {
       // Certain backends (like CUDA) require a workgroup size (aka block
       // size) to be defined ahead of time.
-      workgroup_size = [64 : index, 1 : index, 1 : index]
+      workgroup_size = [64 : index, 1 : index, 1 : index],
+      // Bindings are automatically inferred when possible as part of the ABI
+      // but can be overridden if the user wants to use features such as sparse
+      // bindings or multiple descriptor sets. To do so the
+      // `hal.interface.bindings` attribute can be added to a dispatch op as
+      // follows mapping tensor operands/results to the pipeline layout
+      // sets/bindings:
+      hal.interface.bindings = [
+        #hal.interface.binding<0, 0>,
+        #hal.interface.binding<0, 1>,
+        #hal.interface.binding<0, 2>
+      ]
     } {
     ^bb0(%device: !hal.device, %workload: index):
       // This host function is used to compute the XYZ workgroup count
@@ -137,19 +146,7 @@ module @example attributes {hal.device.targets = [#cuda_target]} {
     %dim_i32 = arith.index_cast %dim : index to i32
 
     // Dispatch a basic `ret = lhs * rhs` kernel.
-    %0 = flow.dispatch @executable::@simple_mul[%dim](%dim_i32, %arg0, %arg1) {
-      // Bindings are automatically inferred when possible as part of the ABI
-      // but can be overridden if the user wants to use features such as sparse
-      // bindings or multiple descriptor sets. To do so the
-      // `hal.interface.bindings` attribute can be added to a dispatch op as
-      // follows mapping tensor operands/results to the pipeline layout
-      // sets/bindings:
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
-    } : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
+    %0 = flow.dispatch @executable::@simple_mul[%dim](%dim_i32, %arg0, %arg1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
 
     // Code gen some other ops - these will interleave with the hand-authored
     // ones but naturally won't be able to fuse with them.

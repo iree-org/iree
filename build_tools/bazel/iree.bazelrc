@@ -277,7 +277,7 @@ build:remote_cache_bazel_ci --config=_remote_cache_base
 # specific docker container the CI Bazel builds are run in. The image URL is
 # included for clarity and so that this reference is automatically updated by
 # manage_images.py
-build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418"}'
+build:remote_cache_bazel_ci --host_platform_remote_properties_override='properties:{name:"cache-silo-key" value:"gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27"}'
 
 
 ###############################################################################

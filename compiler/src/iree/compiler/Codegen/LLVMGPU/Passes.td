@@ -49,8 +49,15 @@ def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
 
 def LLVMGPUCastAddressSpaceFunction :
     Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
-  let summary = "Pass to cast";
+  let summary = "Cast address space to generic in CallOp and FuncOp";
   let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
+}
+
+def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
+                                            "mlir::FunctionOpInterface"> {
+  let summary = "Perform type extension/truncation over vector.contract types "
+                "to target GPU MMA intrinsics";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
 def LLVMGPULowerExecutableTarget :

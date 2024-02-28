@@ -197,6 +197,7 @@ static iree_status_t iree_tooling_open_output_parameter_file(
 }
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_t host_allocator = iree_allocator_system();
@@ -288,5 +289,6 @@ int main(int argc, char** argv) {
   fflush(stderr);
 
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

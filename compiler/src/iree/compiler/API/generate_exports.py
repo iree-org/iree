@@ -60,6 +60,7 @@ MLIR_C_HEADER_FILES = [
     "Transforms.h",
     "Dialect/Linalg.h",
     "Dialect/Transform.h",
+    "Dialect/Transform/Interpreter.h",
     "Dialect/PDL.h",
 ]
 
@@ -71,7 +72,6 @@ EXPLICIT_EXPORTS = [
     # MLIR registration functions that are part of generated code.
     "mlirRegisterLinalgPasses",
     "mlirGetDialectHandle__iree_input__",
-    "mlirGetDialectHandle__iree_linalg_ext__",
     "mlirGetDialectHandle__transform__",
 ]
 

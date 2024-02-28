@@ -40,6 +40,7 @@ typedef struct iree_hal_task_queue_t {
 } iree_hal_task_queue_t;
 
 void iree_hal_task_queue_initialize(iree_string_view_t identifier,
+                                    iree_task_scope_flags_t scope_flags,
                                     iree_task_executor_t* executor,
                                     iree_arena_block_pool_t* block_pool,
                                     iree_hal_task_queue_t* out_queue);

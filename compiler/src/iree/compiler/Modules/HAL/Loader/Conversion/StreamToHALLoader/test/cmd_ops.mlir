@@ -80,11 +80,6 @@ util.func public @cmdDispatch(%buffer0: !stream.resource<transient>, %buffer0_si
     stream.cmd.dispatch @ex::@dispatch[%workload_x, %workload_y](%constant0, %constant1 : i32, i32) {
       ro %buffer0_inner[%buffer0_offset for %buffer0_length] : !stream.resource<transient>{%buffer0_size},
       wo %buffer1_inner[%buffer1_offset for %buffer1_length] : !stream.resource<external>{%buffer1_size}
-    } attributes {
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 4>,
-        #hal.interface.binding<1, 5>
-      ]
     }
   } => !stream.timepoint
   // CHECK: return %c0

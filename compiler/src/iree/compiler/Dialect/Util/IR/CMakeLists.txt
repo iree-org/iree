@@ -12,24 +12,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    ExternalModels
-  HDRS
-    "UtilExternalModels.h"
-  SRCS
-    "UtilExternalModels.cpp"
-  DEPS
-    ::IR
-    IREELinalgExtDialect
-    MLIRArithDialect
-    MLIRLinalgDialect
-    MLIRLinalgStructuredOpsIncGenLib
-    MLIRMLProgramDialect
-    MLIRTensorDialect
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     IR
   HDRS
     "ClosureOpUtils.h"

@@ -128,12 +128,24 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // Select SPIR-V environments to compile for.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
+      targetAttrs.push_back(getExecutableTarget(
+          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
+          options_.indirectBindings));
+    }
+    // If no environment specified, populate with a minimal target.
+    if (targetAttrs.empty()) {
+      targetAttrs.push_back(getExecutableTarget(
+          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
+          options_.indirectBindings));
+    }
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -389,24 +401,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-
-    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
-      targetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
-          options_.indirectBindings));
-    }
-
-    // If no environment specified, populate with a minimal target.
-    if (targetAttrs.empty()) {
-      targetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
-          options_.indirectBindings));
-    }
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context, spirv::TargetEnvAttr targetEnv,
                       bool indirectBindings) const {

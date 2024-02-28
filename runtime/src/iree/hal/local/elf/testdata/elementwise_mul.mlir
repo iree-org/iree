@@ -43,9 +43,9 @@ hal.executable.source public @ex {
   // exported.
   builtin.module {
     func.func @elementwise_mul() {
-      %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
-      %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
-      %dst = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:4xf32>
+      %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:tensor<4xf32>>
+      %dst = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -54,8 +54,8 @@ hal.executable.source public @ex {
       %end_i = arith.constant 4 : index
       scf.for %i = %base_i to %end_i step %step_i {
         %remaining = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%i)[%workgroup_size_x]
-        %lhs_tile = flow.dispatch.tensor.load %lhs, offsets = [%i], sizes = [%remaining], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
-        %rhs_tile = flow.dispatch.tensor.load %rhs, offsets = [%i], sizes = [%remaining], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
+        %lhs_tile = flow.dispatch.tensor.load %lhs, offsets = [%i], sizes = [%remaining], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
+        %rhs_tile = flow.dispatch.tensor.load %rhs, offsets = [%i], sizes = [%remaining], strides = [1] : !flow.dispatch.tensor<readonly:tensor<4xf32>> -> tensor<?xf32>
         %dst_init = tensor.empty(%remaining) : tensor<?xf32>
         %dst_tile = linalg.generic {
           indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -66,7 +66,7 @@ hal.executable.source public @ex {
             %dst_value = arith.mulf %lhs_value, %rhs_value : f32
             linalg.yield %dst_value : f32
           } -> tensor<?xf32>
-        flow.dispatch.tensor.store %dst_tile, %dst, offsets = [%i], sizes = [%remaining], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
+        flow.dispatch.tensor.store %dst_tile, %dst, offsets = [%i], sizes = [%remaining], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:tensor<4xf32>>
       }
       return
     }

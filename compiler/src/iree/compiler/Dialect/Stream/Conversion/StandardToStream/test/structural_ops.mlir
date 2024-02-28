@@ -109,11 +109,11 @@ util.func public @scfWhileExpansion(%arg0 : i32, %arg1 : tensor<1xf32>) {
 
 // -----
 
-// CHECK-LABEL: @scfWhileExpansion
+// CHECK-LABEL: @scfForExpansion
 // CHECK-SAME: %[[ARG0:.+]]: index,
 // CHECK-SAME: %[[ARG1:.+]]: !stream.resource<*>,
 // CHECK-SAME: %[[ARG2:.+]]: index
-util.func public @scfWhileExpansion(%arg0 : index, %arg1 : tensor<1xf32>) {
+util.func public @scfForExpansion(%arg0 : index, %arg1 : tensor<1xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
 

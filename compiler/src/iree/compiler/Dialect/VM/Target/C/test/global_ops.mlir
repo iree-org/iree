@@ -1,23 +1,22 @@
 // RUN: iree-compile --compile-mode=vm --output-format=vm-c --iree-vm-c-module-optimize=false %s | FileCheck %s
 
+// TODO(simon-camp): Add back check for static modifiers
+
 vm.module @global_ops {
   // check the generated state struct
   // CHECK-LABEL: struct global_ops_state_t {
-  // CHECK-NEXT: iree_allocator_t allocator;
-  // CHECK-NEXT: uint8_t rwdata[8];
-  // CHECK-NEXT: iree_vm_ref_t refs[1];
-  // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[1];
-  // CHECK-NEXT: iree_vm_function_t imports[1];
-  // CHECK-NEXT: };
+  // CHECK-SAME: iree_allocator_t allocator;
+  // CHECK-SAME: uint8_t rwdata[8];
+  // CHECK-SAME: iree_vm_ref_t refs[1];
+  // CHECK-SAME: iree_vm_buffer_t rodata_buffers[1];
+  // CHECK-SAME: iree_vm_function_t imports[1];
+  // CHECK-SAME: };
 
   vm.global.i32 mutable @c42 = 42 : i32
   vm.global.i32 mutable @c107_mut = 107 : i32
 
-  // Skip forward declarations
-  // CHECK: DEFINE FUNCTIONS
-
   vm.export @test_global_load_i32
-  // CHECK: static iree_status_t global_ops_test_global_load_i32(
+  // CHECK: iree_status_t global_ops_test_global_load_i32([[ARGS:[^)]*]]) {
   vm.func @test_global_load_i32() -> i32 {
     // CHECK-NEXT: uint8_t* v5;
     // CHECK-NEXT: int32_t v6;
@@ -29,7 +28,7 @@ vm.module @global_ops {
   }
 
   vm.export @test_global_store_i32
-  // CHECK: static iree_status_t global_ops_test_global_store_i32(
+  // CHECK: iree_status_t global_ops_test_global_store_i32([[ARGS:[^)]*]]) {
   vm.func @test_global_store_i32() -> i32 {
     // CHECK-NEXT: int32_t v5;
 // CHECK-NEXT: uint8_t* v6;

@@ -157,11 +157,20 @@ private:
     // the layout of the contraction op. This is common for cases where the
     // initial values of the accumulator in a linalg.matmul is read from memory
     // instead of just being a zerofill.
-    SetVector<Operation *> forwardSlice;
-    ForwardSliceOptions options;
-    getForwardSlice(transfer.getResult(), &forwardSlice, options);
+    ForwardSliceOptions forwardOptions;
+    forwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getResultTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    BackwardSliceOptions backwardOptions;
+    backwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getOperandTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    SetVector<Operation *> slice =
+        getSlice(transfer, backwardOptions, forwardOptions);
 
-    if (llvm::any_of(forwardSlice, [](Operation *op) {
+    if (llvm::any_of(slice, [](Operation *op) {
           return llvm::isa<vector::ContractionOp>(op);
         })) {
       return;
@@ -285,7 +294,9 @@ private:
 
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
-        threadCounts, order, elementSizes, order, subgroupBasis, threadBasis);
+        threadCounts, order, elementSizes, order, subgroupBasis,
+        SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
+        SmallVector<bool>(threadBasis.size(), true));
     analysis.setAnchor(transfer.getResult(), layout);
     if (printLayout) {
       llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout

@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "distribute_to_thread.mlir",
             "elementwise_pipeline.mlir",
             "cast_address_space_function.mlir",
+            "cast_type_to_fit_mma.mlir",
             "config_matvec.mlir",
             "extract_address_computation_gpu.mlir",
             "gpu_set_num_workgroups.mlir",

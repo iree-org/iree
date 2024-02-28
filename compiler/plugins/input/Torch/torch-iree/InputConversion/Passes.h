@@ -7,6 +7,7 @@
 #ifndef TORCH_IREE_INPUTCONVERSION_PASSES_H_
 #define TORCH_IREE_INPUTCONVERSION_PASSES_H_
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
@@ -27,6 +28,8 @@ createConvertTMTensorToLinalgExtPass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSetStrictSymbolicShapesPass();
+
+std::unique_ptr<OperationPass<ModuleOp>> createFuncConversionPass();
 
 // Creates a pipeline that lowers from the torch backend contract to IREE.
 // This is based on the torch-backend-to-linalg-on-tensors-backend-pipeline

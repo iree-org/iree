@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
@@ -21,7 +22,11 @@ class ROCDLSelectLoweringStrategyPass
     : public ROCDLSelectLoweringStrategyBase<ROCDLSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect>();
+    // clang-format off
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect,
+                bufferization::BufferizationDialect>();
+    // clang-format on
   }
 
   void runOnOperation() override {

@@ -65,6 +65,7 @@ createFoldUnitExtentDimsPass();
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
+                            bool fuseMultiReduction = true,
                             unsigned multiUseFusionIteration = 2);
 
 // Create a pass to initialize all empty tensors after dispatch formation to

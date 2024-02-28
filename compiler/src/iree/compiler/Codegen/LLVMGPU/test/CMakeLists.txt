@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "attention.mlir"
     "attention_mfma.mlir"
     "cast_address_space_function.mlir"
+    "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"

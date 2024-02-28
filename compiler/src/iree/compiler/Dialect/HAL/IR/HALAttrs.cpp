@@ -93,27 +93,54 @@ DeviceTargetAttr DeviceTargetAttr::get(MLIRContext *context,
                                        StringRef deviceID) {
   // TODO(benvanik): query default configuration from the target backend.
   return get(context, StringAttr::get(context, deviceID),
-             DictionaryAttr::get(context));
+             DictionaryAttr::get(context), {});
 }
 
 // static
 Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
   StringAttr deviceIDAttr;
   DictionaryAttr configAttr;
+  SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
   // `<"device-id"`
   if (failed(p.parseLess()) || failed(p.parseAttribute(deviceIDAttr))) {
     return {};
   }
-  // `, {config}`
-  if (succeeded(p.parseOptionalComma()) &&
-      failed(p.parseAttribute(configAttr))) {
-    return {};
+  // `, `
+  if (succeeded(p.parseOptionalComma())) {
+    if (succeeded(p.parseOptionalLSquare())) {
+      // `[targets, ...]` (optional)
+      do {
+        IREE::HAL::ExecutableTargetAttr executableTargetAttr;
+        if (failed(p.parseAttribute(executableTargetAttr)))
+          return {};
+        executableTargetAttrs.push_back(executableTargetAttr);
+      } while (succeeded(p.parseOptionalComma()));
+      if (failed(p.parseRSquare()))
+        return {};
+    } else {
+      // `{config dict}` (optional)
+      if (failed(p.parseAttribute(configAttr)))
+        return {};
+      // `, [targets, ...]` (optional)
+      if (succeeded(p.parseOptionalComma())) {
+        if (failed(p.parseLSquare()))
+          return {};
+        do {
+          IREE::HAL::ExecutableTargetAttr executableTargetAttr;
+          if (failed(p.parseAttribute(executableTargetAttr)))
+            return {};
+          executableTargetAttrs.push_back(executableTargetAttr);
+        } while (succeeded(p.parseOptionalComma()));
+        if (failed(p.parseRSquare()))
+          return {};
+      }
+    }
   }
   // `>`
   if (failed(p.parseGreater())) {
     return {};
   }
-  return get(p.getContext(), deviceIDAttr, configAttr);
+  return get(p.getContext(), deviceIDAttr, configAttr, executableTargetAttrs);
 }
 
 void DeviceTargetAttr::print(AsmPrinter &p) const {
@@ -125,6 +152,15 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
     os << ", ";
     p.printAttribute(configAttr);
   }
+  auto executableTargetAttrs = getExecutableTargets();
+  if (!executableTargetAttrs.empty()) {
+    os << ", [";
+    llvm::interleaveComma(executableTargetAttrs, os,
+                          [&](auto executableTargetAttr) {
+                            p.printAttribute(executableTargetAttr);
+                          });
+    os << "]";
+  }
   os << ">";
 }
 
@@ -135,20 +171,6 @@ std::string DeviceTargetAttr::getSymbolNameFragment() {
 bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
   auto configAttr = getConfiguration();
   return configAttr && configAttr.get(name);
-}
-
-SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
-  SmallVector<ExecutableTargetAttr, 4> resultAttrs;
-  auto configAttr = getConfiguration();
-  if (configAttr) {
-    auto targetsAttr = configAttr.getAs<ArrayAttr>("executable_targets");
-    if (targetsAttr) {
-      for (auto attr : targetsAttr.getValue()) {
-        resultAttrs.push_back(llvm::dyn_cast<ExecutableTargetAttr>(attr));
-      }
-    }
-  }
-  return resultAttrs;
 }
 
 // static

@@ -25,9 +25,7 @@ func.func @simple_pad_and_pack(%input: tensor<5x1xf32>, %output: tensor<1x1x8x2x
 // CHECK-SAME:    %[[PAD_VAL:[A-Za-z0-9]+]]:
 // CHECK:         %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[3, 1]
 // CHECK:           tensor.yield %[[PAD_VAL]]
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<8x2xf32>
-// CHECK:         %[[TRANS:.+]] = linalg.transpose ins(%[[PAD]] : tensor<8x2xf32>) outs(%[[EMPTY:.+]] : tensor<8x2xf32>) permutation = [0, 1]
-// CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[TRANS]] into %[[OUT]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
+// CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[PAD]] into %[[OUT]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
 // CHECK:         return %[[INSERT]]
 
 // -----
@@ -39,9 +37,7 @@ func.func @simple_NC_to_CNnc(%arg0: tensor<32x8xf32>, %arg1: tensor<1x1x32x8xf32
 // CHECK-LABEL: func.func @simple_NC_to_CNnc
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
-// CHECK:         %[[TRANS:.+]] = linalg.transpose ins(%[[IN]] : tensor<32x8xf32>) outs(%[[EMPTY:.+]] : tensor<32x8xf32>) permutation = [0, 1]
-// CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[TRANS]] into %[[OUT]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
+// CHECK:         %[[INSERT:.+]] = tensor.insert_slice %[[IN]] into %[[OUT]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
 // CHECK:         return %[[INSERT]]
 
 // -----
@@ -122,9 +118,7 @@ func.func @simple_unpack_and_extract_slice(%input: tensor<1x1x8x2xf32>, %output:
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
 // CHECK:         %[[TILE:.+]] = tensor.extract_slice %[[IN]][0, 0, 0, 0] [1, 1, 8, 2] [1, 1, 1, 1]
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<8x2xf32>
-// CHECK:         %[[TRANS:.+]] = linalg.transpose ins(%[[TILE]] : tensor<8x2xf32>) outs(%[[EMPTY]] : tensor<8x2xf32>) permutation = [0, 1]
-// CHECK:         %[[RES:.+]] = tensor.extract_slice %[[TRANS]][0, 0] [5, 1] [1, 1]
+// CHECK:         %[[RES:.+]] = tensor.extract_slice %[[TILE]][0, 0] [5, 1] [1, 1]
 // CHECK:         return %[[RES:.+]]
 
 // -----
@@ -137,9 +131,7 @@ func.func @simple_CNnc_to_NC(%arg0: tensor<1x1x32x8xf32>, %arg1: tensor<32x8xf32
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
 // CHECK:         %[[TILE:.+]] = tensor.extract_slice %[[IN]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
-// CHECK:         %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
-// CHECK:         %[[TRANS:.+]] = linalg.transpose ins(%[[TILE]] : tensor<32x8xf32>) outs(%[[EMPTY]] : tensor<32x8xf32>) permutation = [0, 1]
-// CHECK:         return %[[TRANS]]
+// CHECK:         return %[[TILE]]
 
 // -----
 
@@ -206,9 +198,7 @@ func.func @CKck_to_KC(%arg0: tensor<32x4x32x8xf32>, %arg1: tensor<128x256xf32>) 
 // CHECK-DAG:        %[[IN_C:.+]] = affine.apply #[[MAP1]](%[[C]])
 // CHECK:            %[[IN_SLICE:.+]] = tensor.extract_slice %[[IN]][%[[IN_C]], %[[IN_K]], 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
 // CHECK:            %[[TILE:.+]] = tensor.extract_slice %[[IN_SLICE]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1] : tensor<1x1x32x8xf32> to tensor<32x8xf32>
-// CHECK:            %[[EMPTY:.+]] = tensor.empty() : tensor<32x8xf32>
-// CHECK:            %[[TRANS:.+]] = linalg.transpose ins(%[[TILE]] : tensor<32x8xf32>) outs(%[[EMPTY]] : tensor<32x8xf32>) permutation = [0, 1]
-// CHECK:            %[[INSERT:.+]] = tensor.insert_slice %[[TRANS]] into %[[ITER1]][%[[K]], %[[C]]] [32, 8] [1, 1]
+// CHECK:            %[[INSERT:.+]] = tensor.insert_slice %[[TILE]] into %[[ITER1]][%[[K]], %[[C]]] [32, 8] [1, 1]
 // CHECK:            scf.yield %[[INSERT]]
 // CHECK:          }
 // CHECK:          scf.yield %[[RES1]]

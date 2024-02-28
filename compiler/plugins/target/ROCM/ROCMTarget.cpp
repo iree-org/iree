@@ -157,12 +157,15 @@ public:
     // synchronous mode.
     configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getExecutableTarget(context));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
   // Performs optimizations on |module| (including LTO-style whole-program
   // ones). Inspired by code section in
@@ -280,6 +283,16 @@ public:
         subgroupSize = *setSubgroupSize;
       }
 
+      int64_t wavesPerEu = options.wavesPerEu;
+      IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(exportOp);
+      if (auto translationConfig = translationInfo.getConfiguration()) {
+        if (auto attr = dyn_cast_or_null<IntegerAttr>(
+                translationConfig.get("amdgpu-waves-per-eu"))) {
+          wavesPerEu = attr.getValue().getSExtValue();
+        }
+      }
+
       workgroupSizes.push_back(workgroupSize);
       uint32_t workgroupLocalMemory = 0;
       if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
@@ -294,9 +307,8 @@ public:
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
       std::string wgSizeRange = std::string("1, ") + std::to_string(flatWgSize);
       llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
-      if (options.wavesPerEu > 0)
-        llvmFunc->addFnAttr("amdgpu-waves-per-eu",
-                            std::to_string(options.wavesPerEu));
+      if (wavesPerEu > 0)
+        llvmFunc->addFnAttr("amdgpu-waves-per-eu", std::to_string(wavesPerEu));
       if (subTarget.starts_with(GFX9))
         addPreloadKernArgHint(llvmFunc);
     }
@@ -448,14 +460,6 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    targetAttrs.push_back(getExecutableTarget(context));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context) const {
     Builder b(context);
