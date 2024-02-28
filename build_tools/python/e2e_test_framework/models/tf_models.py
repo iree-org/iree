@@ -43,7 +43,7 @@ EFFICIENTNET_V2_S_FP32 = common_definitions.Model(
     tags=["fp32", "cnn", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://github.com/keras-team/keras/blob/v2.10.0/keras/applications/efficientnet_v2.py
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_2023-05-07.timestamp_1683504734j.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/EfficientNetV2STF_1af8c88f4e64e388a0c87bbeddcfb888084059df30cd631340d51794a0796e0f.mlirbc",
     entry_function="forward",
     input_types=["1x384x384x3xf32"],
 )
