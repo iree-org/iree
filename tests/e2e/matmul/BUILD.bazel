@@ -76,6 +76,9 @@ py_binary(
         "--acc_type=%s" % dtype,
         "--shapes=%s" % size,
     ],
+    tags = [
+        "requires-arm-sme",
+    ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
@@ -430,9 +433,8 @@ iree_generated_e2e_matmul_test(
 ###########################################################################
 
 # Testing CDNA3 + matrix core path.
-# v_mfma_f32_16x16x16_f16
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_rocm_f16_large_cdna3_matrixcore",
+    name = "e2e_matmul_rocm_f16_large_cdna3_mfma",
     compiler_flags = [
         "--iree-rocm-target-chip=gfx942",
     ],
@@ -440,6 +442,32 @@ iree_generated_e2e_matmul_test(
     generator_args = [
         "--lhs_rhs_type=f16",
         "--acc_type=f32",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=LLVMGPUVectorDistribute",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "rocm"),
+    ],
+    test_runner = "//tools:iree-e2e-matmul-test",
+)
+
+iree_generated_e2e_matmul_test(
+    name = "e2e_matmul_rocm_f16_large_cdna3_mfma_tb",
+    compiler_flags = [
+        "--iree-rocm-target-chip=gfx942",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--acc_type=f32",
+        "--transpose_rhs",
         "--shapes=gpu_large_aligned",
         "--compilation_info=LLVMGPUVectorDistribute",
     ],

@@ -27,7 +27,15 @@
 
 #target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_khr = []>>
 
-module attributes {hal.device.targets = [#hal.device.target<"vulkan", {executable_targets = [#hal.executable.target<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform], [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>, api=Vulkan, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 64, cooperative_matrix_properties_khr = []>>}>]}>]} {
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"vulkan", [
+      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+        spirv.target_env = #target_env
+      }>
+    ]>
+  ]
+} {
   hal.executable private @example_module_dispatch_0 {
     hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
       hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(

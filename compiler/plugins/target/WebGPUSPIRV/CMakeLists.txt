@@ -26,19 +26,19 @@ add_subdirectory(test)
 
 iree_compiler_register_plugin(
   PLUGIN_ID
-    hal_target_webgpu
+    hal_target_webgpu_spirv
   TARGET
-    ::WebGPU
+    ::WebGPUSPIRV
 )
 
 iree_cc_library(
   NAME
-    WebGPU
+    WebGPUSPIRV
   HDRS
     "SPIRVToWGSL.h"
   SRCS
     "SPIRVToWGSL.cpp"
-    "WebGPUTarget.cpp"
+    "WebGPUSPIRVTarget.cpp"
   DEPS
     LLVMSupport
     MLIRGPUDialect

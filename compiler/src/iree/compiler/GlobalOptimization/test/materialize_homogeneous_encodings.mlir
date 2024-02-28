@@ -5,7 +5,7 @@
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#device_target_llvm_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#executable_target_embedded_elf_x86_64_]}>
+#device_target_llvm_cpu = #hal.device.target<"llvm-cpu", [#executable_target_embedded_elf_x86_64_]>
 module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32
@@ -36,7 +36,7 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
-#device_target_vulkan = #hal.device.target<"vulkan", {executable_targets = [#executable_target_vulkan_spirv_fb]}>
+#device_target_vulkan = #hal.device.target<"vulkan", [#executable_target_vulkan_spirv_fb]>
 module attributes {hal.device.targets = [#device_target_vulkan]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32
@@ -69,9 +69,9 @@ module attributes {hal.device.targets = [#device_target_vulkan]} {
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {target_triple = "x86_64-none-elf", cpu_features = "+avx512f"}>
-#device_target_llvm_cpu = #hal.device.target<"llvm-cpu", {executable_targets = [#executable_target_embedded_elf_x86_64_]}>
+#device_target_llvm_cpu = #hal.device.target<"llvm-cpu", [#executable_target_embedded_elf_x86_64_]>
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb">
-#device_target_vulkan = #hal.device.target<"vulkan", {executable_targets = [#executable_target_vulkan_spirv_fb]}>
+#device_target_vulkan = #hal.device.target<"vulkan", [#executable_target_vulkan_spirv_fb]>
 module attributes {hal.device.targets = [#device_target_vulkan, #device_target_llvm_cpu]} {
   util.func public @lhs_encoding(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %cst = arith.constant 0.000000e+00 : f32

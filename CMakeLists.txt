@@ -385,7 +385,7 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 # Non-default target backends either have additional dependencies or are
 # experimental/niche in some fashion.
 # Disable WebGPU by default - it has complex deps and is under development.
-cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU_SPIRV "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # Compiler Input Dialects

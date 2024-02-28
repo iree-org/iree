@@ -16,11 +16,9 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary (CPU + Vulkan, etc).
-#cpu_target = #hal.device.target<"llvm-cpu", {
-  executable_targets = [
-    #x86_64_target
-  ]
-}>
+#cpu_target = #hal.device.target<"llvm-cpu", [
+  #x86_64_target
+]>
 
 module attributes {transform.with_named_sequence} {
 
