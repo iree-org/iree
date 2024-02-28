@@ -493,17 +493,19 @@ struct FusionOfTensorOpsPass
     // Run fusion of producer with consumer when producer has multiple uses.
     // For now run this sequence a fixed times (2 by default). Ideally we
     // would run it till no candidates exist.
-    for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
-      (void)i;
-      auto &dominanceInfo = getAnalysis<DominanceInfo>();
-      FailureOr<unsigned> numOfFusableCandidates =
-          fuseMultiUseProducers(funcOp, context, dominanceInfo);
-      if (failed(numOfFusableCandidates)) {
-        funcOp->emitError("failed to fuse multi-use producers");
-        return signalPassFailure();
+    if (fuseMultiUse) {
+      for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
+        (void)i;
+        auto &dominanceInfo = getAnalysis<DominanceInfo>();
+        FailureOr<unsigned> numOfFusableCandidates =
+            fuseMultiUseProducers(funcOp, context, dominanceInfo);
+        if (failed(numOfFusableCandidates)) {
+          funcOp->emitError("failed to fuse multi-use producers");
+          return signalPassFailure();
+        }
+        if (numOfFusableCandidates.value() == 0)
+          break;
       }
-      if (numOfFusableCandidates.value() == 0)
-        break;
     }
   }
 };
