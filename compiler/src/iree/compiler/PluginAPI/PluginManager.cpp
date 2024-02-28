@@ -200,6 +200,13 @@ void PluginManagerSession::populateHALTargetBackends(
   }
 }
 
+void PluginManagerSession::configureHALTargetBackends(
+    IREE::HAL::TargetBackendList &list) {
+  for (auto *s : initializedSessions) {
+    s->configureHALTargetBackends(list);
+  }
+}
+
 void PluginManagerSession::populateHALTargetDevices(
     IREE::HAL::TargetDeviceList &list) {
   for (auto *s : initializedSessions) {

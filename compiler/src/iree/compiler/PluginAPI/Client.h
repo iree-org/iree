@@ -184,6 +184,10 @@ public:
   virtual void
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
 
+  // TODO
+  virtual void
+  configureHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
+
   // Populates new HAL target devices, if any, into the given list.
   // Targets will be merged into the plugin session-owned registry.
   virtual void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {}
