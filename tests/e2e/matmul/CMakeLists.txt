@@ -28,6 +28,8 @@ iree_generated_e2e_matmul_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+  LABELS
+    "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )
@@ -50,6 +52,8 @@ iree_generated_e2e_matmul_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+  LABELS
+    "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
     "arm_64:sme:+sve,+sme"
 )

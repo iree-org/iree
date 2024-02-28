@@ -6,5 +6,5 @@ gcr.io/iree-oss/emscripten@sha256:fe9bcd0851243c7b04d577d9e8a663860720484ec932bb
 gcr.io/iree-oss/android@sha256:66bc80fc16e31de0bf64cfcdc65be37a35b7f6c5cd44e89707e35d34da961bb5
 gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418
 gcr.io/iree-oss/nvidia-bleeding-edge@sha256:2eb17e2e8e0d5d25600e667e3b7a71e8d39d9d12a99ec2ad6bdabbc8919db43b
-gcr.io/iree-oss/base-arm64@sha256:942d01a396f81bff06c5ef4643ba3c9f4500a09010cd30d9ed9be691ddaf1353
+gcr.io/iree-oss/base-arm64@sha256:7e101ab7ba20f23b6fba778f18bf2392f616967c716867dd6295358abf506a7b
 gcr.io/iree-oss/riscv-toolchain-builder@sha256:4240a374d35e5ea9037051559aaae4a8b6414ad5872501d4e240baccaacfff11

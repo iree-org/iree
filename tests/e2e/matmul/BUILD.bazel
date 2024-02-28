@@ -76,6 +76,9 @@ py_binary(
         "--acc_type=%s" % dtype,
         "--shapes=%s" % size,
     ],
+    tags = [
+        "requires-arm-sme",
+    ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
     ],
