@@ -274,8 +274,7 @@ public:
         // complex cases.
         int64_t vecRank = vecType.getRank();
         OpBuilder builder(val.getContext());
-        return AffineMap::get(vecRank, 0,
-                              builder.getAffineDimExpr(vecRank - 1));
+        return builder.getMultiDimIdentityMap(vecRank);
       };
 
       RewritePatternSet patterns(ctx);
