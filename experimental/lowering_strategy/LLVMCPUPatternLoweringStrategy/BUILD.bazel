@@ -1,0 +1,31 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "hal_lowering_strategy_llvmcpu_pattern_lowering_strategy",
+    target = ":registration",
+)
+
+iree_compiler_cc_library(
+    name = "registration",
+    srcs = [
+        "LLVMCPUPatternLoweringStrategy.cpp",
+    ],
+    copts = ["-Iexperimental/lowering_strategy/LLVMCPUPatternLoweringStrategy"],
+    deps = [
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "@llvm-project//mlir:IR",
+    ],
+)

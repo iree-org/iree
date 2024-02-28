@@ -149,10 +149,9 @@ public:
   // Types, Attributes).
   virtual void getDependentDialects(DialectRegistry &registry) const {}
 
-  virtual LogicalResult
+  virtual void
   addLoweringStrategy(std::unique_ptr<IREE::HAL::LoweringStrategy> strategy) {
     assert(false && "unimplemented addLoweringStrategy");
-    return failure();
   };
 
   // Inserts passes used to configure the `hal.executable.variant` op contents

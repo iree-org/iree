@@ -35,3 +35,6 @@ endif()
 if(IREE_TARGET_BACKEND_WEBGPU_SPIRV)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPUSPIRV target/WebGPUSPIRV)
 endif()
+
+# TODO: Move this to the right place
+add_subdirectory(${CMAKE_SOURCE_DIR}/experimental/lowering_strategy/LLVMCPUPatternLoweringStrategy lowering_strategy/LLVMCPUPatternLoweringStrategy)

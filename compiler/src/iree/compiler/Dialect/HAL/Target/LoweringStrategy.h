@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LOWERINGSTRATEGY_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LOWERINGSTRATEGY_H_
 
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
 

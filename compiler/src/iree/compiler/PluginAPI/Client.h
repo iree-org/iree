@@ -27,6 +27,7 @@ class OpPassManager;
 // bringing full dependencies into the plugin API.
 namespace mlir::iree_compiler::IREE::HAL {
 class TargetBackendList;
+class TargetRegistry;
 class TargetDeviceList;
 } // namespace mlir::iree_compiler::IREE::HAL
 
@@ -185,8 +186,8 @@ public:
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
 
   // TODO
-  virtual void
-  configureHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
+  virtual void configureHALTargetBackends(IREE::HAL::TargetRegistry &registry) {
+  }
 
   // Populates new HAL target devices, if any, into the given list.
   // Targets will be merged into the plugin session-owned registry.

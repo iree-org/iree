@@ -201,9 +201,9 @@ void PluginManagerSession::populateHALTargetBackends(
 }
 
 void PluginManagerSession::configureHALTargetBackends(
-    IREE::HAL::TargetBackendList &list) {
+    IREE::HAL::TargetRegistry &registry) {
   for (auto *s : initializedSessions) {
-    s->configureHALTargetBackends(list);
+    s->configureHALTargetBackends(registry);
   }
 }
 

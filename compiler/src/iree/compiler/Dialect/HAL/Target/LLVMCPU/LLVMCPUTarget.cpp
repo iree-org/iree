@@ -272,10 +272,9 @@ public:
     // clang-format on
   }
 
-  LogicalResult addLoweringStrategy(
+  void addLoweringStrategy(
       std::unique_ptr<IREE::HAL::LoweringStrategy> strategy) override {
-    loweringStrategies.emplace_back(std::move(strategy));
-    return success();
+    loweringStrategies.push_back(std::move(strategy));
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
