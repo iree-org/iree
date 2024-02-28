@@ -9,11 +9,9 @@
 #include <string.h>
 
 #include "experimental/hip/status_util.h"
-#include "iree/base/assert.h"
+#include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
-#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 //===----------------------------------------------------------------------===//
 // HIP dynamic symbols

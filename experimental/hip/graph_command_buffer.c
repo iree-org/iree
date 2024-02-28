@@ -16,7 +16,6 @@
 #include "experimental/hip/pipeline_layout.h"
 #include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
-#include "iree/base/status.h"
 #include "iree/hal/utils/resource_set.h"
 
 // The maximal number of HIP graph nodes that can run concurrently between
