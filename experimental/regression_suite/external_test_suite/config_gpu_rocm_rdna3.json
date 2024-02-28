@@ -826,5 +826,15 @@
     "test_where_long_example",
 
     // These pass on CPU but fail on ROCm.
+    "test_reduce_l1_default_axes_keepdims_example_expanded",
+    "test_reduce_l1_default_axes_keepdims_random_expanded",
+    "test_reduce_mean_default_axes_keepdims_example",
+    "test_reduce_sum_square_default_axes_keepdims_random_expanded",
+    "test_reduce_mean_default_axes_keepdims_random",
+    "test_reduce_sum_default_axes_keepdims_example",
+    "test_reduce_sum_default_axes_keepdims_random",
+    "test_reduce_sum_empty_axes_input_noop_example",
+    "test_reduce_sum_negative_axes_keepdims_random",
+    "test_reduce_sum_square_default_axes_keepdims_example_expanded"
   ]
 }
