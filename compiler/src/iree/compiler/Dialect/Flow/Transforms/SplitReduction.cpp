@@ -31,49 +31,33 @@ static llvm::cl::list<int64_t> topkSplitReductionRatio(
     llvm::cl::desc("comma separated list of split ratios"),
     llvm::cl::CommaSeparated);
 
+static LogicalResult splitReductionOnMatmul(
+    RewriterBase &rewriter, linalg::MatmulOp op,
+    linalg::ControlSplitReductionFn controlSplitReductionFn) {
+  // Since user information about compilation are passed through attributes we
+  // need to make sure to propagate those.
+  std::vector<std::pair<StringAttr, Attribute>> attributes;
+  ArrayRef<StringRef> odsAttrs = op.getAttributeNames();
+  for (NamedAttribute kv : op->getAttrs()) {
+    if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
+      attributes.push_back(std::make_pair(kv.getName(), kv.getValue()));
+    }
+  }
+
+  FailureOr<linalg::SplitReductionResult> result =
+      linalg::splitReduction(rewriter, op, controlSplitReductionFn);
+  if (failed(result)) {
+    return failure();
+  }
+
+  // If any attributes needs to be propagated set it.
+  for (std::pair<StringAttr, Attribute> &attrib : attributes) {
+    result->splitLinalgOp->setAttr(attrib.first, attrib.second);
+  }
+  return result;
+}
+
 namespace {
-/// Pattern to wrap splitReduction transformation. This also propagates
-/// attributes to allow compilation info attribute to not be lost.
-struct LinalgSplitReduction
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-  LinalgSplitReduction(MLIRContext *context,
-                       linalg::ControlSplitReductionFn controlSplitReductionFn,
-                       LinalgExt::LinalgTransformationFilter f,
-                       PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-        controlSplitReductionFn(controlSplitReductionFn), filter(std::move(f)) {
-  }
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp op,
-                                PatternRewriter &rewriter) const override {
-    std::vector<std::pair<StringAttr, Attribute>> attributes;
-    // Since user information about compilation are passed through attributes we
-    // need to make sure to propagate those.
-    if (auto matmul = dyn_cast<linalg::MatmulOp>(op.getOperation())) {
-      ArrayRef<StringRef> odsAttrs = matmul.getAttributeNames();
-      for (NamedAttribute kv : op->getAttrs()) {
-        if (!llvm::is_contained(odsAttrs, kv.getName().getValue())) {
-          attributes.push_back(std::make_pair(kv.getName(), kv.getValue()));
-        }
-      }
-    }
-
-    FailureOr<linalg::LinalgOp> result = LinalgExt::splitReduction(
-        rewriter, op, controlSplitReductionFn, filter);
-    if (failed(result))
-      return failure();
-    // If any attributes needs to be propagated set it.
-    for (std::pair<StringAttr, Attribute> &attrib : attributes) {
-      result.value()->setAttr(attrib.first, attrib.second);
-    }
-    return result;
-  }
-
-private:
-  linalg::ControlSplitReductionFn controlSplitReductionFn;
-  LinalgExt::LinalgTransformationFilter filter;
-};
-
 struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
@@ -85,22 +69,27 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       return;
     }
 
-    RewritePatternSet patterns(&getContext());
-    patterns.add<LinalgSplitReduction>(
-        &getContext(),
-        [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
-          // For matmul make the new parallel dimension first so that it looks
-          // like a batch_matmul and can follow the same codegen.
-          if (isa<linalg::MatmulOp>(op))
-            return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
-          // Currently disable spliting reduction for non-matmul op. This will
-          // get enabled after once tests are ready.
-          return {int64_t(0), 0, /*innerParallel=*/false};
-        },
-        LinalgExt::LinalgTransformationFilter(
-            ArrayRef<StringAttr>{}, StringAttr::get(&getContext(), "SPLIT")));
+    MLIRContext *context = &getContext();
+    auto funcOp = getOperation();
 
-    LinalgExt::TopkSplitReductionControlFn splitReductionFn =
+    auto matmulSplitReductionControlFn =
+        [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
+      // For matmul make the new parallel dimension first so that it looks
+      // like a batch_matmul and can follow the same codegen.
+      return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
+    };
+
+    SmallVector<linalg::MatmulOp> matmulCandidates;
+    IRRewriter rewriter(context);
+    funcOp->walk([&](linalg::MatmulOp op) { matmulCandidates.push_back(op); });
+    for (auto op : matmulCandidates) {
+      if (failed(splitReductionOnMatmul(rewriter, op,
+                                        matmulSplitReductionControlFn))) {
+        return signalPassFailure();
+      }
+    }
+
+    LinalgExt::TopkSplitReductionControlFn topkSplitReductionControlFn =
         [&](int64_t splitReductionDepth) -> int64_t {
       SmallVector<int64_t> reductionRatios(topkSplitReductionRatio.begin(),
                                            topkSplitReductionRatio.end());
@@ -110,27 +99,12 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
         return reductionRatios[splitReductionDepth];
       }
     };
-    LinalgExt::populateTopkSplitReductionPattern(
-        patterns, splitReductionFn,
-        LinalgExt::LinalgTransformationFilter(
-            ArrayRef<StringAttr>{},
-            StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
 
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+    SmallVector<LinalgExt::TopkOp> topkCandidates;
+    funcOp->walk([&](LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
+    for (auto op : topkCandidates) {
+      (void)splitReduction(rewriter, op, topkSplitReductionControlFn);
     }
-
-    // Remove all the markers at the end.
-    auto funcOp = getOperation();
-    funcOp->walk([&](linalg::LinalgOp op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-    });
-    funcOp->walk([&](LinalgExt::LinalgExtOp op) {
-      op->removeAttr(IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
-      op->removeAttr(
-          mlir::iree_compiler::IREE::LinalgExt::kSplitReductionDepthMarker);
-    });
   }
 };
 
