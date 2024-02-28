@@ -11,6 +11,7 @@
 #include "experimental/hip/status_util.h"
 #include "iree/base/assert.h"
 #include "iree/base/internal/dynamic_library.h"
+#include "iree/base/status.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
@@ -29,17 +30,24 @@ static const char* iree_hal_hip_dylib_names[] = {
 // Resolves all HIP dynamic symbols in `dynamic_symbol_tables.h`
 static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
     iree_hal_hip_dynamic_symbols_t* syms) {
-#define IREE_HIP_PFN_DECL(hip_symbol_name, ...)              \
+#define REQUIRED_IREE_HIP_PFN_DECL(hip_symbol_name, ...)     \
   {                                                          \
     static const char* name = #hip_symbol_name;              \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol( \
         syms->dylib, name, (void**)&syms->hip_symbol_name)); \
   }
-#define IREE_HIP_PFN_STR_DECL(hip_symbol_name, ...) \
-  IREE_HIP_PFN_DECL(hip_symbol_name, ...)
+#define REQUIRED_IREE_HIP_PFN_STR_DECL(hip_symbol_name, ...) \
+  REQUIRED_IREE_HIP_PFN_DECL(hip_symbol_name, ...)
+#define OPTIONAL_IREE_HIP_PFN_DECL(hip_symbol_name, ...)     \
+  {                                                          \
+    static const char* name = #hip_symbol_name;              \
+    IREE_IGNORE_ERROR(iree_dynamic_library_lookup_symbol(    \
+        syms->dylib, name, (void**)&syms->hip_symbol_name)); \
+  }
 #include "experimental/hip/dynamic_symbol_tables.h"  // IWYU pragma: keep
-#undef IREE_HIP_PFN_DECL
-#undef IREE_HIP_PFN_STR_DECL
+#undef REQUIRED_IREE_HIP_PFN_DECL
+#undef REQUIRED_IREE_HIP_PFN_STR_DECL
+#undef OPTIONAL_IREE_HIP_PFN_DECL
   return iree_ok_status();
 }
 
