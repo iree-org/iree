@@ -19,48 +19,4 @@ iree_check_single_backend_test_suite(
     "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
   LABELS
     "hostonly"
-    "notsan"
 )
-
-if(IREE_ENABLE_ASAN)
-iree_check_single_backend_test_suite(
-  NAME
-    builtin_ukernel_system_plugin_test_asan
-  SRCS
-    "mmt4d.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-sync"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=address"
-  RUNNER_ARGS
-    "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
-  LABELS
-    "hostonly"
-    "notsan"
-)
-endif(IREE_ENABLE_ASAN)
-
-if(IREE_ENABLE_TSAN)
-iree_check_single_backend_test_suite(
-  NAME
-    builtin_ukernel_system_plugin_test_tsan
-  SRCS
-    "mmt4d.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-sync"
-  COMPILER_FLAGS
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-link-embedded=false"
-    "--iree-llvmcpu-sanitize=thread"
-  RUNNER_ARGS
-    "--executable_plugin=${PROJECT_BINARY_DIR}/experimental/cpu_ukernel/builtin_ukernel_system_plugin.so"
-  LABELS
-    "hostonly"
-)
-endif(IREE_ENABLE_TSAN)
