@@ -10,6 +10,7 @@
 #include "experimental/hip/status_util.h"
 #include "experimental/hip/timepoint_pool.h"
 #include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/wait_handle.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_hip_semaphore_t {
@@ -300,7 +301,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     return iree_ok_status();
   }
 
-  // Slow path: acquire a timepoint. This should happen outside of the lock to
+  // Slow path: acquire a timepoint. This should happen outside of the lock too
   // given that acquiring has its own internal locks.
   iree_hal_hip_timepoint_t* timepoint = NULL;
   iree_status_t status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
@@ -318,6 +319,97 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint->base);
   }
   iree_hal_hip_timepoint_pool_release(semaphore->timepoint_pool, 1, &timepoint);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+iree_status_t iree_hal_hip_semaphore_multi_wait(
+    const iree_hal_semaphore_list_t semaphore_list,
+    iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
+    iree_arena_block_pool_t* block_pool) {
+  if (semaphore_list.count == 0) return iree_ok_status();
+
+  if (semaphore_list.count == 1) {
+    // Fast-path for a single semaphore.
+    return iree_hal_semaphore_wait(semaphore_list.semaphores[0],
+                                   semaphore_list.payload_values[0], timeout);
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
+
+  // Avoid heap allocations by using the device block pool for the wait set.
+  iree_arena_allocator_t arena;
+  iree_arena_initialize(block_pool, &arena);
+  iree_wait_set_t* wait_set = NULL;
+  iree_status_t status = iree_wait_set_allocate(
+      semaphore_list.count, iree_arena_allocator(&arena), &wait_set);
+
+  // Acquire a wait handle for each semaphore timepoint we are to wait on.
+  iree_host_size_t timepoint_count = 0;
+  iree_hal_hip_timepoint_t** timepoints = NULL;
+  iree_host_size_t total_timepoint_size =
+      semaphore_list.count * sizeof(timepoints[0]);
+  bool needs_wait = true;
+  status =
+      iree_arena_allocate(&arena, total_timepoint_size, (void**)&timepoints);
+  if (iree_status_is_ok(status)) {
+    memset(timepoints, 0, total_timepoint_size);
+    for (iree_host_size_t i = 0; i < semaphore_list.count && needs_wait; ++i) {
+      uint64_t current_value = 0;
+      status = iree_hal_hip_semaphore_query(semaphore_list.semaphores[i],
+                                            &current_value);
+      if (!iree_status_is_ok(status)) break;
+
+      if (current_value >= semaphore_list.payload_values[i]) {
+        // Fast path: already satisfied.
+        // If in ANY wait mode, this is sufficient and we don't actually need
+        // to wait. This also skips acquiring timepoints for any remaining
+        // semaphores. We still exit normally otherwise so as to cleanup
+        // any timepoints already acquired.
+        if (wait_mode == IREE_HAL_WAIT_MODE_ANY) needs_wait = false;
+      } else {
+        iree_hal_hip_semaphore_t* semaphore =
+            iree_hal_hip_semaphore_cast(semaphore_list.semaphores[i]);
+
+        // Slow path: get a native wait handle for the timepoint. This should
+        // happen outside of the lock given that acquiring has its own internal
+        // locks.
+        iree_hal_hip_timepoint_t* timepoint = NULL;
+        status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
+            semaphore, semaphore_list.payload_values[i], timeout, &timepoint);
+        if (iree_status_is_ok(status)) {
+          timepoints[timepoint_count++] = timepoint;
+          status =
+              iree_wait_set_insert(wait_set, timepoint->timepoint.host_wait);
+        }
+        if (!iree_status_is_ok(status)) break;
+      }
+    }
+  }
+
+  // Perform the wait.
+  if (iree_status_is_ok(status) && needs_wait) {
+    if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
+      status = iree_wait_any(wait_set, deadline_ns, /*out_wake_handle=*/NULL);
+    } else {
+      status = iree_wait_all(wait_set, deadline_ns);
+    }
+  }
+
+  for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
+    iree_hal_hip_timepoint_t* timepoint = timepoints[i];
+    iree_hal_semaphore_t* semaphore = timepoint->base.semaphore;
+    // Cancel if this is still an unresolved host wait.
+    if (semaphore) {
+      iree_hal_semaphore_cancel_timepoint(semaphore, &timepoint->base);
+    }
+    iree_hal_hip_timepoint_pool_release(timepoint->pool, 1, &timepoint);
+  }
+  iree_wait_set_free(wait_set);
+  iree_arena_deinitialize(&arena);
+
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

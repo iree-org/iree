@@ -49,6 +49,14 @@ iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
     hipEvent_t* out_event);
 
+// Performs a multi-wait on one or more semaphores.
+// Returns IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before
+// |deadline_ns| elapses.
+iree_status_t iree_hal_hip_semaphore_multi_wait(
+    const iree_hal_semaphore_list_t semaphore_list,
+    iree_hal_wait_mode_t wait_mode, iree_timeout_t timeout,
+    iree_arena_block_pool_t* block_pool);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

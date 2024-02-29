@@ -790,8 +790,9 @@ static iree_status_t iree_hal_cuda_device_queue_flush(
 static iree_status_t iree_hal_cuda_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t semaphore_list, iree_timeout_t timeout) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "waiting multiple semaphores not yet implemented");
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return iree_hal_cuda_semaphore_multi_wait(semaphore_list, wait_mode, timeout,
+                                            &device->block_pool);
 }
 
 static iree_status_t iree_hal_cuda_device_profiling_begin(
