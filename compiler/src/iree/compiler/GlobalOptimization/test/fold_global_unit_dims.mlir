@@ -49,3 +49,21 @@ module @no_fold_immutable {
 //      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<1x32x1x1x64xf32>
 //      CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[LOAD]]
 //      CHECK:     util.return %[[COLLAPSE]]
+
+// -----
+
+module @no_fold_public {
+  util.global public @global : tensor<1x32x1x1x64xf32>
+  util.func public @no_fold_global_unit_dims() -> tensor<32x64xf32> {
+    %global = util.global.load @global : tensor<1x32x1x1x64xf32>
+    %collapsed = tensor.collapse_shape %global [[0, 1], [2, 3, 4]] : tensor<1x32x1x1x64xf32> into tensor<32x64xf32>
+    util.return %collapsed : tensor<32x64xf32>
+  }
+}
+
+//      CHECK: module @no_fold_public
+//      CHECK:   util.global public @[[GLOBAL:.+]] : tensor<1x32x1x1x64xf32>
+//      CHECK:   util.func public @no_fold_global_unit_dims
+//      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<1x32x1x1x64xf32>
+//      CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[LOAD]]
+//      CHECK:     util.return %[[COLLAPSE]]
