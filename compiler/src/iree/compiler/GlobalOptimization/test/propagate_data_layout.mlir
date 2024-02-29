@@ -22,7 +22,7 @@ module @pack_propagation {
 // //       CHECK:   util.func public @pack_across_globals
 // //  CHECK-SAME:     %[[ARG0:.+]]: tensor<32x1x64x1x2xf32>
 // //   CHECK-DAG:     %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
-// //       CHECK:     %[[PACKED_STATE:.+]] = util.global.load @[[PACKED_GLOBAL]] : tensor<32x16x64x16x2xf32>
+// //       CHECK:     %[[PACKED_STATE:.+]] = util.global.load @[[PACKED_GLOBAL]]{{.+}} : tensor<32x16x64x16x2xf32>
 // //       CHECK:     %[[EMPTY:.+]] = tensor.empty() : tensor<32x1x16x1x16xf32>
 // //       CHECK:     %[[MMT4D_DST:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<32x1x16x1x16xf32>) -> tensor<32x1x16x1x16xf32>
 // //       CHECK:     %[[MMT4D:.+]] = linalg.batch_mmt4d ins(%[[ARG0]], %[[PACKED_STATE]] : tensor<32x1x64x1x2xf32>, tensor<32x16x64x16x2xf32>) outs(%[[MMT4D_DST]] : tensor<32x1x16x1x16xf32>) -> tensor<32x1x16x1x16xf32>

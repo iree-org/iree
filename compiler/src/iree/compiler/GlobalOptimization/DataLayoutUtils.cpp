@@ -5,47 +5,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/GlobalOptimization/DataLayoutUtils.h"
-#include <cstdint>
-#include <optional>
-#include <string>
-#include <type_traits>
-
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/Sequence.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/BuiltinAttributeInterfaces.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/Operation.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/SymbolTable.h"
-#include "mlir/IR/Value.h"
-#include "mlir/IR/ValueRange.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Interfaces/DataLayoutInterfaces.h"
-#include "mlir/Interfaces/DestinationStyleOpInterface.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
 
 #define DEBUG_TYPE "iree-global-opt-propagate-data-layout"
 
@@ -53,7 +18,6 @@ static const char kDataLayoutNodeTypeAttr[] = "__node_type__";
 static const char kFoldablePackUnPack[] = "__foldable_pack_unpack__";
 
 namespace mlir::iree_compiler::GlobalOptimization {
-using iree_compiler::IREE::Util::GlobalOp;
 
 template <typename T>
 static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
@@ -152,6 +116,11 @@ ArrayAttr DataLayoutTransformation::makeTransformArrayAttr(MLIRContext *ctx) {
 /// TODO: Replace this trivially conservative placeholder implementation.
 bool DataLayoutTransformation::isIntersecting(DataLayoutTransformation other) {
   return true;
+}
+
+bool DataLayoutTransformation::isIdentity() {
+  return outerDimsPerm.empty() && innerDimsPos.empty() &&
+         innerTileSizes.empty();
 }
 
 //===----------------------------------------------------------------------===//
@@ -324,31 +293,46 @@ DataLayoutNodeType getNodeTypeForValue(Value value) {
 // Pass helpers
 //===----------------------------------------------------------------------===//
 
-LogicalResult transformGlobalsToNewLayout(IRRewriter &rewriter,
-                                          SmallVector<Value> edgeNodes,
-                                          DataLayoutTransformation *transform,
-                                          GlobalOp global,
-                                          SymbolTable moduleSymbols) {
-  // Create a new transformed GlobalOp.
-  std::string newGlobalName(global.getGlobalName().str());
-  newGlobalName.append(".packed");
+LogicalResult
+transformGlobalsToNewLayout(IRRewriter &rewriter, SmallVector<Value> edgeNodes,
+                            DataLayoutTransformation *transform,
+                            const Explorer::GlobalInfo *globalInfo,
+                            SymbolTable moduleSymbols) {
+  auto global = globalInfo->op;
   auto transformedType = transform->getTransformedType();
   auto originalType = transform->getOriginalType();
   std::optional<TypedAttr> transformedInitialValue = std::nullopt;
-  if (auto initialValue = global.getInitialValue()) {
-    if (auto uninitializedAttr =
-            dyn_cast<IREE::Util::UninitializedAttr>(initialValue.value())) {
-      transformedInitialValue = IREE::Util::UninitializedAttr::get(
-          rewriter.getContext(), transformedType);
-    } else {
-      return failure();
-    }
+  if (auto uninitializedAttr =
+          llvm::dyn_cast_or_null<IREE::Util::UninitializedAttr>(
+              global.getGlobalInitialValue())) {
+    transformedInitialValue = IREE::Util::UninitializedAttr::get(
+        rewriter.getContext(), transformedType);
+  } else if (global.getGlobalInitialValue()) {
+    return success();
   }
+  // Ensure that all loads and stores are found in `edgeNodes`.
+  SetVector<Value> edgeSet;
+  edgeSet.insert(edgeNodes.begin(), edgeNodes.end());
+  for (auto load : globalInfo->getLoads()) {
+    if (!edgeSet.contains(load.getLoadedGlobalValue()))
+      return failure();
+  }
+  for (auto store : globalInfo->getStores()) {
+    if (!edgeSet.contains(store.getStoredGlobalValue()))
+      return failure();
+  }
+
+  // Create a new transformed GlobalOp.
   rewriter.setInsertionPoint(global);
-  auto newGlobal = rewriter.create<GlobalOp>(
-      global->getLoc(), StringRef(newGlobalName), global.getIsMutable(),
-      transformedType, transformedInitialValue);
-  newGlobal.setInliningPolicyAttr(global.getInliningPolicyAttr());
+  auto newGlobalOp = rewriter.create(
+      global->getLoc(), global->getName().getIdentifier(),
+      global->getOperands(), global->getResultTypes(), global->getAttrs());
+  auto newGlobal = cast<IREE::Util::GlobalOpInterface>(newGlobalOp);
+  newGlobal.setGlobalType(transformedType);
+  newGlobal.setGlobalInliningPolicy(global.getGlobalInliningPolicy());
+  newGlobal.setGlobalMutable(global.isGlobalMutable());
+  if (transformedInitialValue.has_value())
+    newGlobal.setGlobalInitialValue(transformedInitialValue.value());
   moduleSymbols.insert(newGlobal);
   SymbolTable::setSymbolVisibility(newGlobal,
                                    SymbolTable::getSymbolVisibility(global));
@@ -374,7 +358,7 @@ LogicalResult transformGlobalsToNewLayout(IRRewriter &rewriter,
   auto splatOp = initializerBuilder.create<IREE::Flow::TensorSplatOp>(
       globalLoc, transformedType, padValue, /*result_dims=*/ValueRange{});
   initializerBuilder.create<IREE::Util::GlobalStoreOp>(
-      globalLoc, splatOp.getResult(), newGlobal.getName());
+      globalLoc, splatOp.getResult(), newGlobal.getGlobalName());
   initializerBuilder.create<IREE::Util::ReturnOp>(globalLoc);
 
   // Rewrite loads and stores to use the new global.
@@ -383,40 +367,50 @@ LogicalResult transformGlobalsToNewLayout(IRRewriter &rewriter,
     innerTilesOfr.push_back(rewriter.getIndexAttr(tile));
   }
   for (auto node : edgeNodes) {
-    if (llvm::any_of(node.getUsers(), [](Operation *user) {
-          return isa<IREE::Util::GlobalStoreOp>(user);
-        })) {
-      rewriter.setInsertionPointAfterValue(node);
-      auto dest = rewriter.create<tensor::EmptyOp>(
-          node.getLoc(), transformedType.getShape(),
-          transformedType.getElementType());
-      Value nodePadValue =
-          rewriter.create<arith::ConstantOp>(node.getLoc(), constPadAttr);
-      auto pack = rewriter.create<tensor::PackOp>(
-          node.getLoc(), node, dest, transform->getInnerDimsPos(),
-          innerTilesOfr, /*padding_value=*/nodePadValue,
-          transform->getOuterDimsPerm());
-      setFoldablePackUnPackAttribute(pack);
-      for (auto user : node.getUsers()) {
-        if (isa<IREE::Util::GlobalStoreOp>(user)) {
-          rewriter.create<IREE::Util::GlobalStoreOp>(
-              user->getLoc(), pack.getResult(), newGlobal);
-          rewriter.eraseOp(user);
-        }
+    for (auto user : node.getUsers()) {
+      if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(user)) {
+        if (!store.getGlobalName().equals(global.getGlobalName()))
+          continue;
+        rewriter.setInsertionPointAfterValue(node);
+        auto dest = rewriter.create<tensor::EmptyOp>(
+            node.getLoc(), transformedType.getShape(),
+            transformedType.getElementType());
+        Value nodePadValue =
+            rewriter.create<arith::ConstantOp>(node.getLoc(), constPadAttr);
+        auto pack = rewriter.create<tensor::PackOp>(
+            node.getLoc(), node, dest, transform->getInnerDimsPos(),
+            innerTilesOfr, /*padding_value=*/nodePadValue,
+            transform->getOuterDimsPerm());
+        setFoldablePackUnPackAttribute(pack);
+        auto newOp = rewriter.create(
+            store->getLoc(), store->getName().getIdentifier(),
+            store->getOperands(), store->getResultTypes(), store->getAttrs());
+        auto newStore = dyn_cast<IREE::Util::GlobalStoreOpInterface>(newOp);
+        newStore.setGlobalAttr(
+            FlatSymbolRefAttr::get(newGlobal.getGlobalName()));
+        newStore.setStoredGlobalValue(pack.getResult());
+        rewriter.eraseOp(user);
       }
     }
-    if (auto loadOp = node.getDefiningOp<IREE::Util::GlobalLoadOp>()) {
-      rewriter.setInsertionPoint(loadOp);
-      auto newLoad = rewriter.create<IREE::Util::GlobalLoadOp>(loadOp->getLoc(),
-                                                               newGlobal);
+    if (auto load = node.getDefiningOp<IREE::Util::GlobalLoadOpInterface>()) {
+      if (!load.getGlobalName().equals(global.getGlobalName()))
+        continue;
+      rewriter.setInsertionPoint(load);
+      auto newOp = rewriter.create(
+          load->getLoc(), load->getName().getIdentifier(), load->getOperands(),
+          {transformedType}, load->getAttrs());
+      auto newLoad = dyn_cast<IREE::Util::GlobalLoadOpInterface>(newOp);
+      newLoad.setGlobalAttr(FlatSymbolRefAttr::get(newGlobal.getGlobalName()));
+      newLoad.setGlobalImmutable(load.isGlobalImmutable());
       auto dest = rewriter.create<tensor::EmptyOp>(
-          loadOp->getLoc(), originalType.getShape(),
+          load->getLoc(), originalType.getShape(),
           originalType.getElementType());
       auto unpack = rewriter.create<tensor::UnPackOp>(
-          loadOp.getLoc(), newLoad, dest, transform->getInnerDimsPos(),
-          innerTilesOfr, transform->getOuterDimsPerm());
+          load.getLoc(), newLoad.getLoadedGlobalValue(), dest,
+          transform->getInnerDimsPos(), innerTilesOfr,
+          transform->getOuterDimsPerm());
       setFoldablePackUnPackAttribute(unpack);
-      rewriter.replaceOp(loadOp, unpack.getResult());
+      rewriter.replaceOp(load, unpack.getResult());
     }
   }
   return success();

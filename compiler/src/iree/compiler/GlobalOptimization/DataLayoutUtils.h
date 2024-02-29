@@ -6,22 +6,7 @@
 #ifndef IREE_GLOBALOPTIMIZATION_DATALAYOUTUTILS_H_
 #define IREE_GLOBALOPTIMIZATION_DATALAYOUTUTILS_H_
 
-#include <optional>
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "llvm/ADT/StringRef.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Interfaces/DataLayoutInterfaces.h"
-#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 class Location;
@@ -101,6 +86,9 @@ public:
   /// the transformed indices of the other transformation.
   bool isIntersecting(DataLayoutTransformation other);
 
+  /// Return true if this transform is an identity transformation.
+  bool isIdentity();
+
   /// Create an ArrayAttr containing transformation information for debugging.
   ArrayAttr makeTransformArrayAttr(MLIRContext *ctx);
 
@@ -155,11 +143,11 @@ SmallVector<StringRef> getTerminalNodeIDs(Value value);
 /// of the `global`, passed in `edgeNodes` as the results or inputs to the
 /// load/store ops. Also, create an initializer to fill the new packed global
 /// with the padding value of the pack in the `transform`.
-LogicalResult transformGlobalsToNewLayout(IRRewriter &rewriter,
-                                          SmallVector<Value> edgeNodes,
-                                          DataLayoutTransformation *transform,
-                                          IREE::Util::GlobalOp global,
-                                          SymbolTable moduleSymbols);
+LogicalResult
+transformGlobalsToNewLayout(IRRewriter &rewriter, SmallVector<Value> edgeNodes,
+                            DataLayoutTransformation *transform,
+                            const Explorer::GlobalInfo *globalInfo,
+                            SymbolTable moduleSymbols);
 
 //===----------------------------------------------------------------------===//
 // Attribute helpers

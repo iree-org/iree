@@ -11,51 +11,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include <optional>
-#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/Dialect/Util/Analysis/DFX/DepGraph.h"
-#include "iree/compiler/Dialect/Util/Analysis/DFX/Element.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
-#include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
-#include "iree/compiler/Dialect/Util/Analysis/Position.h"
-#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/GlobalOptimization/DataLayoutUtils.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SuffixTreeNode.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
-#include "mlir/Dialect/Utils/StaticValueUtils.h"
-#include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/BuiltinTypeInterfaces.h"
-#include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Threading.h"
-#include "mlir/IR/Value.h"
-#include "mlir/IR/Visitors.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Support/LLVM.h"
-#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-global-opt-propagate-data-layout"
@@ -274,35 +239,20 @@ public:
     explorer.setOpAction<IREE::Util::FuncOp>(TraversalAction::RECURSE);
     explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
     explorer.initialize();
-
-    for (auto globalOp : rootOp.getOps<IREE::Util::GlobalOp>()) {
-      auto initialVal = globalOp.getInitialValue();
-      bool isUninitialized =
-          (!initialVal.has_value() ||
-           isa<IREE::Util::UninitializedAttr>(initialVal.value()));
-      if (globalOp.getIsMutable() && isa<ShapedType>(globalOp.getType()) &&
-          isUninitialized) {
-        LLVM_DEBUG({ llvm::dbgs() << "adding global: " << globalOp << "\n"; });
-        globals.insert(std::make_pair(globalOp.getGlobalName(), globalOp));
-      }
-    }
   }
 
   SmallVector<Value> getGlobalLayoutEndpoints() {
     SmallVector<Value> endpoints;
-    auto walkFn = [&](Operation *op) -> WalkResult {
-      if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-        if (globals.contains(loadOp.getGlobal())) {
-          endpoints.push_back(op->getResult(0));
-        }
-      } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(op)) {
-        if (globals.contains(storeOp.getGlobal())) {
-          endpoints.push_back(op->getOperand(0));
-        }
-      }
-      return WalkResult::advance();
-    };
-    explorer.walk(walkFn);
+    explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
+      auto global = globalInfo->op;
+      auto tensorType = dyn_cast<RankedTensorType>(global.getGlobalType());
+      if (!tensorType || !global.isGlobalMutable() || !global.isGlobalPrivate())
+        return;
+      for (auto load : globalInfo->getLoads())
+        endpoints.push_back(load.getLoadedGlobalValue());
+      for (auto store : globalInfo->getStores())
+        endpoints.push_back(store.getStoredGlobalValue());
+    });
     return endpoints;
   }
 
@@ -326,12 +276,6 @@ public:
       auto definingOp = node->getValue().getDefiningOp();
       if (llvm::isa_and_nonnull<tensor::EmptyOp>(definingOp)) {
         continue;
-      }
-      if (auto loadOp =
-              llvm::dyn_cast_or_null<IREE::Util::GlobalLoadOpInterface>(
-                  definingOp)) {
-        if (loadOp.getGlobalName().equals(layoutID))
-          continue;
       }
       DataLayoutTransformation *costNodeTf =
           node->getState().getDataLayoutTransformation(layoutID);
@@ -407,24 +351,26 @@ public:
       return failure();
     }
 
-    SetVector<Value> bestTransformedValues;
+    SetVector<Value> bestTransformedValues =
+        getTransformedValues(bestTf, costNodes, layoutID);
     for (auto tf : barrierTransforms) {
       SetVector<Value> transformedValues =
           getTransformedValues(tf, costNodes, layoutID);
       // Assume the cost of layout transformations are simple element-wise
       // operations, so the cost of the transformations are proportional to the
       // combined total number of elements in the set of transformed tensors.
-      if (!bestTf ||
-          hasMoreTotalElements(transformedValues, bestTransformedValues)) {
+      if (hasMoreTotalElements(transformedValues, bestTransformedValues)) {
         bestTf = tf;
         bestTransformedValues = transformedValues;
       }
     }
-    transform = bestTf;
     LLVM_DEBUG({
       llvm::dbgs() << "layoutID: " << layoutID << "\n";
       llvm::dbgs() << "best tf: " << *bestTf << "\n\n";
     });
+    if (bestTf->isIdentity())
+      return failure();
+    transform = bestTf;
     return success();
   }
 
@@ -442,19 +388,21 @@ public:
         GlobalDataLayoutState state = elementPtr->getState();
         // Only support subgraphs with a single layout ID for now
         auto stateLayoutIDs = state.getLayoutIDs();
-        if (stateLayoutIDs.size() == 1) {
-          if (subgraphMap.count(stateLayoutIDs[0])) {
-            subgraphMap[stateLayoutIDs[0]].insert(elementPtr);
-          } else {
-            SetVector<GlobalDataLayoutValueElement *> s;
-            s.insert(elementPtr);
-            subgraphMap.insert(std::make_pair(stateLayoutIDs[0], s));
-          }
+        if (stateLayoutIDs.size() != 1)
+          return WalkResult::advance();
+        if (subgraphMap.count(stateLayoutIDs[0])) {
+          subgraphMap[stateLayoutIDs[0]].insert(elementPtr);
+        } else {
+          SetVector<GlobalDataLayoutValueElement *> s;
+          s.insert(elementPtr);
+          subgraphMap.insert(std::make_pair(stateLayoutIDs[0], s));
         }
       }
       return WalkResult::advance();
     };
-    explorer.walkValues(walkFn);
+    if (explorer.walkValues(walkFn) == TraversalResult::INCOMPLETE) {
+      return failure();
+    }
 
     // For each subgraph, compute the optimal layout and endpoint nodes
     for (auto [layoutID, valueElems] : subgraphMap) {
@@ -494,13 +442,14 @@ public:
     explorer.walkValues(walkFn);
   }
 
-  DenseMap<StringRef, IREE::Util::GlobalOp> getGlobals() { return globals; }
+  const Explorer::GlobalInfo *getGlobalInfo(StringRef layoutID) {
+    return explorer.queryGlobalInfoFrom(layoutID, explorer.getRootOp());
+  }
 
 private:
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
-  DenseMap<StringRef, IREE::Util::GlobalOp> globals;
 };
 
 void GlobalDataLayoutValueElement::initializeValue(Value value,
@@ -702,14 +651,11 @@ void PropagateDataLayoutPass::runOnOperation() {
     {
       SymbolTable moduleSymbols(moduleOp);
       IRRewriter rewriter(&getContext());
-      DenseMap<StringRef, IREE::Util::GlobalOp> globals = analysis.getGlobals();
       for (auto [idx, layoutID] : llvm::enumerate(layoutIDs)) {
-        if (globals.count(layoutID)) {
-          if (failed(transformGlobalsToNewLayout(
-                  rewriter, edgeNodes[idx], transforms[idx], globals[layoutID],
-                  moduleSymbols))) {
-            return signalPassFailure();
-          }
+        if (failed(transformGlobalsToNewLayout(
+                rewriter, edgeNodes[idx], transforms[idx],
+                analysis.getGlobalInfo(layoutID), moduleSymbols))) {
+          return signalPassFailure();
         }
       }
     }
