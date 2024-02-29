@@ -34,6 +34,8 @@ public:
   explicit DeviceAnalysis(Operation *rootOp);
   ~DeviceAnalysis();
 
+  Explorer &getExplorer() { return explorer; }
+
   // Runs analysis and populates the device traits map.
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
   LogicalResult run();
