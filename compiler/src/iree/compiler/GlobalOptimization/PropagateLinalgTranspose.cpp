@@ -18,6 +18,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -42,8 +43,8 @@ static bool isIdentityPermutation(ArrayRef<int64_t> perm) {
 }
 
 // Constructs a transpose of the given tensor and permutation.
-static Value createTranspose(OpBuilder &builder, Value source,
-                             ArrayRef<int64_t> perm) {
+static Value createTransposeInit(OpBuilder &builder, Value source,
+                                 ArrayRef<int64_t> perm) {
   SmallVector<OpFoldResult> mixedSizes =
       tensor::getMixedSizes(builder, source.getLoc(), source);
   applyPermutationToVector(mixedSizes, perm);
@@ -51,6 +52,13 @@ static Value createTranspose(OpBuilder &builder, Value source,
   Value empty =
       builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
           .getResult();
+  return empty;
+}
+
+// Constructs a transpose of the given tensor and permutation.
+static Value createTranspose(OpBuilder &builder, Value source,
+                             ArrayRef<int64_t> perm) {
+  Value empty = createTransposeInit(builder, source, perm);
   return builder
       .create<linalg::TransposeOp>(source.getLoc(), source, empty, perm)
       ->getResult(0);
@@ -377,6 +385,63 @@ public:
   }
 };
 
+// Propagates a transpose through the input of a unary elementwise operation.
+class PropagateTransposeThroughUnaryElementwiseInput
+    : public OpRewritePattern<linalg::GenericOp> {
+public:
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+      return failure();
+    }
+
+    if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInputs() != 1 ||
+        !linalg::isElementwise(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp, "not unary elementwise");
+    }
+
+    OpOperand *input = genericOp.getDpsInputOperand(0);
+    OpOperand *init = genericOp.getDpsInitOperand(0);
+
+    // Skip transposes and broadcasts. Transposes make more sense to fuse
+    // rather than propagate through, and broadcasts are cheaper to transpose
+    // before broadcasting.
+    if (genericOp.getMatchingIndexingMap(input) !=
+        genericOp.getMatchingIndexingMap(init)) {
+      return failure();
+    }
+
+    linalg::TransposeOp transposeOp =
+        input->get().getDefiningOp<linalg::TransposeOp>();
+    if (!transposeOp) {
+      return rewriter.notifyMatchFailure(genericOp, "no transpose operand");
+    }
+
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
+    auto invPerm = invertPermutationVector(perm);
+
+    // Create a new empty init for the transposed generic.
+    Value newInit = createTransposeInit(rewriter, init->get(), invPerm);
+
+    // We do not need to update indexing maps because this is a unary
+    // elementwise op where the input and output maps are the same. Just
+    // replace the operands with transposed variants.
+    auto newGenericOp = rewriter.create<linalg::GenericOp>(
+        genericOp.getLoc(), newInit.getType(), transposeOp.getInput(), newInit,
+        genericOp.getIndexingMapsArray(), genericOp.getIteratorTypesArray(),
+        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+    rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
+                               newGenericOp.getRegion().begin());
+
+    Value newResult =
+        createTranspose(rewriter, newGenericOp->getResult(0), perm);
+    rewriter.replaceOp(genericOp, newResult);
+    return success();
+  }
+};
+
 // Sinks a transpose to the input of a linalg named op. The conditions for the
 // rewrite are
 //   1) One of the input producers to the named op is a linalg.transpose
@@ -563,6 +628,8 @@ void PropagateLinalgTransposePass::runOnOperation() {
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     sinkingPatterns.insert<FuseTransposeWithGenericConsumer>(context);
+    sinkingPatterns.add<PropagateTransposeThroughUnaryElementwiseInput>(
+        context, /*benefit=*/2);
     if (enableAggressivePropagation) {
       sinkingPatterns.insert<GeneralizeInputTransposedNamedOp>(context);
     }

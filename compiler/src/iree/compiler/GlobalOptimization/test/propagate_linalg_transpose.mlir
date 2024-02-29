@@ -264,3 +264,29 @@ util.func public @sink_non_involution_through_expand_shape(%arg0 : tensor<2x3x4x
 //  SINK-SAME:                    outs({{.*}} : tensor<1x3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 3, 0]
 //       SINK:   util.return %[[RES]] : tensor<1x3x4x2xf32>
+
+// -----
+
+util.func public @propagate_transpose_through_unary_elementwise(%arg0 : tensor<2x3x4xf32>) -> tensor<3x4x2xf32> {
+  %empty = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%arg0 : tensor<2x3x4xf32>)
+      outs(%empty : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%transposed : tensor<3x4x2xf32>)
+                outs(%empty : tensor<3x4x2xf32>) {
+                  ^bb0(%in: f32, %out: f32):
+                    %sqrt = math.rsqrt %in : f32
+                    linalg.yield %sqrt : f32
+                  } -> tensor<3x4x2xf32>
+  util.return %0 : tensor<3x4x2xf32>
+}
+// SINK-LABEL: util.func public @propagate_transpose_through_unary_elementwise
+//       SINK:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%{{.*}} : tensor<2x3x4xf32>
+//       SINK:     math.rsqrt
+//       SINK:   %[[RES:.+]] = linalg.transpose ins(%[[ELEM]] : tensor<2x3x4xf32>
+//  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  SINK-SAME:                    permutation = [1, 2, 0]
+//       SINK:   util.return %[[RES]] : tensor<3x4x2xf32>
