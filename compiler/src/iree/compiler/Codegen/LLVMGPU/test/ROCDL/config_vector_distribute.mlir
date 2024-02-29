@@ -167,7 +167,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
-// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2
+// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

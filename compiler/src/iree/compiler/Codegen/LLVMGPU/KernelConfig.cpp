@@ -522,7 +522,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   } else {
     seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
              /*bestMNTileCountPerSubgroup=*/8,
-             /*bestKTileCountPerSubgroup=*/2};
+             /*bestKTileCountPerSubgroup=*/4};
   }
 
   // First try to find a schedule with an exactly matching intrinsic.
