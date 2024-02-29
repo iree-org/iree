@@ -13,7 +13,6 @@
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
-#include "iree/base/internal/atomics_clang.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/hal/api.h"
