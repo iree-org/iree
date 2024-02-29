@@ -15,7 +15,7 @@ func.func @gather(%operand : tensor<1x4x8xi32>, %start_indices : tensor<1x8x2xi3
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 1, 8]> : tensor<3xi64>,
+    slice_sizes = array<i64: 1, 1, 8>,
     someattr
   } : (tensor<1x4x8xi32>, tensor<1x8x2xi32>) -> tensor<1x8x8xi32>
   func.return %res : tensor<1x8x8xi32>
@@ -60,7 +60,7 @@ func.func @gather_unsigned_index(
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 1, 8]> : tensor<3xi64>,
+    slice_sizes = array<i64: 1, 1, 8>,
     someattr
   } : (tensor<1x4x8xi32>, tensor<1x8x2xui32>) -> tensor<1x8x8xi32>
   func.return %res : tensor<1x8x8xi32>
@@ -85,7 +85,7 @@ func.func @gather_unsigned(%operand : tensor<1x4x8xui32>, %start_indices : tenso
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 1, 8]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 1, 8>
   } : (tensor<1x4x8xui32>, tensor<1x8x2xi32>) -> tensor<1x8x8xui32>
   func.return %res : tensor<1x8x8xui32>
 }
@@ -108,7 +108,7 @@ func.func @gather_no_collapse(%operand : tensor<6x3xi32>, %start_indices : tenso
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[4, 2]> : tensor<2xi64>
+    slice_sizes = array<i64: 4, 2>
   } : (tensor<6x3xi32>, tensor<5x2xi32>) -> tensor<5x4x2xi32>
   func.return %res : tensor<5x4x2xi32>
 }
@@ -149,7 +149,7 @@ func.func @gather_max_offset(%operand : tensor<?x?x?xi32>, %start_indices : tens
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[2, 3, 4]> : tensor<3xi64>
+    slice_sizes = array<i64: 2, 3, 4>
   } : (tensor<?x?x?xi32>, tensor<5x2xi32>) -> tensor<2x3x4x5xi32>
   func.return %res : tensor<2x3x4x5xi32>
 }
@@ -199,7 +199,7 @@ func.func @gather_reorder_start_index(%operand : tensor<6x3x2x7xi32>, %start_ind
       start_index_map = [3, 1, 2, 0]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 2, 1, 4]> : tensor<4xi64>
+    slice_sizes = array<i64: 1, 2, 1, 4>
   } : (tensor<6x3x2x7xi32>, tensor<5x4xi32>) -> tensor<5x2x4xi32>
   func.return %res : tensor<5x2x4xi32>
 }
@@ -257,7 +257,7 @@ func.func @gather_implicit_trailing_dim(%operand : tensor<?x?xi32>, %start_indic
       start_index_map = [0]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[3, 4]> : tensor<2xi64>
+    slice_sizes = array<i64: 3, 4>
   } : (tensor<?x?xi32>, tensor<5x2xi32>) -> tensor<3x4x5x2xi32>
   func.return %res : tensor<3x4x5x2xi32>
 }
@@ -298,7 +298,7 @@ func.func @gather_non_static(%operand : tensor<?x?xi32>, %start_indices : tensor
       start_index_map = [0]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[3, 4]> : tensor<2xi64>
+    slice_sizes = array<i64: 3, 4>
   } : (tensor<?x?xi32>, tensor<?x?xi32>) -> tensor<3x4x?xi32>
   func.return %res : tensor<3x4x?xi32>
 }
@@ -339,7 +339,7 @@ func.func @gather_unranked(%operand : tensor<*xi32>, %start_indices : tensor<?x?
       start_index_map = [0]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[3, 4]> : tensor<2xi64>
+    slice_sizes = array<i64: 3, 4>
   } : (tensor<*xi32>, tensor<?x?xi32>) -> tensor<?x?x?xi32>
   func.return %res : tensor<?x?x?xi32>
 }

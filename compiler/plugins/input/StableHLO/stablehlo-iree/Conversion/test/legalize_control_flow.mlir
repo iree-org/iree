@@ -71,7 +71,7 @@ func.func @while_multi_operands(%arg0: tensor<3xi32>) -> tuple<tensor<i32>, tens
     %5 = stablehlo.constant dense<1> : tensor<i32>
     %6 = stablehlo.add %arg1, %5 : tensor<i32>
     %7 = stablehlo.convert %arg1 : (tensor<i32>) -> tensor<i32>
-    %8 = "stablehlo.broadcast_in_dim"(%7) {broadcast_dimensions = dense<> : tensor<0xi64>} : (tensor<i32>) -> tensor<3xi32>
+    %8 = "stablehlo.broadcast_in_dim"(%7) {broadcast_dimensions = array<i64>} : (tensor<i32>) -> tensor<3xi32>
     %9 = stablehlo.add %arg2, %8 : tensor<3xi32>
     "stablehlo.return"(%6, %9) : (tensor<i32>, tensor<3xi32>) -> ()
   }) : (tensor<i32>, tensor<3xi32>) -> (tensor<i32>, tensor<3xi32>)

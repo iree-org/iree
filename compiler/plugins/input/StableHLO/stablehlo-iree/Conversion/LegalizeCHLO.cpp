@@ -305,7 +305,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
             RankedTensorType::get(resultType.getShape(),
                                   lhsType.getElementType()),
             lhs, resultExtents,
-            rewriter.getI64TensorAttr(lhsBroadcastDimensions));
+            rewriter.getDenseI64ArrayAttr(lhsBroadcastDimensions));
     auto rhsBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - rhsType.getRank(), resultRank));
     Value broadcastedRhs =
@@ -314,7 +314,7 @@ struct ConvertRankedDynamicBroadcastBinaryOp final
             RankedTensorType::get(resultType.getShape(),
                                   rhsType.getElementType()),
             rhs, resultExtents,
-            rewriter.getI64TensorAttr(rhsBroadcastDimensions));
+            rewriter.getDenseI64ArrayAttr(rhsBroadcastDimensions));
 
     // And generate the final non-broadcasted binary op.
     Value finalResult = Adaptor::createOp(
@@ -353,7 +353,7 @@ struct ConvertConstantLikeOp final
         rewriter.create<mlir::stablehlo::ConstantOp>(loc, op.getValue());
     Value shape = rewriter.create<shape::ShapeOfOp>(loc, adaptor.getOperand());
     rewriter.replaceOpWithNewOp<mlir::stablehlo::DynamicBroadcastInDimOp>(
-        op, resultTy, constant, shape, rewriter.getI64TensorAttr({}));
+        op, resultTy, constant, shape, rewriter.getDenseI64ArrayAttr({}));
     return success();
   }
 };
@@ -412,7 +412,7 @@ struct ConvertSelectOp final
               RankedTensorType::get(resultType.getShape(),
                                     predType.getElementType()),
               pred, resultExtents,
-              rewriter.getI64TensorAttr(predBroadcastDimensions));
+              rewriter.getDenseI64ArrayAttr(predBroadcastDimensions));
     }
     auto onTrueBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onTrueType.getRank(), resultRank));
@@ -422,7 +422,7 @@ struct ConvertSelectOp final
             RankedTensorType::get(resultType.getShape(),
                                   onTrueType.getElementType()),
             onTrue, resultExtents,
-            rewriter.getI64TensorAttr(onTrueBroadcastDimensions));
+            rewriter.getDenseI64ArrayAttr(onTrueBroadcastDimensions));
     auto onFalseBroadcastDimensions = llvm::to_vector(
         llvm::seq<int64_t>(resultRank - onFalseType.getRank(), resultRank));
     Value broadcastedOnFalse =
@@ -431,7 +431,7 @@ struct ConvertSelectOp final
             RankedTensorType::get(resultType.getShape(),
                                   onFalseType.getElementType()),
             onFalse, resultExtents,
-            rewriter.getI64TensorAttr(onFalseBroadcastDimensions));
+            rewriter.getDenseI64ArrayAttr(onFalseBroadcastDimensions));
 
     // And generate the final non-broadcasted ternary op.
     Value finalResult = rewriter.create<mlir::stablehlo::SelectOp>(

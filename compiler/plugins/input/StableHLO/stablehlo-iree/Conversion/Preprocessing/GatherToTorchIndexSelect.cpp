@@ -80,18 +80,17 @@ struct GatherIsTorchIndexSelectPattern final
       }
     }
 
-    for (auto [idx, value] :
-         llvm::enumerate(gather.getSliceSizes().getValues<APInt>())) {
+    for (auto [idx, value] : llvm::enumerate(gather.getSliceSizes())) {
       // First shape value must be 1.
       if (idx == 0) {
-        if (value.getSExtValue() != 1) {
+        if (value != 1) {
           return rewriter.notifyMatchFailure(gather, "slice_size[0] != 1");
         }
         continue;
       }
 
       // The gather needs to index the entire slice for each other dimension.
-      if (value.getSExtValue() != operandTy.getDimSize(idx)) {
+      if (value != operandTy.getDimSize(idx)) {
         return rewriter.notifyMatchFailure(
             gather, "slice_size doesn't match operand dimension");
       }
