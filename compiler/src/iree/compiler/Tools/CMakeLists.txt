@@ -32,9 +32,6 @@ iree_cc_library(
     "init_iree_passes.h"
   DEPS
     IREEInputDialect
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
-    IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     IREEVectorExtDialect
@@ -49,10 +46,12 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Dialect::Util::IR::ExternalModels
     iree::compiler::Dialect::Util::TransformOps
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Analysis
@@ -62,6 +61,7 @@ iree_cc_library(
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
     iree::compiler::Dialect::Vulkan::IR
+    iree::compiler::ExternalInterfaces::ExternalModels
     iree::compiler::GlobalOptimization::Interfaces::Interfaces
     iree::compiler::InputConversion::Common
     iree::compiler::Modules::HAL::Inline::IR::HALInlineDialect

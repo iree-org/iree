@@ -26,6 +26,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "attention.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -91,6 +92,7 @@ iree_check_single_backend_test_suite(
     srcs = enforce_glob(
         # keep sorted
         [
+            "attention.mlir",
             "reverse.mlir",
             "scan.mlir",
             "scatter.mlir",
@@ -125,6 +127,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "attention.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -147,6 +150,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            "attention.mlir",
             "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.

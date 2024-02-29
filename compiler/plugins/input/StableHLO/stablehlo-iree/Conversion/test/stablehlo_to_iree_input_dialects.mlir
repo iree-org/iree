@@ -130,3 +130,13 @@ func.func @while_unsigned(%arg0: tensor<ui32>) -> tensor<ui32> {
   }
   return %0 : tensor<ui32>
 }
+
+// -----
+
+// CHECK-LABEL: @select_conversion
+func.func @select_conversion(%arg0: tensor<i1>, %arg1: tensor<?xui16>, %arg2: tensor<?xui16>) -> tensor<?xui16> {
+  %extracted = tensor.extract %arg0[] : tensor<i1>
+  // CHECK: arith.select
+  %0 = arith.select %extracted, %arg1, %arg2 : tensor<?xui16>
+  return %0 : tensor<?xui16>
+}

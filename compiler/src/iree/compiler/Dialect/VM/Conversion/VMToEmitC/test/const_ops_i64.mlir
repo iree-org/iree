@@ -2,7 +2,7 @@
 
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_const_i64_zero
+  // CHECK-LABEL: emitc.func private @my_module_const_i64_zero
   vm.func @const_i64_zero() -> i64 {
     // CHECK: %[[ZERO:.+]] = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     %zero = vm.const.i64.zero
@@ -13,7 +13,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_const_i64
+  // CHECK-LABEL: emitc.func private @my_module_const_i64
   vm.func @const_i64() {
     // CHECK-NEXT: %0 = "emitc.constant"() <{value = 0 : i64}> : () -> i64
     %0 = vm.const.i64 0

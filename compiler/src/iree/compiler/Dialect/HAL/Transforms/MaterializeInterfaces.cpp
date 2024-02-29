@@ -36,11 +36,14 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-// Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants.
-using ExportExpansions = DenseMap<Attribute, SmallVector<Attribute>>;
+// Map of original SymbolRefAttr to a list of SymbolRefAttrs in variants marked
+// with the executable target the export is assigned.
+using ExportExpansions = DenseMap<
+    Attribute,
+    SmallVector<std::pair<Attribute, IREE::HAL::ExecutableTargetAttr>>>;
 
 //===----------------------------------------------------------------------===//
-// Linkage utilities
+// Utilities
 //===----------------------------------------------------------------------===//
 
 static void setApplicableObjects(Operation *sourceOp,
@@ -53,6 +56,65 @@ static void setApplicableObjects(Operation *sourceOp,
   if (!objects)
     return;
   targetOp.setObjectsAttr(*objects);
+}
+
+// Returns a set of executable targets required by any dispatch to the given
+// executable. Not all exports may be dispatched on the targets.
+// If the |executableOp| is public then targets specified on the module will be
+// used in addition to any from the dispatches.
+template <typename OpT>
+static SmallVector<IREE::HAL::ExecutableTargetAttr>
+gatherExecutableTargetAttrs(SymbolOpInterface executableOp,
+                            llvm::iterator_range<OpT> exportOps,
+                            const BindingLayoutAnalysis &layoutAnalysis) {
+  llvm::SetVector<IREE::HAL::ExecutableTargetAttr,
+                  SmallVector<IREE::HAL::ExecutableTargetAttr>>
+      targetAttrsSet;
+  if (executableOp.isPublic()) {
+    for (auto targetAttr :
+         IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(executableOp)) {
+      targetAttrsSet.insert(targetAttr);
+    }
+  }
+  for (auto exportOp : exportOps) {
+    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
+      for (auto targetAttr :
+           IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(dispatchOp)) {
+        targetAttrsSet.insert(targetAttr);
+      }
+    }
+  }
+  auto targetAttrs = targetAttrsSet.takeVector();
+  llvm::stable_sort(targetAttrs, [](auto lhs, auto rhs) {
+    return lhs.getSymbolNameFragment() < rhs.getSymbolNameFragment();
+  });
+  return targetAttrs;
+}
+
+// Updates the target entry point symbols of |dispatchOp| to the expanded set of
+// variant exports in |exportExpansions|.
+static void updateDispatchTargets(IREE::Stream::CmdDispatchOp dispatchOp,
+                                  const ExportExpansions &exportExpansions) {
+  DenseSet<IREE::HAL::ExecutableTargetAttr> requiredTargetAttrs;
+  for (auto targetAttr :
+       IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(dispatchOp)) {
+    requiredTargetAttrs.insert(targetAttr);
+  }
+  SmallVector<Attribute> newAttrs;
+  for (auto oldAttr : dispatchOp.getEntryPointRefs()) {
+    auto it = exportExpansions.find(oldAttr);
+    if (it == exportExpansions.end()) {
+      newAttrs.push_back(oldAttr); // preserve existing
+      continue;
+    }
+    for (auto [newAttr, targetAttr] : it->second) {
+      // Filter the new expansions to only those used by the dispatch.
+      if (requiredTargetAttrs.contains(targetAttr))
+        newAttrs.push_back(newAttr);
+    }
+  }
+  dispatchOp.setEntryPointsAttr(
+      ArrayAttr::get(dispatchOp.getContext(), newAttrs));
 }
 
 //===----------------------------------------------------------------------===//
@@ -69,13 +131,19 @@ SymbolRefAttr makeExportSymbolRefAttr(IREE::HAL::ExecutableOp executableOp,
                             });
 }
 
-static LogicalResult materializeExecutableFromSourceOp(
-    IREE::HAL::ExecutableSourceOp sourceOp,
-    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs,
-    ExportExpansions &exportExpansions) {
-  OpBuilder moduleBuilder(sourceOp);
+static void
+materializeExecutableFromSourceOp(IREE::HAL::ExecutableSourceOp sourceOp,
+                                  BindingLayoutAnalysis &layoutAnalysis) {
+  // Gather the required executable targets based on the dispatches to exports
+  // in the source op.
+  auto targetAttrs = gatherExecutableTargetAttrs(
+      sourceOp, sourceOp.getOps<IREE::HAL::ExecutableExportOp>(),
+      layoutAnalysis);
+  if (targetAttrs.empty())
+    return;
 
   // Create the op that will contain the translated executable.
+  OpBuilder moduleBuilder(sourceOp);
   auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
       sourceOp.getLoc(), sourceOp.getName());
   executableOp.setVisibility(sourceOp.getVisibility());
@@ -86,6 +154,7 @@ static LogicalResult materializeExecutableFromSourceOp(
 
   // Materialize all of the hal.executable.variant ops for all backends we are
   // targeting.
+  ExportExpansions exportExpansions;
   SymbolTable targetSymbolTable(executableOp);
   OpBuilder targetBuilder(&executableOp.getBlock().back());
   for (auto targetAttr : targetAttrs) {
@@ -98,11 +167,13 @@ static LogicalResult materializeExecutableFromSourceOp(
       variantBuilder.clone(*sourceExportOp);
 
       // Map the original export names to the new variant exports.
-      exportExpansions[SymbolRefAttr::get(executableOp.getNameAttr(),
-                                          {FlatSymbolRefAttr::get(
-                                              sourceExportOp.getNameAttr())})]
-          .push_back(makeExportSymbolRefAttr(executableOp, targetVariantOp,
-                                             sourceExportOp));
+      auto oldRefAttr = SymbolRefAttr::get(
+          executableOp.getNameAttr(),
+          {FlatSymbolRefAttr::get(sourceExportOp.getNameAttr())});
+      auto newRefAttr = makeExportSymbolRefAttr(executableOp, targetVariantOp,
+                                                sourceExportOp);
+      exportExpansions[oldRefAttr].push_back(
+          std::make_pair(newRefAttr, targetAttr));
     }
 
     // Clone any target-specific object files specified.
@@ -119,33 +190,15 @@ static LogicalResult materializeExecutableFromSourceOp(
     }
   }
 
-  // Remove the original.
-  sourceOp.erase();
-
-  return success();
-}
-
-static LogicalResult
-materializeExecutablesFromSourceOps(mlir::ModuleOp moduleOp,
-                                    ExportExpansions &exportExpansions) {
-  auto sourceOps =
-      llvm::to_vector<32>(moduleOp.getOps<IREE::HAL::ExecutableSourceOp>());
-  for (auto sourceOp : sourceOps) {
-    // Gather a list of all #hal.executable.targets that we should produce
-    // variants for.
-    auto targetAttrs =
-        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
-    if (targetAttrs.empty()) {
-      return sourceOp.emitError()
-             << "no executable targets specified for translation";
-    }
-
-    if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs,
-                                                 exportExpansions))) {
-      return failure();
+  // Update all dispatch sites to reference the new expanded variants.
+  for (auto exportOp : sourceExportOps) {
+    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
+      updateDispatchTargets(dispatchOp, exportExpansions);
     }
   }
-  return success();
+
+  // Remove the original.
+  sourceOp.erase();
 }
 
 //===----------------------------------------------------------------------===//
@@ -272,49 +325,13 @@ cloneFuncWithInterface(mlir::func::FuncOp sourceFuncOp,
   return clonedFuncOp;
 }
 
-// Updates the target entry point symbols of |dispatchOp| to the expanded set of
-// variant exports in |exportExpansions|.
-static void updateDispatchTargets(IREE::Stream::CmdDispatchOp dispatchOp,
-                                  const ExportExpansions &exportExpansions) {
-  SmallVector<Attribute> newAttrs;
-  for (auto oldAttr : dispatchOp.getEntryPointRefs()) {
-    auto it = exportExpansions.find(oldAttr);
-    if (it == exportExpansions.end()) {
-      newAttrs.push_back(oldAttr); // preserve existing
-      continue;
-    }
-    for (auto newAttr : it->second) {
-      newAttrs.push_back(newAttr);
-    }
-  }
-  dispatchOp.setEntryPointsAttr(
-      ArrayAttr::get(dispatchOp.getContext(), newAttrs));
-}
-
-// Annotates |dispatchOp| with resource binding to interface binding mappings.
-// TODO(benvanik): have a HAL op with structured information instead.
-static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
-                                 const PipelineResourceMap &resourceMap) {
-  // Ignore if bindings already defined.
-  if (dispatchOp->hasAttr("hal.interface.bindings"))
-    return;
-  SmallVector<Attribute> bindingAttrs;
-  for (auto setBinding : resourceMap) {
-    bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
-        dispatchOp.getContext(), setBinding.first, setBinding.second));
-  }
-  dispatchOp->setAttr("hal.interface.bindings",
-                      ArrayAttr::get(dispatchOp.getContext(), bindingAttrs));
-}
-
 // Adds the entry point ops with assigned ordinals for each entry function.
 // The entry points will all use the provided |interfaceOp| and be exported with
 // hal.executable.export ops.
 static LogicalResult
 declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
                      IREE::HAL::ExecutableOp targetExecutableOp,
-                     const BindingLayoutAnalysis &layoutAnalysis,
-                     ExportExpansions &exportExpansions) {
+                     const BindingLayoutAnalysis &layoutAnalysis) {
   auto variantOps =
       targetExecutableOp.getBlock().getOps<IREE::HAL::ExecutableVariantOp>();
   OpBuilder executableBuilder(&targetExecutableOp.getBlock().front());
@@ -342,15 +359,8 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
     const auto &pipelineLayout = layoutAnalysis.getPipelineLayout(exportOp);
     const PipelineResourceMap &resourceMap = pipelineLayout.resourceMap;
 
-    // Update all dispatch sites with the binding information required for
-    // conversion into the HAL dialect. By doing this here we ensure that the
-    // dialect conversion needs only local information on the ops and that it's
-    // not possible for the dispatches and their targets to get out of sync.
-    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
-      annotateDispatchSite(dispatchOp, resourceMap);
-    }
-
     // Clone the updated function declaration into each variant.
+    ExportExpansions exportExpansions;
     int ordinal = nextOrdinal++;
     for (auto variantOp : variantOps) {
       auto targetBuilder = OpBuilder::atBlockBegin(&variantOp.getBlock());
@@ -388,11 +398,24 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
           /*workgroup_local_memory=*/IntegerAttr{});
 
       // Map the original export name to the new variant export.
-      exportExpansions[SymbolRefAttr::get(
-                           sourceExecutableOp.getNameAttr(),
-                           {FlatSymbolRefAttr::get(exportOp.getNameAttr())})]
-          .push_back(makeExportSymbolRefAttr(targetExecutableOp, variantOp,
-                                             newExportOp));
+      auto oldRefAttr =
+          SymbolRefAttr::get(sourceExecutableOp.getNameAttr(),
+                             {FlatSymbolRefAttr::get(exportOp.getNameAttr())});
+      auto newRefAttr =
+          makeExportSymbolRefAttr(targetExecutableOp, variantOp, newExportOp);
+      exportExpansions[oldRefAttr].push_back(
+          std::make_pair(newRefAttr, variantOp.getTargetAttr()));
+
+      // Annotate the export with the a mapping of the resources to the
+      // interface bindings. This is used during conversion.
+      SmallVector<Attribute> bindingAttrs;
+      for (auto setBinding : resourceMap) {
+        bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
+            newExportOp.getContext(), setBinding.first, setBinding.second));
+      }
+      newExportOp->setAttr(
+          "hal.interface.bindings",
+          ArrayAttr::get(newExportOp.getContext(), bindingAttrs));
 
       // Clone the workgroup count calculation function.
       if (!exportOp.getWorkgroupCount().empty()) {
@@ -414,6 +437,11 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
                                                     variantLayoutAttr);
         targetFuncOps[sourceFuncOp][variantOp] = variantFuncOp;
       }
+    }
+
+    // Update all dispatch sites to reference the new expanded variants.
+    for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
+      updateDispatchTargets(dispatchOp, exportExpansions);
     }
   }
 
@@ -522,42 +550,38 @@ struct MaterializeInterfacesPass
     : public IREE::HAL::impl::MaterializeInterfacesPassBase<
           MaterializeInterfacesPass> {
   void runOnOperation() override {
-    SymbolTable symbolTable(getOperation());
-
-    ExportExpansions exportExpansions;
+    auto moduleOp = getOperation();
+    SymbolTable symbolTable(moduleOp);
+    BindingLayoutAnalysis layoutAnalysis(moduleOp, symbolTable);
 
     // Handle any hand-authored executables; these only need variant expansion
     // and no layout analysis as the user specified the layout themselves.
-    if (failed(materializeExecutablesFromSourceOps(getOperation(),
-                                                   exportExpansions))) {
-      return signalPassFailure();
+    for (auto sourceOp : llvm::make_early_inc_range(
+             moduleOp.getOps<IREE::HAL::ExecutableSourceOp>())) {
+      materializeExecutableFromSourceOp(sourceOp, layoutAnalysis);
     }
-
-    const auto &layoutAnalysis = getAnalysis<BindingLayoutAnalysis>();
 
     // Processes all executables within the input module and produce the
     // output HAL ops. We should ensure all deduping is performed prior to
     // this when it's easier to diff IR and where we still have the flow
     // context.
-    auto sourceOps = llvm::to_vector<32>(
-        getOperation().getOps<IREE::Stream::ExecutableOp>());
-    for (auto sourceOp : sourceOps) {
+    for (auto sourceOp : llvm::make_early_inc_range(
+             moduleOp.getOps<IREE::Stream::ExecutableOp>())) {
       auto exportOps = sourceOp.getOps<IREE::Stream::ExecutableExportOp>();
       if (exportOps.empty())
         continue;
 
       // Gather a list of all #hal.executable.targets that we should produce
-      // variants for.
+      // variants for based on the dispatches performed. Not all exports may be
+      // used on any particular target but we let future DCE/pruning passes
+      // remove them instead of modifying the inner modules here.
       auto targetAttrs =
-          IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
-      if (targetAttrs.empty()) {
-        sourceOp.emitError()
-            << "no executable targets specified for translation";
-        return signalPassFailure();
-      }
+          gatherExecutableTargetAttrs(sourceOp, exportOps, layoutAnalysis);
+      if (targetAttrs.empty())
+        continue;
 
       // Create the op that will contain the translated executable.
-      OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
+      OpBuilder builder = OpBuilder::atBlockEnd(moduleOp.getBody());
       builder.setInsertionPointAfter(sourceOp);
       auto executableOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
@@ -581,8 +605,8 @@ struct MaterializeInterfacesPass
       }
 
       // Define interfaces for each exported function based on analysis.
-      if (failed(declareEntryPointOps(sourceOp, executableOp, layoutAnalysis,
-                                      exportExpansions))) {
+      if (failed(
+              declareEntryPointOps(sourceOp, executableOp, layoutAnalysis))) {
         return signalPassFailure();
       }
 
@@ -593,52 +617,6 @@ struct MaterializeInterfacesPass
       }
 
       sourceOp.erase();
-    }
-
-    // Do a cleanup pass for any dispatches that don't yet have interfaces
-    // assigned. If we had dispatches to externally-defined HAL executables we
-    // won't have materialized them from the stream ops above. We do expect to
-    // be able to find the dispatch targets such that we can pull out the
-    // pipeline layout, though, and any that fall through are errors.
-    auto updateDispatchSites = [&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      // Update the export targets to point at the new variants.
-      updateDispatchTargets(dispatchOp, exportExpansions);
-
-      // Annotate the dispatch site with binding information if required.
-      // TODO(benvanik): remove this path; shouldn't be needed in real usage.
-      // Because this is a hack we just look for the first target entry point.
-      PipelineResourceMap resourceMap;
-      auto anyEntryPointAttr = *dispatchOp.getEntryPointRefs().begin();
-      auto anyExportOp =
-          symbolTable.lookupNearestSymbolFrom<IREE::HAL::ExecutableExportOp>(
-              dispatchOp, anyEntryPointAttr);
-      if (anyExportOp) {
-        // Export found - we can use the pipeline layout defined there to infer
-        // the bindings. This allows for bindings to be sparse or have
-        // additional information declared.
-        for (auto setLayout : anyExportOp.getLayoutAttr().getSetLayouts()) {
-          for (auto binding : setLayout.getBindings()) {
-            resourceMap.emplace_back(setLayout.getOrdinal(),
-                                     binding.getOrdinal());
-          }
-        }
-      } else {
-        // No export found - this is likely an external executable and we can
-        // infer a dense pipeline layout. This is kind of shady as we may want
-        // to error in these cases where users have something special explicitly
-        // defined but then typo things but the ergonomic improvements in the
-        // normal case are worth that risk.
-        size_t resourceCount = dispatchOp.getResources().size();
-        for (int i = 0; i < resourceCount; ++i) {
-          // set=0, binding=resource ordinal
-          resourceMap.emplace_back(0, i);
-        }
-      }
-      annotateDispatchSite(dispatchOp, resourceMap);
-      return WalkResult::advance();
-    };
-    if (getOperation()->walk(updateDispatchSites).wasInterrupted()) {
-      return signalPassFailure();
     }
   }
 };

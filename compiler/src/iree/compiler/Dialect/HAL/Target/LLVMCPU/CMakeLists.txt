@@ -29,7 +29,6 @@ iree_cc_library(
     ::LinkerTool
     ::StaticLibraryGenerator
     IREELLVMCPUTargetDeps
-    IREELinalgExtDialect
     IREELinalgTransformDialect
     LLVMAnalysis
     LLVMBitReader
@@ -56,6 +55,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVMCPU::Builtins
     iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Utils
   PUBLIC
 )

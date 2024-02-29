@@ -282,11 +282,14 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
 
     ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
-    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis
+    ArrayRefParameter<"bool", "subgroup_active_ids">:$subgroupActiveIds,
+
+    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis,
+    ArrayRefParameter<"bool", "thread_active_ids">:$threadActiveIds
   );
 
-  // TODO: add custom parser/printer and builder to elide default value array
-  // refs.
+  // By default, identity orderings are elided when parsing/printing.
+  // TODO: Improve custom parsing/printing for sizes/basis elements.
   let assemblyFormat = [{
     `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
         `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
@@ -294,14 +297,14 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
-        `subgroup_order`          `=` `[` $subgroupOrder `]` `,`
-        `batch_order`             `=` `[` $batchOrder `]` `,`
-        `outer_order`             `=` `[` $outerOrder `]` `,`
-        `thread_order`            `=` `[` $threadOrder `]` `,`
-        `element_order`           `=` `[` $elementOrder `]` `,`
+        custom<Permutation>("\"subgroup_order\"", ref($subgroupsPerWorkgroup), "true", $subgroupOrder) ``
+        custom<Permutation>("\"batch_order\"", ref($batchesPerSubgroup), "true", $batchOrder) ``
+        custom<Permutation>("\"outer_order\"", ref($outersPerBatch), "true", $outerOrder) ``
+        custom<Permutation>("\"thread_order\"", ref($threadsPerOuter), "true", $threadOrder) ``
+        custom<Permutation>("\"element_order\"", ref($elementsPerThread), "true", $elementOrder) ``
 
-        `subgroup_basis`          `=` `[` $subgroupBasis `]` `,`
-        `thread_basis`            `=` `[` $threadBasis `]`
+        custom<Basis>("\"subgroup_basis\"", "\"subgroup_active_ids\"", "true", $subgroupBasis, $subgroupActiveIds) ``
+        custom<Basis>("\"thread_basis\"", "\"thread_active_ids\"", "false", $threadBasis, $threadActiveIds) ``
     `>`
   }];
 

@@ -5,9 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/Input/InputDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
@@ -59,7 +56,6 @@ int main(int argc, char **argv) {
       // clang-format off
       // Local dialects
       mlir::iree_compiler::IREE::Input::IREEInputDialect,
-      mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
       mlir::iree_compiler::IREE::VectorExt::IREEVectorExtDialect,
       // Upstream dialects
       mlir::async::AsyncDialect,
@@ -83,7 +79,6 @@ int main(int argc, char **argv) {
   registerTransformsPasses();
   registerSCFPasses();
   // Local dialect passes.
-  mlir::iree_compiler::IREE::LinalgExt::registerPasses();
   mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
@@ -93,8 +88,7 @@ int main(int argc, char **argv) {
   mlir::func::registerInlinerExtension(registry);
   mlir::linalg::registerTilingInterfaceExternalModels(registry);
 
-  registry.addExtensions<IREE::LinalgExt::LinalgExtTransformOpsExtension,
-                         transform_ext::StructuredTransformOpsExtension>();
+  registry.addExtensions<transform_ext::StructuredTransformOpsExtension>();
   mlir::bufferization::registerTransformDialectExtension(registry);
   mlir::linalg::registerTransformDialectExtension(registry);
   mlir::scf::registerTransformDialectExtension(registry);

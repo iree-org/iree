@@ -24,9 +24,9 @@
 // These can come from compiler flags and multiple targets can be supported
 // It's possible, for example, to support targeting multiple devices in the same
 // compiled binary.
-#vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target]
-}>
+#vulkan_target = #hal.device.target<"vulkan", [
+  #spirv_target
+]>
 
 module @example attributes {hal.device.targets = [#vulkan_target]} {
 
@@ -78,7 +78,19 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
               <1, storage_buffer, ReadOnly>,
               <2, storage_buffer>
           ]>
-        ]>) {
+        ]>) attributes {
+          // Bindings are automatically inferred when possible as part of the
+          // ABI but can be overridden if the user wants to use features such as
+          // sparse bindings or multiple descriptor sets. To do so the
+          // `hal.interface.bindings` attribute can be added to an export op as
+          // follows mapping tensor operands/results to the pipeline layout
+          // sets/bindings:
+          hal.interface.bindings = [
+            #hal.interface.binding<0, 0>,
+            #hal.interface.binding<0, 1>,
+            #hal.interface.binding<0, 2>
+          ]
+        } {
     ^bb0(%device: !hal.device, %workload: index):
       // This host function is used to compute the XYZ workgroup count
       // dispatched at runtime. It can query the %device for capabilities
@@ -136,29 +148,13 @@ module @example attributes {hal.device.targets = [#vulkan_target]} {
     %dim_i32 = arith.index_cast %dim : index to i32
 
     // Dispatch a basic `ret = lhs * rhs` shader.
-    %0 = flow.dispatch @simple_mul::@main[%dim](%dim_i32, %arg0, %arg1) {
-      // Bindings are automatically inferred when possible as part of the ABI
-      // but can be overridden if the user wants to use features such as sparse
-      // bindings or multiple descriptor sets. To do so the
-      // `hal.interface.bindings` attribute can be added to a dispatch op as
-      // follows mapping tensor operands/results to the pipeline layout
-      // sets/bindings:
-      hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]
-    } : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
+    %0 = flow.dispatch @simple_mul::@main[%dim](%dim_i32, %arg0, %arg1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> tensor<?xf32>{%dim}
 
     // Code gen some other ops - these will interleave with the hand-authored
     // ones but naturally won't be able to fuse with them.
     %1 = arith.addf %0, %arg1 : tensor<?xf32>
 
     // Dispatch an in-place `rhs *= lhs` shader.
-    //
-    // Note that we don't declare the hal.interface.bindings and let them be
-    // inferred - this only works when either specifying the variant that has
-    // a pipeline layout defined or all variants have the same pipeline layouts.
     %2 = flow.dispatch @simple_mul_inplace::@main[%dim](%dim_i32, %0, %1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> %1{%dim}
 
     // CHECK: 8xf32=96 96 96 96 96 96 96 96

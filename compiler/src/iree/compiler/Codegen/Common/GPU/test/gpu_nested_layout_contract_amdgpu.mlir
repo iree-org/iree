@@ -14,11 +14,7 @@
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -32,10 +28,6 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -50,10 +42,6 @@
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -93,11 +81,11 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<1x1x1x1x1x4xf16>
 //       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x4xf16> to vector<4xf16>
 //       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x1x4xf16> to vector<4xf16>
-//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<4x1x1x4xf32> to vector<4x4xf32>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<4x1x1x4xf32> to vector<16xf32>
 //       CHECK:   %[[MFMA:.+]] = amdgpu.mfma %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]]
 //  CHECK-SAME:     {blocks = 1 : i32, k = 8 : i32, m = 32 : i32, n = 32 : i32} blgp =  none
-//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<4x4xf32>
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]] : vector<4x4xf32> to vector<4x1x1x4xf32>
+//  CHECK-SAME:     : vector<4xf16>, vector<4xf16>, vector<16xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA]] : vector<16xf32> to vector<4x1x1x4xf32>
 //       CHECK:   %[[INSERT:.+]] = vector.insert %[[R_CAST]], %[[INIT]] [0, 0] : vector<4x1x1x4xf32> into vector<1x1x4x1x1x4xf32>
 //       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[INSERT]] : vector<1x1x4x1x1x4xf32> -> vector<32x32xf32>
 //       CHECK:   return {{.*}} %[[R_SIMD]]
@@ -118,11 +106,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [16, 4],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [16, 4]
@@ -136,10 +120,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [4, 16],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -206,11 +186,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -224,10 +200,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -242,10 +214,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -281,16 +249,16 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[C_SLICE0:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<4x1x1x4xf32> from vector<2x1x4x1x1x4xf32>
 //       CHECK:   %[[A_SLICE0:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x4xf16> from vector<2x1x1x1x1x4xf16>
 //       CHECK:   %[[A0_CAST:.+]] = vector.shape_cast %[[A_SLICE0]] : vector<1x1x1x4xf16> to vector<4xf16>
-//       CHECK:   %[[C0_CAST:.+]] = vector.shape_cast %[[C_SLICE0]] : vector<4x1x1x4xf32> to vector<4x4xf32>
+//       CHECK:   %[[C0_CAST:.+]] = vector.shape_cast %[[C_SLICE0]] : vector<4x1x1x4xf32> to vector<16xf32>
 //       CHECK:   %[[MFMA0:.+]] = amdgpu.mfma %[[A0_CAST]] * %{{.+}} + %[[C0_CAST]]
-//       CHECK:   %[[R0_CAST:.+]] = vector.shape_cast %[[MFMA0]] : vector<4x4xf32> to vector<4x1x1x4xf32>
+//       CHECK:   %[[R0_CAST:.+]] = vector.shape_cast %[[MFMA0]] : vector<16xf32> to vector<4x1x1x4xf32>
 //       CHECK:   %[[C0_INS:.+]] = vector.insert %[[R0_CAST]], %[[INIT]] [0, 0] : vector<4x1x1x4xf32> into vector<2x1x4x1x1x4xf32>
 //       CHECK:   %[[C_SLICE1:.+]] = vector.extract %[[C_SIMT]][1, 0] : vector<4x1x1x4xf32> from vector<2x1x4x1x1x4xf32>
 //       CHECK:   %[[A_SLICE1:.+]] = vector.extract %[[A_SIMT]][1, 0] : vector<1x1x1x4xf16> from vector<2x1x1x1x1x4xf16>
 //       CHECK:   %[[A1_CAST:.+]] = vector.shape_cast %[[A_SLICE1]] : vector<1x1x1x4xf16> to vector<4xf16>
-//       CHECK:   %[[C1_CAST:.+]] = vector.shape_cast %[[C_SLICE1]] : vector<4x1x1x4xf32> to vector<4x4xf32>
+//       CHECK:   %[[C1_CAST:.+]] = vector.shape_cast %[[C_SLICE1]] : vector<4x1x1x4xf32> to vector<16xf32>
 //       CHECK:   %[[MFMA1:.+]] = amdgpu.mfma %[[A1_CAST]] * %{{.+}} + %[[C1_CAST]]
-//       CHECK:   %[[R1_CAST:.+]] = vector.shape_cast %[[MFMA1]] : vector<4x4xf32> to vector<4x1x1x4xf32>
+//       CHECK:   %[[R1_CAST:.+]] = vector.shape_cast %[[MFMA1]] : vector<16xf32> to vector<4x1x1x4xf32>
 //       CHECK:   %[[C1_INS:.+]] = vector.insert %[[R1_CAST]], %[[C0_INS]] [1, 0] : vector<4x1x1x4xf32> into vector<2x1x4x1x1x4xf32>
 //       CHECK:   %[[R:.+]] = iree_vector_ext.to_simd %[[C1_INS]] : vector<2x1x4x1x1x4xf32> -> vector<64x32xf32>
 //       CHECK:   return {{.*}}} %[[R]]
@@ -311,11 +279,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -329,10 +293,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -347,10 +307,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -392,7 +348,7 @@ builtin.module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[A1_CAST:.+]] = vector.shape_cast %[[A_SLICE1]] : vector<1x1x1x4xf16> to vector<4xf16>
 //       CHECK:   %[[B1_CAST:.+]] = vector.shape_cast %[[B_SLICE1]] : vector<1x1x1x4xf16> to vector<4xf16>
 //       CHECK:   %[[MFMA1:.+]] = amdgpu.mfma %[[A1_CAST]] * %[[B1_CAST]] + %[[MFMA0]]
-//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA1]] : vector<4x4xf32> to vector<4x1x1x4xf32>
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[MFMA1]] : vector<16xf32> to vector<4x1x1x4xf32>
 //       CHECK:   %[[INSERT:.+]] = vector.insert %[[R_CAST]], %{{.+}} [0, 0] : vector<4x1x1x4xf32> into vector<1x1x4x1x1x4xf32>
 //       CHECK:   %[[R:.+]] = iree_vector_ext.to_simd %[[INSERT]] : vector<1x1x4x1x1x4xf32> -> vector<32x32xf32>
 //       CHECK:   return {{.*}} %[[R]] : vector<32x32xf32>
@@ -413,11 +369,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -431,10 +383,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -449,10 +397,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
   batch_order             = [1, 0],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],
@@ -520,11 +465,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -538,11 +479,7 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
   thread_order            = [1, 0],
-  element_order           = [0, 1],
 
   subgroup_basis          = [1, 1],
   thread_basis            = [32, 2]
@@ -556,10 +493,6 @@ builtin.module attributes { transform.with_named_sequence } {
   threads_per_outer       = [2, 32],
   elements_per_thread     = [4, 1],
 
-  subgroup_order          = [0, 1],
-  batch_order             = [0, 1],
-  outer_order             = [0, 1],
-  thread_order            = [0, 1],
   element_order           = [1, 0],
 
   subgroup_basis          = [1, 1],

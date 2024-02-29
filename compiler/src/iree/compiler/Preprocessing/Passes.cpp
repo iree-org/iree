@@ -5,13 +5,22 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #include "iree/compiler/Preprocessing/Passes.h"
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-preprocessing-pass-pipeline"
 
 namespace mlir::iree_compiler::Preprocessing {
+
+using FunctionLikeNest =
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 namespace {
 
@@ -59,9 +68,8 @@ void buildPreprocessingPassPipeline(
     const PreprocessingOptions &preprocessingOptions,
     PipelineExtensions *pipelineExtensions) {
   auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
-  if (!preprocessingOptions.preprocessingPassPipeline.empty()) {
-    extendWithTextPipeline(passManager,
-                           preprocessingOptions.preprocessingPassPipeline);
+  if (!pipelineStr.empty()) {
+    extendWithTextPipeline(passManager, pipelineStr);
   }
 
   if (pipelineExtensions) {
@@ -77,6 +85,32 @@ void buildPreprocessingPassPipeline(
   }
 }
 
-void registerPreprocessingPasses() { registerCommonPreprocessingPasses(); }
+static void
+buildTransposeConvolutionPassPipeline(OpPassManager &passManager,
+                                      const TransformOptions &options) {
+  FunctionLikeNest(passManager)
+      .addPass(GlobalOptimization::createDetachElementwiseFromNamedOpsPass)
+      .addPass(mlir::createLinalgNamedOpConversionPass)
+      .addPass(GlobalOptimization::createConvert1X1FilterConv2DToMatmulPass)
+      .addPass(createConvertConvToChannelsLastPass)
+      .addPass(IREE::Flow::createFoldUnitExtentDimsPass);
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+}
+
+void registerPreprocessingPasses() {
+  registerCommonPreprocessingPasses();
+
+  PassPipelineRegistration<TransformOptions>
+      globalOptimizationTransformPassPipeline(
+          "iree-preprocessing-transpose-convolution-pipeline",
+          "Runs a pass pipeline for transposing and canonicalizing "
+          "convolutions",
+          [](OpPassManager &passManager,
+             const TransformOptions &transformOptions) {
+            buildTransposeConvolutionPassPipeline(passManager,
+                                                  transformOptions);
+          });
+}
 
 } // namespace mlir::iree_compiler::Preprocessing

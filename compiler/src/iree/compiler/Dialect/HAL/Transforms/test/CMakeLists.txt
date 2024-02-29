@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
     "preprocess_executables.mlir"
+    "prune_executables.mlir"
     "repeat_dispatches.mlir"
     "resolve_export_ordinals.mlir"
     "strip_executable_contents.mlir"

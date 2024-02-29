@@ -13,6 +13,7 @@
 #include "iree/base/internal/threading.h"
 
 void iree_task_scope_initialize(iree_string_view_t name,
+                                iree_task_scope_flags_t flags,
                                 iree_task_scope_t* out_scope) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -23,6 +24,8 @@ void iree_task_scope_initialize(iree_string_view_t name,
       iree_min(name.size, IREE_ARRAYSIZE(out_scope->name) - 1);
   memcpy(out_scope->name, name.data, name_length);
   out_scope->name[name_length] = 0;
+
+  out_scope->flags = flags;
 
   // TODO(benvanik): pick trace colors based on name hash.
   IREE_TRACE(out_scope->task_trace_color = 0xFFFF0000u);
@@ -101,6 +104,14 @@ static void iree_task_scope_try_set_status(iree_task_scope_t* scope,
   IREE_TRACE_ZONE_APPEND_TEXT(z0, "failed: ");
   IREE_TRACE_ZONE_APPEND_TEXT(
       z0, iree_status_code_string(iree_status_code(new_status)));
+
+  // Pretty-print and abort() the program to make it easier to find the stack
+  // of an asynchronous queue failure. Hosting applications should properly
+  // handle the errors by retrieving the failure status from the appropriate
+  // query or wait primitive.
+  if (iree_all_bits_set(scope->flags, IREE_TASK_SCOPE_FLAG_ABORT_ON_FAILURE)) {
+    iree_status_abort(new_status);
+  }
 
   iree_status_t old_status = iree_ok_status();
   if (!iree_atomic_compare_exchange_strong_intptr(

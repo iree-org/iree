@@ -49,7 +49,8 @@ TEST(ExecutorTest, LifetimeStress) {
     IREE_ASSERT_OK(iree_task_executor_create(
         options, &topology, iree_allocator_system(), &executor));
     iree_task_scope_t scope;
-    iree_task_scope_initialize(iree_make_cstring_view("scope"), &scope);
+    iree_task_scope_initialize(iree_make_cstring_view("scope"),
+                               IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
     static std::atomic<int> received_value = {0};
     iree_task_call_t call;
@@ -97,7 +98,8 @@ TEST(ExecutorTest, SubmissionStress) {
   IREE_ASSERT_OK(iree_task_executor_create(options, &topology,
                                            iree_allocator_system(), &executor));
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   for (int i = 0; i < 1000; ++i) {
     static std::atomic<int> received_value = {0};

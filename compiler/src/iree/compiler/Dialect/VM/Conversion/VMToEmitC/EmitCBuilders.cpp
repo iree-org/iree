@@ -7,11 +7,42 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/EmitCBuilders.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "mlir/Dialect/EmitC/IR/EmitC.h"
 
 namespace mlir::iree_compiler::emitc_builders {
 
 namespace {
+std::string mapPreprocessorDirective(PreprocessorDirective directive) {
+  switch (directive) {
+  case PreprocessorDirective::DEFINE:
+    return "#define";
+  case PreprocessorDirective::UNDEF:
+    return "#undef";
+  case PreprocessorDirective::IFDEF:
+    return "#ifdef";
+  case PreprocessorDirective::IFNDEF:
+    return "#ifndef";
+  case PreprocessorDirective::IF:
+    return "#if";
+  case PreprocessorDirective::ENDIF:
+    return "#endif";
+  case PreprocessorDirective::ELSE:
+    return "#else";
+  case PreprocessorDirective::ELIF:
+    return "#elif";
+  case PreprocessorDirective::LINE:
+    return "#line";
+  case PreprocessorDirective::ERROR:
+    return "#error";
+  case PreprocessorDirective::INCLUDE:
+    return "#include";
+  case PreprocessorDirective::PRAGMA:
+    return "#pragma";
+  default:
+    llvm_unreachable("unsupported unary operator");
+    return "XXX";
+  }
+}
+
 std::string mapUnaryOperator(UnaryOperator op) {
   switch (op) {
   case UnaryOperator::PLUS:
@@ -272,20 +303,17 @@ void arrayElementAssign(OpBuilder builder, Location location, Value array,
 
 void structDefinition(OpBuilder builder, Location location,
                       StringRef structName, ArrayRef<StructField> fields) {
-  std::string structBody;
-
-  for (auto &field : fields) {
-    structBody += field.type + " " + field.name + ";";
-  }
-
   auto ctx = builder.getContext();
+  std::string decl = std::string("struct ") + structName.str() + " {";
+  for (auto &field : fields) {
+    decl += field.type + " " + field.name;
+    if (field.isArray())
+      decl += "[" + std::to_string(field.arraySize.value()) + "]";
+    decl += ";";
+  }
+  decl += "};";
 
-  builder.create<emitc::CallOpaqueOp>(
-      /*location=*/location, /*type=*/TypeRange{},
-      /*callee=*/StringAttr::get(ctx, "EMITC_TYPEDEF_STRUCT"), /*args=*/
-      ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, structName),
-                           emitc::OpaqueAttr::get(ctx, structBody)}),
-      /*templateArgs=*/ArrayAttr{}, /*operands=*/ArrayRef<Value>{});
+  builder.create<emitc::VerbatimOp>(location, StringAttr::get(ctx, decl));
 }
 
 Value structMember(OpBuilder builder, Location location, Type type,
@@ -417,6 +445,19 @@ void ireeVmRefRelease(OpBuilder builder, Location location, Value operand) {
       /*args=*/ArrayAttr{},
       /*templateArgs=*/ArrayAttr{},
       /*operands=*/ArrayRef<Value>{operand});
+}
+
+emitc::VerbatimOp preprocessorDirective(OpBuilder builder, Location location,
+                                        PreprocessorDirective directive,
+                                        StringRef value) {
+
+  auto t = mapPreprocessorDirective(directive);
+  if (!value.empty()) {
+    t += " ";
+    t += value;
+  }
+
+  return builder.create<emitc::VerbatimOp>(location, t);
 }
 
 } // namespace mlir::iree_compiler::emitc_builders

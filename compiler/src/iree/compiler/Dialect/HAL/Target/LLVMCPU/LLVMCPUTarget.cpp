@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <unordered_set>
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -23,6 +22,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVMCPU/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -179,12 +179,15 @@ public:
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context, target, addlConfig));
-
     auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
+    targetAttrs.push_back(getExecutableTarget(context, target, addlConfig));
+
     return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
+        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
   }
 
   IREE::HAL::DeviceTargetAttr
@@ -765,15 +768,6 @@ public:
   }
 
 private:
-  ArrayAttr
-  getExecutableTargets(MLIRContext *context, const LLVMTarget &target,
-                       const AdditionalConfigurationValues &addlConfig) const {
-    SmallVector<Attribute> targetAttrs;
-    // This is where we would multiversion.
-    targetAttrs.push_back(getExecutableTarget(context, target, addlConfig));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
   IREE::HAL::ExecutableTargetAttr
   getExecutableTarget(MLIRContext *context, const LLVMTarget &target,
                       const AdditionalConfigurationValues &addlConfig) const {

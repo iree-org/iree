@@ -1,0 +1,74 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "LinalgExtExtensionsOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtExtensionsOpGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "LinalgExtExtensionsOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "LinalgExtExtensionsOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtExtensionsOps.td",
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "LinalgExtExtensions",
+    srcs = [
+        "LinalgExtExtensionsOps.cpp",
+        "LinalgExtExtensionsOps.cpp.inc",
+    ],
+    hdrs = [
+        "LinalgExtExtensionsOps.h",
+        "LinalgExtExtensionsOps.h.inc",
+    ],
+    deps = [
+        ":LinalgExtExtensionsOpGen",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
+        "//llvm-external-projects/iree-dialects:IREEDialectsTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:TransformDialect",
+    ],
+)

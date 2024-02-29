@@ -366,10 +366,9 @@ util.func public @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<1
 
 // -----
 
-util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>) -> (tensor<11008xf16>) {
+util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>, %arg3 : tensor<1x1x32x128xf16>) -> (tensor<11008xf16>) {
   %cst_1 = arith.constant 0.000000e+00 : f16
   %0 = tensor.empty() : tensor<11008x32x128xf16>
-  %1 = arith.constant dense<0.000000e+00> : tensor<1x1x32x128xf16>
   %expanded = tensor.expand_shape %arg0 [[0], [1, 2]] : tensor<11008x4096xi4> into tensor<11008x32x128xi4>
   %collapsed = tensor.collapse_shape %arg2 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
   %collapsed_2 = tensor.collapse_shape %arg1 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
@@ -381,7 +380,7 @@ util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 
     %15 = arith.mulf %14, %in_8 : f16
     linalg.yield %15 : f16
   } -> tensor<11008x32x128xf16>
-  %collapsed_3 = tensor.collapse_shape %1 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
+  %collapsed_3 = tensor.collapse_shape %arg3 [[0, 1, 2], [3]] : tensor<1x1x32x128xf16> into tensor<32x128xf16>
   %3 = tensor.empty() : tensor<11008xf16>
   %4 = linalg.fill ins(%cst_1 : f16) outs(%3 : tensor<11008xf16>) -> tensor<11008xf16>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%collapsed_3, %2 : tensor<32x128xf16>, tensor<11008x32x128xf16>) outs(%4 : tensor<11008xf16>) {
@@ -399,7 +398,7 @@ util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 
 //       CHECK-NOT:   tensor.collapse_shape %[[DEQUANT]]
 //           CHECK:     %[[MATVEC:.+]] = linalg.generic
 //      CHECK-SAME:         iterator_types = ["parallel", "reduction", "reduction"]
-//      CHECK-SAME:         ins(%[[DEQUANT]] : tensor<11008x32x128xf16>)
+//      CHECK-SAME:         ins({{.+}}%[[DEQUANT]]
 
 // -----
 
@@ -554,3 +553,109 @@ util.func public @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<1
 //       CHECK:     %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%{{.+}}, %[[GENERIC0]] :
 //       CHECK:     flow.return %[[GENERIC1]]
+
+// -----
+
+util.func public @fuse_single_use_dequant_with_producer(%arg0: tensor<12x128x128xf16>, %arg1: tensor<12x128x128xf16>) -> tensor<12x128x128xf32> {
+  %4 = tensor.empty() : tensor<12x128x128xf16>
+  %5 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg0, %arg1 : tensor<12x128x128xf16>, tensor<12x128x128xf16>) outs(%4 : tensor<12x128x128xf16>) {
+  ^bb0(%b0: f16, %b1: f16, %arg2: f16):
+    %9 = arith.subf %b0, %b1 : f16
+    linalg.yield %9 : f16
+  } -> tensor<12x128x128xf16>
+  %6 = tensor.empty() : tensor<12x128x128xf32>
+  %7 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%5 : tensor<12x128x128xf16>) outs(%6 : tensor<12x128x128xf32>) {
+  ^bb0(%b0: f16, %b1: f32):
+    %10 = arith.extf %b0 : f16 to f32
+    linalg.yield %10 : f32
+  } -> tensor<12x128x128xf32>
+  %8 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%7 : tensor<12x128x128xf32>) outs(%6 : tensor<12x128x128xf32>) {
+  ^bb0(%b0: f32, %b1: f32):
+    %11 = math.exp %b0 : f32
+    linalg.yield %11 : f32
+  } -> tensor<12x128x128xf32>
+  util.return %8 : tensor<12x128x128xf32>
+}
+// CHECK-LABEL: util.func public @fuse_single_use_dequant_with_producer
+//       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//       CHECK:     arith.subf
+//  CHECK-NEXT:     arith.extf
+//  CHECK-NEXT:     math.exp
+
+// -----
+
+util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x128xf16>,
+                                                          %arg1: tensor<12x128x128xf16>) -> (tensor<12x128x128xf32>, tensor<12x128xf32>) {
+  %4 = tensor.empty() : tensor<12x128x128xf16>
+  %5 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%arg0, %arg1 : tensor<12x128x128xf16>, tensor<12x128x128xf16>) outs(%4 : tensor<12x128x128xf16>) {
+  ^bb0(%b0: f16, %b1: f16, %arg2: f16):
+    %10 = arith.subf %b0, %b1 : f16
+    linalg.yield %10 : f16
+  } -> tensor<12x128x128xf16>
+  %6 = tensor.empty() : tensor<12x128x128xf32>
+  %7 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%5 : tensor<12x128x128xf16>) outs(%6 : tensor<12x128x128xf32>) {
+  ^bb0(%b0: f16, %b1: f32):
+    %11 = arith.extf %b0 : f16 to f32
+    linalg.yield %11 : f32
+  } -> tensor<12x128x128xf32>
+  %8 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+    ], iterator_types = ["parallel", "parallel", "parallel"]}
+    ins(%7 : tensor<12x128x128xf32>) outs(%6 : tensor<12x128x128xf32>) {
+  ^bb0(%b0: f32, %b1: f32):
+    %12 = math.exp %b0 : f32
+    linalg.yield %12 : f32
+  } -> tensor<12x128x128xf32>
+  %empty = tensor.empty() : tensor<12x128xf32>
+  %9 = linalg.generic {
+    indexing_maps = [
+      affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ], iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%7 : tensor<12x128x128xf32>) outs(%empty : tensor<12x128xf32>) {
+  ^bb0(%b0: f32, %b1: f32):
+    %13 = math.rsqrt %b0 : f32
+    %14 = arith.addf %13, %b1 : f32
+    linalg.yield %14 : f32
+  } -> tensor<12x128xf32>
+  util.return %8, %9 : tensor<12x128x128xf32>, tensor<12x128xf32>
+}
+// CHECK-LABEL: util.func public @no_fuse_multi_use_dequant_with_producer
+//       CHECK:   %[[GENERIC0:.+]] = linalg.generic
+//       CHECK:     arith.subf
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//       CHECK:     arith.extf
+//       CHECK:   %[[GENERIC2:.+]] = linalg.generic
+//       CHECK:     math.exp
+//       CHECK:   %[[GENERIC3:.+]] = linalg.generic
+//       CHECK:     math.rsqrt
+//  CHECK-NEXT:     arith.addf

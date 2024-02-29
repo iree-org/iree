@@ -1,0 +1,214 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_tablegen_doc", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "LinalgExtBase.td",
+            "LinalgExtInterfaces.td",
+            "LinalgExtOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:BuiltinDialectTdFiles",
+        "@llvm-project//mlir:CallInterfacesTdFiles",
+        "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
+        "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:PDLDialectTdFiles",
+        "@llvm-project//mlir:SideEffectInterfacesTdFiles",
+        "@llvm-project//mlir:TilingInterfaceTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "IR",
+    srcs = [
+        "LinalgExtAttrs.cpp.inc",
+        "LinalgExtDialect.cpp",
+        "LinalgExtDialect.cpp.inc",
+        "LinalgExtEnums.cpp.inc",
+        "LinalgExtInterfaces.cpp",
+        "LinalgExtInterfaces.cpp.inc",
+        "LinalgExtOps.cpp",
+        "LinalgExtOps.cpp.inc",
+        "LinalgExtTypes.cpp.inc",
+    ],
+    hdrs = [
+        "LinalgExtAttrs.h.inc",
+        "LinalgExtDialect.h",
+        "LinalgExtDialect.h.inc",
+        "LinalgExtEnums.h.inc",
+        "LinalgExtInterfaces.h",
+        "LinalgExtInterfaces.h.inc",
+        "LinalgExtOps.h",
+        "LinalgExtOps.h.inc",
+        "LinalgExtTypes.h.inc",
+    ],
+    deps = [
+        ":LinalgExtEnumsGen",
+        ":LinalgExtInterfacesIncGen",
+        ":LinalgExtOpsIncGen",
+        ":LinalgExtTypesGen",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AffineDialect",
+        "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
+        "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:DestinationStyleOpInterface",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:FuncDialect",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:InferTypeOpInterface",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:LinalgUtils",
+        "@llvm-project//mlir:MathDialect",
+        "@llvm-project//mlir:MemRefDialect",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SideEffectInterfaces",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TilingInterface",
+        "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtEnumsGen",
+    tbl_outs = [
+        (
+            ["--gen-enum-decls"],
+            "LinalgExtEnums.h.inc",
+        ),
+        (
+            ["--gen-enum-defs"],
+            "LinalgExtEnums.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtBase.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtInterfacesIncGen",
+    tbl_outs = [
+        (
+            ["--gen-op-interface-decls"],
+            "LinalgExtInterfaces.h.inc",
+        ),
+        (
+            ["--gen-op-interface-defs"],
+            "LinalgExtInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtInterfaces.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtOpsIncGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "LinalgExtOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "LinalgExtOps.cpp.inc",
+        ),
+        (
+            [
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-decls",
+            ],
+            "LinalgExtDialect.h.inc",
+        ),
+        (
+            [
+                "--dialect=iree_linalg_ext",
+                "--gen-dialect-defs",
+            ],
+            "LinalgExtDialect.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtOps.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "LinalgExtTypesGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-attrdef-decls",
+                "--attrdefs-dialect=iree_linalg_ext",
+            ],
+            "LinalgExtAttrs.h.inc",
+        ),
+        (
+            [
+                "--gen-attrdef-defs",
+                "--attrdefs-dialect=iree_linalg_ext",
+            ],
+            "LinalgExtAttrs.cpp.inc",
+        ),
+        (
+            [
+                "--gen-typedef-decls",
+                "--typedefs-dialect=iree_linalg_ext",
+            ],
+            "LinalgExtTypes.h.inc",
+        ),
+        (
+            [
+                "--gen-typedef-defs",
+                "--typedefs-dialect=iree_linalg_ext",
+            ],
+            "LinalgExtTypes.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtBase.td",
+    deps = [":td_files"],
+)
+
+iree_tablegen_doc(
+    name = "LinalgExtDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "-dialect=iree_linalg_ext",
+            ],
+            "LinalgExtDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgExtOps.td",
+    deps = [":td_files"],
+)

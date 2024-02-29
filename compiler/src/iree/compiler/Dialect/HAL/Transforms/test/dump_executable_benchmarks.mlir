@@ -4,9 +4,9 @@
 // but this is much easier to test with lit.
 
 #executable_target_embedded_elf_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#device_target_cpu = #hal.device.target<"llvm-cpu", {
-  executable_targets = [#executable_target_embedded_elf_x86_64]
-}>
+#device_target_cpu = #hal.device.target<"llvm-cpu", [
+  #executable_target_embedded_elf_x86_64
+]>
 #pipeline_layout_0 = #hal.pipeline.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -134,46 +134,29 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
-      } attributes {hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]}
+      }
       // NOTE: today the dynamic args will prevent us from generating
       // benchmarks. We could handle this better by tracking alignment and such.
       stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch0[%c512](%c300_i32, %dynamic_arg : i32, i32) {
         ro %result_capture[%c0 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c32 for %c32] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
-      } attributes {hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>,
-        #hal.interface.binding<0, 2>
-      ]}
+      }
 
       // Multiple dispatches to a single entry point.
       // Dispatches are deduplicated and the two 128x32x1 should combine.
       stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c512, %c1] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
-      } attributes {hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>
-      ]}
+      }
       stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c128, %c32] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
-      } attributes {hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>
-      ]}
+      }
       stream.cmd.dispatch @ex0::@embedded_elf_x86_64::@dispatch1[%c128, %c32] {
         ro %result_capture[%c0 for %c64] : !stream.resource<transient>{%c128},
         rw %result_capture[%c64 for %c32] : !stream.resource<transient>{%c128}
-      } attributes {hal.interface.bindings = [
-        #hal.interface.binding<0, 0>,
-        #hal.interface.binding<0, 1>
-      ]}
+      }
     } => !stream.timepoint
     %39 = stream.resource.dealloca await(%6) => %result : !stream.resource<transient>{%c128} => !stream.timepoint
     util.return %39 : !stream.timepoint

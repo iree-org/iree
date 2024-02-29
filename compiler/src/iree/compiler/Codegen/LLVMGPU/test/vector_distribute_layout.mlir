@@ -14,15 +14,15 @@ func.func @matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, 
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [1, 0], element_order = [0, 1],
+// CHECK-SAME:   thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 
 // -----
@@ -41,15 +41,15 @@ func.func @matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>,
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [1, 0], element_order = [0, 1],
+// CHECK-SAME:   thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   subgroup_order = [1, 0], batch_order = [1, 0], outer_order = [1, 0], thread_order = [1, 0], element_order = [0, 1],
+// CHECK-SAME:   subgroup_order = [1, 0], batch_order = [1, 0], outer_order = [1, 0], thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [2, 32]>
 
 // -----
@@ -109,24 +109,22 @@ func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offs
 
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}<storage_buffer>>, vector<16x32xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [0, 1],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [16, 4]>
 //      CHECK: transfer '{{.+}} memref<256x16xf16{{.+}}<storage_buffer>>, vector<32x16xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [0, 1],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [32, 2]>
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 4],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [1, 0], element_order = [0, 1],
+// CHECK-SAME:   thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 
 // -----
@@ -171,7 +169,6 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 //  CHECK-NOT: transfer '{{.+}} memref<16x16xf16{{.+}}<storage_buffer>>, vector<16x16xf16>' vector layout
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}<storage_buffer>>, vector<16x32xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [0, 1],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [16, 4]>
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}storage_buffer>>, vector<32x16xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [8, 1],
@@ -180,14 +177,51 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 4],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [1, 0], element_order = [0, 1],
+// CHECK-SAME:   thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [0, 1], batch_order = [0, 1], outer_order = [0, 1], thread_order = [0, 1], element_order = [1, 0],
+// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 
+// -----
+
+func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
+                                  %rhs: memref<32x16xf16>,
+                                  %bias: memref<16x16xf32>,
+                                  %out: memref<16x16xf32>)
+  attributes {
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
+    workgroup_size = [64, 1, 1]} {
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_f32 = arith.constant 0.000000e+00 : f32
+  %c32 = arith.constant 32 : index
+  %c256 = arith.constant 256 : index
+  %c0 = arith.constant 0 : index
+  %acc = vector.transfer_read %out[%c0, %c0], %cst_f32 {in_bounds = [true, true]} : memref<16x16xf32>, vector<16x16xf32>
+  %8 = vector.transfer_read %lhs[%c0, %c0], %cst {in_bounds = [true, true]} : memref<16x32xf16>, vector<16x32xf16>
+  %9 = vector.transfer_read %rhs[%c0, %c0], %cst {in_bounds = [true, true]} : memref<32x16xf16>, vector<32x16xf16>
+  %10 = vector.contract {
+    indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+    %8, %9, %acc : vector<16x32xf16>, vector<32x16xf16> into vector<16x16xf32>
+  %11 = vector.transfer_read %bias[%c0, %c0], %cst_f32 {in_bounds = [true, true]} : memref<16x16xf32>, vector<16x16xf32>
+  %12 = arith.addf %10, %11 : vector<16x16xf32>
+  vector.transfer_write %12, %out[%c0, %c0] {in_bounds = [true, true]} : vector<16x16xf32>, memref<16x16xf32>
+  return
+}
+
+// We don't really care what layout we assign here, just that the only anchor
+// we set is on the contraction.
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract A vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract B vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout
+//      CHECK: contract C vector layout
+//  CHECK-NOT: transfer {{.*}} vector layout

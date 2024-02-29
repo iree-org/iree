@@ -6,13 +6,13 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -58,8 +58,8 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
     result.push_back(cast<tensor::DimOp>(op));
   return result;
 }
-void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::Listener::notifyOperationRemoved(op);
+void TensorDimTrackingRewriter::notifyOperationErased(Operation *op) {
+  IRRewriter::Listener::notifyOperationErased(op);
   if (isa<tensor::DimOp>(op))
     dimOps.erase(op);
 }
@@ -216,6 +216,10 @@ static bool hasFusableUnpackProducer(linalg::LinalgOp linalgOp) {
 /// formation.
 static bool isRootOp(Operation *op) {
   if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+    return false;
+  }
+  // Dequantization-like ops get cloned into dispatches later.
+  if (isDequantizationLikeOp(op)) {
     return false;
   }
   // Any Linalg named op or generic op with reduction iterator types is a root

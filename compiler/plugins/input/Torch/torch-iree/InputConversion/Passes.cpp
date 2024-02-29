@@ -6,6 +6,7 @@
 
 #include "torch-iree/InputConversion/Passes.h"
 
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -49,6 +50,8 @@ void createTorchToIREEPipeline(
   pm.addNestedPass<func::FuncOp>(
       torch::Torch::createDecomposeComplexOpsPass(emptyArrayRef));
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTMTensorPass());
+  pm.addNestedPass<func::FuncOp>(
+      TorchInput::createConvertTMTensorToLinalgExtPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToTensorPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToLinalgPass());
   pm.addNestedPass<func::FuncOp>(torch::createConvertTorchToSCFPass());
@@ -65,15 +68,19 @@ void createTorchToIREEPipeline(
   // The resolution of `dim` ops tends to create identical ops. CSE them.
   pm.addNestedPass<func::FuncOp>(createCSEPass());
 
+  // Regular function calls in torch have to be inlined presently. In the
+  // future, we would like to support async invocation, which will operate
+  // differently and would not be subject to inlining.
+  pm.addPass(mlir::createInlinerPass());
+
+  pm.addPass(createFuncConversionPass());
+  pm.addNestedPass<IREE::Util::FuncOp>(createCanonicalizerPass());
+  pm.addPass(createSymbolDCEPass());
+
   // Finish the type conversion from `torch` types to the types of the
   // linalg-on-tensors backend contract.
-  pm.addPass(torch::TorchConversion::createFuncBackendTypeConversionPass());
-  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<func::FuncOp>(
+  pm.addNestedPass<IREE::Util::FuncOp>(
       torch::TorchConversion::createFinalizingBackendTypeConversionPass());
-
-  // TODO: Add validation pass.
-  pm.addPass(createSymbolDCEPass());
 }
 
 void registerTMTensorConversionPasses() {
