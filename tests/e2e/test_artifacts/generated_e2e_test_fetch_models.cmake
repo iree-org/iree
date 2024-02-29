@@ -119,8 +119,8 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-BertLargeTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_000793afb016fb3afc559304bcb3ba6cdb2df1825e8976ca236c07c12e4f65fa.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.mlirbc"
   UNPACK
 )
 

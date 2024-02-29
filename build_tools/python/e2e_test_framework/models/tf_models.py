@@ -56,7 +56,7 @@ BERT_LARGE_TF_FP32_SEQLEN384 = common_definitions.Model(
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Derived from https://github.com/mlcommons/inference/tree/master/language/bert
     # Instructions on how to regenerate the model: https://gist.github.com/mariecwhite/e61ccebd979d98d097946ac7725bcc29
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertLargeTF_2023-05-07.timestamp_1683504734j.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertLargeTF_000793afb016fb3afc559304bcb3ba6cdb2df1825e8976ca236c07c12e4f65fa.mlirbc",
     entry_function="serving_default",
     input_types=["1x384xi32", "1x384xi32", "1x384xi32"],
 )
