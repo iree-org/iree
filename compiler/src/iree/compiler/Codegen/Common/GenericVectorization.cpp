@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -25,9 +26,11 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static std::optional<SmallVector<int64_t>> inferVectorSizesFromIR(Value val);
+
 /// Tries to infer the vector sizes from an IR using ValueBounds analysis.
 /// Returns failure if vector sizes can't be inferred.
-static FailureOr<SmallVector<int64_t>>
+static std::optional<SmallVector<int64_t>>
 inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
   LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
 
@@ -40,7 +43,7 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
     SmallVector<std::pair<Value, unsigned>> operandDimPairs;
     linalgOp.mapIterationSpaceDimToAllOperandDims(dim, operandDimPairs);
     if (operandDimPairs.empty()) {
-      return failure();
+      return std::nullopt;
     }
 
     Value firstOperand = operandDimPairs[0].first;
@@ -71,7 +74,7 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
     }
 
     if (failed(maybeDimBound)) {
-      return failure();
+      return std::nullopt;
     }
 
     dimSize = maybeDimBound.value();
@@ -83,13 +86,81 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
   return vectorSizes;
 }
 
-// Return the vector sizes from the local lowering config or try to infer them
+static std::optional<SmallVector<int64_t>>
+inferVectorSizesFromIR(tensor::PackOp op) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << op << "\n");
+
+  if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
+        return !getConstantIntValue(v).has_value();
+      })) {
+    LLVM_DEBUG(VEC_DBGS() << "skip, because inner_tiles are not all constant");
+    return std::nullopt;
+  }
+
+  SmallVector<int64_t> vectorSizes;
+  auto inferred = inferVectorSizesFromIR(op.getSource());
+  if (!inferred) {
+    return std::nullopt;
+  }
+  vectorSizes = inferred.value();
+
+  for (auto [dimPos, tileSize] :
+       llvm::zip_equal(op.getInnerDimsPos(), op.getStaticInnerTiles())) {
+    if (vectorSizes[dimPos] % tileSize != 0) {
+      return std::nullopt;
+    }
+    vectorSizes[dimPos] /= tileSize;
+  }
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(vectorSizes, outerDimsPerm);
+  }
+
+  LLVM_DEBUG({
+    VEC_DBGS() << "After adjustment with inner tiles and "
+                  "outer_dims_perm:\n";
+    for (auto [idx, val] : llvm::enumerate(vectorSizes)) {
+      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+    }
+  });
+
+  return vectorSizes;
+}
+
+static std::optional<SmallVector<int64_t>> inferVectorSizesFromIR(Value val) {
+  std::optional<SmallVector<int64_t>> result;
+  TypeSwitch<Operation *, void>(val.getDefiningOp())
+      .Case<linalg::LinalgOp, tensor::PackOp>(
+          [&](auto op) { result = inferVectorSizesFromIR(op); })
+      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
+        LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << op << "\n");
+        SmallVector<int64_t> vectorSizes;
+        int64_t destRank = op.getResult().getType().getRank();
+        for (int dim = 0; dim < destRank; ++dim) {
+          LLVM_DEBUG(VEC_DBGS() << "Dim #" << dim << ": ");
+          FailureOr<int64_t> maybeDimBound =
+              ValueBoundsConstraintSet::computeConstantBound(
+                  presburger::BoundType::UB, op, dim,
+                  /*stopCondition=*/nullptr, /*closedUB=*/true);
+          if (failed(maybeDimBound)) {
+            LLVM_DEBUG(llvm::dbgs() << "failed\n");
+            return;
+          }
+          LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
+          vectorSizes.push_back(maybeDimBound.value());
+        }
+        result = vectorSizes;
+      })
+      .Default([&](Operation *) {});
+  return result;
+}
+
+// Renurn the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
-static FailureOr<SizesAndScalableFlags>
-getVectorSizes(linalg::LinalgOp linalgOp, bool useConfiguredVectorSizes) {
+static std::optional<SizesAndScalableFlags>
+getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   // Get vector sizes from the lowering config, if available in the op itself.
-  IREE::Codegen::LoweringConfigAttr loweringConfig =
-      getLoweringConfig(linalgOp);
+  IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
   if (useConfiguredVectorSizes && loweringConfig) {
     TilingConfig tilingConfig(loweringConfig);
     auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
@@ -99,13 +170,29 @@ getVectorSizes(linalg::LinalgOp linalgOp, bool useConfiguredVectorSizes) {
   }
 
   // Try to infer the vector sizes from the IR.
-  auto vectorSizes = inferVectorSizesFromIR(linalgOp);
-  if (succeeded(vectorSizes)) {
+  std::optional<SmallVector<int64_t>> vectorSizes;
+  TypeSwitch<Operation *, void>(op)
+      .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
+        vectorSizes = inferVectorSizesFromIR(linalgOp);
+      })
+      .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
+        auto ty = padOp.getResultType();
+        // TODO(hanchung): Infer the vector sizes for pad op after
+        // maskedVectorize method allows dynamic result shapes.
+        if (!ty.hasStaticShape())
+          return;
+        vectorSizes = SmallVector<int64_t>(ty.getShape());
+      })
+      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+        vectorSizes = inferVectorSizesFromIR(packOp);
+      })
+      .Default([&](Operation *) {});
+  if (vectorSizes) {
     // This can't identify scalable flags, so pad them with `false`.
-    return std::make_pair(*vectorSizes,
+    return std::make_pair(vectorSizes.value(),
                           SmallVector<bool>(vectorSizes->size(), false));
   }
-  return failure();
+  return std::nullopt;
 }
 
 static LogicalResult isWithinVectorSizeLimit(linalg::LinalgOp linalgOp,
@@ -155,21 +242,30 @@ void GenericVectorizationPass::runOnOperation() {
       candidates.push_back(op);
     if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
       candidates.push_back(op);
+    if (enableVectorMasking && isa<tensor::PackOp>(op))
+      candidates.push_back(op);
   });
+
+  // The vector input sizes inference needs to use producers, so we apply
+  // vectorization from bottom to top.
+  std::reverse(candidates.begin(), candidates.end());
   for (Operation *op : candidates) {
     SmallVector<int64_t> vectorSizes;
     SmallVector<bool> scalableVecDims;
+    if (enableVectorMasking) {
+      std::optional<SizesAndScalableFlags> vectorSizesAndScalableDims =
+          getVectorSizes(op, useConfiguredVectorSizes);
+      if (vectorSizesAndScalableDims) {
+        auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
+        vectorSizes.append(sizes.begin(), sizes.end());
+        scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+      }
+    }
+
     if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
       // Do not vectorize the op if the vector size is greater than or equal
       // to limit.
       if (enableVectorMasking) {
-        auto vectorSizesAndScalableDims =
-            getVectorSizes(linalgOp, useConfiguredVectorSizes);
-        if (succeeded(vectorSizesAndScalableDims)) {
-          auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
-          vectorSizes.append(sizes.begin(), sizes.end());
-          scalableVecDims.append(scalableDims.begin(), scalableDims.end());
-        }
         if (std::accumulate(vectorSizes.begin(), vectorSizes.end(), 1,
                             std::multiplies<int64_t>()) >= maxVectorSize)
           continue;
@@ -177,13 +273,6 @@ void GenericVectorizationPass::runOnOperation() {
         if (failed(isWithinVectorSizeLimit(linalgOp, maxVectorSize)))
           continue;
       }
-    } else if (auto padOp = dyn_cast<tensor::PadOp>(op)) {
-      auto ty = padOp.getResultType();
-      // TODO(hanchung): Infer the vector sizes for pad op after
-      // maskedVectorize method allows dynamic result shapes.
-      if (!ty.hasStaticShape())
-        continue;
-      vectorSizes.append(ty.getShape().begin(), ty.getShape().end());
     }
     // Pad scalable dims with `false` to match the vector sizes.
     scalableVecDims.resize(vectorSizes.size());
