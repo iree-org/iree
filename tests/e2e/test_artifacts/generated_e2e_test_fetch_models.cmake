@@ -91,8 +91,8 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-MiniLML12H384Uncased"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_5aed9c3c3dfe8247ce76b74d518fa570b94dc0c3732631734d02ad70e4c74867.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
   UNPACK
 )
 

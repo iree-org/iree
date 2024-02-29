@@ -21,7 +21,7 @@ MINILM_L12_H384_UNCASED_INT32_SEQLEN128 = common_definitions.Model(
     tags=["int32", "seqlen128"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://huggingface.co/microsoft/MiniLM-L12-H384-uncased/commit/44acabbec0ef496f6dbc93adadea57f376b7c0ec
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734j.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/MiniLML12H384Uncased_5aed9c3c3dfe8247ce76b74d518fa570b94dc0c3732631734d02ad70e4c74867.mlirbc",
     entry_function="predict",
     input_types=["1x128xi32", "1x128xi32", "1x128xi32"],
 )
