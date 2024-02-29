@@ -21,8 +21,11 @@ static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
 }
 
 ArrayAttr getROCMSupportedMmaAttrs(MLIRContext *context, StringRef targetArch) {
-  // MI300a/x
-  if (targetArch == "gfx940" || targetArch == "gfx942") {
+  if (targetArch == "gfx940" || targetArch == "gfx942") { // MI300A/X
+    return getMfmaArrayAttr(context,
+                            {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
+                             IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});
+  } else if (targetArch == "gfx90a") { // MI210
     return getMfmaArrayAttr(context,
                             {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
                              IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});

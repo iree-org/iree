@@ -8,7 +8,7 @@
 #   * CMake
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75
+FROM gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can

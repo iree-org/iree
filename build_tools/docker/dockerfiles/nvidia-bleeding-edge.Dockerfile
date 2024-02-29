@@ -18,7 +18,7 @@ ARG NVIDIA_COMMON_DEB="libnvidia-common-535_535.113.01-0ubuntu0.22.04.1_all.deb"
 ARG NVIDIA_EGL_WAYLAND_DEB="libnvidia-egl-wayland1_1.1.9-1.1_amd64.deb"
 
 
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 AS fetch-nvidia
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 AS fetch-nvidia
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB
@@ -39,7 +39,7 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_EGL_WAYLA
 # - nvidia/vulkan (https://hub.docker.com/r/nvidia/vulkan):
 #      does not support Ubuntu 22.04.
 # This allows to share configuration with base CMake.
-FROM gcr.io/iree-oss/base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418 AS final
+FROM gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 AS final
 ARG NVIDIA_COMMON_DEB
 ARG NVIDIA_GL_DEB
 ARG NVIDIA_COMPUTE_DEB

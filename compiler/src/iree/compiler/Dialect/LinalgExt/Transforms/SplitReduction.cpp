@@ -24,10 +24,11 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::LinalgExt;
-
+namespace mlir::iree_compiler::IREE::LinalgExt {
 namespace {
+
+// Marker used as attribute the depth of the split reduction transformations.
+const StringLiteral kSplitReductionDepthMarker = "__split_reduction_depth__";
 
 SmallVector<int64_t> getExpandedShape(ArrayRef<int64_t> shape,
                                       int64_t splitReductionRatio,
@@ -66,7 +67,7 @@ getReassociationIndices(int64_t rank, int64_t splitDimParallel) {
 }
 
 LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
-                                 PatternRewriter &rewriter, int64_t kDimOrig,
+                                 RewriterBase &rewriter, int64_t kDimOrig,
                                  int64_t splitReductionRatio,
                                  int64_t splitReductionDepth) {
   // Determine if we should split the reduction. Requires aligned static shapes
@@ -95,7 +96,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
 // Creates the first phase of the topk split reduction by reshaping the input
 // into parallel computations then feeding them into a topk op.
 iree_compiler::IREE::LinalgExt::TopkOp
-computeParallelTopk(Location loc, PatternRewriter &rewriter,
+computeParallelTopk(Location loc, RewriterBase &rewriter,
                     iree_compiler::IREE::LinalgExt::TopkOp topkOp,
                     ArrayRef<ReassociationIndices> reassociationIndices,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
@@ -141,9 +142,9 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
           rewriter.create<tensor::DimOp>(loc, valuesExpanded, i));
     }
   }
-  Value emptyTensorOutputValues = rewriter.create<mlir::tensor::EmptyOp>(
+  Value emptyTensorOutputValues = rewriter.create<tensor::EmptyOp>(
       loc, outputValuesExpandedType.getShape(), valueElementType, dynSizes);
-  Value emptyTensorOutputIndices = rewriter.create<mlir::tensor::EmptyOp>(
+  Value emptyTensorOutputIndices = rewriter.create<tensor::EmptyOp>(
       loc, outputIndicesExpandedType.getShape(), indicesElementType, dynSizes);
 
   // Initialize indices to positive infinity and values to negative infinity
@@ -196,7 +197,7 @@ computeParallelTopk(Location loc, PatternRewriter &rewriter,
 // splitReductionFn() ways. The following linalg.generic adds the appropriate
 // offset to reflect to values original position. "Updated pos" = "initial
 // pos" + "splitDimParallel size * "splitDimParallel index"
-Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
+Value offsetParallelIndices(Location loc, RewriterBase &rewriter,
                             Value parallelIndices, int64_t kDimParallelSize,
                             int64_t splitDimParallel) {
   auto parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
@@ -228,9 +229,8 @@ Value offsetParallelIndices(Location loc, PatternRewriter &rewriter,
 
 // Creates the second phase of the topk split reduction by collapsing output
 // from parallel topk and computing the final combined result.
-TopkOp computeReductionTopk(Location loc, PatternRewriter &rewriter,
-                            TopkOp topkOp, TopkOp parallelTopkOp,
-                            Value updatedParallelIndices,
+TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
+                            TopkOp parallelTopkOp, Value updatedParallelIndices,
                             ArrayRef<ReassociationIndices> reassociationIndices,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
@@ -277,93 +277,11 @@ int64_t getSplitReductionDepth(TopkOp topkOp) {
   }
 }
 
-void setSplitReductionDepth(TopkOp topkOp, PatternRewriter &rewriter,
+void setSplitReductionDepth(TopkOp topkOp, RewriterBase &rewriter,
                             int64_t depth) {
   topkOp->setAttr(kSplitReductionDepthMarker,
                   rewriter.getI64IntegerAttr(depth));
 }
-
-struct TopkOpSplitReduction : public OpRewritePattern<TopkOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  TopkOpSplitReduction(MLIRContext *context, TopkSplitReductionControlFn fn,
-                       LinalgTransformationFilter filt)
-      : OpRewritePattern<TopkOp>(context), splitReductionFn(std::move(fn)),
-        filter(std::move(filt)) {}
-
-  // Transforms an applicable standard single reduction TopkOp into a parallel
-  // reduction TopkOp with a reduce step following.
-  //
-  // Handles parallel reductions in 2 phases: A "map" parallel phase and the a
-  // single "reduce" reduction phase. The first phase expands the input tensor
-  // shape by breaking the reduction dimension into multiple parallel reductions
-  // (upping the rank of the input). Topk is run on these dimensions in parallel
-  // The second phase collapses the parallel results into a single final reduce.
-  // Topk is run again on the combined output to produce a final output.
-  //
-  // Currently only topk operations without input indices are supported.
-  LogicalResult matchAndRewrite(TopkOp topkOp,
-                                PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, topkOp))) {
-      return rewriter.notifyMatchFailure(topkOp, "preconditions not met");
-    }
-    Location loc = topkOp.getLoc();
-    // Original reduction dimension used for the final combined reduction
-    int64_t kDimOrig = topkOp.getDimension();
-    // For parallel topk: the dimension that we compute parallel reductions
-    int64_t splitDimParallel = kDimOrig;
-    // For parallel topk: the dimension that we reduce
-    int64_t kDimParallel = kDimOrig + 1;
-    int64_t kSize =
-        topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
-    int64_t splitReductionDepth = getSplitReductionDepth(topkOp);
-    int64_t splitReductionRatio = splitReductionFn(splitReductionDepth);
-    SmallVector<ReassociationIndices> reassociationIndices =
-        getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
-
-    // Determine if should compute parallel topk
-    LogicalResult shouldParallelTopkResult = shouldParallelTopk(
-        topkOp, rewriter, kDimOrig, splitReductionRatio, splitReductionDepth);
-    if (shouldParallelTopkResult.failed()) {
-      return shouldParallelTopkResult;
-    }
-
-    // Topk parallel reduction
-    TopkOp parallelTopkOp = computeParallelTopk(
-        loc, rewriter, topkOp, reassociationIndices, splitReductionRatio,
-        splitDimParallel, kDimParallel, kSize);
-
-    // Update parallel indices to correct offsets if input indices weren't
-    // provided. If input indices were provided, no offsetting is needed as
-    // original original indices are already known.
-    Value updatedParallelIndices = parallelTopkOp.getResult(1);
-    if (!topkOp.indices()) {
-      Value parallelIndices = parallelTopkOp.getResult(1);
-      SmallVector<int64_t> expandedShape = getExpandedShape(
-          topkOp.values().getType().cast<ShapedType>().getShape(),
-          splitReductionRatio, splitDimParallel);
-      int64_t kDimParallelSize = expandedShape[kDimParallel];
-      updatedParallelIndices = offsetParallelIndices(
-          loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);
-    }
-
-    // Topk final reduction
-    TopkOp reductionTopkOp = computeReductionTopk(
-        loc, rewriter, topkOp, parallelTopkOp, updatedParallelIndices,
-        reassociationIndices, splitReductionRatio, kDimOrig, kSize);
-
-    // Replace and update result
-    rewriter.replaceOp(topkOp, reductionTopkOp.getResults());
-    filter.replaceLinalgTransformationFilter(rewriter, parallelTopkOp);
-    setSplitReductionDepth(reductionTopkOp, rewriter, splitReductionDepth + 1);
-    return success();
-  }
-
-private:
-  TopkSplitReductionControlFn splitReductionFn;
-  LinalgTransformationFilter filter;
-};
-
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -375,15 +293,15 @@ struct TopkSplitReductionPass
     : public TopkSplitReductionBase<TopkSplitReductionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<linalg::LinalgDialect, mlir::arith::ArithDialect,
-                math::MathDialect, memref::MemRefDialect, scf::SCFDialect>();
+        .insert<linalg::LinalgDialect, arith::ArithDialect, math::MathDialect,
+                memref::MemRefDialect, scf::SCFDialect>();
   }
 
   void runOnOperation() override {
     if (splitRatios.empty()) {
       return;
     }
-    RewritePatternSet patterns(&getContext());
+
     TopkSplitReductionControlFn splitReductionFn =
         [&](int64_t splitReductionDepth) -> int64_t {
       SmallVector<int64_t, 4> reductionRatios(splitRatios.begin(),
@@ -395,35 +313,92 @@ struct TopkSplitReductionPass
       }
     };
 
-    patterns.add<TopkOpSplitReduction>(
-        patterns.getContext(), splitReductionFn,
-        LinalgTransformationFilter(
-            ArrayRef<StringAttr>{},
-            StringAttr::get(patterns.getContext(), "SPLIT_REDUCTION")));
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
-    }
-
-    // Remove all the markers at the end.
+    IRRewriter rewriter(&getContext());
     auto funcOp = getOperation();
-    funcOp->walk([&](TopkOp op) {
-      op->removeAttr(LinalgTransforms::kLinalgTransformMarker);
-      op->removeAttr(kSplitReductionDepthMarker);
-    });
+    SmallVector<LinalgExt::TopkOp> topkCandidates;
+    funcOp->walk([&](LinalgExt::TopkOp op) { topkCandidates.push_back(op); });
+    for (auto op : topkCandidates) {
+      (void)splitReduction(rewriter, op, splitReductionFn);
+    }
   }
 };
 } // namespace
 
-void mlir::iree_compiler::IREE::LinalgExt::populateTopkSplitReductionPattern(
-    RewritePatternSet &patterns,
-    const TopkSplitReductionControlFn &splitReductionFn,
-    const LinalgTransformationFilter &f) {
-  patterns.add<TopkOpSplitReduction>(patterns.getContext(), splitReductionFn,
-                                     f);
+// Transforms an applicable standard single reduction TopkOp into a parallel
+// reduction TopkOp with a reduce step following.
+//
+// Handles parallel reductions in 2 phases: A "map" parallel phase and the a
+// single "reduce" reduction phase. The first phase expands the input tensor
+// shape by breaking the reduction dimension into multiple parallel reductions
+// (upping the rank of the input). Topk is run on these dimensions in parallel
+// The second phase collapses the parallel results into a single final reduce.
+// Topk is run again on the combined output to produce a final output.
+//
+// Currently only topk operations without input indices are supported.
+LogicalResult
+splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
+               const TopkSplitReductionControlFn &splitReductionFn) {
+  Location loc = topkOp.getLoc();
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(topkOp);
+  // Original reduction dimension used for the final combined reduction
+  int64_t kDimOrig = topkOp.getDimension();
+  // For parallel topk: the dimension that we compute parallel reductions
+  int64_t splitDimParallel = kDimOrig;
+  // For parallel topk: the dimension that we reduce
+  int64_t kDimParallel = kDimOrig + 1;
+  int64_t kSize =
+      topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
+  int64_t splitReductionDepth = getSplitReductionDepth(topkOp);
+  int64_t splitReductionRatio = splitReductionFn(splitReductionDepth);
+  SmallVector<ReassociationIndices> reassociationIndices =
+      getReassociationIndices(topkOp.getInputRank(), splitDimParallel);
+
+  // Determine if should compute parallel topk
+  LogicalResult shouldParallelTopkResult = shouldParallelTopk(
+      topkOp, rewriter, kDimOrig, splitReductionRatio, splitReductionDepth);
+  if (shouldParallelTopkResult.failed()) {
+    return shouldParallelTopkResult;
+  }
+
+  // Topk parallel reduction
+  TopkOp parallelTopkOp = computeParallelTopk(
+      loc, rewriter, topkOp, reassociationIndices, splitReductionRatio,
+      splitDimParallel, kDimParallel, kSize);
+
+  // Update parallel indices to correct offsets if input indices weren't
+  // provided. If input indices were provided, no offsetting is needed as
+  // original original indices are already known.
+  Value updatedParallelIndices = parallelTopkOp.getResult(1);
+  if (!topkOp.indices()) {
+    Value parallelIndices = parallelTopkOp.getResult(1);
+    SmallVector<int64_t> expandedShape = getExpandedShape(
+        topkOp.values().getType().cast<ShapedType>().getShape(),
+        splitReductionRatio, splitDimParallel);
+    int64_t kDimParallelSize = expandedShape[kDimParallel];
+    updatedParallelIndices = offsetParallelIndices(
+        loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);
+  }
+
+  // Topk final reduction
+  TopkOp reductionTopkOp = computeReductionTopk(
+      loc, rewriter, topkOp, parallelTopkOp, updatedParallelIndices,
+      reassociationIndices, splitReductionRatio, kDimOrig, kSize);
+
+  // Replace and update result
+  rewriter.replaceOp(topkOp, reductionTopkOp.getResults());
+  setSplitReductionDepth(reductionTopkOp, rewriter, splitReductionDepth + 1);
+
+  // Recursively apply split reduction until reaching the target depth.
+  if (failed(splitReduction(rewriter, reductionTopkOp, splitReductionFn))) {
+    reductionTopkOp->removeAttr(LinalgExt::kSplitReductionDepthMarker);
+  }
+
+  return success();
 }
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-mlir::iree_compiler::IREE::LinalgExt::createTopkSplitReductionPass() {
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createTopkSplitReductionPass() {
   return std::make_unique<TopkSplitReductionPass>();
 }
+} // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -3,12 +3,10 @@
 // Tests an executable with a workgroup count region specified.
 
 module attributes {hal.device.targets = [
-  #hal.device.target<"llvm-cpu", {
-    executable_targets = [
-      #hal.executable.target<"llvm-cpu", "arm_64">,
-      #hal.executable.target<"llvm-cpu", "x86_64">
-    ]
-  }>
+  #hal.device.target<"llvm-cpu", [
+    #hal.executable.target<"llvm-cpu", "arm_64">,
+    #hal.executable.target<"llvm-cpu", "x86_64">
+  ]>
 ]} {
   // CHECK: #pipeline_layout = #hal.pipeline.layout<
   // CHECK-SAME: push_constants = 1
@@ -78,12 +76,10 @@ module attributes {
   // The default device when none is specified.
   // Functions and scopes can override the target device.
   hal.device.targets = [
-    #hal.device.target<"cpu", {
-      executable_targets = [
-        #hal.executable.target<"llvm-cpu", "arm_64">,
-        #hal.executable.target<"llvm-cpu", "x86_64">
-      ]
-    }>
+    #hal.device.target<"cpu", [
+      #hal.executable.target<"llvm-cpu", "arm_64">,
+      #hal.executable.target<"llvm-cpu", "x86_64">
+    ]>
   ]
 } {
   // CHECK: hal.executable private @ex
@@ -121,11 +117,9 @@ module attributes {
   // CHECK-LABEL: @using_specialized
   util.func public @using_specialized(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint attributes {
     hal.device.targets = [
-      #hal.device.target<"cpu", {
-        executable_targets = [
-          #hal.executable.target<"llvm-cpu", "riscv_32">
-        ]
-      }>
+      #hal.device.target<"cpu", [
+        #hal.executable.target<"llvm-cpu", "riscv_32">
+      ]>
     ]
   } {
     %c0 = arith.constant 0 : index
@@ -153,12 +147,10 @@ module attributes {
   // The default device when none is specified.
   // Functions and scopes can override the target device.
   hal.device.targets = [
-    #hal.device.target<"cpu", {
-      executable_targets = [
-        #hal.executable.target<"llvm-cpu", "arm_64">,
-        #hal.executable.target<"llvm-cpu", "x86_64">
-      ]
-    }>
+    #hal.device.target<"cpu", [
+      #hal.executable.target<"llvm-cpu", "arm_64">,
+      #hal.executable.target<"llvm-cpu", "x86_64">
+    ]>
   ]
 } {
   // CHECK: hal.executable private @ex
@@ -197,11 +189,9 @@ module attributes {
   // CHECK-LABEL: @using_specialized
   util.func public @using_specialized(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint attributes {
     hal.device.targets = [
-      #hal.device.target<"cpu", {
-        executable_targets = [
-          #hal.executable.target<"llvm-cpu", "riscv_32">
-        ]
-      }>
+      #hal.device.target<"cpu", [
+        #hal.executable.target<"llvm-cpu", "riscv_32">
+      ]>
     ]
   } {
     %c0 = arith.constant 0 : index
@@ -225,12 +215,10 @@ module attributes {
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"cpu", {
-      executable_targets = [
-        #hal.executable.target<"llvm-cpu", "arm_64">,
-        #hal.executable.target<"llvm-cpu", "x86_64">
-      ]
-    }>
+    #hal.device.target<"cpu", [
+      #hal.executable.target<"llvm-cpu", "arm_64">,
+      #hal.executable.target<"llvm-cpu", "x86_64">
+    ]>
   ]
 } {
   // CHECK: hal.executable public @ex
@@ -252,11 +240,9 @@ module attributes {
   // CHECK-LABEL: @using_specialized
   util.func public @using_specialized(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint attributes {
     hal.device.targets = [
-      #hal.device.target<"cpu", {
-        executable_targets = [
-          #hal.executable.target<"llvm-cpu", "riscv_32">
-        ]
-      }>
+      #hal.device.target<"cpu", [
+        #hal.executable.target<"llvm-cpu", "riscv_32">
+      ]>
     ]
   } {
     %c0 = arith.constant 0 : index

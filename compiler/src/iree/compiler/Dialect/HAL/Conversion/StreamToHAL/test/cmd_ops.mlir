@@ -166,9 +166,10 @@ util.func public @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %
 
 #executable_target_aarch64 = #hal.executable.target<"llvm-cpu", "embedded-elf-aarch64">
 #executable_target_x86_64 = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64">
-#device_target_cpu = #hal.device.target<"llvm-cpu", {
-  executable_targets = [#executable_target_aarch64, #executable_target_x86_64]
-}>
+#device_target_cpu = #hal.device.target<"llvm-cpu", [
+  #executable_target_aarch64,
+  #executable_target_x86_64
+]>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<4, storage_buffer>
