@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
     "Passes.h.inc"
-    "Transforms.h"
   SRCS
     "ConvertConv2DToWinograd.cpp"
     "ConvertToLoops.cpp"

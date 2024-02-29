@@ -19,7 +19,6 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -69,8 +68,7 @@ tileToInvocation(mlir::FunctionOpInterface funcOp,
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
   auto marker = StringAttr::get(context, getTileReductionMarker());
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
-      ArrayRef<StringAttr>(), marker);
+  auto filter = LinalgTransformationFilter(ArrayRef<StringAttr>(), marker);
 
   SmallVector<TilingInterface> candidates;
   funcOp.walk([&](TilingInterface op) { candidates.push_back(op); });
@@ -98,7 +96,7 @@ tileReduction(mlir::FunctionOpInterface funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+  auto filter = LinalgTransformationFilter(
       StringAttr::get(context, getTileReductionMarker()), std::nullopt);
   auto options =
       scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);

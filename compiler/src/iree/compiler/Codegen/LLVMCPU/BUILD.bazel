@@ -98,7 +98,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
-        "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/Utils",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/Util/Transforms",
