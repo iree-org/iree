@@ -556,7 +556,7 @@ util.func public @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<1
 
 // -----
 
-util.func public @no_fuse_dequant_with_producer(%arg0: tensor<12x128x128xf16>, %arg1: tensor<12x128x128xf16>) -> tensor<12x128x128xf32> {
+util.func public @fuse_single_use_dequant_with_producer(%arg0: tensor<12x128x128xf16>, %arg1: tensor<12x128x128xf16>) -> tensor<12x128x128xf32> {
   %4 = tensor.empty() : tensor<12x128x128xf16>
   %5 = linalg.generic {
     indexing_maps = [
@@ -592,17 +592,16 @@ util.func public @no_fuse_dequant_with_producer(%arg0: tensor<12x128x128xf16>, %
   } -> tensor<12x128x128xf32>
   util.return %8 : tensor<12x128x128xf32>
 }
-// CHECK-LABEL: util.func public @no_fuse_dequant_with_producer
+// CHECK-LABEL: util.func public @fuse_single_use_dequant_with_producer
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
 //       CHECK:     arith.subf
-//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
-//       CHECK:     %[[EXT:.+]] = arith.extf
-//       CHECK:     math.exp %[[EXT]]
+//  CHECK-NEXT:     arith.extf
+//  CHECK-NEXT:     math.exp
 
 // -----
 
 util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x128xf16>,
-                                                          %arg1: tensor<12x128x128xf16>) -> (tensor<12x128x128xf32>, tensor<12x128x128xf32>) {
+                                                          %arg1: tensor<12x128x128xf16>) -> (tensor<12x128x128xf32>, tensor<12x128xf32>) {
   %4 = tensor.empty() : tensor<12x128x128xf16>
   %5 = linalg.generic {
     indexing_maps = [
@@ -636,17 +635,19 @@ util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x1
     %12 = math.exp %b0 : f32
     linalg.yield %12 : f32
   } -> tensor<12x128x128xf32>
+  %empty = tensor.empty() : tensor<12x128xf32>
   %9 = linalg.generic {
     indexing_maps = [
       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
-      affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-    ], iterator_types = ["parallel", "parallel", "parallel"]}
-    ins(%7 : tensor<12x128x128xf32>) outs(%6 : tensor<12x128x128xf32>) {
+      affine_map<(d0, d1, d2) -> (d0, d1)>
+    ], iterator_types = ["parallel", "parallel", "reduction"]}
+    ins(%7 : tensor<12x128x128xf32>) outs(%empty : tensor<12x128xf32>) {
   ^bb0(%b0: f32, %b1: f32):
     %13 = math.rsqrt %b0 : f32
-    linalg.yield %13 : f32
-  } -> tensor<12x128x128xf32>
-  util.return %8, %9 : tensor<12x128x128xf32>, tensor<12x128x128xf32>
+    %14 = arith.addf %13, %b1 : f32
+    linalg.yield %14 : f32
+  } -> tensor<12x128xf32>
+  util.return %8, %9 : tensor<12x128x128xf32>, tensor<12x128xf32>
 }
 // CHECK-LABEL: util.func public @no_fuse_multi_use_dequant_with_producer
 //       CHECK:   %[[GENERIC0:.+]] = linalg.generic
@@ -657,3 +658,4 @@ util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x1
 //       CHECK:     math.exp
 //       CHECK:   %[[GENERIC3:.+]] = linalg.generic
 //       CHECK:     math.rsqrt
+//  CHECK-NEXT:     arith.addf

@@ -101,15 +101,17 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand,
     return true;
   }
 
-  // Do no fuse dequantization-like operations with producers as we want to keep
-  // the smallest bitwidths at the dispatch boundaries.
-  if (isDequantizationLikeOp(consumerOp)) {
-    return false;
-  }
-
   // If producer does not have a single user, dont fuse.
   if (!producerOp->hasOneUse())
     return false;
+
+  // Do no fuse dequantization-like operations with producers as we want to keep
+  // the smallest bitwidths at the dispatch boundaries, unless the consumer
+  // dequantization op only has one use, in which case elementwise op fusion
+  // is fine.
+  if (isDequantizationLikeOp(consumerOp) && !consumerOp->hasOneUse()) {
+    return false;
+  }
 
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
@@ -119,6 +121,7 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand,
   //      broadcast this ends up redundantly computing operations without more
   //      parallelism.
   if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+
     if (linalgConsumerOp.getNumParallelLoops() ==
         linalgConsumerOp.getNumLoops()) {
       return true;
