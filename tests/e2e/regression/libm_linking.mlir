@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targets=llvm-cpu},iree-transformation-pipeline)' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targets=llvm-cpu},iree-transformation-pipeline)' --iree-llvmcpu-link-embedded=false %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=llvm-cpu},iree-transformation-pipeline)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=llvm-cpu},iree-transformation-pipeline)' --iree-llvmcpu-link-embedded=false %s | FileCheck %s
 
 // When lowering to CPU code through LLVM, certain LLVM intrinsics require
 // linking against libm (the standard C library of math functions, `-lm`).

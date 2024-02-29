@@ -54,7 +54,7 @@ def VerifyTargetEnvironmentPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -69,13 +69,13 @@ def AssignTargetDevicesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     ListOption<
-      "targets", "targets",
+      "targetBackends", "targetBackends",
       "std::string",
-      "List of devices to assign as targets."
+      "List of target backends to assign as device targets."
     >,
   ];
 }
@@ -212,7 +212,7 @@ def ConfigureExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -228,7 +228,7 @@ def ConfigureTargetExecutableVariantsPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -250,7 +250,7 @@ def TranslateExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -267,7 +267,7 @@ def TranslateTargetExecutableVariantsPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -299,7 +299,7 @@ def LinkExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -317,7 +317,7 @@ def LinkTargetExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -353,7 +353,7 @@ def SerializeExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -385,7 +385,7 @@ def SerializeTargetExecutablesPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<

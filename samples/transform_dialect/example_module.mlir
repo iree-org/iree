@@ -30,14 +30,14 @@
 module attributes {
   hal.device.targets = [
     #hal.device.target<"vulkan", [
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #target_env
       }>
     ]>
   ]
 } {
   hal.executable private @example_module_dispatch_0 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
       hal.executable.export public @example_module_dispatch_0_generic_80_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
@@ -63,7 +63,7 @@ module attributes {
     }
   }
   hal.executable private @example_module_dispatch_1 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
       hal.executable.export public @example_module_dispatch_1_matmul_16x16x5_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):
@@ -87,7 +87,7 @@ module attributes {
     }
   }
   hal.executable private @example_module_dispatch_2 {
-    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
+    hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #target_env}>) {
       hal.executable.export public @example_module_dispatch_2_generic_16x16_f32 ordinal(0) layout(
                                    #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
       ^bb0(%arg0: !hal.device):

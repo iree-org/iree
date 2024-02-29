@@ -345,10 +345,15 @@ struct Session {
         pluginActivationStatus = pluginSession.activatePlugins(&context);
 
         // Initialize target registry, bootstrapping with the static globals.
-        targetRegistry.mergeFrom(IREE::HAL::TargetBackendRegistry::getGlobal());
-        IREE::HAL::TargetBackendList pluginTargetList;
-        pluginSession.populateHALTargetBackends(pluginTargetList);
-        targetRegistry.mergeFrom(pluginTargetList);
+        // TODO(15468): remove the static registration mechanism so the merge
+        // from global is not required.
+        targetRegistry.mergeFrom(IREE::HAL::TargetRegistry::getGlobal());
+        IREE::HAL::TargetBackendList pluginTargetBackendList;
+        pluginSession.populateHALTargetBackends(pluginTargetBackendList);
+        targetRegistry.mergeFrom(pluginTargetBackendList);
+        IREE::HAL::TargetDeviceList pluginTargetDeviceList;
+        pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
+        targetRegistry.mergeFrom(pluginTargetDeviceList);
       }
     }
     return pluginActivationStatus;
@@ -368,8 +373,8 @@ struct Session {
   PluginManagerOptions pluginManagerOptions;
   PluginManagerSession pluginSession;
 
-  // We initialize the TargetBackendRegistry lazily with the plugins.
-  IREE::HAL::TargetBackendRegistry targetRegistry;
+  // We initialize the TargetRegistry lazily with the plugins.
+  IREE::HAL::TargetRegistry targetRegistry;
 
   // We lazily activate plugins on the first invocation. This allows plugin
   // activation to be configured at the session level via the API, if
@@ -715,7 +720,7 @@ Invocation::Invocation(Session &session) : session(session) {
   auto &targetRegistry = session.targetRegistry;
   pipelineHooks.buildConstEvalPassPipelineCallback =
       [&targetRegistry](OpPassManager &pm) {
-        pm.addPass(ConstEval::createJitGlobalsPass(targetRegistry));
+        pm.addPass(ConstEval::createJitGlobalsPass({&targetRegistry}));
       };
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.

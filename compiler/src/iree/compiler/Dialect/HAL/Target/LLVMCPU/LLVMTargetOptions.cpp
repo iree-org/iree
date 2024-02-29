@@ -10,9 +10,11 @@
 
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
@@ -141,19 +143,26 @@ std::optional<LLVMTarget> LLVMTarget::create(std::string_view triple,
     // but we need to continue to avoid breaking existing users. Hopefully
     // resolveCPUAndCPUFeatures logged a helpful error already.
   }
+
   return target;
 }
 
 std::optional<LLVMTarget> LLVMTarget::createForHost() {
-  return LLVMTarget::create(llvm::sys::getProcessTriple(), /*cpu=*/"host",
-                            /*cpuFeatures=*/"host",
-                            /*requestLinkEmbedded=*/true);
+  auto target =
+      LLVMTarget::create(llvm::sys::getProcessTriple(), /*cpu=*/"host",
+                         /*cpuFeatures=*/"host",
+                         /*requestLinkEmbedded=*/true);
+  if (target)
+    target->populateDefaultsFromTargetMachine();
+  return target;
 }
 
 void LLVMTarget::print(llvm::raw_ostream &os) const {
   os << "LLVMTarget{\n"
      << "  triple=" << triple << ", cpu=" << cpu
      << ", cpuFeatures=" << cpuFeatures << "\n"
+     << "  dataLayout=" << dataLayout << "\n"
+     << "  vectorWidthInBytes=" << vectorWidthInBytes << "\n"
      << "  linkEmbedded=" << linkEmbedded << "\n"
      << "  debugSymbols=" << debugSymbols << "\n"
      << "  sanitizer=" << static_cast<int>(sanitizerKind) << "\n"
@@ -171,6 +180,8 @@ void LLVMTarget::print(llvm::raw_ostream &os) const {
      << "    FloatABIType=" << static_cast<int>(llvmTargetOptions.FloatABIType)
      << "\n"
      << "  }\n"
+     << "  ukernels=" << ukernels << "\n"
+     << "  linkUkernelBitcode=" << linkUkernelBitcode << "\n"
      << "}\n";
 }
 
@@ -183,10 +194,19 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
   auto addBool = [&](StringRef name, bool value) {
     config.emplace_back(b.getStringAttr(name), b.getBoolAttr(value));
   };
+  auto addInt64 = [&](StringRef name, int64_t value) {
+    config.emplace_back(b.getStringAttr(name), b.getI64IntegerAttr(value));
+  };
 
   addString("target_triple", triple);
   addString("cpu", cpu);
   addString("cpu_features", cpuFeatures);
+  if (!dataLayout.empty()) {
+    addString("data_layout", dataLayout);
+  }
+  if (vectorWidthInBytes != DEFAULT_VECTOR_WIDTH_IN_BYTES) {
+    addInt64("native_vector_size", vectorWidthInBytes);
+  }
   if (linkEmbedded != DEFAULT_LINK_EMBEDDED) {
     addBool("link_embedded", linkEmbedded);
   }
@@ -235,6 +255,10 @@ void LLVMTarget::storeToConfigAttrs(MLIRContext *context,
       break;
     }
   }
+  if (ukernels.compare(DEFAULT_ENABLE_UKERNELS) != 0)
+    addString("ukernels", ukernels);
+  if (linkUkernelBitcode != DEFAULT_LINK_UKERNEL_BITCODE)
+    addBool("link_ukernel_bitcode", linkUkernelBitcode);
 }
 
 std::optional<LLVMTarget>
@@ -266,7 +290,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     }
     return {};
   };
-  auto getBoolValue = [&](StringRef name, bool fallback) -> bool {
+  auto getBool = [&](StringRef name, bool fallback) -> bool {
     Attribute attr = config.get(name);
     if (auto battr = llvm::dyn_cast_if_present<BoolAttr>(attr)) {
       return battr.getValue();
@@ -277,6 +301,17 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     }
     return fallback;
   };
+  auto getInt64 = [&](StringRef name, int64_t fallback) -> int64_t {
+    Attribute attr = config.get(name);
+    if (auto iattr = llvm::dyn_cast_if_present<IntegerAttr>(attr)) {
+      return iattr.getValue().getSExtValue();
+    } else if (attr) {
+      hasFailures = true;
+      emitError(loc) << "executable config '" << name
+                     << "' requires i64 but got " << attr;
+    }
+    return fallback;
+  };
 
   LLVMTarget target;
 
@@ -284,7 +319,7 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
   auto triple = getOptionalString("target_triple");
   auto cpu = getOptionalString("cpu");
   auto cpuFeatures = getOptionalString("cpu_features");
-  bool linkEmbedded = getBoolValue("link_embedded", DEFAULT_LINK_EMBEDDED);
+  bool linkEmbedded = getBool("link_embedded", DEFAULT_LINK_EMBEDDED);
   if (triple || cpu || cpuFeatures) {
     if (!triple) {
       emitError(loc) << "executable config 'cpu' or 'cpu_features' must be "
@@ -302,9 +337,12 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     target.copy(defaultTarget);
   }
 
-  // Loose items.
-  target.debugSymbols = getBoolValue("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
-  target.linkStatic = getBoolValue("link_static", DEFAULT_LINK_STATIC);
+  target.dataLayout = getString("data_layout", DEFAULT_DATA_LAYOUT, false);
+  target.vectorWidthInBytes =
+      getInt64("native_vector_size", DEFAULT_VECTOR_WIDTH_IN_BYTES);
+
+  target.debugSymbols = getBool("debug_symbols", DEFAULT_DEBUG_SYMBOLS);
+  target.linkStatic = getBool("link_static", DEFAULT_LINK_STATIC);
   auto sanitizer = getOptionalString("sanitizer");
   if (sanitizer) {
     if (sanitizer == "none")
@@ -320,13 +358,14 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     }
   }
   target.staticLibraryOutput = getString("static_library_output", "", false);
-  target.pipelineTuningOptions.LoopInterleaving = getBoolValue(
+
+  target.pipelineTuningOptions.LoopInterleaving = getBool(
       "loop_interleaving", target.pipelineTuningOptions.LoopInterleaving);
-  target.pipelineTuningOptions.LoopVectorization = getBoolValue(
+  target.pipelineTuningOptions.LoopVectorization = getBool(
       "loop_vectorization", target.pipelineTuningOptions.LoopVectorization);
-  target.pipelineTuningOptions.LoopUnrolling = getBoolValue(
-      "loop_unrolling", target.pipelineTuningOptions.LoopUnrolling);
-  target.pipelineTuningOptions.SLPVectorization = getBoolValue(
+  target.pipelineTuningOptions.LoopUnrolling =
+      getBool("loop_unrolling", target.pipelineTuningOptions.LoopUnrolling);
+  target.pipelineTuningOptions.SLPVectorization = getBool(
       "slp_vectorization", target.pipelineTuningOptions.SLPVectorization);
   auto targetAbi = getOptionalString("target_abi");
   if (targetAbi)
@@ -345,10 +384,70 @@ LLVMTarget::loadFromConfigAttr(Location loc, DictionaryAttr config,
     }
   }
 
+  target.ukernels = getString("ukernels", target.ukernels, false);
+  target.linkUkernelBitcode =
+      getBool("link_ukernel_bitcode", target.linkUkernelBitcode);
+
   if (hasFailures) {
     return {};
   }
+  target.populateDefaultsFromTargetMachine();
   return target;
+}
+
+void LLVMTarget::populateDefaultsFromTargetMachine() {
+  // We may need the target machine for certain default values.
+  std::unique_ptr<llvm::TargetMachine> cachedTargetMachine;
+  auto getTargetMachine = [&]() {
+    if (!cachedTargetMachine) {
+      cachedTargetMachine = createTargetMachine(*this);
+      // TODO(#13988): proper error propagation. This is a common user scenario.
+      assert(cachedTargetMachine && "createTargetMachine failed");
+    }
+    return cachedTargetMachine.get();
+  };
+
+  if (dataLayout.empty()) {
+    auto targetDataLayout = getTargetMachine()->createDataLayout();
+    dataLayout = targetDataLayout.getStringRepresentation();
+  }
+
+  if (vectorWidthInBytes == DEFAULT_VECTOR_WIDTH_IN_BYTES) {
+    auto targetMachine = getTargetMachine();
+    auto targetFeatures = targetMachine->getTargetFeatureString();
+
+    // The only way to get the real TTI is to create a function using it.
+    // LLVM's TargetMachine and related APIs are terrible. Absolutely yuck.
+    // Note that we use the data layout set above to either what the user
+    // specified or what the target machine returned.
+    //
+    // If anyone comes across this: it'd be great if getTargetTransformInfo
+    // could be called without requiring a function.
+    llvm::LLVMContext llvmContext;
+    auto llvmModule =
+        std::make_unique<llvm::Module>("dummy_module", llvmContext);
+    llvmModule->setDataLayout(dataLayout);
+    llvm::Function *dummyFunc = llvm::Function::Create(
+        llvm::FunctionType::get(llvm::Type::getVoidTy(llvmContext), false),
+        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
+    if (targetFeatures.contains("avx512")) {
+      // Always override the vector with to 512 on systems with avx512.
+      // @dcaballe says:
+      // > in ML the frequency throttling that happens when using 512-bit
+      // > register doesn't have an overall negative impact in performance due
+      // > to the high computational density of the workloads, even on skylake
+      // > where the throttling was really bad
+      dummyFunc->addFnAttr("prefer-vector-width", "512");
+    }
+    auto targetTTI = targetMachine->getTargetTransformInfo(*dummyFunc);
+
+    // Query the vector width from TTI.
+    unsigned ttiVectorWidthInBytes =
+        targetTTI.getRegisterBitWidth(
+            llvm::TargetTransformInfo::RGK_FixedWidthVector) /
+        8;
+    vectorWidthInBytes = ttiVectorWidthInBytes > 1 ? ttiVectorWidthInBytes : 16;
+  }
 }
 
 void LLVMTargetOptions::initializeTargetInvariantFlags() {
@@ -387,32 +486,33 @@ LLVMTargetOptions LLVMTargetOptions::getHostOptions() {
     return {};
   targetOptions.target = *maybeTarget;
   targetOptions.initializeTargetInvariantFlags();
+  targetOptions.target.populateDefaultsFromTargetMachine();
   return targetOptions;
 }
 
-LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
-  LLVMTargetOptions targetOptions;
+// static
+void LLVMTargetOptions::initializeFromFlags(LLVMTargetOptions &targetOptions) {
   targetOptions.initializeTargetInvariantFlags();
 
   // Target parameters.
   static llvm::cl::opt<std::string> clTargetTriple(
       "iree-llvmcpu-target-triple",
-      llvm::cl::desc("LLVM target machine triple"),
+      llvm::cl::desc("LLVM target machine triple."),
       llvm::cl::init(llvm::sys::getProcessTriple()));
   static llvm::cl::opt<std::string> clTargetCPU(
       "iree-llvmcpu-target-cpu",
       llvm::cl::desc(
-          "LLVM target machine CPU; use 'host' for your host native CPU"),
+          "LLVM target machine CPU; use 'host' for your host native CPU."),
       llvm::cl::init("generic"));
   static llvm::cl::opt<std::string> clTargetCPUFeatures(
       "iree-llvmcpu-target-cpu-features",
       llvm::cl::desc("LLVM target machine CPU features; use 'host' for your "
-                     "host native CPU"),
+                     "host native CPU."),
       llvm::cl::init(""));
   static llvm::cl::opt<bool> clLinkEmbedded(
       "iree-llvmcpu-link-embedded",
       llvm::cl::desc("Links binaries into a platform-agnostic ELF to be loaded "
-                     "by the embedded IREE ELF loader"),
+                     "by the embedded IREE ELF loader."),
       llvm::cl::init(LLVMTarget::DEFAULT_LINK_EMBEDDED));
   std::optional<LLVMTarget> maybeTarget =
       LLVMTarget::create(clTargetTriple, clTargetCPU, clTargetCPUFeatures,
@@ -476,6 +576,18 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
                      "Hardware floating-point instructions")));
   target.llvmTargetOptions.FloatABIType = clTargetFloatABI;
 
+  static llvm::cl::opt<std::string> clTargetDataLayout(
+      "iree-llvmcpu-target-data-layout",
+      llvm::cl::desc("LLVM target machine data layout override."),
+      llvm::cl::init(""));
+  target.dataLayout = clTargetDataLayout;
+  static llvm::cl::opt<unsigned> clTargetVectorWidthInBytes(
+      "iree-llvmcpu-target-vector-width-in-bytes",
+      llvm::cl::desc("Overrides the native vector register width (in bytes) of "
+                     "the target."),
+      llvm::cl::init(0));
+  target.vectorWidthInBytes = clTargetVectorWidthInBytes;
+
   static llvm::cl::opt<bool> clDebugSymbols(
       "iree-llvmcpu-debug-symbols",
       llvm::cl::desc("Generate and embed debug information (DWARF, PDB, etc)"),
@@ -499,6 +611,20 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
       llvm::cl::init(target.staticLibraryOutput));
   target.staticLibraryOutput = clStaticLibraryOutputPath;
 
+  static llvm::cl::opt<std::string> clEnableUkernels(
+      "iree-llvmcpu-enable-ukernels",
+      llvm::cl::desc("Enables ukernels in the llvmcpu backend. May be "
+                     "`default`, `none`, `all`, or a comma-separated list of "
+                     "specific unprefixed ukernels to enable, e.g. `mmt4d`."),
+      llvm::cl::init("default"));
+  target.ukernels = clEnableUkernels;
+  static llvm::cl::opt<bool> clLinkUKernelBitcode(
+      "iree-llvmcpu-link-ukernel-bitcode",
+      llvm::cl::desc(
+          "Link ukernel bitcode libraries into generated executables"),
+      llvm::cl::init(target.linkUkernelBitcode));
+  target.linkUkernelBitcode = clLinkUKernelBitcode;
+
   static llvm::cl::opt<bool> clListTargets(
       "iree-llvmcpu-list-targets",
       llvm::cl::desc("Lists all registered targets that the LLVM backend can "
@@ -508,8 +634,36 @@ LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
         llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
         exit(0);
       }));
+}
 
+// static
+void LLVMTargetOptions::registerFlags() {
+  LLVMTargetOptions targetOptions;
+  initializeFromFlags(targetOptions);
+}
+
+// static
+LLVMTargetOptions LLVMTargetOptions::getFromFlags() {
+  LLVMTargetOptions targetOptions;
+  initializeFromFlags(targetOptions);
+  targetOptions.target.populateDefaultsFromTargetMachine();
   return targetOptions;
+}
+
+std::unique_ptr<llvm::TargetMachine>
+createTargetMachine(const LLVMTarget &target) {
+  std::string errorMessage;
+  auto llvmTarget =
+      llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
+  if (!llvmTarget)
+    return nullptr;
+  std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
+      target.getTriple(), target.getCpu() /* cpu e.g k8 */,
+      target.getCpuFeatures() /* cpu features e.g avx512f */,
+      target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
+      target.codeGenOptLevel,
+      /*JIT=*/false));
+  return machine;
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

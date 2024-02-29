@@ -39,9 +39,9 @@ enum class PipelinePhase {
 // Adds a set of passes to the given pass manager that run the head of the HAL
 // pipeline to assign devices, materialize interfaces, and translate
 // executables. The host portion of the program is annotated but not modified.
-void buildHALConfigurationPassPipeline(
-    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
-    const TargetOptions &targetOptions);
+void buildHALConfigurationPassPipeline(OpPassManager &passManager,
+                                       const TargetRegistry &targetRegistry,
+                                       const TargetOptions &targetOptions);
 
 // Adds a set of passes to the given pass manager that run the required HAL
 // transforms in the canonical order.
@@ -54,7 +54,7 @@ void buildHALConfigurationPassPipeline(
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(
-    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    OpPassManager &passManager, const TargetRegistry &targetRegistry,
     const TargetOptions &targetOptions,
     PipelinePhase compileFrom = PipelinePhase::Start,
     PipelinePhase compileTo = PipelinePhase::End);

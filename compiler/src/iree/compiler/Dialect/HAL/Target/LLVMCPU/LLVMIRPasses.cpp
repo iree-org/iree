@@ -24,22 +24,6 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-std::unique_ptr<llvm::TargetMachine>
-createTargetMachine(const LLVMTarget &target) {
-  std::string errorMessage;
-  auto llvmTarget =
-      llvm::TargetRegistry::lookupTarget(target.getTriple(), errorMessage);
-  if (!llvmTarget)
-    return nullptr;
-  std::unique_ptr<llvm::TargetMachine> machine(llvmTarget->createTargetMachine(
-      target.getTriple(), target.getCpu() /* cpu e.g k8 */,
-      target.getCpuFeatures() /* cpu features e.g avx512f */,
-      target.llvmTargetOptions, llvm::Reloc::Model::PIC_, {},
-      target.codeGenOptLevel,
-      /*JIT=*/false));
-  return machine;
-}
-
 LogicalResult runLLVMIRPasses(const LLVMTarget &target,
                               llvm::TargetMachine *machine,
                               llvm::Module *module) {

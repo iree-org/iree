@@ -89,6 +89,7 @@ iree_cc_library(
   SRCS
     "LLVMTargetOptions.cpp"
   DEPS
+    LLVMAnalysis
     LLVMMC
     LLVMPasses
     LLVMSupport

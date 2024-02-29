@@ -21,7 +21,7 @@ module @module attributes {hal.device.targets = ["wrong_type"]} {
 
 // -----
 
-// expected-error@+1 {{unregistered target backend "foo"}}
+// expected-error@+1 {{unregistered target device "foo"}}
 module @module attributes {hal.device.targets = [#hal.device.target<"foo">]} {
   util.func private @func() -> ()
 }

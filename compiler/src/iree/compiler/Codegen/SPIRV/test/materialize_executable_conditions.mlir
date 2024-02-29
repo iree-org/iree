@@ -18,10 +18,10 @@
 
 hal.executable private @dispatch_executable {
   // CHECK-LABEL: hal.executable.variant public @test_assumed_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv"]}>)
   //   CHECK-NOT:   hal.executable.condition
   hal.executable.variant public @test_assumed_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader, GroupNonUniform], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -40,7 +40,7 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_subgroup_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup.ops=3"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "subgroup.ops=3"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
@@ -54,7 +54,7 @@ hal.executable private @dispatch_executable {
   //  CHECK-NEXT:   hal.return %[[RESULT]] : i1
   //  CHECK-NEXT: }
   hal.executable.variant public @test_subgroup_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [GroupNonUniformShuffle, GroupNonUniformArithmetic], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -73,7 +73,7 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_8bit_storage_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage.bitwidths=1"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "storage.bitwidths=1"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
@@ -87,7 +87,7 @@ hal.executable private @dispatch_executable {
   //  CHECK-NEXT:   hal.return %[[RESULT]] : i1
   //  CHECK-NEXT: }
   hal.executable.variant public @test_8bit_storage_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [UniformAndStorageBuffer8BitAccess, StorageBuffer8BitAccess], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -107,7 +107,7 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_16bit_storage_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "storage.bitwidths=2"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "storage.bitwidths=2"]}>)
   //  CHECK-NEXT:   hal.executable.condition(%[[DEV:.+]]: !hal.device) -> i1 {
   //  CHECK-NEXT:   %[[T:.+]] = arith.constant true
   //  CHECK-NEXT:   %[[OK:.+]], %[[V:.+]] = hal.device.query<%[[DEV]] : !hal.device>
@@ -121,7 +121,7 @@ hal.executable private @dispatch_executable {
   //  CHECK-NEXT:   hal.return %[[RESULT]] : i1
   //  CHECK-NEXT: }
   hal.executable.variant public @test_16bit_storage_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [StorageBuffer16BitAccess, StorageUniform16], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -141,13 +141,13 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_int_compute_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.bitwidths.int=7"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "compute.bitwidths.int=7"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.int") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 7 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_int_compute_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Int64, Int16, Int8], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -166,13 +166,13 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_float_compute_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "compute.bitwidths.fp=3"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "compute.bitwidths.fp=3"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.fp") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 3 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_float_compute_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Float16, Float64], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -191,13 +191,13 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_dot_product_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "dotprod.ops=1"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "dotprod.ops=1"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "dotprod.ops") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_dot_product_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [DotProduct, DotProductInput4x8Bit], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -216,13 +216,13 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_cooperative_matrix_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "coopmatrix.ops=1"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "coopmatrix.ops=1"]}>)
   //       CHECK:   %{{.+}}, %[[V:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "coopmatrix.ops") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V]], %[[TARGET]] : i32
   hal.executable.variant public @test_cooperative_matrix_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [CooperativeMatrixKHR], []>, #spirv.resource_limits<>>
       }>
     ) {
@@ -243,8 +243,8 @@ hal.executable private @dispatch_executable {
   }
 
   // CHECK-LABEL: hal.executable.variant public @test_address_capabilities
-  //  CHECK-SAME: target(<"vulkan", "vulkan-spirv-fb-ptr",
-  //  CHECK-SAME:   {hal.bindings.indirect, iree.spirv.features = ["vulkan", "compute.bitwidths.int=4", "address.mode=1"]}>)
+  //  CHECK-SAME: target(<"vulkan-spirv", "vulkan-spirv-fb-ptr",
+  //  CHECK-SAME:   {hal.bindings.indirect, iree.spirv.features = ["vulkan-spirv", "compute.bitwidths.int=4", "address.mode=1"]}>)
   //       CHECK:   %{{.+}}, %[[V0:.+]] = hal.device.query<%{{.+}} : !hal.device>
   //  CHECK-SAME:     key("hal.dispatch" :: "compute.bitwidths.int") : i1, i32 = 0 : i32
   //       CHECK:   %[[TARGET0:.+]] = arith.constant 4 : i32
@@ -254,7 +254,7 @@ hal.executable private @dispatch_executable {
   //       CHECK:   %[[TARGET1:.+]] = arith.constant 1 : i32
   //       CHECK:   %{{.+}} = arith.andi %[[V1]], %[[TARGET1]] : i32
   hal.executable.variant public @test_address_capabilities target(
-      #hal.executable.target<"vulkan", "vulkan-spirv-fb-ptr", {
+      #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb-ptr", {
         spirv.target_env = #spirv.target_env<#spirv.vce<v1.5,
                                                         [Int64, PhysicalStorageBufferAddresses],
                                                         [SPV_KHR_physical_storage_buffer]>,
