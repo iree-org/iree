@@ -221,7 +221,7 @@ typedef struct iree_hal_cuda_working_area_t {
   // Count the number of work items that have started but are not done yet.
   // We don't need this to be atomic since it is modified only from the worker
   // thread.
-  iree_atomic_int32_t pending_work_items_count;
+  int32_t pending_work_items_count;
   iree_atomic_intptr_t error_code;                    // atomic
   iree_allocator_t host_allocator;                    // const
 } iree_hal_cuda_working_area_t;
