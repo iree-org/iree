@@ -5,12 +5,12 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 64, 32]{{\]}}
+// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 64, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4,
-// CHECK-SAME:   subgroup_m_tile_count = 4, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2
+// CHECK-SAME:   subgroup_m_tile_count = 4, subgroup_n_tile_count = 1, subgroup_k_tile_count = 8
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -86,7 +86,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable @conv_nhwc_dispatch_0 {
+hal.executable @conv_nhwc {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
       mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
@@ -116,7 +116,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   }
 }
 
-// CHECK-LABEL: hal.executable public @conv_nhwc_dispatch_0
+// CHECK-LABEL: hal.executable public @conv_nhwc
 // CHECK: linalg.conv_2d_nhwc_hwcf {{.*}} lowering_config = #[[$TILE_SIZES]]
 
 // -----
@@ -159,3 +159,51 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // Check that we do not use the distribute pipeline if there are no supported
 // intrinsics.
 //       CHECK-NOT: iree_codegen.translation_info<LLVMGPUVectorDistribute
+
+// -----
+
+// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[32, 128, 32]{{\]}}
+// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
+// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
+// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @matmul_1024x1024x1024 {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+  }>) {
+  hal.executable.export @matmul_1024x1024x1024 layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @matmul_1024x1024x1024() {
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>> -> tensor<1024x1024xf16>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>> -> tensor<1024x1024xf16>
+      %5 = tensor.empty() : tensor<1024x1024xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+      %7 = linalg.matmul ins(%3, %4 : tensor<1024x1024xf16>, tensor<1024x1024xf16>) outs(%6 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : tensor<1024x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x1024xf32>>
+      return
+    }
+  }
+}
+}
+
+// CHECK-LABEL: hal.executable public @matmul_1024x1024x1024
+// CHECK: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
