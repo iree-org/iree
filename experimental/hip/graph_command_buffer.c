@@ -362,7 +362,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "missing hipDrvGraphAddMemcpyNode symbol; "
                             "cannot use graph-based command buffer");
   }
@@ -425,7 +425,7 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
-    return iree_make_status(IREE_STATUS_NOT_FOUND,
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
                             "missing hipDrvGraphAddMemcpyNode symbol; "
                             "cannot use graph-based command buffer");
   }
