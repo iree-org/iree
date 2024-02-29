@@ -119,8 +119,7 @@ static void rewriteParallelInsertSlices(RewriterBase &rewriter,
 /// IREE::Flow::DispatchTensorLoadOps. Takes a list of all tensor and all
 /// tensorDynamicDims operands to the dispatchOp as well as a IRMapping from
 /// tensor operands to the corresponding Flow dispatch tensor bbArgs.
-static void rewriteExtractSlices(PatternRewriter &rewriter,
-                                 scf::ForallOp forallOp,
+static void rewriteExtractSlices(RewriterBase &rewriter, scf::ForallOp forallOp,
                                  IREE::Flow::DispatchWorkgroupsOp dispatchOp,
                                  ValueRange tensorOperands,
                                  ValueRange tensorDynamicDims,
