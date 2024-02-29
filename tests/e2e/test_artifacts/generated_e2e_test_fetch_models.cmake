@@ -112,8 +112,8 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-BertForMaskedLMTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_e757a10b24f6ff83aaae0ceb5bb05d4efe9ff3e9931f8e9a29f12bc5c2e42b5e.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   UNPACK
 )
 

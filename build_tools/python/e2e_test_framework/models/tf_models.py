@@ -32,7 +32,7 @@ BERT_FOR_MASKED_LM_FP32_SEQLEN512 = common_definitions.Model(
     tags=["fp32", "seqlen512", "tensorflow"],
     source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
     # Converted from https://huggingface.co/transformers/v3.0.2/model_doc/bert.html#tfbertformaskedlm
-    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertForMaskedLMTF_2023-05-07.timestamp_1683504734j.mlirbc",
+    source_url=f"{TF_MODELS_MANUAL_ROOT_DIR}/BertForMaskedLMTF_e757a10b24f6ff83aaae0ceb5bb05d4efe9ff3e9931f8e9a29f12bc5c2e42b5e.mlirbc",
     entry_function="forward",
     input_types=["1x512xi32", "1x512xi32"],
 )

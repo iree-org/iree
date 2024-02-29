@@ -302,7 +302,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -612,7 +612,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -927,7 +927,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -1191,7 +1191,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
@@ -2266,7 +2266,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -2660,7 +2660,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -3059,7 +3059,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=llvm-cpu"
@@ -3395,7 +3395,7 @@ iree_bytecode_module(
 
 iree_bytecode_module(
   NAME "iree-module-BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SRC "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_BertForMaskedLMTF_stablehlo___cuda-sm_80-linux_gnu-cuda__default-flags_compile-stats_/module.vmfb"
   FLAGS
     "--iree-hal-target-backends=cuda"
