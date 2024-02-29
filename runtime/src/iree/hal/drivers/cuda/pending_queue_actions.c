@@ -890,13 +890,6 @@ static iree_status_t iree_hal_cuda_worker_process_ready_list(
   return status;
 }
 
-static bool iree_hal_cuda_worker_has_no_more_pending_work_items(
-    iree_hal_cuda_working_area_t* working_area) {
-  int32_t value = iree_atomic_load_int32(
-      &working_area->pending_work_items_count, iree_memory_order_acquire);
-  return value == 0;
-}
-
 // The main function for the ready-list processing worker thread.
 static int iree_hal_cuda_worker_execute(
     iree_hal_cuda_working_area_t* working_area) {
