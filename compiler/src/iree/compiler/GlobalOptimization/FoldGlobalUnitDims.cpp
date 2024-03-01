@@ -37,32 +37,24 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
   if (newShape.empty()) {
     return success();
   }
-  auto newGlobalType =
-      RankedTensorType::get(newShape, globalType.getElementType());
-  std::optional<TypedAttr> newInitialValue = std::nullopt;
-  if (auto uninitializedAttr =
-          llvm::dyn_cast_or_null<IREE::Util::UninitializedAttr>(
-              global.getGlobalInitialValue())) {
+  auto newGlobalType = globalType.clone(newShape);
+  auto initialValue = global.getGlobalInitialValue();
+  // TODO: Handle non-uninitialized cases.
+  auto uninitializedAttr =
+      llvm::dyn_cast_if_present<IREE::Util::UninitializedAttr>(initialValue);
+  if (initialValue && !uninitializedAttr)
+    return success();
+  TypedAttr newInitialValue;
+  if (initialValue) {
     newInitialValue = IREE::Util::UninitializedAttr::get(rewriter.getContext(),
                                                          newGlobalType);
   }
-  // TODO: Handle non-uninitialized cases.
-  else {
-    return success();
-  }
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(global);
-  auto newGlobalOp = rewriter.create(
-      global->getLoc(), global->getName().getIdentifier(),
-      global->getOperands(), global->getResultTypes(), global->getAttrs());
-  auto newGlobal = cast<IREE::Util::GlobalOpInterface>(newGlobalOp);
+  auto newGlobal =
+      clone(rewriter, global, global->getResultTypes(), global->getOperands());
   newGlobal.setGlobalType(newGlobalType);
-  newGlobal.setGlobalInliningPolicy(global.getGlobalInliningPolicy());
-  newGlobal.setGlobalMutable(global.isGlobalMutable());
-  if (newInitialValue.has_value())
-    newGlobal.setGlobalInitialValue(newInitialValue.value());
-  moduleSymbols.insert(newGlobal);
-  SymbolTable::setSymbolVisibility(newGlobal,
-                                   SymbolTable::getSymbolVisibility(global));
+  newGlobal.setGlobalInitialValue(newInitialValue);
 
   // Rewrite loads and stores to use the new global.
   auto expandShapeReInds =
@@ -73,12 +65,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
 
   for (auto load : loadOps) {
     rewriter.setInsertionPoint(load);
-    auto newOp =
-        rewriter.create(load->getLoc(), load->getName().getIdentifier(),
-                        load->getOperands(), {newGlobalType}, load->getAttrs());
-    auto newLoad = dyn_cast<IREE::Util::GlobalLoadOpInterface>(newOp);
+    auto newLoad = clone(rewriter, load, {newGlobalType}, load->getOperands());
     newLoad.setGlobalAttr(FlatSymbolRefAttr::get(newGlobal.getGlobalName()));
-    newLoad.setGlobalImmutable(load.isGlobalImmutable());
     rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
         load, globalType, newLoad->getResult(0), expandShapeReInds.value());
   }
@@ -87,10 +75,8 @@ foldUnitDimsOnGlobal(IRRewriter &rewriter, IREE::Util::GlobalOpInterface global,
     Value collapse = rewriter.create<tensor::CollapseShapeOp>(
         store.getLoc(), newGlobalType, store->getOperand(0),
         expandShapeReInds.value());
-    auto newOp = rewriter.create(
-        store->getLoc(), store->getName().getIdentifier(), store->getOperands(),
-        store->getResultTypes(), store->getAttrs());
-    auto newStore = dyn_cast<IREE::Util::GlobalStoreOpInterface>(newOp);
+    auto newStore =
+        clone(rewriter, store, store->getResultTypes(), store->getOperands());
     newStore.setGlobalAttr(FlatSymbolRefAttr::get(newGlobal.getGlobalName()));
     newStore.setStoredGlobalValue(collapse);
     rewriter.eraseOp(store);
@@ -107,9 +93,10 @@ class FoldGlobalUnitDimsPass
     : public FoldGlobalUnitDimsBase<FoldGlobalUnitDimsPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
+    MLIRContext *context = &getContext();
     Explorer explorer(moduleOp, TraversalAction::RECURSE);
     explorer.initialize();
-    IRRewriter rewriter(&getContext());
+    IRRewriter rewriter(context);
     SymbolTable moduleSymbols(moduleOp);
 
     // Rewrite globals without unit dims.
@@ -136,7 +123,6 @@ class FoldGlobalUnitDimsPass
 
     // Try to fold reshapes introduced by folding unit dims.
     {
-      MLIRContext *context = &getContext();
       RewritePatternSet patterns(context);
       tensor::CollapseShapeOp::getCanonicalizationPatterns(patterns, context);
       tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
