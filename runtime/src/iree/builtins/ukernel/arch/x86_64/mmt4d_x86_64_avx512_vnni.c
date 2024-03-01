@@ -24,8 +24,8 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   __m512i acc[4][4];
   const int imax = M0 <= 4 ? M0 : 4;
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < imax; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         if (M0 <= 8) {
           acc[i][j] = _mm512_castsi128_si512(
               _mm_loadu_si128((__m128i*)(out_ptr + i * 16 + j * 4)));
@@ -44,8 +44,8 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
       }
     }
   } else {
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         acc[i][j] = _mm512_setzero_si512();
       }
     }
@@ -58,7 +58,7 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   __m512i idx_CDEF89AB45670123 =
       _mm512_setr_epi32(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3);
 
-  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
+  for (int k = 0; k < params->K; ++k) {
     __m512i rhs_i16_perm[4];
     // rhs_i16_perm[0] is the rhs tile (2x8), sign-extended to i16.
     rhs_i16_perm[0] =
@@ -101,16 +101,16 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
     if (M0 >= 2) lhs_i16_dup4[1] = _mm512_shuffle_epi32(lhs_i16, 1 * 0x55);
     if (M0 >= 4) lhs_i16_dup4[2] = _mm512_shuffle_epi32(lhs_i16, 2 * 0x55);
     if (M0 >= 4) lhs_i16_dup4[3] = _mm512_shuffle_epi32(lhs_i16, 3 * 0x55);
-    for (int i = 0; i < imax; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         acc[i][j] =
             _mm512_dpwssd_epi32(acc[i][j], lhs_i16_dup4[i], rhs_i16_perm[j]);
       }
     }
   }
 
-  for (int i = 0; i < imax; ++i) {
-    for (int j = 0; j < 4; ++j) {
+  IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+    IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
       if (M0 <= 8) {
         _mm_storeu_si128((__m128i*)(out_ptr + i * 16 + j * 4),
                          _mm512_extracti32x4_epi32(acc[i][j], 0));
@@ -153,8 +153,8 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   __m512i acc[4][4];
   const int imax = M0 <= 4 ? M0 : 4;
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < imax; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         if (M0 <= 8) {
           acc[i][j] = _mm512_castsi128_si512(
               _mm_loadu_si128((__m128i*)(out_ptr + i * 16 + j * 4)));
@@ -173,8 +173,8 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
       }
     }
   } else {
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         acc[i][j] = _mm512_setzero_si512();
       }
     }
@@ -187,7 +187,7 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   __m512i idx_CDEF89AB45670123 =
       _mm512_setr_epi32(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3);
 
-  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
+  for (int k = 0; k < params->K; ++k) {
     __m512i rhs_perm[4];
     // rhs_perm[0] is the rhs tile (2x8).
     rhs_perm[0] = _mm512_loadu_si512((const __m512i*)rhs_ptr);
@@ -221,15 +221,15 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
     if (M0 >= 2) lhs_dup4[1] = _mm512_shuffle_epi32(lhs, 1 * 0x55);
     if (M0 >= 4) lhs_dup4[2] = _mm512_shuffle_epi32(lhs, 2 * 0x55);
     if (M0 >= 4) lhs_dup4[3] = _mm512_shuffle_epi32(lhs, 3 * 0x55);
-    for (int i = 0; i < imax; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         acc[i][j] = _mm512_dpwssd_epi32(acc[i][j], lhs_dup4[i], rhs_perm[j]);
       }
     }
   }
 
-  for (int i = 0; i < imax; ++i) {
-    for (int j = 0; j < 4; ++j) {
+  IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+    IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
       if (M0 <= 8) {
         _mm_storeu_si128((__m128i*)(out_ptr + i * 16 + j * 4),
                          _mm512_extracti32x4_epi32(acc[i][j], 0));
@@ -274,8 +274,8 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
 // being less-than-8-bit values (it's not specific beyond that to 4bit).
 // Meanwhile, when we split the LHS s16 values into high and low 8bit components
 // the high 8bits are signed s8 and the low 8bit are unsigned u8. So, for each
-// of the combinations of operands that we have to feed _mm512_dpbusd_epi32,
-// we manage to find an operand order that accomodates the instruction's
+// of the combinations of operands that we have to feed _mm512_dpbusd_epi32, we
+// manage to find an operand order that accomodates the instruction's
 // requirements on signednesses.
 void iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
@@ -307,7 +307,7 @@ void iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni(
   const __m128i idx_2_mod_4 = _mm_set1_epi32(0x0e0a0602);
   const __m128i idx_3_mod_4 = _mm_set1_epi32(0x0f0b0703);
   const __m512i mask_0f = _mm512_set1_epi8(0x0f);
-  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
+  for (int k = 0; k < params->K; ++k) {
     // Load 8xs16 LHS data.
     __m128i lhs = _mm_loadu_si128((const __m128i*)lhs_ptr);
     lhs_ptr += 8;
