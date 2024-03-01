@@ -708,51 +708,64 @@ struct CmdDispatchOpPattern
       caseExportOps.push_back(std::make_pair(entryPointAttr, exportOp));
     });
 
-    // Select the variant index.
-    Value selectedIndex = buildIfElseTree(
-        loc, caseExportOps.size(),
-        [&](Location loc, size_t i, OpBuilder &builder) {
-          auto exportOp = caseExportOps[i].second;
-          auto variantOp =
-              exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-          return variantOp.buildCondition(device, rewriter);
-        },
-        rewriter);
-
-    // Allow each variant to define how it is dispatched.
-    auto switchOp = rewriter.replaceOpWithNewOp<scf::IndexSwitchOp>(
-        dispatchOp, TypeRange{}, selectedIndex, caseIndices,
-        caseIndices.size());
-    for (size_t i = 0; i < caseExportOps.size(); ++i) {
-      auto entryPointAttr = caseExportOps[i].first;
-      auto exportOp = caseExportOps[i].second;
-      auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
-      auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
-
+    auto recordDispatch = [&](SymbolRefAttr entryPointAttr,
+                              IREE::HAL::ExecutableExportOp exportOp,
+                              OpBuilder &builder) {
       // Record push constants and buffer bindings.
       recordParameters(loc, affinityAttr, device, commandBuffer, exportOp,
-                       dispatchOp, adaptor, caseBuilder);
+                       dispatchOp, adaptor, builder);
 
       // Dispatch with a target-specific workgroup count.
-      auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
-          loc, device, adaptor.getWorkload(), caseBuilder);
-      Value executable = caseBuilder.create<IREE::HAL::ExecutableLookupOp>(
-          loc, caseBuilder.getType<IREE::HAL::ExecutableType>(), device,
+      auto workgroupCount = exportOp.calculateWorkgroupCount(
+          loc, device, adaptor.getWorkload(), builder);
+      Value executable = builder.create<IREE::HAL::ExecutableLookupOp>(
+          loc, builder.getType<IREE::HAL::ExecutableType>(), device,
           entryPointAttr.getRootReference().getValue());
-      Value ordinal = caseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
-          loc, caseBuilder.getIndexType(), entryPointAttr);
-      caseBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
-          loc, commandBuffer, executable, ordinal, caseWorkgroupCount[0],
-          caseWorkgroupCount[1], caseWorkgroupCount[2]);
+      Value ordinal = builder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+          loc, builder.getIndexType(), entryPointAttr);
+      return builder.create<IREE::HAL::CommandBufferDispatchOp>(
+          loc, commandBuffer, executable, ordinal, workgroupCount[0],
+          workgroupCount[1], workgroupCount[2]);
+    };
 
-      caseBuilder.create<scf::YieldOp>(loc);
+    // If there is only one variant we can emit that directly without a
+    // conditional check. The same result should occur later on but it saves
+    // a lot of IR during generation if we know we can avoid it.
+    if (caseExportOps.size() == 1) {
+      auto [entryPointAttr, exportOp] = caseExportOps.front();
+      rewriter.replaceOp(dispatchOp,
+                         recordDispatch(entryPointAttr, exportOp, rewriter));
+    } else {
+      // Select the variant index.
+      Value selectedIndex = buildIfElseTree(
+          loc, caseExportOps.size(),
+          [&](Location loc, size_t i, OpBuilder &builder) {
+            auto exportOp = caseExportOps[i].second;
+            auto variantOp =
+                exportOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+            return variantOp.buildCondition(device, rewriter);
+          },
+          rewriter);
+
+      // Allow each variant to define how it is dispatched.
+      auto switchOp = rewriter.create<scf::IndexSwitchOp>(
+          loc, TypeRange{}, selectedIndex, caseIndices, caseIndices.size());
+      for (size_t i = 0; i < caseExportOps.size(); ++i) {
+        auto [entryPointAttr, exportOp] = caseExportOps[i];
+        auto &caseBlock = switchOp.getCaseRegions()[i].emplaceBlock();
+        auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
+        recordDispatch(entryPointAttr, exportOp, caseBuilder);
+        caseBuilder.create<scf::YieldOp>(loc);
+      }
+
+      // Fallback for no available variant. Today we just no-op as executable
+      // loading should have already failed.
+      auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
+      auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
+      defaultBuilder.create<scf::YieldOp>(loc);
+
+      rewriter.replaceOp(dispatchOp, switchOp);
     }
-
-    // Fallback for no available variant. Today we just no-op as executable
-    // loading should have already failed.
-    auto &defaultBlock = switchOp.getDefaultRegion().emplaceBlock();
-    auto defaultBuilder = OpBuilder::atBlockBegin(&defaultBlock);
-    defaultBuilder.create<scf::YieldOp>(loc);
 
     return success();
   }

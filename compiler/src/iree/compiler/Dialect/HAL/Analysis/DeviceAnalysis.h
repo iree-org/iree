@@ -55,7 +55,35 @@ public:
   // analyzed.
   std::optional<DeviceSet> lookupDeviceTargets(Value deviceValue);
 
+  // Gathers all possible device targets in the root op.
+  // Ordering is undefined.
+  void
+  gatherAllDeviceTargets(SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
+
+  // Gathers the set of device targets potentially referenced by the given
+  // affinity. Targets are ordered by most likely to least likely.
+  void gatherDeviceAffinityTargets(
+      IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+      SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
+
+  // Gathers all executable targets from all devices in the root op.
+  // This should generally be avoided and the scoped
+  // gatherRequiredExecutableTargets gather should be used instead.
+  void gatherAllExecutableTargets(
+      SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet);
+
+  // Gathers all executable targets that may be required by the given host op.
+  // This should be called on the most narrowly scoped op possible as multiple
+  // devices may be used within the same function-like op and have different
+  // requirements. This may return a set with more targets than expected.
+  void gatherRequiredExecutableTargets(
+      Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet);
+
 private:
+  // Recursively resolves the referenced device into targets.
+  void gatherDeviceTargets(Attribute rootAttr, Operation *fromOp,
+                           SetVector<IREE::HAL::DeviceTargetAttr> &resultSet);
+
   Explorer explorer;
   llvm::BumpPtrAllocator allocator;
   DFX::Solver solver;
