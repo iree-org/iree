@@ -6,13 +6,15 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
+#include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
 static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
 #ifdef IREE_UK_ENABLE_ASSERTS
   const iree_uk_uint32_t allflags =
       IREE_UK_FLAG_MMT4D_TYPE_MASK | IREE_UK_FLAG_MMT4D_ACCUMULATE |
-      IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
+      IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
+      IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
   IREE_UK_ASSERT(!(params->flags & ~allflags));
   iree_uk_uint32_t flags_type = params->flags & IREE_UK_FLAG_MMT4D_TYPE_MASK;
   IREE_UK_ASSERT(flags_type < IREE_UK_FLAG_MMT4D_TYPE_END);
@@ -125,8 +127,30 @@ void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params) {
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
-  iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
+  iree_uk_mmt4d_tile_func_t tile_func =
+      iree_uk_mmt4d_select_tile_func_arch(params);
+
+  // If no target-specific tile_func is available, fall back to a generic one if
+  // allowed by the flags.
+  if (!tile_func) {
+    if (params->flags &
+        IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION) {
+      tile_func = iree_uk_mmt4d_select_tile_func_generic(params);
+    } else {
+      IREE_UK_ASSERT(
+          0 && "no target-specific tile function, and fallback not enabled.");
+    }
+  }
+
   iree_uk_mmt4d_using_tile_func(params, tile_func);
+}
+
+iree_uk_uint32_t iree_uk_mmt4d_info_p(const iree_uk_mmt4d_params_t* params) {
+  iree_uk_uint32_t result = 0;
+  if (iree_uk_mmt4d_select_tile_func_arch(params)) {
+    result |= IREE_UK_FLAG_MMT4D_INFO_HAVE_ARCHITECTURE_SPECIFIC_TILE_FUNCTION;
+  }
+  return result;
 }
 
 IREE_UK_EXPORT void iree_uk_mmt4d(
@@ -155,4 +179,12 @@ IREE_UK_EXPORT void iree_uk_mmt4d(
                                    .flags = flags,
                                    .cpu_data = cpu_data};
   iree_uk_mmt4d_p(&params);
+}
+
+IREE_UK_EXPORT iree_uk_uint32_t
+iree_uk_mmt4d_info(iree_uk_int32_t M0, iree_uk_int32_t N0, iree_uk_int32_t K0,
+                   iree_uk_uint32_t flags, const iree_uk_uint64_t* cpu_data) {
+  iree_uk_mmt4d_params_t params = {
+      .M0 = M0, .N0 = N0, .K0 = K0, .flags = flags, .cpu_data = cpu_data};
+  return iree_uk_mmt4d_info_p(&params);
 }

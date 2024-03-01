@@ -415,3 +415,5 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
       return 0;
   }
 }
+
+const bool iree_uk_mmt4d_linked_arch_code = true;
