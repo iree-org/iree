@@ -55,12 +55,6 @@ def ExpandTensorShapes :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createExpandTensorShapesPass()";
 }
 
-def FoldGlobalUnitDims:
-    Pass<"iree-global-opt-fold-global-unit-dims", "mlir::ModuleOp"> {
-  let summary = "Removes unit dims from util.global ops";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createFoldGlobalUnitDimsPass()";
-}
-
 def FuseDequantizationMatmul:
     InterfacePass<"iree-global-opt-fuse-dequantization-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Fuses dequantization and matmul linalg.generic ops";
