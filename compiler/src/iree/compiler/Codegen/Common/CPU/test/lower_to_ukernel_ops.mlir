@@ -27,11 +27,11 @@ func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -110,11 +110,11 @@ func.func @mmt4d_fill(%arg0 : tensor<?x?x?x?xf32>, %arg1 : tensor<?x?x?x?xf32>, 
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -144,11 +144,11 @@ func.func @mmt4d_i8i8i32(%arg0 : tensor<?x?x?x?xi8>, %arg1 : tensor<?x?x?x?xi8>,
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -178,11 +178,11 @@ func.func @mmt4d_i16i16i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -212,11 +212,11 @@ func.func @mmt4d_i16i8i32(%arg0 : tensor<?x?x?x?xi16>, %arg1 : tensor<?x?x?x?xi8
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -246,11 +246,11 @@ func.func @mmt4d_f16f16f32(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -280,11 +280,11 @@ func.func @mmt4d_f16f16f16(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 //      NOSKIPROUND: func @mmt4d_f16f16f16(
 // NOSKIPROUND-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf16>
@@ -304,11 +304,11 @@ func.func @mmt4d_f16f16f16(%arg0 : tensor<?x?x?x?xf16>, %arg1 : tensor<?x?x?x?xf
 //  NOSKIPROUND-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  NOSKIPROUND-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  NOSKIPROUND-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      NOSKIPROUND:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      NOSKIPROUND:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // NOSKIPROUND-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // NOSKIPROUND-SAME:       outs(%[[ARG2]] :
 // NOSKIPROUND-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      NOSKIPROUND:   return %[[MICRO_KERNEL]]
+//      NOSKIPROUND:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -338,11 +338,11 @@ func.func @mmt4d_bf16bf16f32(%arg0 : tensor<?x?x?x?xbf16>, %arg1 : tensor<?x?x?x
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -372,11 +372,11 @@ func.func @mmt4d_bf16bf16bf16(%arg0 : tensor<?x?x?x?xbf16>, %arg1 : tensor<?x?x?
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -699,11 +699,11 @@ func.func @mmt4d_i8i8i32_extend_producers(%arg0: tensor<?x?x?x?xi8>, %arg1: tens
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
 
 // -----
 
@@ -761,8 +761,8 @@ func.func @mmt4d_i16u4i32_extend_producers(%arg0: tensor<?x?x?x?xi16>, %arg1: te
 //  CHECK-DAG:   %[[N0:.+]] = arith.index_cast %[[N0_index]] : index to i32
 //  CHECK-DAG:   %[[K0_index:.+]] = tensor.dim %[[ARG1]], %[[C3]]
 //  CHECK-DAG:   %[[K0:.+]] = arith.index_cast %[[K0_index]] : index to i32
-//      CHECK:   %[[MICRO_KERNEL:.+]] = iree_codegen.ukernel.generic "iree_uk_mmt4d"
+//      CHECK:   %[[MICRO_KERNEL:.+]]:2 = iree_codegen.ukernel.generic "iree_uk_mmt4d"
 // CHECK-SAME:       ins(%[[ARG0]], %[[ARG1]] :
 // CHECK-SAME:       outs(%[[ARG2]] :
 // CHECK-SAME:       (%[[M]], %[[N]], %[[K]], %[[M0]], %[[N0]], %[[K0]], %[[FLAGS]] :
-//      CHECK:   return %[[MICRO_KERNEL]]
+//      CHECK:   return %[[MICRO_KERNEL]]#0
