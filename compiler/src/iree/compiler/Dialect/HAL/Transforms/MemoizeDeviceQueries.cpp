@@ -52,9 +52,11 @@ struct Query {
 
 static std::string getDeviceNamePrefix(IREE::Util::GlobalOpInterface deviceOp) {
   StringRef deviceName = deviceOp.getGlobalName().getValue();
-  if (deviceName.starts_with("__"))
+  if (deviceName.starts_with("__")) {
     return deviceName.str();
-  return ("__" + deviceName).str();
+  }
+  auto prefixedName = "__" + deviceName;
+  return prefixedName.str();
 }
 
 // NOTE: this implementation is just for a single active device. As we start to
