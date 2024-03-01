@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -348,8 +349,8 @@ public:
     OpOperand *transposeOperand = nullptr;
     linalg::TransposeOp transposeOp;
     for (OpOperand *input : genericOp.getDpsInputOperands()) {
-      if (auto maybeTransposeOp =
-              input->get().getDefiningOp<linalg::TransposeOp>()) {
+      auto maybeTransposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
+      if (maybeTransposeOp && maybeTransposeOp->hasOneUse()) {
         transposeOp = maybeTransposeOp;
         transposeOperand = input;
         break;
@@ -432,13 +433,8 @@ public:
     // We do not need to update indexing maps because this is a unary
     // elementwise op where the input and output maps are the same. Just
     // replace the operands with transposed variants.
-    auto newGenericOp = rewriter.create<linalg::GenericOp>(
-        genericOp.getLoc(), newInit.getType(), transposeOp.getInput(), newInit,
-        genericOp.getIndexingMapsArray(), genericOp.getIteratorTypesArray(),
-        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-    rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
-                               newGenericOp.getRegion().begin());
-
+    auto newGenericOp = mlir::clone(rewriter, genericOp, newInit.getType(),
+                                    {transposeOp.getInput(), newInit});
     rewriter.replaceOp(
         genericOp, createTranspose(rewriter, newGenericOp->getResult(0), perm));
     return success();
@@ -469,7 +465,8 @@ public:
     }
     bool hasTranspose = false;
     for (Value input : linalgOp.getDpsInputs()) {
-      if (input.getDefiningOp<linalg::TransposeOp>()) {
+      auto definingTranspose = input.getDefiningOp<linalg::TransposeOp>();
+      if (definingTranspose && definingTranspose->hasOneUse()) {
         hasTranspose = true;
         break;
       }
