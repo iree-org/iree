@@ -222,6 +222,11 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
     flags |= IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
   }
 
+  // TODO(#15784): drop the fallback flag, instead create a iree_uk_mmt4d_info
+  // ukernel op to query whether the ukernel has fast code for this case, and
+  // preserve the original `linalg.mmt4d` as a fallback in the `else` branch.
+  flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
+
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);

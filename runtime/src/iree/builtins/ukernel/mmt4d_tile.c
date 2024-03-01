@@ -462,7 +462,7 @@ static void iree_uk_mmt4d_tile_bf16bf16bf16_generic_skipround(
     out_tile[i] = iree_uk_f32_to_bf16(acc_f32[i]);
 }
 
-static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
     const iree_uk_mmt4d_params_t* params) {
   switch (iree_uk_mmt4d_type(params->flags)) {
     case iree_uk_mmt4d_type_f32f32f32:
@@ -493,12 +493,4 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
       // Shouldn't happen, validated earlier.
       return 0;
   }
-}
-
-iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
-    const iree_uk_mmt4d_params_t* params) {
-  iree_uk_mmt4d_tile_func_t arch_tile_func =
-      iree_uk_mmt4d_select_tile_func_arch(params);
-  if (arch_tile_func) return arch_tile_func;
-  return iree_uk_mmt4d_select_tile_func_generic(params);
 }

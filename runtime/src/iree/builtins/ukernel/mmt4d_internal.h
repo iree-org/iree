@@ -34,6 +34,11 @@ typedef struct iree_uk_mmt4d_params_t {
 // Same as the iree_uk_mmt4d public entry point, but taking the struct.
 void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params);
 
+// Same as the iree_uk_mmt4d_info public entry point, but taking the struct.
+// Only the struct fields corresponding to iree_uk_mmt4d_info parameters are
+// used.
+iree_uk_uint32_t iree_uk_mmt4d_info_p(const iree_uk_mmt4d_params_t* params);
+
 typedef enum iree_uk_mmt4d_type_t {
   iree_uk_mmt4d_type_f32f32f32 =
       IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),
@@ -163,12 +168,15 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
 // support the CPU feature that the tile sizes were picked to target.
 enum { iree_uk_mmt4d_tile_generic_max_bytes = 4096 };
 
-// Returns the tile function to use for the mmt4d op with the given params.
-iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func(
+// Architecture-specific implementation, or generic fallback returning null.
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
     const iree_uk_mmt4d_params_t* params);
 
-// Architecture-specific implementation.
-iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
+// Indicator of architecture-specific implementation.
+extern const bool iree_uk_mmt4d_linked_arch_code;
+
+// Generic fallback.
+iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
     const iree_uk_mmt4d_params_t* params);
 
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_INTERNAL_H_

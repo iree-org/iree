@@ -126,30 +126,23 @@ void iree_uk_test(const char* name,
       .status = IREE_UK_TEST_STATUS_RUN,
   };
   iree_uk_test_log_status(&test);
-  // First try without any optional CPU feature (test.cpu_data is still zeros).
-  // This matters even when the feature is supported by the CPU because we want
-  // to test the fallback to the architecture-default code path.
-  test_func(&test, params);
-  // Then try with optional CPU features, if specified.
-  if (strlen(cpu_features)) {
-    // Are specified CPU features supported by the CPU?
-    iree_uk_initialize_cpu_once();
-    iree_uk_make_cpu_data_for_features(cpu_features, test.cpu_data);
-    if (iree_uk_cpu_supports(test.cpu_data)) {
-      // CPU supports features. Run this part of the test.
-      iree_uk_test_log_info(&test, "🚀", "CPU supports required features");
-      test_func(&test, params);
-    } else {
-      // CPU does not support features. Skip this part of the test.
-      char msg[128];
-      snprintf(msg, sizeof msg, "CPU does not support required feature %s",
-               iree_uk_cpu_first_unsupported_feature(test.cpu_data));
-      iree_uk_test_log_info(&test, "🦕", msg);
-      // Set test status to SKIPPED if it was still the initial RUN.
-      // Do not overwrite a FAILED from the run without optional CPU features.
-      if (test.status == IREE_UK_TEST_STATUS_RUN) {
-        test.status = IREE_UK_TEST_STATUS_SKIPPED;
-      }
+  // Are specified CPU features supported by the CPU?
+  iree_uk_initialize_cpu_once();
+  iree_uk_make_cpu_data_for_features(cpu_features, test.cpu_data);
+  if (iree_uk_cpu_supports(test.cpu_data)) {
+    // CPU supports features. Run this part of the test.
+    iree_uk_test_log_info(&test, "🚀", "CPU supports required features");
+    test_func(&test, params);
+  } else {
+    // CPU does not support features. Skip this part of the test.
+    char msg[128];
+    snprintf(msg, sizeof msg, "CPU does not support required feature %s",
+             iree_uk_cpu_first_unsupported_feature(test.cpu_data));
+    iree_uk_test_log_info(&test, "🦕", msg);
+    // Set test status to SKIPPED if it was still the initial RUN.
+    // Do not overwrite a FAILED from the run without optional CPU features.
+    if (test.status == IREE_UK_TEST_STATUS_RUN) {
+      test.status = IREE_UK_TEST_STATUS_SKIPPED;
     }
   }
   if (test.status == IREE_UK_TEST_STATUS_FAILED) {

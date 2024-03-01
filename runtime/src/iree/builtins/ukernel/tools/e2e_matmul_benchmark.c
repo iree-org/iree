@@ -391,6 +391,7 @@ static void iree_uk_benchmark_register_e2e_matmul(const char* type_str, int M,
   char name[128];
   snprintf(name, sizeof name, "e2e_matmul_%s_%dx%dx%d", type_str, M, K, N);
   iree_uk_uint32_t mmt4d_flags = iree_uk_mmt4d_parse_type_into_flag(type_str);
+  mmt4d_flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
   if (accumulate) mmt4d_flags |= IREE_UK_FLAG_MMT4D_ACCUMULATE;
   iree_uk_benchmark_e2e_matmul_params_t params = {
       .mmt4d_flags = mmt4d_flags, .M = M, .K = K, .N = N};
