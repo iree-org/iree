@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -181,10 +181,6 @@ struct CombineTransferReadOpBroadcast final
   }
 };
 
-template <typename T>
-using LinalgPromotionPattern =
-    mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
-
 /// Returns true if op is appropriate contract for promotion.
 static LogicalResult contractOpFilter(Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
@@ -240,7 +236,7 @@ void populateContractPromotionPatterns(RewritePatternSet &patterns,
           .setCopyInOutFns(copyToWorkgroupMemory, copyToWorkgroupMemory)
           .setOperandsToPromote(operandsToPromote)
           .setUseFullTileBuffers({false, false}),
-      IREE::LinalgExt::LinalgTransformationFilter(
+      LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
           StringAttr::get(context, getWorkgroupMemoryMarker()))
           .setMatchByDefault()

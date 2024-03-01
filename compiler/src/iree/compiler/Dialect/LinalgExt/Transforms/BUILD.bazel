@@ -42,7 +42,6 @@ iree_compiler_cc_library(
     hdrs = [
         "Passes.h",
         "Passes.h.inc",
-        "Transforms.h",
     ],
     deps = [
         ":PassesIncGen",

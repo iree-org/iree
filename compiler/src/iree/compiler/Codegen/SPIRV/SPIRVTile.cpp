@@ -18,7 +18,6 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -148,8 +147,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 static LogicalResult
 tileReduction(mlir::FunctionOpInterface funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
-  auto filter =
-      IREE::LinalgExt::LinalgTransformationFilter().setMatchByDefault();
+  auto filter = LinalgTransformationFilter().setMatchByDefault();
   auto options =
       scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
   auto result = tileLinalgOpsWithFilter(funcOp, options, filter);

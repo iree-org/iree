@@ -20,7 +20,6 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -43,7 +42,7 @@ namespace mlir::iree_compiler {
 
 static LogicalResult
 tileReductionLoops(mlir::FunctionOpInterface funcOp,
-                   IREE::LinalgExt::LinalgTransformationFilter filter,
+                   LinalgTransformationFilter filter,
                    const scf::SCFTileSizeComputationFunction &computeFn) {
   auto options =
       scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
@@ -56,7 +55,7 @@ tileReductionLoops(mlir::FunctionOpInterface funcOp,
 
 static LogicalResult
 tileToInvocation(mlir::FunctionOpInterface funcOp,
-                 IREE::LinalgExt::LinalgTransformationFilter filter,
+                 LinalgTransformationFilter filter,
                  const linalg::TileSizeComputationFunction &computeFn) {
   auto getThreadProcInfoFn = [](OpBuilder &builder, Location loc,
                                 ArrayRef<Range> parallelLoopRanges) {
@@ -80,10 +79,6 @@ tileToInvocation(mlir::FunctionOpInterface funcOp,
 
 static const char promoteBothMarker[] = "promote_lhs_and_rhs";
 
-template <typename T>
-using LinalgPromotionPattern =
-    mlir::iree_compiler::IREE::LinalgExt::LinalgPromotionPattern<T>;
-
 static void populatePromotionPatterns(RewritePatternSet &patterns,
                                       StringAttr replaceMarker) {
   MLIRContext *context = patterns.getContext();
@@ -95,7 +90,7 @@ static void populatePromotionPatterns(RewritePatternSet &patterns,
           .setUseFullTileBuffers({false, false});
   auto promoteBothOptions = baseOptions.setOperandsToPromote({0, 1});
 
-  IREE::LinalgExt::LinalgTransformationFilter promoteBothFilter(
+  LinalgTransformationFilter promoteBothFilter(
       {StringAttr::get(context, promoteBothMarker)}, replaceMarker);
 
   patterns.insert<LinalgPromotionPattern<linalg::MatmulOp>,
@@ -163,14 +158,13 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   if (failed(doPromoteCMatrix(funcOp)))
     return signalPassFailure();
 
-  StringLiteral markerAttrName =
-      IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker;
+  StringLiteral markerAttrName = LinalgTransforms::kLinalgTransformMarker;
   auto workgroupMarker = StringAttr::get(context, getWorkgroupMemoryMarker());
   auto kTiledMarker = StringAttr::get(context, getWorkgroupKTiledMarker());
 
   { // Tile reduction dimensions.
     RewritePatternSet patterns(context);
-    IREE::LinalgExt::LinalgTransformationFilter filter(
+    LinalgTransformationFilter filter(
         // Going through C matrix promotion we will have the marker..
         {workgroupMarker}, kTiledMarker);
     // Not going through C matrix promotion we will have no marker..
@@ -258,8 +252,7 @@ void SPIRVTileAndPromotePass::runOnOperation() {
   });
 
   if (!skipThreadLevel) { // Tile and distribute to invocations.
-    IREE::LinalgExt::LinalgTransformationFilter filter({workgroupMarker},
-                                                       std::nullopt);
+    LinalgTransformationFilter filter({workgroupMarker}, std::nullopt);
     if (failed(tileToInvocation(funcOp, filter, *threadTileComputeFn))) {
       funcOp.emitOpError() << "failed tiling and distributing to invocations";
       return signalPassFailure();

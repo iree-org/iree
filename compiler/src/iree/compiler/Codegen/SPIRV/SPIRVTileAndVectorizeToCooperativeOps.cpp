@@ -24,7 +24,6 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -164,7 +163,7 @@ static LogicalResult tileToSubgroup(mlir::FunctionOpInterface funcOp,
                            .setTileSizeComputationFunction(setTileSizesFn)
                            .setDistributionOptions(distributionOptions);
 
-  IREE::LinalgExt::LinalgTransformationFilter filter(
+  LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
