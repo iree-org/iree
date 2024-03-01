@@ -7,7 +7,8 @@
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
 
-void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -17,23 +18,21 @@ void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(
   const float16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   float16x8_t acc[8];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < M0; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = vld1q_f16(out_ptr + 8 * i);
     }
   } else {
-    for (int i = 0; i < M0; ++i) {
-      acc[i] = vdupq_n_f16(0);
-    }
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) { acc[i] = vdupq_n_f16(0); }
   }
   for (int k = 0; k < params->K; ++k) {
     float16x8_t rhs = vld1q_f16(rhs_ptr);
     rhs_ptr += 8;
     if (M0 <= 2) {
-      for (int i = 0; i < M0; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
         acc[i] = vfmaq_n_f16(acc[i], rhs, *lhs_ptr++);
       }
     } else {
-      for (int i = 0; i < M0; i += 4) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; i += 4) {
         float16x4_t lhs = vld1_f16(lhs_ptr);
         lhs_ptr += 4;
         acc[i + 0] = vfmaq_lane_f16(acc[i + 0], rhs, lhs, 0);
@@ -43,7 +42,7 @@ void iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(
       }
     }
   }
-  for (int i = 0; i < M0; ++i) {
+  IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
     vst1q_f16(out_ptr + 8 * i, acc[i]);
   }
 }
