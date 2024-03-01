@@ -365,7 +365,7 @@ func.func @einsum_dynamic_size_broadcast_dot(%arg0: tensor<?x?x4xf32>, %arg1: te
 // CHECK: func @broadcast_in_dim
 func.func @broadcast_in_dim(%operand: tensor<5x7x1xf32>) -> tensor<7x10x6x4x5xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
-         {broadcast_dimensions = dense<[4,0,2]> : tensor<3xi64>}
+         {broadcast_dimensions = array<i64: 4,0,2>}
          : (tensor<5x7x1xf32>) -> tensor<7x10x6x4x5xf32>
   func.return %0 : tensor<7x10x6x4x5xf32>
 }
@@ -389,7 +389,7 @@ func.func @broadcast_in_dim(%operand: tensor<5x7x1xf32>) -> tensor<7x10x6x4x5xf3
 // CHECK: func @broadcast_in_dim_ui32
 func.func @broadcast_in_dim_ui32(%operand: tensor<5x7x1xui32>) -> tensor<7x10x6x4x5xui32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
-         {broadcast_dimensions = dense<[4,0,2]> : tensor<3xi64>}
+         {broadcast_dimensions = array<i64: 4,0,2>}
          : (tensor<5x7x1xui32>) -> tensor<7x10x6x4x5xui32>
   func.return %0 : tensor<7x10x6x4x5xui32>
 }
@@ -440,7 +440,7 @@ func.func @broadcast_in_dim_with_one_to_one(
 func.func @broadcast_in_dim_with_transpose(
          %operand: tensor<2x3x4xf32>) -> tensor<3x4x2x5xf32> {
   %0 = "stablehlo.broadcast_in_dim"(%operand)
-         {broadcast_dimensions = dense<[2, 0, 1]> : tensor<3xi64>}
+         {broadcast_dimensions = array<i64: 2, 0, 1>}
          : (tensor<2x3x4xf32>) -> tensor<3x4x2x5xf32>
   func.return %0 : tensor<3x4x2x5xf32>
 }
@@ -605,9 +605,9 @@ func.func @iota_complexf32() -> tensor<7x10xcomplex<f32>> {
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 // CHECK: func @dynamic_iota_f32
-// CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
-func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
-  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xf32>)
+// CHECK-SAME: %[[SHAPE:.*]]: tensor<3xi32>
+func.func @dynamic_iota_f32(%shape: tensor<3xi32>) -> tensor<?x?x8xf32> {
+  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<3xi32>) -> (tensor<?x?x8xf32>)
   func.return %result : tensor<?x?x8xf32>
 }
 // CHECK: %[[V1:.*]] = tensor.extract %[[SHAPE]][%c0]
@@ -626,10 +626,10 @@ func.func @dynamic_iota_f32(%shape: tensor<?xi32>) -> tensor<?x?x8xf32> {
 // -----
 
 // CHECK: #[[RESULT_MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK: func @dyanmic_iota_ui32
-// CHECK-SAME: %[[SHAPE:.*]]: tensor<?xi32>
-func.func @dyanmic_iota_ui32(%shape: tensor<?xi32>) -> tensor<?x?x8xui32> {
-  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<?xi32>) -> (tensor<?x?x8xui32>)
+// CHECK: func @dynamic_iota_ui32
+// CHECK-SAME: %[[SHAPE:.*]]: tensor<3xi32>
+func.func @dynamic_iota_ui32(%shape: tensor<3xi32>) -> tensor<?x?x8xui32> {
+  %result = "stablehlo.dynamic_iota"(%shape) {iota_dimension = 1 : i64} : (tensor<3xi32>) -> (tensor<?x?x8xui32>)
   func.return %result : tensor<?x?x8xui32>
 }
 // CHECK: %[[V1:.*]] = tensor.extract %[[SHAPE]][%c0]
@@ -655,7 +655,7 @@ func.func @map_mixed(%arg0: tensor<?xf32>,
   ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):
     %1 = stablehlo.add %arg2, %arg3 : tensor<f32>
     "stablehlo.return"(%1) : (tensor<f32>) -> ()
-  }) {dimensions = dense<[0]> : tensor<1xi64>}
+  }) {dimensions = array<i64: 0>}
   : (tensor<?xf32>, tensor<4xf32>) -> tensor<?xf32>
   func.return %0 : tensor<?xf32>
 }
@@ -675,7 +675,7 @@ func.func @map_one_arg(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   ^bb0(%arg2: tensor<f32>):
     %1 = stablehlo.add %arg2, %arg2 : tensor<f32>
     "stablehlo.return"(%1) : (tensor<f32>) -> ()
-  }) {dimensions = dense<[0]> : tensor<1xi64>}
+  }) {dimensions = array<i64: 0>}
   : (tensor<?xf32>) -> tensor<?xf32>
   func.return %0 : tensor<?xf32>
 }
@@ -706,7 +706,7 @@ func.func @map_compare(%arg0: tensor<?xcomplex<f32>>,
        {comparison_direction = #stablehlo<comparison_direction EQ>}
        : (tensor<f32>, tensor<f32>) -> tensor<i1>
     "stablehlo.return"(%3) : (tensor<i1>) -> ()
-  }) {dimensions = dense<[0]> : tensor<1xi64>}
+  }) {dimensions = array<i64: 0>}
   : (tensor<?xcomplex<f32>>, tensor<?xcomplex<f32>>) -> tensor<?xi1>
   func.return %0 : tensor<?xi1>
 }
@@ -1093,8 +1093,8 @@ func.func @select_and_scatter(%arg0 : tensor<2x8x8x1xf32>, %arg1 : tensor<2x4x4x
     stablehlo.return %9 : tensor<f32>
   }) {
     padding = dense<0> : tensor<4x2xi64>,
-    window_dimensions = dense<[1, 2, 2, 1]> : tensor<4xi64>,
-    window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>
+    window_dimensions = array<i64: 1, 2, 2, 1>,
+    window_strides = array<i64: 1, 2, 2, 1>
   } : (tensor<2x8x8x1xf32>, tensor<2x4x4x1xf32>, tensor<f32>) -> tensor<2x8x8x1xf32>
 
   return %0 : tensor<2x8x8x1xf32>

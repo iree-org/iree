@@ -8,7 +8,7 @@
   ]>
 ]>
 hal.executable @matmul_4x4096x9216 {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -59,7 +59,7 @@ hal.executable @matmul_4x4096x9216 {
   ]>
 ]>
 hal.executable @matmul_1x4096x9216 {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,
@@ -110,7 +110,7 @@ hal.executable @matmul_1x4096x9216 {
   ]>
 ]>
 hal.executable private @multi_reduction_transposed_b_matmul {
-  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(#hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 49152,
         max_compute_workgroup_invocations = 1024,

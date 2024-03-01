@@ -9,6 +9,31 @@
 
 #include "iree/builtins/ukernel/mmt4d.h"
 
+// While the iree_uk_mmt4d public entry point takes separate parameters,
+// internally the implementation functions pass parameters as this struct.
+typedef struct iree_uk_mmt4d_params_t {
+  const void* lhs_buffer;
+  iree_uk_index_t lhs_offset;
+  iree_uk_index_t lhs_stride0;
+  const void* rhs_buffer;
+  iree_uk_index_t rhs_offset;
+  iree_uk_index_t rhs_stride0;
+  void* out_buffer;
+  iree_uk_index_t out_offset;
+  iree_uk_index_t out_stride0;
+  iree_uk_index_t M;
+  iree_uk_index_t N;
+  iree_uk_index_t K;
+  iree_uk_int32_t M0;
+  iree_uk_int32_t N0;
+  iree_uk_int32_t K0;
+  iree_uk_uint32_t flags;
+  const iree_uk_uint64_t* cpu_data;
+} iree_uk_mmt4d_params_t;
+
+// Same as the iree_uk_mmt4d public entry point, but taking the struct.
+void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params);
+
 typedef enum iree_uk_mmt4d_type_t {
   iree_uk_mmt4d_type_f32f32f32 =
       IREE_UK_TIE_3_TYPES_LITERAL(FLOAT_32, FLOAT_32, FLOAT_32),

@@ -68,11 +68,11 @@ func.func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%
   cf.cond_br %extracted, ^bb2(%26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>), ^bb3(%26, %31, %32, %33, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb2(%41: tensor<i64>, %42: tensor<i64>, %43: tensor<40xf32>, %44: tensor<i64>, %45: tensor<74x40xf32>, %46: tensor<i64>, %47: tensor<1x10xf32>, %48: tensor<1x10xf32>, %49: tensor<5x1x64xf32>, %50: tensor<5x1x1xf32>, %51: tensor<5x1x1xf32>, %52: tensor<5xi64>, %53: tensor<5x1x10xf32>, %54: tensor<5x1x10xf32>):  // pred: ^bb1
   %55 = stablehlo.add %41, %cst_5 : tensor<i64>
-  %56 = "stablehlo.gather"(%50, %41) {dimension_numbers = #stablehlo.gather<offset_dims = [0, 1], collapsed_slice_dims = [0], start_index_map = [0]>, slice_sizes = dense<1> : tensor<3xi64>} : (tensor<5x1x1xf32>, tensor<i64>) -> tensor<1x1xf32>
+  %56 = "stablehlo.gather"(%50, %41) {dimension_numbers = #stablehlo.gather<offset_dims = [0, 1], collapsed_slice_dims = [0], start_index_map = [0]>, slice_sizes = array<i64: 1, 1, 1>} : (tensor<5x1x1xf32>, tensor<i64>) -> tensor<1x1xf32>
   %57 = stablehlo.reshape %56 : (tensor<1x1xf32>) -> tensor<1xf32>
   %58 = stablehlo.broadcast_in_dim %57, dims = [0] : (tensor<1xf32>) -> tensor<1x10xf32>
   %59 = stablehlo.compare  GT, %58, %7 : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
-  %60 = "stablehlo.gather"(%49, %41) {dimension_numbers = #stablehlo.gather<offset_dims = [0, 1], collapsed_slice_dims = [0], start_index_map = [0]>, slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>} : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
+  %60 = "stablehlo.gather"(%49, %41) {dimension_numbers = #stablehlo.gather<offset_dims = [0, 1], collapsed_slice_dims = [0], start_index_map = [0]>, slice_sizes = array<i64: 1, 1, 64>} : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
   %61 = stablehlo.concatenate %60, %48, dim = 1 : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
   %62 = stablehlo.dot %61, %45, precision = [DEFAULT] : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
   %63 = stablehlo.reshape %43 : (tensor<40xf32>) -> tensor<1x40xf32>

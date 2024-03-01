@@ -17,7 +17,7 @@
 // HACK: Currently this must match EXACTLY with the executable target for the
 // custom kernel. For things to be truly portable, we need to be able to compare
 // executable configurations.
-#spirv_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#spirv_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<
     #spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformArithmetic, GroupNonUniformBallot],
                      [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,

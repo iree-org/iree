@@ -6,7 +6,7 @@
 
 // The configuration used for executable compilation.
 // This specifies the device configurations that support this custom kernel.
-#spirv_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#spirv_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<
     #spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformArithmetic, GroupNonUniformBallot],
                      [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,

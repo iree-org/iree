@@ -115,17 +115,44 @@ static bool iree_uk_mmt4d_early(const iree_uk_mmt4d_params_t* params) {
   return false;
 }
 
-IREE_UK_EXPORT int iree_uk_mmt4d(const iree_uk_mmt4d_params_t* params) {
+void iree_uk_mmt4d_p(const iree_uk_mmt4d_params_t* params) {
   iree_uk_mmt4d_validate(params);
 
   // Maybe handle this mmt4d "early", without needing to select a tile_func.
   // Typical cases include trivial cases (e.g. when params->K == 0) and hardware
   // targets that want to handle the entire loop nest in target-specific code.
-  if (iree_uk_mmt4d_early(params)) return 0;
+  if (iree_uk_mmt4d_early(params)) return;
 
   // Select a target-specific tile_func (inner loop on K, computing one M0xN0
   // tile) and use that with generic outer loops.
   iree_uk_mmt4d_tile_func_t tile_func = iree_uk_mmt4d_select_tile_func(params);
   iree_uk_mmt4d_using_tile_func(params, tile_func);
-  return 0;
+}
+
+IREE_UK_EXPORT void iree_uk_mmt4d(
+    const void* lhs_buffer, iree_uk_index_t lhs_offset,
+    iree_uk_index_t lhs_stride0, const void* rhs_buffer,
+    iree_uk_index_t rhs_offset, iree_uk_index_t rhs_stride0, void* out_buffer,
+    iree_uk_index_t out_offset, iree_uk_index_t out_stride0, iree_uk_index_t M,
+    iree_uk_index_t N, iree_uk_index_t K, iree_uk_int32_t M0,
+    iree_uk_int32_t N0, iree_uk_int32_t K0, iree_uk_uint32_t flags,
+    const iree_uk_uint64_t* cpu_data) {
+  iree_uk_mmt4d_params_t params = {.lhs_buffer = lhs_buffer,
+                                   .lhs_offset = lhs_offset,
+                                   .lhs_stride0 = lhs_stride0,
+                                   .rhs_buffer = rhs_buffer,
+                                   .rhs_offset = rhs_offset,
+                                   .rhs_stride0 = rhs_stride0,
+                                   .out_buffer = out_buffer,
+                                   .out_offset = out_offset,
+                                   .out_stride0 = out_stride0,
+                                   .M = M,
+                                   .N = N,
+                                   .K = K,
+                                   .M0 = M0,
+                                   .N0 = N0,
+                                   .K0 = K0,
+                                   .flags = flags,
+                                   .cpu_data = cpu_data};
+  iree_uk_mmt4d_p(&params);
 }

@@ -764,7 +764,7 @@ struct EmptyReduceOpCanon final : OpRewritePattern<mlir::stablehlo::ReduceOp> {
       return failure();
 
     Location loc = op.getLoc();
-    DenseIntElementsAttr empty = rewriter.getI64TensorAttr({});
+    DenseI64ArrayAttr empty = rewriter.getDenseI64ArrayAttr({});
     if (elemTy.hasStaticShape()) {
       SmallVector<Value> broadcasts(op.getNumResults());
       for (auto [bcast, init, outTy] : llvm::zip_equal(
@@ -907,8 +907,7 @@ struct GatherOpCanon final : OpRewritePattern<mlir::stablehlo::GatherOp> {
     if (!operandType || !operandType.hasStaticShape())
       return failure();
 
-    auto sliceEnd =
-        llvm::to_vector(gather.getSliceSizes().getValues<int64_t>());
+    auto sliceEnd = llvm::to_vector(gather.getSliceSizes());
     SmallVector<int64_t> sliceStart(sliceEnd.size(), 0);
     for (auto [mapIndex, value] :
          llvm::zip_equal(dnums.getStartIndexMap(), index.getValues<APInt>())) {

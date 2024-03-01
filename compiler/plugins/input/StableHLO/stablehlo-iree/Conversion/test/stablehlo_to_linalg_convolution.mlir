@@ -38,8 +38,8 @@ func.func @linalg.conv_1d_nwc(%arg0: tensor<?x8x?xf32>, %arg1: tensor<2x?x?xf32>
     >,
     feature_group_count = 1 : i64,
     padding = dense<[[0, 0]]> : tensor<1x2xi64>,
-    rhs_dilation = dense<1> : tensor<1xi64>,
-    window_strides = dense<1> : tensor<1xi64>,
+    rhs_dilation = array<i64: 1>,
+    window_strides = array<i64: 1>,
     someattr
   } : (tensor<?x8x?xf32>, tensor<2x?x?xf32>) -> tensor<?x7x?xf32>
   func.return %0 : tensor<?x7x?xf32>
@@ -81,8 +81,8 @@ func.func @conv_2d_nhwc_hwcf(%arg0: tensor<?x4x5x?xf32>, %arg1: tensor<3x2x?x?xf
     >,
     feature_group_count = 1 : i64,
     padding = dense<[[0, 0], [0, 0]]> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>
   } : (tensor<?x4x5x?xf32>, tensor<3x2x?x?xf32>) -> tensor<?x2x4x?xf32>
   func.return %0 : tensor<?x2x4x?xf32>
 }
@@ -224,8 +224,8 @@ func.func @conv_3d_ndhwc_dhwcf(%arg0: tensor<?x8x8x8x?xf32>, %arg1: tensor<2x2x2
     >,
     feature_group_count = 1 : i64,
     padding = dense<[[0, 0], [0, 0], [0, 0]]> : tensor<3x2xi64>,
-    rhs_dilation = dense<1> : tensor<3xi64>,
-    window_strides = dense<1> : tensor<3xi64>
+    rhs_dilation = array<i64: 1, 1, 1>,
+    window_strides = array<i64: 1, 1, 1>
   } : (tensor<?x8x8x8x?xf32>, tensor<2x2x2x?x?xf32>) -> tensor<?x7x7x7x?xf32>
   func.return %0 : tensor<?x7x7x7x?xf32>
 }
@@ -264,8 +264,8 @@ func.func @conv2d_1452x2223_dilated_valid(%arg0: tensor<1x4x5x2xf32>, %arg1: ten
     >,
     feature_group_count = 1 : i64,
     padding = dense<0> : tensor<2x2xi64>,
-    rhs_dilation = dense<[2, 1]> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>
+    rhs_dilation = array<i64: 2, 1>,
+    window_strides = array<i64: 1, 1>
   } : (tensor<1x4x5x2xf32>, tensor<2x2x2x3xf32>) -> tensor<1x2x4x3xf32>
   func.return %0 : tensor<1x2x4x3xf32>
 }
@@ -350,8 +350,8 @@ func.func @depthwise_conv(%arg0: tensor<2x4x5x2xf32>,
     >,
     feature_group_count = 2 : i64,
     padding = dense<0> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>,
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>,
     someattr} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
   func.return %0 : tensor<2x3x4x6xf32>
 }
@@ -391,8 +391,8 @@ func.func @depthwise_conv_with_padding(
     >,
     feature_group_count = 2 : i64,
     padding = dense<[[0, 0], [1, 1]]> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>,
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>,
     someattr} : (tensor<2x4x5x2xf32>, tensor<2x2x1x4xf32>) -> tensor<2x3x6x4xf32>
   func.return %0 : tensor<2x3x6x4xf32>
 }
@@ -439,8 +439,8 @@ func.func @depthwise_conv_multiplier_1(%arg0: tensor<1x113x113x96xf32>,
     >,
     feature_group_count = 96 : i64,
     padding = dense<0> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<2> : tensor<2xi64>} : (tensor<1x113x113x96xf32>, tensor<3x3x1x96xf32>) -> tensor<1x56x56x96xf32>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 2, 2>} : (tensor<1x113x113x96xf32>, tensor<3x3x1x96xf32>) -> tensor<1x56x56x96xf32>
   func.return %0 : tensor<1x56x56x96xf32>
 }
 // CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
@@ -477,8 +477,8 @@ func.func @depthwise_conv_multiplier_1_with_padding(
     >,
     feature_group_count = 96 : i64,
     padding = dense<[[1, 1], [2, 2]]> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<2> : tensor<2xi64>} : (tensor<1x113x113x96xf32>, tensor<3x3x1x96xf32>) -> tensor<1x57x58x96xf32>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 2, 2>} : (tensor<1x113x113x96xf32>, tensor<3x3x1x96xf32>) -> tensor<1x57x58x96xf32>
   func.return %0 : tensor<1x57x58x96xf32>
 }
 // CHECK-DAG:     %[[ZERO:.*]] = arith.constant 0.000000e+00 : f32

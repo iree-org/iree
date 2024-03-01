@@ -45,7 +45,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32
 //  CHECK-SAME:    subgroup_size = 64
@@ -53,12 +53,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}}) -> (vector<2x4x1x1x1x4xf32>)
-// Each subgroup handles 2 * 4 tiles, and for each tile we accumulate 2 times
-// along the K dimension. So in total 16 mfma ops.
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<2x4x1x1x1x4xf32>
-//  CHECK-COUNT-8:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x1x4xf32>)
+// Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
+// along the K dimension. So in total 32 mfma ops.
+// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x1x4xf32>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -100,7 +100,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f16
 //  CHECK-SAME:    subgroup_size = 64
@@ -108,12 +108,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x1x4xf16>)
-//          CHECK:     arith.extf %[[ARG]] : vector<2x4x1x1x1x4xf16> to vector<2x4x1x1x1x4xf32>
-// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<2x4x1x1x1x4xf32> to vector<2x4x1x1x1x4xf16>
-//          CHECK:     scf.yield %[[TRUNC]] : vector<2x4x1x1x1x4xf16>
-//  CHECK-COUNT-8:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<256x256xf16, #hal.descriptor_type<storage_buffer>>
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x1x4xf16>)
+//          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x1x4xf16> to vector<2x2x1x1x1x4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<2x2x1x1x1x4xf32> to vector<2x2x1x1x1x4xf16>
+//          CHECK:     scf.yield %[[TRUNC]] : vector<2x2x1x1x1x4xf16>
+//  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<256x256xf16, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -177,9 +177,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //  CHECK-SAME:    workgroup_size = [256 : index, 1 : index, 1 : index]
 
 //    CHECK-LABEL: func @expanded_matmul_transpose_b
-//          CHECK:   scf.for {{.*}} = %c0 to %c2048 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x1x4xf16>)
+//          CHECK:   scf.for {{.*}} = %c0 to %c2048 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x1x4xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<4x1x1x1x1x4xf16> to vector<4x1x1x1x1x4xf32>
-// CHECK-COUNT-8:      amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<4x1x1x1x1x4xf32> to vector<4x1x1x1x1x4xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<4x1x1x1x1x4xf16>
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<2x10x64x64xf16, #hal.descriptor_type<storage_buffer>>

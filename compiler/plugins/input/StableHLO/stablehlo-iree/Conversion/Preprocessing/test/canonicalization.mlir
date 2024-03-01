@@ -478,9 +478,9 @@ func.func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic(%arg0: tensor
 func.func @dynamic_broadcast_in_dim_all_dims_non_expanding(%arg0: tensor<*xf32>, %arg1: tensor<1xindex>) -> tensor<?xf32> {
   // CHECK-SAME: %[[ARG:.*]]: tensor<*xf32>
   %1 = "stablehlo.dynamic_broadcast_in_dim"(%arg0, %arg1) {
-    broadcast_dimensions = dense<0> : tensor<1xi64>,
-    known_expanding_dimensions = dense<> : tensor<0xi64>,
-    known_nonexpanding_dimensions = dense<0> : tensor<1xi64>
+    broadcast_dimensions = array<i64: 0>,
+    known_expanding_dimensions = array<i64>,
+    known_nonexpanding_dimensions = array<i64: 0>
   } : (tensor<*xf32>, tensor<1xindex>) -> tensor<?xf32>
   // CHECK: %[[RES:.*]] = tensor.cast %[[ARG]] : tensor<*xf32> to tensor<?xf32>
   // CHECK: return %[[RES]] : tensor<?xf32>
@@ -499,7 +499,7 @@ func.func @gather_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<3x6x5xf32> {
       start_index_map = [0, 2],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[3, 6, 5]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6x5xf32>
+    slice_sizes = array<i64: 3, 6, 5>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6x5xf32>
   return %1 : tensor<3x6x5xf32>
   // CHECK:      %[[RET:.*]] = stablehlo.slice %arg0 [1:4, 0:6, 2:7]
   // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<3x6x5xf32>
@@ -518,7 +518,7 @@ func.func @gather_scalar_index_to_slice(%arg0: tensor<5x6x7xf32>) -> tensor<5x6x
       start_index_map = [2],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[5, 6, 4]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<i32>) -> tensor<5x6x4xf32>
+    slice_sizes = array<i64: 5, 6, 4>} : (tensor<5x6x7xf32>, tensor<i32>) -> tensor<5x6x4xf32>
   return %1 : tensor<5x6x4xf32>
   // CHECK:      %[[RET:.*]] = stablehlo.slice %arg0 [0:5, 0:6, 1:5]
   // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<5x6x4xf32>
@@ -538,7 +538,7 @@ func.func @gather_to_slice_reshape(%arg0: tensor<5x6x7xf32>) -> tensor<3x6xf32> 
       start_index_map = [0, 2],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[3, 6, 1]> : tensor<3xi64>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6xf32>
+    slice_sizes = array<i64: 3, 6, 1>} : (tensor<5x6x7xf32>, tensor<2xi32>) -> tensor<3x6xf32>
   return %1 : tensor<3x6xf32>
   // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [1:4, 0:6, 2:3]
   // CHECK-SAME:    : (tensor<5x6x7xf32>) -> tensor<3x6x1xf32>
@@ -558,7 +558,7 @@ func.func @gather_to_slice_indices_clamp_upperbound(%arg0 : tensor<4x2xui32>) ->
       collapsed_slice_dims = [0],
       start_index_map = [0]
     >, indices_are_sorted = true,
-    slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
+    slice_sizes = array<i64: 1, 2>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
   return %1 : tensor<2xui32>
   // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [3:4, 0:2]
   // CHECK-SAME:    : (tensor<4x2xui32>) -> tensor<1x2xui32>
@@ -578,7 +578,7 @@ func.func @gather_to_slice_indices_clamp_lowerbound(%arg0 : tensor<4x2xui32>) ->
       collapsed_slice_dims = [0],
       start_index_map = [0]
     >, indices_are_sorted = true,
-    slice_sizes = dense<[1, 2]> : tensor<2xi64>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
+    slice_sizes = array<i64: 1, 2>} : (tensor<4x2xui32>, tensor<1xi32>) -> tensor<2xui32>
   return %1 : tensor<2xui32>
   // CHECK:      %[[V0:.*]] = stablehlo.slice %arg0 [0:1, 0:2]
   // CHECK-SAME:    : (tensor<4x2xui32>) -> tensor<1x2xui32>

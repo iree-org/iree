@@ -29,6 +29,8 @@ enum class SanitizerKind {
 // and linking for an ExecutableVariant. It should not contain any
 // environmental configuration like linker paths, diagnostic aids, etc.
 struct LLVMTarget {
+  static constexpr const char *DEFAULT_DATA_LAYOUT = "";
+  static constexpr int64_t DEFAULT_VECTOR_WIDTH_IN_BYTES = 0;
   static constexpr bool DEFAULT_LINK_EMBEDDED = true;
   static constexpr bool DEFAULT_DEBUG_SYMBOLS = true;
   static constexpr SanitizerKind DEFAULT_SANITIZER_KIND = SanitizerKind::kNone;
@@ -39,6 +41,8 @@ struct LLVMTarget {
   static constexpr bool DEFAULT_SLP_VECTORIZATION = false;
   static constexpr llvm::FloatABI::ABIType DEFAULT_FLOAT_ABI =
       llvm::FloatABI::ABIType::Hard;
+  static constexpr const char *DEFAULT_ENABLE_UKERNELS = "default";
+  static constexpr bool DEFAULT_LINK_UKERNEL_BITCODE = true;
 
   // Default initialize all fields.
   LLVMTarget();
@@ -47,7 +51,11 @@ struct LLVMTarget {
     triple = other.triple;
     cpu = other.cpu;
     cpuFeatures = other.cpuFeatures;
+    dataLayout = other.dataLayout;
+    vectorWidthInBytes = other.vectorWidthInBytes;
     linkEmbedded = other.linkEmbedded;
+    ukernels = other.ukernels;
+    linkUkernelBitcode = other.linkUkernelBitcode;
   }
 
   void print(llvm::raw_ostream &os) const;
@@ -73,7 +81,11 @@ struct LLVMTarget {
   const std::string &getTriple() const { return triple; }
   const std::string &getCpu() const { return cpu; }
   const std::string &getCpuFeatures() const { return cpuFeatures; }
-  bool getLinkEmbedded() const { return linkEmbedded; }
+
+  // Overrides the data layout of the target.
+  std::string dataLayout = DEFAULT_DATA_LAYOUT;
+  // Overrides the vector width (in bytes) of the target.
+  int64_t vectorWidthInBytes = DEFAULT_VECTOR_WIDTH_IN_BYTES;
 
   llvm::PipelineTuningOptions pipelineTuningOptions;
   // Optimization level to be used by the LLVM optimizer (middle-end).
@@ -81,6 +93,8 @@ struct LLVMTarget {
   // Optimization level to be used by the LLVM code generator (back-end).
   llvm::CodeGenOptLevel codeGenOptLevel;
   llvm::TargetOptions llvmTargetOptions;
+
+  bool getLinkEmbedded() const { return linkEmbedded; }
 
   // Include debug information in output files (PDB, DWARF, etc).
   // Though this can be set independently from the optLevel (so -O3 with debug
@@ -104,7 +118,17 @@ struct LLVMTarget {
   // any machine without requiring matching system libraries to be installed.
   bool linkStatic = DEFAULT_LINK_STATIC;
 
+  // Enables ukernels in the generated executables. May be `default`, `none`,
+  // `all`, or a comma-separated list of specific unprefixed ukernels to
+  // enable, e.g. `mmt4d`.
+  std::string ukernels = DEFAULT_ENABLE_UKERNELS;
+
+  // Link built-in ukernel bitcode libraries into generated executables.
+  bool linkUkernelBitcode = DEFAULT_LINK_UKERNEL_BITCODE;
+
 private:
+  void populateDefaultsFromTargetMachine();
+
   std::string triple;
   std::string cpu;
   std::string cpuFeatures;
@@ -113,6 +137,8 @@ private:
   // Note: this is ignored for target machines that do not support the ELF
   // loader, such as WebAssembly.
   bool linkEmbedded = DEFAULT_LINK_EMBEDDED;
+
+  friend struct LLVMTargetOptions;
 };
 
 struct LLVMTargetOptions {
@@ -138,12 +164,21 @@ struct LLVMTargetOptions {
   // are target invariant.
   static LLVMTargetOptions getHostOptions();
 
-  // Returns LLVMTargetOptions struct intialized with the iree-llvmcpu-* flags.
+  // Ensures that command line flags are registered. Should be called on
+  // startup.
+  static void registerFlags();
+
+  // Returns LLVMTargetOptions struct initialized with the iree-llvmcpu-* flags.
   static LLVMTargetOptions getFromFlags();
 
 private:
+  static void initializeFromFlags(LLVMTargetOptions &targetOptions);
   void initializeTargetInvariantFlags();
 };
+
+// Creates target machine form target options.
+std::unique_ptr<llvm::TargetMachine>
+createTargetMachine(const LLVMTarget &target);
 
 } // namespace mlir::iree_compiler::IREE::HAL
 

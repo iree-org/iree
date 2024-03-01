@@ -85,7 +85,7 @@ inline static void enumerateIREEVMPipelinePhases(
 
 // Builds a pass pipeline to perform pre-compilation global optimizations.
 void buildIREEPrecompileTransformPassPipeline(
-    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    const IREE::HAL::TargetRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,
@@ -101,7 +101,7 @@ void buildIREEPrecompileTransformPassPipeline(
 // If a |runTo| phase is specified the pipeline will stop and output the full
 // IR after the phase completes.
 void buildIREEVMTransformPassPipeline(
-    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    const IREE::HAL::TargetRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions highLevelOptimizationOptions,

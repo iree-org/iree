@@ -11,7 +11,7 @@ Typically, when installed from a wheel, this can be invoked as:
   iree-import-onnx some.pb
 
 Or from Python:
-  
+
   python -m iree.compiler.tools.import_onnx ...
 """
 import argparse
@@ -42,7 +42,7 @@ def main(args):
     model_proto = load_onnx_model(args.input_file)
     context = Context()
     model_info = onnx_importer.ModelInfo(model_proto)
-    m = model_info.create_module(context=context)
+    m = model_info.create_module(context=context).operation
     imp = onnx_importer.NodeImporter.define_function(model_info.main_graph, m)
     imp.import_all()
     if not args.no_verify:

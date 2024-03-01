@@ -16,7 +16,7 @@ func.func @gather_to_index_select(%arg0 : tensor<5x4xf32>, %arg1 : tensor<1x3x1x
       start_index_map = [0],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 4]> : tensor<2xi64>
+    slice_sizes = array<i64: 1, 4>
   } : (tensor<5x4xf32>, tensor<1x3x1xi32>) -> tensor<1x3x4xf32>
 
   // CHECK: return [[RES]]
@@ -34,7 +34,7 @@ func.func @gather_no_lowering_subslice(%arg0 : tensor<5x4xf32>, %arg1 : tensor<1
       start_index_map = [0],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 3]> : tensor<2xi64>
+    slice_sizes = array<i64: 1, 3>
   } : (tensor<5x4xf32>, tensor<1x3x1xi32>) -> tensor<1x3x3xf32>
   func.return %0 : tensor<1x3x3xf32>
 }
@@ -50,7 +50,7 @@ func.func @gather_no_lowering_multidim(%arg0 : tensor<5x4xf32>, %arg1 : tensor<1
       start_index_map = [0, 1],
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 4]> : tensor<2xi64>
+    slice_sizes = array<i64: 1, 4>
   } : (tensor<5x4xf32>, tensor<1x3x2xi32>) -> tensor<1x3x4xf32>
   func.return %0 : tensor<1x3x4xf32>
 }

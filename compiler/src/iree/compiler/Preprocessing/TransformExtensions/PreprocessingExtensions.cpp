@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Transform/IR/TransformInterfaces.h"

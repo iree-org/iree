@@ -359,11 +359,13 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "update buffer not yet implemented");
-  /*
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+  if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "missing hipDrvGraphAddMemcpyNode symbol; "
+                            "cannot use graph-based command buffer");
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Allocate scratch space in the arena for the data and copy it in.
@@ -413,7 +415,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-  */
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
@@ -421,11 +422,13 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "copy buffer not yet implemented");
-  /*
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+  if (command_buffer->symbols->hipDrvGraphAddMemcpyNode == NULL) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "missing hipDrvGraphAddMemcpyNode symbol; "
+                            "cannot use graph-based command buffer");
+  }
   IREE_TRACE_ZONE_BEGIN(z0);
 
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
@@ -469,7 +472,6 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
-  */
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_collective(
