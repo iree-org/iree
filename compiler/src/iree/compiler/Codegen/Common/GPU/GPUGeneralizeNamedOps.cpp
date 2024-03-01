@@ -44,19 +44,21 @@ generalizeCandidates(MLIRContext *context,
 }
 
 namespace {
-struct GPUGeneralizeNamedConvolutionOpsPass
-    : public GPUGeneralizeNamedConvolutionOpsBase<
-          GPUGeneralizeNamedConvolutionOpsPass> {
+struct GPUGeneralizeNamedConvolutionAndContractionOpsPass
+    : public GPUGeneralizeNamedConvolutionAndContractionOpsBase<
+          GPUGeneralizeNamedConvolutionAndContractionOpsPass> {
 
   void runOnOperation() override;
 };
 } // namespace
 
-void GPUGeneralizeNamedConvolutionOpsPass::runOnOperation() {
+void GPUGeneralizeNamedConvolutionAndContractionOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   SmallVector<linalg::LinalgOp> namedOpCandidates;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     if (isa<linalg::ConvolutionOpInterface>(*linalgOp))
+      namedOpCandidates.push_back(linalgOp);
+    if (isa<linalg::ContractionOpInterface>(*linalgOp))
       namedOpCandidates.push_back(linalgOp);
   });
 
@@ -66,8 +68,8 @@ void GPUGeneralizeNamedConvolutionOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUGeneralizeNamedConvolutionOpsPass() {
-  return std::make_unique<GPUGeneralizeNamedConvolutionOpsPass>();
+createGPUGeneralizeNamedConvolutionAndContractionOpsPass() {
+  return std::make_unique<GPUGeneralizeNamedConvolutionAndContractionOpsPass>();
 }
 
 namespace {
