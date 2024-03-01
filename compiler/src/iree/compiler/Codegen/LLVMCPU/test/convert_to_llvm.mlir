@@ -198,7 +198,7 @@ module {
 // Make sure we can lowering multi-dimensional `vector.interleave` and its
 // corresponding multi-dimensional `vector.bitcast`.
 
-// CHECK-LABEL: llvm.func @interleave_and_bitcast_lowering()
+// CHECK-LABEL: llvm.func @interleave_and_bitcast_lowering(
 //   CHECK-NOT:   vector.bitcast %{{.*}} : vector<4x4xi4> to vector<4x2xi8>
 //   CHECK-NOT:   vector.interleave
 
