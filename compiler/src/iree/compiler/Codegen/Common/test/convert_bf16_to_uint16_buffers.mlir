@@ -45,7 +45,7 @@ func.func @bf16_constant(%arg0 : bf16) -> bf16 {
 // CHECK-SAME:    memref<i16>
 // CHECK-SAME:    memref<i16>
 // CHECK-SAME:    memref<f32>
-func.func private @iree_uk_mmt4d(memref<bf16>, index, index, memref<bf16>, index, index, memref<f32>, index, index, index, index, index, i32, i32, i32, i32) attributes {hal.import.bitcode = true, hal.import.cconv = 1 : i32, hal.import.fields = ["processor_data"], llvm.bareptr = true}
+func.func private @iree_uk_mmt4d(memref<bf16>, index, index, memref<bf16>, index, index, memref<f32>, index, index, index, index, index, i32, i32, i32, i32) attributes {hal.import.bitcode = true, hal.import.fields = ["processor_data"], llvm.bareptr = true}
 
 // CHECK-LABEL: @mmt4d_bf16xbf16xf32
 // CHECK:         func.call
