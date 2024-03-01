@@ -177,6 +177,12 @@ void registerCodegenLLVMGPUPasses();
 
 std::unique_ptr<OperationPass<ModuleOp>> createTestLLVMGPULegalizePass();
 
+//------------------------------------------------------------------------------
+// Public functions
+//------------------------------------------------------------------------------
+
+// Loop prefetching transformation. Returns the new loop on success or failure
+// when the `forOp` is not supported.
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp);
 

@@ -18,6 +18,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -26,6 +27,8 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Visitors.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -67,30 +70,43 @@ static FailureOr<int64_t> getConstantIdx(Value v) {
 
 class LoopPrefetcher {
 public:
-  static FailureOr<LoopPrefetcher> getLoopPrefetcher(scf::ForOp op) {
+  static FailureOr<LoopPrefetcher> get(scf::ForOp op) {
     LoopPrefetcher prefetcher;
     prefetcher.singleStage = true;
     prefetcher.mapping = SmallVector<IRMapping>(4);
     prefetcher.forOp = op;
-    FailureOr<int64_t> upperBoundCst = getConstantIdx(op.getUpperBound());
-    FailureOr<int64_t> lowerBoundCst = getConstantIdx(op.getLowerBound());
-    FailureOr<int64_t> stepCst = getConstantIdx(op.getStep());
-    if (failed(upperBoundCst) || failed(lowerBoundCst) || failed(stepCst)) {
+
+    if (failed(prefetcher.initializeLoopInfo())) {
+      LDBG("Failed to initialize loop info (unsupported loop)");
       return failure();
     }
 
-    prefetcher.ub = *upperBoundCst;
-    prefetcher.lb = *lowerBoundCst;
-    prefetcher.step = *stepCst;
-
-    int64_t numIters = ceilDiv(prefetcher.ub - prefetcher.lb, prefetcher.step);
-    if (numIters <= 2)
+    if (failed(prefetcher.initializeStages())) {
+      LDBG("Failed to initialize stage info (unsupported loop)");
       return failure();
+    }
 
     return prefetcher;
   }
 
-  enum class Stage { Read, Compute, Write, None };
+  LogicalResult initializeLoopInfo() {
+    FailureOr<int64_t> upperBoundCst = getConstantIdx(forOp.getUpperBound());
+    FailureOr<int64_t> lowerBoundCst = getConstantIdx(forOp.getLowerBound());
+    FailureOr<int64_t> stepCst = getConstantIdx(forOp.getStep());
+    if (failed(upperBoundCst) || failed(lowerBoundCst) || failed(stepCst)) {
+      return failure();
+    }
+
+    ub = *upperBoundCst;
+    lb = *lowerBoundCst;
+    step = *stepCst;
+
+    int64_t numIters = ceilDiv(ub - lb, step);
+    if (numIters <= 2)
+      return failure();
+
+    return success();
+  }
 
   void getValueDependencies(Operation *op, DenseSet<Operation *> &dependencies,
                             bool noTransferReads = false) {
@@ -115,7 +131,10 @@ public:
     });
   }
 
-  void initializeStages() {
+  // We only support loops whose bodies can be divided into 3 stages (read,
+  // write, compute). If there are any remaning ops with side effects (except
+  // for gpu.barrier), the loop is not supported.
+  LogicalResult initializeStages() {
     DenseSet<Operation *> readDependencies;
     DenseSet<Operation *> writeDependencies;
     DenseSet<Operation *> computeDependencies;
@@ -133,32 +152,46 @@ public:
 
     // Restore the original order.
     for (auto &op : forOp.getBody()->getOperations()) {
+      bool hasStage = false;
       if (readDependencies.contains(&op)) {
         readStage.push_back(&op);
+        hasStage = true;
       }
       if (writeDependencies.contains(&op)) {
         writeStage.push_back(&op);
+        hasStage = true;
       }
       if (computeDependencies.contains(&op)) {
         computeStage.push_back(&op);
+        hasStage = true;
+      }
+
+      // Ops with a stage will be cloned over to the new for op, while barriers
+      // will be re-written.
+      if (!hasStage && !isa<gpu::BarrierOp>(op)) {
+        if (!isPure(&op)) {
+          LDBG("Found a non-pure loop body op not assigned to any stage "
+               "(unsupported loop): "
+               << op);
+          return failure();
+        }
       }
     }
 
     LLVM_DEBUG({
       // Stages cannot have overlapping operations.
       llvm::dbgs() << "--- Read Stage ---\n";
-      for (Operation *op : readStage) {
+      for (Operation *op : readStage)
         op->dump();
-      }
       llvm::dbgs() << "--- Write Stage ---\n";
-      for (Operation *op : writeStage) {
+      for (Operation *op : writeStage)
         op->dump();
-      }
       llvm::dbgs() << "--- Compute Stage ---\n";
-      for (Operation *op : computeStage) {
+      for (Operation *op : computeStage)
         op->dump();
-      }
     });
+
+    return success();
   }
 
   /// Clone `op` and call `callback` on the cloned op's oeprands as well as any
@@ -266,8 +299,6 @@ public:
         break;
       }
     }
-    // Remove the invalid link to yield
-    // computeStage.pop_back();
   }
 
   std::tuple<SmallVector<Value>, SmallVector<Value>>
@@ -295,8 +326,7 @@ public:
 
     // Collect the values to be used as write args.
     for (Operation *op : readStage) {
-      if (isa<vector::TransferReadOp>(op)) {
-        auto transferReadOp = cast<vector::TransferReadOp>(op);
+      if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
         for (Operation *user : transferReadOp.getResult().getUsers()) {
           if (auto writeOp = dyn_cast<vector::TransferWriteOp>(user)) {
             writeArgs.push_back(writeOp.getVector());
@@ -355,7 +385,7 @@ public:
     return newForOp;
   }
 
-  void createKernel(scf::ForOp newForOp, RewriterBase &rewriter) {
+  void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
     rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
     Location loc = forOp.getLoc();
     Value indVar = newForOp.getInductionVar();
@@ -396,8 +426,9 @@ public:
     updateYield(mapping[0], readRegisters, rewriter);
   }
 
-  SmallVector<Value> emitEpilogue(scf::ForOp newForOp, RewriterBase &rewriter,
+  SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp,
                                   SmallVector<Value> &writeArgs) {
+    rewriter.setInsertionPointAfter(newForOp);
     Location loc = forOp.getLoc();
     Value nMinusTwo =
         rewriter.create<arith::ConstantIndexOp>(loc, ub - 2 * step);
@@ -448,46 +479,21 @@ private:
   SmallVector<Operation *> computeStage;
 };
 
-FailureOr<scf::ForOp> applyPrefetching(RewriterBase &rewriter,
-                                       scf::ForOp forOp) {
-  rewriter.setInsertionPoint(forOp);
-
-  auto prefetcherOr = LoopPrefetcher::getLoopPrefetcher(forOp);
-  if (failed(prefetcherOr)) {
-    return failure();
-  }
-  LoopPrefetcher &prefetcher = *prefetcherOr;
-
-  prefetcher.initializeStages();
-  auto [iterArgs, writeArgs] = prefetcher.emitPrologue(rewriter);
-
-  scf::ForOp newForOp =
-      prefetcher.createKernelLoop(rewriter, iterArgs, writeArgs);
-  prefetcher.createKernel(newForOp, rewriter);
-
-  rewriter.setInsertionPointAfter(newForOp);
-  SmallVector<Value> result =
-      prefetcher.emitEpilogue(newForOp, rewriter, writeArgs);
-
-  rewriter.replaceOp(forOp, result);
-  return newForOp;
-}
-
 struct LLVMGPUPrefetchSharedMemoryPass final
     : LLVMGPUPrefetchSharedMemoryBase<LLVMGPUPrefetchSharedMemoryPass> {
   void runOnOperation() override {
     FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp.getContext());
 
-    // Collect for ops.
-    SmallVector<scf::ForOp> forOps;
-    funcOp.walk([&](scf::ForOp forOp) { forOps.push_back(forOp); });
+    SmallVector<scf::ForOp> loops;
+    funcOp.walk([&loops](scf::ForOp forOp) { loops.push_back(forOp); });
 
-    if (forOps.empty())
-      return;
-
-    if (failed(prefetchSharedMemoryCopy(rewriter, forOps.front()))) {
-      return signalPassFailure();
+    for (scf::ForOp forOp : loops) {
+      FailureOr<scf::ForOp> newLoop = prefetchSharedMemoryCopy(rewriter, forOp);
+      // The only possible failure is the analysis failure, which does not cause
+      // the pass to fail. Therefore we discard any failures at this point.
+      (void)newLoop;
+      break; // TODO: Fix nested loop handling.
     }
   }
 };
@@ -496,7 +502,22 @@ struct LLVMGPUPrefetchSharedMemoryPass final
 
 FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
                                                scf::ForOp forOp) {
-  return applyPrefetching(rewriter, forOp);
+  rewriter.setInsertionPoint(forOp);
+
+  auto prefetcherOr = LoopPrefetcher::get(forOp);
+  if (failed(prefetcherOr))
+    return failure();
+  LoopPrefetcher &prefetcher = *prefetcherOr;
+
+  auto [iterArgs, writeArgs] = prefetcher.emitPrologue(rewriter);
+  scf::ForOp newForOp =
+      prefetcher.createKernelLoop(rewriter, iterArgs, writeArgs);
+  prefetcher.createKernel(rewriter, newForOp);
+
+  SmallVector<Value> results =
+      prefetcher.emitEpilogue(rewriter, newForOp, writeArgs);
+  rewriter.replaceOp(forOp, results);
+  return newForOp;
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
