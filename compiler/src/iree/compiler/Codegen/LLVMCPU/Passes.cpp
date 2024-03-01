@@ -515,14 +515,40 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
+
   // We still run codegen pipeline because we want a better fallback when
   // ukernels are not available. They are nop if the mmt4d op is convereted to
   // ukernels. If ukernels are not implemented, the lowering config is still
   // carried by compute ops, so we can use it as a fallback solution.
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTileAndFusePass(
-      static_cast<int64_t>(tilingConfig.getVectorCommonParallelLevel())));
-  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(
-      static_cast<int64_t>(tilingConfig.getVectorReductionLevel())));
+
+  // Apply tile and fuse to all the non-distribution fusable levels. Skip
+  // distribution level as such a level has been fused already.
+  SmallVector<int64_t> allFusableLevels(tilingConfig.getFusableLevels());
+  if (allFusableLevels.size() > 1) {
+    llvm::SmallSetVector<int64_t, 4> fusableLevels(allFusableLevels.begin(),
+                                                   allFusableLevels.end());
+    for (int i = 0, end = tilingConfig.getNumTilingLevels(); i < end; ++i) {
+      if (i == tilingConfig.getDistributionLevel())
+        continue;
+      if (fusableLevels.contains(i)) {
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUTileAndFusePass(i));
+        continue;
+      }
+
+      if (i == tilingConfig.getVectorReductionLevel()) {
+        // Run SplitReductionPass before the final reduction Fuse pass, because
+        // SplitReductionPass takes care of banked-tiling.
+        nestedModulePM.addNestedPass<func::FuncOp>(
+            createLLVMCPUSplitReductionPass(clEnableReassociateFpReductions));
+        nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
+        continue;
+      }
+
+      nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUTilePass(i));
+    }
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeTensorInsertExtractSlicesPass());
