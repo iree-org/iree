@@ -105,6 +105,14 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!producerOp->hasOneUse())
     return false;
 
+  // Do no fuse dequantization-like operations with producers as we want to keep
+  // the smallest bitwidths at the dispatch boundaries, unless the consumer
+  // dequantization op only has one use, in which case elementwise op fusion
+  // is fine.
+  if (isDequantizationLikeOp(consumerOp) && !consumerOp->hasOneUse()) {
+    return false;
+  }
+
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
   //      can be used as a way to amortize cost of redundant computation
@@ -113,6 +121,7 @@ static bool areFusableOps(MLIRContext *context, OpOperand *fusedOperand,
   //      broadcast this ends up redundantly computing operations without more
   //      parallelism.
   if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
+
     if (linalgConsumerOp.getNumParallelLoops() ==
         linalgConsumerOp.getNumLoops()) {
       return true;
@@ -225,6 +234,12 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
           return;
         }
 
+        // Dequantization-like operations should be fused with consumers to keep
+        // the smaller bit width on the dispatch boundary.
+        if (isDequantizationLikeOp(genericOp)) {
+          return;
+        }
+
         Operation *fusableProducer = nullptr;
         for (OpOperand &operand : genericOp->getOpOperands()) {
           // 2. Only fuse with `linalg.generic` producers that arent
@@ -259,7 +274,13 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
             continue;
           }
 
-          // 7. All uses from `producer` -> `consumer` need to be fusable.
+          // 7. Skip dequantization-like `producer` ops as we would rather fuse
+          // by cloning the producer instead of multi-use fusion.
+          if (isDequantizationLikeOp(producer)) {
+            return;
+          }
+
+          // 8. All uses from `producer` -> `consumer` need to be fusable.
           //    Without this the `producer` is still live, and there is no
           //    advantage to do the fusion.
           if (llvm::any_of(getAllUsesInConsumer(producer, genericOp),

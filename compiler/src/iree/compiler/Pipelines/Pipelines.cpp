@@ -23,7 +23,7 @@
 namespace mlir::iree_compiler {
 
 void buildIREEPrecompileTransformPassPipeline(
-    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    const IREE::HAL::TargetRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
@@ -168,7 +168,7 @@ void buildIREEPrecompileTransformPassPipeline(
 }
 
 void buildIREEVMTransformPassPipeline(
-    const IREE::HAL::TargetBackendRegistry &targetRegistry,
+    const IREE::HAL::TargetRegistry &targetRegistry,
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
@@ -303,8 +303,8 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   highLevelOptimizations.constEval = false;
 
   buildIREEVMTransformPassPipeline(
-      IREE::HAL::TargetBackendRegistry::getGlobal(),
-      BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
+      IREE::HAL::TargetRegistry::getGlobal(), BindingOptions::FromFlags::get(),
+      InputDialectOptions::FromFlags::get(),
       PreprocessingOptions::FromFlags::get(), highLevelOptimizations,
       SchedulingOptions::FromFlags::get(),
       IREE::HAL::TargetOptions::FromFlags::get(),

@@ -41,29 +41,26 @@ struct VMVXOptions {
 static IREE::HAL::ExecutableTargetAttr
 getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
                         StringRef backend, StringRef format) {
-  SmallVector<NamedAttribute> config;
-  config.emplace_back(
-      StringAttr::get(context, "ukernels"),
-      StringAttr::get(context, enableMicrokernels ? "all" : "none"));
-  return IREE::HAL::ExecutableTargetAttr::get(
-      context, StringAttr::get(context, backend),
-      StringAttr::get(context, format), DictionaryAttr::get(context, config));
+  Builder b(context);
+  SmallVector<NamedAttribute> configItems;
+
+  configItems.emplace_back(
+      b.getStringAttr("ukernels"),
+      b.getStringAttr(enableMicrokernels ? "all" : "none"));
+
+  return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
+      b.getStringAttr(backend), b.getStringAttr(format),
+      b.getDictionaryAttr(configItems));
 }
 
-class VMVXTargetBackend final : public TargetBackend {
+// TODO(benvanik): move to a CPU device registration outside of VMVX.
+class VMVXTargetDevice final : public TargetDevice {
 public:
-  VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
-
-  std::string name() const override { return "vmvx"; }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
-                    IREE::VMVX::VMVXDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect>();
-  }
+  VMVXTargetDevice() = default;
 
   IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -71,17 +68,49 @@ public:
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
-    targetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("vmvx")->getDefaultExecutableTargets(
+        context, "vmvx", configAttr, executableTargetAttrs);
 
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("vmvx"),
+                                            configAttr, executableTargetAttrs);
   }
 
   std::optional<IREE::HAL::DeviceTargetAttr>
-  getHostDeviceTarget(MLIRContext *context) const override {
-    return getDefaultDeviceTarget(context);
+  getHostDeviceTarget(MLIRContext *context,
+                      const TargetRegistry &targetRegistry) const override {
+    return getDefaultDeviceTarget(context, targetRegistry);
+  }
+};
+
+class VMVXTargetBackend final : public TargetBackend {
+public:
+  VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
+
+  std::string getLegacyDefaultDeviceID() const override { return "vmvx"; }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+  }
+
+  void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
+                                DictionaryAttr deviceConfigAttr,
+                                SmallVectorImpl<IREE::HAL::ExecutableTargetAttr>
+                                    &executableTargetAttrs) const override {
+    executableTargetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx", "vmvx-bytecode-fb"));
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<IREE::Codegen::IREECodegenDialect, IREE::VM::VMDialect,
+                    IREE::VMVX::VMVXDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect>();
   }
 
   IREE::VM::TargetOptions
@@ -171,19 +200,13 @@ private:
   const VMVXOptions &options;
 };
 
-class VMVXInlineTargetBackend final : public TargetBackend {
+class VMVXInlineTargetDevice final : public TargetDevice {
 public:
-  VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
-
-  std::string name() const override { return "vmvx-inline"; }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
-  }
+  VMVXInlineTargetDevice() = default;
 
   IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
@@ -191,12 +214,36 @@ public:
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
-    targetAttrs.push_back(getVMVXExecutableTarget(
-        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("vmvx-inline")
+        ->getDefaultExecutableTargets(context, "vmvx-inline", configAttr,
+                                      executableTargetAttrs);
 
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
+    return IREE::HAL::DeviceTargetAttr::get(context,
+                                            b.getStringAttr("vmvx-inline"),
+                                            configAttr, executableTargetAttrs);
+  }
+};
+
+class VMVXInlineTargetBackend final : public TargetBackend {
+public:
+  VMVXInlineTargetBackend(const VMVXOptions &options) : options(options) {}
+
+  std::string getLegacyDefaultDeviceID() const override {
+    return "vmvx-inline";
+  }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(getVMVXExecutableTarget(
+        options.enableMicrokernels, context, "vmvx-inline", "vmvx-ir"));
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -217,12 +264,19 @@ namespace {
 struct VMVXSession
     : public PluginSession<VMVXSession, VMVXOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+    // TODO(benvanik): move to a CPU device registration outside of VMVX. Note
+    // that the inline device does need to be special.
     // #hal.device.target<"vmvx", ...
+    targets.add("vmvx", [&]() { return std::make_shared<VMVXTargetDevice>(); });
+    // #hal.device.target<"vmvx-inline", ...
+    targets.add("vmvx-inline",
+                [&]() { return std::make_shared<VMVXInlineTargetDevice>(); });
+  }
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"vmvx", ...
     targets.add("vmvx",
                 [&]() { return std::make_shared<VMVXTargetBackend>(options); });
-    // #hal.device.target<"vmvx-inline", ...
     // #hal.executable.target<"vmvx-inline", ...
     targets.add("vmvx-inline", [&]() {
       return std::make_shared<VMVXInlineTargetBackend>(options);

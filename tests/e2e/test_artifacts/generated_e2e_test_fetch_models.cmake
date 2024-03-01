@@ -84,15 +84,15 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-EfficientNetV2STF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/EfficientNetV2STF_1af8c88f4e64e388a0c87bbeddcfb888084059df30cd631340d51794a0796e0f.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_EfficientNetV2STF.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-MiniLML12H384Uncased"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/MiniLML12H384Uncased_5aed9c3c3dfe8247ce76b74d518fa570b94dc0c3732631734d02ad70e4c74867.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_MiniLML12H384Uncased.mlirbc"
   UNPACK
 )
 
@@ -112,15 +112,15 @@ iree_fetch_artifact(
 
 iree_fetch_artifact(
   NAME "model-BertForMaskedLMTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertForMaskedLMTF_e757a10b24f6ff83aaae0ceb5bb05d4efe9ff3e9931f8e9a29f12bc5c2e42b5e.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertForMaskedLMTF.mlirbc"
   UNPACK
 )
 
 iree_fetch_artifact(
   NAME "model-BertLargeTF"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_2023-05-07.timestamp_1683504734j.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.timestamp_1683504734j.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/tensorflow/manual/BertLargeTF_000793afb016fb3afc559304bcb3ba6cdb2df1825e8976ca236c07c12e4f65fa.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargeTF.mlirbc"
   UNPACK
 )
 

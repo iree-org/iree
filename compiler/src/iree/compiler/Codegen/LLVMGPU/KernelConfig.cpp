@@ -57,6 +57,13 @@ llvm::cl::opt<bool>
                     llvm::cl::desc("force use mma sync instead of wmma ops"),
                     llvm::cl::init(false));
 
+llvm::cl::opt<int> clGPUMatmulCThreshold(
+    "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
+    llvm::cl::desc("matmul c matrix element count threshold to be considered "
+                   "as small vs. large when deciding MMA schedule"),
+    // TODO: We should get this value from the target's parallelism.
+    llvm::cl::init(512 * 512));
+
 namespace {
 
 constexpr StringLiteral kCudaTarget = "cuda";
@@ -500,12 +507,23 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
+  GPUMMAHeuristicSeeds seeds;
+
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/openxla/iree/issues/16341 for details.
-  GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
-                             /*bestMNTileCountPerSubgroup=*/8,
-                             /*bestKTileCountPerSubgroup=*/2};
+  if (problem.mSize * problem.nSize <= clGPUMatmulCThreshold) {
+    // For matmuls with small M*N size, we want to distribute M*N onto more
+    // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
+    // and a larger bestKTileCountPerSubgroup.
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+             /*bestMNTileCountPerSubgroup=*/4,
+             /*bestKTileCountPerSubgroup=*/8};
+  } else {
+    seeds = {/*bestSubgroupCountPerWorkgroup=*/4,
+             /*bestMNTileCountPerSubgroup=*/8,
+             /*bestKTileCountPerSubgroup=*/4};
+  }
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =

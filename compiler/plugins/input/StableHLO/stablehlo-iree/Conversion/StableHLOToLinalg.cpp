@@ -586,7 +586,8 @@ struct BroadcastInDimOpToBroadcastConverter final
                   ConversionPatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
 
-    SmallVector<int64_t> broadcastDimensions = op.getBroadcastDimensions();
+    SmallVector<int64_t> broadcastDimensions =
+        llvm::to_vector(op.getBroadcastDimensions());
 
     Value operand = adaptor.getOperand();
     auto operandTy = llvm::cast<ShapedType>(operand.getType());
@@ -721,7 +722,8 @@ struct DynamicBroadcastInDimOpToBroadcastConverter final
     if (!resultTy)
       return failure();
 
-    SmallVector<int64_t> broadcastDimensions = op.getBroadcastDimensions();
+    SmallVector<int64_t> broadcastDimensions =
+        llvm::to_vector(op.getBroadcastDimensions());
 
     SmallVector<std::optional<bool>> expansionBehavior(
         broadcastDimensions.size());
@@ -1745,7 +1747,7 @@ struct GatherConversion final : OpConversionPattern<mlir::stablehlo::GatherOp> {
     int64_t resultRank = resultType.getRank();
     // slice_sizes has to have the same size as operand.rank, and doing it this
     // way permits an unranked operand.
-    int64_t operandRank = gatherOp.getSliceSizes().getNumElements();
+    int64_t operandRank = gatherOp.getSliceSizes().size();
 
     int64_t indexVectorDim = gatherOp.getDimensionNumbers().getIndexVectorDim();
 
@@ -1960,10 +1962,8 @@ struct SelectAndScatterNoOverlapConverter final
     if (!op.getWindowDimensions().has_value())
       return rewriter.notifyMatchFailure(op, "no window dimensions found");
 
-    auto strides =
-        llvm::to_vector(op.getWindowStridesAttr().getValues<int64_t>());
-    auto window =
-        llvm::to_vector(op.getWindowDimensionsAttr().getValues<int64_t>());
+    auto strides = llvm::to_vector(op.getWindowStrides().value());
+    auto window = llvm::to_vector(op.getWindowDimensions().value());
 
     if (static_cast<int64_t>(strides.size()) != operandTy.getRank() ||
         static_cast<int64_t>(window.size()) != operandTy.getRank())

@@ -24,7 +24,6 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
-#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/GlobalValue.h"
@@ -46,27 +45,23 @@
 #define DEBUG_TYPE "iree-llvm-cpu-target"
 using llvm::dbgs;
 
-static llvm::cl::opt<std::string> clEnableCPUUkernels(
-    "iree-llvmcpu-enable-ukernels",
-    llvm::cl::desc("Enables microkernels in the llvmcpu backend. May be "
-                   "`default`, `none`, `all`, or a comma-separated list of "
-                   "specific unprefixed microkernels to enable, e.g. `mmt4d`."),
-    llvm::cl::init("default"));
-
-static llvm::cl::opt<bool> clLinkCPUUKernelBitcode(
-    "iree-llvmcpu-link-ukernel-bitcode",
-    llvm::cl::desc("Link ukernel bitcode libraries into generated executables"),
-    llvm::cl::init(true));
-
-static llvm::cl::opt<unsigned> clNativeVectorWidthInBytes(
-    "iree-llvmcpu-native-vector-width-in-bytes",
-    llvm::cl::desc("sets the native vector register width of the hardware. It "
-                   "overrides any inferred vector register width"),
-    llvm::cl::init(0));
-
-// Default native vector width when target or specific native vector width are
-// not provided.
-constexpr unsigned defaultNativeVectorWidth = 16;
+//===----------------------------------------------------------------------===//
+//    __    __   ___________    ____     ____    ____  ______    __    __     //
+//   |  |  |  | |   ____\   \  /   /     \   \  /   / /  __  \  |  |  |  |    //
+//   |  |__|  | |  |__   \   \/   /       \   \/   / |  |  |  | |  |  |  |    //
+//   |   __   | |   __|   \_    _/         \_    _/  |  |  |  | |  |  |  |    //
+//   |  |  |  | |  |____    |  |   __        |  |    |  `--'  | |  `--'  |    //
+//   |__|  |__| |_______|   |__|  (_ )       |__|     \______/   \______/     //
+//                                 |/                                         //
+//===----------------------------------------------------------------------===//
+//
+// Do _not_ add command-line flags here: IREE is a cross-compiler and can
+// compile for multiple targets in a single invocation. Global flags added here
+// apply to all targets with no way to override them from hosting applications
+// that may need to programmatically set them per target and that's bad.
+//
+// Flags *must* be added to the LLVMTarget if they are target-specific and
+// LLVMTargetOptions if they are apply to the whole backend.
 
 namespace mlir::iree_compiler::IREE::HAL {
 
@@ -143,19 +138,123 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
   return success();
 }
 
-class LLVMCPUTargetBackend final : public TargetBackend {
+class LLVMCPUTargetDevice final : public TargetDevice {
 public:
-  struct AdditionalConfigurationValues {
-    std::string dataLayoutStr;
-    int64_t vectorSize;
-  };
+  LLVMCPUTargetDevice() = default;
 
-  explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
-      : defaultOptions_(std::move(options)) {
-    initializeAdditionalConfiguration(defaultOptions_);
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("llvm-cpu")
+        ->getDefaultExecutableTargets(context, "llvm-cpu", configAttr,
+                                      executableTargetAttrs);
+
+    return IREE::HAL::DeviceTargetAttr::get(context,
+                                            b.getStringAttr("llvm-cpu"),
+                                            configAttr, executableTargetAttrs);
   }
 
-  std::string name() const override { return "llvm-cpu"; }
+  std::optional<IREE::HAL::DeviceTargetAttr>
+  getHostDeviceTarget(MLIRContext *context,
+                      const TargetRegistry &targetRegistry) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("llvm-cpu")
+        ->getHostExecutableTargets(context, "llvm-cpu", configAttr,
+                                   executableTargetAttrs);
+
+    return IREE::HAL::DeviceTargetAttr::get(context,
+                                            b.getStringAttr("llvm-cpu"),
+                                            configAttr, executableTargetAttrs);
+  }
+};
+
+class LLVMCPUTargetBackend final : public TargetBackend {
+public:
+  explicit LLVMCPUTargetBackend(LLVMTargetOptions options)
+      : defaultOptions_(std::move(options)) {}
+
+  std::string getLegacyDefaultDeviceID() const override { return "llvm-cpu"; }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(
+        getExecutableTarget(context, defaultOptions_.target));
+  }
+
+  void getHostExecutableTargets(MLIRContext *context, StringRef deviceID,
+                                DictionaryAttr deviceConfigAttr,
+                                SmallVectorImpl<IREE::HAL::ExecutableTargetAttr>
+                                    &executableTargetAttrs) const override {
+    std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
+    if (maybeTarget) {
+      executableTargetAttrs.push_back(
+          getExecutableTarget(context, *maybeTarget));
+    }
+  }
+
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context, const LLVMTarget &target) const {
+    // Add some configurations to the `hal.executable.target` attribute.
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    target.storeToConfigAttrs(context, configItems);
+
+    // Compute the format used at runtime to select the executable loader.
+    std::string format;
+    if (target.linkStatic) {
+      // Static libraries are just string references when serialized so we don't
+      // need to specify the target architecture.
+      format += "static";
+    } else {
+      // Construct the [loader]-[format]-[arch] triple.
+      llvm::Triple targetTriple(target.getTriple());
+      if (target.getLinkEmbedded()) {
+        // Using the IREE embedded ELF format/loader.
+        format += "embedded-elf-";
+      } else {
+        // System-specific shared library format.
+        format += "system-";
+        switch (targetTriple.getObjectFormat()) {
+        case llvm::Triple::ObjectFormatType::COFF:
+          format += "dll-";
+          break;
+        case llvm::Triple::ObjectFormatType::ELF:
+          format += "elf-";
+          break;
+        case llvm::Triple::ObjectFormatType::MachO:
+          format += "dylib-";
+          break;
+        case llvm::Triple::ObjectFormatType::Wasm:
+          format += "wasm-";
+          break;
+        default:
+          format += "unknown-";
+          break;
+        }
+      }
+      format += getIreeArchNameForTargetTriple(targetTriple);
+    }
+    return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
+        b.getStringAttr("llvm-cpu"), b.getStringAttr(format),
+        b.getDictionaryAttr(configItems));
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerBuiltinDialectTranslation(registry);
@@ -171,38 +270,6 @@ public:
                     arm_neon::ArmNeonDialect,
                     arm_sme::ArmSMEDialect>();
     // clang-format on
-  }
-
-  IREE::HAL::DeviceTargetAttr getDeviceTargetFromTarget(
-      MLIRContext *context, const LLVMTarget &target,
-      const AdditionalConfigurationValues &addlConfig) const {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
-    targetAttrs.push_back(getExecutableTarget(context, target, addlConfig));
-
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
-  }
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
-    return getDeviceTargetFromTarget(context, defaultOptions_.target,
-                                     defaultAddlConfig_);
-  }
-
-  std::optional<IREE::HAL::DeviceTargetAttr>
-  getHostDeviceTarget(MLIRContext *context) const override {
-    std::optional<LLVMTarget> maybeTarget = LLVMTarget::createForHost();
-    if (!maybeTarget) {
-      return {};
-    }
-    return getDeviceTargetFromTarget(context, *maybeTarget, defaultAddlConfig_);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -486,7 +553,7 @@ public:
       }
     }
 
-    if (clLinkCPUUKernelBitcode) {
+    if (target.linkUkernelBitcode) {
       // Link in ukernel bitcode.
       if (hasUkernel(variantOp.getTarget())) {
         llvm::Expected<std::unique_ptr<llvm::Module>> bitcode =
@@ -768,141 +835,17 @@ public:
   }
 
 private:
-  IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context, const LLVMTarget &target,
-                      const AdditionalConfigurationValues &addlConfig) const {
-    // Add some configurations to the `hal.executable.target` attribute.
-    Builder b(context);
-    SmallVector<NamedAttribute> configAttrs;
-    target.storeToConfigAttrs(context, configAttrs);
-
-    // Compute the format.
-    std::string format;
-    if (target.linkStatic) {
-      // Static libraries are just string references when serialized so we don't
-      // need to specify the target architecture.
-      format += "static";
-    } else {
-      // Construct the [loader]-[format]-[arch] triple.
-      llvm::Triple targetTriple(target.getTriple());
-      if (target.getLinkEmbedded()) {
-        // Using the IREE embedded ELF format/loader.
-        format += "embedded-elf-";
-      } else {
-        // System-specific shared library format.
-        format += "system-";
-        switch (targetTriple.getObjectFormat()) {
-        case llvm::Triple::ObjectFormatType::COFF:
-          format += "dll-";
-          break;
-        case llvm::Triple::ObjectFormatType::ELF:
-          format += "elf-";
-          break;
-        case llvm::Triple::ObjectFormatType::MachO:
-          format += "dylib-";
-          break;
-        case llvm::Triple::ObjectFormatType::Wasm:
-          format += "wasm-";
-          break;
-        default:
-          format += "unknown-";
-          break;
-        }
-      }
-      format += getIreeArchNameForTargetTriple(targetTriple);
-    }
-
-    // Additional configuration items that are used in various places.
-    // Note: Some of these look to not be isolated properly for
-    // cross-compilation, likely requiring a closer look.
-    // Set data layout
-    configAttrs.emplace_back(b.getStringAttr("data_layout"),
-                             b.getStringAttr(addlConfig.dataLayoutStr));
-    // Set the native vector size. This creates a dummy llvm module just to
-    // build the TTI the right way.
-    configAttrs.emplace_back(b.getStringAttr("native_vector_size"),
-                             b.getIndexAttr(addlConfig.vectorSize));
-
-    std::string enableUkernels = clEnableCPUUkernels.getValue();
-    // Check if microkernels are to be enabled.
-    configAttrs.emplace_back(b.getStringAttr("ukernels"),
-                             b.getStringAttr(enableUkernels));
-
-    return IREE::HAL::ExecutableTargetAttr::get(
-        context, StringAttr::get(context, "llvm-cpu"),
-        StringAttr::get(context, format),
-        DictionaryAttr::get(context, configAttrs));
-  }
-
-  void initializeAdditionalConfiguration(const LLVMTargetOptions &options) {
-    auto targetMachine = createTargetMachine(options.target);
-    // TODO(#13988): proper error propagation. This is a common user scenario.
-    assert(targetMachine && "createTargetMachine failed");
-
-    // Data layout
-    llvm::DataLayout DL = targetMachine->createDataLayout();
-    defaultAddlConfig_.dataLayoutStr = DL.getStringRepresentation();
-
-    // Set the native vector size. This creates a dummy llvm module just to
-    // build the TTI the right way.
-    llvm::LLVMContext llvmContext;
-    auto llvmModule =
-        std::make_unique<llvm::Module>("dummy_module", llvmContext);
-    llvm::Type *voidType = llvm::Type::getVoidTy(llvmContext);
-    llvmModule->setDataLayout(DL);
-    llvm::Function *dummyFunc = llvm::Function::Create(
-        llvm::FunctionType::get(voidType, false),
-        llvm::GlobalValue::ExternalLinkage, "dummy_func", *llvmModule);
-
-    // If target supports AVX-512, enforce 512-bit vector registers.
-    llvm::StringRef targetFeatures = targetMachine->getTargetFeatureString();
-    if (targetFeatures.contains("avx512")) {
-      dummyFunc->addFnAttr("prefer-vector-width", "512");
-    }
-
-    llvm::TargetTransformInfo tti =
-        targetMachine->getTargetTransformInfo(*dummyFunc);
-
-    // Set the native vector width. We prioritize user-specified widths over
-    // widths provided by TTI.
-    if (clNativeVectorWidthInBytes) {
-      defaultAddlConfig_.vectorSize = clNativeVectorWidthInBytes;
-    } else {
-      unsigned ttiVectorWidth =
-          tti.getRegisterBitWidth(
-              llvm::TargetTransformInfo::RGK_FixedWidthVector) /
-          8;
-      defaultAddlConfig_.vectorSize =
-          ttiVectorWidth > 1 ? ttiVectorWidth : defaultNativeVectorWidth;
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "CPU : " << targetMachine->getTargetCPU() << "\n";
-      llvm::dbgs() << "Target Triple : "
-                   << targetMachine->getTargetTriple().normalize() << "\n";
-      llvm::dbgs() << "Target Feature string : " << targetFeatures << "\n";
-      llvm::dbgs() << "Data Layout : " << defaultAddlConfig_.dataLayoutStr
-                   << "\n";
-      llvm::dbgs() << "Vector Width : " << defaultAddlConfig_.vectorSize
-                   << "\n";
-    });
-  }
-
   // Default options as registered from the command line. Should not be
   // relied on outside of getDefaultDeviceTarget() since it represents
   // a static "cross compiling" config and would override more specific
   // settings.
   LLVMTargetOptions defaultOptions_;
-
-  // Additional target information besides that is contained in
-  // LLVMTargetOptions defaultOptions_.
-  AdditionalConfigurationValues defaultAddlConfig_;
 };
 
 void registerLLVMCPUTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   // Make sure flags are registered.
-  LLVMTargetOptions::getFromFlags();
+  LLVMTargetOptions::registerFlags();
 
 // Dynamically do preprocessor dispatch to initialize only targets that we
 // care about if they are enabled. Unfortunately, the way the LLVM macros
@@ -950,13 +893,14 @@ void registerLLVMCPUTargetBackends(
 #define LLVM_TARGET(TargetName) LLVM_INITIALIZE_TARGET_##TargetName()
 #include "llvm/Config/Targets.def"
 
-  auto backendFactory = [=]() {
-    return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
-  };
-
+  // TODO(benvanik): move to a CPU device registration outside of LLVM.
   // #hal.device.target<"llvm-cpu", ...
+  static TargetDeviceRegistration registration0(
+      "llvm-cpu", [=]() { return std::make_shared<LLVMCPUTargetDevice>(); });
   // #hal.executable.target<"llvm-cpu", ...
-  static TargetBackendRegistration registration("llvm-cpu", backendFactory);
+  static TargetBackendRegistration registration1("llvm-cpu", [=]() {
+    return std::make_shared<LLVMCPUTargetBackend>(queryOptions());
+  });
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

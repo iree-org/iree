@@ -54,13 +54,64 @@ static spirv::TargetEnvAttr getWebGPUTargetEnv(MLIRContext *context) {
       spirv::DeviceType::Unknown, spirv::TargetEnvAttr::kUnknownDeviceID);
 }
 
+// TODO: WebGPUOptions for choosing the version/extensions/etc.
+class WebGPUTargetDevice : public TargetDevice {
+public:
+  WebGPUTargetDevice(const WebGPUSPIRVOptions &options) : options(options) {}
+
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("webgpu-spirv")
+        ->getDefaultExecutableTargets(context, "webgpu", configAttr,
+                                      executableTargetAttrs);
+
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
+                                            configAttr, executableTargetAttrs);
+  }
+
+private:
+  const WebGPUSPIRVOptions &options;
+};
+
 class WebGPUSPIRVTargetBackend : public TargetBackend {
 public:
   WebGPUSPIRVTargetBackend(const WebGPUSPIRVOptions &options)
       : options(options) {}
 
-  // NOTE: we could vary this based on the options such as 'webgpu-v2'.
-  std::string name() const override { return "webgpu"; }
+  std::string getLegacyDefaultDeviceID() const override { return "webgpu"; }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(
+        getExecutableTarget(context, getWebGPUTargetEnv(context)));
+  }
+
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(b.getStringAttr(name), value);
+    };
+
+    addConfig(spirv::getTargetEnvAttrName(), targetEnv);
+
+    return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
+        b.getStringAttr("webgpu-spirv"), b.getStringAttr("webgpu-wgsl-fb"),
+        b.getDictionaryAttr(configItems));
+  }
 
   // TODO(scotttodd): Prune FlowDialect dep when WGSLReplacePushConstantsPass
   //     does not use the Flow dialect (TranslateExecutables calls this
@@ -69,23 +120,6 @@ public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
                     spirv::SPIRVDialect, gpu::GPUDialect>();
-  }
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
-    targetAttrs.push_back(
-        getExecutableTarget(context, getWebGPUTargetEnv(context)));
-
-    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("webgpu"),
-                                            configAttr, targetAttrs);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -259,35 +293,23 @@ public:
   }
 
 private:
-  IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context,
-                      spirv::TargetEnvAttr targetEnv) const {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    configItems.emplace_back(b.getStringAttr(spirv::getTargetEnvAttrName()),
-                             targetEnv);
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-    return IREE::HAL::ExecutableTargetAttr::get(
-        context, b.getStringAttr("webgpu-spirv"),
-        b.getStringAttr("webgpu-wgsl-fb"), configAttr);
-  }
-
   const WebGPUSPIRVOptions &options;
 };
 
 struct WebGPUSPIRVSession
     : public PluginSession<WebGPUSPIRVSession, WebGPUSPIRVOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
-    auto backendFactory = [=]() {
-      return std::make_shared<WebGPUSPIRVTargetBackend>(options);
-    };
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"webgpu", ...
-    targets.add("webgpu", backendFactory);
+    targets.add("webgpu", [=]() {
+      return std::make_shared<WebGPUTargetDevice>(options);
+    });
+  }
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"webgpu-spirv", ...
-    targets.add("webgpu-spirv", backendFactory);
+    targets.add("webgpu-spirv", [=]() {
+      return std::make_shared<WebGPUSPIRVTargetBackend>(options);
+    });
   }
 };
 

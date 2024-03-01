@@ -19,13 +19,16 @@ namespace {
 /// Apply dilation and padding to the input of a convolution.
 Value applyConvolutionPadding(Location loc, Value input,
                               DenseIntElementsAttr padding,
-                              DenseIntElementsAttr lhsDilation,
+                              DenseI64ArrayAttr lhsDilation,
                               llvm::ArrayRef<int64_t> dimMappings,
                               OpBuilder &rewriter) {
-  if ((!padding || isSplatValue(padding, 0)) &&
-      (!lhsDilation || isSplatValue(lhsDilation, 1))) {
+  SmallVector<int64_t> lhsDilationValues;
+  if (lhsDilation)
+    lhsDilationValues = llvm::to_vector(lhsDilation.asArrayRef());
+  bool noPadding = !padding || isSplatValue(padding, 0);
+  bool noDilation = !lhsDilation || hlo::isSplatArray(lhsDilationValues, 1);
+  if (noPadding && noDilation)
     return input;
-  }
 
   auto inputType = cast<ShapedType>(input.getType());
   int64_t rank = inputType.getRank();
@@ -48,10 +51,10 @@ Value applyConvolutionPadding(Location loc, Value input,
   // Translate input dilation into interior padding.
   SmallVector<int64_t, 8> padInterior(rank, 0);
   if (lhsDilation) {
-    assert(rank == lhsDilation.size() + 2);
-    for (int64_t i : llvm::seq<int64_t>(0, lhsDilation.size())) {
+    assert(rank == static_cast<int64_t>(lhsDilationValues.size()) + 2);
+    for (int64_t i : llvm::seq<int64_t>(0, lhsDilationValues.size())) {
       int64_t dim = dimMappings[i];
-      padInterior[dim] = lhsDilation.getValues<int64_t>()[i] - 1;
+      padInterior[dim] = lhsDilationValues[i] - 1;
     }
   }
 
@@ -68,10 +71,8 @@ Value applyConvolutionPadding(Location loc, Value input,
                  RankedTensorType::get({}, inputType.getElementType())));
   }
 
-  return rewriter.create<mlir::stablehlo::PadOp>(
-      loc, input, zero, rewriter.getDenseI64ArrayAttr(padLow),
-      rewriter.getDenseI64ArrayAttr(padHigh),
-      rewriter.getDenseI64ArrayAttr(padInterior));
+  return rewriter.create<mlir::stablehlo::PadOp>(loc, input, zero, padLow,
+                                                 padHigh, padInterior);
 }
 
 /// If the ConvolutionOp has a window reversal, applies it to the filter.
@@ -83,8 +84,7 @@ Value applyConvolutionReversal(Location loc, OpBuilder &b,
     return filter;
   }
   llvm::SmallVector<int64_t> reversedDims;
-  for (auto [idx, reversed] :
-       llvm::enumerate(reversals.value().getValues<bool>())) {
+  for (auto [idx, reversed] : llvm::enumerate(reversals.value())) {
     if (reversed) {
       reversedDims.push_back(
           op.getDimensionNumbers().getKernelSpatialDimensions()[idx]);
@@ -213,8 +213,12 @@ struct NormalConvolutionOpConversion final
         loc, resultType.getShape(), resultType.getElementType(), dynSizes);
     Value zeroTensor = fillTensorWithZeros(rewriter, loc, emptyTensor);
     linalg::LinalgOp res;
-    Attribute strides = op.getWindowStridesAttr();
-    Attribute dilations = op.getRhsDilationAttr();
+    Attribute strides;
+    if (auto s = op.getWindowStrides())
+      strides = rewriter.getI64TensorAttr(*s);
+    Attribute dilations;
+    if (auto d = op.getRhsDilation())
+      dilations = rewriter.getI64TensorAttr(*d);
 
     // Apply padding and input dilation.
     llvm::SmallVector<int64_t> spatialDimMapping(rank - 2);
@@ -507,7 +511,7 @@ struct ConvolutionOpGeneralConversion final
 
       AffineExpr stride = dim0;
       if (op.getWindowStrides().has_value())
-        stride = stride * op.getWindowStrides().value().getValues<int64_t>()[i];
+        stride = stride * op.getWindowStrides().value()[i];
       AffineExpr srcExpr = stride + dim1;
 
       srcExprs[lhsIndexMapping[inputSpatialDimensions[i]]] = srcExpr;
@@ -596,7 +600,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute windowStrides;
     if (op.getWindowStrides()) {
-      windowStrides = op.getWindowStrides().value();
+      windowStrides = rewriter.getI64TensorAttr(op.getWindowStrides().value());
     } else {
       windowStrides = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),
@@ -605,7 +609,7 @@ struct DepthwiseConvolutionOpConversion final
 
     Attribute rhsDilation;
     if (op.getRhsDilation()) {
-      rhsDilation = op.getRhsDilation().value();
+      rhsDilation = rewriter.getI64TensorAttr(op.getRhsDilation().value());
     } else {
       rhsDilation = SplatElementsAttr::get(
           VectorType::get({spatialRank}, rewriter.getI64Type()),

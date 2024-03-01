@@ -6,7 +6,7 @@
 //
 // For such case we can link all executables into one, with just one variant.
 
-#vulkan_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}>
+#vulkan_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv"]}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -186,10 +186,10 @@ util.initializer {
 // For such case we need to link into multiple executables, with each one
 // having one variant containing all entry points needing the same target.
 
-#vulkan_target_0 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan"]}>
-#vulkan_target_1 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup=1"]}>
+#vulkan_target_0 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.spirv.features = ["vulkan-spirv"]}>
+#vulkan_target_1 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.spirv.features = ["vulkan-spirv", "subgroup=1"]}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -308,8 +308,8 @@ func.func @two_target_environments() -> () {
   return
 }
 
-//  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}
-//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=1"]}
+//  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv"]}
+//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "subgroup=1"]}
 
 //      CHECK: hal.executable private @link_executables_linked_spirv_0 {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb target(#[[TARGET0]]) {
@@ -377,12 +377,12 @@ func.func @two_target_environments() -> () {
 // For such case we can only link two executables together if they have the
 // same set of target requirements.
 
-#vulkan_target_0 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan"]}>
-#vulkan_target_1 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup=1"]}>
-#vulkan_target_2 = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
-  iree.spirv.features = ["vulkan", "subgroup=2"]}>
+#vulkan_target_0 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.spirv.features = ["vulkan-spirv"]}>
+#vulkan_target_1 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.spirv.features = ["vulkan-spirv", "subgroup=1"]}>
+#vulkan_target_2 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  iree.spirv.features = ["vulkan-spirv", "subgroup=2"]}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -547,9 +547,9 @@ hal.executable private @dispatch_3 {
   }
 }
 
-//  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan"]}
-//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=1"]}
-//  CHECK-DAG: #[[TARGET2:.+]] = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan", "subgroup=2"]}
+//  CHECK-DAG: #[[TARGET0:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv"]}
+//  CHECK-DAG: #[[TARGET1:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "subgroup=1"]}
+//  CHECK-DAG: #[[TARGET2:.+]] = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {iree.spirv.features = ["vulkan-spirv", "subgroup=2"]}
 
 //      CHECK: hal.executable private @link_executables_linked_spirv {
 //      CHECK:   hal.executable.variant public @vulkan_spirv_fb_0 target(#[[TARGET0]]) {

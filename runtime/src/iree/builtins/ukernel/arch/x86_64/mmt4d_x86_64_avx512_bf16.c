@@ -54,40 +54,40 @@ iree_uk_mmt4d_tile_bf16bf16fXX_1x16x2_to_16x16x2_x86_64_avx512_bf16(
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     if (acc_type == IREE_UK_TYPE_FLOAT_32) {
       float* IREE_UK_RESTRICT out_ptr = out_tile;
-      for (int i = 0; i < M0; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
         acc[i] = _mm512_loadu_ps(out_ptr + i * 16);
       }
     } else {
       iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
-      for (int i = 0; i < M0; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
         __m256i loaded = _mm256_loadu_si256((const __m256i*)(out_ptr + i * 16));
         acc[i] = _mm512_cvtpbh_ps(*(const __m256bh*)&loaded);
       }
     }
   } else {
-    for (int i = 0; i < M0; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = _mm512_setzero_ps();
     }
   }
 
-  for (iree_uk_int32_t k = 0; k < params->K; ++k) {
+  for (int k = 0; k < params->K; ++k) {
     __m512 rhs = _mm512_loadu_ps(rhs_ptr);
     rhs_ptr += 32;
-    for (int i = 0; i < M0; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = iree_mm512_dpbf16_ps_broadcast_rhs(acc[i], rhs, lhs_ptr + 2 * i);
     }
     lhs_ptr += M0 * 2;
   }
 
-  for (int i = 0; i < M0; ++i) {
+  IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
     if (acc_type == IREE_UK_TYPE_FLOAT_32) {
       float* IREE_UK_RESTRICT out_ptr = out_tile;
-      for (int i = 0; i < M0; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
         _mm512_storeu_ps(out_ptr + i * 16, acc[i]);
       }
     } else {
       iree_uk_uint16_t* IREE_UK_RESTRICT out_ptr = out_tile;
-      for (int i = 0; i < M0; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
         __m256bh converted = _mm512_cvtneps_pbh(acc[i]);
         _mm256_storeu_si256((__m256i*)(out_ptr + i * 16),
                             *(const __m256i*)&converted);

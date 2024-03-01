@@ -27,7 +27,8 @@ static inline int32x4_t iree_uk_neon_uzp2_s32_as_s64(int32x4_t a, int32x4_t b) {
       vuzp2q_s64(vreinterpretq_s64_s32(a), vreinterpretq_s64_s32(b)));
 }
 
-void iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -41,8 +42,8 @@ void iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
   const int mtiles = M0 == 1 ? 1 : M0 / 2;
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
     // Load row-major accumulator and swizzle into 2x2 register tiles.
-    for (int i = 0; i < mtiles; ++i) {
-      for (int j = 0; j < 2; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < mtiles; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
         int32x4_t acc_1x4_0 = vld1q_s32(out_ptr + 8 * (2 * i + 0) + 4 * j);
         int32x4_t acc_1x4_1 =
             M0 == 1 ? vdupq_n_s32(0)
@@ -52,15 +53,13 @@ void iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
       }
     }
   } else {
-    for (int i = 0; i < mtiles; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        acc[i][j] = vdupq_n_s32(0);
-      }
+    IREE_UK_UNROLL for (int i = 0; i < mtiles; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) { acc[i][j] = vdupq_n_s32(0); }
     }
   }
   for (int k = 0; k < params->K; ++k) {
     int8x16_t rhs[4];
-    for (int i = 0; i < 4; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
       rhs[i] = vld1q_s8(rhs_ptr + 16 * i);
     }
     rhs_ptr += 64;
@@ -70,20 +69,20 @@ void iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
       lhs[0] = vcombine_s8(lhs8, lhs8);
       lhs_ptr += 8;
     } else
-      for (int i = 0; i < mtiles; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < mtiles; ++i) {
         lhs[i] = vld1q_s8(lhs_ptr);
         lhs_ptr += 16;
       }
-    for (int i = 0; i < mtiles; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    IREE_UK_UNROLL for (int i = 0; i < mtiles; ++i) {
+      IREE_UK_UNROLL for (int j = 0; j < 4; ++j) {
         acc[i][j] = vmmlaq_s32(acc[i][j], lhs[i], rhs[j]);
       }
     }
   }
 
   // Swizzle accumulator 2x2 register tiles back to row-major and store.
-  for (int i = 0; i < mtiles; ++i) {
-    for (int j = 0; j < 2; ++j) {
+  IREE_UK_UNROLL for (int i = 0; i < mtiles; ++i) {
+    IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
       int32x4_t acc_1x4_0 =
           iree_uk_neon_uzp1_s32_as_s64(acc[i][2 * j + 0], acc[i][2 * j + 1]);
       vst1q_s32(out_ptr + 8 * (2 * i + 0) + 4 * j, acc_1x4_0);

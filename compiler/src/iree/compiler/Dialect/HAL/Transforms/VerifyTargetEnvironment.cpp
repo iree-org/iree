@@ -69,27 +69,47 @@ struct VerifyTargetEnvironmentPass
 
     // Verify each target is registered.
     for (auto attr : targetsAttr) {
-      auto targetAttr = llvm::dyn_cast<IREE::HAL::DeviceTargetAttr>(attr);
-      if (!targetAttr) {
+      auto deviceTargetAttr = llvm::dyn_cast<IREE::HAL::DeviceTargetAttr>(attr);
+      if (!deviceTargetAttr) {
         moduleOp.emitError() << "invalid target attr type: " << attr;
         signalPassFailure();
         return;
       }
 
-      auto targetBackend =
-          targetRegistry->getTargetBackend(targetAttr.getDeviceID().getValue());
-      if (!targetBackend) {
+      auto targetDevice = targetRegistry->getTargetDevice(
+          deviceTargetAttr.getDeviceID().getValue());
+      if (!targetDevice) {
         auto diagnostic = moduleOp.emitError();
         diagnostic
-            << "unregistered target backend " << targetAttr.getDeviceID()
+            << "unregistered target device " << deviceTargetAttr.getDeviceID()
             << "; ensure it is linked in to the compiler (available = [ ";
         for (const auto &targetName :
-             targetRegistry->getRegisteredTargetBackends()) {
+             targetRegistry->getRegisteredTargetDevices()) {
           diagnostic << "'" << targetName << "' ";
         }
         diagnostic << "])";
         signalPassFailure();
         return;
+      }
+
+      for (auto executableTargetAttr :
+           deviceTargetAttr.getExecutableTargets()) {
+        auto targetBackend = targetRegistry->getTargetBackend(
+            executableTargetAttr.getBackend().getValue());
+        if (!targetBackend) {
+          auto diagnostic = moduleOp.emitError();
+          diagnostic
+              << "unregistered target backend "
+              << executableTargetAttr.getBackend()
+              << "; ensure it is linked in to the compiler (available = [ ";
+          for (const auto &targetName :
+               targetRegistry->getRegisteredTargetBackends()) {
+            diagnostic << "'" << targetName << "' ";
+          }
+          diagnostic << "])";
+          signalPassFailure();
+          return;
+        }
       }
     }
   }
