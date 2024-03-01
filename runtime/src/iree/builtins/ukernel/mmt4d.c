@@ -44,11 +44,6 @@ static void iree_uk_mmt4d_validate(const iree_uk_mmt4d_params_t* params) {
   // - Ensure that {LHS,RHS} strides are multiples of 8 bits.
   IREE_UK_ASSERT(!((params->lhs_stride0 * lhs_bits) % 8));
   IREE_UK_ASSERT(!((params->rhs_stride0 * rhs_bits) % 8));
-
-  // Ensure iree_uk_mmt4d_tile_generic_max_bytes large enough for this tile.
-  IREE_UK_ASSERT(params->M0 * params->N0 *
-                     iree_uk_type_size(iree_uk_mmt4d_out_type(mmt4d_type)) <=
-                 iree_uk_mmt4d_tile_generic_max_bytes);
 #endif  // IREE_UK_ENABLE_ASSERTS
 }
 

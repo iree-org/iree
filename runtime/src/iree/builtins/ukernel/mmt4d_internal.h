@@ -150,24 +150,6 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
   IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(G, F1, F2, F4, F8)               \
   IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F16, 16)
 
-// In order to be helpful as a reference for future architecture-specific
-// kernels, the generic kernels are structured like an actual optimized kernel,
-// using an "accumulator tile" that in this case is a stack array (which would
-// become a group of SIMD registers in an actual optimized kernel). The downside
-// of this approach is that we have to set a fixed max size for the accumulator
-// tile, but for now all known cases are comfortably far below where trouble
-// would happen. For reference:
-// - On ARM NEON, the entire register space is 512 bytes, so the accumulator
-//   tile is less than that, typically 256 to 384 bytes.
-// - On ARM SME, we will be working with an accumulator tile as large as 4096
-//   bytes (IIUC).
-// - The smallest stack frame size limit that we know we may have to deal with
-//   on certain targets is 16 kilobytes.
-// The size or architecture-specific tiles is relevant here because this
-// generic code is what will be run as a fallback if the device is found not to
-// support the CPU feature that the tile sizes were picked to target.
-enum { iree_uk_mmt4d_tile_generic_max_bytes = 4096 };
-
 // Architecture-specific implementation, or generic fallback returning null.
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
     const iree_uk_mmt4d_params_t* params);
