@@ -66,6 +66,12 @@ operator<<(llvm::raw_ostream &os, const DataLayoutTransformation &transform) {
 
 class GlobalDataLayoutState : public DFX::AbstractState {
 public:
+  ~GlobalDataLayoutState() {
+    for (auto id : getLayoutIDs()) {
+      delete layoutMap[id];
+    }
+  }
+
   bool isValidState() const override { return true; }
   /// TODO: There are cases where the `correspondingTransformedIndices` of a
   /// transformation may not have maximal information when transforms are
@@ -110,18 +116,22 @@ public:
   void setDataLayoutTransformation(StringRef id,
                                    DataLayoutTransformation *newLayout) {
     if (layoutMap.count(id)) {
+      delete layoutMap[id];
       layoutMap.erase(id);
     }
     layoutMap.insert(std::make_pair(id, newLayout));
   };
 
   bool initializeTerminalNodeIDs(Value value) {
-    DataLayoutTransformation *newLayout =
-        new DataLayoutTransformation(cast<ShapedType>(value.getType()));
     SmallVector<StringRef> IDs = getTerminalNodeIDs(value);
     bool addedID = false;
     for (auto id : IDs) {
-      addedID |= addDataLayoutTransformation(id, newLayout);
+      DataLayoutTransformation *newLayout =
+          new DataLayoutTransformation(cast<ShapedType>(value.getType()));
+      if (addDataLayoutTransformation(id, newLayout))
+        addedID = true;
+      else
+        delete newLayout;
     }
     return addedID;
   }
@@ -129,14 +139,14 @@ public:
   bool initializeTerminalNodeLayouts(Value value) {
     bool changed = false;
     auto layoutType = cast<ShapedType>(value.getType());
-    DataLayoutTransformation *newLayout =
-        DataLayoutTransformation::getIdentityTransformation(layoutType);
     SmallVector<StringRef> IDs = getTerminalNodeIDs(value);
     for (auto id : IDs) {
       if (getDataLayoutTransformation(id) &&
           !getDataLayoutTransformation(id)->hasValidTransform()) {
         changed = true;
       }
+      DataLayoutTransformation *newLayout =
+          DataLayoutTransformation::getIdentityTransformation(layoutType);
       setDataLayoutTransformation(id, newLayout);
     }
     return changed;
@@ -335,7 +345,7 @@ public:
     SmallVector<GlobalDataLayoutValueElement *> costNodes;
     DataLayoutTransformation *bestTf;
     for (auto node : subgraph) {
-      GlobalDataLayoutState state = node->getState();
+      GlobalDataLayoutState &state = node->getState();
       if (state.getNodeType() == DataLayoutNodeType::BARRIER) {
         costNodes.push_back(node);
         barrierTransforms.push_back(
@@ -385,7 +395,7 @@ public:
                   Position::forValue(val),
                   /*queryingElement=*/nullptr, DFX::Resolution::NONE,
                   /*allowInvalidState=*/false)) {
-        GlobalDataLayoutState state = elementPtr->getState();
+        GlobalDataLayoutState &state = elementPtr->getState();
         // Only support subgraphs with a single layout ID for now
         auto stateLayoutIDs = state.getLayoutIDs();
         if (stateLayoutIDs.size() != 1)
@@ -429,7 +439,7 @@ public:
                     Position::forValue(val),
                     /*queryingElement=*/nullptr, DFX::Resolution::NONE,
                     /*allowInvalidState=*/false)) {
-          GlobalDataLayoutState state = elementPtr->getState();
+          GlobalDataLayoutState &state = elementPtr->getState();
           setNodeTypeAttribute(definingOp, state.getNodeType());
           for (StringRef id : state.getLayoutIDs()) {
             setDataLayoutTransformationAttributes(
@@ -477,21 +487,24 @@ ChangeStatus GlobalDataLayoutValueElement::updateValue(Value value,
     if (!neighborVE) {
       continue;
     }
-    GlobalDataLayoutState neighborState = neighborVE->getState();
+    GlobalDataLayoutState &neighborState = neighborVE->getState();
     for (StringRef id : neighborState.getLayoutIDs()) {
-      auto *newLayout = new DataLayoutTransformation(
-          *neighborState.getDataLayoutTransformation(id));
+      auto *neighborLayout = neighborState.getDataLayoutTransformation(id);
       // Start by initializing the current newState with an empty transformation
       // if it does not already have one for this ID.
-      if (newState.addDataLayoutTransformation(
-              id, new DataLayoutTransformation(newLayout->getOriginalType()))) {
+      auto *emptyTfLayout =
+          new DataLayoutTransformation(neighborLayout->getOriginalType());
+      if (newState.addDataLayoutTransformation(id, emptyTfLayout)) {
         status = ChangeStatus::CHANGED;
+      } else {
+        delete emptyTfLayout;
       }
       // Try to infer the transformation to the current value using the
       // transformation from the neighboring value.
-      if (!newLayout->hasValidTransform()) {
+      if (!neighborLayout->hasValidTransform()) {
         continue;
       }
+      auto *newLayout = new DataLayoutTransformation(*neighborLayout);
       if (newLayout->transformLayout(neighbor, value)) {
         // If there is already a known transformation to the current node, then
         // try to combine the information from the new inferred layout with the
@@ -502,11 +515,14 @@ ChangeStatus GlobalDataLayoutValueElement::updateValue(Value value,
           if (currentTf->combineLayout(*newLayout)) {
             status = ChangeStatus::CHANGED;
           }
+          delete newLayout;
           continue;
         }
         // Otherwise, take the inferred transformation.
         newState.setDataLayoutTransformation(id, newLayout);
         status = ChangeStatus::CHANGED;
+      } else {
+        delete newLayout;
       }
     }
   }

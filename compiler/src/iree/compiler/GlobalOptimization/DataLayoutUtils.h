@@ -34,14 +34,6 @@ public:
   DataLayoutTransformation(ShapedType orig, ShapedType transformed)
       : originalType(orig), transformedType(transformed){};
   DataLayoutTransformation(ShapedType orig) : originalType(orig){};
-  DataLayoutTransformation(DataLayoutTransformation &other) {
-    originalType = other.originalType;
-    transformedType = other.transformedType;
-    innerDimsPos = other.innerDimsPos;
-    innerTileSizes = other.innerTileSizes;
-    outerDimsPerm = other.outerDimsPerm;
-    correspondingTransformedIndices = other.correspondingTransformedIndices;
-  };
   DataLayoutTransformation(){};
 
   ShapedType getOriginalType() const { return originalType; };
@@ -76,7 +68,7 @@ public:
 
   /// Combine the information from this transform with another transform, and
   /// return whether or not information was gained.
-  bool combineLayout(DataLayoutTransformation other);
+  bool combineLayout(DataLayoutTransformation &other);
 
   /// Return whether this transform is valid. For now, only check that there is
   /// an originalType and a transformedType.
@@ -84,7 +76,7 @@ public:
 
   /// Return true if the transformed indices in this transformation overlap with
   /// the transformed indices of the other transformation.
-  bool isIntersecting(DataLayoutTransformation other);
+  bool isIntersecting(DataLayoutTransformation &other);
 
   /// Return true if this transform is an identity transformation.
   bool isIdentity();

@@ -114,7 +114,7 @@ ArrayAttr DataLayoutTransformation::makeTransformArrayAttr(MLIRContext *ctx) {
 }
 
 /// TODO: Replace this trivially conservative placeholder implementation.
-bool DataLayoutTransformation::isIntersecting(DataLayoutTransformation other) {
+bool DataLayoutTransformation::isIntersecting(DataLayoutTransformation &other) {
   return true;
 }
 
@@ -220,7 +220,7 @@ bool DataLayoutTransformation::transform(Operation *op, Value currentValue,
 
 /// The only information to combine for now is correspondingTransformedIndices.
 /// TODO: Check that the transformations are compatible and fail if they aren't.
-bool DataLayoutTransformation::combineLayout(DataLayoutTransformation other) {
+bool DataLayoutTransformation::combineLayout(DataLayoutTransformation &other) {
   assert(correspondingTransformedIndices.size() ==
          other.correspondingTransformedIndices.size());
   bool changed = false;
@@ -240,7 +240,6 @@ bool DataLayoutTransformation::combineLayout(DataLayoutTransformation other) {
 /// Terminal nodes are just GlobalLoadOp and GlobalStoreOp for now.
 SmallVector<StringRef> getTerminalNodeIDs(Value value) {
   SmallVector<StringRef> IDs;
-  DataLayoutTransformation newLayout(cast<ShapedType>(value.getType()));
   if (auto loadOp = value.getDefiningOp<IREE::Util::GlobalLoadOp>()) {
     IDs.push_back(loadOp.getGlobal());
   }
