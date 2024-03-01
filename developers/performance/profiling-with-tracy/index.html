@@ -3701,7 +3701,7 @@ additional steps needed when Sampling is also wanted.</p>
 <tr>
 <td>Build IREE's own tests and benchmark suites with Tracy instrumentation</td>
 <td><a href="#build-iree-device-binaries-with-tracy-instrumentation-clients">As above</a>, CMake: set <code>IREE_ENABLE_RUNTIME_TRACING</code>.</td>
-<td><a href="#additional-steps-for-sampling">Also need</a> the CMake setting <code>IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER</code> so that <code>--iree-llvmcpu-link-embedded=false</code> will be passed to <code>iree-compile</code>.</td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -3792,11 +3792,6 @@ particular here. Just run <code>iree-compile</code> as usual.</p>
 <p>For the <code>llvm-cpu</code> target backend, sampling features also rely on debug
 information in the compiled module, enabled by
 <code>--iree-llvmcpu-debug-symbols=true</code>, but that is currently the default.</p>
-<p>When building IREE's own test and benchmark suites, if Tracy Sampling support
-is wanted, set the CMake setting
-<code>IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER</code> to <code>ON</code>. It has the effect of
-passing that <code>--iree-llvmcpu-link-embedded=false</code> when compiling test/benchmark
-modules.</p>
 <h2 id="build-iree-device-binaries-with-tracy-instrumentation-clients">Build IREE device binaries with Tracy instrumentation ("clients")<a class="headerlink" href="#build-iree-device-binaries-with-tracy-instrumentation-clients" title="Permanent link">link</a></h2>
 <p>Set the CMake setting <code>IREE_ENABLE_RUNTIME_TRACING</code> to <code>ON</code> and rebuild IREE
 device binaries, e.g.</p>
