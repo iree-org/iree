@@ -49,7 +49,7 @@ Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-yo
 Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (CMake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
 Run IREE device binaries loading your modules | [Nothing particular](#running-the-profiled-program) (May need to set the environment variable `TRACY_NO_EXIT=1` for short-running benchmarks) | [Also need](#additional-steps-for-sampling-2) to set the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` and adjust device security settings or run as root depending on OS.
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
-Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. | [Also need](#additional-steps-for-sampling) the CMake setting `IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` so that `--iree-llvmcpu-link-embedded=false` will be passed to `iree-compile`.
+Build IREE's own tests and benchmark suites with Tracy instrumentation | [As above](#build-iree-device-binaries-with-tracy-instrumentation-clients), CMake: set `IREE_ENABLE_RUNTIME_TRACING`. |
 
 !!! tip - "Tip - python bindings"
 
@@ -185,12 +185,6 @@ In order for Sampling to work with your compiled modules, add this flag to your
 For the `llvm-cpu` target backend, sampling features also rely on debug
 information in the compiled module, enabled by
 `--iree-llvmcpu-debug-symbols=true`, but that is currently the default.
-
-When building IREE's own test and benchmark suites, if Tracy Sampling support
-is wanted, set the CMake setting
-`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` to `ON`. It has the effect of
-passing that `--iree-llvmcpu-link-embedded=false` when compiling test/benchmark
-modules.
 
 ## Build IREE device binaries with Tracy instrumentation ("clients")
 
