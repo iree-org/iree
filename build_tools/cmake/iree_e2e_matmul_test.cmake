@@ -13,6 +13,8 @@ include(CMakeParseArguments)
 #
 # Parameters:
 #   NAME: Name of the target
+#   VARIANT_NAME: Variant name to suffix NAME with.
+#       Will reuse the same matmul/calls vmfb files.
 #   MATMULS_SRC: mlir source file with matmuls to be compiled to an IREE module.
 #   MATMULS_VMFB: specifies the path to use for the generated IREE module.
 #   CALLS_SRC: mlir source file with calls to be compiled to an IREE module.
@@ -44,7 +46,7 @@ function(iree_e2e_matmul_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
+    "NAME;VARIANT_NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -64,46 +66,50 @@ function(iree_e2e_matmul_test)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
-  iree_bytecode_module(
-    NAME
-      "${_RULE_NAME}_matmuls_module"
-    MODULE_FILE_NAME
-      "${_RULE_MATMULS_VMFB}"
-    SRC
-      "${_RULE_MATMULS_SRC}"
-    FLAGS
-      "${_BASE_COMPILER_FLAGS}"
-      "${_RULE_COMPILER_FLAGS}"
-  )
+  if(NOT TARGET "${_NAME}_matmuls_module")
+    iree_bytecode_module(
+      NAME
+        "${_RULE_NAME}_matmuls_module"
+      MODULE_FILE_NAME
+        "${_RULE_MATMULS_VMFB}"
+      SRC
+        "${_RULE_MATMULS_SRC}"
+      FLAGS
+        "${_BASE_COMPILER_FLAGS}"
+        "${_RULE_COMPILER_FLAGS}"
+    )
+  endif()
 
-  iree_bytecode_module(
-    NAME
-      "${_RULE_NAME}_calls_module"
-    MODULE_FILE_NAME
-      "${_RULE_CALLS_VMFB}"
-    SRC
-      "${_RULE_CALLS_SRC}"
-    FLAGS
-      "${_BASE_COMPILER_FLAGS}"
-      "${_RULE_COMPILER_FLAGS}"
-  )
+  if(NOT TARGET "${_NAME}_calls_module")
+    iree_bytecode_module(
+      NAME
+        "${_RULE_NAME}_calls_module"
+      MODULE_FILE_NAME
+        "${_RULE_CALLS_VMFB}"
+      SRC
+        "${_RULE_CALLS_SRC}"
+      FLAGS
+        "${_BASE_COMPILER_FLAGS}"
+        "${_RULE_COMPILER_FLAGS}"
+    )
+  endif()
 
   # A target specifically for the test. We could combine this with the above,
   # but we want that one to get pulled into iree_bytecode_module.
-  add_custom_target("${_NAME}" ALL)
+  add_custom_target("${_NAME}${_RULE_VARIANT_NAME}" ALL)
   add_dependencies(
-    "${_NAME}"
+    "${_NAME}${_RULE_VARIANT_NAME}"
     "${_NAME}_matmuls_module"
     "${_NAME}_calls_module"
     "${_RULE_TEST_RUNNER}"
   )
 
-  add_dependencies(iree-test-deps "${_NAME}")
+  add_dependencies(iree-test-deps "${_NAME}${_RULE_VARIANT_NAME}")
 
   if(_RULE_TEST_DEFINED)
     iree_native_test(
       NAME
-        "${_RULE_NAME}"
+        "${_RULE_NAME}${_RULE_VARIANT_NAME}"
       DRIVER
         "${_RULE_DRIVER}"
       SRC
@@ -284,6 +290,7 @@ function(iree_single_backend_e2e_matmul_test)
   if(NOT _RULE_TARGET_BACKEND STREQUAL "llvm-cpu" OR NOT IREE_ENABLE_TSAN)
     iree_e2e_matmul_test(
       NAME ${_RULE_NAME}
+      VARIANT_NAME ""
       MATMULS_SRC ${_MATMULS_SRC}
       MATMULS_VMFB ${_MATMULS_VMFB}
       CALLS_SRC ${_CALLS_SRC}
@@ -315,7 +322,8 @@ function(iree_single_backend_e2e_matmul_test)
       list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
       list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=address")
       iree_e2e_matmul_test(
-        NAME "${_RULE_NAME}_asan"
+        NAME ${_RULE_NAME}
+        VARIANT_NAME "_asan"
         MATMULS_SRC ${_MATMULS_SRC}
         MATMULS_VMFB ${_MATMULS_VMFB}
         CALLS_SRC ${_CALLS_SRC}
@@ -341,7 +349,8 @@ function(iree_single_backend_e2e_matmul_test)
       list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
       list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=thread")
       iree_e2e_matmul_test(
-        NAME "${_RULE_NAME}_tsan"
+        NAME ${_RULE_NAME}
+        VARIANT_NAME "_tsan"
         MATMULS_SRC ${_MATMULS_SRC}
         MATMULS_VMFB ${_MATMULS_VMFB}
         CALLS_SRC ${_CALLS_SRC}
