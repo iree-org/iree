@@ -614,7 +614,8 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue value = transposeOp.getVector();
-    LayoutAttr layout = dyn_cast<LayoutAttr>(signature[value]);
+    VectorLayoutInterface layout =
+        dyn_cast<VectorLayoutInterface>(signature[value]);
     if (!layout) {
       return failure();
     }
