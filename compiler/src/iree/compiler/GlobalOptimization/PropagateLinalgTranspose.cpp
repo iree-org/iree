@@ -413,10 +413,14 @@ public:
       return failure();
     }
 
-    linalg::TransposeOp transposeOp =
-        input->get().getDefiningOp<linalg::TransposeOp>();
+    auto transposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
     if (!transposeOp) {
       return rewriter.notifyMatchFailure(genericOp, "no transpose operand");
+    }
+
+    if (!transposeOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "do not propagate multi-use transpose");
     }
 
     ArrayRef<int64_t> perm = transposeOp.getPermutation();
@@ -435,9 +439,8 @@ public:
     rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
                                newGenericOp.getRegion().begin());
 
-    Value newResult =
-        createTranspose(rewriter, newGenericOp->getResult(0), perm);
-    rewriter.replaceOp(genericOp, newResult);
+    rewriter.replaceOp(
+        genericOp, createTranspose(rewriter, newGenericOp->getResult(0), perm));
     return success();
   }
 };
