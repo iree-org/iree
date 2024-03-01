@@ -99,10 +99,13 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   uint8_t* buffer_ptr = (uint8_t*)device + sizeof(*device);
   buffer_ptr += iree_string_view_append_to_buffer(
       identifier, &device->identifier, (char*)buffer_ptr);
+  iree_arena_block_pool_initialize(/*arena_block_size=*/32 * 1024,
+                                   host_allocator, &device->block_pool);
   device->device = rocm_device;
   device->stream = stream;
   device->context_wrapper.rocm_context = context;
   device->context_wrapper.rocm_device = rocm_device;
+  device->context_wrapper.rocm_stream = stream;
   device->context_wrapper.host_allocator = host_allocator;
   device->context_wrapper.syms = syms;
   // Enable tracing for the (currently only) stream - no-op if disabled.

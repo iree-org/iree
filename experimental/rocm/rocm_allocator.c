@@ -18,6 +18,8 @@ typedef struct iree_hal_rocm_allocator_t {
   iree_hal_device_t* base_device;
   iree_hal_rocm_context_wrapper_t* context;
 
+  bool supports_concurrent_managed_access;
+
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_rocm_allocator_t;
 
@@ -34,6 +36,28 @@ iree_status_t iree_hal_rocm_allocator_create(
     iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // To support device-local + host-visible memory we need concurrent managed
+  // access indicating that the host and devices can concurrently access the
+  // device memory. If we don't have this feature then we fall back to forcing
+  // all device-local + host-visible memory into host-local + device-visible
+  // page-locked memory. The compiler tries to avoid this for high-traffic
+  // buffers except for readback staging buffers.
+  int supports_concurrent_managed_access = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, ROCM_RESULT_TO_STATUS(
+              context->syms,
+              hipDeviceGetAttribute(&supports_concurrent_managed_access,
+                                    hipDeviceAttributeConcurrentManagedAccess,
+                                    context->rocm_device),
+              "hipDeviceGetAttribute"));
+
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, supports_concurrent_managed_access
+              ? "has CONCURRENT_MANAGED_ACCESS"
+              : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
+                "device-local + host-visible memory)");
+
   iree_hal_rocm_allocator_t* allocator = NULL;
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*allocator), (void**)&allocator);
@@ -41,6 +65,8 @@ iree_status_t iree_hal_rocm_allocator_create(
     iree_hal_resource_initialize(&iree_hal_rocm_allocator_vtable,
                                  &allocator->resource);
     allocator->context = context;
+    allocator->supports_concurrent_managed_access =
+        supports_concurrent_managed_access != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -141,6 +167,9 @@ iree_hal_rocm_allocator_query_buffer_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t* IREE_RESTRICT allocation_size) {
+  iree_hal_rocm_allocator_t* allocator =
+      iree_hal_rocm_allocator_cast(base_allocator);
+
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
@@ -151,9 +180,28 @@ iree_hal_rocm_allocator_query_buffer_compatibility(
 
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_any_bit_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+    }
     if (iree_any_bit_set(params->usage,
                          IREE_HAL_BUFFER_USAGE_DISPATCH_STORAGE)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
+    }
+  }
+
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
+    // If concurrent managed access is not supported then make device-local +
+    // host-visible allocations fall back to host-local + device-visible
+    // page-locked memory. This will be significantly slower for the device to
+    // access but the compiler only uses this type for readback staging buffers
+    // and it's better to function than function fast.
+    if (!allocator->supports_concurrent_managed_access) {
+      params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+      params->type |=
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
     }
   }
 
@@ -209,6 +257,15 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
       status = ROCM_RESULT_TO_STATUS(
           allocator->context->syms,
           hipMallocManaged(&device_ptr, allocation_size, hipMemAttachGlobal));
+      if (iree_status_is_ok(status) &&
+          allocator->supports_concurrent_managed_access) {
+        // Prefetch the buffer on the GPU device.
+        status = ROCM_RESULT_TO_STATUS(
+            allocator->context->syms,
+            hipMemPrefetchAsync(device_ptr, allocation_size,
+                                allocator->context->rocm_device,
+                                allocator->context->rocm_stream));
+      }
       host_ptr = (void*)device_ptr;
     } else {
       // Device only.

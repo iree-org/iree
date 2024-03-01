@@ -27,6 +27,11 @@ typedef struct {
   iree_arena_block_pool_t* block_pool;
   iree_hal_rocm_tracing_context_t* tracing_context;
 
+  // Staging arena used for host->device transfers.
+  // Used for when we need HIP to be able to reference memory as it performs
+  // asynchronous operations.
+  iree_arena_allocator_t arena;
+
   // Keep track of the current set of kernel arguments.
   int32_t push_constant[IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT];
   void* current_descriptor[];
@@ -79,6 +84,7 @@ iree_status_t iree_hal_rocm_direct_command_buffer_create(
     command_buffer->context = context;
     command_buffer->tracing_context = tracing_context;
     command_buffer->block_pool = block_pool;
+    iree_arena_initialize(block_pool, &command_buffer->arena);
     hipDeviceptr_t* device_ptrs =
         (hipDeviceptr_t*)(command_buffer->current_descriptor +
                           IREE_HAL_ROCM_MAX_KERNEL_ARG);
@@ -99,6 +105,7 @@ static void iree_hal_rocm_direct_command_buffer_destroy(
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -227,8 +234,34 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need rocm implementation");
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+
+  // Allocate scratch space in the arena for the data and copy it in.
+  // The update buffer API requires that the command buffer capture the host
+  // memory at the time the method is called in case the caller wants to reuse
+  // the memory. Because HIP memcpys are async if we didn't copy it's possible
+  // for the reused memory to change before the stream reaches the copy
+  // operation and get the wrong data.
+  const uint8_t* src = (const uint8_t*)source_buffer + source_offset;
+  uint8_t* storage = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_arena_allocate(&command_buffer->arena, length, (void**)&storage));
+  memcpy(storage, src, length);
+  src = storage;
+
+  // Issue the copy using the scratch memory as the source.
+  hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
+      iree_hal_buffer_allocated_buffer(target_buffer));
+  hipDeviceptr_t dst = (uint8_t*)target_device_buffer +
+                       iree_hal_buffer_byte_offset(target_buffer) +
+                       target_offset;
+  ROCM_RETURN_IF_ERROR(command_buffer->context->syms,
+                       hipMemcpyHtoDAsync(dst, (void*)src, length,
+                                          command_buffer->context->rocm_stream),
+                       "hipMemcpyHtoDAsync");
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
