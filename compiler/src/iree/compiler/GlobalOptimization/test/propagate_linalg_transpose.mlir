@@ -383,3 +383,19 @@ util.func public @do_not_sink_unary_multi_use(%arg0 : tensor<2x3x4xf32>) -> (ten
 //       SINK:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[T]]
 //       SINK:     math.rsqrt
 //       SINK:   util.return %[[ELEM]], %[[T]]
+
+// -----
+
+util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
+                                        %rhs: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty = tensor.empty(): tensor<16x16xf32>
+  %mm = linalg.matmul ins(%lhs, %rhs : tensor<16x16xf32>, tensor<16x16xf32>)
+                            outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %transpose = linalg.transpose ins(%mm : tensor<16x16xf32>)
+      outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
+  util.return %transpose : tensor<16x16xf32>
+}
+// CHECK-LABEL: util.func public @propagate_to_matmul_ops
+//       CHECK:   linalg.matmul_transpose_b
+//       CHECK:   %[[SECOND_MM:.+]] = linalg.matmul_transpose_a
+//       CHECK:   util.return %[[SECOND_MM]]
