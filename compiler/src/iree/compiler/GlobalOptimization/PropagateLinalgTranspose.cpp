@@ -17,6 +17,7 @@
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -113,7 +114,147 @@ static void specializeGenericTransposeOp(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
-// Transpose propagation
+// Other pattern helpers
+//===----------------------------------------------------------------------===//
+
+/// If the `op` is a ContractionOpInterface, return the generalized op. If the
+/// `op` is a linalg::GenericOp, then just return the generic op.
+static FailureOr<linalg::GenericOp>
+getGenericOpOrGeneralizeContraction(RewriterBase &rewriter, Operation *op) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    return failure();
+  }
+  if (!isa<linalg::GenericOp>(linalgOp) &&
+      !linalg::isaContractionOpInterface(linalgOp)) {
+    return failure();
+  }
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (genericOp) {
+    return genericOp;
+  }
+  OpBuilder::InsertionGuard guard(rewriter);
+  rewriter.setInsertionPoint(linalgOp);
+  return linalg::generalizeNamedOp(rewriter, linalgOp);
+}
+
+//===----------------------------------------------------------------------===//
+// Transpose Bubbling Patterns
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Fuses a transpose with the init of a linalg.generic op or contraction op.
+// Contraction ops are generalized and then treated as a generic. For example,
+//
+// linalg.generic {
+//   indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d0, d2)>,
+//                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>]
+//   ins(%0 : tensor<2x7x5>) outs(%1 : tensor<7x2x5>)
+//
+// %2 = linalg.transpose ... permutation = [0, 2, 1] :
+//                           tensor<7x2x5> -> tensor<7x5x2>
+// Becomes
+//
+// linalg.generic {
+//   indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
+//                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>]
+//   ins(%0 : tensor<2x7x5>) outs(%3 : tensor<7x5x2>)
+class BubbleTransposeThroughDpsInit
+    : public OpRewritePattern<linalg::TransposeOp> {
+public:
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(transposeOp)) {
+      return failure();
+    }
+    OpResult result = dyn_cast<OpResult>(transposeOp.getInput());
+    if (!result) {
+      return failure();
+    }
+    if (!result.hasOneUse()) {
+      return failure();
+    }
+    auto linalgOp = dyn_cast<linalg::LinalgOp>(result.getOwner());
+    if (!linalgOp) {
+      return failure();
+    }
+
+    int64_t resultIndex = result.getResultNumber();
+    auto maybeGenericOp =
+        getGenericOpOrGeneralizeContraction(rewriter, result.getOwner());
+    if (failed(maybeGenericOp)) {
+      return failure();
+    }
+    auto genericOp = maybeGenericOp.value();
+    result = genericOp->getOpResult(resultIndex);
+
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
+    auto invPerm = invertPermutationVector(perm);
+
+    OpOperand *init = genericOp.getDpsInitOperand(resultIndex);
+    SmallVector<Value> inits = genericOp.getDpsInits();
+    Value newInit = createTranspose(rewriter, init->get(), perm);
+    inits[resultIndex] = newInit;
+
+    SmallVector<Type> resultTypes(genericOp->getResultTypes());
+    resultTypes[resultIndex] = newInit.getType();
+
+    SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
+    AffineMap resultMap =
+        newIndexingMaps[genericOp.getNumDpsInputs() + resultIndex];
+    SmallVector<AffineExpr> newExprs =
+        applyPermutation(resultMap.getResults(), perm);
+    AffineMap transposedMap =
+        AffineMap::get(resultMap.getNumDims(), resultMap.getNumSymbols(),
+                       newExprs, rewriter.getContext());
+    newIndexingMaps[genericOp.getNumDpsInputs() + resultIndex] = transposedMap;
+
+    auto newGenericOp = rewriter.create<linalg::GenericOp>(
+        genericOp.getLoc(), resultTypes, genericOp.getDpsInputs(), newInit,
+        newIndexingMaps, genericOp.getIteratorTypesArray(),
+        /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+    rewriter.cloneRegionBefore(genericOp.getRegion(), newGenericOp.getRegion(),
+                               newGenericOp.getRegion().begin());
+
+    // Remap iteration space of the generic to be in order of the output.
+    SmallVector<unsigned int> interchange;
+    int64_t permIdx = 0;
+    for (int i = 0, e = transposedMap.getNumDims(); i < e; ++i) {
+      if (transposedMap.isFunctionOfDim(i)) {
+        interchange.push_back(
+            llvm::cast<AffineDimExpr>(transposedMap.getResult(permIdx))
+                .getPosition());
+        permIdx++;
+        continue;
+      }
+      interchange.push_back(i);
+    }
+    auto interchangedGenericOp =
+        linalg::interchangeGenericOp(rewriter, newGenericOp, interchange);
+    if (failed(interchangedGenericOp)) {
+      return failure();
+    }
+
+    // Replace the result of the transpose with the transposed init.
+    rewriter.replaceOp(transposeOp,
+                       interchangedGenericOp->getResult(resultIndex));
+    for (auto [oldRes, newRes] : llvm::zip_equal(
+             genericOp.getResults(), interchangedGenericOp->getResults())) {
+      if (oldRes.getResultNumber() == resultIndex)
+        continue;
+      rewriter.replaceAllUsesWith(oldRes, newRes);
+    }
+    return success();
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
+// Transpose Sinking Patterns
 //===----------------------------------------------------------------------===//
 
 namespace {
@@ -312,7 +453,8 @@ public:
   }
 };
 
-// Fuses a transpose with the input of a linalg.generic op. For example,
+// Fuses a transpose with the input of a linalg.generic op or contraction op.
+// Contraction ops are generalized and then treated as a generic. For example,
 //
 // %0 = linalg.transpose ... permutation = [0, 2, 1] :
 //                           tensor<2x5x7> -> tensor<2x7x5>
@@ -335,19 +477,19 @@ public:
 // and isn't the way this pass is modeled. Global data layout transformations
 // like that are better suited for pack/unpack propagation rooted on specific
 // operations.
-class FuseTransposeWithGenericConsumer
-    : public OpRewritePattern<linalg::GenericOp> {
+class FuseTransposeWithLinalgOpConsumer
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
-  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
       return failure();
     }
     OpOperand *transposeOperand = nullptr;
     linalg::TransposeOp transposeOp;
-    for (OpOperand *input : genericOp.getDpsInputOperands()) {
+    for (OpOperand *input : linalgOp.getDpsInputOperands()) {
       auto maybeTransposeOp = input->get().getDefiningOp<linalg::TransposeOp>();
       if (maybeTransposeOp && maybeTransposeOp->hasOneUse()) {
         transposeOp = maybeTransposeOp;
@@ -356,7 +498,7 @@ public:
       }
     }
     if (!transposeOperand) {
-      return rewriter.notifyMatchFailure(genericOp, "no transpose operand");
+      return rewriter.notifyMatchFailure(linalgOp, "no transpose operand");
     }
 
     int64_t inputIndex = transposeOperand->getOperandNumber();
@@ -366,6 +508,13 @@ public:
     // To do the fusion, we can simply apply the permutation of the transpose
     // to the results of the associated input's indexing map, and then forward
     // the input to the transpose to the consumer generic.
+    auto maybeGenericOp =
+        getGenericOpOrGeneralizeContraction(rewriter, linalgOp);
+    if (failed(maybeGenericOp)) {
+      return failure();
+    }
+    auto genericOp = maybeGenericOp.value();
+    transposeOperand = genericOp.getDpsInputOperand(inputIndex);
     rewriter.startOpModification(genericOp);
 
     SmallVector<AffineMap> newIndexingMaps = genericOp.getIndexingMapsArray();
@@ -436,6 +585,56 @@ public:
                                     {transposeOp.getInput(), newInit});
     rewriter.replaceOp(
         genericOp, createTranspose(rewriter, newGenericOp->getResult(0), perm));
+    return success();
+  }
+};
+
+// Propagates a transpose through the input of a unary elementwise operation.
+class PropagateTransposeThroughUnaryElementwiseDpsInit
+    : public OpRewritePattern<linalg::TransposeOp> {
+public:
+  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
+                                PatternRewriter &rewriter) const override {
+    auto genericOp = transposeOp.getInput().getDefiningOp<linalg::GenericOp>();
+    if (!genericOp) {
+      return failure();
+    }
+    if (!IREE::Flow::isNonNullAndOutsideDispatch({genericOp, transposeOp})) {
+      return failure();
+    }
+
+    if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInputs() != 1 ||
+        !linalg::isElementwise(genericOp)) {
+      return rewriter.notifyMatchFailure(genericOp, "not unary elementwise");
+    }
+
+    if (!genericOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(genericOp, "not single user");
+    }
+
+    OpOperand *input = genericOp.getDpsInputOperand(0);
+    OpOperand *init = genericOp.getDpsInitOperand(0);
+
+    if (genericOp.getMatchingIndexingMap(input) !=
+        genericOp.getMatchingIndexingMap(init)) {
+      return failure();
+    }
+
+    ArrayRef<int64_t> perm = transposeOp.getPermutation();
+    Value newTranspose =
+        createTranspose(rewriter, genericOp.getOperand(0), perm);
+
+    // Create a new empty init for the transposed generic.
+    Value newInit = createTransposeInit(rewriter, init->get(), perm);
+
+    // We do not need to update indexing maps because this is a unary
+    // elementwise op where the input and output maps are the same. Just
+    // replace the operands with transposed variants.
+    auto newGenericOp = mlir::clone(rewriter, genericOp, newInit.getType(),
+                                    {newTranspose, newInit});
+    rewriter.replaceOp(transposeOp, newGenericOp);
     return success();
   }
 };
@@ -555,8 +754,57 @@ private:
       llvm::cl::desc("Flag used for lit-testing sinking patterns only. "
                      "Not for general usage"),
       llvm::cl::init(false)};
+  Option<bool> testBubblingOnly{
+      *this, "test-bubbling-only",
+      llvm::cl::desc("Flag used for lit-testing bubbling patterns only. "
+                     "Not for general usage"),
+      llvm::cl::init(false)};
 };
 } // namespace
+
+static void populateNamedOpSinkingPatterns(MLIRContext *context,
+                                           RewritePatternSet &sinkingPatterns) {
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                /*ReplacementType=*/linalg::MatmulTransposeBOp,
+                                /*inputIdx=*/1>>(context,
+                                                 SmallVector<int64_t>{1, 0});
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::MatmulOp,
+                                /*ReplacementType=*/linalg::MatmulTransposeAOp,
+                                /*inputIdx=*/0>>(context,
+                                                 SmallVector<int64_t>{1, 0});
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeBOp,
+                                /*ReplacementType=*/linalg::MatmulOp,
+                                /*inputIdx=*/1>>(context,
+                                                 SmallVector<int64_t>{1, 0});
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeAOp,
+                                /*ReplacementType=*/linalg::MatmulOp,
+                                /*inputIdx=*/0>>(context,
+                                                 SmallVector<int64_t>{1, 0});
+  sinkingPatterns.insert<
+      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                        /*ReplacementType=*/linalg::BatchMatmulTransposeBOp,
+                        /*inputIdx=*/1>>(context,
+                                         SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns.insert<
+      NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
+                        /*ReplacementType=*/linalg::BatchMatmulTransposeAOp,
+                        /*inputIdx=*/0>>(context,
+                                         SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeBOp,
+                                /*ReplacementType=*/linalg::BatchMatmulOp,
+                                /*inputIdx=*/1>>(context,
+                                                 SmallVector<int64_t>{0, 2, 1});
+  sinkingPatterns
+      .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeAOp,
+                                /*ReplacementType=*/linalg::BatchMatmulOp,
+                                /*inputIdx=*/0>>(context,
+                                                 SmallVector<int64_t>{0, 2, 1});
+}
 
 void PropagateLinalgTransposePass::runOnOperation() {
   MLIRContext *context = &getContext();
@@ -584,51 +832,119 @@ void PropagateLinalgTransposePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  {
+  // First try to fuse transposes with some consumer linalg named ops before
+  // any reshape propagation. Some transposes may be adjacent to named ops,
+  // and it is more canonical if we can fuse the ops into a new named op.
+  if (!testBubblingOnly) {
     RewritePatternSet sinkingPatterns(context);
-    sinkingPatterns.insert<
-        NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                          /*ReplacementType=*/linalg::MatmulTransposeBOp,
-                          /*inputIdx=*/1>>(context, SmallVector<int64_t>{1, 0});
-    sinkingPatterns.insert<
-        NamedOpConversion</*OpType=*/linalg::MatmulOp,
-                          /*ReplacementType=*/linalg::MatmulTransposeAOp,
-                          /*inputIdx=*/0>>(context, SmallVector<int64_t>{1, 0});
-    sinkingPatterns
-        .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeBOp,
-                                  /*ReplacementType=*/linalg::MatmulOp,
-                                  /*inputIdx=*/1>>(context,
-                                                   SmallVector<int64_t>{1, 0});
-    sinkingPatterns
-        .insert<NamedOpConversion</*OpType=*/linalg::MatmulTransposeAOp,
-                                  /*ReplacementType=*/linalg::MatmulOp,
-                                  /*inputIdx=*/0>>(context,
-                                                   SmallVector<int64_t>{1, 0});
-    sinkingPatterns.insert<
-        NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                          /*ReplacementType=*/linalg::BatchMatmulTransposeBOp,
-                          /*inputIdx=*/1>>(context,
-                                           SmallVector<int64_t>{0, 2, 1});
-    sinkingPatterns.insert<
-        NamedOpConversion</*OpType=*/linalg::BatchMatmulOp,
-                          /*ReplacementType=*/linalg::BatchMatmulTransposeAOp,
-                          /*inputIdx=*/0>>(context,
-                                           SmallVector<int64_t>{0, 2, 1});
-    sinkingPatterns
-        .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeBOp,
-                                  /*ReplacementType=*/linalg::BatchMatmulOp,
-                                  /*inputIdx=*/1>>(
-            context, SmallVector<int64_t>{0, 2, 1});
-    sinkingPatterns
-        .insert<NamedOpConversion</*OpType=*/linalg::BatchMatmulTransposeAOp,
-                                  /*ReplacementType=*/linalg::BatchMatmulOp,
-                                  /*inputIdx=*/0>>(
-            context, SmallVector<int64_t>{0, 2, 1});
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
-    sinkingPatterns.insert<FuseTransposeWithGenericConsumer>(context);
+    populateNamedOpSinkingPatterns(context, sinkingPatterns);
     sinkingPatterns.add<PropagateTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
+    if (failed(
+            applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After canonicalizing transpose in place ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // Propagate transposes upwards, and fuse with any producer generic ops. Also
+  // propagate reshapes upwards to open up more transpose fusion opportunities.
+  if (!testSinkingOnly) {
+    linalg::ControlFusionFn reshapePropagationFn = [](OpOperand *fusedOperand) {
+      Operation *producer = fusedOperand->get().getDefiningOp();
+      Operation *consumer = fusedOperand->getOwner();
+      if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+        return false;
+      }
+
+      // Do not reshape producer linalg op if it has more than one user.
+      auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
+      if (!producerLinalgOp || !producerLinalgOp->hasOneUse()) {
+        return false;
+      }
+      // Only reshape generic ops and contraction ops.
+      if (!linalg::isaContractionOpInterface(producerLinalgOp) &&
+          !isa<linalg::GenericOp>(producerLinalgOp)) {
+        return false;
+      }
+      // Only propagate reshapes up through generics in this case, hoping
+      // to increase the chance we can fuse with a nearby transpose.
+      if (!isa<tensor::ExpandShapeOp>(consumer) &&
+          !isa<tensor::CollapseShapeOp>(consumer)) {
+        return false;
+      }
+
+      return consumer->hasOneUse() &&
+             llvm::isa<linalg::TransposeOp>(*(consumer->user_begin()));
+    };
+    RewritePatternSet bubblingPatterns(context);
+    linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
+                                                      reshapePropagationFn);
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(bubblingPatterns,
+                                                       reshapePropagationFn);
+    linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
+    bubblingPatterns.insert<BubbleTransposeThroughDpsInit>(context);
+    bubblingPatterns.add<PropagateTransposeThroughUnaryElementwiseDpsInit>(
+        context, /*benefit=*/2);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(bubblingPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After bubbling transpose ops up ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // Propagate transposes downwards, and fuse with any non-unary generic ops
+  // or linalg named ops. Also propagate reshapes downwards to open up more
+  // transpose fusion opportunities.
+  if (!testBubblingOnly) {
+    linalg::ControlFusionFn reshapePropagationFn = [](OpOperand *fusedOperand) {
+      Operation *producer = fusedOperand->get().getDefiningOp();
+      Operation *consumer = fusedOperand->getOwner();
+      if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+        return false;
+      }
+      auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+      if (!consumerLinalgOp) {
+        return false;
+      }
+      // Only reshape generic ops and contraction ops.
+      if (!linalg::isaContractionOpInterface(consumerLinalgOp) &&
+          !isa<linalg::GenericOp>(consumerLinalgOp)) {
+        return false;
+      }
+      // Only propagate reshapes down through generics in this case, hoping
+      // to increase the chance we can fuse with a nearby transpose.
+      if (!isa<tensor::ExpandShapeOp>(producer) &&
+          !isa<tensor::CollapseShapeOp>(producer)) {
+        return false;
+      }
+      return isa_and_nonnull<linalg::TransposeOp>(
+          producer->getOperand(0).getDefiningOp());
+    };
+    RewritePatternSet sinkingPatterns(context);
+    linalg::populateFoldReshapeOpsByExpansionPatterns(sinkingPatterns,
+                                                      reshapePropagationFn);
+    linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkingPatterns,
+                                                       reshapePropagationFn);
+    sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
+    sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
+    sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(context);
+    populateNamedOpSinkingPatterns(context, sinkingPatterns);
+    sinkingPatterns.add<PropagateTransposeThroughUnaryElementwiseInput>(
+        context, /*benefit=*/2);
+
     if (enableAggressivePropagation) {
       sinkingPatterns.insert<GeneralizeInputTransposedNamedOp>(context);
     }
@@ -643,11 +959,6 @@ void PropagateLinalgTransposePass::runOnOperation() {
     funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-
-  // Pre-empting additional patterns for bubbling transposes.
-  // if (!testSinkingOnly) {
-  //   ...
-  // }
 
   // Currently this only runs after all propagation has finished. There are
   // cases where combining transposes can allow further propagation, but
@@ -666,7 +977,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After propagating transpose ops ---\n";
+    llvm::dbgs() << "\n--- After composing transpose ops ---\n";
     funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
