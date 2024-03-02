@@ -8,7 +8,6 @@
 
 #include <memory>
 
-#include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -261,10 +260,6 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   if (compileFrom < PipelinePhase::ExecutableSources) {
     buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                       targetOptions);
-
-    FunctionLikeNest(passManager).addPass([]() {
-      return createCPUMaterializeUpperBoundTileSizePass();
-    });
 
     // Preprocess executables using an external tool. The tool may mutate one or
     // more variants and even insert or remove variants.
