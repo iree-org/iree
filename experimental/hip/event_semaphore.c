@@ -346,7 +346,7 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
   iree_status_t status = iree_wait_set_allocate(
       semaphore_list.count, iree_arena_allocator(&arena), &wait_set);
 
-  // Acquire a wait handle for each semaphore timepoint we are to wait on.
+  // Acquire a host wait handle for each semaphore timepoint we are to wait on.
   iree_host_size_t timepoint_count = 0;
   iree_hal_hip_timepoint_t** timepoints = NULL;
   iree_host_size_t total_timepoint_size =
@@ -373,9 +373,9 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
         iree_hal_hip_semaphore_t* semaphore =
             iree_hal_hip_semaphore_cast(semaphore_list.semaphores[i]);
 
-        // Slow path: get a native wait handle for the timepoint. This should
-        // happen outside of the lock given that acquiring has its own internal
-        // locks.
+        // Slow path: get a native host wait handle for the timepoint. This
+        // should happen outside of the lock given that acquiring has its own
+        // internal locks.
         iree_hal_hip_timepoint_t* timepoint = NULL;
         status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
             semaphore, semaphore_list.payload_values[i], timeout, &timepoint);

@@ -11,6 +11,7 @@
 #include <thread>
 
 #include "iree/base/api.h"
+#include "iree/hal/allocator.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/testing/gtest.h"
@@ -216,14 +217,14 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
   // Prepare device wait and signal semaphore lists.
   uint64_t device_wait_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_wait_semaphores = {
-      /*cout=*/1, &device_wait_semaphore, device_wait_payload_values};
+      /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
   uint64_t device_signal_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
   // Dispatch the device command buffer to have it wait.
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
-      device_, /*queue_affinity=*/0, device_wait_semaphores,
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, device_wait_semaphores,
       device_signal_semaphores, 1, &command_buffer));
 
   // Start another thread and have it wait.
@@ -265,8 +266,8 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
   iree_hal_semaphore_release(device_signal_semaphore);
 }
 
-// Tests we can wait on any host and device semaphore to singal and device
-// signals.
+// Tests that we can wait on any host and device semaphore to singal,
+// and device signals.
 TEST_P(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndDeviceSignals) {
   iree_hal_command_buffer_t* command_buffer = NULL;
@@ -299,14 +300,14 @@ TEST_P(semaphore_submission_test,
   // Prepare device wait and signal semaphore lists.
   uint64_t device_wait_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_wait_semaphores = {
-      /*cout=*/1, &device_wait_semaphore, device_wait_payload_values};
+      /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
   uint64_t device_signal_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
   // Dispatch the device command buffer to have it wait.
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
-      device_, /*queue_affinity=*/0, device_wait_semaphores,
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, device_wait_semaphores,
       device_signal_semaphores, 1, &command_buffer));
 
   // Start another thread and have it wait.
@@ -338,7 +339,7 @@ TEST_P(semaphore_submission_test,
       device_, IREE_HAL_WAIT_MODE_ANY, main_wait_semaphores,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
-  // Check both host and device signal semaphores match our expectation.
+  // Check that the device has signaled but the host thread hasn't.
   IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
   EXPECT_EQ(0ull, value);
   IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
@@ -355,8 +356,8 @@ TEST_P(semaphore_submission_test,
   iree_hal_semaphore_release(device_signal_semaphore);
 }
 
-// Tests we can wait on any host and device semaphore to singal and host
-// signals.
+// Tests we can wait on any host and device semaphore to singal,
+// and host signals.
 TEST_P(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
   iree_hal_command_buffer_t* command_buffer = NULL;
@@ -389,14 +390,14 @@ TEST_P(semaphore_submission_test,
   // Prepare device wait and signal semaphore lists.
   uint64_t device_wait_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_wait_semaphores = {
-      /*cout=*/1, &device_wait_semaphore, device_wait_payload_values};
+      /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
   uint64_t device_signal_payload_values[] = {1ull};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
   // Dispatch the device command buffer to have it wait.
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
-      device_, /*queue_affinity=*/0, device_wait_semaphores,
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY, device_wait_semaphores,
       device_signal_semaphores, 1, &command_buffer));
 
   // Start another thread and have it wait.
@@ -430,7 +431,7 @@ TEST_P(semaphore_submission_test,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
   thread.join();
 
-  // Check both host and device signal semaphores match our expectation.
+  // Check that the host thread has signaled but the device hasn't.
   IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
   EXPECT_EQ(1ull, value);
   IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
