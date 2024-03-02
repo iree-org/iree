@@ -1505,8 +1505,9 @@ public:
   TransformVectorLayoutOptions(Operation *root, bool fullConversion)
       : VectorLayoutOptions(root, fullConversion) {}
 
-  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 
