@@ -237,6 +237,7 @@ static void iree_hal_cuda_working_area_initialize(
                           iree_memory_order_release);
   iree_atomic_store_int32(&working_area->error_code, IREE_STATUS_OK,
                           iree_memory_order_release);
+  working_area->pending_action_count = 0;
   working_area->host_allocator = host_allocator;
 }
 
@@ -940,7 +941,7 @@ static int iree_hal_cuda_worker_execute(
       return -1;
     }
 
-    if (should_exit && !working_area->pending_action_count) {
+    if (should_exit && working_area->pending_action_count == 0) {
       // Signal that this thread is committed to exit. This state has a priority
       // that is only lower than error exit. And we just checked error exit in
       // the above. So also just overwrite.
